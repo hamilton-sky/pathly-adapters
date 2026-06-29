@@ -72,12 +72,15 @@ export function buildHeadlessArgv(adapter: CliAdapter, promptRaw: string, opts: 
     return argv
   }
 
-  if (adapter === 'antigravity') {
-    return buildHeadlessArgv('claude', prompt, opts)
-  }
-
-  // copilot: no headless mode — caller should check noHeadless first
-  return buildHeadlessArgv('claude', prompt, opts)
+  // antigravity + copilot have no headless one-shot mode. Fail loud instead of silently
+  // building the claude argv (the old behavior mis-attributed the run to the wrong engine).
+  // The UI already filters these out via ADAPTER_META.noHeadless; this is the honest backstop.
+  const meta = ADAPTER_META.find((m) => m.id === adapter)
+  throw new Error(
+    `Adapter '${adapter}' has no headless mode` +
+      (meta?.noHeadless ? ` (${meta.noHeadless})` : '') +
+      '. Use claude or codex for headless runs.'
+  )
 }
 
 /** Build argv for an interactive REPL session (no -p, no --print). */

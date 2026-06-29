@@ -337,6 +337,15 @@ def test_block_duplicate_fragment_raises():
         validate_composition(manifest)
 
 
+def test_task_dag_post_block_retired():
+    """The task-dag-post stopgap is gone — `planning/plan` is the real decomposer now
+    (it derives context_refs + depends_on). The consultation-plan block must not exist."""
+    with pytest.raises(KeyError):
+        resolve_block("consultation-plan", "claude")
+    # planning/plan still composes cleanly (it stays the terminal planner for all decompose tiers).
+    assert "context_refs" in compose_skill("planning/plan", "claude")
+
+
 def test_manifest_without_blocks_key_passes_validation():
     manifest = {
         "fragments_dir": "fragments",

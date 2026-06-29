@@ -143,15 +143,19 @@ function MainApp(): JSX.Element | null {
     root.style.setProperty('--theme-accent-a11', `${resolved.accent}11`)
   }, [theme])
 
-  // Auto-open Monitor if a flow is already running on mount (EC-2.5 handled via catch)
+  // On mount: jump to the Monitor if a run is already in progress; otherwise land on
+  // the default panel (the Command Center). We still restore the last-used flow as the
+  // selected item so the Flow panel is pre-loaded when the user navigates to it — but we
+  // no longer auto-switch to the flow canvas on open (EC-2.5 handled via catch).
   useEffect(() => {
     const isRunning = fsmState?.current && fsmState.current !== 'IDLE' && fsmState.current !== 'DONE'
 
     if (isRunning) {
       setActivePanel('monitor')
+      return
     }
 
-    if (lastUsedFlowPath && !isRunning) {
+    if (lastUsedFlowPath) {
       readFile(lastUsedFlowPath)
         .then(() => {
           setSelectedItem({
@@ -159,7 +163,6 @@ function MainApp(): JSX.Element | null {
             path: lastUsedFlowPath,
             type: 'flow'
           })
-          setActivePanel('flow')
         })
         .catch(() => {
           // File deleted — clear stored path and show empty state (EC-2.5)

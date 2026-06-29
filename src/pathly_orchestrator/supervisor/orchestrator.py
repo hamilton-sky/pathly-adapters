@@ -12,6 +12,24 @@ from .registry import _lock, _set_status, _write_mirror
 from .state import OpenSession, RunnerState, logger
 from .terminal import _write_supervisor_phase_summary
 
+# The terminal stage that seeds a board task-DAG. When a run carries a goal_id (it is a
+# decompose/executor of an EXISTING goal), this stage must attach its tasks to that goal
+# rather than find-or-create its own — otherwise a "decompose goal X via consultation"
+# seeds the wrong goal (or none). Mirrors the directive _decompose_plan injects.
+_DAG_SEEDER_AGENT = "planning/plan"
+
+
+def _decompose_directive(agent: str, goal_id: str) -> str:
+    """Return the 'seed THIS goal' instruction suffix, or '' when it doesn't apply."""
+    if not goal_id or agent != _DAG_SEEDER_AGENT:
+        return ""
+    return (
+        "\n\n## Decompose target\n"
+        "This run decomposes an EXISTING goal. Attach EVERY task you post to "
+        f"goal_id={goal_id!r} and do NOT post a new goal — it already exists. "
+        "Use that goal_id as $GOAL_ID at the 'Post Tasks to Comms Board' step."
+    )
+
 
 def _loop(state: RunnerState, broadcast_fn: Optional[Callable]) -> None:
     from pathly_orchestrator import fsm_http_client as fhc
@@ -118,6 +136,8 @@ def _loop(state: RunnerState, broadcast_fn: Optional[Callable]) -> None:
 
             current_fsm_state = response.get("current_state", "")
             instructions = response.get("instructions", "")
+            # Goal decompose/executor: tell the DAG-seeder stage which existing goal to fill.
+            instructions += _decompose_directive(response.get("agent", ""), state.goal_id)
             preferred_adapter = response.get("preferred_adapter", "") or "claude"
 
             # Apply reroute override if set

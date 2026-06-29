@@ -30,7 +30,7 @@ agent_map:
   ARCHITECTING: team/architect
   RESEARCHING: team/research
   DESIGNING: team/design
-  PLANNING: team/plan
+  PLANNING: planning/plan
 role_map:
   PO_DISCUSSING: po
   ARCHITECTING: architect

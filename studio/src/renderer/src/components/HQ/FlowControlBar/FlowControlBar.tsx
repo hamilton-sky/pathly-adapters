@@ -1,6 +1,7 @@
 ﻿import { useState } from 'react'
 import { Play, Pause, SkipForward, ChevronsRight, Shuffle, RotateCcw, Square, Terminal, EyeOff } from 'lucide-react'
 import { useRunnerStore } from '../../../store/runnerStore'
+import { useUiStore } from '../../../store/uiStore'
 import { AbortConfirmStrip } from './AbortConfirmStrip'
 import { ReroutePopover } from './ReroutePopover'
 import { RunnerBtn } from './RunnerBtn'
@@ -9,6 +10,14 @@ import { apiFetch } from '../../../lib/config'
 import { useAutoCommitSetting } from './hooks/useAutoCommitSetting'
 
 type Action = 'start' | 'pause' | 'resume' | 'advance' | 'retry'
+
+/** Derive a runnable flow name from the selected flow's path (or name). Falls back to
+ *  'team' when no flow is selected, preserving the previous hardcoded default. */
+function flowNameFromPath(pathOrName: string | null): string {
+  if (!pathOrName) return 'team'
+  const filename = pathOrName.replace(/\\/g, '/').split('/').pop() ?? ''
+  return filename.replace(/\.flow\.yaml$/i, '').trim() || 'team'
+}
 
 export function FlowControlBar(): JSX.Element {
   const status = useRunnerStore((s) => s.status)
@@ -19,6 +28,7 @@ export function FlowControlBar(): JSX.Element {
   const [showAbort, setShowAbort] = useState(false)
   const [showReroute, setShowReroute] = useState(false)
   const { enabled: autoCommit, toggle: toggleAutoCommit } = useAutoCommitSetting()
+  const selectedFlow = useUiStore((s) => flowNameFromPath(s.lastUsedFlowPath))
 
   async function postAction(action: Action, extraBody: Record<string, unknown> = {}): Promise<void> {
     const { topic, projectRoot } = useRunnerStore.getState()
@@ -38,7 +48,8 @@ export function FlowControlBar(): JSX.Element {
   function buildRunBody(): Record<string, unknown> {
     const { projectRoot, maxCostUsd, maxIterations, runnerMode: mode } = useRunnerStore.getState()
     return {
-      flow: 'team',
+      // Run the currently-selected flow (the one open in the builder), not a hardcoded 'team'.
+      flow: flowNameFromPath(useUiStore.getState().lastUsedFlowPath),
       project_root: projectRoot ?? '',
       max_iterations: maxIterations,
       max_cost_usd: maxCostUsd,
@@ -62,7 +73,7 @@ export function FlowControlBar(): JSX.Element {
         {/* Lifecycle group */}
         <RunnerBtn
           label="Start"
-          tooltip="Start a new pipeline run"
+          tooltip={`Start a new pipeline run — flow: ${selectedFlow}`}
           enabled={startEnabled}
           onClick={() => {
             setRunnerState({ errorMessage: null })

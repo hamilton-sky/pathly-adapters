@@ -29,6 +29,26 @@
   background: transparent;
 }
 
+/* Board-level action: open every goal's tasks in one combined DAG canvas. */
+.allDagBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 10px;
+  border: var(--border);
+  border-color: var(--accent-border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface0);
+  color: var(--accent);
+  cursor: pointer;
+  font: 500 12px/1 var(--font-family-base);
+  flex-shrink: 0;
+}
+.allDagBtn:hover { background: var(--accent-bg); }
+
 .empty {
   display: flex;
   flex: 1;

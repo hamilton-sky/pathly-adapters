@@ -102,6 +102,40 @@ def test_resolve_command_unknown_adapter_raises():
         resolve_command("turbo-ai", "do stuff", "model-x")
 
 
+# ── Phase 2b: headless-capability helpers (run-start adapter validation) ──────
+
+from pathly_orchestrator.adapters import (  # noqa: E402
+    headless_capable,
+    unsupported_headless_adapters,
+)
+
+
+def test_headless_capable_true_for_claude_codex():
+    assert headless_capable("claude") is True
+    assert headless_capable("codex") is True
+
+
+def test_headless_capable_false_for_null_and_unknown():
+    assert headless_capable("copilot") is False  # headless: null
+    assert headless_capable("antigravity") is False  # headless: null
+    assert headless_capable("turbo-ai") is False  # unknown adapter
+
+
+def test_unsupported_headless_adapters_filters_sorts_and_dedups():
+    bad = unsupported_headless_adapters(
+        ["claude", "codex", "copilot", "antigravity", "copilot", "claude"]
+    )
+    assert bad == ["antigravity", "copilot"]
+
+
+def test_unsupported_headless_adapters_empty_when_all_supported():
+    assert unsupported_headless_adapters(["claude", "codex", "claude"]) == []
+
+
+def test_unsupported_headless_adapters_ignores_blanks():
+    assert unsupported_headless_adapters(["", "claude", ""]) == []
+
+
 # ── Phase 3: adapters.gen.ts staleness ───────────────────────────────────────
 
 

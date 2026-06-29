@@ -69,6 +69,13 @@ def start_goal_decompose(
             progress=progress, broadcast_fn=broadcast_fn,
             on_start=on_start, on_done=on_done, spawn_fn=spawn_fn, block=block,
         )
+    if mode == "plan":
+        return _decompose_plan(
+            goal_id, board, scope, goal_text,
+            project_root=project_root, adapter=adapter, model=model,
+            progress=progress, broadcast_fn=broadcast_fn,
+            on_start=on_start, on_done=on_done, spawn_fn=spawn_fn, block=block,
+        )
     if mode == "consultation":
         return _decompose_consultation(
             goal_id, board, scope,
@@ -79,7 +86,7 @@ def start_goal_decompose(
     return {
         "ok": False,
         "reason": "unknown_mode",
-        "error": f"unknown decompose mode {mode!r} (expected planner|consultation)",
+        "error": f"unknown decompose mode {mode!r} (expected planner|plan|consultation)",
     }
 
 
@@ -147,6 +154,55 @@ def _decompose_planner(
     return result
 
 
+def _decompose_plan(
+    goal_id: str,
+    board: str,
+    scope: str,
+    goal_text: str,
+    *,
+    project_root: str,
+    adapter: str,
+    model: str,
+    progress: str,
+    broadcast_fn,
+    on_start,
+    on_done,
+    spawn_fn,
+    block: bool,
+) -> dict:
+    """Full single-planner decompose: ONE agent runs the `planning/plan` skill → plan artifacts
+    + a context_refs/depends_on-wired task DAG, without the full consultation team. The goal
+    already exists, so the planner uses goal_id rather than posting a new one."""
+    from pathly_orchestrator.supervisor.board_run import start_board_run
+
+    instructions = (
+        f"Decompose the goal below into a plan and a task DAG. The goal ALREADY EXISTS on the "
+        f"'{board}' board (scope '{scope}') with goal_id={goal_id!r} — at the 'Post Tasks to "
+        f"Comms Board' step use goal_id={goal_id!r} as $GOAL_ID and do NOT post a new goal; only "
+        f"add its task children (each with context_refs + depends_on as the skill specifies)."
+        + (f"\n\nGoal: {goal_text}" if goal_text else "")
+    )
+    result = start_board_run(
+        board, scope, "single-agent",
+        instructions=instructions,
+        project_root=project_root,
+        model=model or _DEFAULT_MODEL,
+        adapter=adapter or "claude",
+        skill="planning/plan",
+        agent="planner",
+        progress=progress,
+        broadcast_fn=broadcast_fn,
+        on_start=on_start,
+        on_done=on_done,
+        spawn_fn=spawn_fn,
+        block=block,
+    )
+    if isinstance(result, dict) and result.get("ok"):
+        result["mode"] = "plan"
+        result["goal_id"] = goal_id
+    return result
+
+
 def _decompose_consultation(
     goal_id: str,
     board: str,
@@ -177,6 +233,13 @@ def _decompose_consultation(
     _start = start_fn
     if _start is None:
         from pathly_orchestrator.supervisor.api import start_run as _start
+        # Re-seed a stale DONE/foreign FSM state so a re-decompose actually spawns the PO
+        # stage instead of short-circuiting to {done:True}. Only when driving the real FSM.
+        from pathly_orchestrator.supervisor.goal_executor import (
+            _reset_fsm_state_for_flow,
+        )
+
+        _reset_fsm_state_for_flow(_CONSULTATION_FLOW, scope, project_root)
 
     try:
         state = _start(
@@ -186,6 +249,11 @@ def _decompose_consultation(
             model=model or _DEFAULT_MODEL,
             broadcast_fn=broadcast_fn,
             interactive=False,
+            # Seed THIS goal's DAG at the terminal planner stage (not a new goal), and
+            # fire the lifecycle on_done on terminal status so the board's "Decomposing…"
+            # indicator clears even when the consultation flow ends in error.
+            goal_id=goal_id,
+            on_done=on_done,
         )
     except ValueError as exc:
         return {"ok": False, "reason": "board_busy", "error": str(exc)}

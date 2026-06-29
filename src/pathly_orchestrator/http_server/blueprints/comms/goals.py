@@ -272,7 +272,15 @@ def comms_goals_decompose():
 
         def _on_done(_run_id: str, res) -> None:
             if isinstance(res, dict) and res.get("error"):
-                return  # run was killed or errored — don't post false-positive success
+                # Surface the failure instead of silently spinning — the human needs to see WHY
+                # (a spawn timeout, an adapter error, …). Stay quiet only on user-initiated stops,
+                # which the /comms/goals/stop handler already announces.
+                err = str(res.get("error"))
+                low = err.lower()
+                if "stop" in low or "abort" in low or "kill" in low:
+                    return
+                _board_post(f"❌ decomposition failed — {err[:300]}", phase="error")
+                return
             _board_post("✅ decomposition finished — task DAG seeded", phase="done")
 
         result = start_goal_decompose(

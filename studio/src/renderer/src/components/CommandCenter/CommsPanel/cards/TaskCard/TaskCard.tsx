@@ -1,7 +1,10 @@
-import { FileText } from 'lucide-react'
+import { useState } from 'react'
+import { FileText, ChevronRight, ChevronDown } from 'lucide-react'
 import type { Message } from '../../../types'
+import { Tooltip } from '../../../../ui'
 import MarkdownRenderer from '../../../../shared/MarkdownRenderer/MarkdownRenderer'
 import { RunPill } from '../../../../shared/RunPill/RunPill'
+import { CopyTextButton } from '../../../../shared/CopyTextButton/CopyTextButton'
 import s from './TaskCard.module.css'
 
 type TaskStatus = NonNullable<Message['taskStatus']>
@@ -18,20 +21,27 @@ function basename(path: string): string {
   return path.split(/[/\\]/).pop() ?? path
 }
 
+function firstLine(text: string): string {
+  return text.split('\n').find((l) => l.trim()) ?? text
+}
+
 interface Props {
   task: Message
   siblings: Message[]
 }
 
-// A single task row: status dot + text + (optional) artifact label + dependency badges.
-// (A per-task ad-hoc "Run task" button is a future affordance — no backend route yet.)
+// A collapsible task banner: status dot + a one-line title + a copy icon + an expand chevron.
+// Collapsed keeps the DAG list compact; expanded reveals the FULL task text in a scrolling box
+// (a build task is a multi-line "what · Files · Done-when" block). The copy icon lifts the raw
+// task text to the clipboard so a human can hand it to any agent.
 export function TaskCard({ task: t, siblings }: Props): JSX.Element {
+  const [expanded, setExpanded] = useState(false)
   const status: TaskStatus = t.taskStatus ?? 'pending'
   const byId = new Map(siblings.map((m) => [m.id, m]))
   const deps = t.dependsOn ?? []
 
   return (
-    <div className={s.task} data-type="task">
+    <div className={s.task} data-type="task" {...(expanded ? { 'data-expanded': 'true' } : {})}>
       <span
         className={s.dot}
         data-status={status}
@@ -39,13 +49,30 @@ export function TaskCard({ task: t, siblings }: Props): JSX.Element {
       />
       <div className={s.taskMain}>
         <div className={s.taskRow}>
-          <div className={s.taskText} title={t.text}>
-            <MarkdownRenderer content={t.text} className={s.taskMd} />
-          </div>
+          <Tooltip label={expanded ? 'Collapse task' : 'Expand task'} placement="top">
+            <button
+              type="button"
+              className={s.banner}
+              onClick={() => setExpanded((e) => !e)}
+              {...(expanded ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
+              aria-label={expanded ? 'Collapse task' : 'Expand task'}
+            >
+              <span className={s.chev}>
+                {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+              </span>
+              <span className={s.bannerText}>{firstLine(t.text)}</span>
+            </button>
+          </Tooltip>
           {status === 'in_progress' && (
             <RunPill size="sm" state="running" idleLabel="In progress" disabled />
           )}
+          <CopyTextButton text={t.text} label="task" />
         </div>
+        {expanded && (
+          <div className={s.taskFull}>
+            <MarkdownRenderer content={t.text} />
+          </div>
+        )}
         {t.artifactPath && (
           <div className={s.taskArtifact}>
             <FileText size={11} />

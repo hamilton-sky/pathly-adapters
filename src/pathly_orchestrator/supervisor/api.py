@@ -21,8 +21,18 @@ def start_run(
     autonomy: Optional[dict] = None,
     broadcast_fn: Optional[Callable] = None,
     interactive: bool = True,
+    goal_id: str = "",
+    on_done: Optional[Callable] = None,
 ) -> RunnerState:
-    """Start a new supervised run for *topic*.  Raises ValueError if already active."""
+    """Start a new supervised run for *topic*.  Raises ValueError if already active.
+
+    goal_id: when set, this run is a goal decompose/executor — the terminal planner
+        stage is told to seed THIS goal's DAG (see orchestrator._decompose_directive).
+    on_done: called as ``on_done(run_id, result)`` exactly once when the run reaches a
+        terminal status (done/error/aborted). ``result`` carries ``status`` and, on
+        failure, ``error`` — so a caller (e.g. the decompose lifecycle poster) can clear
+        a "running" UI indicator that would otherwise hang forever when _loop errors out.
+    """
     import uuid as _uuid
 
     with _lock:
@@ -44,6 +54,7 @@ def start_run(
             run_id=str(_uuid.uuid4()),
             _broadcast_fn=broadcast_fn,
             interactive=interactive,
+            goal_id=goal_id,
         )
         state.trace_id = secrets.token_hex(16)
         _registry[topic] = state
@@ -65,9 +76,24 @@ def start_run(
 
     from .orchestrator import _loop
 
+    def _run_and_finalize() -> None:
+        # The loop owns all status transitions; we only OBSERVE the terminal status and
+        # fire on_done once, so a decompose/goal run always reports completion even when
+        # _loop returns via an error path (otherwise the board's timer never stops).
+        try:
+            _loop(state, broadcast_fn)
+        finally:
+            if on_done is not None:
+                result = {"status": state.status}
+                if state.status in {"error", "aborted"}:
+                    result["error"] = state.error_kind or state.status
+                try:
+                    on_done(state.run_id, result)
+                except Exception:
+                    logger.warning("on_done callback error", exc_info=True)
+
     t = threading.Thread(
-        target=_loop,
-        args=(state, broadcast_fn),
+        target=_run_and_finalize,
         daemon=True,
         name=f"supervisor-{topic}",
     )

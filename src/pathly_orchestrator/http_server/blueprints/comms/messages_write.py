@@ -7,6 +7,7 @@ triggers artifact indexing, emits the summary request, and fires the SSE update.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 
@@ -37,9 +38,20 @@ def comms_post():
             embed_async as _embed_async,
         )
 
-        data = request.get_json()
+        # Windows agents post via curl whose JSON body may be cp1252-encoded (a stray em-dash →
+        # byte 0x97), which strict UTF-8 parsing rejects with a 500 — silently dropping a task or
+        # artifact. Decode leniently: UTF-8 first, then cp1252, so the post always lands.
+        raw = request.get_data()
+        data = None
+        if raw:
+            for _enc in ("utf-8", "cp1252"):
+                try:
+                    data = json.loads(raw.decode(_enc))
+                    break
+                except (UnicodeDecodeError, ValueError):
+                    continue
         if not data:
-            return jsonify({"error": "Missing JSON body"}), 400
+            return jsonify({"error": "Missing or invalid JSON body"}), 400
 
         required = {"feature", "from", "type", "text"}
         missing = required - set(data.keys())

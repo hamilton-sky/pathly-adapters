@@ -1,12 +1,13 @@
 import { useState } from 'react'
-import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react'
+import { ChevronDown, ChevronRight, Trash2, Pencil, Network } from 'lucide-react'
 import type { Message } from '../../../types'
 import { Tooltip } from '../../../../ui'
 import { ConfirmModal } from '../../../../shared/ConfirmModal/ConfirmModal'
+import { CopyTextButton } from '../../../../shared/CopyTextButton/CopyTextButton'
 import { GoalRunButton } from '../../GoalRunButton/GoalRunButton'
 import { GoalDecomposeButton } from '../../GoalDecomposeButton/GoalDecomposeButton'
 import { EditableGoalTitle } from './EditableGoalTitle'
-import { computeRollup } from '../../GoalsView/goalsViewUtils'
+import { computeRollup, serializeTasks } from '../../GoalsView/goalsViewUtils'
 import s from './GoalCard.module.css'
 
 interface Props {
@@ -16,18 +17,18 @@ interface Props {
   onToggle: () => void
   onEditGoal: (goalId: string, text: string) => void
   onDeleteGoal: (goalId: string) => void
+  onOpenDetail: () => void
 }
 
-// Goal header: collapse toggle + goal text + a task rollup chip + the executor
-// selector / Run control (reused from GoalRunButton — the selector value is sent
-// as the executor override on Run, which persists it onto the goal) + a delete
-// affordance (mirrors the message card's trash → confirm → remove).
-export function GoalCardHeader({ goal, tasks, open, onToggle, onEditGoal, onDeleteGoal }: Props): JSX.Element {
+// Goal header: collapse toggle + title, then a single right-aligned action group (edit · view-DAG
+// · copy-all · delete) — uniform icon buttons that hold their place in view and edit mode. Row 2
+// carries the task rollup + executor/Run (or Decompose when empty).
+export function GoalCardHeader({ goal, tasks, open, onToggle, onEditGoal, onDeleteGoal, onOpenDetail }: Props): JSX.Element {
   const r = computeRollup(tasks)
   const [confirming, setConfirming] = useState(false)
+  const [editing, setEditing] = useState(false)
   return (
     <div className={s.header}>
-      {/* Row 1 — collapse + title (full width) + delete */}
       <div className={s.titleRow}>
         <Tooltip label={open ? 'Collapse goal' : 'Expand goal'} placement="top">
           <button
@@ -40,19 +41,30 @@ export function GoalCardHeader({ goal, tasks, open, onToggle, onEditGoal, onDele
             {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
           </button>
         </Tooltip>
-        <EditableGoalTitle text={goal.text} onSave={(t) => onEditGoal(goal.id, t)} />
-        <Tooltip label="Delete goal" placement="top">
-          <button
-            type="button"
-            className={s.goalDel}
-            aria-label="Delete goal"
-            onClick={() => setConfirming(true)}
-          >
-            <Trash2 size={13} />
-          </button>
-        </Tooltip>
+        <EditableGoalTitle text={goal.text} editing={editing} onSave={(t) => onEditGoal(goal.id, t)} onCancel={() => setEditing(false)} />
+        <div className={s.actions}>
+          {!editing && (
+            <Tooltip label="Edit goal title" placement="top">
+              <button type="button" className={s.actBtn} onClick={() => setEditing(true)} aria-label="Edit goal title">
+                <Pencil size={13} />
+              </button>
+            </Tooltip>
+          )}
+          {tasks.length > 0 && (
+            <Tooltip label="View DAG & details" placement="top">
+              <button type="button" className={s.actBtn} onClick={onOpenDetail} aria-label="View DAG and details">
+                <Network size={13} />
+              </button>
+            </Tooltip>
+          )}
+          {tasks.length > 0 && <CopyTextButton text={serializeTasks(goal.text, tasks)} label="all tasks" />}
+          <Tooltip label="Delete goal" placement="top">
+            <button type="button" className={s.actBtnDanger} onClick={() => setConfirming(true)} aria-label="Delete goal">
+              <Trash2 size={13} />
+            </button>
+          </Tooltip>
+        </div>
       </div>
-      {/* Row 2 — task rollup + executor/Run controls (wrap, never crush the title) */}
       <div className={s.metaRow}>
         <span className={s.rollup}>
           {r.total} task{r.total !== 1 ? 's' : ''} · {r.done} done · {r.ready} ready

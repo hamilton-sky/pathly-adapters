@@ -62,18 +62,86 @@ function isValidCwd(dir: string): boolean {
   }
 }
 
-/** Resolve the absolute path to agy.exe — checks known install location first, falls back to PATH. */
-function resolveAgyPath(): string {
+// Engines whose launcher we resolve to an absolute path before spawning. A Claude/Codex
+// self-update rewrites the PATH shim (`npm i -g`) or moves a versioned install dir; if the
+// runner spawns the bare name mid-swap, PowerShell throws CommandNotFound and the flow stage
+// dies. Resolving an absolute launcher per spawn (and briefly waiting one out if it's mid-swap)
+// keeps in-flight stages alive across an update.
+const RESOLVABLE_ENGINES = new Set(['claude', 'codex', 'agy'])
+
+const delay = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
+
+/** Resolve an absolute path to a CLI engine's launcher, checking known install locations
+ *  first and falling back to the bare name (PATH lookup). Prefers the npm `.ps1` shim so
+ *  PowerShell arg-passing matches the previous bare-name behavior exactly (no regression). */
+function resolveEnginePath(engine: string): string {
   if (process.platform === 'win32') {
-    const localAppData = process.env.LOCALAPPDATA ?? ''
-    const knownPath = join(localAppData, 'agy', 'bin', 'agy.exe')
-    if (fs.existsSync(knownPath)) return knownPath
-    // Also check npm bin (our fallback copy)
     const appData = process.env.APPDATA ?? ''
-    const npmPath = join(appData, 'npm', 'agy.exe')
-    if (fs.existsSync(npmPath)) return npmPath
+    const localAppData = process.env.LOCALAPPDATA ?? ''
+    const home = process.env.USERPROFILE ?? os.homedir()
+    const candidates =
+      engine === 'agy'
+        ? [
+            join(localAppData, 'agy', 'bin', 'agy.exe'),
+            join(localAppData, 'Microsoft', 'WindowsApps', 'agy.cmd'),
+            join(appData, 'npm', 'agy.cmd'),
+            join(appData, 'npm', 'agy.ps1'),
+          ]
+        : [
+            // npm-global shims — prefer .ps1 (what PATH resolves to today → identical arg handling)
+            join(appData, 'npm', `${engine}.ps1`),
+            join(appData, 'npm', `${engine}.cmd`),
+            // native-installer locations
+            join(localAppData, 'Programs', engine, `${engine}.exe`),
+            join(home, '.local', 'bin', `${engine}.exe`),
+          ]
+    for (const c of candidates) {
+      if (c && fs.existsSync(c)) return c
+    }
+  } else {
+    const home = os.homedir()
+    for (const c of [
+      join(home, '.local', 'bin', engine),
+      join(home, '.npm-global', 'bin', engine),
+      `/opt/homebrew/bin/${engine}`,
+      `/usr/local/bin/${engine}`,
+    ]) {
+      try { if (fs.existsSync(c)) return c } catch { /* ignore */ }
+    }
   }
-  return 'agy'  // rely on PATH on non-Windows or if known paths don't exist
+  return engine // rely on PATH on non-Windows or if known paths don't exist
+}
+
+/** True if `engine` resolves on PATH right now (one cheap `where`/`which` probe). */
+function isOnPath(engine: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const probe = process.platform === 'win32' ? 'where' : 'which'
+    try {
+      execFile(probe, [engine], { timeout: 3000, windowsHide: true }, (err, stdout) => {
+        resolve(!err && typeof stdout === 'string' && stdout.trim().length > 0)
+      })
+    } catch {
+      resolve(false)
+    }
+  })
+}
+
+/** Resolve a launcher for a runner engine, surviving an in-progress self-update.
+ *  Fast path: a known absolute launcher exists → use it (PATH-independent). Otherwise the
+ *  launcher is either installed somewhere we don't list (PATH still works — don't stall) or
+ *  mid-swap during an update (briefly absent). Probe PATH once; only if that also fails do we
+ *  wait a few seconds for the swap to finish before giving up and falling back to the bare name. */
+async function resolveEngineLauncher(engine: string): Promise<string> {
+  const first = resolveEnginePath(engine)
+  if (first !== engine) return first
+  if (await isOnPath(engine)) return engine
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await delay(1000)
+    const retry = resolveEnginePath(engine)
+    if (retry !== engine) return retry
+    if (await isOnPath(engine)) return engine
+  }
+  return engine
 }
 
 // Windows PowerShell 5.1 reads AND writes files with the legacy ANSI code page (cp1252) by default,
@@ -97,11 +165,10 @@ function resolveShell(command: string | undefined): { shell: string; args: strin
     }
     return { shell: command ?? 'bash', args: [] }
   }
-  if (command === 'claude') return { shell: 'powershell.exe', args: ['-NoExit', '-Command', `${PS_UTF8_INLINE}; claude`] }
-  if (command === 'codex')  return { shell: 'powershell.exe', args: ['-NoExit', '-Command', `${PS_UTF8_INLINE}; codex`] }
-  if (command === 'agy') {
-    const agyExe = resolveAgyPath()
-    return { shell: 'powershell.exe', args: ['-NoExit', '-Command', `${PS_UTF8_INLINE}; & '${agyExe}'`] }
+  if (command === 'claude' || command === 'codex' || command === 'agy') {
+    // Absolute launcher (falls back to the bare name) so manual tabs survive a self-update too.
+    const exe = resolveEnginePath(command)
+    return { shell: 'powershell.exe', args: ['-NoExit', '-Command', `${PS_UTF8_INLINE}; & '${exe}'`] }
   }
   return { shell: 'powershell.exe', args: [] }
 }
@@ -206,11 +273,45 @@ function resolveRunnerShell(argv: string[]): { shell: string; args: string[]; te
   const tmpScript = path.join(os.tmpdir(), `pathly-runner-${Date.now()}.ps1`)
   const bom = Buffer.from([0xEF, 0xBB, 0xBF])
 
+  // Detect the engine by launcher BASENAME — argv[0] may be a resolved absolute path
+  // (…\claude.ps1) rather than the bare name, so a `=== 'claude'` check would miss.
+  const engineBase = path.basename(argv[0]).toLowerCase()
+  const isClaude = engineBase.startsWith('claude')
+  const isCodex = engineBase.startsWith('codex')
+
+  // Windows caps a process command line (~32 KB). A big composed prompt (e.g. the planner
+  // skill) passed as `claude -p <prompt>` blows it → claude.exe "filename or extension is too
+  // long". claude's print mode reads the prompt from STDIN, so for an over-long prompt we pipe
+  // it instead of putting it on the command line. (The first long non-flag arg is the prompt.)
+  // Both claude and codex read the prompt from STDIN, so an over-long prompt is piped instead
+  // of placed on the command line. claude's `-p` reads stdin directly; `codex exec` reads stdin
+  // when the prompt is `-` or absent (per `codex exec --help`: "If not provided as an argument
+  // (or if `-` is used), instructions are read from stdin"). This is what stops the big-prompt
+  // codex.ps1 crash ("The filename or extension is too long").
+  const STDIN_PROMPT_MAX = 8000
+  let pipeIdx = -1
+  if (isClaude || isCodex) {
+    for (let i = 1; i < argv.length; i++) {
+      if (!argv[i].startsWith('-') && argv[i].length > STDIN_PROMPT_MAX) { pipeIdx = i; break }
+    }
+  }
+
   const varDecls: string[] = []
   const callTokens: string[] = []
+  let pipePrefix = ''
 
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
+    if (i === pipeIdx) {
+      // Pipe the prompt via stdin — keep it OFF the command line so a huge prompt can never
+      // overflow the Win32 command-line limit. claude's `-p` reads stdin when the value is
+      // omitted; `codex exec` reads stdin only when the prompt arg is `-`, so substitute it.
+      const body = a.endsWith('\n') ? a : `${a}\n`
+      varDecls.push(`$prompt = @'\n${body}'@`)
+      pipePrefix = '$prompt | '
+      if (isCodex) callTokens.push("'-'")
+      continue
+    }
     // Use a here-string for any arg that has newlines or single-quote variants.
     // Here-strings only end at `'@` at column 0 — virtually impossible in prompt content.
     if (/['''\r\n]/.test(a)) {
@@ -229,8 +330,9 @@ function resolveRunnerShell(argv: string[]): { shell: string; args: string[]; te
 
   // `codex exec` reads stdin even when the prompt is passed as an argument ("Reading additional
   // input from stdin…") and stalls forever in a PTY whose stdin never closes. Piping $null gives
-  // it an immediately-closed stdin so it proceeds with the prompt arg. Harmless for other engines.
-  const stdinClose = argv[0] === 'codex' ? '$null | ' : ''
+  // it an immediately-closed stdin so it proceeds with the prompt arg. If we're already piping
+  // the prompt (claude over-long path) that pipe serves the same purpose.
+  const stdinClose = pipePrefix || (isCodex ? '$null | ' : '')
   // UTF-8 preamble first — hardens this session's cmdlet I/O + console encoding. See PS_UTF8_PREAMBLE.
   const scriptLines = [...PS_UTF8_PREAMBLE, ...varDecls, `${stdinClose}& ${callTokens.join(' ')}`].join('\n') + '\r\n'
   fs.writeFileSync(tmpScript, Buffer.concat([bom, Buffer.from(scriptLines, 'utf8')]))
@@ -407,12 +509,23 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
       if (!ALLOWED_SHELLS.has(runnerArgv[0])) {
         throw new Error('Shell not allowed: ' + runnerArgv[0])
       }
+      // Resolve the engine to an absolute launcher so a self-update that rewrites the PATH
+      // shim doesn't kill this stage with CommandNotFound. Gating below still keys off the
+      // original bare name, so queue classification is unchanged.
+      let effectiveArgv = runnerArgv
+      if (RESOLVABLE_ENGINES.has(runnerArgv[0])) {
+        const launcher = await resolveEngineLauncher(runnerArgv[0])
+        if (launcher !== runnerArgv[0]) {
+          effectiveArgv = [launcher, ...runnerArgv.slice(1)]
+          slog('resolved engine', runnerArgv[0], '→', launcher)
+        }
+      }
       if (initialInput) {
         // Interactive runner: open the CLI normally so the user can keep chatting after
-        ;({ shell, args: shellArgs } = resolveInteractiveShell(runnerArgv))
+        ;({ shell, args: shellArgs } = resolveInteractiveShell(effectiveArgv))
       } else {
         // Headless runner: PTY exits when agent finishes
-        ;({ shell, args: shellArgs, tempScript } = resolveRunnerShell(runnerArgv))
+        ;({ shell, args: shellArgs, tempScript } = resolveRunnerShell(effectiveArgv))
       }
       if (tempScript) runnerScripts.set(tabId, tempScript)
     } else {

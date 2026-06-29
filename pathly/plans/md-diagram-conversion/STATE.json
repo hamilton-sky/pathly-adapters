@@ -1,6 +1,7 @@
 {
-  "convs_total": 0,
+  "current": "PLANNING",
+  "updated_at": "2026-06-29T09:06:53Z",
+  "convs_total": 7,
   "convs_done": 0,
-  "current": "PO_DISCUSSING",
-  "updated_at": "2026-06-26T06:44:57Z"
+  "conv_start_sha": "4be9acaa61d6c8b0352f73ac559aea0af0639a4d"
 }

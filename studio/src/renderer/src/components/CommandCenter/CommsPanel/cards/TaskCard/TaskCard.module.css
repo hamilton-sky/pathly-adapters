@@ -32,39 +32,65 @@
   flex: 1;
 }
 
-/* Text + optional in-progress RunPill side-by-side */
+/* Banner (clickable title region) + optional in-progress RunPill + copy icon, side-by-side. */
 .taskRow {
   display: flex;
-  align-items: flex-start;
-  gap: 6px;
+  align-items: center;
+  gap: 4px;
   min-width: 0;
 }
 
-/* Clamp the task text to 2 lines so a long phase description stays a compact row
-   (full text on hover via title attr). Keeps the DAG browsable / scrollable. */
-.taskText {
+/* The whole title row is one toggle button: chevron + a one-line clamped title. */
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+.banner:hover .bannerText { color: var(--accent); }
+
+.chev {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.bannerText {
   flex: 1;
   min-width: 0;
   font-size: 12px;
   line-height: 1.4;
   color: var(--text-primary);
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
+  white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Expanded: the FULL task text in a scrolling box so a long "what · Files · Done-when"
+   block stays readable without bloating the DAG list. */
+.taskFull {
+  max-height: 240px;
+  overflow: auto;
+  margin: 2px 0 1px;
+  padding: 7px 9px;
+  border: var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface0);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-primary);
   overflow-wrap: anywhere;
-  cursor: default;
 }
-
-.taskMd,
-.taskText p {
-  display: inline;
-}
-
-.taskText p {
-  margin: 0;
-}
+.taskFull :first-child { margin-top: 0; }
+.taskFull :last-child { margin-bottom: 0; }
 
 .taskArtifact {
   display: inline-flex;

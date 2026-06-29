@@ -25,6 +25,21 @@ export function orderByDeps(tasks: Message[]): Message[] {
   return result
 }
 
+// Serialize a goal + its tasks to one markdown block for the clipboard. Order follows the
+// DAG (orderByDeps); each task is numbered with its status, artifact, and full text — so a
+// human can paste the whole work list into a prompt or an issue.
+export function serializeTasks(goalText: string, tasks: Message[]): string {
+  const ordered = orderByDeps(tasks)
+  const lines: string[] = [`# ${goalText.trim()}`, '']
+  ordered.forEach((t, i) => {
+    const status = t.taskStatus ?? 'pending'
+    lines.push(`## Task ${i + 1} — ${status}`)
+    if (t.artifactPath) lines.push(`_artifact: ${t.artifactPath}_`)
+    lines.push('', t.text.trim(), '')
+  })
+  return lines.join('\n').trimEnd() + '\n'
+}
+
 export interface Rollup {
   total: number
   done: number

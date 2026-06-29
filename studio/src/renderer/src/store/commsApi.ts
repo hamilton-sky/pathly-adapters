@@ -694,10 +694,13 @@ export interface RunGoalOpts {
   flow?: string
 }
 
-export type DecomposeMode = 'planner' | 'consultation'
+export type DecomposeMode = 'planner' | 'plan' | 'consultation'
 
-// Decompose a goal into a task DAG (planner = fast, consultation = deep). Returns the
-// parsed {ok, reason} so the caller can distinguish board_busy / already_decomposed.
+// Decompose a goal into a task DAG. Three tiers, all terminating in the same planner agent:
+//   planner      = Quick — bare task list, no artifacts/context_refs
+//   plan         = one planner runs planning/plan → full plan + context_refs/depends_on DAG
+//   consultation = deep — PO→arch→research→design, then the same planner
+// Returns the parsed {ok, reason} so the caller can distinguish board_busy / already_decomposed.
 export async function apiDecomposeGoal(
   goal_id: string,
   mode: DecomposeMode,

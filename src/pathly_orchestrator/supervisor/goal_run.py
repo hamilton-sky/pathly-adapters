@@ -17,6 +17,7 @@ from .goal_executor import (  # noqa: F401
 from .goal_decomposer import (  # noqa: F401
     _CONSULTATION_FLOW,
     _decompose_consultation,
+    _decompose_plan,
     _decompose_planner,
     start_goal_decompose,
 )

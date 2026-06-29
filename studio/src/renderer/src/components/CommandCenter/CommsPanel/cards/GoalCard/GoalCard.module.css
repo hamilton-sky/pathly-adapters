@@ -26,7 +26,7 @@
    width so it can never be squeezed by the controls (which now live on row 2). */
 .titleRow {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 6px;
   min-width: 0;
 }
@@ -50,13 +50,22 @@
   flex-shrink: 0;
 }
 
-/* Trash affordance — mirrors the message card's .msgDel (muted → red on hover). */
-.goalDel {
+/* Right-aligned action group: edit · view-DAG · copy · delete — uniform 20px icon buttons that
+   hold their place (and height) across view/edit mode and align with the 20px CopyTextButton. */
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.actBtn,
+.actBtnDanger {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 28px;
+  width: 20px;
+  height: 20px;
   padding: 0;
   border: none;
   border-radius: var(--radius-sm);
@@ -66,8 +75,8 @@
   flex-shrink: 0;
   transition: color var(--transition-fast), background var(--transition-fast);
 }
-
-.goalDel:hover { color: var(--red); background: var(--red-bg); }
+.actBtn:hover { color: var(--text-primary); background: var(--bg-surface1); }
+.actBtnDanger:hover { color: var(--red); background: var(--red-bg); }
 
 .collapse {
   display: inline-flex;
@@ -105,6 +114,7 @@
   color: var(--text-muted);
   padding: 4px 0 6px;
 }
+
 
 /* ── Editable goal title ────────────────────────────────── */
 .titleView {
@@ -158,18 +168,24 @@
 .titleView:hover .titleEditBtn { opacity: 1; }
 .titleEditBtn:hover { color: var(--accent); }
 
+/* flex:1 mirrors .titleView so the edit box occupies the SAME width as the rendered title —
+   the trailing action icons (copy + delete) never shift between view and edit. */
 .titleEdit {
   display: flex;
   align-items: flex-start;
   gap: 5px;
   min-width: 0;
+  flex: 1;
 }
 
+/* resize:none + a capped height = the edit box can't be dragged to grow the card; a long
+   title scrolls inside the textarea instead. */
 .titleInput {
   flex: 1;
   min-width: 0;
   min-height: 32px;
-  resize: vertical;
+  max-height: 88px;
+  resize: none;
   box-sizing: border-box;
   padding: 5px 8px;
   border: var(--border);

@@ -493,6 +493,15 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
       window.setTimeout(() => {
         set((s) => ({ goalRunState: { ...s.goalRunState, [goal_id]: 'idle' }, goalRunStart: { ...s.goalRunStart, [goal_id]: 0 } }))
       }, 3000)
+    } else if (phase === 'error') {
+      // A failed run MUST drop the elapsed timer at once — otherwise the "Decomposing…"
+      // clock runs forever (the reported bug: it kept counting after the run died). Reset
+      // the pill to idle and zero the start time so useElapsedProgress stops.
+      useToastStore.getState().push('Goal run failed', 'error', { category: 'runner_state' })
+      set((s) => ({
+        goalRunState: { ...s.goalRunState, [goal_id]: 'idle' },
+        goalRunStart: { ...s.goalRunStart, [goal_id]: 0 },
+      }))
     }
   },
 

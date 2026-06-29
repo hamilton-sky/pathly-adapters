@@ -15,6 +15,37 @@ user intent, and writes PO_NOTES.md as a persistent record for the planner and a
 
 ---
 
+## Execution mode — decide this FIRST
+
+Before anything else, determine how you are running:
+
+- **Headless (runner / an automated flow such as `consultation`):** your prompt contains a
+  `## Current task` section with a `State:` and `Storage path:`. **No human is available** — any
+  question you ask goes unanswered, so the stage produces nothing, the `PO_NOTES.md` gate fails,
+  and the flow loops. Follow **Headless mode** below and SKIP the interactive Q&A (Steps 1–5).
+- **Interactive (`/pathly po`):** a human is driving. Run Steps 1–5 below exactly as written.
+
+### Headless mode (autonomous synthesis — no human Q&A)
+
+Do **not** ask the human anything and do **not** wait for replies.
+
+1. **Gather context** from the storage path and your prompt: read whichever exist —
+   `SPEC.md`, `USER_STORIES.md`, `PO_NOTES.md`, `PROGRESS.md`, `STORM_SEED.md` — plus the
+   goal/feature text and the Communication Board context already injected into this prompt.
+2. **Synthesise the four PO dimensions yourself** (Who / Success / Out of scope / Constraints),
+   making explicit, reasonable assumptions wherever a source is silent. Never leave a section
+   blank: if something is genuinely unknown, state your working assumption and record the open
+   item under **Open Questions** — do not block on it.
+3. **Write `PO_NOTES.md`** to the storage path using the template in Step 4. It MUST begin with a
+   `#` heading (the flow gate requires `PO_NOTES.md` to contain `#`).
+4. **Post to the board** per the "Posting to the Comms Board" section appended below: one
+   `artifact` post for `PO_NOTES.md`, plus one non-blocking `question` post per genuinely open
+   decision (state your fallback assumption in the question text; never wait for an answer).
+5. **Stop.** The runner advances the flow once `PO_NOTES.md` exists — do not call any transition
+   and do not print an interactive menu.
+
+---
+
 ## Step 1: Detect feature context
 
 1. Infer `FEATURE` from `$ARGUMENTS` if provided (first word, kebab-cased).

@@ -144,7 +144,7 @@ def skills_preview():
     """Preview an assembled skill with live fragment substitution."""
     try:
         from pathly_orchestrator.compose import compose_skill
-        from pathly_orchestrator.fsm_ops import _inject_prompt_vars
+        from pathly_orchestrator.fsm_compose import _inject_prompt_vars
         from pathly_orchestrator.skill_parser import serialize_skill_document
 
         data = request.get_json()
@@ -238,7 +238,7 @@ def skills_compose():
     """Compose a skill into one complete, dash-safe prompt for a client-side action."""
     try:
         from pathly_orchestrator.compose import compose_skill, load_effective_manifest
-        from pathly_orchestrator.fsm_ops import _inject_prompt_vars
+        from pathly_orchestrator.fsm_compose import _inject_prompt_vars
 
         data = request.get_json()
         if not data:

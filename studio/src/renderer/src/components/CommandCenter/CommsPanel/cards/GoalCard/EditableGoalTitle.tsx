@@ -1,27 +1,28 @@
-import { useState } from 'react'
-import { Pencil, Check, X } from 'lucide-react'
-import { Tooltip } from '../../../../ui'
+import { useEffect, useState } from 'react'
+import { Check, X } from 'lucide-react'
 import MarkdownRenderer from '../../../../shared/MarkdownRenderer/MarkdownRenderer'
 import s from './GoalCard.module.css'
 
 interface Props {
   text: string
+  editing: boolean
   onSave: (text: string) => void
+  onCancel: () => void
 }
 
-// The goal title — rendered as markdown, with an inline edit mode (pencil → textarea
-// → save/cancel). Saving keeps the goal id, so its task links survive a rename.
-export function EditableGoalTitle({ text, onSave }: Props): JSX.Element {
-  const [editing, setEditing] = useState(false)
+// The goal title — markdown when viewing, a textarea when editing. `editing` is controlled by
+// the header (so the edit pencil can sit in the shared action group with copy/delete). Saving
+// keeps the goal id, so its task links survive a rename.
+export function EditableGoalTitle({ text, editing, onSave, onCancel }: Props): JSX.Element {
   const [draft, setDraft] = useState(text)
+  useEffect(() => { if (editing) setDraft(text) }, [editing, text])
 
   if (editing) {
     const save = (): void => {
       const t = draft.trim()
       if (t && t !== text) onSave(t)
-      setEditing(false)
+      onCancel()
     }
-    const cancel = (): void => { setDraft(text); setEditing(false) }
     return (
       <div className={s.titleEdit}>
         <textarea
@@ -31,11 +32,11 @@ export function EditableGoalTitle({ text, onSave }: Props): JSX.Element {
           onChange={(e) => setDraft(e.currentTarget.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); save() }
-            if (e.key === 'Escape') { e.preventDefault(); cancel() }
+            if (e.key === 'Escape') { e.preventDefault(); onCancel() }
           }}
         />
         <button type="button" className={s.titleIconBtn} onClick={save} aria-label="Save goal title"><Check size={13} /></button>
-        <button type="button" className={s.titleIconBtn} onClick={cancel} aria-label="Cancel edit"><X size={13} /></button>
+        <button type="button" className={s.titleIconBtn} onClick={onCancel} aria-label="Cancel edit"><X size={13} /></button>
       </div>
     )
   }
@@ -45,16 +46,6 @@ export function EditableGoalTitle({ text, onSave }: Props): JSX.Element {
       <div className={s.goalText} title={text}>
         <MarkdownRenderer content={text} className={s.goalMd} />
       </div>
-      <Tooltip label="Edit goal" placement="top">
-        <button
-          type="button"
-          className={s.titleEditBtn}
-          onClick={() => { setDraft(text); setEditing(true) }}
-          aria-label="Edit goal title"
-        >
-          <Pencil size={12} />
-        </button>
-      </Tooltip>
     </div>
   )
 }

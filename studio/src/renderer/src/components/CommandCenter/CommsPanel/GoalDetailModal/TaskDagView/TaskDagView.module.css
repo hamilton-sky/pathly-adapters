@@ -1,0 +1,212 @@
+.wrap {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  min-height: 0;
+  overflow: hidden;
+  border: var(--border);
+  border-radius: var(--radius-md);
+  cursor: grab;
+  touch-action: none;
+  background:
+    radial-gradient(circle, color-mix(in srgb, var(--text-muted) 14%, transparent) 1px, transparent 1px)
+    0 0 / 20px 20px,
+    var(--bg-base);
+}
+.wrap[data-panning='true'] { cursor: grabbing; }
+
+/* The pan/zoom transform layer — translated + scaled by the viewport interactions. */
+.canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--cw);
+  height: var(--ch);
+  transform: translate(var(--tx, 0), var(--ty, 0)) scale(var(--scale, 1));
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.edges {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  /* A dragged node can move past the graph's natural bounds; without this the SVG clips its
+     edges at width/height and the connector "erases". */
+  overflow: visible;
+}
+
+.edge {
+  fill: none;
+  stroke: var(--text-muted);
+  stroke-width: 2;
+  stroke-linecap: round;
+  opacity: 0.85;
+}
+.edge[data-done='true'] { stroke: var(--green, #4caf50); opacity: 0.9; }
+
+/* Node — an absolutely-positioned button; coordinates come from dagLayout via CSS vars. */
+.node {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  width: var(--w);
+  height: var(--h);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border: 1.5px solid var(--border-color, var(--text-muted));
+  border-left-width: 3px;
+  border-radius: var(--radius-md);
+  background: var(--bg-surface1);
+  color: var(--text-primary);
+  cursor: grab;
+  text-align: left;
+  /* Drag must not select text or pan the scroll container. */
+  user-select: none;
+  touch-action: none;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
+}
+.node:hover { transform: translateY(-1px); box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25); }
+.node:active { cursor: grabbing; }
+.node[data-status='pending']     { --border-color: var(--text-muted); }
+.node[data-status='in_progress'] { --border-color: var(--accent); }
+.node[data-status='done']        { --border-color: var(--green, #4caf50); }
+.node[data-status='blocked']     { --border-color: var(--yellow, #d8a657); }
+.node[data-status='failed']      { --border-color: var(--red, #e05a5a); }
+.node[data-selected='true'] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.nodeNum {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--border-color) 22%, var(--bg-surface0));
+  color: var(--text-secondary);
+  font: 600 9px/1 var(--font-family-mono, monospace);
+}
+
+.nodeText {
+  flex: 1;
+  min-width: 0;
+  font-size: 10.5px;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+/* Preview popover — anchored under the selected node (same coordinate space as the canvas). */
+/* Portaled to <body> and positioned in SCREEN space (var(--x/--y)) so it floats above the modal,
+   at full size, never scaled by the canvas zoom or clipped by the viewport. */
+.preview {
+  position: fixed;
+  left: var(--x);
+  top: var(--y);
+  z-index: 9999;
+  width: 360px;
+  max-width: calc(100vw - 80px);
+  border: var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated, var(--bg-surface0));
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4);
+}
+
+.previewHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 7px 6px 10px;
+  border-bottom: var(--border);
+}
+
+.previewStatus {
+  flex: 1;
+  min-width: 0;
+  font: 600 10.5px/1.2 var(--font-family-mono, monospace);
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.previewStatus[data-status='in_progress'] { color: var(--accent); }
+.previewStatus[data-status='done']        { color: var(--green, #4caf50); }
+.previewStatus[data-status='failed'],
+.previewStatus[data-status='blocked']      { color: var(--red, #e05a5a); }
+
+.previewClose {
+  display: inline-flex;
+  flex-shrink: 0;
+  padding: 3px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.previewClose:hover { background: var(--bg-surface1); color: var(--text-primary); }
+
+.previewBody {
+  max-height: 320px;
+  overflow: auto;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+.previewBody :first-child { margin-top: 0; }
+.previewBody :last-child { margin-bottom: 0; }
+
+.empty {
+  padding: 28px 12px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Zoom controls — pinned bottom-left of the viewport (above the panning canvas). */
+.zoom {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: var(--border);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--bg-elevated, var(--bg-surface0)) 92%, transparent);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+.zoomBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.zoomBtn:hover { background: var(--bg-surface1); color: var(--text-primary); }
+.zoomPct {
+  min-width: 38px;
+  text-align: center;
+  font: 600 10.5px/1 var(--font-family-mono, monospace);
+  color: var(--text-muted);
+  user-select: none;
+}

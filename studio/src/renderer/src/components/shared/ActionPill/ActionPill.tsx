@@ -56,8 +56,12 @@ export default function ActionPill({
   resultIcon, resultLabel, resultReady, resultTip, onOpenResult, tone, compact,
 }: Props) {
   const hasResult = resultLabel !== undefined
+  // The elapsed timer renders in its own fixed-width tabular-nums span so the pill never
+  // reflows as the digits tick (0:09 → 0:39 → 10:39). The verb stays in the main label.
+  const isRunning = state === 'running'
+  const timer = isRunning && progress ? fmtElapsed(progress.elapsedS) : null
   const label =
-    state === 'running' ? (progress ? `${runningVerb}… ${fmtElapsed(progress.elapsedS)}` : `${runningVerb}…`)
+    isRunning ? `${runningVerb}…`
     : state === 'busy' ? 'Busy'
     : state === 'done' ? 'Done'
     : state === 'error' ? 'Error'
@@ -76,6 +80,7 @@ export default function ActionPill({
         >
           {mainIcon}
           {!compact && <span className={styles.label}>{label}</span>}
+          {!compact && timer && <span className={styles.timer}>{timer}</span>}
         </button>
       </Tooltip>
 

@@ -29,6 +29,11 @@ def test_health_returns_ok(client):
     assert data["status"] == "ok"
 
 
+# Loopback clients (127.0.0.1, the Flask test client's default) are exempt from
+# rate limiting, so these tests drive a non-loopback IP to exercise the limiter.
+_EXTERNAL = {"REMOTE_ADDR": "203.0.113.10"}  # TEST-NET-3 documentation range
+
+
 def test_rate_limit_blocks_after_limit(client, monkeypatch):
     from pathly_orchestrator import http_server
 
@@ -38,10 +43,27 @@ def test_rate_limit_blocks_after_limit(client, monkeypatch):
     http_server._rate_counters.clear()
     try:
         for _ in range(3):
-            r = client[0].get("/metrics")
+            r = client[0].get("/metrics", environ_overrides=_EXTERNAL)
             assert r.status_code == 200
-        r = client[0].get("/metrics")
+        r = client[0].get("/metrics", environ_overrides=_EXTERNAL)
         assert r.status_code == 429
+    finally:
+        http_server._RATE_LIMIT_MAX = orig
+        http_server._rate_counters.clear()
+
+
+def test_loopback_is_exempt_from_rate_limit(client, monkeypatch):
+    """Loopback (the local desktop app) is never rate-limited, even over the cap."""
+    from pathly_orchestrator import http_server
+
+    monkeypatch.setenv("PATHLY_FF_RATE_LIMITING", "true")
+    orig = http_server._RATE_LIMIT_MAX
+    http_server._RATE_LIMIT_MAX = 1
+    http_server._rate_counters.clear()
+    try:
+        for _ in range(5):
+            r = client[0].get("/metrics")  # default REMOTE_ADDR is 127.0.0.1
+            assert r.status_code == 200, "loopback must never be rate-limited"
     finally:
         http_server._RATE_LIMIT_MAX = orig
         http_server._rate_counters.clear()
@@ -57,13 +79,46 @@ def test_health_bypasses_rate_limit(client, monkeypatch):
     http_server._rate_counters.clear()
     try:
         for _ in range(5):
-            r = client[0].get("/health")
+            # Non-loopback IP so the bypass is proven against an IP that WOULD be limited.
+            r = client[0].get("/health", environ_overrides=_EXTERNAL)
             assert (
                 r.status_code == 200
             ), "/health must always return 200 regardless of rate-limit"
     finally:
         http_server._RATE_LIMIT_MAX = orig
         http_server._rate_counters.clear()
+
+
+def test_auth_allows_loopback_agent_without_secret(client, monkeypatch):
+    """A loopback non-browser caller (no Origin header) is allowed even when a secret is
+    configured — this is how Pathly's spawned agents reach /comms/* via plain curl."""
+    from pathly_orchestrator.http_server import middleware
+
+    monkeypatch.setattr(middleware, "_api_secret", "s3cr3t")
+    r = client[0].get("/metrics")  # loopback, no Origin, no X-Pathly-Secret
+    assert r.status_code != 401
+
+
+def test_auth_blocks_browser_origin_without_secret(client, monkeypatch):
+    """A browser-origin request (Origin header present) without the secret is rejected — the
+    secret's real job is CSRF protection, and browsers always send Origin."""
+    from pathly_orchestrator.http_server import middleware
+
+    monkeypatch.setattr(middleware, "_api_secret", "s3cr3t")
+    r = client[0].get("/metrics", headers={"Origin": "http://evil.example"})
+    assert r.status_code == 401
+
+
+def test_auth_allows_browser_origin_with_correct_secret(client, monkeypatch):
+    """Studio's own browser-origin calls carry the secret and are allowed."""
+    from pathly_orchestrator.http_server import middleware
+
+    monkeypatch.setattr(middleware, "_api_secret", "s3cr3t")
+    r = client[0].get(
+        "/metrics",
+        headers={"Origin": "http://localhost:5173", "X-Pathly-Secret": "s3cr3t"},
+    )
+    assert r.status_code != 401
 
 
 def test_next_action_missing_body(client):

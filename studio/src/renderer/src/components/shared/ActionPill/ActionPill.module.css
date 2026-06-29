@@ -122,3 +122,14 @@
 }
 
 .label { white-space: nowrap; }
+
+/* Elapsed timer — fixed-width, tabular figures so each second-tick keeps the same footprint
+   and the pill never reflows. min-width reserves room for MM:SS (up to 99:59). */
+.timer {
+  display: inline-block;
+  min-width: 4.5ch;
+  text-align: left;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}

@@ -49,6 +49,7 @@ skills:
       - completion-report
       - scout-choreography
       - feedback-protocol
+      - consult
       - { name: spawn-rules, requires: can_spawn }
       - catalog-pull
   team/review:
@@ -56,6 +57,7 @@ skills:
       - completion-report
       - scout-choreography
       - feedback-protocol
+      - consult
       - { name: spawn-rules, requires: can_spawn }
       - comms-post
       - catalog-pull
@@ -64,6 +66,7 @@ skills:
       - completion-report
       - scout-choreography
       - feedback-protocol
+      - consult
       - comms-post
   development/build:
     fragments:
@@ -107,6 +110,13 @@ skills:
       - comms-post
 
   planning/consolidate:
+    fragments:
+      - comms-post
+
+  # po is dual-mode: interactive (/pathly po) runs the human Q&A; headless (consultation
+  # flow) synthesises PO_NOTES.md autonomously. comms-post gives it the board write-back so
+  # the PO_NOTES artifact + open questions land on the board for downstream stages.
+  planning/po:
     fragments:
       - comms-post
 

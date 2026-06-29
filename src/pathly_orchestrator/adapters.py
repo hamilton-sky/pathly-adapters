@@ -89,3 +89,19 @@ def resolve_command(
         "terminal_kind": terminal_kind,
         "supports_resume": supports_resume,
     }
+
+
+def headless_capable(adapter: str) -> bool:
+    """True if *adapter* exists and has a headless template (can run a one-shot in the runner)."""
+    cfg = _load_adapters().get(adapter)
+    return bool(cfg and cfg.get("headless"))
+
+
+def unsupported_headless_adapters(adapters: list[str]) -> list[str]:
+    """Return the sorted, de-duplicated subset of *adapters* that cannot run headless.
+
+    An adapter is unsupported if it is unknown or declares ``headless: null``. Used at
+    run-start to reject a flow whose adapter_map routes a stage to a CLI with no headless
+    mode, instead of letting resolve_command raise opaquely mid-pipeline.
+    """
+    return sorted({a for a in adapters if a and not headless_capable(a)})

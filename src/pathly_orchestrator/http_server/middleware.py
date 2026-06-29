@@ -87,8 +87,22 @@ def _inc(key: str, amount: int | float = 1) -> None:
         _metrics[key] = _metrics.get(key, 0) + amount
 
 
+def _is_loopback(ip: str) -> bool:
+    """Loopback clients (the local desktop app) are trusted and never rate-limited.
+
+    The FSM server binds to 127.0.0.1 by design (config.Settings warns/errors on a
+    non-loopback host), so all normal Studio traffic shares the single loopback IP — a
+    per-IP cap would throttle the trusted local UI for no security benefit (the Command
+    Center's SSE + polling + a decompose burst easily exceed 120/min). The cap still
+    applies to any non-loopback client if the server is ever force-bound externally.
+    """
+    return ip == "::1" or ip.startswith("127.")
+
+
 def _check_rate_limit(ip: str) -> bool:
     """Return True if the request is allowed, False if rate limited."""
+    if _is_loopback(ip):
+        return True
     import sys
 
     # Tests override _RATE_LIMIT_MAX on the package module (http_server.__init__);
@@ -132,13 +146,22 @@ def _log_request():
             resp.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
         return resp
 
-    # Auth check — skip for health (already exited above) and read-only SSE streams
+    # Auth check — skip for health (already exited above) and read-only SSE streams.
     if _api_secret and not request.path.startswith("/events/"):
         token = request.headers.get("X-Pathly-Secret") or request.args.get("token", "")
         if token != _api_secret:
-            from flask import jsonify as _jsonify
+            # The secret lives in a user-readable file (~/.pathly/server_secret.txt), so it
+            # never guarded against local processes — Pathly's own spawned agents read it and
+            # call /comms/* via plain curl. Its real job is blocking BROWSER CSRF, and browser
+            # requests always carry an `Origin` header while local curl/CLI calls do not. So
+            # require the secret only for browser-origin OR non-loopback callers; let
+            # unauthenticated loopback non-browser clients (the agents) through. Without this,
+            # every agent board read/write 401s and the board silently stays empty.
+            browser_origin = bool(request.headers.get("Origin"))
+            if browser_origin or not _is_loopback(request.remote_addr or ""):
+                from flask import jsonify as _jsonify
 
-            return _jsonify({"error": "unauthorized"}), 401
+                return _jsonify({"error": "unauthorized"}), 401
 
     if flags.rate_limiting and not _check_rate_limit(request.remote_addr or "unknown"):
         _inc("pathly_requests_rate_limited_total")

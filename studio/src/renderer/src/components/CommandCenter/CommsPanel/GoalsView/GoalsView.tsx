@@ -1,7 +1,9 @@
-import { Target } from 'lucide-react'
+import { useState } from 'react'
+import { Target, Network } from 'lucide-react'
 import type { Message } from '../../types'
 import { GoalCard } from '../cards/GoalCard/GoalCard'
 import { TaskCard } from '../cards/TaskCard/TaskCard'
+import { GoalDetailModal } from '../GoalDetailModal/GoalDetailModal'
 import { orderByDeps } from './goalsViewUtils'
 import s from './GoalsView.module.css'
 
@@ -16,6 +18,7 @@ interface Props {
 // goal falls into an "Ungrouped tasks" section. The "+ New goal" control lives in
 // the board's view-toggle row (top right).
 export function GoalsView({ messages, onEditGoal, onDeleteGoal }: Props): JSX.Element {
+  const [allOpen, setAllOpen] = useState(false)
   const goals = messages.filter((m) => m.type === 'goal')
   const goalIds = new Set(goals.map((g) => g.id))
 
@@ -43,6 +46,11 @@ export function GoalsView({ messages, onEditGoal, onDeleteGoal }: Props): JSX.El
 
   return (
     <div className={s.view}>
+      {goals.length > 0 && (
+        <button type="button" className={s.allDagBtn} onClick={() => setAllOpen(true)}>
+          <Network size={13} /> View all goals &amp; tasks in one canvas
+        </button>
+      )}
       {goals.map((g) => (
         <GoalCard key={g.id} goal={g} tasks={tasksByGoal.get(g.id) ?? []} siblings={messages} onEditGoal={onEditGoal} onDeleteGoal={onDeleteGoal} />
       ))}
@@ -53,6 +61,9 @@ export function GoalsView({ messages, onEditGoal, onDeleteGoal }: Props): JSX.El
             <TaskCard key={t.id} task={t} siblings={messages} />
           ))}
         </div>
+      )}
+      {allOpen && (
+        <GoalDetailModal messages={messages} initialGoalId="__all__" onClose={() => setAllOpen(false)} />
       )}
     </div>
   )

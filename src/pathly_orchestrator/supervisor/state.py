@@ -79,6 +79,10 @@ class RunnerState:
     db_path: str = ""  # resolved DB file path; "" means use get_db() default
     fsm_port: int = 8765  # FSM HTTP port (mirrors PATHLY_FSM_HTTP_PORT default)
 
+    # Set when this run is a goal decompose/executor — the terminal planner stage is
+    # told to seed THIS existing goal's DAG instead of finding-or-creating its own.
+    goal_id: str = ""
+
     # Active terminal tab id — set while a terminal-mode stage is in flight
     active_tab_id: str = ""
 

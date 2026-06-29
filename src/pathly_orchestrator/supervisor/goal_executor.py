@@ -20,6 +20,51 @@ def _safe_call(fn: Optional[Callable], *args) -> None:
         pass
 
 
+def _reset_fsm_state_for_flow(flow_name: str, scope: str, project_root: str) -> None:
+    """Re-seed a scope's persisted FSM state to *flow*'s initial state when it is stale.
+
+    FSM state is keyed by SCOPE (feature/topic), NOT by flow — so a scope that previously
+    ran any flow to ``DONE`` (or ran a *different* flow, leaving a ``current`` this flow does
+    not declare) breaks a fresh FSM-driven run two ways:
+      • ``current == "DONE"`` → ``next_action`` short-circuits to ``{done: True}`` and the loop
+        exits having spawned ZERO stages — the "run started but no terminal opened" symptom.
+      • ``current`` is a foreign state (e.g. team's ``BUILDING`` under the ``consultation`` flow)
+        → ``agent_map[current]`` raises ``KeyError`` and the run errors.
+    Before (re)launching an FSM flow from the goal layer we re-seed ``states[0]`` in exactly
+    those two cases; a valid non-terminal state for *this* flow is left so it can resume.
+
+    We write the raw row via ``eventlog._write_state_db`` (not ``write_state``) because
+    ``write_state`` enforces transition validity and would reject ``DONE → <initial>``.
+    Best-effort: callers already refuse when a run is actively running/paused/awaiting, so we
+    only ever reset a finished/foreign/errored state — never a live one. Any failure is logged
+    and swallowed so a reset hiccup never blocks the run.
+    """
+    try:
+        from pathlib import Path
+
+        from pathly_orchestrator import eventlog
+        from pathly_orchestrator.fsm_ops import _load_flow, _resolve_storage_path
+
+        flow_cfg = _load_flow(flow_name, project_root or None) or {}
+        states = flow_cfg.get("states") or []
+        if not states:
+            return
+        storage_path = _resolve_storage_path(flow_cfg, project_root or "", scope)
+        cur = (eventlog.read_state(str(storage_path)) or {}).get("current")
+        if cur is None:
+            return  # no prior state — next_action defaults to states[0]
+        if cur in states and cur != "DONE":
+            return  # valid, non-terminal state for THIS flow — let it resume
+        feature_dir = Path(str(storage_path))
+        eventlog._write_state_db(feature_dir, feature_dir.name, {"current": states[0]})
+    except Exception:
+        import logging
+
+        logging.getLogger(__name__).debug(
+            "_reset_fsm_state_for_flow(%s, %s) failed", flow_name, scope, exc_info=True
+        )
+
+
 def start_goal_run(
     goal_id: str,
     *,
@@ -268,6 +313,8 @@ def _run_team(
     _start = start_fn
     if _start is None:
         from pathly_orchestrator.supervisor.api import start_run as _start
+        # Only re-seed when driving the REAL FSM — a test start_fn owns its own state.
+        _reset_fsm_state_for_flow(flow, scope, project_root)
 
     try:
         state = _start(
@@ -276,6 +323,14 @@ def _run_team(
             project_root=project_root or "",
             model=model or _DEFAULT_MODEL,
             broadcast_fn=broadcast_fn,
+            # Goal executors are headless one-shots per stage — never the interactive REPL
+            # path (which start_run defaults to). interactive=True would spawn a bare REPL
+            # and hang waiting on prompt injection. Mirror _decompose_consultation.
+            interactive=False,
+            # Carry the goal context and fire the lifecycle on_done on terminal status so
+            # the goal-run indicator clears even when the FSM flow ends in error.
+            goal_id=goal_id,
+            on_done=on_done,
         )
     except ValueError as exc:
         return {"ok": False, "reason": "board_busy", "error": str(exc)}

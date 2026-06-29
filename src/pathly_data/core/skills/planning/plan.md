@@ -287,18 +287,23 @@ edge-case, happy-flow, and architecture sections. The heading text must contain 
 `## Phase N` headings where the proposal maps to specific phases; a single-phase or
 phase-agnostic proposal may use descriptive headings instead.
 
-**Idempotency guard — skip if this DAG already exists.** Check for BOTH an existing goal
-and existing tasks for this feature's scope:
+**Idempotency guard — skip only if the task DAG already exists.** Check for existing tasks:
 ```
 curl -s "http://127.0.0.1:8765/comms/tasks?feature=$FEATURE"
+```
+If it contains any tasks, skip this entire step — the DAG is already seeded.
+
+**Find OR create the goal.** This run may be a *decompose of a goal that already exists* (the
+goal card you were launched from — its `goal_id` may be named in your prompt) OR a fresh plan.
+Look the goal up first:
+```
 curl -s "http://127.0.0.1:8765/comms?feature=$FEATURE&scope=$FEATURE&type=goal"
 ```
-If **either** response contains any messages, skip this entire step — the DAG is already
-seeded (e.g. from a previous planning run).
-
-**Post the goal first.** One `type=goal` message; capture its returned `message_id` as
-`$GOAL_ID`. `executor` is set on the **goal only** (`single` = one agent runs the whole
-goal; the `{single,loop,team}` choice is consumed later by the dispatcher, not here):
+- **If a `type=goal` message exists** (or your prompt names a `goal_id`): use its `id` as
+  `$GOAL_ID`. Do **NOT** post a duplicate goal — you are only adding its task children.
+- **If none exists:** post one and capture its `message_id` as `$GOAL_ID`. `executor` is set on
+  the **goal only** (`single` = one agent runs the whole goal; the `{single,loop,team}` choice is
+  consumed later by the dispatcher, not here):
 
 ```bash
 curl -s -X POST http://127.0.0.1:8765/comms/post \
@@ -313,7 +318,7 @@ curl -s -X POST http://127.0.0.1:8765/comms/post \
     "executor": "single"
   }'
 ```
-Record the response `"message_id"` as `$GOAL_ID`.
+Record the `$GOAL_ID` (the existing goal's `id`, or the new `"message_id"`).
 
 **Post advisory files as artifacts (standard/strict only).** Before posting phase tasks,
 post each advisory file that exists as a `type='artifact'` message so the context-retrieval

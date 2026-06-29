@@ -158,6 +158,17 @@ def build_prompt(flow_config: dict, state_name: str, storage_path: Path) -> str:
         f"Feature: {feature}\n"
         f"State: {state_name}\n"
         f"Storage path: {storage_path}\n"
+        "\n"
+        "### Runner contract — the supervisor owns the FSM\n"
+        "You are running headless under the Pathly supervisor, which drives every state "
+        "transition. Do your stage's work, write your artifact(s), post progress and results "
+        "to the board (`/comms/*`), then STOP. Do NOT advance the pipeline yourself: never run "
+        "`pathly-fsm-call`, never call `complete-stage`/`next-action`, never POST to "
+        "`/complete_stage` or `/next_action`, and do NOT route back to another skill (e.g. "
+        "`team <feature> …`). The supervisor advances the flow automatically once your artifact "
+        "exists — any transition you trigger yourself causes a double-advance or a 404 loop. "
+        "(Any `FSM operations` / `complete-stage` / `route back` instructions in the skill above "
+        "apply ONLY to interactive `/pathly` use and must be ignored here.)\n"
     )
     from pathly_orchestrator.runner import build_pipeline_history_block
     import os

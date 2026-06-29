@@ -317,6 +317,11 @@ def start_board_run(
         try:
             _work()
         except Exception as exc:  # noqa: BLE001
+            import logging
+
+            # Log the traceback so the failure is visible in the FSM console, not just
+            # swallowed into on_done (which a caller may choose to drop).
+            logging.getLogger(__name__).exception("board run %s failed", run_id)
             if on_done is not None:
                 _safe_call(
                     on_done, run_id, {"result": f"error: {exc}", "error": str(exc)}

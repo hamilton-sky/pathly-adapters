@@ -7,9 +7,12 @@ import { type EditorCli } from '../../../../MarkdownEditor/EditorHeader/editorCl
 import type { DecomposeMode } from '../../../../../store/commsApi'
 import s from './DecomposeConfigPopover.module.css'
 
-// Mode picker hints (mirror the old BoardSelect dropdown): fast/shallow vs deep/full-team.
+// Three decompose tiers — one planner agent, increasing depth. Quick = bare task list;
+// Plan = one planner writes the full plan + a context_refs/depends_on DAG; Consultation =
+// a full team gathers context first, then the same planner runs at higher rigor.
 export const MODE_OPTIONS = [
-  { value: 'planner', label: 'Planner', hint: 'Fast · DAG only' },
+  { value: 'planner', label: 'Quick', hint: 'Fast · bare task list' },
+  { value: 'plan', label: 'Plan', hint: 'One planner · full plan + wired DAG' },
   { value: 'consultation', label: 'Consultation', hint: 'Deep · full team' },
 ]
 

@@ -67,6 +67,34 @@ def runner_start():
         if not isinstance(interactive, bool):
             interactive = bool(interactive)
 
+        # Reject up-front if a headless run routes any stage to an adapter with no headless
+        # mode (copilot/antigravity today), so it fails fast with a clear message instead of
+        # dying opaquely mid-pipeline when resolve_command raises. Interactive runs are exempt
+        # (they launch a visible REPL, not a one-shot argv).
+        if not interactive:
+            try:
+                from pathly_orchestrator.adapters import unsupported_headless_adapters
+                from pathly_orchestrator.fsm_ops import _load_flow
+
+                flow_cfg = _load_flow(data["flow"], data["project_root"] or None) or {}
+                adapter_map = flow_cfg.get("adapter_map") or {}
+                bad = unsupported_headless_adapters(list(adapter_map.values()))
+                if bad:
+                    return (
+                        jsonify(
+                            {
+                                "error": (
+                                    f"Flow {data['flow']!r} routes stage(s) to adapter(s) with "
+                                    f"no headless mode: {', '.join(bad)}. Use claude or codex, or "
+                                    f"remove them from the flow's adapter_map."
+                                )
+                            }
+                        ),
+                        400,
+                    )
+            except Exception:
+                logging.debug("adapter pre-flight check skipped", exc_info=True)
+
         state = _sup.start_run(
             topic=topic,
             flow=data["flow"],

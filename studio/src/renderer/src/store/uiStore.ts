@@ -117,7 +117,7 @@ export const useUiStore = create<UiState>()(
     (set) => ({
       sidebarCollapsed: false,
       sidebarTab: loadSidebarTab(),
-      activePanel: 'monitor',
+      activePanel: 'command-center',
       dirtyItems: new Set(),
       theme: 'dark',
       preferredDark: 'dark',

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Copy, Check } from 'lucide-react'
 import { useToastStore } from '../../../store/toastStore'
+import { Tooltip } from '../../ui'
 import s from './CopyTextButton.module.css'
 
 interface Props {
@@ -32,14 +33,15 @@ export function CopyTextButton({ text, label }: Props): JSX.Element {
 
   const tip = `Copy ${label}`
   return (
-    <button
-      type="button"
-      className={s.copyBtn}
-      title={tip}
-      aria-label={tip}
-      onClick={(e) => { e.stopPropagation(); void copy() }}
-    >
-      {copied ? <Check size={12} /> : <Copy size={12} />}
-    </button>
+    <Tooltip label={tip} placement="top">
+      <button
+        type="button"
+        className={s.copyBtn}
+        aria-label={tip}
+        onClick={(e) => { e.stopPropagation(); void copy() }}
+      >
+        {copied ? <Check size={12} /> : <Copy size={12} />}
+      </button>
+    </Tooltip>
   )
 }

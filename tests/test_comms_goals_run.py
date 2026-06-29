@@ -359,6 +359,30 @@ def test_decompose_planner_routes_to_board_run():
     assert "task" in seen["prompt"].lower()
 
 
+def test_decompose_plan_routes_to_planning_plan():
+    """mode='plan' runs the planning/plan skill as ONE board agent → a context_refs DAG."""
+    from pathly_orchestrator.db.connection import get_db
+    from pathly_orchestrator.supervisor.goal_run import start_goal_decompose
+
+    conn = get_db()
+    goal = _make_goal(conn, "dec_plan")
+    seen = {}
+
+    def fake_board_spawn(**kw):
+        seen.update(kw)
+        return {"result": "seeded"}
+
+    result = start_goal_decompose(
+        goal, mode="plan", project_root="", spawn_fn=fake_board_spawn, block=True
+    )
+    assert result["ok"] is True
+    assert result["mode"] == "plan"
+    # the planning/plan skill body is composed into the prompt (it derives context_refs)...
+    assert "context_refs" in seen["prompt"]
+    # ...and the directive names the existing goal so the planner reuses it (no duplicate).
+    assert goal in seen["prompt"]
+
+
 def test_decompose_consultation_routes_to_consultation_flow():
     """mode='consultation' launches the consultation FSM flow."""
     import types
@@ -373,8 +397,15 @@ def test_decompose_consultation_routes_to_consultation_flow():
         captured.update(kw)
         return types.SimpleNamespace(run_id="cons-1")
 
+    def _sentinel_done(run_id, res):
+        pass
+
     result = start_goal_decompose(
-        goal, mode="consultation", project_root="/x", start_fn=fake_start
+        goal,
+        mode="consultation",
+        project_root="/x",
+        start_fn=fake_start,
+        on_done=_sentinel_done,
     )
     assert result["ok"] is True
     assert result["mode"] == "consultation"
@@ -382,6 +413,62 @@ def test_decompose_consultation_routes_to_consultation_flow():
     # A board-context decompose has no human at a terminal, so the consultation flow
     # must run headless — an interactive PTY would block waiting for input.
     assert captured["interactive"] is False
+    # The goal_id is threaded so the terminal planner seeds THIS goal's DAG (not a new
+    # goal), and on_done is wired so the board's "Decomposing…" indicator clears on
+    # terminal status even when the flow errors out.
+    assert captured["goal_id"] == goal
+    assert captured["on_done"] is _sentinel_done
+
+
+def test_decompose_directive_targets_only_the_dag_seeder():
+    """The 'seed THIS goal' suffix fires only for planning/plan with a goal_id set."""
+    from pathly_orchestrator.supervisor.orchestrator import _decompose_directive
+
+    d = _decompose_directive("planning/plan", "g-123")
+    assert "g-123" in d and "Decompose target" in d and "do NOT post a new goal" in d
+    # No goal_id → no directive (a normal flow run, not a decompose).
+    assert _decompose_directive("planning/plan", "") == ""
+    # Other stages (PO, architect, the team-flow planner) must not get it — only the
+    # board-DAG seeder does.
+    assert _decompose_directive("planning/po", "g-123") == ""
+    assert _decompose_directive("team/plan", "g-123") == ""
+    assert _decompose_directive("team/build", "g-123") == ""
+
+
+def test_start_run_fires_on_done_on_terminal_status(tmp_path, monkeypatch):
+    """A supervised run fires on_done once it reaches a terminal status.
+
+    This is what clears the board's "Decomposing…" indicator — without it, a consultation
+    decompose that ends in error leaves the timer running forever (the bug we hit).
+    """
+    import threading
+
+    from pathly_orchestrator import fsm_http_client as fhc
+    from pathly_orchestrator.supervisor.api import start_run
+
+    # FSM reports done on the first poll → _loop returns at once with status='done'.
+    monkeypatch.setattr(fhc, "next_action", lambda args: {"done": True})
+
+    seen: dict = {}
+    fired = threading.Event()
+
+    def _on_done(run_id, res):
+        seen["run_id"] = run_id
+        seen["res"] = res
+        fired.set()
+
+    state = start_run(
+        topic="on_done_topic",
+        flow="consultation",
+        project_root=str(tmp_path),
+        broadcast_fn=None,
+        goal_id="g-xyz",
+        on_done=_on_done,
+    )
+    assert fired.wait(timeout=5), "on_done must fire when the run reaches terminal status"
+    assert seen["run_id"] == state.run_id
+    assert seen["res"]["status"] == "done"
+    assert state.goal_id == "g-xyz"  # goal_id threaded onto the run
 
 
 def test_decompose_already_decomposed():
@@ -442,3 +529,78 @@ def test_http_decompose_already(client):
     r = client.post("/comms/goals/decompose", json={"goal_id": goal})
     assert r.status_code == 409
     assert json.loads(r.data)["reason"] == "already_decomposed"
+
+
+# ---------------------------------------------------------------------------
+# Stale-state reset — re-running an FSM flow on a scope must not no-op.
+# These drive the REAL next_action (no mock on the FSM side) so the round-trip
+# is exercised end-to-end: a scope left at DONE (or a foreign flow's state) is
+# the "run started but no terminal opened" trap.
+# ---------------------------------------------------------------------------
+
+
+def _consultation_storage(root: str, scope: str):
+    from pathlib import Path
+
+    from pathly_orchestrator.fsm_ops import _load_flow, _resolve_storage_path
+
+    flow_cfg = _load_flow("consultation", root)
+    storage = Path(str(_resolve_storage_path(flow_cfg, root, scope)))
+    storage.mkdir(parents=True, exist_ok=True)
+    return storage
+
+
+def test_reset_unsticks_done_consultation_real_fsm(tmp_path):
+    """A scope parked at DONE makes next_action short-circuit; reset re-seeds the PO stage."""
+    from pathly_orchestrator import eventlog
+    from pathly_orchestrator.fsm_ops import next_action
+    from pathly_orchestrator.supervisor.goal_executor import _reset_fsm_state_for_flow
+
+    scope = "reset_done"
+    root = str(tmp_path)
+    storage = _consultation_storage(root, scope)
+    eventlog._write_state_db(storage, storage.name, {"current": "DONE"})
+
+    # Before the reset: the real FSM reports done and would spawn nothing.
+    pre = next_action({"flow": "consultation", "topic": scope, "project_root": root})
+    assert pre.get("done") is True
+
+    _reset_fsm_state_for_flow("consultation", scope, root)
+
+    post = next_action({"flow": "consultation", "topic": scope, "project_root": root})
+    assert not post.get("done"), "after reset the flow must re-run, not report done"
+    assert post["current_state"] == "PO_DISCUSSING"
+
+
+def test_reset_unsticks_foreign_state_real_fsm(tmp_path):
+    """A scope left in another flow's state (team's BUILDING) is re-seeded to this flow's start."""
+    from pathly_orchestrator import eventlog
+    from pathly_orchestrator.fsm_ops import next_action
+    from pathly_orchestrator.supervisor.goal_executor import _reset_fsm_state_for_flow
+
+    scope = "reset_foreign"
+    root = str(tmp_path)
+    storage = _consultation_storage(root, scope)
+    # BUILDING is a team-flow state — the consultation flow has no agent_map entry for it.
+    eventlog._write_state_db(storage, storage.name, {"current": "BUILDING"})
+
+    _reset_fsm_state_for_flow("consultation", scope, root)
+
+    post = next_action({"flow": "consultation", "topic": scope, "project_root": root})
+    assert post["current_state"] == "PO_DISCUSSING"
+
+
+def test_reset_preserves_valid_midflow(tmp_path):
+    """A valid, non-terminal state for THIS flow is left untouched so the run can resume."""
+    from pathly_orchestrator import eventlog
+    from pathly_orchestrator.supervisor.goal_executor import _reset_fsm_state_for_flow
+
+    scope = "reset_midflow"
+    root = str(tmp_path)
+    storage = _consultation_storage(root, scope)
+    eventlog._write_state_db(storage, storage.name, {"current": "ARCHITECTING"})
+
+    _reset_fsm_state_for_flow("consultation", scope, root)
+
+    cur = (eventlog.read_state(str(storage)) or {}).get("current")
+    assert cur == "ARCHITECTING", "a resumable mid-flow state must not be clobbered"
