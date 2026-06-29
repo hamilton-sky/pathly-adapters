@@ -1,6 +1,16 @@
 import type { Message } from '../../../types'
 
 export type DagOrient = 'vertical' | 'horizontal' | 'snake'
+export type CommentColor = 'yellow' | 'blue' | 'green' | 'pink' | 'purple'
+
+export interface DagComment {
+  id: string
+  text: string
+  color: CommentColor
+  taskIds: string[] // empty = general note; non-empty = attached to these specific tasks
+  x: number
+  y: number
+}
 
 export interface DagNode {
   id: string

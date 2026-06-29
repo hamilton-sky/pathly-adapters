@@ -21,6 +21,15 @@
   background: var(--bg-elevated, var(--bg-surface0));
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
   overflow: hidden;
+  transition: width 200ms ease, height 200ms ease;
+}
+.modal[data-expand='1'] {
+  width: min(860px, 92vw);
+  height: min(720px, 92vh);
+}
+.modal[data-expand='2'] {
+  width: min(92vw, 1400px);
+  height: min(92vh, 960px);
 }
 
 /* One compact top bar: tabs · DAG layout controls · rollup · goal selector · close. */

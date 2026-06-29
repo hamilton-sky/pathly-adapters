@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Network, ListTree, Target, Rows3, Columns3, LayoutGrid, RotateCcw } from 'lucide-react'
+import { X, Network, ListTree, Target, Rows3, Columns3, LayoutGrid, RotateCcw, Maximize2, Minimize2, Maximize } from 'lucide-react'
 import type { Message } from '../../types'
 import { useFocusTrap } from '../../../../hooks/useFocusTrap'
 import { Tooltip } from '../../../ui'
@@ -9,7 +9,7 @@ import { CopyTextButton } from '../../../shared/CopyTextButton/CopyTextButton'
 import { BoardSelect } from '../../../shared/BoardSelect/BoardSelect'
 import { TaskCard } from '../cards/TaskCard/TaskCard'
 import { TaskDagView } from './TaskDagView/TaskDagView'
-import type { DagOrient } from './TaskDagView/dagLayout'
+import type { DagOrient, DagComment } from './TaskDagView/dagLayout'
 import { orderByDeps, computeRollup, serializeTasks } from '../GoalsView/goalsViewUtils'
 import s from './GoalDetailModal.module.css'
 
@@ -27,15 +27,19 @@ function firstLine(text: string): string {
 }
 
 // Full goal+tasks modal. A single compact top bar carries: tabs (DAG / Tasks), the DAG layout
-// controls (top-down / left-right / snake + auto-arrange), the task rollup, a compact goal selector
-// (incl. an All-goals cross-goal view), and close. Mirrors ArtifactModal's portal + focus-trap shell.
+// controls (top-down / left-right / snake + auto-arrange), a modal expand toggle, the task
+// rollup, a compact goal selector (incl. an All-goals cross-goal view), and close.
+// Canvas comment notes are owned here so they survive DAG remounts and are included in
+// the serialised task copy (agents see user guidance attached to each task).
 export function GoalDetailModal({ messages, initialGoalId, onClose }: Props): JSX.Element {
   const boxRef = useRef<HTMLDivElement>(null)
   useFocusTrap(boxRef)
   const [tab, setTab] = useState<Tab>('dag')
   const [goalId, setGoalId] = useState<string>(initialGoalId)
   const [orient, setOrient] = useState<DagOrient>('vertical')
-  const [dagKey, setDagKey] = useState(0) // bump to remount TaskDagView → auto-arrange (clear drags + view)
+  const [dagKey, setDagKey] = useState(0)
+  const [expandLevel, setExpandLevel] = useState<0 | 1 | 2>(0)
+  const [comments, setComments] = useState<DagComment[]>([])
 
   const goals = useMemo(() => messages.filter((m) => m.type === 'goal'), [messages])
   const isAll = goalId === ALL
@@ -47,6 +51,9 @@ export function GoalDetailModal({ messages, initialGoalId, onClose }: Props): JS
   const ordered = useMemo(() => orderByDeps(tasks), [tasks])
   const r = computeRollup(tasks)
   const headerText = isAll ? 'All goals' : goal?.text ?? 'Goal'
+
+  // Clear notes when switching goals so stale task-attachments don't linger.
+  useEffect(() => { setComments([]) }, [goalId])
 
   useEffect(() => {
     function onKey(e: KeyboardEvent): void {
@@ -64,7 +71,14 @@ export function GoalDetailModal({ messages, initialGoalId, onClose }: Props): JS
 
   return createPortal(
     <div className={s.backdrop} onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <div ref={boxRef} role="dialog" aria-modal="true" aria-label="Goal details" className={s.modal}>
+      <div
+        ref={boxRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Goal details"
+        className={s.modal}
+        data-expand={expandLevel}
+      >
         <div className={s.topbar}>
           <div className={s.tabs} role="tablist">
             <button type="button" role="tab" className={s.tab} data-active={tab === 'dag' ? 'true' : 'false'} {...(tab === 'dag' ? { 'aria-selected': 'true' } : { 'aria-selected': 'false' })} onClick={() => setTab('dag')}>
@@ -92,6 +106,27 @@ export function GoalDetailModal({ messages, initialGoalId, onClose }: Props): JS
             </div>
           )}
 
+          {(() => {
+            const EXPAND = [
+              { icon: <Maximize2 size={13} />, label: 'Expand to medium' },
+              { icon: <Maximize size={13} />, label: 'Expand to full' },
+              { icon: <Minimize2 size={13} />, label: 'Restore compact size' },
+            ] as const
+            const ea = EXPAND[expandLevel]
+            return (
+              <Tooltip label={ea.label} placement="bottom">
+                <button
+                  type="button"
+                  className={s.iconBtn}
+                  onClick={() => setExpandLevel(((expandLevel + 1) % 3) as 0 | 1 | 2)}
+                  aria-label={ea.label}
+                >
+                  {ea.icon}
+                </button>
+              </Tooltip>
+            )
+          })()}
+
           <span className={s.spacer} />
           <BoardSelect
             value={goalId}
@@ -109,7 +144,14 @@ export function GoalDetailModal({ messages, initialGoalId, onClose }: Props): JS
 
         <div className={s.body}>
           {tab === 'dag' ? (
-            <TaskDagView key={dagKey} tasks={tasks} order={ordered} orient={orient} />
+            <TaskDagView
+              key={dagKey}
+              tasks={tasks}
+              order={ordered}
+              orient={orient}
+              comments={comments}
+              onCommentsChange={setComments}
+            />
           ) : (
             <div className={s.overview}>
               {!isAll && goal?.text && (
@@ -129,12 +171,13 @@ export function GoalDetailModal({ messages, initialGoalId, onClose }: Props): JS
         <footer className={s.foot}>
           <div className={s.footSide}>
             {tasks.length > 0 && (
-              <CopyTextButton text={serializeTasks(headerText, tasks)} label="all tasks" />
+              <CopyTextButton text={serializeTasks(headerText, tasks, comments)} label="all tasks" />
             )}
           </div>
           <span className={s.rollup}>
             {r.total} task{r.total !== 1 ? 's' : ''} · {r.done} done · {r.ready} ready
             {r.failed > 0 ? ` · ${r.failed} blocked` : ''}
+            {comments.length > 0 ? ` · ${comments.length} note${comments.length !== 1 ? 's' : ''}` : ''}
           </span>
           <button type="button" className={s.btnQuiet} onClick={onClose}>Close</button>
         </footer>

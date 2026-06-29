@@ -175,12 +175,33 @@
   color: var(--text-muted);
 }
 
-/* Zoom controls — pinned bottom-left of the viewport (above the panning canvas). */
-.zoom {
+/* Dashed edge from a comment note to its attached task. */
+.commentEdge {
+  fill: none;
+  stroke: var(--text-muted);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+  stroke-linecap: round;
+  opacity: 0.55;
+}
+
+/* Preview: expanded variant — wider card, taller body. */
+.preview[data-expanded='true'] { width: 520px; max-width: calc(100vw - 40px); }
+.preview[data-expanded='true'] .previewBody { max-height: 68vh; }
+
+/* Bottom bar — wraps zoom pill + note pill together, pinned bottom-left. */
+.bottomBar {
   position: absolute;
   left: 10px;
   bottom: 10px;
   z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Zoom pill — inline inside the bottom bar (no longer absolutely positioned). */
+.zoom {
   display: inline-flex;
   align-items: center;
   gap: 2px;
@@ -189,6 +210,38 @@
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--bg-elevated, var(--bg-surface0)) 92%, transparent);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+/* Note pill — sits to the right of the zoom pill. */
+.noteBar {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px 3px 5px;
+  border: var(--border);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--bg-elevated, var(--bg-surface0)) 92%, transparent);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+.noteBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 4px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+}
+.noteBtn:hover { background: var(--bg-surface1); color: var(--text-primary); }
+.noteBadge {
+  padding: 1px 5px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
+  font: 600 10px/1.4 var(--font-family-mono, monospace);
 }
 .zoomBtn {
   display: inline-flex;

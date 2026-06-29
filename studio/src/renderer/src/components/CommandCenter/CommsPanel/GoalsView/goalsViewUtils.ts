@@ -1,4 +1,5 @@
 import type { Message } from '../../types'
+import type { DagComment } from '../GoalDetailModal/TaskDagView/dagLayout'
 
 // Order tasks so a task always appears after the tasks it depends on (a stable
 // DFS topological sort). Cycles are tolerated — the `visiting` guard prevents
@@ -25,18 +26,39 @@ export function orderByDeps(tasks: Message[]): Message[] {
   return result
 }
 
-// Serialize a goal + its tasks to one markdown block for the clipboard. Order follows the
-// DAG (orderByDeps); each task is numbered with its status, artifact, and full text — so a
-// human can paste the whole work list into a prompt or an issue.
-export function serializeTasks(goalText: string, tasks: Message[]): string {
+// Serialize a goal + its tasks (plus any canvas comments) to one markdown block for the
+// clipboard. Comments attached to a task appear directly under it; free-floating notes
+// appear in a "General Notes" section at the end — so agents see all user guidance.
+export function serializeTasks(goalText: string, tasks: Message[], comments?: DagComment[]): string {
   const ordered = orderByDeps(tasks)
+  const byTask = new Map<string, DagComment[]>()
+  const standalone: DagComment[] = []
+  for (const c of comments ?? []) {
+    if (c.text.trim() === '') continue
+    if (c.taskIds.length > 0) {
+      for (const tid of c.taskIds) {
+        const list = byTask.get(tid) ?? []
+        list.push(c)
+        byTask.set(tid, list)
+      }
+    } else {
+      standalone.push(c)
+    }
+  }
   const lines: string[] = [`# ${goalText.trim()}`, '']
   ordered.forEach((t, i) => {
     const status = t.taskStatus ?? 'pending'
     lines.push(`## Task ${i + 1} — ${status}`)
     if (t.artifactPath) lines.push(`_artifact: ${t.artifactPath}_`)
     lines.push('', t.text.trim(), '')
+    for (const c of byTask.get(t.id) ?? []) {
+      lines.push(`> **Note:** ${c.text.trim()}`, '')
+    }
   })
+  if (standalone.length > 0) {
+    lines.push('## General Notes', '')
+    for (const c of standalone) lines.push(`- ${c.text.trim()}`, '')
+  }
   return lines.join('\n').trimEnd() + '\n'
 }
 

@@ -1,16 +1,19 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { X, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react'
+import { X, ZoomIn, ZoomOut, Maximize2, Minimize2, StickyNote } from 'lucide-react'
 import type { Message } from '../../../types'
 import { Tooltip } from '../../../../ui'
 import MarkdownRenderer from '../../../../shared/MarkdownRenderer/MarkdownRenderer'
 import { CopyTextButton } from '../../../../shared/CopyTextButton/CopyTextButton'
-import { dagLayout, type DagNode, type DagOrient } from './dagLayout'
+import { dagLayout, type DagNode, type DagOrient, type DagComment } from './dagLayout'
+import { CommentNode } from './CommentNode/CommentNode'
 import s from './TaskDagView.module.css'
 
 const MIN_SCALE = 0.3
 const MAX_SCALE = 2.5
 const PREVIEW_W = 360
+const COMMENT_W = 210
+const COMMENT_ANCHOR_Y = 26 // approx mid-handle for edge anchor
 
 function firstLine(text: string): string {
   return text.split('\n').find((l) => l.trim()) ?? text
@@ -19,13 +22,8 @@ function clampScale(v: number): number {
   return Math.min(MAX_SCALE, Math.max(MIN_SCALE, v))
 }
 
-interface Pt {
-  x: number
-  y: number
-}
+interface Pt { x: number; y: number }
 
-// Straight centre-to-centre connector. The opaque nodes paint on top of the edge layer, so the
-// visible segment reads as an edge-to-edge link from ANY node position (robust to dragging).
 function edgePath(a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }): string {
   return `M${a.x + a.w / 2},${a.y + a.h / 2} L${b.x + b.w / 2},${b.y + b.h / 2}`
 }
@@ -33,16 +31,14 @@ function edgePath(a: { x: number; y: number; w: number; h: number }, b: { x: num
 interface Props {
   tasks: Message[]
   order: Message[]
-  // Layout is controlled by the modal toolbar so the layout actions can sit next to the tabs.
   orient: DagOrient
+  comments: DagComment[]
+  onCommentsChange: (comments: DagComment[]) => void
 }
 
-// The task DAG as an interactive node graph. Layout (top-down / left-right / snake) is owned by the
-// modal. The canvas PANS (drag the background) and ZOOMS (buttons bottom-left, or wheel over the
-// background). A node can be DRAGGED to reposition it (edges follow). A plain click (no drag) opens
-// a preview popover (portaled above everything) — closed by clicking outside, its ✕, or re-click.
-export function TaskDagView({ tasks, order, orient }: Props): JSX.Element {
+export function TaskDagView({ tasks, order, orient, comments, onCommentsChange }: Props): JSX.Element {
   const [selected, setSelected] = useState<string | null>(null)
+  const [previewExpanded, setPreviewExpanded] = useState(false)
   const [moved, setMoved] = useState<Record<string, Pt>>({})
   const [view, setView] = useState({ tx: 0, ty: 0, scale: 1 })
   const [panning, setPanning] = useState(false)
@@ -57,20 +53,35 @@ export function TaskDagView({ tasks, order, orient }: Props): JSX.Element {
   )
   const byId = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes])
 
-  // A layout switch invalidates drag positions (old coords) and the framing — reset both.
-  useEffect(() => {
+  // Center the graph in the viewport on mount and whenever the layout direction changes.
+  // useLayoutEffect runs before paint so there's no flash of nodes at (0,0).
+  // layout.width/height are read at run-time (not listed as deps) because we only want
+  // to re-center on explicit orientation changes, not on every task addition.
+  useLayoutEffect(() => {
     setMoved({})
-    setView({ tx: 0, ty: 0, scale: 1 })
-  }, [orient])
+    const wrap = wrapRef.current
+    setView({
+      tx: wrap ? (wrap.clientWidth - layout.width) / 2 : 0,
+      ty: wrap ? (wrap.clientHeight - layout.height) / 2 : 0,
+      scale: 1,
+    })
+  }, [orient]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => { setPreviewExpanded(false) }, [selected])
 
   function zoomBy(factor: number): void {
     setView((v) => ({ ...v, scale: clampScale(v.scale * factor) }))
   }
   function resetView(): void {
-    setView({ tx: 0, ty: 0, scale: 1 })
+    const wrap = wrapRef.current
+    setView({
+      tx: wrap ? (wrap.clientWidth - layout.width) / 2 : 0,
+      ty: wrap ? (wrap.clientHeight - layout.height) / 2 : 0,
+      scale: 1,
+    })
   }
 
-  // ── Node drag (screen delta → canvas delta via the current scale) ───────────
+  // ── Node drag ────────────────────────────────────────────────────────────────
   function onNodeDown(e: ReactPointerEvent<HTMLButtonElement>, n: DagNode): void {
     e.stopPropagation()
     const p = moved[n.id] ?? { x: n.x, y: n.y }
@@ -83,7 +94,7 @@ export function TaskDagView({ tasks, order, orient }: Props): JSX.Element {
     const dx = (e.clientX - d.sx) / view.scale
     const dy = (e.clientY - d.sy) / view.scale
     if (!d.dragged && Math.abs(e.clientX - d.sx) + Math.abs(e.clientY - d.sy) > 4) d.dragged = true
-    if (d.dragged) setMoved((prev) => ({ ...prev, [d.id]: { x: Math.max(0, d.ox + dx), y: Math.max(0, d.oy + dy) } }))
+    if (d.dragged) setMoved((prev) => ({ ...prev, [d.id]: { x: d.ox + dx, y: d.oy + dy } }))
   }
   function onNodeUp(e: ReactPointerEvent<HTMLButtonElement>, n: DagNode): void {
     const d = drag.current
@@ -92,9 +103,14 @@ export function TaskDagView({ tasks, order, orient }: Props): JSX.Element {
     if (d && !d.dragged) setSelected((cur) => (cur === n.id ? null : n.id))
   }
 
-  // ── Canvas pan (drag the background) ────────────────────────────────────────
+  // ── Canvas pan ───────────────────────────────────────────────────────────────
   function overInteractive(t: HTMLElement): boolean {
-    return Boolean(t.closest(`.${s.node}`) || t.closest(`.${s.preview}`) || t.closest(`.${s.zoom}`))
+    return Boolean(
+      t.closest(`.${s.node}`) ||
+      t.closest(`.${s.preview}`) ||
+      t.closest(`.${s.bottomBar}`) ||
+      t.closest('[data-dag-comment]'),
+    )
   }
   function onWrapDown(e: ReactPointerEvent<HTMLDivElement>): void {
     if (overInteractive(e.target as HTMLElement)) return
@@ -113,13 +129,10 @@ export function TaskDagView({ tasks, order, orient }: Props): JSX.Element {
     try { e.currentTarget.releasePointerCapture(e.pointerId) } catch { /* gone */ }
   }
   function onWheel(e: ReactWheelEvent<HTMLDivElement>): void {
-    // Zoom is a canvas action — only over the background. Over a node or the preview the wheel
-    // belongs to that element (e.g. scrolling the preview text), not the canvas.
     if (overInteractive(e.target as HTMLElement)) return
     zoomBy(e.deltaY < 0 ? 1.1 : 0.9)
   }
 
-  // Close the preview on any mousedown outside it AND outside a node.
   useEffect(() => {
     if (!selected) return
     function onDown(e: MouseEvent): void {
@@ -130,20 +143,36 @@ export function TaskDagView({ tasks, order, orient }: Props): JSX.Element {
     return () => document.removeEventListener('mousedown', onDown)
   }, [selected])
 
+  // ── Comment helpers ──────────────────────────────────────────────────────────
+  function addComment(): void {
+    const wrap = wrapRef.current
+    const cx = wrap ? (wrap.clientWidth / 2 - view.tx) / view.scale - COMMENT_W / 2 : 80
+    const cy = wrap ? (wrap.clientHeight / 2 - view.ty) / view.scale - 44 : 80
+    const id = `cmt-${Date.now()}`
+    onCommentsChange([...comments, { id, text: '', color: 'yellow', taskIds: [], x: cx, y: cy }])
+  }
+  function updateComment(id: string, patch: Partial<Pick<DagComment, 'text' | 'color' | 'taskIds'>>): void {
+    onCommentsChange(comments.map((c) => (c.id === id ? { ...c, ...patch } : c)))
+  }
+  function deleteComment(id: string): void {
+    onCommentsChange(comments.filter((c) => c.id !== id))
+  }
+  function moveComment(id: string, x: number, y: number): void {
+    onCommentsChange(comments.map((c) => (c.id === id ? { ...c, x, y } : c)))
+  }
+
   if (tasks.length === 0) return <div className={s.empty}>No tasks to graph yet.</div>
 
   const sel = selected ? byId.get(selected) ?? null : null
+  const previewActualW = previewExpanded ? 520 : PREVIEW_W
 
-  // Anchor the preview under the selected node IN SCREEN SPACE, then portal it to <body> so it
-  // floats above everything — full size (never scaled by the zoom transform) and never clipped by
-  // the canvas viewport. Recomputed each render so it tracks the node while panning/zooming.
   let previewPos: Pt | null = null
   if (sel && wrapRef.current) {
     const rect = wrapRef.current.getBoundingClientRect()
     const x = rect.left + sel.x * view.scale + view.tx
     const y = rect.top + (sel.y + sel.h) * view.scale + view.ty + 8
     previewPos = {
-      x: Math.max(8, Math.min(x, window.innerWidth - PREVIEW_W - 12)),
+      x: Math.max(8, Math.min(x, window.innerWidth - previewActualW - 12)),
       y: Math.max(8, Math.min(y, window.innerHeight - 80)),
     }
   }
@@ -177,6 +206,20 @@ export function TaskDagView({ tasks, order, orient }: Props): JSX.Element {
                 />
               )
             })}
+            {/* Dashed edges: one per (comment, attached task) pair */}
+            {comments.flatMap((c) =>
+              c.taskIds.map((tid) => {
+                const taskNode = byId.get(tid)
+                if (!taskNode) return null
+                return (
+                  <path
+                    key={`cmt-${c.id}-${tid}`}
+                    className={s.commentEdge}
+                    d={`M${c.x + COMMENT_W / 2},${c.y + COMMENT_ANCHOR_Y} L${taskNode.x + taskNode.w / 2},${taskNode.y + taskNode.h / 2}`}
+                  />
+                )
+              }).filter(Boolean)
+            )}
           </svg>
 
           {nodes.map((n) => (
@@ -196,19 +239,44 @@ export function TaskDagView({ tasks, order, orient }: Props): JSX.Element {
               </button>
             </Tooltip>
           ))}
+
+          {comments.map((c) => (
+            <CommentNode
+              key={c.id}
+              comment={c}
+              tasks={order}
+              scale={view.scale}
+              onUpdate={updateComment}
+              onDelete={deleteComment}
+              onMove={moveComment}
+            />
+          ))}
         </div>
 
-        <div className={s.zoom}>
-          <Tooltip label="Zoom in" placement="top">
-            <button type="button" className={s.zoomBtn} onClick={() => zoomBy(1.2)} aria-label="Zoom in"><ZoomIn size={13} /></button>
-          </Tooltip>
-          <span className={s.zoomPct}>{Math.round(view.scale * 100)}%</span>
-          <Tooltip label="Zoom out" placement="top">
-            <button type="button" className={s.zoomBtn} onClick={() => zoomBy(1 / 1.2)} aria-label="Zoom out"><ZoomOut size={13} /></button>
-          </Tooltip>
-          <Tooltip label="Reset view" placement="top">
-            <button type="button" className={s.zoomBtn} onClick={resetView} aria-label="Reset view"><Maximize2 size={12} /></button>
-          </Tooltip>
+        {/* Bottom bar: zoom controls + Note button — both pinned together bottom-left */}
+        <div className={s.bottomBar}>
+          <div className={s.zoom}>
+            <Tooltip label="Zoom in" placement="top">
+              <button type="button" className={s.zoomBtn} onClick={() => zoomBy(1.2)} aria-label="Zoom in"><ZoomIn size={13} /></button>
+            </Tooltip>
+            <span className={s.zoomPct}>{Math.round(view.scale * 100)}%</span>
+            <Tooltip label="Zoom out" placement="top">
+              <button type="button" className={s.zoomBtn} onClick={() => zoomBy(1 / 1.2)} aria-label="Zoom out"><ZoomOut size={13} /></button>
+            </Tooltip>
+            <Tooltip label="Reset view" placement="top">
+              <button type="button" className={s.zoomBtn} onClick={resetView} aria-label="Reset view"><Maximize2 size={12} /></button>
+            </Tooltip>
+          </div>
+
+          <div className={s.noteBar}>
+            <Tooltip label="Add sticky note to canvas" placement="top">
+              <button type="button" className={s.noteBtn} onClick={addComment} aria-label="Add note">
+                <StickyNote size={12} />
+                <span>Note</span>
+              </button>
+            </Tooltip>
+            {comments.length > 0 && <span className={s.noteBadge}>{comments.length}</span>}
+          </div>
         </div>
       </div>
 
@@ -217,6 +285,7 @@ export function TaskDagView({ tasks, order, orient }: Props): JSX.Element {
           className={s.preview}
           role="dialog"
           aria-label="Task preview"
+          data-expanded={previewExpanded ? 'true' : 'false'}
           style={{ '--x': `${previewPos.x}px`, '--y': `${previewPos.y}px` } as React.CSSProperties}
         >
           <div className={s.previewHead}>
@@ -224,6 +293,16 @@ export function TaskDagView({ tasks, order, orient }: Props): JSX.Element {
               Task {sel.index} · {sel.task.taskStatus ?? 'pending'}
             </span>
             <CopyTextButton text={sel.task.text} label="task" />
+            <Tooltip label={previewExpanded ? 'Collapse text' : 'Expand full text'} placement="left">
+              <button
+                type="button"
+                className={s.previewClose}
+                onClick={() => setPreviewExpanded((v) => !v)}
+                aria-label={previewExpanded ? 'Collapse preview' : 'Expand preview'}
+              >
+                {previewExpanded ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
+              </button>
+            </Tooltip>
             <Tooltip label="Close preview" placement="left">
               <button type="button" className={s.previewClose} onClick={() => setSelected(null)} aria-label="Close preview">
                 <X size={13} />

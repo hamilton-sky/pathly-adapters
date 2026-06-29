@@ -1,0 +1,157 @@
+.note {
+  position: absolute;
+  left: var(--cx);
+  top: var(--cy);
+  width: 210px;
+  display: flex;
+  flex-direction: column;
+  border: 1.5px solid var(--note-color, var(--text-muted));
+  border-top-width: 3px;
+  border-radius: var(--radius-md);
+  background: var(--bg-surface1);
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.3);
+  z-index: 4;
+}
+
+.note[data-color='yellow'] { --note-color: #d8a657; }
+.note[data-color='blue']   { --note-color: #7ab0df; }
+.note[data-color='green']  { --note-color: #a9b665; }
+.note[data-color='pink']   { --note-color: #e882a0; }
+.note[data-color='purple'] { --note-color: #c792ea; }
+
+.handle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 6px;
+  border-bottom: var(--border);
+  cursor: grab;
+  min-width: 0;
+}
+.handle:active { cursor: grabbing; }
+
+/* Color dots */
+.colorRow { display: flex; align-items: center; gap: 3px; flex-shrink: 0; }
+
+.colorDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1.5px solid transparent;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: transform 80ms;
+}
+.colorDot:hover { transform: scale(1.3); }
+.colorDot[data-color='yellow'] { background: #d8a657; }
+.colorDot[data-color='blue']   { background: #7ab0df; }
+.colorDot[data-color='green']  { background: #a9b665; }
+.colorDot[data-color='pink']   { background: #e882a0; }
+.colorDot[data-color='purple'] { background: #c792ea; }
+.colorDot[data-active='true']  { border-color: var(--text-primary); }
+
+/* Task attachment button — shows link icon + label */
+.attachBtn {
+  flex: 1;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 5px;
+  border: var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface0);
+  color: var(--text-muted);
+  font-size: 9.5px;
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color var(--transition-fast), color var(--transition-fast);
+}
+.attachBtn:hover { border-color: var(--accent); color: var(--accent); }
+.attachBtn[data-linked='true'] { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 50%, transparent); }
+
+.attachLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.delBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+}
+.delBtn:hover { background: var(--bg-surface0); color: var(--red, #e05a5a); }
+
+/* Note body textarea */
+.text {
+  width: 100%;
+  min-height: 60px;
+  padding: 7px 9px;
+  border: none;
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 11.5px;
+  line-height: 1.5;
+  resize: vertical;
+  outline: none;
+  font-family: var(--font-family-sans, sans-serif);
+  user-select: text;
+  box-sizing: border-box;
+}
+.text::placeholder { color: var(--text-muted); }
+
+/* ── Portal multi-select picker ─────────────────────────────────────────────── */
+/* Portaled to <body> so it escapes canvas overflow:hidden. Fixed-positioned
+   in screen space via CSS vars set from getBoundingClientRect(). */
+.picker {
+  position: fixed;
+  left: var(--px);
+  top: var(--py);
+  z-index: 10000;
+  width: 240px;
+  max-height: 220px;
+  overflow-y: auto;
+  border: var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated, var(--bg-surface0));
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+  padding: 5px 4px;
+}
+
+.pickerRow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  user-select: none;
+}
+.pickerRow:hover { background: var(--bg-surface1); color: var(--text-primary); }
+.pickerRow[data-all='true'] { font-weight: 600; color: var(--text-primary); }
+.pickerRow input[type='checkbox'] { flex-shrink: 0; cursor: pointer; accent-color: var(--accent); }
+.pickerRow span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.pickerDiv {
+  height: 1px;
+  margin: 4px 8px;
+  background: var(--border-color, var(--text-muted));
+  opacity: 0.3;
+}
