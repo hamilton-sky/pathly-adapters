@@ -75,6 +75,23 @@ def comms_goals_run():
             _board_post("▶ goal run started — dispatching executor…", phase="running")
 
         def _on_done(_run_id: str, res) -> None:
+            # A user stop / crash must still clear the board's "Running…" timer pill —
+            # never mislabel a killed or errored run as "finished".
+            if isinstance(res, dict) and res.get("error"):
+                if res.get("announced"):
+                    return
+                err = str(res.get("error"))
+                low = err.lower()
+                if (
+                    res.get("status") == "aborted"
+                    or "stop" in low
+                    or "abort" in low
+                    or "kill" in low
+                ):
+                    _board_post("⏹ goal run stopped", phase="stopped")
+                    return
+                _board_post(f"❌ goal run failed — {err[:300]}", phase="error")
+                return
             summary = ""
             if isinstance(res, dict):
                 ex = res.get("executor", "")
@@ -173,7 +190,9 @@ def comms_goals_stop():
             ):
                 from pathly_orchestrator.supervisor.api import abort_run
 
-                abort_run(scope)
+                # announced=True: this route posts the "stopped" board message itself
+                # below, so the run's on_done must stay quiet (no double-announce).
+                abort_run(scope, announced=True)
                 stopped = True
                 how = "fsm"
 
@@ -272,12 +291,22 @@ def comms_goals_decompose():
 
         def _on_done(_run_id: str, res) -> None:
             if isinstance(res, dict) and res.get("error"):
-                # Surface the failure instead of silently spinning — the human needs to see WHY
-                # (a spawn timeout, an adapter error, …). Stay quiet only on user-initiated stops,
-                # which the /comms/goals/stop handler already announces.
+                # The ■ Stop route already posted "stopped" before aborting — stay quiet so
+                # the stop isn't announced twice.
+                if res.get("announced"):
+                    return
                 err = str(res.get("error"))
                 low = err.lower()
-                if "stop" in low or "abort" in low or "kill" in low:
+                # A user stop (killed runner tab → abort) clears the pill as "stopped", not
+                # "failed" — only a genuine crash is a failure. Either way we MUST post a
+                # phase, or the board's "Decomposing…" timer pill ticks forever.
+                if (
+                    res.get("status") == "aborted"
+                    or "stop" in low
+                    or "abort" in low
+                    or "kill" in low
+                ):
+                    _board_post("⏹ decomposition stopped", phase="stopped")
                     return
                 _board_post(f"❌ decomposition failed — {err[:300]}", phase="error")
                 return

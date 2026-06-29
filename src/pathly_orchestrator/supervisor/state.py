@@ -92,6 +92,12 @@ class RunnerState:
     # Kind string for error state
     error_kind: Optional[str] = None
 
+    # Set True by the ■ Stop route (/comms/goals/stop) right before it aborts, so the
+    # run's on_done stays quiet — the route already posted the "stopped" board message.
+    # A killed runner tab leaves this False, so on_done becomes the sole announcer that
+    # clears the board's "Decomposing…/Running…" timer pill.
+    stop_announced: bool = field(default=False, repr=False, compare=False)
+
     def public_dict(self) -> dict:
         """Return serialisable state for RUNNER_STATE.json and status API."""
         return {

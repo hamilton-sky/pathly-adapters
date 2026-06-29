@@ -84,9 +84,10 @@ def start_run(
             _loop(state, broadcast_fn)
         finally:
             if on_done is not None:
-                result = {"status": state.status}
+                result: dict[str, object] = {"status": state.status}
                 if state.status in {"error", "aborted"}:
                     result["error"] = state.error_kind or state.status
+                    result["announced"] = state.stop_announced
                 try:
                     on_done(state.run_id, result)
                 except Exception:
@@ -117,13 +118,23 @@ def resume_run(topic: str) -> None:
         state._pause_flag = False
 
 
-def abort_run(topic: str) -> None:
-    """Hard-kill the in-flight subprocess (if any) and set status=aborted."""
+def abort_run(topic: str, *, announced: bool = False) -> None:
+    """Hard-kill the in-flight subprocess (if any) and set status=aborted.
+
+    announced: set True when the caller has already posted a user-facing "stopped"
+        message (the ■ Stop route does). The run's on_done reads this and stays quiet
+        so the stop isn't announced twice. A killed runner tab leaves it False, so
+        on_done becomes the sole announcer that clears the board's timer pill.
+    """
     with _lock:
         state = _registry.get(topic)
         if state is None:
             raise KeyError(topic)
         state._abort_flag = True
+        # Monotonic: once the ■ Stop route announces a stop, a follow-up abort (e.g. the
+        # TERMINAL_SIGNAL → frontend kill → user_initiated terminal/result cascade) must
+        # not reset it back to un-announced, or on_done would announce the same stop twice.
+        state.stop_announced = announced or state.stop_announced
         proc = state._proc
         active_tab_id = state.active_tab_id
         run_id = state.run_id

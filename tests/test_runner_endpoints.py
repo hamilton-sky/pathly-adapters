@@ -199,6 +199,70 @@ def test_runner_terminal_result_unknown_run_id(client):
     assert r.status_code == 404
 
 
+def test_runner_terminal_result_user_initiated_aborts_active_run(client):
+    """Killing the runner tab (user_initiated) must abort the active run so a multi-stage
+    goal run stops re-spawning the next stage; its on_done then fires and clears the
+    board's "Decomposing…/Running…" timer pill instead of ticking forever."""
+    c, tmp_path = client
+    from pathly_orchestrator.supervisor import _lock, _registry, RunnerState
+    from pathly_orchestrator.supervisor.registry import create_run, drop_run
+
+    topic = "ep-kill-active"
+    with _lock:
+        st = RunnerState(
+            topic=topic, flow="consultation", project_root=str(tmp_path),
+            model="m", timeout=60, run_id="run-kill-1",
+        )
+        st.status = "running"
+        _registry[topic] = st
+    create_run("run-kill-1")
+    try:
+        r = c.post(
+            "/runner/terminal/result",
+            json={
+                "topic": topic, "run_id": "run-kill-1", "exit_code": 130,
+                "stdout_tail": "", "user_initiated": True,
+            },
+        )
+        assert r.status_code == 200
+        assert st._abort_flag is True
+        # A tab kill is NOT pre-announced → the run's on_done becomes the sole announcer
+        # that posts the clearing phase (stop_announced stays False).
+        assert st.stop_announced is False
+    finally:
+        drop_run("run-kill-1")
+
+
+def test_runner_terminal_result_normal_exit_does_not_abort(client):
+    """A normal (non-user) stage exit must NOT abort the run — the supervisor advances to
+    the next stage as usual. Only user_initiated kills stop the whole run."""
+    c, tmp_path = client
+    from pathly_orchestrator.supervisor import _lock, _registry, RunnerState
+    from pathly_orchestrator.supervisor.registry import create_run, drop_run
+
+    topic = "ep-normal-exit"
+    with _lock:
+        st = RunnerState(
+            topic=topic, flow="consultation", project_root=str(tmp_path),
+            model="m", timeout=60, run_id="run-norm-1",
+        )
+        st.status = "running"
+        _registry[topic] = st
+    create_run("run-norm-1")
+    try:
+        r = c.post(
+            "/runner/terminal/result",
+            json={
+                "topic": topic, "run_id": "run-norm-1", "exit_code": 0,
+                "stdout_tail": "", "user_initiated": False,
+            },
+        )
+        assert r.status_code == 200
+        assert st._abort_flag is False
+    finally:
+        drop_run("run-norm-1")
+
+
 # ── Phase 8: /runner/decision — validates decision ∈ options ─────────────────
 
 

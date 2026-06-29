@@ -251,6 +251,27 @@ def runner_terminal_result():
                 "user_initiated": data.get("user_initiated"),
             }
         )
+
+        # Killing the runner tab means "stop this run", not "advance to the next stage".
+        # Without this, a multi-stage goal run (consultation decompose, team executor)
+        # just re-spawns the next stage after early-advance, so the run never reaches a
+        # terminal status, its on_done never fires, and the board's "Decomposing…/Running…"
+        # timer pill ticks forever. Abort the run (if still active) so the loop stops and
+        # on_done clears the pill. Board-run / single executors hold no RunnerState in the
+        # registry — they already terminate via the non-zero exit code — so the guard makes
+        # this a no-op for them.
+        if data.get("user_initiated"):
+            try:
+                st = _sup.get_state(topic)
+                if st is not None and st.status in (
+                    "running",
+                    "paused",
+                    "awaiting_decision",
+                ):
+                    _sup.abort_run(topic)
+            except Exception:
+                logging.debug("user_initiated tab-kill abort failed", exc_info=True)
+
         return jsonify({"ok": True}), 200
     except Exception as exc:
         logging.exception("runner_terminal_result error")
