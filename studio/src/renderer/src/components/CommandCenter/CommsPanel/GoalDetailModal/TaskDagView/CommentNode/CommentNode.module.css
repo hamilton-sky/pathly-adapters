@@ -79,6 +79,25 @@
   white-space: nowrap;
 }
 
+.saveBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+  transition: color 150ms, background 150ms;
+}
+.saveBtn:hover:not(:disabled) { background: var(--bg-surface0); color: var(--accent); }
+.saveBtn:disabled { opacity: 0.35; cursor: default; }
+.saveBtn[data-saved='true'] { color: var(--green, #a9b665); }
+
 .delBtn {
   display: inline-flex;
   align-items: center;

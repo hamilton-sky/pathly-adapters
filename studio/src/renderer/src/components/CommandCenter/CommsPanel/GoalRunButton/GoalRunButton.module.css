@@ -13,30 +13,3 @@
   min-width: 0;
   flex-wrap: wrap;
 }
-
-/* Executor dropdown */
-.select {
-  flex: 1;
-  min-width: 0;
-  height: 26px;
-  padding: 0 8px;
-  border: var(--border);
-  border-radius: var(--radius-md);
-  background: var(--bg-base);
-  color: var(--text-secondary);
-  font: 500 11px/1 var(--font-family-base);
-  cursor: pointer;
-  transition: border-color var(--transition-fast);
-}
-
-.select:focus {
-  outline: none;
-  border-color: var(--accent-border);
-}
-
-.select:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-/* Run + Stop are now rendered by the shared <RunPill> component. */

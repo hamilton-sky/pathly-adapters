@@ -34,9 +34,10 @@ interface Props {
   orient: DagOrient
   comments: DagComment[]
   onCommentsChange: (comments: DagComment[]) => void
+  onSaveNote?: (comment: DagComment) => Promise<boolean>
 }
 
-export function TaskDagView({ tasks, order, orient, comments, onCommentsChange }: Props): JSX.Element {
+export function TaskDagView({ tasks, order, orient, comments, onCommentsChange, onSaveNote }: Props): JSX.Element {
   const [selected, setSelected] = useState<string | null>(null)
   const [previewExpanded, setPreviewExpanded] = useState(false)
   const [moved, setMoved] = useState<Record<string, Pt>>({})
@@ -249,6 +250,7 @@ export function TaskDagView({ tasks, order, orient, comments, onCommentsChange }
               onUpdate={updateComment}
               onDelete={deleteComment}
               onMove={moveComment}
+              onSave={onSaveNote ? () => onSaveNote(c) : undefined}
             />
           ))}
         </div>

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Network, ListTree, Target, Rows3, Columns3, LayoutGrid, RotateCcw, Maximize2, Minimize2, Maximize } from 'lucide-react'
-import type { Message } from '../../types'
+import type { BoardScope, Message } from '../../types'
 import { useFocusTrap } from '../../../../hooks/useFocusTrap'
 import { Tooltip } from '../../../ui'
 import MarkdownRenderer from '../../../shared/MarkdownRenderer/MarkdownRenderer'
@@ -11,12 +11,16 @@ import { TaskCard } from '../cards/TaskCard/TaskCard'
 import { TaskDagView } from './TaskDagView/TaskDagView'
 import type { DagOrient, DagComment } from './TaskDagView/dagLayout'
 import { orderByDeps, computeRollup, serializeTasks } from '../GoalsView/goalsViewUtils'
+import { scopeToParams, apiPostNote } from '../../../../store/commsApi'
+import { useToastStore } from '../../../../store/toastStore'
 import s from './GoalDetailModal.module.css'
 
 interface Props {
   messages: Message[]
   initialGoalId: string
   onClose: () => void
+  boardKey?: string
+  boardScope?: BoardScope
 }
 
 type Tab = 'dag' | 'overview'
@@ -31,7 +35,7 @@ function firstLine(text: string): string {
 // rollup, a compact goal selector (incl. an All-goals cross-goal view), and close.
 // Canvas comment notes are owned here so they survive DAG remounts and are included in
 // the serialised task copy (agents see user guidance attached to each task).
-export function GoalDetailModal({ messages, initialGoalId, onClose }: Props): JSX.Element {
+export function GoalDetailModal({ messages, initialGoalId, onClose, boardKey, boardScope }: Props): JSX.Element {
   const boxRef = useRef<HTMLDivElement>(null)
   useFocusTrap(boxRef)
   const [tab, setTab] = useState<Tab>('dag')
@@ -54,6 +58,28 @@ export function GoalDetailModal({ messages, initialGoalId, onClose }: Props): JS
 
   // Clear notes when switching goals so stale task-attachments don't linger.
   useEffect(() => { setComments([]) }, [goalId])
+
+  // Save a canvas note to the board as type='note' so agents receive it via context retrieval.
+  // Text is prefixed with task titles so hybrid search surfaces the note for those tasks.
+  async function handleSaveNote(comment: DagComment): Promise<boolean> {
+    if (!boardKey || !boardScope || !comment.text.trim() || comment.taskIds.length === 0) return false
+    const taskLines = comment.taskIds
+      .map((tid) => {
+        const idx = ordered.findIndex((t) => t.id === tid)
+        const task = ordered[idx]
+        if (!task) return null
+        return `Task ${idx + 1}: ${firstLine(task.text).slice(0, 100)}`
+      })
+      .filter((l): l is string => l !== null)
+      .join('\n')
+    const text = `${taskLines}\n\n${comment.text.trim()}`
+    const { board, scope: scopeVal } = scopeToParams(boardScope, boardKey)
+    const gid = goalId === ALL ? undefined : goalId
+    const id = await apiPostNote(boardKey, board, scopeVal, text, gid, comment.taskIds)
+    const push = useToastStore.getState().push
+    if (id) { push('Note saved to board', 'success') } else { push('Failed to save note', 'error') }
+    return id !== null
+  }
 
   useEffect(() => {
     function onKey(e: KeyboardEvent): void {
@@ -151,6 +177,7 @@ export function GoalDetailModal({ messages, initialGoalId, onClose }: Props): JS
               orient={orient}
               comments={comments}
               onCommentsChange={setComments}
+              onSaveNote={handleSaveNote}
             />
           ) : (
             <div className={s.overview}>

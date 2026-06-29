@@ -215,6 +215,37 @@ export async function apiPost(
 }
 
 /**
+ * Post a type='note' message. The text should start with task title(s) so hybrid
+ * retrieval surfaces the note when agents query context about those tasks.
+ * dependsOn = task message IDs this note is attached to.
+ */
+export async function apiPostNote(
+  feature: string,
+  board: string,
+  scope: string,
+  text: string,
+  goalId?: string,
+  dependsOn?: string[],
+): Promise<string | null> {
+  try {
+    const r = await apiFetch('/comms/post', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        feature, from: 'human', type: 'note', text, board, scope,
+        ...(goalId ? { goal_id: goalId } : {}),
+        ...(dependsOn?.length ? { depends_on: dependsOn } : {}),
+      }),
+    })
+    if (!r.ok) return null
+    const json = await r.json() as { message_id?: string }
+    return json.message_id ?? null
+  } catch {
+    return null
+  }
+}
+
+/**
  * Post a type='artifact' message that points at a file path, so it renders as an
  * artifact card AND the backend creates its comms_artifacts metadata row. Returns
  * the new message id, or null on failure.

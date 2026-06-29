@@ -28,18 +28,24 @@ export function RunPill({ idleLabel, state, progress, icon, onRun, onStop, disab
   const isActive = isRunning || state === 'busy'
   const iconSize = size === 'sm' ? 8 : 10
 
+  // Label is fixed per state — timer is a separate fixed-width span (matches ActionPill)
+  // so the button never reflows as digits tick 0:09 → 0:39 → 10:39.
   const label =
     state === 'idle'    ? idleLabel
-    : state === 'running' ? (progress != null ? `${idleLabel}… ${fmtElapsed(progress.elapsedS)}` : `${idleLabel}…`)
+    : state === 'running' ? `${idleLabel}…`
     : state === 'busy'    ? 'Busy'
     : state === 'done'    ? 'Done'
     :                       'Error'
 
+  const timer = isRunning && progress != null ? fmtElapsed(progress.elapsedS) : null
+
   // Tooltip shows the latest PTY output line while running; otherwise the label.
   const tipLabel = isRunning && progress?.detail ? progress.detail : label
 
+  const hasStop = !!onStop && size !== 'sm'
+
   return (
-    <div className={s.pill} data-size={size !== 'md' ? size : undefined}>
+    <div className={s.pill} data-size={size !== 'md' ? size : undefined} {...(hasStop ? { 'data-has-stop': '' } : {})}>
       <Tooltip label={tipLabel} placement="top">
         <button
           type="button"
@@ -47,10 +53,11 @@ export function RunPill({ idleLabel, state, progress, icon, onRun, onStop, disab
           data-state={state !== 'idle' ? state : undefined}
           disabled={disabled || isRunning || state === 'busy'}
           onClick={onRun}
-          aria-label={label}
+          aria-label={timer ? `${label} ${timer}` : label}
         >
           {icon ?? <Play size={iconSize} />}
           <span className={s.label}>{label}</span>
+          {timer && <span className={s.timer}>{timer}</span>}
         </button>
       </Tooltip>
       {onStop && size !== 'sm' && (

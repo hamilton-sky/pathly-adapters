@@ -2,22 +2,30 @@ import { useState } from 'react'
 import { useCommsStore } from '../../../../store/commsStore'
 import { useElapsedProgress } from '../../../shared/RunPill/progress'
 import { RunPill } from '../../../shared/RunPill/RunPill'
+import { GoalSelect } from './GoalSelect/GoalSelect'
 import {
   type EditorCli,
   loadEditorCli,
   saveEditorCli,
-  EDITOR_CLIS,
   CLI_KEY_GOAL,
+  EDITOR_CLIS,
 } from '../../../MarkdownEditor/EditorHeader/editorCli'
 import s from './GoalRunButton.module.css'
 
 type RunState = 'idle' | 'running' | 'busy' | 'done'
 
-const EXECUTOR_LABELS: Record<string, string> = {
-  single: 'Single',
-  loop: 'Loop',
-  team: 'Team',
-}
+const EXECUTOR_OPTIONS = [
+  { value: 'single', label: 'Single' },
+  { value: 'loop',   label: 'Loop'   },
+  { value: 'team',   label: 'Team'   },
+]
+
+const ADAPTER_OPTIONS = EDITOR_CLIS.map((c) => ({
+  value: c.id,
+  label: c.label,
+  hint: c.unavailable ?? c.hint,
+  disabled: !!c.unavailable,
+}))
 
 interface Props {
   goalId: string
@@ -49,9 +57,9 @@ export function GoalRunButton({ goalId, defaultExecutor = 'single' }: Props): JS
     : runState === 'done' ? 'done'
     : 'idle'
 
-  function handleAdapterChange(v: EditorCli): void {
-    setAdapter(v)
-    saveEditorCli(CLI_KEY_GOAL, v)
+  function handleAdapterChange(v: string): void {
+    setAdapter(v as EditorCli)
+    saveEditorCli(CLI_KEY_GOAL, v as EditorCli)
   }
 
   function handleRun(): void {
@@ -63,32 +71,23 @@ export function GoalRunButton({ goalId, defaultExecutor = 'single' }: Props): JS
   return (
     <div className={s.root}>
       <div className={s.controls}>
-        <select
-          className={s.select}
+        <GoalSelect
           value={executor}
-          aria-label="Executor"
-          onChange={(e) => setExecutor(e.currentTarget.value)}
+          options={EXECUTOR_OPTIONS}
+          onChange={setExecutor}
+          ariaLabel="Executor"
           disabled={isActive}
-        >
-          {Object.keys(EXECUTOR_LABELS).map((ex) => (
-            <option key={ex} value={ex}>{EXECUTOR_LABELS[ex]}</option>
-          ))}
-        </select>
+          minWidth={68}
+        />
 
-        <select
-          className={s.select}
+        <GoalSelect
           value={adapter}
-          aria-label="CLI engine"
-          title={adapterApplies ? 'CLI engine for this goal' : "Team uses the flow’s per-stage routing"}
-          onChange={(e) => handleAdapterChange(e.currentTarget.value as EditorCli)}
+          options={ADAPTER_OPTIONS}
+          onChange={handleAdapterChange}
+          ariaLabel="CLI engine"
           disabled={isActive || !adapterApplies}
-        >
-          {EDITOR_CLIS.map((c) => (
-            <option key={c.id} value={c.id} disabled={!!c.unavailable}>
-              {c.label}{c.unavailable ? ' (n/a)' : ''}
-            </option>
-          ))}
-        </select>
+          minWidth={72}
+        />
 
         <RunPill
           idleLabel="Run"

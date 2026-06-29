@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Link } from 'lucide-react'
+import { X, Link, Upload, Check } from 'lucide-react'
 import type { DagComment, CommentColor } from '../dagLayout'
 import type { Message } from '../../../../types'
 import s from './CommentNode.module.css'
@@ -19,15 +19,21 @@ interface Props {
   onUpdate: (id: string, patch: Partial<Pick<DagComment, 'text' | 'color' | 'taskIds'>>) => void
   onDelete: (id: string) => void
   onMove: (id: string, x: number, y: number) => void
+  onSave?: () => Promise<boolean>
 }
 
 // Sticky note on the DAG canvas. Header = drag handle. Task attachment uses a portaled
 // custom multi-select so it escapes the canvas overflow:hidden clip.
-export function CommentNode({ comment, tasks, scale, onUpdate, onDelete, onMove }: Props): JSX.Element {
+export function CommentNode({ comment, tasks, scale, onUpdate, onDelete, onMove, onSave }: Props): JSX.Element {
   const dragRef = useRef<{ sx: number; sy: number; ox: number; oy: number } | null>(null)
   const linkBtnRef = useRef<HTMLButtonElement>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pickerPos, setPickerPos] = useState<{ x: number; y: number } | null>(null)
+  const [saved, setSaved] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  // Reset saved badge whenever content changes (note is dirty again).
+  useEffect(() => { setSaved(false) }, [comment.text, comment.taskIds])
 
   function onHandleDown(e: React.PointerEvent<HTMLDivElement>): void {
     if ((e.target as HTMLElement).closest('button,textarea')) return
@@ -43,6 +49,15 @@ export function CommentNode({ comment, tasks, scale, onUpdate, onDelete, onMove 
   function onHandleUp(e: React.PointerEvent<HTMLDivElement>): void {
     dragRef.current = null
     try { e.currentTarget.releasePointerCapture(e.pointerId) } catch { /* gone */ }
+  }
+
+  async function handleSave(e: React.MouseEvent): Promise<void> {
+    e.stopPropagation()
+    if (!onSave || saving || saved) return
+    setSaving(true)
+    const ok = await onSave()
+    setSaving(false)
+    if (ok) setSaved(true)
   }
 
   function togglePicker(e: React.MouseEvent): void {
@@ -133,6 +148,19 @@ export function CommentNode({ comment, tasks, scale, onUpdate, onDelete, onMove 
           <Link size={9} />
           <span className={s.attachLabel}>{attachLabel()}</span>
         </button>
+
+        {onSave && (
+          <button
+            type="button"
+            className={s.saveBtn}
+            data-saved={saved ? 'true' : 'false'}
+            disabled={saving || !comment.text.trim() || comment.taskIds.length === 0}
+            onClick={(e) => { void handleSave(e) }}
+            aria-label={saved ? 'Note saved to board' : 'Save note to board'}
+          >
+            {saved ? <Check size={9} /> : <Upload size={9} />}
+          </button>
+        )}
 
         <button
           type="button"

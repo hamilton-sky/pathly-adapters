@@ -206,6 +206,8 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
       {boardView === 'goals' && (
         <GoalsView
           messages={messages}
+          boardKey={boardKey}
+          boardScope={scope}
           onEditGoal={(goalId, text) => editMessage(goalId, text)}
           onDeleteGoal={(goalId) => del(goalId)}
         />
