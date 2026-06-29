@@ -263,6 +263,46 @@ def test_runner_terminal_result_normal_exit_does_not_abort(client):
         drop_run("run-norm-1")
 
 
+def test_runner_terminal_result_fills_otel_and_invocation_tables(client):
+    """Each completed stage now persists ONE otel_spans row + ONE agent_invocations row —
+    the two trace tables were previously defined-but-empty (no writers)."""
+    c, tmp_path = client
+    from pathly_orchestrator.supervisor import _lock, _registry, RunnerState
+    from pathly_orchestrator.supervisor.registry import create_run, drop_run
+    from pathly_orchestrator.db.connection import get_db
+    from pathly_orchestrator.db.queries.otel_spans import read_otel_spans
+    from pathly_orchestrator.db.queries.invocations import read_agent_invocations
+
+    topic = "tele-feature"
+    pr = str(tmp_path)
+    with _lock:
+        st = RunnerState(
+            topic=topic, flow="team", project_root=pr, model="m", timeout=60,
+            run_id="run-tele-1", current_state="BUILDING", current_adapter="claude",
+            trace_id="trace-abc", span_id="span-xyz",
+        )
+        st.status = "running"
+        _registry[topic] = st
+    create_run("run-tele-1")
+    try:
+        r = c.post(
+            "/runner/terminal/result",
+            json={"topic": topic, "run_id": "run-tele-1", "exit_code": 0,
+                  "stdout_tail": "", "wall_seconds": 4},
+        )
+        assert r.status_code == 200
+        conn = get_db()
+        spans = read_otel_spans(conn, pr, topic)
+        invs = read_agent_invocations(conn, pr, topic)
+        assert len(spans) == 1, spans
+        assert spans[0]["trace_id"] == "trace-abc" and spans[0]["span_id"] == "span-xyz"
+        assert spans[0]["name"] == "BUILDING"
+        assert len(invs) == 1, invs
+        assert invs[0]["stage"] == "BUILDING" and invs[0]["run_id"] == "run-tele-1"
+    finally:
+        drop_run("run-tele-1")
+
+
 # ── Phase 8: /runner/decision — validates decision ∈ options ─────────────────
 
 

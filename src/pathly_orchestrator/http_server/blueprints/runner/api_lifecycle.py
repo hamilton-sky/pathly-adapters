@@ -10,6 +10,77 @@ from ...sse import _broadcast_runner
 from ._runner_bp import _topic_from_body, bp
 
 
+def _write_stage_telemetry(runner_state, parsed: dict, agent_done, wall_seconds) -> None:
+    """Best-effort: persist ONE OTEL span + ONE agent_invocation per completed stage.
+
+    These two tables were previously defined-but-empty (`write_otel_span`/`write_agent_invocation`
+    had no callers), so there was no span tree and no per-agent rollup even though the run's
+    `trace_id`/`span_id` were already generated. This is the missing writer. It never raises —
+    telemetry must not break the terminal-result callback.
+    """
+    try:
+        import json as _json
+        from datetime import datetime, timedelta, timezone
+
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.queries.invocations import write_agent_invocation
+        from pathly_orchestrator.db.queries.otel_spans import write_otel_span
+
+        ad = agent_done or {}
+        stage = runner_state.current_state or "stage"
+        agent_role = ad.get("agent") or stage
+        cost = parsed.get("cost_usd") or ad.get("cost_usd") or 0.0
+        tin = parsed.get("tokens_in") or ad.get("tokens_in") or 0
+        tout = parsed.get("tokens_out") or ad.get("tokens_out") or 0
+        summary = parsed.get("result") or ad.get("summary") or ""
+        session_id = parsed.get("session_id") or ad.get("session_id")
+        end_dt = datetime.now(timezone.utc)
+        start_dt = end_dt - timedelta(seconds=float(wall_seconds or 0))
+
+        conn = _get_db()
+        write_otel_span(
+            conn,
+            runner_state.project_root,
+            runner_state.topic,
+            name=stage,
+            trace_id=runner_state.trace_id or None,
+            span_id=runner_state.span_id or None,
+            parent_span_id=None,
+            start_time=start_dt.isoformat(),
+            end_time=end_dt.isoformat(),
+            attributes=_json.dumps(
+                {
+                    "agent": agent_role,
+                    "adapter": runner_state.current_adapter,
+                    "cost_usd": cost,
+                    "tokens_in": tin,
+                    "tokens_out": tout,
+                }
+            ),
+        )
+        write_agent_invocation(
+            conn,
+            runner_state.project_root,
+            runner_state.topic,
+            {
+                "run_id": runner_state.run_id,
+                "stage": stage,
+                "agent_role": agent_role,
+                "started_at": start_dt.isoformat(),
+                "finished_at": end_dt.isoformat(),
+                "tokens_in": tin,
+                "tokens_out": tout,
+                "cost_usd": cost,
+                "session_id": session_id,
+                "summary": (summary or "")[:2000],
+            },
+        )
+    except Exception:
+        logging.getLogger("pathly.http").debug(
+            "stage telemetry write skipped", exc_info=True
+        )
+
+
 @bp.route("/runner/start", methods=["POST"])
 def runner_start():
     """Start a supervised run for a topic."""
@@ -186,6 +257,7 @@ def runner_terminal_result():
                 adapter = "claude"
 
         parsed = parse_result(adapter, data.get("stdout_tail", ""))
+        agent_done = None
 
         if runner_state is not None:
             try:
@@ -226,6 +298,13 @@ def runner_terminal_result():
                 logging.getLogger("pathly.http").warning(
                     "runner_terminal_result: EVENTS.jsonl read failed: %s", exc
                 )
+
+        # Fill the otel_spans + agent_invocations trace tables (one span + one invocation
+        # per completed stage). Best-effort — never blocks the result callback.
+        if runner_state is not None:
+            _write_stage_telemetry(
+                runner_state, parsed, agent_done, data.get("wall_seconds")
+            )
 
         tab_id = runner_state.active_tab_id if runner_state is not None else ""
         if tab_id and topic:
