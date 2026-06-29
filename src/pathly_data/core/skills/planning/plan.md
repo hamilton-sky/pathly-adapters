@@ -83,7 +83,11 @@ Plus all existing context: rigor level, `STORM_SEED` contents if it existed, `PO
 
 log-phase PHASE_DONE plan
 
-Run the Completion report with `agent: planner`, `result: DONE`, `conversation: 0`, using `PLAN_START` from the start of this step. Set `summary` to: `"planner created <N> files for <FEATURE> (<rigor> rigor)"` where N is the count of files written in Step 4.
+> **Do NOT write the completion report (`AGENT_DONE`) here.** It MUST be your **final action**,
+> written only AFTER the task DAG is seeded in Step 6 — see **Step 8**. Emitting `AGENT_DONE` at the
+> end of this phase lets the runner's early-advance end the stage before Steps 4–6 run, so the
+> goal+task DAG never gets seeded (the consultation flow's terminal planner stage relies on Step 6).
+> That is also why the summary's `N` references "files written in Step 4" — it is only knowable later.
 
 ## Template Path Resolution
 
@@ -287,11 +291,14 @@ edge-case, happy-flow, and architecture sections. The heading text must contain 
 `## Phase N` headings where the proposal maps to specific phases; a single-phase or
 phase-agnostic proposal may use descriptive headings instead.
 
-**Idempotency guard — skip only if the task DAG already exists.** Check for existing tasks:
+**Idempotency guard — skip only if THIS goal already has a task DAG.** After you resolve
+`$GOAL_ID` (the "Find OR create the goal" block just below), check for tasks **scoped to that goal**:
 ```
-curl -s "http://127.0.0.1:8765/comms/tasks?feature=$FEATURE"
+curl -s "http://127.0.0.1:8765/comms/tasks?goal_id=$GOAL_ID"
 ```
-If it contains any tasks, skip this entire step — the DAG is already seeded.
+Skip the task-posting only if **this goal** already has tasks. Do NOT skip just because some
+*other* goal on the feature has tasks — a feature-wide check is what previously made a fresh
+decompose of a new goal silently seed nothing.
 
 **Find OR create the goal.** This run may be a *decompose of a goal that already exists* (the
 goal card you were launched from — its `goal_id` may be named in your prompt) OR a fresh plan.
@@ -442,8 +449,11 @@ curl -s -X POST http://127.0.0.1:8765/comms/post \
 
 7. Record the `"message_id"` from the response as `phase_N_id` in your local map.
 
-If the comms server is unreachable (connection refused or non-200 response), skip this step
-silently — plan files are the authoritative source of truth and the DAG is advisory.
+If the comms server is unreachable (connection refused or non-200 response), do not fail the run
+— plan files remain the authoritative source of truth — but make the miss **observable**: record
+in your Step 8 completion-report `summary` that the DAG seed did not complete (e.g.
+`"… seeded 0 tasks — comms server unreachable"`), so a failed seed is distinguishable from a
+successful one instead of silently looking done.
 
 ## Step 7: Report
 
@@ -466,3 +476,15 @@ Files:
 Seed consumed: [yes / no]
 Next route: `continue $FEATURE`
 ```
+
+## Step 8: Completion report (FINAL action — only after the DAG is seeded)
+
+This is the **last thing you do**, AFTER Step 6 has seeded the task DAG. Writing `AGENT_DONE`
+earlier lets the runner's early-advance terminate the stage before the DAG exists — that is the
+exact bug this ordering fixes, so do not move it back.
+
+Run the Completion report with `agent: planner`, `result: DONE`, `conversation: 0`, using
+`PLAN_START` from Step 3. Set `summary` to:
+`"planner created <N> files for <FEATURE> (<rigor> rigor) and seeded <T> tasks under goal <GOAL_ID>"`
+where `N` is the count of files written in Step 4 and `T` is the number of phase tasks you posted
+in Step 6 (use `0` and note the reason if Step 6 was skipped or the server was unreachable).
