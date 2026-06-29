@@ -95,6 +95,14 @@ def _default_spawn(
         current_adapter=adapter,
         interactive=interactive,
     )
+    # telemetry-three-tier: a board/single run registers no topic RunnerState, so
+    # api_lifecycle won't record it — the executor owns the projection. One agent
+    # drains the whole goal, so a fresh trace with this single span as its root.
+    from pathly_orchestrator.runner.telemetry import new_trace_id, scope_tier_for
+
+    state.executor_owned_telemetry = True
+    state.scope_tier = scope_tier_for(board)
+    state.goal_trace_id = new_trace_id()
     # Interactive: spawn the bare REPL and let terminal.ts inject the prompt once the
     # '> ' readline prompt is ready (it stays open for further instructions).
     # Headless: the prompt is delivered via -p argv and the agent exits when done.

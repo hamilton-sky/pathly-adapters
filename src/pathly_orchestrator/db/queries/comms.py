@@ -37,6 +37,7 @@ from .comms_artifacts import (  # noqa: F401
 )
 from .comms_tasks import (  # noqa: F401
     get_ready_tasks,
+    get_tasks,
     complete_task,
     claim_task,
     fail_task,

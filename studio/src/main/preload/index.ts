@@ -37,6 +37,26 @@ interface DbFeature {
   updated_at: string
 }
 
+interface DbRollupTier {
+  invocations: number
+  cost_usd: number
+  tokens_in: number
+  tokens_out: number
+}
+interface DbRollupByTier {
+  feature: DbRollupTier
+  project: DbRollupTier
+  global: DbRollupTier
+}
+interface DbRollupProject extends DbRollupTier {
+  project_root: string
+}
+interface DbRollup {
+  project: { root: string; by_tier: DbRollupByTier; totals: DbRollupTier }
+  global: { by_tier: DbRollupByTier; totals: DbRollupTier; by_project: DbRollupProject[] }
+  feature?: { feature: string; by_tier: DbRollupByTier; totals: DbRollupTier }
+}
+
 interface DbEvent {
   seq: number
   ts: string
@@ -56,6 +76,7 @@ interface DbAgent {
   cost_usd: number | null
   session_id: string | null
   summary: string | null
+  scope_tier?: string | null
 }
 
 interface DbTrendPoint {
@@ -292,6 +313,7 @@ contextBridge.exposeInMainWorld('pathly', {
   db: {
     stats: (projectRoot?: string): Promise<DbStats | null> => ipcRenderer.invoke('db:stats', projectRoot),
     features: (projectRoot?: string): Promise<DbFeature[]> => ipcRenderer.invoke('db:features', projectRoot),
+    rollup: (projectRoot?: string, feature?: string): Promise<DbRollup | null> => ipcRenderer.invoke('db:rollup', projectRoot, feature),
     events: (feature: string, projectRoot?: string): Promise<DbEvent[]> =>
       ipcRenderer.invoke('db:events', feature, projectRoot),
     agents: (feature: string, projectRoot?: string): Promise<DbAgent[]> =>

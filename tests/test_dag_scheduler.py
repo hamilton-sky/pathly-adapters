@@ -96,9 +96,10 @@ def _make_fake_spawn(
     sleep_s:
         How long to sleep to simulate work (enables overlap detection).
     fail_for:
-        Set of task text values to raise for. The scheduler passes task["text"]
-        as the instructions arg, then appends the scope-aware board context after
-        a blank line — so the task text is the segment before the first "\n\n".
+        Set of task IDs to raise for. Matched against the task_id derived from
+        run_id ("sched-<task_id>") — NOT the prompt text. The composed prompt now
+        carries scope-aware board context that quotes every sibling task's text, so a
+        substring match on instructions would (flakily) trip whichever task ran first.
     """
     fail_for = fail_for or set()
     lock = threading.Lock()
@@ -117,9 +118,12 @@ def _make_fake_spawn(
         end = time.monotonic()
         with lock:
             records[task_id]["end"] = end
-        task_text = instructions.split("\n\n", 1)[0]
-        if task_text in fail_for:
-            raise RuntimeError(f"Intentional failure for task: {task_text!r}")
+        # Fail by task_id, not by matching prompt text. The composed prompt now
+        # carries board context that quotes every sibling task's text, so a substring
+        # match on instructions trips whichever task ran first (flaky cascade). The
+        # task_id derived from run_id is the one stable identifier the fake controls.
+        if task_id in fail_for:
+            raise RuntimeError(f"Intentional failure for task: {task_id}")
         return {"ok": True}
 
     return _spawn
@@ -287,8 +291,9 @@ def test_failure_cascades_and_sibling_completes():
     d_id = _make_task(conn, scope, "task-D", lane="tests", depends_on=[b_id, c_id])
 
     records: dict = {}
-    # "task-B" is the instructions text for B — raise when that text is passed.
-    spawn = _make_fake_spawn(records, sleep_s=0.05, fail_for={"task-B"})
+    # Fail task B by its id — robust to prompt composition + board context, which
+    # quotes sibling task text and would otherwise cause cross-task false matches.
+    spawn = _make_fake_spawn(records, sleep_s=0.05, fail_for={b_id})
     result = _run_scheduler(scope, spawn_fn=spawn)
 
     # A and C must complete.

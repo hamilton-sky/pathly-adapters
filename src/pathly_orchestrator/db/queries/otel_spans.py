@@ -19,6 +19,7 @@ def write_otel_span(
     start_time: str | None = None,
     end_time: str | None = None,
     attributes: str | None = None,
+    scope_tier: str = "feature",
 ) -> int:
     """Insert an otel_spans row. Returns the new row id."""
     now = datetime.now(timezone.utc).isoformat()
@@ -26,8 +27,8 @@ def write_otel_span(
         cur = conn.execute(
             "INSERT INTO otel_spans "
             "(project_root, feature, trace_id, span_id, parent_span_id, "
-            " name, start_time, end_time, attributes) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            " name, start_time, end_time, attributes, scope_tier) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 project_root,
                 feature,
@@ -38,6 +39,7 @@ def write_otel_span(
                 start_time or now,
                 end_time or now,
                 attributes,
+                scope_tier or "feature",
             ),
         )
         conn.commit()

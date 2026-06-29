@@ -233,6 +233,33 @@ def _run_stage_via_terminal(
 
     run = create_run(run_id)
 
+    def _emit_executor_telemetry(ad: Optional[dict], wall: float) -> None:
+        """Project this spawn's result into otel_spans + agent_invocations — but
+        ONLY for executor-owned runs (board/single/loop), which register no topic
+        RunnerState. FSM/team leave executor_owned_telemetry False and are covered
+        by api_lifecycle._write_stage_telemetry, so this never double-writes.
+        Each task gets a fresh span under the goal's trace (goal=trace, task=span).
+        Best-effort."""
+        if not getattr(state, "executor_owned_telemetry", False):
+            return
+        try:
+            from pathly_orchestrator.runner.telemetry import project_agent_done
+
+            project_agent_done(
+                project_root=state.project_root,
+                feature=state.topic,
+                agent_done=ad,
+                run_id=run_id,
+                stage=state.current_state or "task",
+                agent_role=(ad or {}).get("agent") or "",
+                scope_tier=getattr(state, "scope_tier", "feature"),
+                trace_id=getattr(state, "goal_trace_id", ""),
+                parent_span_id=getattr(state, "goal_span_id", ""),
+                wall_seconds=wall,
+            )
+        except Exception:
+            logger.debug("_emit_executor_telemetry skipped", exc_info=True)
+
     try:
         payload = {
             "type": "TERMINAL_SPAWN",
@@ -372,6 +399,7 @@ def _run_stage_via_terminal(
                         name=f"recon-window-{run_id}",
                     )
                     recon_t.start()
+                _emit_executor_telemetry(agent_done_data, 0.0)
                 return result_for_fsm
 
             # outcome == "pty_result" — PTY arrived first; cancel watcher and return
@@ -383,6 +411,9 @@ def _run_stage_via_terminal(
                 raise RuntimeError(
                     f"terminal_exit_nonzero: PTY for {tab_id} exited with code {exit_code}"
                 )
+            _emit_executor_telemetry(
+                data.get("result") or {}, float(data.get("wall_seconds") or 0)
+            )
             return data.get("result", {})
 
         # ── Slow path (early_advance disabled) ────────────────────────────────
@@ -401,6 +432,9 @@ def _run_stage_via_terminal(
             raise RuntimeError(
                 f"terminal_exit_nonzero: PTY for {tab_id} exited with code {exit_code}"
             )
+        _emit_executor_telemetry(
+            data.get("result") or {}, float(data.get("wall_seconds") or 0)
+        )
         return data.get("result", {})
     finally:
         with _lock:

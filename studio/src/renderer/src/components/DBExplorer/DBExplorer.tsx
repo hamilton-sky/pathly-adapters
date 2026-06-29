@@ -6,9 +6,10 @@ import { FeatureGrid } from './FeatureGrid'
 import FeatureStack from './FeatureStack'
 import { FeatureModal } from './FeatureModal'
 import { CostChart } from './CostChart/CostChart'
+import { RollupView } from './RollupView/RollupView'
 import styles from './DBExplorer.module.css'
 
-type ViewMode = 'grid' | 'stack'
+type ViewMode = 'grid' | 'stack' | 'rollup'
 
 function dbFeatureToFeatureData(f: DbFeature): FeatureData {
   const state = mapState(f.state)
@@ -71,9 +72,11 @@ export function DBExplorer(): JSX.Element {
       <CostChart featureName="" />
       {loading
         ? <div className={styles.loading}>Loading…</div>
-        : viewMode === 'grid'
-          ? <FeatureGrid features={features} onCardClick={setModalFeature} />
-          : <FeatureStack features={features} onRowClick={setModalFeature} />
+        : viewMode === 'rollup'
+          ? <RollupView />
+          : viewMode === 'grid'
+            ? <FeatureGrid features={features} onCardClick={setModalFeature} />
+            : <FeatureStack features={features} onRowClick={setModalFeature} />
       }
       <FeatureModal feature={modalFeature} onClose={() => setModalFeature(null)} />
     </div>
@@ -112,6 +115,15 @@ function DBExplorerHeader({ viewMode, onViewMode, onRefresh }: HeaderProps): JSX
             {...(viewMode === 'stack' ? { 'aria-pressed': 'true' } : { 'aria-pressed': 'false' })}
           >
             ☰
+          </button>
+          <button
+            type="button"
+            className={`${styles.toggleBtn} ${viewMode === 'rollup' ? styles.toggleBtnActive : ''}`}
+            onClick={() => onViewMode('rollup')}
+            aria-label="Roll-up view (feature → project → global)"
+            {...(viewMode === 'rollup' ? { 'aria-pressed': 'true' } : { 'aria-pressed': 'false' })}
+          >
+            Σ
           </button>
         </div>
         <button type="button" className={styles.btnB} onClick={onRefresh}>↻ Refresh</button>

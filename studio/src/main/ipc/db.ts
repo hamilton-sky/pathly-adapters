@@ -47,6 +47,12 @@ export function registerDbHandlers(): void {
     try { return await fsmGet(`/db/features?project_root=${pr}`) } catch { return [] }
   })
 
+  ipcMain.handle('db:rollup', async (_e, projectRoot?: string, feature?: string) => {
+    const pr = projectRoot ? encodeURIComponent(projectRoot) : _PR
+    const fq = feature ? `&feature=${encodeURIComponent(feature)}` : ''
+    try { return await fsmGet(`/db/rollup?project_root=${pr}${fq}`) } catch { return null }
+  })
+
   ipcMain.handle('db:events', async (_e, feature: string, projectRoot?: string) => {
     const qs = projectRoot ? `?project_root=${encodeURIComponent(projectRoot)}` : ''
     try { return await fsmGet(`/db/features/${encodeURIComponent(feature)}/events${qs}`) } catch { return [] }

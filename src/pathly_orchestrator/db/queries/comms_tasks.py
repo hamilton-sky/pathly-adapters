@@ -55,6 +55,39 @@ def get_ready_tasks(
     return ready
 
 
+def get_tasks(
+    conn: sqlite3.Connection,
+    board: str,
+    scope: str,
+    *,
+    task_status: str | None = None,
+    goal_id: str | None = None,
+    limit: int = 200,
+) -> list[dict]:
+    """List task messages, filtered by the DAG ``task_status`` column.
+
+    The task lifecycle lives in ``task_status`` (pending/in_progress/done/failed/
+    blocked) — NOT the generic message ``status`` column, which stays at its posted
+    value ('pending') for a task's whole life. Listing tasks via ``status`` therefore
+    returns completed tasks as if still pending; this helper filters the right column
+    and optionally scopes to a single goal. Newest first.
+    """
+    sql = (
+        "SELECT * FROM comms_messages "  # nosec B608
+        "WHERE board=? AND scope=? AND type='task' AND deleted_at IS NULL"
+    )
+    params: list = [board, scope]
+    if task_status is not None:
+        sql += " AND task_status=?"
+        params.append(task_status)
+    if goal_id is not None:
+        sql += " AND goal_id=?"
+        params.append(goal_id)
+    sql += " ORDER BY ts DESC LIMIT ?"
+    params.append(limit)
+    return [dict(r) for r in conn.execute(sql, params).fetchall()]
+
+
 def complete_task(
     conn: sqlite3.Connection,
     message_id: str,

@@ -40,6 +40,26 @@ declare global {
     source?: string
   }
 
+  interface DbRollupTier {
+    invocations: number
+    cost_usd: number
+    tokens_in: number
+    tokens_out: number
+  }
+  interface DbRollupByTier {
+    feature: DbRollupTier
+    project: DbRollupTier
+    global: DbRollupTier
+  }
+  interface DbRollupProject extends DbRollupTier {
+    project_root: string
+  }
+  interface DbRollup {
+    project: { root: string; by_tier: DbRollupByTier; totals: DbRollupTier }
+    global: { by_tier: DbRollupByTier; totals: DbRollupTier; by_project: DbRollupProject[] }
+    feature?: { feature: string; by_tier: DbRollupByTier; totals: DbRollupTier }
+  }
+
   interface DbEvent {
     seq: number
     ts: string
@@ -59,6 +79,7 @@ declare global {
     cost_usd: number | null
     session_id: string | null
     summary: string | null
+    scope_tier?: string | null
   }
 
   interface DbTrendPoint {
@@ -93,6 +114,7 @@ declare global {
     start_time: string
     end_time: string
     attributes: Record<string, unknown>
+    scope_tier?: string | null
   }
 
   interface DbRun {
@@ -212,6 +234,7 @@ declare global {
       db: {
         stats: (projectRoot?: string) => Promise<DbStats | null>
         features: (projectRoot?: string) => Promise<DbFeature[]>
+        rollup: (projectRoot?: string, feature?: string) => Promise<DbRollup | null>
         events: (feature: string, projectRoot?: string) => Promise<DbEvent[]>
         agents: (feature: string, projectRoot?: string) => Promise<DbAgent[]>
         otel: (feature: string, projectRoot?: string) => Promise<DbOtelSpan[]>

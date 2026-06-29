@@ -74,6 +74,19 @@ class RunnerState:
     trace_id: str = ""  # 32-char hex, set once at run start
     span_id: str = ""  # 16-char hex, set per stage invocation
 
+    # telemetry-three-tier — board/single/loop executors spawn agents WITHOUT a
+    # registry RunnerState, so api_lifecycle._write_stage_telemetry never fires for
+    # them. These let the executor own the projection itself (in _run_stage_via_terminal):
+    #   executor_owned_telemetry — write the invocation+span here (FSM/team leave it False,
+    #                              since api_lifecycle covers them — prevents double-counting)
+    #   scope_tier               — board tier tag for roll-up (feature|project|global)
+    #   goal_trace_id/goal_span_id — goal=trace, task=span: the goal's root span, so a
+    #                              DAG run's per-task spans share one trace under it
+    executor_owned_telemetry: bool = field(default=False, repr=False, compare=False)
+    scope_tier: str = "feature"
+    goal_trace_id: str = ""
+    goal_span_id: str = ""
+
     # Runtime-config seam (§5, DAG scheduler) — populated by start_run; carried
     # into TaskWorkspace.env so workers inherit the shared DB path and FSM port.
     db_path: str = ""  # resolved DB file path; "" means use get_db() default

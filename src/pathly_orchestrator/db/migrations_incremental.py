@@ -52,6 +52,11 @@ def _add_additive_migrations(conn: sqlite3.Connection) -> None:
         ("agent_invocations", "cache_write_tokens", "INTEGER DEFAULT 0"),
         ("run_history", "cost_source", "TEXT DEFAULT 'unpriced'"),
         ("run_history", "provider", "TEXT"),
+        # telemetry-three-tier: board tier each invocation/span ran under
+        # (feature|project|global). A TAG for aggregate-on-read roll-up, NOT a
+        # separate counter row — project/global totals are GROUP BYs over this.
+        ("agent_invocations", "scope_tier", "TEXT DEFAULT 'feature'"),
+        ("otel_spans", "scope_tier", "TEXT DEFAULT 'feature'"),
         # flow-nodes-edges-migration: normalized storage for flow graph
         ("flow_nodes", "agent", "TEXT"),
         ("flow_nodes", "role", "TEXT"),

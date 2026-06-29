@@ -1,0 +1,41 @@
+{
+  "feature": "telemetry-three-tier",
+  "executor": "loop",
+  "tasks": [
+    {
+      "ref": "T1",
+      "text": "Add scope_tier column (TEXT DEFAULT 'feature') to agent_invocations and otel_spans in src/pathly_orchestrator/db/migrations_incremental.py additive-column list.",
+      "depends_on": []
+    },
+    {
+      "ref": "T2",
+      "text": "Universal projector: map every AGENT_DONE payload to one agent_invocations row (run_id, stage, agent_role, tokens, cost_usd, session_id, summary, scope_tier). Call from the single append point so board/single/loop are covered. Best-effort, never raises.",
+      "depends_on": ["T1"]
+    },
+    {
+      "ref": "T3",
+      "text": "Executor scope_tier tagging: thread board (feature|project|global) -> scope_tier into the projector from scheduler.py / goal_run.py / board_run.py.",
+      "depends_on": ["T2"]
+    },
+    {
+      "ref": "T4",
+      "text": "goal=trace, task=span: mint a trace_id per goal run (root span = goal); each task worker writes an otel_span with that trace_id and parent_span_id = goal span.",
+      "depends_on": ["T1", "T3"]
+    },
+    {
+      "ref": "T5",
+      "text": "Aggregation endpoint: new db_api_rollup.py with GET /db/rollup returning project + global sums grouped by scope_tier over agent_invocations. Pure aggregation, no stored counters. Under 400 lines.",
+      "depends_on": ["T2"]
+    },
+    {
+      "ref": "T6",
+      "text": "DB Explorer roll-up UI: feature->project->global view + scope_tier column on Agents/OTel tables. Renderer typecheck must stay clean.",
+      "depends_on": ["T5"]
+    },
+    {
+      "ref": "T7",
+      "text": "Tests: projector writes a row for synthetic board/single/loop AGENT_DONE; aggregation feature-sums equal project total and global has no duplicate facts.",
+      "depends_on": ["T2", "T5"]
+    }
+  ]
+}

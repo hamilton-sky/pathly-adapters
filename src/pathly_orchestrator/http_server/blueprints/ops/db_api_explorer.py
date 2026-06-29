@@ -246,7 +246,7 @@ def db_feature_agents(feature: str):
         pr = _project_root_param()
         query = (
             "SELECT id, run_id, stage, agent_role, started_at, finished_at, "
-            "tokens_in, tokens_out, cost_usd, session_id, summary "
+            "tokens_in, tokens_out, cost_usd, session_id, summary, scope_tier "
             "FROM agent_invocations WHERE feature=?"
         )
         params: list = [feature]
@@ -269,7 +269,7 @@ def db_feature_otel(feature: str):
         pr = _project_root_param()
         query = (
             "SELECT id, trace_id, span_id, parent_span_id, name, "
-            "start_time, end_time, attributes "
+            "start_time, end_time, attributes, scope_tier "
             "FROM otel_spans WHERE feature=?"
         )
         params: list = [feature]

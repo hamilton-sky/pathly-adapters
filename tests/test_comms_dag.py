@@ -71,6 +71,42 @@ def _set_task_deps_direct(conn, message_id: str, depends_on: list[str]) -> None:
     conn.commit()
 
 
+def test_comms_tasks_list_reports_true_task_status(client):
+    """GET /comms/tasks (non-ready) lists the goal's tasks with their real DAG
+    task_status — a completed task stays in the list (the Goals view needs it for
+    duration) but reads 'done', not 'pending'.
+
+    Regression: the list previously filtered the generic message `status` column,
+    which never changes for a task, so completion was invisible at this layer."""
+    a = _post_task(client, "task A", feature="dagf", scope="dagf")
+    b = _post_task(client, "task B", depends_on=[a], feature="dagf", scope="dagf")
+
+    rc = client.post("/comms/tasks/complete", json={"message_id": a, "feature": "dagf"})
+    assert rc.status_code == 200
+
+    rows = {t["id"]: t for t in json.loads(client.get("/comms/tasks?feature=dagf").data)}
+    assert set(rows) == {a, b}, "both tasks should still be listed"
+    assert rows[a]["task_status"] == "done", rows[a]
+    assert rows[b]["task_status"] == "pending", rows[b]
+
+
+def test_comms_tasks_list_scoped_to_goal(client):
+    """GET /comms/tasks?goal_id=… returns only that goal's tasks (the list used to
+    ignore goal_id and return every task in the scope)."""
+    from pathly_orchestrator.db.connection import get_db
+
+    conn = get_db()
+    g1 = _post_task(client, "g1 task", feature="gscope", scope="gscope")
+    g2 = _post_task(client, "g2 task", feature="gscope", scope="gscope")
+    conn.execute("UPDATE comms_messages SET goal_id='G1' WHERE id=?", (g1,))
+    conn.execute("UPDATE comms_messages SET goal_id='G2' WHERE id=?", (g2,))
+    conn.commit()
+
+    rows = json.loads(client.get("/comms/tasks?feature=gscope&goal_id=G1").data)
+    ids = {t["id"] for t in rows}
+    assert ids == {g1}, ids
+
+
 # ---------------------------------------------------------------------------
 # DB-layer tests
 # ---------------------------------------------------------------------------

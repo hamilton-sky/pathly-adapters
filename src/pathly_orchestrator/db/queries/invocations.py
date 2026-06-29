@@ -19,8 +19,8 @@ def write_agent_invocation(
         cur = conn.execute(
             "INSERT INTO agent_invocations "
             "(project_root, feature, run_id, stage, agent_role, started_at, finished_at, "
-            " tokens_in, tokens_out, cost_usd, session_id, summary) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            " tokens_in, tokens_out, cost_usd, session_id, summary, scope_tier) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 project_root,
                 feature,
@@ -34,6 +34,7 @@ def write_agent_invocation(
                 d.get("cost_usd"),
                 d.get("session_id"),
                 d.get("summary"),
+                d.get("scope_tier") or "feature",
             ),
         )
         conn.commit()

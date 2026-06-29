@@ -16,10 +16,10 @@ def comms_tasks_get():
     """Fetch task messages for a feature."""
     try:
         from pathly_orchestrator.db.connection import get_db as _get_db
-        from pathly_orchestrator.db.queries.comms import get_messages as _get_messages
         from pathly_orchestrator.db.queries.comms import (
             get_ready_tasks as _get_ready_tasks,
         )
+        from pathly_orchestrator.db.queries.comms import get_tasks as _get_tasks
 
         feature = request.args.get("feature", "").strip()
         if not feature:
@@ -38,9 +38,13 @@ def comms_tasks_get():
                 conn, boards=[board], scopes=[scope], goal_id=goal_id
             )
         else:
-            tasks = _get_messages(
-                conn, board=board, scope=scope, type="task", status="pending"
-            )
+            # Return the goal's tasks with their real DAG task_status. The previous
+            # filter on the generic message `status` column was meaningless (it stays
+            # 'pending' for a task's whole life) AND it ignored goal_id, so a goal's
+            # list could include other goals' tasks. task_status=None keeps completed
+            # tasks in the list (the Goals view needs them for duration) but now each
+            # carries its true status, so the UI can tell done from pending.
+            tasks = _get_tasks(conn, board, scope, goal_id=goal_id)
         # Surface per-task claim→complete duration for the Goals & Tasks view
         # (board-context-pull Solution B). Additive: None until both stamps exist.
         from ._helpers import task_duration_seconds as _duration

@@ -229,6 +229,29 @@ def _run_loop(
         run_id=run_id,
         current_adapter=adapter or "claude",
     )
+    # telemetry-three-tier: the loop owns its telemetry (no registry RunnerState →
+    # api_lifecycle won't write it). Tag every task with the board's scope_tier and
+    # thread each task's span under one goal trace (goal=trace, task=span).
+    from pathly_orchestrator.runner.telemetry import (
+        new_span_id,
+        new_trace_id,
+        scope_tier_for,
+        write_goal_root_span,
+    )
+
+    state.executor_owned_telemetry = True
+    state.scope_tier = scope_tier_for(board)
+    state.goal_trace_id = new_trace_id()
+    state.goal_span_id = new_span_id()
+    write_goal_root_span(
+        project_root=project_root,
+        feature=scope,
+        goal_id=goal_id,
+        trace_id=state.goal_trace_id,
+        span_id=state.goal_span_id,
+        scope_tier=state.scope_tier,
+        executor="loop",
+    )
     isolation = SerialIsolation()
 
     def _abort_check() -> bool:
