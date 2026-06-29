@@ -122,7 +122,23 @@ def scheduler_loop(
     def _worker(task: dict, task_run_id: str, ws) -> None:
         """Run in a daemon thread. Calls spawn_fn and pushes result onto completion_q."""
         task_id = task["id"]
-        instructions = task.get("text", "")
+        task_text = task.get("text", "")
+        adapter = task.get("adapter") or (
+            state.current_adapter if hasattr(state, "current_adapter") else ""
+        )
+        model = task.get("model") or (state.model if hasattr(state, "model") else "")
+        # Compose the loop task agent through the SAME fragment layer the FSM/team path
+        # uses (progress-logging + comms-post + completion-report, via the execute-task
+        # manifest entry) so it narrates progress, posts findings, and writes AGENT_DONE —
+        # instead of running blind on the raw task text. Best-effort: fall back to the raw
+        # task text if composition is unavailable.
+        try:
+            from pathly_orchestrator.skills.compose import compose_skill
+
+            _body = compose_skill("development/execute-task", adapter or "claude")
+            instructions = f"{_body}\n\n## Your task\n\n{task_text}"
+        except Exception:
+            instructions = task_text
         # Inject the same scope-aware board context (governance + memory, honoring
         # the Reads toggle) the FSM/team path gets, so loop-executor tasks aren't
         # blind to the board. Best-effort — never block a task on context.
@@ -133,17 +149,13 @@ def scheduler_loop(
                 board,
                 scope,
                 getattr(state, "project_root", "") or "",
-                instructions,
+                task_text,
                 task_id=task_id,
             )
             if _ctx:
                 instructions = f"{instructions}\n\n{_ctx}"
         except Exception:
             pass
-        adapter = task.get("adapter") or (
-            state.current_adapter if hasattr(state, "current_adapter") else ""
-        )
-        model = task.get("model") or (state.model if hasattr(state, "model") else "")
 
         try:
             outcome = spawn_fn(

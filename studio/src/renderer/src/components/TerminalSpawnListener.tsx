@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useRunnerStore } from '../store/runnerStore'
 import { useTerminalStore } from '../store/terminalStore'
+import { useToastStore } from '../store/toastStore'
 import type { TerminalTab } from '../types/terminal'
 import { apiFetch } from '../lib/config'
 import * as xtermRegistry from './Terminal/xtermRegistry'
@@ -38,6 +39,10 @@ export function TerminalSpawnListener(): null {
       if (!cwd) console.warn('[spawn] no working directory for', tab_id, '— PTY may fail to start')
       useTerminalStore.getState().addTab(tab_id, label, 'left', adapter as TerminalTab['kind'], undefined, undefined, prompt)
       useTerminalStore.getState().openTab(tab_id)
+      // Progress parity with the Markdown Editor: board/executor agent spawns now also
+      // surface a toast. Board agents were previously silent unless they posted to the board
+      // (and loop-executor agents posted nothing) — this gives every board spawn a start signal.
+      useToastStore.getState().push(`Agent started · ${label}`, 'info', { category: 'phase_summary' })
       useTerminalStore.setState((st) => ({
         tabs: st.tabs.map((t) => t.id === tab_id ? { ...t, runnerOwned: true } : t),
       }))

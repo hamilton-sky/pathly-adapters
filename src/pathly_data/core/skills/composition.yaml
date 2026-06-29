@@ -154,6 +154,23 @@ skills:
     fragments:
       - comms-post
 
+  # ── Goal executors: loop per-task agents + the single drain-dag agent ───────
+  # The loop executor dispatches ONE agent per ready DAG task. Give it the same
+  # fragment layer the FSM/team path gets so it narrates progress, posts findings,
+  # and writes AGENT_DONE — instead of running blind on the raw task text.
+  # (completion-report stays LAST — it owns the "AGENT_DONE is your final act" rule.)
+  development/execute-task:
+    fragments:
+      - comms-post
+      - completion-report
+  # drain-dag (single executor) already does its board CRUD inline — it IS the drain
+  # loop — so it only needs completion-report for a clean AGENT_DONE. no_defaults keeps
+  # the log-phase prose out: a drain loop has no pipeline phases.
+  development/drain-dag:
+    no_defaults: true
+    fragments:
+      - completion-report
+
   # ── Unified CLI composition: client-side pure-transform actions ──────────────
   # Summary / Analyze / Split are pure transforms (read a source artifact → derive a
   # file). They compose ONLY the two transform fragments (+ the progress-logging
