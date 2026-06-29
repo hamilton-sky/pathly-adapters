@@ -204,10 +204,23 @@ FSM server is not automatically managed by the host environment.
 
 ---
 
-## Completion report (AGENT_DONE)
+## Completion report (AGENT_DONE) — your FINAL action
 
-After the stage agent completes, write an AGENT_DONE event to the **central DB** via eventlog.
-This is **mandatory** — the supervisor reads this event as the authoritative result.
+`AGENT_DONE` is the authoritative signal the supervisor reads to end this stage, and the runner's
+early-advance acts on it the instant it appears in the central DB — it does **not** wait for your
+process to exit. So this is the **last thing you do**, with NOTHING after it:
+
+- Write it ONLY after every output file is written **and** every board write is done — including
+  deliverable board state (a seeded task DAG: `type=goal` / `type=task`) and any advisory
+  `artifact` / `status` / `decision` posts. Anything that writes to the board comes BEFORE this.
+- If the task above lists later steps (e.g. "Post Tasks to Comms Board"), this runs **after all of
+  them** — never mid-workflow. A completion report emitted early lets early-advance silently cut off
+  the remaining steps, so the DAG you were supposed to seed never gets posted.
+- The skill supplies only the *content* (role, result, conversation, summary, the `*_START` time);
+  this fragment owns *when* (last) and *how* (below).
+
+Write the AGENT_DONE event to the **central DB** via eventlog. This is **mandatory** — the
+supervisor reads it as the authoritative result.
 
 ## Compute wall seconds
 
