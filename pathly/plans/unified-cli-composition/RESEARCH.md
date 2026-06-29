@@ -1,0 +1,1 @@
+No external research required. Gate 2 is an internal refactor within the established Pathly stack (Python/Flask fragments, TypeScript/React Electron, existing `compose_skill` + `composition.yaml` patterns) — no new libraries, external APIs, or domain standards are involved. The ARCHITECTURE_PROPOSAL.md fully specifies the technical contract.

@@ -1,0 +1,215 @@
+[
+  {
+    "id": "T1",
+    "title": "Shared _safe_topic / _is_unsafe_topic guard (WARN-only leaf module)",
+    "phase": "P0",
+    "depends_on": [],
+    "files": [
+      "src/pathly_orchestrator/storage_paths.py",
+      "tests/test_storage_paths.py"
+    ],
+    "text": "Create NEW leaf module src/pathly_orchestrator/storage_paths.py importing ONLY stdlib (os, logging; NO internal imports so fsm_ops AND runner/argv import it cycle-free). logger=logging.getLogger('pathly.storage'). _is_unsafe_topic(topic)->str|None returns a reason when unsafe: empty/whitespace->'empty'; os.path.isabs(topic)->'absolute path'; any(c in topic for c in ('\\\\',':'))->'contains path separator' (DO NOT flag bare forward-slash \u2014 slash is covered by isabs; flagging it would false-positive a working POSIX sub-path and break behavior-neutrality); splitting on both seps yields a '..' part->'contains traversal segment'. _safe_topic(topic)->str: if _is_unsafe_topic returns a reason, logger.warning('unsafe topic %r (%s); P0 WARN mode \u2014 using unchanged', topic, reason) and RETURN topic UNCHANGED (never raise \u2014 P1 flips to raise). Pure pass-through. Do NOT add __all__ exporting private names (omit it). Add tests/test_storage_paths.py: normal slug pass-through; absolute forward-slash path WARNs once + unchanged; absolute backslash path same; '../escape','a/../b','' truthy; 'goal-abc12345' None.",
+    "acceptance": "module imports only stdlib, _safe_topic never raises in P0 (returns input unchanged, WARNs only on unsafe), forward-slash not WARNed unless absolute \u2014 verify: PYTHONPATH=src python -m pytest tests/test_storage_paths.py -q"
+  },
+  {
+    "id": "T2",
+    "title": "Wire _safe_topic into both storage-path resolvers (behavior-neutral)",
+    "phase": "P0",
+    "depends_on": [
+      "T1"
+    ],
+    "files": [
+      "src/pathly_orchestrator/fsm_ops.py",
+      "src/pathly_orchestrator/runner/argv.py",
+      "tests/test_fsm_ops.py"
+    ],
+    "text": "Add 'from pathly_orchestrator.storage_paths import _safe_topic' to fsm_ops.py and runner/argv.py. In fsm_ops._resolve_storage_path (lines 68-74) make 'topic = _safe_topic(topic)' the FIRST statement before 'new_style = Path(project_root)/\"pathly\"/topic'; do NOT alter the two-probe logic (collapse is P1's fix). In runner/argv._storage_path (lines 13-21) make 'topic = _safe_topic(topic)' the FIRST statement. Pass-through guard = ZERO behavior change. Extend the _resolve_storage_path tests section in tests/test_fsm_ops.py: test_resolve_storage_path_warns_on_absolute_topic_but_resolves_unchanged \u2014 absolute topic logs exactly one pathly.storage WARNING AND the returned value is byte-identical to the pre-P0 collapse (compute Path(project_root)/'pathly'/topic explicitly, assert equality), no raise; test_resolve_storage_path_normal_slug_no_warning \u2014 plain slug + new-style dir created, no warning, result==new-style dir. Add 'import logging' if absent.",
+    "acceptance": "both resolvers call _safe_topic first; normal slug no warning + byte-identical path (existing prefers_new_style/falls_back_to_plans/legacy tests pass); absolute topic one WARNING no raise; no import cycle \u2014 verify: PYTHONPATH=src python -m pytest tests/test_fsm_ops.py -q && PYTHONPATH=src python -c \"import pathly_orchestrator.fsm_ops, pathly_orchestrator.runner.argv; print('import-ok')\""
+  },
+  {
+    "id": "T3",
+    "title": "Additive migration: nullable comms_messages.slug column + partial UNIQUE index",
+    "phase": "P0",
+    "depends_on": [],
+    "files": [
+      "src/pathly_orchestrator/db/migrations_incremental.py",
+      "tests/test_migrations_slug.py"
+    ],
+    "text": "In _add_additive_migrations (migrations_incremental.py:43-110) append a comment + tuple ('comms_messages','slug','TEXT') to the column-add list (after line 104, before the closing ]); comment says the column is added here (not 'P1'). The existing try/except ADD COLUMN loop (106-110) skips already-present columns \u2014 no loop change. AFTER the for loop completes (after line 110, still inside the function) create a partial UNIQUE index: try: conn.execute(\"CREATE UNIQUE INDEX IF NOT EXISTS idx_comms_messages_slug ON comms_messages(slug) WHERE slug IS NOT NULL\"); conn.commit(); except sqlite3.OperationalError: pass. The WHERE slug IS NOT NULL clause is REQUIRED. New tests/test_migrations_slug.py: build an in-memory DB via 'from pathly_orchestrator.db import _run_migrations' (match test_db.py's package-import path), conn=sqlite3.connect(':memory:'), conn.row_factory=sqlite3.Row, _run_migrations(conn). test_slug_column_exists (slug in PRAGMA table_info); test_slug_unique_index_exists (idx_comms_messages_slug in PRAGMA index_list); test_slug_unique_constraint_enforced (two rows same non-null slug -> second raises sqlite3.IntegrityError; two NULL-slug rows both succeed; EVERY INSERT supplies all NOT NULL cols id/board/scope/from_agent/type/text/ts); test_migration_idempotent (second _run_migrations call no raise, column+index present once).",
+    "acceptance": "slug TEXT nullable column + idx_comms_messages_slug exist; same non-null slug -> IntegrityError, two NULLs both insert; second migration idempotent; no row sets slug in P0 \u2014 verify: PYTHONPATH=src python -m pytest tests/test_migrations_slug.py -q"
+  },
+  {
+    "id": "T4",
+    "title": "ensure_goal_slug: collision-safe goal->slug under the process write-lock",
+    "phase": "P1",
+    "depends_on": [
+      "T3"
+    ],
+    "files": [
+      "src/pathly_orchestrator/supervisor/slug.py",
+      "src/pathly_orchestrator/db/queries/comms_messages.py",
+      "src/pathly_orchestrator/db/queries/comms.py",
+      "tests/test_goal_slug.py"
+    ],
+    "text": "NEW supervisor/slug.py (may import db; MUST NOT import http_server). _slugify(text)->str: lowercase, runs of non-[a-z0-9]->'-', strip leading/trailing '-', cap 48 chars; empty->'goal'; cap whole slug to 64 chars max. ensure_goal_slug(conn, goal_id)->str: 'from pathly_orchestrator.db.connection import _get_write_lock' (returns a _WriteGuard context manager \u2014 use only 'with _get_write_lock(conn):', never .acquire()). Inside the block: read the goal row's slug+text via read_message_slug (SELECT WHERE id=goal_id AND type='goal'); if slug non-empty return it (idempotent). Else base=_slugify(text)[:48]; candidate=f'{base}-{goal_id[:8]}'; persist via set_message_slug; catch sqlite3.IntegrityError, retry with goal_id[:10],[:12] up to 3 times, then a uuid4 hex tail (truncate to the 64-char cap). All read+write inside the single write-lock block. In comms_messages.py add set_message_slug(conn,message_id,slug) (mirror set_goal_executor:71-78, UPDATE ... SET slug=? WHERE id=?) and read_message_slug(conn,message_id)->{slug,text}|None (read-only, WHERE id=? AND type='goal'); slug.py contains NO inline SQL. Add both helpers to the comms.py re-export shim. tests/test_goal_slug.py: idempotent (twice->same slug, one write); format base[:48]+'-'+goal_id[:8]; empty/symbol text->base 'goal'; two threads racing on the same goal_id converge on ONE slug (no IntegrityError escapes).",
+    "acceptance": "slug.py exports _slugify+ensure_goal_slug; the latter wraps SELECT+UPDATE in one write-lock + short-circuits on persisted slug; concurrency converges; comms_messages gains set_message_slug+read_message_slug; no inline SQL in slug.py; no http_server import \u2014 verify: PYTHONPATH=src python -m pytest tests/test_goal_slug.py -q"
+  },
+  {
+    "id": "T5",
+    "title": "Resolver goals/ probe + create-by-caller, _safe_topic RAISE, thread storage_path through board_run/terminal",
+    "phase": "P1",
+    "depends_on": [
+      "T2",
+      "T4"
+    ],
+    "files": [
+      "src/pathly_orchestrator/fsm_ops.py",
+      "src/pathly_orchestrator/runner/argv.py",
+      "src/pathly_orchestrator/storage_paths.py",
+      "src/pathly_orchestrator/supervisor/board_run.py",
+      "src/pathly_orchestrator/supervisor/state.py",
+      "src/pathly_orchestrator/supervisor/terminal.py",
+      "tests/test_resolve_storage_path.py"
+    ],
+    "text": "1) fsm_ops._resolve_storage_path (68-74): extend the probe to multi-tier in EXACTLY this order \u2014 (1) pathly/<topic> [existing new_style], (2) pathly/goals/<topic> [new goal tier], (3) pathly/plans/<topic> [legacy]; return the first .is_dir(); if none exists FALL THROUGH to the existing template join Path(project_root)/template.format(topic=topic) (unchanged default). Do NOT mkdir inside _resolve_storage_path \u2014 directory creation is the CALLER's job in T6 (the caller knows it is a goal). Storage stays exactly two components under pathly (watcher derives project_root via parent.parent.parent at terminal.py:86). 2) Flip _safe_topic in storage_paths.py to RAISE ValueError when _is_unsafe_topic returns a reason (one-line P1-flip comment); applies at both fsm_ops._resolve_storage_path and runner/argv._storage_path. Feature runs (topic==slug) never hit it. 3) board_run.start_board_run: add optional 'storage_path: str = \"\"' kwarg; where_line (246-255) uses it directly when set, AND broaden the guard so where_line is emitted for goal-tier boards (project/global) when storage_path is supplied \u2014 keep the byte-identical feature inline fallback (pathly/<scope> else pathly/plans/<scope>) when absent. 4) state.py RunnerState: add 'storage_path: str = \"\"' field AND add storage_path to public_dict() (101-129); set once at run start. 5) terminal.py three hardcoded pathly/plans/<topic> sites (:39 _write_supervisor_phase_summary, :269 early_advance feature_dir, :307 agent_done storage_path): replace hardcoded 'plans'; :269/:307 read RunnerState.storage_path; :39 resolves via lazy 'from pathly_orchestrator.fsm_ops import _load_flow, _resolve_storage_path' (wrap in try/except so the existing early-return-if-missing semantics survive). Keep watcher parent.parent.parent valid. tests/test_resolve_storage_path.py: (a) pre-created goals/<slug> returned (two components under pathly); (b) absolute topic raises ValueError; (c) feature slug resolves pathly/plans/<slug> or pathly/<slug> unchanged.",
+    "acceptance": "probe order pathly/<topic>->goals/<topic>->plans/<topic>; _safe_topic RAISES on absolute/\\\\/:/.. at both resolvers; start_board_run gains storage_path (where_line for goal-tier when set, byte-identical feature fallback when absent); RunnerState gains storage_path field+public_dict entry; terminal.py three sites (incl :39) resolve correctly; watcher project_root unchanged \u2014 verify: PYTHONPATH=src python -m pytest tests/test_resolve_storage_path.py -q"
+  },
+  {
+    "id": "T6",
+    "title": "Route topic=slug at every goal call site + thread storage_path + Studio RESERVED set (closes the project-goal loop)",
+    "phase": "P1",
+    "depends_on": [
+      "T5"
+    ],
+    "files": [
+      "src/pathly_orchestrator/supervisor/goal_decomposer.py",
+      "src/pathly_orchestrator/supervisor/goal_executor.py",
+      "src/pathly_orchestrator/supervisor/board_run.py",
+      "studio/src/renderer/src/store/commsStore.ts",
+      "tests/test_project_goal_decompose.py"
+    ],
+    "text": "Reroute every goal-tier call so the on-disk topic is the SLUG; scope keeps flowing for board posts + the board-tier lock. 1) goal_decomposer._decompose_consultation (244-257): add lazy imports 'from pathly_orchestrator.db.connection import get_db' and 'from pathly_orchestrator.supervisor.slug import ensure_goal_slug'; slug=ensure_goal_slug(get_db(project_root or None), goal_id); mkdir Path(project_root)/'pathly'/'goals'/slug (parents=True,exist_ok=True); call _start(topic=slug,...) instead of topic=scope; _reset_fsm_state_for_flow at :242 also receives slug. 2) goal_executor._run_team (:317 reset + :320-334 _start): resolve slug at the top (same imports+mkdir); pass slug to _reset_fsm_state_for_flow(flow, slug, project_root) and _start(topic=slug,...). Leave board_lock.holder(board,scope)/get_state(scope) busy checks (292-300) keyed on scope. _run_loop: set RunnerState.topic=slug (was topic=scope at 223-231); scheduler_loop(state,board,scope,...) at :249 keeps board/scope as scope. 3) goal_executor._reset_fsm_state_for_flow (23-65): rename 2nd positional param scope->topic (disk key; already forwards into _resolve_storage_path at :52); update docstring; arity unchanged so positional callers keep working. 4) _decompose_planner + _decompose_plan: resolve slug (same pattern), pass storage_path=str(Path(project_root)/'pathly'/'goals'/slug) into start_board_run (kwarg from T5); positional args stay (board, scope). 5) board_run.start_board_run: use the storage_path kwarg for where_line (broadened guard from T5). 6) commsStore.ts:140: extend RESERVED to new Set(['plans','.archive','goals','lessons','explorations','debugs','pipeline-walkthrough']). No core skill changed -> no pathly-setup/build/snapshot for T6. NEW tests/test_project_goal_decompose.py MUST drive the REAL FSM through >=1 transition for an ABSOLUTE-path-scoped goal (a mock on each side hides the collapse): seed a type='goal' row with scope=str(tmp_path) into a temp DB, run the consultation decompose (or drive _resolve_storage_path + the PO stage transition with the resolved slug), assert (a) pathly/goals/<slug>/ created, (b) writing PO_NOTES.md with '#' under it fires PO_DISCUSSING->ARCHITECTING (advances past PO_DISCUSSING, no re-spawn), (c) a feature goal still resolves pathly/plans/<slug> unchanged.",
+    "acceptance": "every goal call site passes slug as on-disk topic; scope still board-post scope + lock key; real-FSM project-goal test advances past PO_DISCUSSING; start_board_run threads storage_path for goal-tier; commsStore RESERVED extended; renderer typechecks \u2014 verify: PYTHONPATH=src python -m pytest tests/test_project_goal_decompose.py -q && node_modules/.bin/tsc --noEmit -p studio/tsconfig.web.json"
+  },
+  {
+    "id": "T7",
+    "title": "goal_id capability + build_adapter_caps + caps-threading seam through start_board_run",
+    "phase": "GATE2",
+    "depends_on": [
+      "T6"
+    ],
+    "files": [
+      "src/pathly_orchestrator/skills/compose.py",
+      "src/pathly_orchestrator/skills/__init__.py",
+      "src/pathly_orchestrator/supervisor/board_run.py",
+      "src/pathly_orchestrator/supervisor/goal_decomposer.py",
+      "src/pathly_orchestrator/http_server/blueprints/skills/editor_render.py",
+      "tests/test_compose.py"
+    ],
+    "text": "1) compose.py: extend _KNOWN_CAPABILITIES (line 28) {'can_spawn'} -> {'can_spawn','goal_id'}; gating is caps.get('goal_id') truthiness so goal_id doubles as gate flag + value; _coerce_caps already passes extra dict keys through. 2) build_adapter_caps(adapter, *, goal_id='', executor='', kind='')->dict near adapter_caps_for (~line 165): calls adapter_caps_for(adapter) for can_spawn then merges {'goal_id':goal_id or '','executor':executor or '','kind':kind or ''}; export from skills/__init__.py (import list + re-export list). 3) THE CAPS-THREADING SEAM (blocking fix): board_run._compose_skill_body(skill, adapter) (104-115) currently calls compose_skill(skill, adapter or 'claude') passing only the adapter STRING, so every goal_id-gated fragment is dropped unconditionally. Add 'caps: dict | None = None' param: compose_skill(skill, caps if caps is not None else (adapter or 'claude')). Add 'caps: dict | None = None' kwarg to start_board_run and forward it into _compose_skill_body. 4) goal_decomposer: in _decompose_planner + _decompose_plan build caps once via build_adapter_caps(adapter or 'claude', goal_id=goal_id, executor='', kind='dag') (lazy import) and pass caps=<that dict> into start_board_run (routing/skill change is T9; T7 only threads caps). 5) editor_render.py: replace inline adapter_caps={'can_spawn':True} (line 201) with build_adapter_caps('claude'); ALSO update the /skills/compose endpoint (~line 260) \u2014 read optional goal_id from the request body, pass build_adapter_caps(adapter, goal_id=goal_id) (default empty -> behavior-equivalent). 6) tests/test_compose.py: test_build_adapter_caps_merges_goal_context (the two equalities); test_goal_id_gate_known_capability \u2014 synthetic manifest {name: comms-post, requires: goal_id} passes validate_composition (call it AFTER _KNOWN_CAPABILITIES is patched), compose_skill keeps the fragment with caps={'goal_id':'g1'}, drops with caps={'goal_id':''}.",
+    "acceptance": "_KNOWN_CAPABILITIES includes goal_id; requires:goal_id validates; build_adapter_caps merges+exported; _compose_skill_body/start_board_run accept & forward a caps dict so goal_id reaches compose_skill; compose_skill keeps/drops requires:goal_id by caps; no existing test regresses (task_dag_post_block_retired green) \u2014 verify: PYTHONPATH=src python -m pytest tests/test_compose.py -q"
+  },
+  {
+    "id": "T8",
+    "title": "Create task-dag-post + board-start-context fragments and planning/dag-sketch skill; wire composition.yaml",
+    "phase": "GATE2",
+    "depends_on": [
+      "T7"
+    ],
+    "files": [
+      "src/pathly_data/core/skills/fragments/task-dag-post.md",
+      "src/pathly_data/core/skills/fragments/board-start-context.md",
+      "src/pathly_data/core/skills/planning/dag-sketch.md",
+      "src/pathly_data/core/skills/composition.yaml",
+      "tests/test_compose.py"
+    ],
+    "text": "1) fragments/task-dag-post.md \u2014 the SINGLE board-task-POST mechanism (extracted from plan.md Step 6). Structure like comms-post.md (H2 + curl + skip-if-down). H2 '## Posting the task DAG to the Comms Board'. Body assumes $GOAL_ID known (goal exists; do NOT post type=goal): (a) idempotency guard curl -s 'http://127.0.0.1:8765/comms/tasks?goal_id=$GOAL_ID' + skip-only-if-THIS-goal-has-tasks (port plan.md 294-301); (b) per-task POST shape type:'task', goal_id:'$GOAL_ID', self-contained text, board, scope, stage, optional integer conv, depends_on array, optional artifact_path/context_refs + the 'executor is NOT on the task' note (port plan.md 423-448); (c) skip-if-down advisory (port 452-456). Agnostic of where titles come from. Do NOT include the advisory-artifact POST block. 2) fragments/board-start-context.md \u2014 read-only board context pull at decompose start, gated on goal_id. H2 '## Reading the board before you decompose'. Body: POST http://127.0.0.1:8765/comms/agent-context (POST not GET \u2014 GET returns 405) scoped to {scope, goal_id}; instruct reading existing goal text + open questions before producing tasks; explicit skip-if-down. <=30 lines, advisory. 3) planning/dag-sketch.md \u2014 AGNOSTIC body only (NO http://127.0.0.1:8765 or /comms/ strings). Leading ---\\n\\n--- block fine. Body: 'Decompose the goal into 3-7 concrete, independently-runnable tasks. Each title actionable+specific. Write a one-page DAG_PLAN.md with a ## Tasks table [id | title | depends_on]. Then post each task.' No curl mechanics; no heavy phases; end before completion prose. 4) composition.yaml: add a skills: entry for planning/dag-sketch composing exactly - { name: board-start-context, requires: goal_id }, - { name: task-dag-post, requires: goal_id }, - completion-report (completion-report LAST). progress-logging default applies automatically. Do NOT add a consultation-plan block. 5) tests/test_compose.py: test_dag_sketch_composes_task_post_and_completion \u2014 compose_skill('planning/dag-sketch', build_adapter_caps('claude', goal_id='g1')) contains both H2 markers + '## Completion report'; with build_adapter_caps('claude') (no goal_id) the two gated sections absent but completion-report+progress-logging remain. Leave task_dag_post_block_retired UNCHANGED. After editing core files run pathly-setup claude --apply --repair + python -m build; if the build errors on a missing _meta/skills/dag-sketch.yaml, add it to all four adapters.",
+    "acceptance": "three new files exist with the specified structure; skill body has NO http/comms strings; validate_composition passes with the new entry; compose_skill('planning/dag-sketch', build_adapter_caps('claude', goal_id='g1')) includes the three sections, drops the two gated ones with no goal_id; task_dag_post_block_retired green; adapters build \u2014 verify: PYTHONPATH=src python -m pytest tests/test_compose.py -q && PYTHONPATH=src python -c \"from pathly_orchestrator.skills.compose import validate_composition; validate_composition(); print('manifest ok')\""
+  },
+  {
+    "id": "T9",
+    "title": "Route _decompose_planner->planning/dag-sketch; keep _decompose_plan on planning/plan; move plan.md Step 6 task-POST into the fragment",
+    "phase": "GATE2",
+    "depends_on": [
+      "T7",
+      "T8"
+    ],
+    "files": [
+      "src/pathly_orchestrator/supervisor/goal_decomposer.py",
+      "src/pathly_data/core/skills/planning/plan.md",
+      "src/pathly_data/core/skills/composition.yaml",
+      "tests/test_compose.py",
+      "tests/snapshots/team__build.claude.md"
+    ],
+    "text": "1) _decompose_planner (93-154): REPLACE the inline instructions (113-135) + skill='' (line 142) with a SHORT goal-context instructions (e.g. f'Decompose this goal into 3-7 tasks. Goal: {goal_text}. The goal already exists with goal_id={goal_id!r} \u2014 post task children only, do NOT post a new goal.'), skill='planning/dag-sketch', agent='planner', caps= from T7; DELETE the inline POST {post_url} JSON block (mechanics now from the composed task-dag-post fragment). Keep result['mode']='planner'/goal_id; read result from AGENT_DONE.summary as today. 2) _decompose_plan (157-203): NO routing change \u2014 stays skill='planning/plan' (the full decomposer that derives context_refs+depends_on); pass caps=build_adapter_caps(adapter or 'claude', goal_id=goal_id, kind='plan'). 3) Do NOT touch _decompose_consultation. 4) plan.md Step 6 (277-456): MOVE the per-task POST mechanics OUT \u2014 replace the inline idempotency-guard + per-task curl block (~382-456) with a short pointer that the composed task-dag-post fragment owns the POST mechanics (idempotency guard, task JSON shape, depends_on resolution, skip-if-down) and that for each phase you extract N/title/Purpose/File/Done-when/Depends-on, compose the self-contained task text, derive context_refs from the phase number, and post via the fragment. The surviving prose MUST KEEP the literal tokens 'context_refs' and 'depends_on' so compose_skill('planning/plan','claude') (no goal_id, drops the gated fragment) still contains 'context_refs' \u2014 keeping test_task_dag_post_block_retired (line 346) green WITHOUT editing it. KEEP in Step 6: the advisory artifact-heading convention (285-292), the Find-OR-create-goal block (303-328), and the advisory-artifact POST block (330-380). 5) composition.yaml planning/plan (123-125): change fragments: [completion-report] -> fragments: [{ name: task-dag-post, requires: goal_id }, completion-report] (task-dag-post BEFORE completion-report). 6) Snapshots: the 6 existing (team/dev build/review/test) should be UNCHANGED; re-run snapshot generation, commit any diff; optionally add tests/snapshots/planning__plan.claude.md from compose_skill('planning/plan', build_adapter_caps('claude', goal_id='g1')) with a parametrized test. After editing core files run pathly-setup claude --apply --repair + python -m build. 7) tests/test_compose.py: test_plan_composes_task_dag_post_before_completion \u2014 compose_skill('planning/plan', build_adapter_caps('claude', goal_id='g1')) contains the task-dag-post H2 + '## Completion report' with completion-report index > task-dag-post index; with no goal_id task-dag-post drops but completion-report stays.",
+    "acceptance": "_decompose_planner uses planning/dag-sketch + short instructions + NO inline POST block + caps; _decompose_plan still planning/plan; planning/plan composes task-dag-post BEFORE completion-report (POST shape once, from fragment) and plan.md Step 6 retains context_refs; validate_composition passes; 6 golden snapshots pass \u2014 verify: PYTHONPATH=src python -m pytest tests/test_compose.py -q && PYTHONPATH=src python -c \"from pathly_orchestrator.skills.compose import compose_skill, build_adapter_caps; out=compose_skill('planning/plan', build_adapter_caps('claude', goal_id='g1')); assert out.count('## Completion report')==1; print('ok')\""
+  },
+  {
+    "id": "T10",
+    "title": "Harden the Summary ActionPill error state (ERROR:-prefixed capture -> pill='error', parity with Analyze/Split)",
+    "phase": "GATE2",
+    "depends_on": [],
+    "files": [
+      "studio/src/renderer/src/components/CommandCenter/CommsPanel/hooks/useResummarize.ts",
+      "studio/src/renderer/src/components/CommandCenter/CommsPanel/ArtifactsView/summarizeArtifact.ts"
+    ],
+    "text": "Renderer-only. Ensure the Summary path treats an ERROR:-prefixed capture file as a hard failure driving the pill to state='error', matching the Analyze/Split contract. Most wiring exists \u2014 verify and lock it. 1) useResummarize.ts run() (204-268): confirm the engine path reads the sibling .summary file, that /^ERROR:/i (line 229) THROWS into the catch (255-267) -> markStatus(messageId,'failed',msg) + setPillState('error') (262-264) + 2.5s auto-reset (265); the thrown message strips the ERROR: prefix (line 230) so the toast shows the agent's reason. Restore any drift. 2) summarizeArtifact.ts summarizeArtifactById (84-149): confirm the engine path's /^ERROR:/i (line 119) throws + is caught (142-148) -> 'Summary failed: <reason>' toast, and the file is NOT written back as a real summary (auto path has no pill). 3) If renderer test infra exists, add a guard feeding a .summary whose first line is 'ERROR: boom' asserting pill->'error' (not 'done') + toast 'Summary failed: boom'; else acceptance is the typecheck + a manual-trace note. No core/skill change -> no pathly-setup/build/snapshot. No inline styles (logic-only). Do NOT pull in CardKind/loadCards (deferred Studio package).",
+    "acceptance": "Re-summarize engine path: ERROR:-prefixed file -> pill state='error' + stripped-prefix 'Summary failed: <reason>' toast + auto-reset; auto path throws+toasts+does NOT write back; no style={{...}}; renderer typechecks \u2014 verify: node_modules/.bin/tsc --noEmit -p studio/tsconfig.web.json"
+  },
+  {
+    "id": "T11",
+    "title": "artifact-manifest.yaml (role->file->gate single source) + per-skill artifact-register fragment",
+    "phase": "P2",
+    "depends_on": [
+      "T6",
+      "T9"
+    ],
+    "files": [
+      "src/pathly_data/core/skills/artifact-manifest.yaml",
+      "src/pathly_data/core/skills/fragments/artifact-register.md",
+      "src/pathly_data/core/skills/composition.yaml",
+      "src/pathly_orchestrator/skills/compose.py",
+      "tests/test_compose.py"
+    ],
+    "text": "1) NEW artifact-manifest.yaml \u2014 single source read by BOTH composer and FSM gates: version:1; roles: po {file: PO_NOTES.md, gate:'#'}, architect {ARCHITECTURE_PROPOSAL.md,'#'}, web-researcher {RESEARCH.md,'#'}, designer {DESIGN.md,'## Design System Output'}, planner {IMPLEMENTATION_PLAN.md,'## Phase'}, reviewer {feedback/REVIEW_FAILURES.md,'#'}, tester {feedback/TEST_FAILURES.md,'#'}, retro {RETRO.md,'#'}, explorer {CONCLUSIONS.md,'#'}; overrides: planner.planning/dag-sketch {file: DAG_PLAN.md, gate:'## Tasks'}. roles keys match role_map strings; gate strings stay consistent with the existing on_content markers in the flow YAMLs (only consultation PLANNING switches to on_board_count in T13). 2) compose.py: load_artifact_manifest()->dict (reads _skills_root()/'artifact-manifest.yaml', mirrors load_manifest) and manifest_role_file(role, skill=None)->tuple[str,str]|None (overrides['<role>.<skill>'] first, else roles[role], else None). PURE (no DB) so the FSM gate imports it without a layer violation (skills/ is a sibling of fsm/; fsm->skills allowed). 3) NEW fragments/artifact-register.md \u2014 agnostic-to-role HOW fragment owning THREE mechanics: (a) write the role's named output file to <out_path>; (b) append ONE line to <feature_path>/ARTIFACTS.jsonl {role,path,type,title,summary,ts} via a python3 -c heredoc (create if absent, append-only); (c) advisory board POST type='artifact' to http://127.0.0.1:8765/comms/post with skip-if-down. Body MUST state: runs AFTER the output file is written and BEFORE the completion report. NO /complete_stage or FSM transition. Reuse the SAME <out_path> substitution site client-file-output.md uses, and feed <feature_path> = the resolved storage dir. 4) composition.yaml: attach - artifact-register PER-SKILL to team/build, team/review, team/test, team/design, team/retro, planning/plan, planning/dag-sketch (the manifest roles map is the allow-list). For team/design and team/retro (only comms-post today, no completion-report) insert artifact-register BEFORE comms-post so no ordering-invariant skill ends on artifact-register. Do NOT add to defaults:, nor planning/po/evaluate/consolidate/summarize*/analyze/split. 5) tests/test_compose.py: test_artifact_manifest_loads; test_manifest_role_file_override (('planner','planning/dag-sketch')==('DAG_PLAN.md','## Tasks'); ('planner')==('IMPLEMENTATION_PLAN.md','## Phase'); ('designer')==('DESIGN.md','## Design System Output')); test_artifact_register_composed (compose_skill('team/build','claude') contains the artifact-register heading); test_artifact_register_not_in_po (compose_skill('planning/po','claude') does NOT). Extend the snapshot parametrize lists to cover team/design, team/retro, planning/plan, planning/dag-sketch. 6) Run pathly-setup claude --apply --repair + python -m build; regenerate snapshots for the 7 composed skills (diff = fragment insertion only, completion-report still LAST where present).",
+    "acceptance": "artifact-manifest.yaml exists with roles+override; manifest_role_file resolves override/default/designer; artifact-register.md writes <out_path>, appends ARTIFACTS.jsonl, advisory skip-if-down POST, NO /complete_stage/FSM call; composition.yaml lists artifact-register under the 7 skills + NOWHERE in defaults/po/evaluate/consolidate/summarize*/analyze/split, no skill ending on it; validate_composition passes; new tests pass; 7 snapshots regenerated \u2014 verify: PYTHONPATH=src python -m pytest tests/test_compose.py -q && pathly-setup claude --apply --repair && python -m build"
+  },
+  {
+    "id": "T12",
+    "title": "Thread board/scope/goal_id into /complete_stage + ensure_attached reconciler with manifest/JSONL fallback",
+    "phase": "P2",
+    "depends_on": [
+      "T11"
+    ],
+    "files": [
+      "src/pathly_orchestrator/db/queries/comms_artifacts.py",
+      "src/pathly_orchestrator/db/queries/comms.py",
+      "src/pathly_orchestrator/db/queries/__init__.py",
+      "src/pathly_orchestrator/http_server/blueprints/core/fsm.py",
+      "src/pathly_orchestrator/fsm_ops_complete.py",
+      "src/pathly_orchestrator/supervisor/orchestrator_stage.py",
+      "src/pathly_orchestrator/supervisor/terminal.py",
+      "tests/test_artifact_reconcile.py"
+    ],
+    "text": "1) comms_artifacts.py ensure_attached(conn, scope, board, artifact_path, role, *, title=None, summary=None, artifact_type='md', broadcast_fn=None)->str: idempotent UPSERT keyed on (scope, artifact_path). Resolve via find_or_create_artifact_by_path(conn, scope, artifact_path) \u2014 BUT that function (line 175) only creates a sentinel when the path contains '/pathly/plans/'; goal-tier artifacts live under pathly/goals/<slug>/, so BROADEN the path check to also accept '/pathly/goals/' (or inline the broader-path sentinel inside ensure_attached). When no row + not creatable, post_message(conn, board=board, scope=scope, from_agent=role, type='artifact', text=title or <basename>, artifact_path=artifact_path, artifact_type=artifact_type) then insert_artifact(...). All writes wrapped in 'with _get_write_lock(conn):'. Return the artifact id. Idempotency: two calls for the same (scope, artifact_path) -> SAME id, one row. After a fresh attach call broadcast_fn({'type':'COMMS_UPDATE','event':'artifact_attached','board':board,'scope':scope,'artifact_type':artifact_type}) best-effort \u2014 broadcaster is an INJECTED callable (db layer imports NO http_server). The sentinel scope column = the board scope (NOT the slug). Re-export ensure_attached from db/queries/comms.py (shim) AND db/queries/__init__.py (and db/__init__.py if it has its own import list). 2) fsm.py complete_stage_endpoint: KEEP required={flow,topic,project_root}; additively forward the full body so board/scope/goal_id reach complete_stage with NO 400 when absent. 3) fsm_ops_complete.py complete_stage(args): board=args.get('board') or 'feature'; scope=args.get('scope') or topic; goal_id=args.get('goal_id'). AFTER a successful transition, resolve the prev-state role's file via compose.manifest_role_file(role, skill) (role from role_map[prev_state], skill from agent_map[prev_state]); if (storage_path/file).exists() call ensure_attached(get_db(project_root), scope=scope, board=board, artifact_path=str(storage_path/file), role=role, broadcast_fn=<lazy _broadcast_comms>) inside try/except (never block the transition). Pass goal_id into evaluate_transition_rules (consumed in T13). 4) orchestrator_stage.py: at the two fhc.complete_stage call sites (:48 primary, :108 decide-result) additively include board/scope/goal_id from RunnerState; only :48 needs them for the gate, :108 may pass them harmlessly; feature runs leave them None/absent. 5) terminal.py non-FSM/post-PTY path: add a best-effort _reconcile_artifacts(feature_dir, scope, board, role) helper (<=30 lines) \u2014 read <feature_dir>/ARTIFACTS.jsonl if present and ensure_attached each line; FALLBACK when absent \u2014 stat the role's manifest file (compose.manifest_role_file) under feature_dir and ensure_attached if it exists; run it for EVERY stage role (so consultation team/architect->ARCHITECTURE_PROPOSAL.md and team/research->RESEARCH.md, which write no ARTIFACTS.jsonl, still attach via the manifest-stat fallback). Wrap in try/except+logger.debug; never affect PTY result handling. 6) tests/test_artifact_reconcile.py: (a) JSONL path->one row for (scope,path); (b) manifest-stat fallback (no JSONL, role file on disk)->attached; (c) idempotency (twice->one row,same id); (d) complete_stage carries scope/board through. Use a REAL temp SQLite DB via the test_gates.py harness (_db.get_db(project_root), project_root=storage.parent.parent.parent) \u2014 pass an explicit tmp project_root so get_db resolves a temp DB, NOT ~/.pathly/pathly.db.",
+    "acceptance": "ensure_attached idempotent on (scope,artifact_path) (two calls->one row,same id)+emits artifact_attached via injected broadcast_fn; db layer imports no http_server (import smoke clean); find_or_create_artifact_by_path accepts /pathly/goals/ paths; /complete_stage accepts optional board/scope/goal_id with no 400; complete_stage derives feature/topic/None defaults + best-effort attaches without blocking; terminal.py reconciles via JSONL-or-manifest-stat fully wrapped; four reconcile tests + existing test_gates pass \u2014 verify: PYTHONPATH=src python -m pytest tests/test_artifact_reconcile.py tests/test_gates.py -q"
+  },
+  {
+    "id": "T13",
+    "title": "FIX B: new on_board_count FSM gate type + switch consultation PLANNING->DONE to assert the seeded DAG",
+    "phase": "P2",
+    "depends_on": [
+      "T12"
+    ],
+    "files": [
+      "src/pathly_orchestrator/fsm/engine_transitions.py",
+      "src/pathly_orchestrator/fsm_ops_complete.py",
+      "src/pathly_orchestrator/db/queries/comms_tasks.py",
+      "src/pathly_orchestrator/db/queries/__init__.py",
+      "src/pathly_data/core/flows/consultation.flow.yaml",
+      "tests/test_gates.py"
+    ],
+    "text": "1) comms_tasks.py count_tasks_for_goal(conn, goal_id, *, boards=None, scopes=None)->int: count non-deleted type='task' messages with the given goal_id (optional board/scope filter); pure wrapped read; mirror get_ready_tasks param style; re-export from db/queries/__init__.py (and the comms.py shim). 2) engine_transitions.py: change signature to evaluate_transition_rules(flow, current_state, storage_path, *, goal_id: str | None = None). Add Level 2.6 on_board_count between on_state_counter (line 95) and decide (line 97). YAML: on_board_count: {goal_scoped: true, op: gt, compare_to: 0, next: DONE}. CRITICAL: on_board_count's compare_to is a RAW INTEGER not a state-doc field key \u2014 on_state_counter does int(state_doc[compare_to]) (line 91) and guards 'and compare_to' (line 85, truthy) which both break a literal 0; for on_board_count read compare_to as int(rule_value) directly and guard with 'compare_to is not None' so 0 is honored. If goal_id is None -> SKIP (fall through; never blocks non-goal flows). Else lazily 'from pathly_orchestrator.db.connection import get_db' + 'from pathly_orchestrator.db.queries.comms_tasks import count_tasks_for_goal'; project_root=storage_path.parent.parent.parent (valid because storage is two components under pathly incl pathly/goals/<slug>); count=count_tasks_for_goal(get_db(project_root), goal_id); if op_fn(count, compare_to) return rule['next']. Wrap the DB call in try/except -> on ANY error do NOT advance (fail-closed). Reuse the _ops table. Still returns str|dict. 3) fsm_ops_complete.py: pass goal_id (read in T12) into evaluate_transition_rules(flow_config, current_state, storage_path, goal_id=goal_id); if next_action's path also evaluates pass goal_id=None there. 4) consultation.flow.yaml: switch PLANNING (currently on_content IMPLEMENTATION_PLAN.md '## Phase' -> DONE) to PLANNING: {on_board_count: {goal_scoped: true, op: gt, compare_to: 0, next: DONE}, default: PLANNING}. transition_rules.PLANNING and transition_actions are SIBLINGS (73-76) \u2014 do NOT drop transition_actions: PLANNING->DONE: [skill: archive-artifacts]. Add a leading comment (Fix A removed the race; Fix B is the structural backstop). 5) tests/test_gates.py: test_on_board_count_advances (seed 1 type='task' row goal_id=G, call evaluate_transition_rules(flow,'PLANNING',storage,goal_id=G) -> 'DONE'); test_on_board_count_blocks_when_zero (no tasks -> 'PLANNING'); test_on_board_count_skips_without_goal_id (goal_id=None -> skipped, default, no raise); test_on_board_count_db_error_does_not_advance (monkeypatch count to raise -> default). Use the existing db.get_db() harness with a tmp project_root. 6) Run pathly-setup claude --apply --repair + python -m build (consultation.flow.yaml is a seeded flow; rebuild so all four adapters carry the updated seed).",
+    "acceptance": "count_tasks_for_goal returns the task count+re-exported; evaluate_transition_rules gains keyword-only goal_id; Level 2.6 on_board_count evaluates between on_state_counter and decide, reads compare_to as a raw int + guards is-not-None (honors 0); goal_id=None skips, DB error fails-closed; consultation PLANNING->DONE uses on_board_count + keeps archive-artifacts; fsm_ops_complete passes goal_id through; all gate tests + existing test_gates pass; adapters rebuilt \u2014 verify: PYTHONPATH=src python -m pytest tests/test_gates.py -q && pathly-setup claude --apply --repair && python -m build"
+  }
+]
