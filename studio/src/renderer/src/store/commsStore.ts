@@ -454,7 +454,11 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
     const now = Date.now()
     set((s) => ({ goalRunState: { ...s.goalRunState, [goal_id]: 'running' }, goalRunStart: { ...s.goalRunStart, [goal_id]: now } }))
 
-    apiRunGoal(goal_id, executor, opts)
+    // The project root is the PTY's working directory — without it the spawn fails
+    // ("Working directory is required") and the run dies on a 30s terminal_spawn_timeout.
+    // Mirror decomposeGoal / runBoard / runEvaluator, which all forward it.
+    const projectRoot = useProjectStore.getState().projectPath.replace(/\\/g, '/').replace(/\/$/, '')
+    apiRunGoal(goal_id, executor, { ...opts, projectRoot })
       .then((res) => {
         if (res === null) {
           set((s) => ({ goalRunState: { ...s.goalRunState, [goal_id]: 'idle' } }))

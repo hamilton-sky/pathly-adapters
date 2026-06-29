@@ -723,6 +723,7 @@ export interface RunGoalOpts {
   adapter?: string
   model?: string
   flow?: string
+  projectRoot?: string
 }
 
 export type DecomposeMode = 'planner' | 'plan' | 'consultation'
@@ -766,6 +767,7 @@ export async function apiRunGoal(
     if (opts.adapter) body.adapter = opts.adapter
     if (opts.model) body.model = opts.model
     if (opts.flow) body.flow = opts.flow
+    if (opts.projectRoot) body.project_root = opts.projectRoot
     const r = await apiFetch('/comms/goals/run', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

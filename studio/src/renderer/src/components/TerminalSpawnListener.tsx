@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useRunnerStore } from '../store/runnerStore'
+import { useProjectStore } from '../store/projectStore'
 import { useTerminalStore } from '../store/terminalStore'
 import { useToastStore } from '../store/toastStore'
 import { attachProgress } from './shared/RunPill/progress'
@@ -49,8 +50,14 @@ export function TerminalSpawnListener(): null {
       const adapter = data.adapter as string
       const label = (data.label as string | undefined) ?? adapter
       // Use || (not ??) so an empty-string cwd falls back to the project root — an
-      // empty cwd makes node-pty fail silently and the run times out.
-      const cwd = (data.cwd as string | undefined) || useRunnerStore.getState().projectRoot || ''
+      // empty cwd makes node-pty fail silently and the run times out. runnerStore.projectRoot
+      // is only set during an FSM pipeline run, so for board/goal runs fall back to the
+      // canonical selected project (projectStore) before giving up.
+      const cwd =
+        (data.cwd as string | undefined) ||
+        useRunnerStore.getState().projectRoot ||
+        useProjectStore.getState().projectPath ||
+        ''
       const prompt = (data.prompt as string | undefined) ?? ''
       const isInteractive = !!(data.interactive as boolean | undefined)
       if (useTerminalStore.getState().tabs.some((t) => t.id === tab_id)) return   // idempotent — never double-open
