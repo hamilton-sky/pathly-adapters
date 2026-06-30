@@ -25,14 +25,6 @@ export default defineConfig({
   },
   renderer: {
     root: resolve(__dirname, 'src/renderer'),
-    // Mermaid lazy-loads some diagram defs (mindmap, timeline, …) via a RELATIVE dynamic
-    // import ("./chunks/mermaid.core/mindmap-definition-*.mjs"). Vite's dep pre-bundling
-    // rewrites mermaid into .vite/deps, and those relative chunk paths then 404 at render
-    // time — so mindmap throws while core diagrams (flowchart) still work. Excluding mermaid
-    // from pre-bundling serves it from its real dist/ folder so the lazy chunks resolve.
-    optimizeDeps: {
-      exclude: ['mermaid']
-    },
     build: {
       rollupOptions: {
         input: resolve(__dirname, 'src/renderer/index.html')
