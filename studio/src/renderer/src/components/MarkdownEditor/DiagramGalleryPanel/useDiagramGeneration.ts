@@ -23,7 +23,7 @@ export function useDiagramGeneration(mdEditorPath: string | null) {
   const [peekOpen, setPeekOpen] = useState(false)
   const [localCli, setLocalCli] = useState<EditorCli>(() => loadEditorCli(CLI_KEY_DIAGRAM))
   const [localPreset, setLocalPreset] = useState<string>(() => loadPreset(PRESET_KEY_DIAGRAM))
-  const { handleDiagram } = useEditorDiagramAction(mdEditorPath, null, () => {}, localCli, localPreset)
+  const { handleDiagram, stopDiagram } = useEditorDiagramAction(mdEditorPath, null, () => {}, localCli, localPreset)
 
   const fromPreset = useCallback(
     (name: string) => {
@@ -90,6 +90,7 @@ export function useDiagramGeneration(mdEditorPath: string | null) {
     fromStyle,
     runOnce,
     addToBoard,
+    stopDiagram,
     changeCli,
     changePreset,
   }

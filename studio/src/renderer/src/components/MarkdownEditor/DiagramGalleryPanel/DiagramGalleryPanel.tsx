@@ -1,21 +1,24 @@
 // Right-docked gallery panel (mirrors AnalysisPanel): lists the file's diagram cards;
-// View opens the lightbox, Delete removes (closing on the last card). Header: [+ New]
-// generates with the selected preset; the gear opens the shared PromptPeekModal (preset /
-// prompt / engine; "Use once" generates now). Generation lives in useDiagramGeneration.
+// View opens the lightbox, Delete removes (closing on the last card). The header is one
+// ActionPill — New (run) │ gear (PromptPeekModal config) │ elapsed timer + stop while a run
+// is in flight — matching the board's Evaluate pill. Generation lives in useDiagramGeneration.
 
 import React, { useEffect, useState } from 'react'
-import { X, Plus, Settings, Image as ImageIcon } from 'lucide-react'
+import { X, Plus, Image as ImageIcon } from 'lucide-react'
 import {
   useUiStore,
   selectMdEditorDiagramPath,
   selectMdEditorDiagram,
 } from '../../../store/uiStore'
+import { useTerminalStore } from '../../../store/terminalStore'
 import { useDiagramSidecar } from './useDiagramSidecar'
 import { useDiagramGeneration } from './useDiagramGeneration'
+import { useElapsedProgress } from '../EditorHeader/editorProgress'
 import { updateDiagramLayout } from './diagramSidecar'
 import type { DiagramEntry } from '../diagramTypes'
 import { DIAGRAM_PRESETS, PRESET_KEY_DIAGRAM, STORAGE_KEY_DIAGRAM } from '../EditorHeader/diagramPresets'
 import PromptPeekModal from '../EditorHeader/PromptPeekModal/PromptPeekModal'
+import ActionPill from '../../shared/ActionPill/ActionPill'
 import DiagramCard from './DiagramCard/DiagramCard'
 import DiagramLightbox from './DiagramLightbox/DiagramLightbox'
 import styles from './DiagramGalleryPanel.module.css'
@@ -35,12 +38,15 @@ export default function DiagramGalleryPanel({ onNew, onRegenerate, busy }: Props
   const panelOpen = useUiStore((s) => s.mdEditorDiagramPanelOpen)
   const setPanelOpen = useUiStore((s) => s.setMdEditorDiagramPanelOpen)
   const slot = useUiStore(selectMdEditorDiagram)
+  const startedAt = useTerminalStore((s) => s.tabs.find((t) => t.id === slot?.tabId)?.startedAt)
 
   const { diagrams, loading, reload, remove } = useDiagramSidecar(mdEditorPath)
   const gen = useDiagramGeneration(mdEditorPath)
   const [lightbox, setLightbox] = useState<DiagramEntry | null>(null)
 
-  const isBusy = busy ?? slot?.status === 'running'
+  const diagState = slot?.status ?? 'idle'
+  const isBusy = busy ?? diagState === 'running'
+  const progress = useElapsedProgress(diagState === 'running' ? startedAt : undefined)
 
   // Refresh the cards when a run completes (file path unchanged → the sidecar hook's own
   // effect won't re-fire; watch the slot transition instead).
@@ -69,20 +75,21 @@ export default function DiagramGalleryPanel({ onNew, onRegenerate, busy }: Props
     <div className={styles.panel}>
       <div className={styles.header}>
         <span className={styles.title}>Diagrams</span>
-        <button type="button" className={styles.newBtn} onClick={handleNew} disabled={isBusy || !mdEditorPath}>
-          <Plus size={12} />
-          New
-        </button>
-        <button
-          type="button"
-          className={styles.gearBtn}
-          onClick={() => gen.setPeekOpen(true)}
-          disabled={!mdEditorPath}
-          aria-label="Configure diagram preset and prompt"
-          title="Preset / prompt / engine"
-        >
-          <Settings size={13} />
-        </button>
+        <ActionPill
+          state={diagState === 'success' ? 'done' : diagState}
+          progress={progress}
+          hasPath={!!mdEditorPath}
+          title="New"
+          runningVerb="Diagramming"
+          mainIcon={<Plus size={13} />}
+          idleTip="Generate a new diagram with the selected preset"
+          runningTip="Generating diagram…"
+          ariaName="Diagram"
+          onRun={handleNew}
+          onStop={() => gen.stopDiagram()}
+          configTip="Preset / prompt / engine"
+          onToggleConfig={() => gen.setPeekOpen(true)}
+        />
         <button
           type="button"
           className={styles.closeBtn}
