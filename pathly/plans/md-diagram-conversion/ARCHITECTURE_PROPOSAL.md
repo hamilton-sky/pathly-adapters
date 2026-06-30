@@ -2,10 +2,35 @@
 
 **Branch:** `claude/md-diagram-conversion-wze4x3`
 **Layer:** Studio (Electron / React renderer)
-**Status:** Design — not yet implemented
+**Status:** Implemented & shipped on `fix/goal-executor-cwd` (copy-in + Phase 7 review + Phase 8 acceptance done). See **As-built decisions** below.
 **Rigor:** standard
 
 > All file paths below are relative to `studio/src/renderer/src/` unless prefixed with `studio/`.
+
+---
+
+## As-built decisions (supersede the design where noted)
+
+**R6 — Diagram prompts use presets BY DESIGN, not fragment composition.**
+§5 below planned the diagram action to default to `composeClientSkill('development/diagram')` (fragments),
+mirroring Split/Analyze. The build deliberately did **not** take that path: the diagram action resolves its
+prompt via `resolvePrompt` over the editable `DIAGRAM_PRESETS` (gear/peek modal). This is intentional:
+
+1. **Different output contract.** Split/Analyze write one whole derived file to `out_path`, so they compose
+   `client-file-output` + `artifact-transform`. Diagram **appends a schema'd entry** (`DiagramEntry`) to a
+   JSON sidecar (`.diagrams.json`) — a different shape those fragments don't describe. Reusing them cleanly
+   isn't possible; it would need a bespoke append-contract fragment.
+2. **Interactive UX.** Presets are user-editable and previewable (the gear modal, in both the header pill
+   and the gallery panel) — better for a one-click editor action than an opaque composed prompt.
+3. **The real artifact contract lives elsewhere.** A canonical "artifacts register on the board" mechanism
+   (reusable `artifact-register` fragment + `artifact-manifest.yaml` + `ensure_attached` reconciler) is
+   designed in **pathly-entity-model Phase 2** (not yet built). A one-off diagram fragment now would
+   duplicate it and later be ripped out. **Future path:** when entity-model Phase 2 lands, make a generated
+   diagram a first-class board artifact that registers via `artifact-register`, instead of (or alongside)
+   the local sidecar. Pointer planted in `pathly/plans/pathly-entity-model/FEATURE_INDEX.md`.
+
+Consequence: §5's `composeClientSkill` / `development/diagram` skill plan is **not** implemented and should be
+read as superseded by this decision.
 
 ---
 

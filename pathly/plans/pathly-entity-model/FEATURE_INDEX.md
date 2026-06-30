@@ -85,3 +85,16 @@ PO forever.
 - Phase 1: One real consultation decompose for a project goal advances past `PO_DISCUSSING`.
 - Phase 2: `pytest tests/test_artifact_reconcile.py` passes; `ARTIFACTS.jsonl` + board row created.
 - Phase 3: Sidebar shows Features, Goals, Lessons, Explorations sections; TypeScript compiles clean.
+
+---
+
+## Related follow-up (post-Phase-2)
+
+**md-diagram-conversion → adopt the artifact contract.** The shipped diagram feature (on
+`fix/goal-executor-cwd`) persists diagrams to a **local `.diagrams.json` sidecar** and deliberately uses
+presets, not fragment composition — see its `ARCHITECTURE_PROPOSAL.md` → "As-built decisions" (R6). Once
+Phase 2's `artifact-register` fragment + `artifact-manifest.yaml` + `ensure_attached` reconciler exist, make
+a generated diagram a **first-class board artifact** that registers via `artifact-register` (so diagrams land
+in `comms_artifacts` and surface in `CardSidebar`), instead of (or alongside) the local sidecar. This is the
+aligned home for "diagram = artifact" — NOT a bespoke diagram fragment. **Not part of the atomic Phase 2
+commit** (keep that to its 7 artifacts); a separate follow-up.
