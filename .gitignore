@@ -33,3 +33,7 @@ pathly/plans/**/EVENTS.jsonl
 *.md.analysis
 # Board artifact copies — duplicates of plan diagrams, written on "Add to board"
 pathly/board-artifacts/
+
+# gitnexus/serena local index + project cache
+.serena/
+.gitnexus/
