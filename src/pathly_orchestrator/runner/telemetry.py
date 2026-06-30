@@ -95,6 +95,7 @@ def project_agent_done(
     stage: str = "",
     agent_role: str = "",
     scope_tier: str = "feature",
+    adapter: str = "",
     trace_id: str = "",
     span_id: str = "",
     parent_span_id: str = "",
@@ -143,6 +144,7 @@ def project_agent_done(
                     "tokens_out": tout,
                     "scope_tier": tier,
                     "run_id": run_id,
+                    "adapter": adapter,
                 }
             ),
         )

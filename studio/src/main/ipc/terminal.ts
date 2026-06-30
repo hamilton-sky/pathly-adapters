@@ -483,9 +483,16 @@ function reorderQueue(tabId: string, dir: 'up' | 'down'): void {
   broadcastSpawnState()
 }
 
+/** Telemetry hint passed by renderer-driven one-shot spawns (editor AI actions, HQ
+ *  summaries) so the spawn gate can project a project-tier invocation+span for them.
+ *  Absent for runner/board tabs — those are projected Python-side by the supervisor. */
+interface SpawnTelemetryMeta {
+  telemetry?: { scopeTier: string; label: string; feature?: string; role?: string }
+}
+
 export function registerTerminalHandlers(win: BrowserWindow): void {
   spawnStateWin = win
-  ipcMain.handle('terminal:spawn', async (event, tabId: string, cwd: string, command?: string, runnerArgv?: string[], initialInput?: string) => {
+  ipcMain.handle('terminal:spawn', async (event, tabId: string, cwd: string, command?: string, runnerArgv?: string[], initialInput?: string, spawnMeta?: SpawnTelemetryMeta) => {
     slog('request', tabId, '| command=' + (command ?? '-'), 'argv0=' + (runnerArgv?.[0] ?? '-'), 'hasInput=' + !!initialInput, '|', spawnCounts())
     if (!pty) { console.error('[spawn] reject: node-pty unavailable', tabId); throw new Error('node-pty is not available') }
     if (activePtys.has(tabId)) {
@@ -681,15 +688,25 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
       releaseEngineSlot(tabId)
       const scriptPath = runnerScripts.get(tabId)
       if (scriptPath) { runnerScripts.delete(tabId); try { fs.unlinkSync(scriptPath) } catch { /* ignore */ } }
-      const exitTail = tailMeaningfulOutput(ptyOutput.get(tabId) ?? [])
+      const exitTailRaw = tailMeaningfulOutput(ptyOutput.get(tabId) ?? [])
+      // One-shot telemetry: a gated headless engine run that is NOT a runner tab but carries a
+      // telemetry hint (editor AI actions, HQ summaries). If the argv requested --output-format
+      // json, parse the result for cost/tokens; normalize the exit tail to the agent's result
+      // prose so stdout-reading consumers (aiRouter) stay clean instead of seeing raw JSON.
+      const telem = spawnMeta?.telemetry
+      const isOneShotTelem = headlessEngine && !runnerTabMeta.has(tabId) && !!telem
+      const oneShotParsed = isOneShotTelem
+        ? parseClaudeJsonResult((ptyOutput.get(tabId) ?? []).join(''))
+        : null
+      const exitTail = oneShotParsed?.result ? oneShotParsed.result.slice(-4000) : exitTailRaw
       // If a gated engine run hit a rate limit, arm a cooldown so the next gated runs back off.
-      if (headlessEngine && exitCode !== 0 && RATE_LIMIT_RE.test(exitTail)) {
+      if (headlessEngine && exitCode !== 0 && RATE_LIMIT_RE.test(exitTailRaw)) {
         rateLimitedUntil = Date.now() + RATE_LIMIT_COOLDOWN_MS
         broadcastSpawnState()
       }
       sendToWindow(tabId, 'terminal:exit', tabId, exitCode, exitTail)
-      const meta = runnerTabMeta.get(tabId)
-      if (meta) {
+      const runnerMeta = runnerTabMeta.get(tabId)
+      if (runnerMeta) {
         const userInitiated = ptyKilledByRunner.has(tabId)
         const stdoutTail = (ptyOutput.get(tabId) ?? []).join('')
         // Parse the claude --output-format=json result
@@ -697,18 +714,18 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
         if (stageResult) {
           sendToWindow(tabId, 'terminal:stage-result', tabId, stageResult)
         }
-        const wallSeconds = (Date.now() - meta.spawnedAt) / 1000
+        const wallSeconds = (Date.now() - runnerMeta.spawnedAt) / 1000
         runnerTabMeta.delete(tabId)
         ptyOutput.delete(tabId)
         ptyKilledByRunner.delete(tabId)
-        const label = meta.label || tabId
+        const label = runnerMeta.label || tabId
         const banner = exitCode === 0
           ? `\r\n\x1b[2m──\x1b[0m \x1b[1;32m${label} DONE\x1b[0m \x1b[2m──────────────────────────────\x1b[0m\r\n`
           : `\r\n\x1b[2m──\x1b[0m \x1b[1;31m${label} ABORTED\x1b[0m \x1b[2m──────────────────────────────\x1b[0m\r\n`
         sendToWindow(tabId, `terminal:data:${tabId}`, banner)
         const postBody = JSON.stringify({
-          run_id: meta.run_id,
-          topic: meta.topic,
+          run_id: runnerMeta.run_id,
+          topic: runnerMeta.topic,
           exit_code: exitCode,
           stdout_tail: stdoutTail,
           wall_seconds: wallSeconds,
@@ -721,6 +738,35 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
         })
         doPost().catch(() => setTimeout(() => doPost().catch(() => { /* give up */ }), 1000))
       } else {
+        // Renderer-driven one-shot (editor / chat): project its telemetry to the project tier
+        // so EVERY CLI the app spawns is observable, not just supervisor-driven runs. Cost +
+        // tokens come from the parsed JSON result (null for non-json/codex → span-only). Best-effort.
+        if (isOneShotTelem && telem) {
+          const wallSeconds = (Date.now() - ptyStartedAt) / 1000
+          const engineBase = path.basename(runnerArgv?.[0] ?? '').toLowerCase().replace(/\.(ps1|cmd|exe)$/, '')
+          const usage = oneShotParsed?.usage
+          const invBody = JSON.stringify({
+            project_root: cwd,
+            feature: telem.feature ?? '(project)',
+            scope_tier: telem.scopeTier || 'project',
+            run_id: tabId,
+            label: telem.label || 'one-shot',
+            agent_role: telem.role || engineBase || 'agent',
+            adapter: engineBase || 'claude',
+            cost_usd: oneShotParsed?.total_cost_usd ?? 0,
+            tokens_in: usage?.input_tokens ?? 0,
+            tokens_out: usage?.output_tokens ?? 0,
+            session_id: null,
+            summary: (oneShotParsed?.result ?? '').slice(0, 2000),
+            wall_seconds: wallSeconds,
+          })
+          const postInv = () => fetch('http://127.0.0.1:8765/db/invocation', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Pathly-Secret': getApiSecret() },
+            body: invBody,
+          })
+          postInv().catch(() => setTimeout(() => postInv().catch(() => { /* give up */ }), 1000))
+        }
         ptyOutput.delete(tabId)
       }
       ptyWindows.delete(tabId)

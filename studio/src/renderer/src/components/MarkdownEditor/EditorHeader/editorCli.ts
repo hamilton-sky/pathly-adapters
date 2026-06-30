@@ -58,9 +58,11 @@ export function saveEditorCli(key: string, cli: CliAdapter): void {
   try { localStorage.setItem(key, cli) } catch { /* ignore */ }
 }
 
-/** Resolve the spawn argv for the selected engine; falls back to Claude if unavailable. */
+/** Resolve the spawn argv for the selected engine; falls back to Claude if unavailable.
+ *  Requests the JSON result envelope so the spawn gate can capture cost/tokens for telemetry
+ *  (editor actions read their output from a result file, so this doesn't affect their result). */
 export function buildCliArgv(cli: CliAdapter, prompt: string): string[] {
-  return buildHeadlessArgv(cli, prompt)
+  return buildHeadlessArgv(cli, prompt, { jsonResult: true })
 }
 
 /** Human-friendly engine name for toasts/labels. */

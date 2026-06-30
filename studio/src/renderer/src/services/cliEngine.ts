@@ -26,6 +26,11 @@ export interface SpawnOpts {
   session?: string
   /** Whether to pass the autonomy/auto-accept flag (default true). */
   autonomy?: boolean
+  /** Request a machine-readable JSON result (claude `--output-format json`) so the
+   *  main-process spawn gate can capture cost_usd + token usage for telemetry. The
+   *  agent still writes its real output to its result file, so file-output consumers
+   *  are unaffected. Claude only — ignored for codex (no equivalent result to parse). */
+  jsonResult?: boolean
 }
 
 /**
@@ -50,11 +55,13 @@ export function dashSafePrompt(prompt: string): string {
  * is never parsed as a CLI flag.
  */
 export function buildHeadlessArgv(adapter: CliAdapter, promptRaw: string, opts: SpawnOpts = {}): string[] {
-  const { model, session, autonomy = true } = opts
+  const { model, session, autonomy = true, jsonResult } = opts
   const prompt = dashSafePrompt(promptRaw)
 
   if (adapter === 'claude') {
     const argv = ['claude', '-p', prompt, '--print']
+    // JSON result envelope → lets the spawn gate read total_cost_usd + usage for telemetry.
+    if (jsonResult) argv.push('--output-format', 'json')
     if (model) argv.push('--model', model)
     if (autonomy) argv.push('--dangerously-skip-permissions')
     if (session) argv.push('--resume', session)

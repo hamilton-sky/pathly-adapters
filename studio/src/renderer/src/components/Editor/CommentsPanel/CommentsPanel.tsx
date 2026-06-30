@@ -183,7 +183,9 @@ export function CommentsPanel({
     })
 
     try {
-      await window.pathly.terminal.spawn(tabId, cwd, undefined, buildCliArgv(cli, prompt))
+      await window.pathly.terminal.spawn(tabId, cwd, undefined, buildCliArgv(cli, prompt), undefined, {
+        telemetry: { scopeTier: 'project', label: 'ai-comment', role: 'commenter' },
+      })
     } catch (e) {
       // Spawn rejected (e.g. queue cancel / over cap) — onExit will never fire, so clean up here.
       exitUnsubRef.current?.()

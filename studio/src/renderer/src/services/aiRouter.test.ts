@@ -16,9 +16,10 @@ vi.mock('../store/projectStore', () => ({
 // engine run is visible in the CLI bar. Mock getState() to capture those calls.
 const addTab = vi.fn()
 const updateTabStatus = vi.fn()
+const openTab = vi.fn()
 const closeTab = vi.fn()
 vi.mock('../store/terminalStore', () => ({
-  useTerminalStore: { getState: () => ({ addTab, updateTabStatus, closeTab }) },
+  useTerminalStore: { getState: () => ({ addTab, updateTabStatus, openTab, closeTab }) },
 }))
 
 import * as modelManager from './modelManager'
@@ -63,7 +64,7 @@ describe('aiRouter.runJob', () => {
     )
     // onExit must be subscribed before spawn (lifecycle invariant).
     expect(onExit).toHaveBeenCalledTimes(1)
-    expect(buildArgvMock).toHaveBeenCalledWith('claude', 'summarize this')
+    expect(buildArgvMock).toHaveBeenCalledWith('claude', 'summarize this', { jsonResult: true })
     expect(spawn).toHaveBeenCalledTimes(1)
     const [tabId, cwd, command, argv] = spawn.mock.calls[0]
     expect(typeof tabId).toBe('string')

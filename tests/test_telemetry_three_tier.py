@@ -138,3 +138,45 @@ def test_db_rollup_aggregates_without_double_count(client):
     # feature block = just f1
     assert body["feature"]["totals"]["invocations"] == 1
     assert round(body["feature"]["totals"]["cost_usd"], 2) == 0.10
+
+
+# ── T6 — POST /db/invocation: client-side one-shot ingestion ─────────────────
+
+
+def test_post_db_invocation_writes_one_invocation_and_span(client):
+    c, tmp_path = client
+    from pathly_orchestrator.db.connection import get_db
+    from pathly_orchestrator.db.queries.invocations import read_agent_invocations
+    from pathly_orchestrator.db.queries.otel_spans import read_otel_spans
+
+    pr = str(tmp_path / "proj-inv").replace("\\", "/")
+
+    resp = c.post(
+        "/db/invocation",
+        json={
+            "project_root": pr,
+            "feature": "editor-ai",
+            "scope_tier": "project",
+            "label": "ai-split",
+            "agent_role": "builder",
+            "adapter": "claude",
+            "cost_usd": 0.042,
+            "tokens_in": 100,
+            "tokens_out": 50,
+            "summary": "split the file",
+            "wall_seconds": 3.5,
+        },
+        content_type="application/json",
+    )
+    assert resp.status_code == 200
+    assert resp.get_json()["ok"] is True
+
+    conn = get_db()
+    invs = read_agent_invocations(conn, pr, "editor-ai")
+    spans = read_otel_spans(conn, pr, "editor-ai")
+
+    assert len(invs) == 1
+    assert len(spans) == 1
+    assert invs[0]["scope_tier"] == "project"
+    assert abs(invs[0]["cost_usd"] - 0.042) < 1e-9
+    assert spans[0]["scope_tier"] == "project"

@@ -319,7 +319,9 @@ export function Editor({ path: pathOverride, embedded }: { path?: string | null;
       }
       check()
     })
-    await window.pathly.terminal.spawn(tabId, getSpawnCwd(effectivePath), undefined, buildCliArgv(cli, prompt))
+    await window.pathly.terminal.spawn(tabId, getSpawnCwd(effectivePath), undefined, buildCliArgv(cli, prompt), undefined, {
+      telemetry: { scopeTier: 'project', label: 'ai-editor', role: 'editor' },
+    })
   }
 
   const draftFileFor = (src: 'split' | 'comments'): string =>

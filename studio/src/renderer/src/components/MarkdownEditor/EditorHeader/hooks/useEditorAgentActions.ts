@@ -155,7 +155,9 @@ export function useEditorAgentActions(
       })
     })
     try {
-      await window.pathly.terminal.spawn(tabId, getSpawnCwd(forFile), undefined, buildCliArgv(splitCli, prompt))
+      await window.pathly.terminal.spawn(tabId, getSpawnCwd(forFile), undefined, buildCliArgv(splitCli, prompt), undefined, {
+        telemetry: { scopeTier: 'project', label: 'ai-split', role: 'splitter' },
+      })
       onSplitOnceUsed()
     } catch (e) {
       unsubscribe()
@@ -221,7 +223,9 @@ export function useEditorAgentActions(
       })
     })
     try {
-      await window.pathly.terminal.spawn(tabId, getSpawnCwd(forFile), undefined, buildCliArgv(analyzeCli, prompt))
+      await window.pathly.terminal.spawn(tabId, getSpawnCwd(forFile), undefined, buildCliArgv(analyzeCli, prompt), undefined, {
+        telemetry: { scopeTier: 'project', label: 'ai-analyze', role: 'analyzer' },
+      })
       onAnalyzeOnceUsed()
     } catch (e) {
       unsubscribe()
