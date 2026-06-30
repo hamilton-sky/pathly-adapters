@@ -52,9 +52,7 @@ export const DIAGRAM_PRESETS: DiagramPreset[] = [
     group: 'anywhere',
     prompt: buildPrompt(
       'mermaid',
-      `Produce a Mermaid flowchart (\`flowchart LR\` or \`TD\`) that explains how this content's\n` +
-        `components or steps connect. Use the file's own nouns as node labels. Keep it under ~14 nodes.\n` +
-        `Set "style":"mermaid" and put the Mermaid source in "content".`,
+      'Produce a Mermaid flowchart (`flowchart LR` or `TD`) that explains how this content\'s components or steps connect, using the file\'s own nouns as node labels and keeping the diagram under ~14 nodes. Apply these parser-safety rules without exception: (1) Always wrap every node label in double quotes — write `nodeID["label text"]` rather than `nodeID[label text]`; this single rule neutralises parentheses, colons, single-quotes, slashes, pipes, angle brackets, and most other special characters. (2) Never use a Mermaid reserved word as the bare node identifier; the full reserved set is: `graph`, `flowchart`, `subgraph`, `end`, `class`, `click`, `style`, `linkStyle`, `direction` — prefix every one of them, e.g. `n_end["end"]`, `n_style["style"]`, `n_linkStyle["linkStyle"]`, `node_graph["graph"]`. (3) To include a literal double-quote character inside a label, use the HTML entity `&quot;` — write `["say &quot;hello&quot;"]`, never `["say "hello""]`. (4) For edge labels using the pipe syntax, keep the label text free of nested pipe characters, e.g. `-->|"result value"|`. Set "style":"mermaid" and put the Mermaid source in "content".',
     ),
   },
   {
@@ -65,8 +63,7 @@ export const DIAGRAM_PRESETS: DiagramPreset[] = [
     group: 'anywhere',
     prompt: buildPrompt(
       'mermaid',
-      `Produce a Mermaid \`sequenceDiagram\` showing the ordered interactions / messages between\n` +
-        `the actors or systems described. Set "style":"mermaid".`,
+      'Produce a Mermaid `sequenceDiagram` showing the ordered interactions and messages between the actors or systems described. Follow these parser-safety rules without exception: (1) Never place a semicolon (`;`) anywhere in message text or in a participant alias — it is an unconditional line terminator in the Mermaid sequence lexer and no quoting escapes it; if a label would require a semicolon, reword it to remove the semicolon entirely. (2) Never use HTML entities (`&amp;`, `&lt;`, `&gt;`, `&apos;`, `&quot;`, `&#N;`, etc.) in message text or aliases — every such entity contains a semicolon and will trigger the same termination bug; write the raw character instead (literal `&`, `<`, `>`). (3) Any participant whose identifier clashes with a Mermaid reserved word (`note`, `over`, `loop`, `alt`, `opt`, `par`, `and`, `end`, `activate`, `deactivate`, `participant`, `actor`) must be declared with an alias using `participant reservedWord as SafeAlias` and then referenced only by `SafeAlias` — the name after `as` — in every arrow statement; the bare reserved word must never appear as an arrow source or target. For example: `participant loop as LoopSvc` followed by `LoopSvc->>A: message`, never `loop->>A: message`. Set "style":"mermaid".',
     ),
   },
   {
@@ -77,8 +74,7 @@ export const DIAGRAM_PRESETS: DiagramPreset[] = [
     group: 'anywhere',
     prompt: buildPrompt(
       'mermaid',
-      `Produce a Mermaid \`mindmap\` that organises the document's topics hierarchically from a\n` +
-        `single root. Set "style":"mermaid".`,
+      'Produce a Mermaid `mindmap` that organises the document\'s topics hierarchically from a single root node. Obey these parser-safety rules exactly: (1) never use the bare word `mindmap` as a node label — if you must label a node with that word, wrap it in double quotes; (2) never place `{` or `}` anywhere in a node label, quoted or unquoted, as there is no escaping mechanism that makes curly braces safe; (3) never place `(...)` or `[...]` where text continues on the same line after the closing delimiter — the parser treats those closing delimiters as the end of a shape declaration, so any trailing text causes a parse error; text that precedes a `(...)` or `[...]` at the very end of the label line is fine, but text that follows is not; (4) do not rely on double-quote wrapping to neutralise shape delimiters — `"...(parens)..."` and `"...[brackets]..."` fail just as they do unquoted. Set "style":"mermaid".',
     ),
   },
   {
@@ -89,8 +85,7 @@ export const DIAGRAM_PRESETS: DiagramPreset[] = [
     group: 'anywhere',
     prompt: buildPrompt(
       'mermaid',
-      `Produce a Mermaid \`flowchart\` grouped with \`subgraph\` blocks to show the system's layers /\n` +
-        `boundaries and the data flow between them. Set "style":"mermaid".`,
+      'Produce a Mermaid flowchart (`flowchart LR` or `TD`) grouped with `subgraph` blocks to show the system\'s layers / boundaries and the data flow between them. Apply these parser-safety rules without exception: (1) wrap every node label in double quotes — `nodeID["label text"]` — which neutralises parentheses, colons, slashes, pipes, and most special characters; (2) give every subgraph an explicit quoted title via an id — `subgraph s1["Layer name"]` ... `end` — and never write a bare `subgraph Layer name`; (3) never use a Mermaid reserved word (`graph`, `flowchart`, `subgraph`, `end`, `class`, `click`, `style`, `linkStyle`, `direction`) as a bare node or subgraph identifier — prefix it, e.g. `n_end["end"]`; (4) to include a literal double-quote in a label, use the HTML entity `&quot;`. Set "style":"mermaid".',
     ),
   },
   {
