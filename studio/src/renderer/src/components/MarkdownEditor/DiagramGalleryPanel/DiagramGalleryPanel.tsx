@@ -112,6 +112,7 @@ export default function DiagramGalleryPanel({ onNew, onRegenerate, busy }: Props
                 entry={d}
                 busy={isBusy}
                 onView={setLightbox}
+                onAddToBoard={(e) => void gen.addToBoard(e).then((ok) => ok && reload())}
                 onRegenerate={handleRegenerate}
                 onDelete={(e) => void handleDelete(e)}
               />

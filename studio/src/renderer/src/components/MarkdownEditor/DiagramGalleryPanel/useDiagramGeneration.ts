@@ -1,6 +1,7 @@
-// Panel-local diagram generation: owns the CLI + preset selection (seeded from the
-// persisted keys, editable via the gear modal) and the spawn-hook instance, and exposes
-// generate-by-preset / by-style / run-once helpers. Keeps DiagramGalleryPanel presentational.
+// Panel-local diagram actions: owns the CLI + preset selection (seeded from the persisted
+// keys, editable via the gear modal) and the spawn-hook instance; exposes generate-by-preset
+// / by-style / run-once helpers plus "add to board" (user-triggered, renderer-side — the
+// agent never posts). Keeps DiagramGalleryPanel presentational.
 
 import { useCallback, useState } from 'react'
 import { useEditorDiagramAction } from '../EditorHeader/hooks/useEditorDiagramAction'
@@ -13,7 +14,10 @@ import {
 } from '../EditorHeader/editorCli'
 import { DIAGRAM_PRESETS, CLI_KEY_DIAGRAM, PRESET_KEY_DIAGRAM } from '../EditorHeader/diagramPresets'
 import { resolvePrompt } from '../../shared/PromptActionConfig/presetTypes'
+import { useToastStore } from '../../../store/toastStore'
 import { sidecarPathFor, type DiagramEntry } from '../diagramTypes'
+import { addDiagramToBoard } from './addDiagramToBoard'
+import { markDiagramOnBoard } from './diagramSidecar'
 
 export function useDiagramGeneration(mdEditorPath: string | null) {
   const [peekOpen, setPeekOpen] = useState(false)
@@ -48,6 +52,25 @@ export function useDiagramGeneration(mdEditorPath: string | null) {
     [handleDiagram],
   )
 
+  // Post one diagram to the board (copy — the card stays). Persists the marker so it
+  // survives reload. Returns true on success so the caller can refresh the cards.
+  const addToBoard = useCallback(
+    async (entry: DiagramEntry): Promise<boolean> => {
+      if (!mdEditorPath) return false
+      const id = await addDiagramToBoard(mdEditorPath, entry)
+      if (id) {
+        await markDiagramOnBoard(mdEditorPath, entry.id, { id, at: new Date().toISOString() })
+        useToastStore
+          .getState()
+          .push(`Added to board · ${entry.title || entry.style}`, 'success', { category: 'agent_done' })
+        return true
+      }
+      useToastStore.getState().push('Could not add to board', 'error', { category: 'agent_done' })
+      return false
+    },
+    [mdEditorPath],
+  )
+
   const changeCli = useCallback((c: EditorCli) => {
     setLocalCli(c)
     saveEditorCli(CLI_KEY_DIAGRAM, c)
@@ -66,6 +89,7 @@ export function useDiagramGeneration(mdEditorPath: string | null) {
     fromPreset,
     fromStyle,
     runOnce,
+    addToBoard,
     changeCli,
     changePreset,
   }

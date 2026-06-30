@@ -22,6 +22,8 @@ export interface DiagramEntry {
   createdAt: string
   /** Saved React Flow node positions from Arrange mode (node id -> x/y). Optional. */
   layout?: Record<string, { x: number; y: number }>
+  /** Set when the user posted this diagram to the comms board (renderer action). */
+  board?: { id: string; at: string }
 }
 
 export interface DiagramSidecar {

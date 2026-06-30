@@ -79,3 +79,15 @@ export async function updateDiagramLayout(
   const diagrams = sidecar.diagrams.map((d) => (d.id === id ? { ...d, layout } : d))
   await writeFile(sidecarPathFor(filePath), JSON.stringify({ ...sidecar, diagrams }, null, 2))
 }
+
+/** Record that a diagram was posted to the board (renderer read-modify-write). */
+export async function markDiagramOnBoard(
+  filePath: string,
+  id: string,
+  board: { id: string; at: string },
+): Promise<void> {
+  const sidecar = await readSidecar(filePath)
+  if (!sidecar) return
+  const diagrams = sidecar.diagrams.map((d) => (d.id === id ? { ...d, board } : d))
+  await writeFile(sidecarPathFor(filePath), JSON.stringify({ ...sidecar, diagrams }, null, 2))
+}
