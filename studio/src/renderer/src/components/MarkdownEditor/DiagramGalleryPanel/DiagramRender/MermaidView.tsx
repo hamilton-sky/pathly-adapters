@@ -10,6 +10,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { AlertTriangle } from 'lucide-react'
 import { useUiStore } from '../../../../store/uiStore'
+import { repairMermaid, mermaidErrorHint } from './mermaidSafety'
 import styles from './DiagramRender.module.css'
 
 // Cache the dynamic import so the chunk is fetched + evaluated only once.
@@ -61,7 +62,9 @@ export default function MermaidView({ id, content }: Props) {
           },
         })
         const renderId = `mmd_${id}_${renderSeq++}`
-        const { svg: out } = await mermaid.render(renderId, content)
+        // Safety net: repair near-miss / already-saved diagrams (e.g. a reserved word used as
+        // a node id) before rendering. A no-op on already-valid source.
+        const { svg: out } = await mermaid.render(renderId, repairMermaid(content))
         if (active) setSvg(out)
       })
       .catch((e: unknown) => {
@@ -74,8 +77,10 @@ export default function MermaidView({ id, content }: Props) {
   }, [id, content, theme])
 
   if (error) {
-    // Surface WHY it failed instead of silently showing raw text — some Mermaid types
-    // (mindmap, timeline, …) are lazy-loaded chunks that can fail to load in the bundle.
+    // Surface WHY it failed instead of silently showing raw text. repairMermaid already
+    // auto-fixes the common flowchart/mindmap reserved-word slips; mermaidErrorHint adds a
+    // targeted tip for the sequence case (which is too ambiguous to auto-rewrite safely).
+    const hint = mermaidErrorHint(content)
     return (
       <>
         <pre className={styles.mono} data-mermaid-error>
@@ -83,7 +88,7 @@ export default function MermaidView({ id, content }: Props) {
         </pre>
         <div className={styles.notice}>
           <AlertTriangle size={12} />
-          Mermaid couldn’t render this diagram: {error}
+          {hint ?? `Mermaid couldn’t render this diagram: ${error}`}
         </div>
       </>
     )
