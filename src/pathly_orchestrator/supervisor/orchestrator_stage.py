@@ -51,6 +51,9 @@ def _resolve_stage_supervised(
                     "topic": topic,
                     "project_root": project_root,
                     "resolved_files": resolved or None,
+                    "board": "feature",
+                    "scope": topic,
+                    "goal_id": state.goal_id or None,
                 }
             )
         except RuntimeError as exc:
@@ -111,6 +114,9 @@ def _resolve_stage_supervised(
                         "topic": topic,
                         "project_root": project_root,
                         "decision": decision,
+                        "board": "feature",
+                        "scope": topic,
+                        "goal_id": state.goal_id or None,
                     }
                 )
             except RuntimeError as exc:

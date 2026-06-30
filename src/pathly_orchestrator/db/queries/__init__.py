@@ -6,5 +6,6 @@ from .comms import (
     claim_task,
     fail_task,
     reclaim_stale_claims,
+    count_tasks_for_goal,
 )
 from .trends import get_daily_trends

@@ -109,37 +109,42 @@ def _decompose_planner(
     """Light decomposer: one planner run posts 3-7 tasks under the existing goal."""
     from pathly_orchestrator.supervisor.board_run import start_board_run
 
-    post_url = "http://127.0.0.1:8765/comms/post"
     instructions = (
-        f"Analyze the goal below and break it into 3-7 concrete, actionable tasks.\n\n"
-        f"**Goal:** {goal_text}\n\n"
-        "For each task make an HTTP POST request:\n\n"
-        f"  POST {post_url}\n"
-        "  Content-Type: application/json\n\n"
-        "  {\n"
-        f'    "board": "{board}",\n'
-        f'    "scope": "{scope}",\n'
-        '    "from": "planner",\n'
-        '    "type": "task",\n'
-        f'    "goal_id": "{goal_id}",\n'
-        '    "text": "<one-line task title>",\n'
-        '    "stage": "implement",\n'
-        '    "status": "pending"\n'
-        "  }\n\n"
-        "Rules:\n"
-        "- POST all tasks before doing anything else — that is your entire job\n"
-        "- Do NOT create plan files, run the planning workflow, or read any skill files\n"
-        "- Do NOT post a new goal (goal_id already exists)\n"
-        "- Each task title must be actionable and specific (e.g. 'Set up DB schema')\n"
-        f"- Stamp every task with goal_id={goal_id!r}"
+        f"Decompose this goal into 3-7 concrete, independently-runnable tasks.\n\n"
+        f"Goal: {goal_text}\n\n"
+        f"The goal already exists with goal_id={goal_id!r} — post task children only, "
+        f"do NOT post a new goal. Follow the task-posting mechanics in the fragment below."
     )
+    # Resolve goal slug for where_line so the planner knows the on-disk dir.
+    _slug = scope  # fallback
+    _storage_path_str = ""
+    if project_root and goal_id:
+        try:
+            from pathly_orchestrator.db.connection import get_db
+            from pathly_orchestrator.supervisor.slug import ensure_goal_slug
+            import os
+            _slug = ensure_goal_slug(get_db(project_root or None), goal_id)
+            _goal_dir = os.path.join(project_root, "pathly", "goals", _slug)
+            os.makedirs(_goal_dir, exist_ok=True)
+            _storage_path_str = _goal_dir
+        except Exception:
+            pass
+
+    _caps = None
+    if goal_id and (adapter or "claude"):
+        try:
+            from pathly_orchestrator.skills.compose import build_adapter_caps
+            _caps = build_adapter_caps(adapter or "claude", goal_id=goal_id, kind="dag")
+        except Exception:
+            pass
+
     result = start_board_run(
         board, scope, "single-agent",
         instructions=instructions,
         project_root=project_root,
         model=model or _DEFAULT_MODEL,
         adapter=adapter or "claude",
-        skill="",
+        skill="planning/dag-sketch",
         agent="planner",
         progress=progress,
         broadcast_fn=broadcast_fn,
@@ -147,6 +152,8 @@ def _decompose_planner(
         on_done=on_done,
         spawn_fn=spawn_fn,
         block=block,
+        storage_path=_storage_path_str,
+        caps=_caps,
     )
     if isinstance(result, dict) and result.get("ok"):
         result["mode"] = "planner"
@@ -182,6 +189,29 @@ def _decompose_plan(
         f"add its task children (each with context_refs + depends_on as the skill specifies)."
         + (f"\n\nGoal: {goal_text}" if goal_text else "")
     )
+    # Resolve goal slug for where_line so the planner knows the on-disk dir.
+    _slug = scope  # fallback
+    _storage_path_str = ""
+    if project_root and goal_id:
+        try:
+            from pathly_orchestrator.db.connection import get_db
+            from pathly_orchestrator.supervisor.slug import ensure_goal_slug
+            import os
+            _slug = ensure_goal_slug(get_db(project_root or None), goal_id)
+            _goal_dir = os.path.join(project_root, "pathly", "goals", _slug)
+            os.makedirs(_goal_dir, exist_ok=True)
+            _storage_path_str = _goal_dir
+        except Exception:
+            pass
+
+    _caps = None
+    if goal_id and (adapter or "claude"):
+        try:
+            from pathly_orchestrator.skills.compose import build_adapter_caps
+            _caps = build_adapter_caps(adapter or "claude", goal_id=goal_id, kind="dag")
+        except Exception:
+            pass
+
     result = start_board_run(
         board, scope, "single-agent",
         instructions=instructions,
@@ -196,6 +226,8 @@ def _decompose_plan(
         on_done=on_done,
         spawn_fn=spawn_fn,
         block=block,
+        storage_path=_storage_path_str,
+        caps=_caps,
     )
     if isinstance(result, dict) and result.get("ok"):
         result["mode"] = "plan"
@@ -230,6 +262,18 @@ def _decompose_consultation(
             "error": f"a pipeline run is already active for {scope!r} (status={existing.status})",
         }
 
+    # Route on-disk storage to pathly/goals/<slug> so the project path never
+    # becomes a FSM topic (which collapses to itself via Path joining).
+    try:
+        from pathly_orchestrator.db.connection import get_db
+        from pathly_orchestrator.supervisor.slug import ensure_goal_slug
+        import os
+        slug = ensure_goal_slug(get_db(project_root or None), goal_id)
+        _goal_dir = os.path.join(project_root, "pathly", "goals", slug)
+        os.makedirs(_goal_dir, exist_ok=True)
+    except Exception:
+        slug = scope  # fallback: old behavior
+
     _start = start_fn
     if _start is None:
         from pathly_orchestrator.supervisor.api import start_run as _start
@@ -239,11 +283,11 @@ def _decompose_consultation(
             _reset_fsm_state_for_flow,
         )
 
-        _reset_fsm_state_for_flow(_CONSULTATION_FLOW, scope, project_root)
+        _reset_fsm_state_for_flow(_CONSULTATION_FLOW, slug, project_root)
 
     try:
         state = _start(
-            topic=scope,
+            topic=slug,
             flow=_CONSULTATION_FLOW,
             project_root=project_root or "",
             model=model or _DEFAULT_MODEL,

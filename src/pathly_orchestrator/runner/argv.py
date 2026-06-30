@@ -8,9 +8,11 @@ import yaml
 from importlib.resources import files
 
 from pathly_orchestrator.adapters import resolve_command
+from pathly_orchestrator.storage_paths import _safe_topic
 
 
 def _storage_path(flow: str, project_root: str, topic: str) -> Path:
+    topic = _safe_topic(topic)
     text = (
         files("pathly_data")
         .joinpath(f"core/flows/{flow}.flow.yaml")

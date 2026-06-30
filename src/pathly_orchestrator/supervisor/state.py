@@ -96,6 +96,9 @@ class RunnerState:
     # told to seed THIS existing goal's DAG instead of finding-or-creating its own.
     goal_id: str = ""
 
+    # Resolved on-disk storage dir for this run (goal-tier: pathly/goals/<slug>)
+    storage_path: str = ""
+
     # Active terminal tab id — set while a terminal-mode stage is in flight
     active_tab_id: str = ""
 
@@ -139,4 +142,5 @@ class RunnerState:
                 if self.open_session
                 else None
             ),
+            "storage_path": self.storage_path,
         }

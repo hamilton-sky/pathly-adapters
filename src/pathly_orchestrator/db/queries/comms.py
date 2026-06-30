@@ -11,6 +11,8 @@ from .comms_messages import (  # noqa: F401
     _now,
     post_message,
     set_goal_executor,
+    set_message_slug,
+    read_message_slug,
     get_messages,
     get_pending_decisions,
     get_active_escalations,
@@ -34,6 +36,7 @@ from .comms_artifacts import (  # noqa: F401
     find_or_create_artifact_by_path,
     list_artifacts_catalog,
     update_artifact_summary,
+    ensure_attached,
 )
 from .comms_tasks import (  # noqa: F401
     get_ready_tasks,
@@ -42,6 +45,7 @@ from .comms_tasks import (  # noqa: F401
     claim_task,
     fail_task,
     reclaim_stale_claims,
+    count_tasks_for_goal,
 )
 from .comms_embeddings import (  # noqa: F401
     _RRF_K,

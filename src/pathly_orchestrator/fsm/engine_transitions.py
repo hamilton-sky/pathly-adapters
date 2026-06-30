@@ -9,15 +9,25 @@ from pathlib import Path
 # Feedback escalation attempt threshold for a single-target (string) escalation.
 _ESCALATE_AT_ATTEMPT = 3
 
+_COMPARE_OPS = {
+    "lt": lambda a, b: a < b,
+    "lte": lambda a, b: a <= b,
+    "eq": lambda a, b: a == b,
+    "gte": lambda a, b: a >= b,
+    "gt": lambda a, b: a > b,
+    "ne": lambda a, b: a != b,
+}
+
 
 def evaluate_transition_rules(
-    flow: dict, current_state: str, storage_path: Path
+    flow: dict, current_state: str, storage_path: Path, *, goal_id: str | None = None
 ) -> str | dict:
     """Evaluate routing rules for current_state in strict level order.
 
     Level 1 — on_artifact: if storage_path/filename exists → return next_state.
     Level 2 — on_content: substring/regex match in a file → return next_state.
     Level 2.5 — on_state_counter: numeric DB field comparison.
+    Level 2.6 — on_board_count: goal-scoped board task-count gate (Fix B).
     Level 3 — decide: return sentinel dict (no LLM call).
     Fallback — default or first transition.
     """
@@ -73,15 +83,7 @@ def evaluate_transition_rules(
         op = on_state_counter.get("op")
         compare_to = on_state_counter.get("compare_to")
         next_s = on_state_counter.get("next")
-        _ops = {
-            "lt": lambda a, b: a < b,
-            "lte": lambda a, b: a <= b,
-            "eq": lambda a, b: a == b,
-            "gte": lambda a, b: a >= b,
-            "gt": lambda a, b: a > b,
-            "ne": lambda a, b: a != b,
-        }
-        op_fn = _ops.get(op)
+        op_fn = _COMPARE_OPS.get(op)
         if op_fn is not None and field and compare_to and next_s:
             try:
                 from pathly_orchestrator import eventlog as _eventlog
@@ -93,6 +95,24 @@ def evaluate_transition_rules(
                     return next_s
             except (KeyError, ValueError, TypeError):
                 pass
+
+    # Level 2.6 — on_board_count (goal-scoped board task-count gate; Fix B)
+    on_board_count = rule.get("on_board_count")
+    if on_board_count is not None and goal_id is not None:
+        op = on_board_count.get("op")
+        compare_to = on_board_count.get("compare_to")
+        next_s = on_board_count.get("next")
+        op_fn = _COMPARE_OPS.get(op)
+        # compare_to read as a raw int; `is not None` so compare_to=0 is honored
+        if op_fn is not None and compare_to is not None and next_s:
+            try:
+                from pathly_orchestrator.db.connection import get_db
+                from pathly_orchestrator.db.queries.comms_tasks import count_tasks_for_goal
+                count = count_tasks_for_goal(get_db(), goal_id)
+                if op_fn(count, int(compare_to)):
+                    return next_s
+            except Exception:
+                pass  # DB error → fail-closed: do NOT advance
 
     # Level 3 — decide
     decide = rule.get("decide")

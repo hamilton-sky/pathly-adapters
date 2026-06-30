@@ -26,6 +26,10 @@ def complete_stage(args: dict) -> dict:
     flow_config = _fops._load_flow(flow_name, project_root)
     storage_path = _fops._resolve_storage_path(flow_config, project_root, topic)
 
+    board = args.get("board", "feature")
+    scope = args.get("scope") or topic
+    goal_id = args.get("goal_id")
+
     if resolved_files:
         feedback_dir = storage_path / "feedback"
         for filename in resolved_files:
@@ -104,7 +108,7 @@ def complete_stage(args: dict) -> dict:
         return {"done": True}
 
     eval_result: str | dict = evaluate_transition_rules(
-        flow_config, state_info["current_state"], storage_path
+        flow_config, state_info["current_state"], storage_path, goal_id=goal_id
     )
 
     if isinstance(eval_result, dict) and eval_result.get("decide") is True:
@@ -233,4 +237,9 @@ def complete_stage(args: dict) -> dict:
     )
     result["limits"] = state_info["limits"]
     result["next_state"] = next_state
+    try:
+        from pathly_orchestrator.supervisor.artifact_reconcile import reconcile_artifacts
+        reconcile_artifacts(storage_path, scope, goal_id=goal_id, board=board)
+    except Exception:
+        pass  # best-effort; the ledger + files remain authoritative
     return result

@@ -35,8 +35,13 @@ def _write_supervisor_phase_summary(
         return
     try:
         from pathly_orchestrator import db as _db
+        from pathly_orchestrator.fsm_ops import _load_flow, _resolve_storage_path
 
-        feature_dir = Path(project_root) / "pathly" / "plans" / topic
+        try:
+            flow_config = _load_flow("team")
+            feature_dir = _resolve_storage_path(flow_config, project_root, topic)
+        except Exception:
+            feature_dir = Path(project_root) / "pathly" / "plans" / topic
         if not feature_dir.exists():
             return
         conn = _db.get_db()
@@ -293,7 +298,11 @@ def _run_stage_via_terminal(
             )
 
         if feature_flags.early_advance:
-            feature_dir = Path(state.project_root) / "pathly" / "plans" / state.topic
+            feature_dir = (
+                Path(state.storage_path)
+                if state.storage_path
+                else Path(state.project_root) / "pathly" / "plans" / state.topic
+            )
             feature = state.topic
 
             last_seq = 0
@@ -331,7 +340,9 @@ def _run_stage_via_terminal(
 
             if outcome == "agent_done":
                 storage_path = (
-                    Path(state.project_root) / "pathly" / "plans" / state.topic
+                    Path(state.storage_path)
+                    if state.storage_path
+                    else Path(state.project_root) / "pathly" / "plans" / state.topic
                 )
                 agent_done_data = read_last_agent_done(storage_path) or {}
                 result_for_fsm = {
@@ -386,6 +397,16 @@ def _run_stage_via_terminal(
                         )
                     drop_run(run_id)
                 else:
+                    try:
+                        from pathly_orchestrator.supervisor.artifact_reconcile import reconcile_artifacts
+                        _bfn = (lambda payload: broadcast_fn(state.topic, payload)) if broadcast_fn else None
+                        reconcile_artifacts(
+                            storage_path, state.topic,
+                            goal_id=(state.goal_id or None),
+                            broadcast_fn=_bfn,
+                        )
+                    except Exception as exc:
+                        logger.warning("_run_stage_via_terminal: artifact reconcile failed: %s", exc)
                     events_path_for_recon = str(feature_dir / "EVENTS.jsonl")
                     recon_t = threading.Thread(
                         target=_reconciliation_window,

@@ -78,6 +78,29 @@ def set_goal_executor(conn: sqlite3.Connection, message_id: str, executor: str) 
         conn.commit()
 
 
+def set_message_slug(conn: sqlite3.Connection, message_id: str, slug: str) -> None:
+    """Persist the filesystem slug on a goal message."""
+    with _get_write_lock(conn):
+        conn.execute(
+            "UPDATE comms_messages SET slug=? WHERE id=?",
+            (slug, message_id),
+        )
+        conn.commit()
+
+
+def read_message_slug(
+    conn: sqlite3.Connection, message_id: str
+) -> dict | None:
+    """Read slug + text for a goal message. Returns None if not found."""
+    row = conn.execute(
+        "SELECT slug, text FROM comms_messages WHERE id=? AND type='goal'",
+        (message_id,),
+    ).fetchone()
+    if row is None:
+        return None
+    return {"slug": row["slug"], "text": row["text"]}
+
+
 def get_messages(
     conn: sqlite3.Connection,
     board: str,

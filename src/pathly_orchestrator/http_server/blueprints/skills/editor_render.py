@@ -198,7 +198,8 @@ def skills_preview():
             raw_parts = [skill_body.rstrip("\n")] + fragment_bodies
             assembled = "\n\n".join(p for p in raw_parts if p) + "\n"
         else:
-            assembled = compose_skill(skill, adapter_caps={"can_spawn": True})
+            from pathly_orchestrator.skills.compose import build_adapter_caps
+            assembled = compose_skill(skill, build_adapter_caps("claude"))
 
         feature = Path(feature_path).name if feature_path else ""
         project_root = (
@@ -249,6 +250,7 @@ def skills_compose():
             return jsonify({"error": "Field 'skill' must be a valid skill key"}), 400
 
         adapter = (data.get("adapter") or "claude").strip() or "claude"
+        goal_id = (data.get("goal_id") or "").strip()
         project_root = (data.get("project_root") or "").strip()
         transform = data.get("transform")
         if not isinstance(transform, dict):
@@ -257,7 +259,9 @@ def skills_compose():
         manifest = load_effective_manifest(project_root or None)
         composed = skill in (manifest.get("skills") or {})
         try:
-            prompt = compose_skill(skill, adapter, manifest=manifest)
+            from pathly_orchestrator.skills.compose import build_adapter_caps
+            _caps = build_adapter_caps(adapter, goal_id=goal_id)
+            prompt = compose_skill(skill, _caps, manifest=manifest)
         except Exception:
             return jsonify({"error": f"unknown or unreadable skill {skill!r}"}), 404
 

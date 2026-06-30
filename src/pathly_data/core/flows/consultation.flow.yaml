@@ -65,10 +65,10 @@ transition_rules:
         next: PLANNING
     default: DESIGNING
   PLANNING:
-    on_content:
-      - file: IMPLEMENTATION_PLAN.md
-        contains: '## Phase'
-        next: DONE
+    on_board_count:
+      op: gt
+      compare_to: 0
+      next: DONE
     default: PLANNING
 transition_actions:
   PLANNING->DONE:

@@ -21,9 +21,9 @@ def _safe_call(fn: Optional[Callable], *args) -> None:
 
 
 def _reset_fsm_state_for_flow(flow_name: str, scope: str, project_root: str) -> None:
-    """Re-seed a scope's persisted FSM state to *flow*'s initial state when it is stale.
+    """Re-seed a topic's persisted FSM state to *flow*'s initial state when it is stale.
 
-    FSM state is keyed by SCOPE (feature/topic), NOT by flow — so a scope that previously
+    FSM state is keyed by TOPIC (the on-disk slug), NOT by flow — so a topic that previously
     ran any flow to ``DONE`` (or ran a *different* flow, leaving a ``current`` this flow does
     not declare) breaks a fresh FSM-driven run two ways:
       • ``current == "DONE"`` → ``next_action`` short-circuits to ``{done: True}`` and the loop
@@ -220,8 +220,20 @@ def _run_loop(
             "holder": board_lock.holder(board, scope),
         }
 
+    slug = scope  # fallback
+    if project_root and goal_id:
+        try:
+            from pathly_orchestrator.db.connection import get_db
+            from pathly_orchestrator.supervisor.slug import ensure_goal_slug
+            import os
+            slug = ensure_goal_slug(get_db(project_root or None), goal_id)
+            _goal_dir = os.path.join(project_root, "pathly", "goals", slug)
+            os.makedirs(_goal_dir, exist_ok=True)
+        except Exception:
+            pass
+
     state = RunnerState(
-        topic=scope,
+        topic=slug,
         flow="goal-loop",
         project_root=project_root,
         model=model or _DEFAULT_MODEL,
@@ -322,6 +334,19 @@ def _run_team(
             "error": f"a pipeline run is already active for {scope!r} (status={existing.status})",
         }
 
+    # Slug: stable on-disk topic under pathly/goals/<slug>
+    slug = scope  # fallback
+    if project_root and goal_id:
+        try:
+            from pathly_orchestrator.db.connection import get_db
+            from pathly_orchestrator.supervisor.slug import ensure_goal_slug
+            import os
+            slug = ensure_goal_slug(get_db(project_root or None), goal_id)
+            _goal_dir = os.path.join(project_root, "pathly", "goals", slug)
+            os.makedirs(_goal_dir, exist_ok=True)
+        except Exception:
+            pass
+
     if start_fn is None:
         try:
             from pathly_orchestrator.fsm_ops import _load_flow
@@ -337,11 +362,11 @@ def _run_team(
     if _start is None:
         from pathly_orchestrator.supervisor.api import start_run as _start
         # Only re-seed when driving the REAL FSM — a test start_fn owns its own state.
-        _reset_fsm_state_for_flow(flow, scope, project_root)
+        _reset_fsm_state_for_flow(flow, slug, project_root)
 
     try:
         state = _start(
-            topic=scope,
+            topic=slug,
             flow=flow,
             project_root=project_root or "",
             model=model or _DEFAULT_MODEL,

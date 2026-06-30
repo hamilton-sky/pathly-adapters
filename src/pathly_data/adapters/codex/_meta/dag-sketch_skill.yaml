@@ -1,0 +1,5 @@
+skill: dag-sketch
+filename: pathly-dag-sketch/SKILL.md
+natural_language: "/pathly dag-sketch, decompose goal, sketch dag, dag sketch"
+variables:
+  TEMPLATES_DIR: ~/.codex/plugins/pathly/templates

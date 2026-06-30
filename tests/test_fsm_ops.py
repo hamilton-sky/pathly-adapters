@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 
 import pytest
@@ -734,3 +735,28 @@ def test_resolve_storage_path_legacy_not_shadowed_by_missing_new_style(tmp_path)
     flow = {**ROUTING_FLOW, "storage_path": "pathly/plans/{topic}/"}
     result = fsm_ops._resolve_storage_path(flow, str(tmp_path), topic)
     assert result == legacy_dir
+
+
+def test_resolve_storage_path_raises_on_absolute_topic(tmp_path):
+    """Absolute topic in P1 mode: raises ValueError."""
+    flow = {
+        "storage_path": "pathly/plans/{topic}/",
+    }
+    topic = str(tmp_path / "some" / "absolute")  # an absolute path on this OS
+    with pytest.raises(ValueError, match="unsafe topic"):
+        fsm_ops._resolve_storage_path(flow, str(tmp_path), topic)
+
+
+def test_resolve_storage_path_normal_slug_no_warning(tmp_path, caplog):
+    """Plain slug must produce no storage warning and return the new-style dir."""
+    flow = {
+        "storage_path": "pathly/plans/{topic}/",
+    }
+    topic = "my-feature-slug"
+    new_style = tmp_path / "pathly" / topic
+    new_style.mkdir(parents=True)
+    with caplog.at_level(logging.WARNING, logger="pathly.storage"):
+        result = fsm_ops._resolve_storage_path(flow, str(tmp_path), topic)
+    storage_warnings = [r for r in caplog.records if r.name == "pathly.storage"]
+    assert len(storage_warnings) == 0
+    assert result == new_style

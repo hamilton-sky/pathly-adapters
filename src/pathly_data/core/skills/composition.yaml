@@ -46,6 +46,7 @@ blocks:
 skills:
   team/build:
     fragments:
+      - artifact-register
       - completion-report
       - scout-choreography
       - feedback-protocol
@@ -54,6 +55,7 @@ skills:
       - catalog-pull
   team/review:
     fragments:
+      - artifact-register
       - completion-report
       - scout-choreography
       - feedback-protocol
@@ -63,6 +65,7 @@ skills:
       - catalog-pull
   team/test:
     fragments:
+      - artifact-register
       - completion-report
       - scout-choreography
       - feedback-protocol
@@ -122,6 +125,15 @@ skills:
 
   planning/plan:
     fragments:
+      - { name: task-dag-post, requires: goal_id }
+      - artifact-register
+      - completion-report
+
+  planning/dag-sketch:
+    fragments:
+      - { name: board-start-context, requires: goal_id }
+      - { name: task-dag-post, requires: goal_id }
+      - artifact-register
       - completion-report
 
   team/plan:
@@ -131,6 +143,7 @@ skills:
   team/design:
     fragments:
       - completion-report
+      - artifact-register
       - comms-post
 
   # ── Gap 1: silent-skill board write-back ────────────────────────────────────
@@ -152,6 +165,7 @@ skills:
       - comms-post
   team/retro:
     fragments:
+      - artifact-register
       - comms-post
 
   # ── Goal executors: loop per-task agents + the single drain-dag agent ───────

@@ -18,6 +18,7 @@ from pathly_orchestrator.fsm import (
     run_gates,
     run_transition_actions,
 )
+from pathly_orchestrator.storage_paths import _safe_topic
 from pathly_orchestrator.fsm_compose import (
     _SCHEMA_VERSION,
     _agent_hint,
@@ -66,12 +67,18 @@ def _load_flow(flow_name: str, project_root: str | None = None) -> dict:
 
 
 def _resolve_storage_path(flow_config: dict, project_root: str, topic: str) -> Path:
-    new_style = Path(project_root) / "pathly" / topic
-    if new_style.is_dir():
-        return new_style
+    topic = _safe_topic(topic)
+    root = Path(project_root)
+    for candidate in (
+        root / "pathly" / topic,
+        root / "pathly" / "goals" / topic,
+        root / "pathly" / "plans" / topic,
+    ):
+        if candidate.is_dir():
+            return candidate
+    # None exists — fall through to template default (feature runs rely on this)
     template = flow_config["storage_path"]
-    relative = template.format(topic=topic)
-    return Path(project_root) / relative
+    return root / template.format(topic=topic)
 
 
 def _count_planned_convs(storage_path: Path) -> int:
@@ -304,7 +311,16 @@ def next_action(args: dict) -> dict:
     return result
 
 
-# Re-export complete_stage from fsm_ops_complete.
-# Bottom-of-file: all helpers and next_action are already defined when
-# fsm_ops_complete is loaded, so its top-level imports from this module succeed.
-from pathly_orchestrator.fsm_ops_complete import complete_stage  # noqa: E402, F401
+# Lazy re-export of complete_stage to break the fsm_ops <-> fsm_ops_complete
+# import cycle. fsm_ops_complete imports ~12 helpers from this module at load time;
+# a top-level `from fsm_ops_complete import complete_stage` here would force that
+# module to load while fsm_ops is still initializing — which raises ImportError
+# whenever fsm_ops_complete is imported first. PEP 562 module __getattr__ defers
+# the import to first attribute access, so `from ...fsm_ops import complete_stage`
+# still resolves for every call site, in any import order.
+def __getattr__(name):
+    if name == "complete_stage":
+        from pathly_orchestrator.fsm_ops_complete import complete_stage
+
+        return complete_stage
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

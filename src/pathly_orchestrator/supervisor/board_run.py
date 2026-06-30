@@ -109,7 +109,7 @@ def _default_spawn(
     return _run_stage_via_terminal(state, prompt, adapter, model, run_id, broadcast_fn)
 
 
-def _compose_skill_body(skill: str, adapter: str) -> str:
+def _compose_skill_body(skill: str, adapter: str, caps: dict | None = None) -> str:
     """Compose the chosen skill into its full prompt body (runner-mode delivery —
     assembled in Python and injected via argv; the CLI reads nothing from disk).
     Returns '' on any failure so a board run is never blocked by a bad skill name."""
@@ -118,7 +118,7 @@ def _compose_skill_body(skill: str, adapter: str) -> str:
     try:
         from pathly_orchestrator.skills.compose import compose_skill
 
-        return compose_skill(skill, adapter or "claude")
+        return compose_skill(skill, caps if caps is not None else (adapter or "claude"))
     except Exception:
         return ""
 
@@ -166,6 +166,8 @@ def start_board_run(
     system_prompt: str = "",
     interactive: bool = False,
     progress: str = "normal",
+    storage_path: str = "",
+    caps: dict | None = None,
     broadcast_fn=None,
     spawn_fn: Callable | None = None,
     on_start: Optional[Callable] = None,
@@ -232,7 +234,7 @@ def start_board_run(
     context = board_context_for(board, scope, project_root or "", instructions or "")
     prompt_parts: list[str] = []
     # The composed skill body is the agent's behavior contract for this run.
-    skill_body = _compose_skill_body(skill, adapter)
+    skill_body = _compose_skill_body(skill, adapter, caps=caps)
     if skill_body:
         prompt_parts.append(skill_body)
     if system_prompt:
@@ -247,20 +249,20 @@ def start_board_run(
     # follows along; they are not a user-facing skill.
     _from = agent or "agent"
     cadence = _PROGRESS_CADENCE.get(progress, _PROGRESS_CADENCE["normal"])
-    # Where the agent should write files: the feature's resolved working directory —
-    # pathly/<scope>/ (new-style root) if it exists, else legacy pathly/plans/<scope>/.
-    # Mirrors fsm_ops._resolve_storage_path so a board agent writes exactly where the
-    # FSM resolves this feature. Only meaningful for feature boards.
-    where_line = ""
-    if board == "feature" and project_root:
-        _root = Path(project_root)
-        _feat = _root / "pathly" / scope
-        if not _feat.is_dir():
-            _feat = _root / "pathly" / "plans" / scope
-        where_line = (
-            f"Write any files you create under `{_feat.as_posix()}/` — this feature's "
-            "working directory (where its plan, artifacts, and state live).\n\n"
+    # Where the agent should write files: prefer the resolved storage_path when supplied
+    # (goal-tier runs pass this); fall back to the feature inline-resolve for feature boards.
+    if storage_path:
+        where_line = f"Your working directory is: {storage_path}"
+    elif board == "feature" and project_root:
+        # feature inline fallback (byte-identical to pre-T5)
+        feature_path = (
+            Path(project_root) / "pathly" / scope
+            if (Path(project_root) / "pathly" / scope).is_dir()
+            else Path(project_root) / "pathly" / "plans" / scope
         )
+        where_line = f"Your working directory is: {feature_path}"
+    else:
+        where_line = ""
     prompt_parts.append(
         "## Working from the board\n\n"
         "Your task is the most recent message from the human on this board (shown in "
@@ -272,7 +274,7 @@ def start_board_run(
         '"type": "status", "text": "<one or two sentences>"}\n'
         f"{cadence} Keep each post to one or two sentences — the board is the human's "
         "window into this run.\n\n"
-        f"{where_line}"
+        f"{where_line + chr(10) + chr(10) if where_line else ''}"
         "If you CREATE A FILE (an artifact), post it as an artifact AND link the path so the "
         "human can open it from the board. Provide TWO fields: text = a real 1-2 sentence "
         "description (what it is and why it matters, NOT a bare label); summary = a topic map of "

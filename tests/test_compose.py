@@ -189,7 +189,7 @@ def test_load_manifest_shape():
 
 # ── Converted team/* family: golden snapshots + exactly-once guarantee ───────
 
-_CONVERTED_TEAM_SKILLS = ["team/build", "team/review", "team/test"]
+_CONVERTED_TEAM_SKILLS = ["team/build", "team/review", "team/test", "team/design", "team/retro", "planning/plan"]
 
 
 @pytest.mark.parametrize("skill", _CONVERTED_TEAM_SKILLS)
@@ -372,3 +372,100 @@ def test_user_block_overrides_core_block():
     user_blocks = {"full-build": ["completion-report"]}
     result = resolve_block("full-build", {}, user_blocks=user_blocks)
     assert len(result) == 1
+
+
+def test_build_adapter_caps_merges_goal_context():
+    from pathly_orchestrator.skills.compose import build_adapter_caps
+    caps = build_adapter_caps("claude", goal_id="g1", executor="loop", kind="dag")
+    assert caps["goal_id"] == "g1"
+    assert caps["executor"] == "loop"
+    assert caps["kind"] == "dag"
+    # can_spawn from the adapter
+    assert isinstance(caps.get("can_spawn"), bool)
+
+
+def test_goal_id_gate_known_capability():
+    """goal_id is a known capability and gates fragments correctly."""
+    from pathly_orchestrator.skills.compose import (
+        _KNOWN_CAPABILITIES,
+        build_adapter_caps,
+    )
+    assert "goal_id" in _KNOWN_CAPABILITIES
+
+    # With goal_id — a gated fragment would be kept
+    caps_with = build_adapter_caps("claude", goal_id="g1")
+    assert caps_with.get("goal_id") == "g1"  # truthy → gated fragment kept
+
+    # Without goal_id — gated fragment dropped
+    caps_without = build_adapter_caps("claude", goal_id="")
+    assert not caps_without.get("goal_id")  # falsy → gated fragment dropped
+
+
+def test_dag_sketch_composes_task_post_and_completion():
+    from pathly_orchestrator.skills.compose import compose_skill, build_adapter_caps
+
+    # With goal_id — both gated fragments included
+    out = compose_skill("planning/dag-sketch", build_adapter_caps("claude", goal_id="g1"))
+    assert "## Posting the task DAG to the Comms Board" in out
+    assert "## Reading the board before you decompose" in out
+    assert "## Completion report" in out
+
+    # Without goal_id — gated fragments dropped but completion-report stays
+    out_no_goal = compose_skill("planning/dag-sketch", build_adapter_caps("claude"))
+    assert "## Posting the task DAG to the Comms Board" not in out_no_goal
+    assert "## Reading the board before you decompose" not in out_no_goal
+    assert "## Completion report" in out_no_goal
+
+
+def test_plan_composes_task_dag_post_before_completion():
+    """planning/plan includes task-dag-post before completion-report when goal_id set."""
+    from pathly_orchestrator.skills.compose import compose_skill, build_adapter_caps
+
+    # With goal_id — task-dag-post fragment included
+    out = compose_skill("planning/plan", build_adapter_caps("claude", goal_id="g1"))
+    assert "## Posting the task DAG to the Comms Board" in out
+    task_idx = out.index("## Posting the task DAG to the Comms Board")
+    completion_idx = out.index("## Completion report")
+    assert task_idx < completion_idx, "task-dag-post must appear before completion-report"
+
+
+# ── artifact-manifest + artifact-register tests ───────────────────────────────
+
+
+def test_artifact_manifest_loads():
+    from pathly_orchestrator.skills.compose import load_artifact_manifest
+    m = load_artifact_manifest()
+    assert m["version"] == 1
+    assert "planner" in m["roles"]
+    assert m["roles"]["designer"]["gate"] == "## Design System Output"
+
+
+def test_manifest_role_file_override():
+    from pathly_orchestrator.skills.compose import manifest_role_file
+    assert manifest_role_file("planner", "planning/dag-sketch") == ("DAG_PLAN.md", "## Tasks")
+    assert manifest_role_file("planner") == ("IMPLEMENTATION_PLAN.md", "## Phase")
+    assert manifest_role_file("designer") == ("DESIGN.md", "## Design System Output")
+    assert manifest_role_file("nonexistent-role") is None
+
+
+def test_artifact_register_composed():
+    out = compose_skill("team/build", "claude")
+    assert "## Registering your output artifact" in out
+
+
+def test_artifact_register_not_in_po():
+    out = compose_skill("planning/po", "claude")
+    assert "## Registering your output artifact" not in out
+
+
+def test_artifact_register_never_last():
+    """No ordering-invariant skill may end on artifact-register."""
+    for skill in ("team/build", "team/review", "team/test", "team/design",
+                  "team/retro", "planning/plan"):
+        out = compose_skill(skill, "claude").rstrip()
+        # the artifact-register section must not be the final section
+        reg = "## Registering your output artifact"
+        assert reg in out
+        tail = out[out.index(reg) + len(reg):]
+        assert tail.lstrip().count("## ") >= 1 or "comms-post" in tail.lower() or "Completion" in tail, \
+            f"{skill}: artifact-register appears to be the last section"

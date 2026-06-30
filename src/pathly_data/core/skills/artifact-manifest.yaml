@@ -1,0 +1,13 @@
+version: 1
+roles:
+  po:             {file: PO_NOTES.md,                 gate: '#'}
+  architect:      {file: ARCHITECTURE_PROPOSAL.md,    gate: '#'}
+  web-researcher: {file: RESEARCH.md,                 gate: '#'}
+  designer:       {file: DESIGN.md,                   gate: '## Design System Output'}
+  planner:        {file: IMPLEMENTATION_PLAN.md,      gate: '## Phase'}
+  reviewer:       {file: feedback/REVIEW_FAILURES.md, gate: '#'}
+  tester:         {file: feedback/TEST_FAILURES.md,   gate: '#'}
+  retro:          {file: RETRO.md,                    gate: '#'}
+  explorer:       {file: CONCLUSIONS.md,              gate: '#'}
+overrides:
+  planner.planning/dag-sketch: {file: DAG_PLAN.md, gate: '## Tasks'}

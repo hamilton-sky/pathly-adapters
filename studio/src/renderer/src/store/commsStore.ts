@@ -137,7 +137,7 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
 
       // New-style features live directly under pathly/<id>/
       // Exclude reserved names so we don't pick up "plans" or hidden dirs.
-      const RESERVED = new Set(['plans', '.archive'])
+      const RESERVED = new Set(['plans', '.archive', 'goals', 'lessons', 'explorations', 'debugs', 'pipeline-walkthrough'])
       const pathlyDir = `${projectPath}/pathly`
       const topLevelNames = await listDirs(pathlyDir).catch(() => [] as string[])
       const newStyleIds = topLevelNames.filter((n) => !RESERVED.has(n))

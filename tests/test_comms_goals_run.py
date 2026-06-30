@@ -196,7 +196,11 @@ def test_dispatch_team_routes_to_team_build_flow():
     assert (
         captured["flow"] == "team-build"
     ), "team executor must run the trimmed team-build flow"
-    assert captured["topic"] == "gr_team"
+    # T6: topic is now the goal slug (filesystem-safe), NOT the raw scope string
+    topic = captured["topic"]
+    assert topic != "gr_team", "topic must be the slug, not the raw scope"
+    assert goal[:8] in topic, "slug must contain the goal id prefix"
+    assert " " not in topic and "/" not in topic
 
 
 def test_dispatch_team_custom_flow():

@@ -25,7 +25,7 @@ from typing import Any
 import yaml
 
 # Capabilities a fragment may gate on via ``requires:``. Extend as adapters grow.
-_KNOWN_CAPABILITIES = {"can_spawn"}
+_KNOWN_CAPABILITIES = {"can_spawn", "goal_id"}
 
 # Adapters whose ``_meta`` capability flags we can derive caps from.
 _KNOWN_ADAPTERS = {"claude", "codex", "copilot", "antigravity"}
@@ -58,6 +58,29 @@ def load_manifest() -> dict:
     """Read and parse ``core/skills/composition.yaml`` (the version-controlled default)."""
     text = _skills_root().joinpath("composition.yaml").read_text(encoding="utf-8")
     return yaml.safe_load(text) or {}
+
+
+def load_artifact_manifest() -> dict:
+    """Load artifact-manifest.yaml (role->file->gate). Mirrors load_manifest."""
+    text = _skills_root().joinpath("artifact-manifest.yaml").read_text(encoding="utf-8")
+    return yaml.safe_load(text) or {}
+
+
+def manifest_role_file(role: str, skill: str | None = None) -> tuple[str, str] | None:
+    """Resolve (file, gate) for a role, honoring (role, skill) overrides first.
+
+    Returns None when the role has no manifest entry (the allow-list gate).
+    """
+    m = load_artifact_manifest()
+    overrides = m.get("overrides", {}) or {}
+    if skill and f"{role}.{skill}" in overrides:
+        e = overrides[f"{role}.{skill}"]
+        return (e["file"], e["gate"])
+    roles = m.get("roles", {}) or {}
+    if role in roles:
+        e = roles[role]
+        return (e["file"], e["gate"])
+    return None
 
 
 def load_effective_manifest(project_root: str | None = None) -> dict:
@@ -163,6 +186,25 @@ def adapter_caps_for(adapter: str) -> dict:
     except (FileNotFoundError, OSError):
         pass
     return {"can_spawn": can_spawn}
+
+
+def build_adapter_caps(
+    adapter: str,
+    *,
+    goal_id: str = "",
+    executor: str = "",
+    kind: str = "",
+) -> dict:
+    """Build a capability dict by merging adapter hardware flags with goal context.
+
+    Extends adapter_caps_for(adapter) with goal-level fields so fragments gated on
+    requires:goal_id can be included when a goal run provides a goal_id.
+    """
+    caps = adapter_caps_for(adapter or "claude")
+    caps["goal_id"] = goal_id or ""
+    caps["executor"] = executor or ""
+    caps["kind"] = kind or ""
+    return caps
 
 
 def _coerce_caps(adapter_caps: Any) -> dict:

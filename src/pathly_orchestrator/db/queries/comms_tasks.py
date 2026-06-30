@@ -203,6 +203,20 @@ def fail_task(conn: sqlite3.Connection, message_id: str, reason: str = "") -> li
     return blocked
 
 
+def count_tasks_for_goal(conn: sqlite3.Connection, goal_id: str) -> int:
+    """Count non-deleted task rows belonging to a goal (any task_status).
+
+    Used by the on_board_count FSM gate to assert a goal's DAG was actually
+    seeded before advancing (Fix B).
+    """
+    row = conn.execute(
+        "SELECT COUNT(*) AS n FROM comms_messages "
+        "WHERE goal_id=? AND type='task' AND deleted_at IS NULL",
+        (goal_id,),
+    ).fetchone()
+    return int(row["n"]) if row else 0
+
+
 def reclaim_stale_claims(conn: sqlite3.Connection, board: str, scope: str) -> list[str]:
     """On scheduler startup, revert in_progress tasks back to pending.
 

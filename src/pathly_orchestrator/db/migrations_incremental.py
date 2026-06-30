@@ -89,6 +89,8 @@ def _add_additive_migrations(conn: sqlite3.Connection) -> None:
         # comms-board context-retrieval: advisory artifact links carried on the task.
         # Phase 2 — SHAPE guard only; resolve-against-index gate lands in Phase 3.
         ("comms_messages", "context_refs", "TEXT"),
+        # T5 goal-slug: stable filesystem slug for goal messages.
+        ("comms_messages", "slug", "TEXT"),
         # Phase 3 — staleness fingerprints for the section index (§3.4).
         # indexed_mtime: st_mtime at last index (cheap gate, one stat).
         # indexed_hash: sha256 of full file content at last index (content-change gate).
@@ -113,3 +115,13 @@ def _add_additive_migrations(conn: sqlite3.Connection) -> None:
             conn.commit()
         except sqlite3.OperationalError:
             pass  # column already exists
+    # Partial unique index on slug (only for non-NULL values) — allows many NULL slugs
+    # while preventing duplicate slugs on distinct goal messages.
+    try:
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_comms_messages_slug "
+            "ON comms_messages(slug) WHERE slug IS NOT NULL"
+        )
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass

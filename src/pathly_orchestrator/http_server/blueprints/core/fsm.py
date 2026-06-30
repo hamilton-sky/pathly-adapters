@@ -53,6 +53,7 @@ def complete_stage_endpoint():
         if not data:
             return jsonify({"error": "Missing JSON body"}), 400
 
+        # board/scope/goal_id are optional pass-through fields handled by complete_stage
         required = {"flow", "topic", "project_root"}
         missing = required - set(data.keys())
         if missing:

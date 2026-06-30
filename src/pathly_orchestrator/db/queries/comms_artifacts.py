@@ -7,7 +7,7 @@ import uuid
 from typing import Any
 
 from ..connection import _get_write_lock
-from .comms_messages import _now
+from .comms_messages import _now, post_message
 
 
 def attach_artifact_to_message(
@@ -172,7 +172,7 @@ def find_or_create_artifact_by_path(
         return None
 
     normalized_path = path.replace("\\", "/")
-    if "/pathly/plans/" not in normalized_path:
+    if "/pathly/plans/" not in normalized_path and "/pathly/goals/" not in normalized_path:
         return None
 
     sentinel_artifact_id = str(uuid.uuid4())
@@ -205,6 +205,68 @@ def find_or_create_artifact_by_path(
         "indexed_hash": None,
         "indexed_structure_key": None,
     }
+
+
+def ensure_attached(
+    conn: sqlite3.Connection,
+    scope: str,
+    artifact_path: str,
+    *,
+    board: str = "feature",
+    goal_id: str | None = None,
+    role: str | None = None,
+    title: str | None = None,
+    summary: str | None = None,
+    type: str = "md",
+    broadcast_fn=None,
+) -> dict:
+    """Idempotently ensure an artifact at (scope, artifact_path) is on the board.
+
+    Idempotent on (scope, artifact_path): a second call returns the SAME artifact id
+    and creates no duplicate row/message. If broadcast_fn is provided, emits an
+    'artifact_attached' event (injected callback — SSE concerns stay out of db layer).
+    Returns the artifact row dict.
+    """
+    existing = conn.execute(
+        "SELECT a.* FROM comms_artifacts a "
+        "JOIN comms_messages m ON m.id = a.message_id "
+        "WHERE m.scope=? AND a.path=? "
+        "ORDER BY a.created_at DESC LIMIT 1",
+        (scope, artifact_path),
+    ).fetchone()
+    if existing is not None:
+        return dict(existing)
+
+    fname = artifact_path.replace("\\", "/").rsplit("/", 1)[-1]
+    msg_id = post_message(
+        conn,
+        board=board,
+        scope=scope,
+        from_agent=(role or "system"),
+        type="artifact",
+        text=(summary or f"Artifact: {title or fname}"),
+        artifact_path=artifact_path,
+        artifact_type=type,
+        goal_id=goal_id,
+    )
+    artifact_id = insert_artifact(
+        conn,
+        message_id=msg_id,
+        path=artifact_path,
+        type=type,
+        title=(title or fname),
+        summary=summary,
+        created_by=(role or "system"),
+    )
+    if broadcast_fn is not None:
+        try:
+            broadcast_fn({"type": "artifact_attached", "scope": scope,
+                          "path": artifact_path, "artifact_id": artifact_id,
+                          "goal_id": goal_id})
+        except Exception:
+            pass
+    row = conn.execute("SELECT * FROM comms_artifacts WHERE id=?", (artifact_id,)).fetchone()
+    return dict(row) if row is not None else {"id": artifact_id, "path": artifact_path}
 
 
 def list_artifacts_catalog(

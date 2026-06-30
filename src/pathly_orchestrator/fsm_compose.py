@@ -79,6 +79,7 @@ def _inject_prompt_vars(
     project_root: str,
     agent_role: str,
     storage_path: Path | None = None,
+    skill: str | None = None,
 ) -> str:
     """Replace log-phase markers and common placeholders with real values."""
 
@@ -107,6 +108,12 @@ def _inject_prompt_vars(
     if storage_path is not None:
         feature_path = storage_path.as_posix().rstrip("/")
         text = text.replace("<feature_path>", feature_path)
+        if skill is not None:
+            from pathly_orchestrator.compose import manifest_role_file
+            entry = manifest_role_file(agent_role, skill)
+            if entry is not None:
+                out_path = f"{feature_path}/{entry[0]}"
+                text = text.replace("<out_path>", out_path)
     return text
 
 
@@ -150,7 +157,8 @@ def build_prompt(flow_config: dict, state_name: str, storage_path: Path) -> str:
         agent_text = _load_agent_text(agent)
 
     agent_text = _inject_prompt_vars(
-        agent_text, feature, project_root, agent_role, storage_path=storage_path
+        agent_text, feature, project_root, agent_role, storage_path=storage_path,
+        skill=(agent if "/" in agent else None),
     )
 
     context = (
