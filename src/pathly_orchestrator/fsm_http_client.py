@@ -23,6 +23,7 @@ _NEXT_ACTION_PATH = "/next_action"
 _COMPLETE_STAGE_PATH = "/complete_stage"
 _RECORD_ACTIVITY_PATH = "/record_activity"
 _RECORD_PHASE_PATH = "/record_phase"
+_CODE_QUERY_PATH = "/code/query"
 
 
 class _ServerUnreachable(RuntimeError):
@@ -241,7 +242,16 @@ def _filter_none(values: dict[str, object | None]) -> dict[str, object]:
     return {key: value for key, value in values.items() if value is not None}
 
 
-# Re-export main so callers that import from fsm_http_client still work.
-# Bottom-of-file import: fsm_http_client is fully defined before fsm_cli loads,
-# so fsm_cli's top-level import of fsm_http_client symbols succeeds without a cycle.
-from pathly_orchestrator.fsm_cli import main  # noqa: E402, F401
+# Backward-compat: expose `main` for any external caller that does
+# `from pathly_orchestrator.fsm_http_client import main`. Resolved lazily via a
+# PEP 562 module __getattr__ so importing this module NEVER imports fsm_cli at
+# load time. fsm_cli imports this module at its top (line 13), so a load-time
+# re-export here is an import cycle: it breaks whenever fsm_cli is imported
+# first — exactly what the `pathly-fsm-call` console script (fsm_cli:main) does.
+# Deferring to attribute access keeps the re-export working without the cycle.
+def __getattr__(name: str):
+    if name == "main":
+        from pathly_orchestrator.fsm_cli import main as _main
+
+        return _main
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
