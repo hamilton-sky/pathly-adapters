@@ -59,7 +59,7 @@ function runEngineCancellable(
   prompt: string,
   cwd: string,
 ): { promise: Promise<AiResult>; abort: () => void } {
-  const argv = buildHeadlessArgv(adapter, prompt, { jsonResult: true })
+  const argv = buildHeadlessArgv(adapter, prompt)
   const tabId = `airouter-${adapter}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
   const term = useTerminalStore.getState()
   term.addTab(tabId, `Summary · ${adapter}`, 'left', adapter as TerminalTab['kind'], undefined, undefined, prompt)

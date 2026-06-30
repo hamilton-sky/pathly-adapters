@@ -29,14 +29,28 @@ spawn already passes through. It is now the universal *client-side* projector �
   `runner/telemetry.py::project_agent_done`, so client one-shots and supervisor runs converge
   on the **same** schema and the same Σ roll-up. Each one-shot mints its own standalone trace.
 
+### Output format follows the PROGRESS SOURCE (design rule)
+
+The output format must match where a spawn draws its live progress — get this wrong and you
+either lose cost or freeze the UI:
+
+- **Board / goal / FSM runs** draw progress from the **board** (EVENTS.jsonl events written by
+  fragments). The terminal is secondary → `--output-format json` is fine (cost reads from stdout).
+- **Editor / chat one-shots** draw progress from the **terminal stdout stream** (`attachProgress`
+  → milestone toasts + the live pill). They **must stream** → plain `--print`. Buffered json
+  freezes that stream. The format legitimately differs by spawn type for this reason.
+
 ### Two parts
 
-1. **Universal spans** — wall-time, tier, label, adapter, exit. Zero risk; 100% coverage
-   immediately (cost/tokens may be null).
-2. **Cost + tokens** — opt the one-shot argv into `claude --output-format json` (new
-   `SpawnOpts.jsonResult`). `terminal.ts` already had `parseClaudeJsonResult`; it now reuses it
-   for one-shots to read `total_cost_usd` + `usage`, and **normalizes the exit tail to the
-   agent's `.result` prose** so stdout-reading consumers (aiRouter) stay clean.
+1. **Universal spans** — wall-time, tier, label, adapter, exit. Zero risk; 100% coverage now
+   (cost/tokens null for one-shots until part 2). **DONE.**
+2. **Cost + tokens (DEFERRED — must not regress UX)** — the first cut forced
+   `--output-format json` on the one-shots; that buffered the stream and broke the editor's live
+   progress, so it was reverted. The correct path is a **stream-json renderer in `terminal.ts`**:
+   run one-shots with `--output-format stream-json`, re-emit assistant text deltas as clean prose
+   (streaming + toasts preserved), surface `tool_use` events as live "⚙ Tool" lines, and read
+   `total_cost_usd` / `usage` / tool-count from the final `result` event. Cost + tokens + tool
+   calls, no UX cost.
 
 ## Why this design
 
@@ -46,16 +60,15 @@ spawn already passes through. It is now the universal *client-side* projector �
 - Editor actions read their result from a **file** (`pollForFile`/`fs.read`), so the JSON
   envelope switch does not affect their output; aiRouter reads stdout, handled by tail-normalization.
 
-## Known tradeoff / limits
+## Status / limits
 
-- Under `--output-format json` the editor terminals show a buffered JSON result instead of live
-  streaming, and `attachProgress` milestone toasts (stdout-driven) pause. The **elapsed pill
-  survives** (it derives from `tab.startedAt`, not stdout). Restoring live streaming would need a
-  stream-json renderer in `terminal.ts` — deferred.
-- **codex** one-shots: no claude-style result to parse → **span-only** (cost/tokens 0). Acceptable;
-  most one-shots default to claude.
-- The diagram action (`useEditorDiagramAction.ts`) is part of the untracked md-diagram WIP; its
-  telemetry meta rides in the working tree and lands when that feature commits.
+- One-shots are currently **span-only** (time / tier / label / adapter); streaming UX is intact.
+  Cost/tokens arrive when the stream-json renderer (part 2) is built.
+- **codex** one-shots: span-only regardless (no claude-style result event); revisit if codex gains
+  a stream-json mode.
+- The diagram action (`useEditorDiagramAction.ts`) landed via the parallel md-diagram commit
+  (848032ad) carrying its telemetry meta; this feature supplies the `terminal:spawn` meta-arg infra
+  it depends on.
 
 ## Files
 

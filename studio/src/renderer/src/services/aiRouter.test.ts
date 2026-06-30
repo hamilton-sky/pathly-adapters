@@ -64,7 +64,7 @@ describe('aiRouter.runJob', () => {
     )
     // onExit must be subscribed before spawn (lifecycle invariant).
     expect(onExit).toHaveBeenCalledTimes(1)
-    expect(buildArgvMock).toHaveBeenCalledWith('claude', 'summarize this', { jsonResult: true })
+    expect(buildArgvMock).toHaveBeenCalledWith('claude', 'summarize this')
     expect(spawn).toHaveBeenCalledTimes(1)
     const [tabId, cwd, command, argv] = spawn.mock.calls[0]
     expect(typeof tabId).toBe('string')
