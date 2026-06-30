@@ -26,6 +26,11 @@ export interface SpawnOpts {
   session?: string
   /** Whether to pass the autonomy/auto-accept flag (default true). */
   autonomy?: boolean
+  /** Stream structured events (claude `--output-format stream-json`) instead of plain text.
+   *  The main-process spawn gate (terminal.ts) renders these events back into clean prose +
+   *  live "⚙ Tool" lines, so streaming UX is preserved while it captures cost / tokens /
+   *  tool-call count from the final `result` event. Claude only — codex ignores it. */
+  streamJson?: boolean
 }
 
 /**
@@ -50,11 +55,15 @@ export function dashSafePrompt(prompt: string): string {
  * is never parsed as a CLI flag.
  */
 export function buildHeadlessArgv(adapter: CliAdapter, promptRaw: string, opts: SpawnOpts = {}): string[] {
-  const { model, session, autonomy = true } = opts
+  const { model, session, autonomy = true, streamJson } = opts
   const prompt = dashSafePrompt(promptRaw)
 
   if (adapter === 'claude') {
     const argv = ['claude', '-p', prompt, '--print']
+    // stream-json events → the spawn gate renders them to clean text + tool lines and reads
+    // cost/tokens/tool-count from the final result event. --verbose is required for the full
+    // event stream in -p mode.
+    if (streamJson) argv.push('--output-format', 'stream-json', '--verbose')
     if (model) argv.push('--model', model)
     if (autonomy) argv.push('--dangerously-skip-permissions')
     if (session) argv.push('--resume', session)

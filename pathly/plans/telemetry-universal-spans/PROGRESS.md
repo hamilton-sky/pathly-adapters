@@ -27,7 +27,16 @@ Status: **BUILT** (pending full-suite confirmation + commit)
 |-------|------|-----------|
 | FSM / team | feature | ✅ api_lifecycle |
 | board single / loop | feature | ✅ supervisor projector |
-| editor AI split / analyze / comment / editor | project | ✅ span (time/tier) — cost via stream-json next |
-| HQ-chat / AI-router summary | project | ✅ span (time/tier) — cost via stream-json next |
-| editor diagram | project | ✅ span (time/tier) — cost via stream-json next |
+| editor AI split / analyze / comment / editor | project | ✅ cost + tokens + tool calls (stream-json) |
+| HQ-chat / AI-router summary | project | ✅ cost + tokens + tool calls (stream-json) |
+| editor diagram | project | ✅ cost + tokens + tool calls (stream-json) |
 | codex one-shots | project | ⚠️ span-only (no result event) |
+
+## Part 2 — stream-json renderer (cost + tokens + tool calls, streaming preserved)
+
+| # | Task | State | Notes |
+|---|------|-------|-------|
+| T10 | `SpawnOpts.streamJson` → `--output-format stream-json --verbose` | DONE | `cliEngine.ts`; `buildCliArgv` + aiRouter opt in |
+| T11 | pure `claudeJson.ts` (parse + stream renderer) + `terminal.ts` wiring | DONE | renders events → clean prose + "⚙ Tool" lines; captures cost/tokens/tool-count; opt-in per tab only |
+| T12 | `tool_uses` through `/db/invocation` + `project_agent_done` (otel attr) | DONE | Python |
+| T13 | `claudeJson.test.ts` — synthetic stream-json (wrap / multi-chunk / noise) | DONE | 11 tests; the un-live-testable parser is covered |

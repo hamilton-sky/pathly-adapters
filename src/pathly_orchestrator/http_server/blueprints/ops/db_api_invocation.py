@@ -56,6 +56,7 @@ def db_invocation():
         cost_usd = float(body.get("cost_usd") or 0)
         tokens_in = int(body.get("tokens_in") or 0)
         tokens_out = int(body.get("tokens_out") or 0)
+        tool_uses = int(body.get("tool_uses") or 0)
         session_id = body.get("session_id") or None
         summary = body.get("summary") or ""
         wall_seconds = float(body.get("wall_seconds") or 0)
@@ -79,6 +80,7 @@ def db_invocation():
             agent_role=agent_role,
             scope_tier=scope_tier,
             adapter=adapter,
+            tool_uses=tool_uses,
             trace_id=trace_id,
             wall_seconds=wall_seconds,
         )

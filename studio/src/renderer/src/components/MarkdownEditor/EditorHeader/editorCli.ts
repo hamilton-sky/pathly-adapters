@@ -59,13 +59,12 @@ export function saveEditorCli(key: string, cli: CliAdapter): void {
 }
 
 /** Resolve the spawn argv for the selected engine; falls back to Claude if unavailable.
- *  Uses plain STREAMING output — editor actions show live progress in their terminal
- *  (attachProgress reads the stdout stream) and read their result from a file. Buffered
- *  `--output-format json` would freeze that stream, so cost/tokens for these one-shots come
- *  from a stream-json renderer instead (see pathly/plans/telemetry-universal-spans/BRIEF.md),
- *  which preserves streaming. They still get a span (time/tier) via the spawn gate. */
+ *  Uses claude's stream-json output: the main-process spawn gate (terminal.ts) renders the
+ *  events back into clean prose + live "⚙ Tool" lines — so the editor's live progress is
+ *  preserved AND the gate captures cost / tokens / tool-call count for telemetry. Editor
+ *  actions still read their actual result from a file, so the output format never affects it. */
 export function buildCliArgv(cli: CliAdapter, prompt: string): string[] {
-  return buildHeadlessArgv(cli, prompt)
+  return buildHeadlessArgv(cli, prompt, { streamJson: true })
 }
 
 /** Human-friendly engine name for toasts/labels. */

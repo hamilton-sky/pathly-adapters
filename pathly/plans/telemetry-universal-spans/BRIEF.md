@@ -44,13 +44,16 @@ either lose cost or freeze the UI:
 
 1. **Universal spans** — wall-time, tier, label, adapter, exit. Zero risk; 100% coverage now
    (cost/tokens null for one-shots until part 2). **DONE.**
-2. **Cost + tokens (DEFERRED — must not regress UX)** — the first cut forced
-   `--output-format json` on the one-shots; that buffered the stream and broke the editor's live
-   progress, so it was reverted. The correct path is a **stream-json renderer in `terminal.ts`**:
-   run one-shots with `--output-format stream-json`, re-emit assistant text deltas as clean prose
-   (streaming + toasts preserved), surface `tool_use` events as live "⚙ Tool" lines, and read
-   `total_cost_usd` / `usage` / tool-count from the final `result` event. Cost + tokens + tool
-   calls, no UX cost.
+2. **Cost + tokens + tool calls (BUILT)** — the first cut forced buffered `--output-format json`,
+   which froze the editor's stdout-driven progress (reverted). The shipped path is a **stream-json
+   renderer**: one-shots run `--output-format stream-json --verbose`; the pure `claudeJson.ts`
+   module (called from `terminal.ts`) turns the event stream back into clean prose + live "⚙ Tool"
+   lines (streaming + milestone toasts preserved, raw JSON never shown) and reads `total_cost_usd`
+   / `usage` / tool-count from the final `result` event → POSTed to `/db/invocation` (tool count
+   lands in the otel span attributes, answering "where do I see tool calls"). Robust to PTY
+   line-wrapping, multi-chunk events, and non-JSON noise — and because the renderer is the one
+   piece that can't be checked against live claude here, it's covered by synthetic-event unit
+   tests (`claudeJson.test.ts`).
 
 ## Why this design
 
@@ -62,10 +65,13 @@ either lose cost or freeze the UI:
 
 ## Status / limits
 
-- One-shots are currently **span-only** (time / tier / label / adapter); streaming UX is intact.
-  Cost/tokens arrive when the stream-json renderer (part 2) is built.
-- **codex** one-shots: span-only regardless (no claude-style result event); revisit if codex gains
-  a stream-json mode.
+- claude one-shots: full **cost + tokens + tool-count + streaming** via the stream-json renderer.
+- **codex** one-shots: span-only (time/tier/label/adapter) — no claude-style result event to parse;
+  revisit if codex gains a stream-json mode. The renderer only activates for `stream-json` tabs, so
+  codex keeps raw passthrough.
+- Needs verification in the running app: the renderer is unit-tested against synthetic events, but
+  the live claude stream-json event shapes/flags should be confirmed once (run an AI Analyze → the
+  terminal should stream clean prose + "⚙ Tool" lines, and DB Explorer should show cost+tokens).
 - The diagram action (`useEditorDiagramAction.ts`) landed via the parallel md-diagram commit
   (848032ad) carrying its telemetry meta; this feature supplies the `terminal:spawn` meta-arg infra
   it depends on.

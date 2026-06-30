@@ -5,6 +5,7 @@ import { join } from 'path'
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
+import { parseClaudeJsonResult, feedStreamJson, newStreamJsonState, type StreamJsonState } from './claudeJson'
 
 let pty: typeof import('node-pty') | null = null
 try {
@@ -173,73 +174,8 @@ function resolveShell(command: string | undefined): { shell: string; args: strin
   return { shell: 'powershell.exe', args: [] }
 }
 
-interface ClaudeJsonResult {
-  result: string
-  total_cost_usd: number
-  duration_ms: number
-  usage: {
-    input_tokens: number
-    output_tokens: number
-    cache_read_input_tokens: number
-    cache_creation_input_tokens: number
-  }
-  permission_denials?: Array<{
-    tool_name: string
-    tool_use_id?: string
-    tool_input?: unknown
-  }>
-}
-
-/** Extract the balanced { … } object starting at position 0.
- *  Handles string escaping so embedded braces inside strings are ignored. */
-function extractBalancedJson(s: string): string | null {
-  let depth = 0
-  let inString = false
-  let escape = false
-  for (let i = 0; i < s.length; i++) {
-    const c = s[i]
-    if (escape) { escape = false; continue }
-    if (c === '\\' && inString) { escape = true; continue }
-    if (c === '"') { inString = !inString; continue }
-    if (inString) continue
-    if (c === '{') depth++
-    else if (c === '}') {
-      depth--
-      if (depth === 0) return s.slice(0, i + 1)
-    }
-  }
-  return null
-}
-
-function parseClaudeJsonResult(stdout: string): ClaudeJsonResult | null {
-  // Strip ANSI escape sequences
-  const stripped = stdout.replace(/\x1b\[[0-9;]*[mGKHFABCDJsu]/g, '')
-
-  // Claude emits {"type":"result",...} as compact JSON on one logical line, but
-  // the PTY terminal wraps it at the column width with \r\n sequences.  We find
-  // the marker, walk back to the opening brace, flatten the PTY wrapping in
-  // that section, then extract a balanced { } object before parsing.
-  const idxA = stripped.lastIndexOf('"type":"result"')
-  const idxB = stripped.lastIndexOf('"type": "result"')
-  const markerIdx = Math.max(idxA, idxB)
-  if (markerIdx === -1) return null
-
-  // Walk backward to find the opening brace for this object
-  let start = markerIdx
-  while (start > 0 && stripped[start] !== '{') start--
-  if (stripped[start] !== '{') return null
-
-  // Flatten PTY-introduced \r\n wrapping within the JSON section only
-  const flat = stripped.slice(start).replace(/\r\n/g, '').replace(/\r/g, '')
-  const json = extractBalancedJson(flat)
-  if (!json) return null
-
-  try {
-    const parsed = JSON.parse(json) as { type?: string } & ClaudeJsonResult
-    if (parsed.type === 'result') return parsed
-  } catch { /* malformed */ }
-  return null
-}
+// ClaudeJsonResult, parseClaudeJsonResult and the stream-json renderer moved to ./claudeJson
+// (pure, no Electron deps → unit-tested in claudeJson.test.ts).
 
 /** Spawn a specific argv interactively — the shell stays open after the command exits so the user can keep chatting. */
 function resolveInteractiveShell(argv: string[]): { shell: string; args: string[] } {
@@ -666,10 +602,21 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
       })
     }
 
+    // Stream-json one-shots (editor / chat) asked claude for an event stream so the gate can
+    // capture cost/tokens/tool-calls. Render those events to clean prose + "⚙ Tool" lines instead
+    // of dumping raw JSON. ONLY these tabs are affected — every other spawn is byte-identical.
+    const isStreamJsonTab = headlessEngine && !runnerTabMeta.has(tabId)
+      && !!spawnMeta?.telemetry && !!runnerArgv?.includes('stream-json')
+    const streamState: StreamJsonState | null = isStreamJsonTab ? newStreamJsonState() : null
+
     ptyProcess.onData((data: string) => {
-      sendToWindow(tabId, `terminal:data:${tabId}`, data)
-      // Buffer a rolling tail for every tab (not just runner tabs) so onExit can report the
-      // real failure reason for notebook/editor AI actions too.
+      if (streamState) {
+        feedStreamJson(streamState, data, (text) => sendToWindow(tabId, `terminal:data:${tabId}`, text))
+      } else {
+        sendToWindow(tabId, `terminal:data:${tabId}`, data)
+      }
+      // Buffer a rolling RAW tail for every tab so onExit can report the real failure reason for
+      // notebook/editor AI actions too (stream tabs read the clean result from streamState).
       const lines = ptyOutput.get(tabId) ?? []
       lines.push(data)
       if (lines.length > 500) lines.splice(0, lines.length - 500)
@@ -690,14 +637,13 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
       if (scriptPath) { runnerScripts.delete(tabId); try { fs.unlinkSync(scriptPath) } catch { /* ignore */ } }
       const exitTailRaw = tailMeaningfulOutput(ptyOutput.get(tabId) ?? [])
       // One-shot telemetry: a gated headless engine run that is NOT a runner tab but carries a
-      // telemetry hint (editor AI actions, HQ summaries). If the argv requested --output-format
-      // json, parse the result for cost/tokens; normalize the exit tail to the agent's result
-      // prose so stdout-reading consumers (aiRouter) stay clean instead of seeing raw JSON.
+      // telemetry hint (editor AI actions, HQ summaries). Cost/tokens/tool-count come from the
+      // stream-json renderer's captured result event; the exit tail is normalized to the agent's
+      // result prose so stdout-reading consumers (aiRouter) stay clean instead of seeing JSON.
       const telem = spawnMeta?.telemetry
       const isOneShotTelem = headlessEngine && !runnerTabMeta.has(tabId) && !!telem
-      const oneShotParsed = isOneShotTelem
-        ? parseClaudeJsonResult((ptyOutput.get(tabId) ?? []).join(''))
-        : null
+      const oneShotParsed = streamState?.result
+        ?? (isOneShotTelem ? parseClaudeJsonResult((ptyOutput.get(tabId) ?? []).join('')) : null)
       const exitTail = oneShotParsed?.result ? oneShotParsed.result.slice(-4000) : exitTailRaw
       // If a gated engine run hit a rate limit, arm a cooldown so the next gated runs back off.
       if (headlessEngine && exitCode !== 0 && RATE_LIMIT_RE.test(exitTailRaw)) {
@@ -756,6 +702,7 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
             cost_usd: oneShotParsed?.total_cost_usd ?? 0,
             tokens_in: usage?.input_tokens ?? 0,
             tokens_out: usage?.output_tokens ?? 0,
+            tool_uses: streamState?.toolUses ?? 0,
             session_id: null,
             summary: (oneShotParsed?.result ?? '').slice(0, 2000),
             wall_seconds: wallSeconds,
