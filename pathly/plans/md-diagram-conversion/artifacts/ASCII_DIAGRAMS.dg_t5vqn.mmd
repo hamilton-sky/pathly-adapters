@@ -1,0 +1,108 @@
+mindmap
+  root((MD Diagram Conversion))
+    User Stories
+      S-01 Diagram button in header
+      S-02 AI generates diagram source
+      S-03 Sidecar persists across reload
+      S-04 Gallery panel with cards
+      S-05 Mermaid renders as SVG
+      S-06 ASCII renders in pre
+      S-07 PlantUML shows source
+      S-08 Lightbox zoom/pan
+      S-09 Delete a diagram card
+      S-10 Regenerate a diagram card
+      S-11 Panel auto-opens on complete
+      S-12 TypeScript clean
+      S-13 Theme re-render
+    Editor Header
+      Before feature
+        Split + Analyze pills
+      After feature
+        Diagram pill added
+      Pill Segments
+        Run generates diagram
+        Gear opens PromptPeekModal
+        Gallery chip opens panel
+      Pill States
+        idle
+        running spinner
+        done chip
+        error red border
+    Modals
+      PromptPeekModal
+        Renders anywhere
+          Flowchart Mermaid
+          Sequence Mermaid
+          Mindmap Mermaid
+          Architecture Mermaid
+          Boxes ASCII
+        Needs engine
+          UML PlantUML
+      SendPreviewModal
+        Style Engine File summary
+        Prompt preview
+        Cancel or Run
+    Components
+      EditorHeader
+        ActionPill Diagram
+      DiagramGalleryPanel
+        DiagramCard
+          Style badge
+          Thumbnail preview
+          View Regen Delete
+        DiagramRender
+          MermaidView SVG
+          ASCII pre block
+          PlantUML source
+        DiagramLightbox
+          zoom 0.5x to 4x
+          drag to pan
+    File Structure
+      EditorHeader slash
+        diagramPresets.ts
+        editorCli.ts
+        useEditorDiagramAction.ts
+      DiagramGalleryPanel slash
+        diagramSidecar.ts
+        useDiagramSidecar.ts
+        DiagramCard
+        DiagramRender
+        DiagramLightbox
+      store slash uiStore.ts
+    Data Flow
+      User clicks Run
+      Selects preset
+      Confirms spawn
+      PTY opens terminal tab
+      Agent writes sidecar
+      Poll for diagrams.json
+      Gallery auto-opens
+    Sidecar Format
+      version 1
+      source filename
+      diagrams array
+        id dg_XXXXX
+        title and style
+        content source
+        status kept or draft
+        engine and model
+        createdAt ISO-8601
+    State Machine
+      NONE undefined
+      RUNNING spinner Diagramming
+      DONE chip N panel opens
+      ERROR red border toast
+    Mermaid Pipeline
+      lazy import mermaid
+      Read CSS token values
+      Initialize with theme
+      Render to SVG
+      Theme flip re-renders
+    Delivery Milestones
+      Conv 0 Preflight scan
+      Conv 1 State scaffold
+      Conv 2 Sidecar and hook
+      Conv 3 Pill in header
+      Conv 4 Gallery and cards
+      Conv 5 Render and lightbox
+      Conv 6 Polish and verify

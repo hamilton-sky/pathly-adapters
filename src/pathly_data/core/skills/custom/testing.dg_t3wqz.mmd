@@ -1,0 +1,59 @@
+sequenceDiagram
+    participant User
+    participant ChatInput
+    participant useHQ
+    participant chatStore
+    participant llmBridge
+    participant LLM
+    participant launchTerminal
+    participant PTY as Claude Code PTY
+    participant MessageList
+
+    Note over User,MessageList: Conv 1 — Stop Button (LLM mode)
+
+    User->>ChatInput: type message + click Send
+    ChatInput->>useHQ: onSend(prompt)
+    useHQ->>chatStore: setLoading(true)
+    useHQ->>chatStore: addMessage({role:'assistant', status:'streaming'})
+    useHQ->>LLM: askLlm(prompt)
+    LLM-->>useHQ: stream tokens
+    useHQ->>chatStore: updateLastMessage({content})
+    chatStore-->>MessageList: re-render streaming bubble
+
+    alt User clicks Stop
+        User->>ChatInput: click Square icon
+        ChatInput->>useHQ: onStop()
+        useHQ->>llmBridge: abortLlm()
+        llmBridge->>llmBridge: window.pathly.llm.abort()
+        useHQ->>chatStore: updateLastMessage({status:'done'})
+        useHQ->>chatStore: setLoading(false)
+        chatStore-->>MessageList: render partial bubble (done)
+    else Stream completes naturally
+        LLM-->>useHQ: stream end
+        useHQ->>chatStore: updateLastMessage({status:'done'})
+        useHQ->>chatStore: setLoading(false)
+        chatStore-->>MessageList: render complete bubble
+    end
+
+    Note over User,MessageList: Conv 2 — Claude Code Proxy (claude mode)
+
+    User->>ChatInput: switch mode toggle to Claude Code
+    ChatInput->>chatStore: setChatMode('claude')
+
+    User->>ChatInput: type message + click Send
+    ChatInput->>useHQ: onSend(prompt)
+    useHQ->>chatStore: setLoading(true)
+    useHQ->>chatStore: addMessage({role:'assistant', status:'streaming', source:'claude-code'})
+    useHQ->>launchTerminal: writeToTerminal('claude', prompt, projectPath)
+    launchTerminal->>PTY: spawn claude -p prompt
+    PTY-->>launchTerminal: tabId
+    launchTerminal-->>useHQ: tabId
+    useHQ->>PTY: window.pathly.terminal.onData(tabId, cb)
+    PTY-->>useHQ: output lines (streaming)
+    useHQ->>chatStore: appendOutputLine('claude', line)
+    useHQ->>chatStore: updateLastMessage({content})
+    chatStore-->>MessageList: streaming bubble with CC badge
+    PTY-->>useHQ: idle timeout (12 s)
+    useHQ->>chatStore: updateLastMessage({status:'done'})
+    useHQ->>chatStore: setLoading(false)
+    chatStore-->>MessageList: final CC bubble (done)

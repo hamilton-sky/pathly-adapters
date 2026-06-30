@@ -1,0 +1,65 @@
+.card {
+  max-height: 160px;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Soft fade at the clamp edge so a truncated diagram reads as "more below". */
+.card::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 28px;
+  background: linear-gradient(to bottom, transparent, var(--bg-surface0));
+  pointer-events: none;
+}
+
+.full {
+  max-height: none;
+  overflow: visible;
+}
+
+.mono {
+  margin: 0;
+  padding: 12px 14px;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-snug);
+  color: var(--text-secondary);
+  white-space: pre;
+  overflow-x: auto;
+}
+
+.svgHost {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+}
+
+.svgHost svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 80px;
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.notice {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  font-size: var(--font-size-xs);
+  color: var(--yellow);
+  background: var(--badge-integration-bg);
+  border-bottom: var(--border-subtle);
+}

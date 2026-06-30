@@ -1,0 +1,142 @@
+{
+  "version": 1,
+  "source": "pathly/plans/md-diagram-conversion/artifacts/ASCII_DIAGRAMS.md",
+  "diagrams": [
+    {
+      "id": "dg_a9wrx",
+      "title": "End-to-End Component Flow",
+      "style": "mermaid",
+      "content": "flowchart LR\n    User([User]) --> DiagramPill[Diagram Pill]\n    DiagramPill --> PromptPeekModal[PromptPeekModal]\n    PromptPeekModal --> SendPreviewModal[SendPreviewModal]\n    SendPreviewModal --> PTY[PTY Terminal Tab]\n    PTY --> Agent[AI Agent]\n    Agent --> Sidecar[.diagrams.json]\n    Sidecar --> Poll[Poll 5x600ms]\n    Poll --> uiStore[uiStore]\n    uiStore --> GalleryPanel[DiagramGalleryPanel]\n    GalleryPanel --> DiagramCard[DiagramCard]\n    DiagramCard --> DiagramRender[DiagramRender]\n    DiagramRender --> Lightbox[DiagramLightbox]",
+      "status": "kept",
+      "engine": "claude",
+      "model": null,
+      "createdAt": "2026-06-30T00:00:00Z",
+      "layout": {
+        "User": {
+          "x": 48,
+          "y": 48
+        },
+        "DiagramPill": {
+          "x": 48,
+          "y": 200
+        },
+        "PromptPeekModal": {
+          "x": 48,
+          "y": 352
+        },
+        "SendPreviewModal": {
+          "x": 48,
+          "y": 504
+        },
+        "PTY": {
+          "x": 48,
+          "y": 656
+        },
+        "Agent": {
+          "x": 48,
+          "y": 808
+        },
+        "Sidecar": {
+          "x": 48,
+          "y": 960
+        },
+        "Poll": {
+          "x": 48,
+          "y": 1112
+        },
+        "uiStore": {
+          "x": 48,
+          "y": 1264
+        },
+        "GalleryPanel": {
+          "x": 48,
+          "y": 1416
+        },
+        "DiagramCard": {
+          "x": 48,
+          "y": 1568
+        },
+        "DiagramRender": {
+          "x": 48,
+          "y": 1720
+        },
+        "Lightbox": {
+          "x": 48,
+          "y": 1872
+        }
+      }
+    },
+    {
+      "id": "dg_p3lxc",
+      "title": "Mermaid Render Pipeline",
+      "style": "mermaid",
+      "content": "flowchart TD\n    DiagramCard[DiagramCard] --> useEffect[useEffect\\ndeps: content, theme]\n    useEffect -->|already loaded| skipImport[Skip dynamic import]\n    useEffect -->|first call| lazyImport[lazy import mermaid]\n    lazyImport --> getStyle[getComputedStyle\\nCSS tokens]\n    getStyle --> initialize[m.initialize\\ntheme + securityLevel]\n    initialize --> mRender[m.render\\nunique id per call]\n    mRender -->|unmount guard| setSvg[setSvg\\nsanitized SVG]\n    setSvg --> innerHTML[dangerouslySetInnerHTML]\n    mRender -->|error| preFallback[pre fallback\\nerror note]\n    useEffect -->|theme flip| initialize",
+      "status": "kept",
+      "engine": "claude",
+      "model": null,
+      "createdAt": "2026-06-30T10:00:00Z",
+      "layout": {
+        "DiagramCard": {
+          "x": 233,
+          "y": 48
+        },
+        "useEffect": {
+          "x": 233,
+          "y": 200
+        },
+        "skipImport": {
+          "x": 473,
+          "y": 352
+        },
+        "lazyImport": {
+          "x": 233,
+          "y": 352
+        },
+        "getStyle": {
+          "x": 233,
+          "y": 504
+        },
+        "initialize": {
+          "x": 168,
+          "y": 656
+        },
+        "mRender": {
+          "x": 168,
+          "y": 808
+        },
+        "setSvg": {
+          "x": 288,
+          "y": 960
+        },
+        "innerHTML": {
+          "x": 288,
+          "y": 1112
+        },
+        "preFallback": {
+          "x": 48,
+          "y": 960
+        }
+      }
+    },
+    {
+      "id": "dg_b5nqf",
+      "title": "Diagram Pill State Machine",
+      "style": "mermaid",
+      "content": "flowchart TD\n    FileSwitch([file switch]) -->|resets to| NONE\n    NONE[NONE] -->|handleDiagram called| RUNNING\n    RUNNING[\"RUNNING\\nspinner · Diagramming…\"] -->|PTY exit + poll success| DONE\n    RUNNING -->|PTY stop| ERROR\n    RUNNING -->|poll fail / parse fail| ERROR\n    DONE[\"DONE\\n🖼 N chip · panel opens\"] -->|click Run again| RUNNING\n    DONE -->|error| ERROR\n    ERROR[\"ERROR\\nred border · retry toast\"] -->|clearIfStill| NONE",
+      "status": "kept",
+      "engine": "claude",
+      "model": null,
+      "createdAt": "2026-06-30T14:00:00Z"
+    },
+    {
+      "id": "dg_m4k7z",
+      "title": "Feature Topic Mindmap",
+      "style": "mermaid",
+      "content": "mindmap\n  root((md-diagram-conversion))\n    User Stories\n      Diagram pill in header\n      Sidecar persistence\n      Gallery & cards\n      Render mermaid/ascii/plantuml\n      Lightbox zoom/pan\n      Delete & regenerate\n      Auto-open on complete\n      TypeScript clean\n      Theme re-render\n    UI Surfaces\n      Editor Header\n        Split pill\n        Analyze pill\n        Diagram pill\n      Diagram Gallery Panel\n        DiagramCard\n        DiagramRender\n        DiagramLightbox\n      Modals\n        PromptPeekModal\n        SendPreviewModal\n    Diagram Styles\n      Mermaid\n        Flowchart\n        Sequence\n        Mindmap\n        Architecture\n      ASCII boxes\n      PlantUML\n    Architecture\n      Component tree\n      New file structure\n      uiStore state slot\n      mermaid dependency\n    Data & State\n      Sidecar format\n        version/source/diagrams\n        id/title/style/content\n        status/engine/model/createdAt\n      Data flow end-to-end\n      Pill state machine\n        NONE\n        RUNNING\n        DONE\n        ERROR\n      Mermaid render pipeline\n    Delivery\n      Conv 0 Preflight\n      Conv 1 State scaffold\n      Conv 2 Sidecar + hook\n      Conv 3 Pill in header\n      Conv 4 Gallery + cards\n      Conv 5 Render + lightbox\n      Conv 6 Polish + verify",
+      "status": "kept",
+      "engine": "claude",
+      "model": null,
+      "createdAt": "2026-06-30T18:00:00Z"
+    }
+  ]
+}

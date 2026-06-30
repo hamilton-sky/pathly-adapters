@@ -1,0 +1,127 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.frame {
+  display: flex;
+  flex-direction: column;
+  width: min(1000px, 90vw);
+  height: min(720px, 86vh);
+  background: var(--bg-surface0);
+  border: var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-modal);
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 44px;
+  padding: 0 14px;
+  border-bottom: var(--border);
+  background: var(--bg-mantle);
+  flex-shrink: 0;
+}
+
+.title {
+  flex: 1;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-normal);
+  color: var(--text-muted);
+}
+
+.reset {
+  background: transparent;
+  border: var(--border);
+  border-radius: var(--radius-md);
+  padding: 4px 9px;
+  font-size: var(--font-size-sm);
+  font-family: var(--font-family-base);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.reset:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.close {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.close:hover {
+  background: var(--bg-surface0);
+  color: var(--red);
+}
+
+.viewport {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(var(--border-subtle-color) 1px, transparent 1px) 0 0 / 22px 22px,
+    var(--bg-base);
+  cursor: grab;
+  touch-action: none;
+}
+
+.viewport:active {
+  cursor: grabbing;
+}
+
+.stage {
+  transform-origin: center center;
+  transition: transform 60ms linear;
+  will-change: transform;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 8px 14px;
+  border-top: var(--border-subtle);
+  background: var(--bg-mantle);
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.zoomReadout {
+  margin-left: auto;
+  font-family: var(--font-family-mono);
+  color: var(--text-secondary);
+}

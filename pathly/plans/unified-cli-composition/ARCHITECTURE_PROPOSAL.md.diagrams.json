@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "source": "pathly/plans/unified-cli-composition/ARCHITECTURE_PROPOSAL.md",
+  "diagrams": [
+    {
+      "id": "dg_xkp72",
+      "title": "Unified CLI Composition — Component Flow",
+      "style": "mermaid",
+      "content": "flowchart LR\n    Renderer[\"skillCompose.ts\\n(Renderer)\"] -->|POST /skills/compose| Endpoint[\"editor_render.py\"]\n    GoalRun[\"goal_run.py\\n(Decompose)\"] -->|Gate 2: in-process| ComposeSkill\n    Endpoint --> ComposeSkill[\"compose_skill()\\ncompose.py\"]\n    ComposeSkill --> BuildCaps[\"build_adapter_caps()\"]\n    BuildCaps --> Manifest[\"composition.yaml\\n(manifest)\"]\n    Manifest --> LiveFrags[\"Live Fragments\\nclient-file-output · artifact-transform · comms-post\"]\n    Manifest -->|requires: goal_id| Gate2A[\"board-start-context.md\\n(Gate 2)\"]\n    Manifest -->|requires: goal_id| Gate2B[\"task-dag-post.md\\n(Gate 2)\"]\n    LiveFrags --> CLI[\"CLI Engine\\n(headless spawn)\"]\n    Gate2A --> CLI\n    Gate2B --> CLI\n    CLI --> AgentDone[\"AGENT_DONE.summary\"]\n    AgentDone --> GoalRun\n    AgentDone -->|task IDs| Board[\"/comms/tasks\\n(board)\"]\n    CLI -->|ERROR: file| ActionPill[\"ActionPill\\n(error path)\"]",
+      "status": "kept",
+      "engine": "mermaid",
+      "model": null,
+      "createdAt": "2026-06-30T00:00:00Z"
+    },
+    {
+      "id": "dg_m4w9z",
+      "title": "Gate 2 Build Sequence",
+      "style": "mermaid",
+      "content": "flowchart TD\n    ErrorUI[\"1. Error Normalization UI\\nActionPill / RunPill error path\"]\n    BoardCtx[\"2. board-start-context.md\\nfragment\"]\n    TaskDAG[\"3. task-dag-post.md\\nfragment\"]\n    ManifestEntry[\"4. composition.yaml\\nplanning/plan entry\"]\n    Decompose[\"5. Decompose conversion\\ngoal_run.py → compose_skill()\"]\n    CapsHelper[\"6. build_adapter_caps()\\nhelper extraction\"]\n    Gate2Done[\"Gate 2 Done\\n7 acceptance criteria met\"]\n\n    ErrorUI --> BoardCtx\n    ErrorUI --> TaskDAG\n    BoardCtx --> ManifestEntry\n    TaskDAG --> ManifestEntry\n    ManifestEntry --> Decompose\n    Decompose --> CapsHelper\n    CapsHelper --> Gate2Done",
+      "status": "kept",
+      "engine": "mermaid",
+      "model": null,
+      "createdAt": "2026-06-30T00:00:00Z"
+    }
+  ]
+}

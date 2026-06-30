@@ -1,0 +1,125 @@
+.card {
+  background: var(--bg-surface0);
+  border: var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: border-color var(--transition-fast);
+}
+
+.card:hover {
+  border-color: var(--accent-border);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: var(--border-subtle);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  text-transform: lowercase;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+}
+
+.status {
+  font-size: var(--font-size-xs);
+  color: var(--green);
+  background: var(--badge-core-bg);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+}
+
+.spacer {
+  flex: 1;
+}
+
+.meta {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+}
+
+.render {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: var(--bg-surface0);
+  cursor: zoom-in;
+  text-align: left;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-top: var(--border-subtle);
+}
+
+.viewBtn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  background: transparent;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-md);
+  padding: 5px 9px;
+  font-size: var(--font-size-sm);
+  font-family: var(--font-family-base);
+  color: var(--accent);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.viewBtn:hover {
+  background: var(--accent-bg);
+}
+
+.iconBtn,
+.deleteBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  border: var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.iconBtn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.iconBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.deleteBtn {
+  color: var(--text-muted);
+}
+
+.deleteBtn:hover {
+  color: var(--red);
+  border-color: var(--red);
+}

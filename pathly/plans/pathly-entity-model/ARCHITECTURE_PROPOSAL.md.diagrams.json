@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "source": "pathly/plans/pathly-entity-model/ARCHITECTURE_PROPOSAL.md",
+  "diagrams": [
+    {
+      "id": "dg_k7m2p",
+      "title": "Entity Model & Artifact Contract — Component Flow",
+      "style": "mermaid",
+      "content": "flowchart LR\n    goalRow[\"Goal DB Row\\ngoal_id + scope\"]\n    ensureSlug[\"ensure_goal_slug\\nslug.py\"]\n    safeTopic[\"_safe_topic guard\\nfsm_ops.py\"]\n    resolvePath[\"_resolve_storage_path\"]\n    goalsDir[\"pathly/goals/slug/\\nnew\"]\n    plansDir[\"pathly/plans/slug/\\nexisting\"]\n    terminalPY[\"terminal.py\\nstorage_path\"]\n    artifactManifest[\"artifact-manifest.yaml\"]\n    dagSketch[\"planning/dag-sketch\\nskill\"]\n    artifactReg[\"artifact-register.md\\nfragment\"]\n    ensureAttached[\"ensure_attached\\nreconciler\"]\n    commsArtifacts[\"comms_artifacts DB\"]\n    CardSidebar[\"CardSidebar\\nStudio\"]\n\n    goalRow --> ensureSlug\n    ensureSlug --> safeTopic\n    safeTopic --> resolvePath\n    resolvePath --> goalsDir\n    resolvePath --> plansDir\n    goalsDir --> terminalPY\n    plansDir --> terminalPY\n    artifactManifest --> artifactReg\n    artifactManifest --> dagSketch\n    terminalPY --> artifactReg\n    artifactReg --> ensureAttached\n    dagSketch --> ensureAttached\n    ensureAttached --> commsArtifacts\n    commsArtifacts --> CardSidebar",
+      "status": "kept",
+      "engine": "mermaid",
+      "model": null,
+      "createdAt": "2026-06-30T00:00:00.000Z",
+      "layout": {
+        "goalRow": {
+          "x": 947,
+          "y": -357
+        },
+        "ensureSlug": {
+          "x": 947,
+          "y": -263
+        },
+        "safeTopic": {
+          "x": 948,
+          "y": -180
+        },
+        "resolvePath": {
+          "x": 949,
+          "y": -72
+        },
+        "goalsDir": {
+          "x": 1070,
+          "y": 17
+        },
+        "plansDir": {
+          "x": 801,
+          "y": 19
+        },
+        "terminalPY": {
+          "x": 942,
+          "y": 107
+        },
+        "artifactManifest": {
+          "x": 1164,
+          "y": 109
+        },
+        "dagSketch": {
+          "x": 1157,
+          "y": 199
+        },
+        "artifactReg": {
+          "x": 942,
+          "y": 196
+        },
+        "ensureAttached": {
+          "x": 1047,
+          "y": 320
+        },
+        "commsArtifacts": {
+          "x": 1042,
+          "y": 393
+        },
+        "CardSidebar": {
+          "x": 1045,
+          "y": 479
+        }
+      }
+    }
+  ]
+}

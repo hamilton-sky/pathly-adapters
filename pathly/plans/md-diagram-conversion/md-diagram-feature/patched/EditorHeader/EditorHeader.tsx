@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { useToastStore } from '../../../store/toastStore'
 import {
   ArrowLeft, Undo2, Redo2, Database, FileCode, BookOpen,
@@ -172,53 +172,17 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
   const diagramProgress = useElapsedProgress(diagramState === 'running' ? diagramStartedAt : undefined)
 
   const headerRef = useRef<HTMLDivElement>(null)
-  // Responsive collapse tier: 0 = full labels · 1 = AI pills + Visual/Source + Split-cells drop to
-  // icons (Save & Export keep labels) · 2 = icon-only everything.
-  //
-  // Driven by ACTUAL overflow, with HYSTERESIS so it can't flicker icons↔labels while the panel is
-  // dragged near the boundary. The trap to avoid: measuring scrollWidth at the CURRENT tier flips
-  // the decision every ResizeObserver tick (tier 0 overflows → collapse; tier 1 fits → expand → …).
-  // Instead we LEARN the natural fully-labeled width once (measured at tier 0, where the pills +
-  // result chips are expanded) and only expand back once there's a clear margin over it — so the
-  // decision no longer depends on the current tier.
-  const naturalWidthRef = useRef(0)
-  const tierRef = useRef(0)
-  const [tier, setTier] = useState(0)
-
-  const measureTier = useCallback((): void => {
-    const node = headerRef.current
-    if (!node) return
-    const avail = node.clientWidth
-    const cur = tierRef.current
-    // Only tier 0 shows every label, so its overflow reveals the true natural width.
-    if (cur === 0 && node.scrollWidth > avail + 1) naturalWidthRef.current = node.scrollWidth
-    const need = naturalWidthRef.current
-    let next = cur
-    if (avail < 640) next = 2
-    else if (!need || avail >= need + 24) next = 0            // never overflowed, or clear room → labels
-    else if (cur === 0 ? node.scrollWidth > avail + 1 : true) next = 1  // collapse on overflow; stay collapsed in the gap
-    if (next !== cur) { tierRef.current = next; setTier(next) }
-  }, [])
+  const [isCompact, setIsCompact] = useState(false)
 
   useEffect(() => {
     const el = headerRef.current
     if (!el) return
-    measureTier()
-    const obs = new ResizeObserver(() => measureTier())
+    const obs = new ResizeObserver(entries => {
+      setIsCompact(entries[0].contentRect.width < 760)
+    })
     obs.observe(el)
     return () => obs.disconnect()
-  }, [measureTier])
-
-  // The toolbar's own width changes when result chips appear/disappear, the view toggles, or a
-  // preset label length changes — re-learn the natural width from a clean tier-0 state so a stale
-  // measurement can't leave it collapsed (or expanded) when the content no longer matches.
-  useEffect(() => {
-    naturalWidthRef.current = 0
-    tierRef.current = 0
-    setTier(0)
-    const id = requestAnimationFrame(() => measureTier())
-    return () => cancelAnimationFrame(id)
-  }, [measureTier, mdEditorSplitDraftPath, mdEditorAnalysisPath, mdEditorDiagramPath, viewMode, splitTitle, analyzeTitle, diagramTitle])
+  }, [])
 
   const canUndo = viewMode === 'cells' ? historyIndex > 0            : true
   const canRedo = viewMode === 'cells' ? historyIndex < history.length - 1 : true
@@ -290,7 +254,7 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
   }
 
   return (
-    <div ref={headerRef} className={styles.headerRoot} data-tier={tier}>
+    <div ref={headerRef} className={styles.headerRoot} data-compact={isCompact}>
       <button
         type="button"
         className={styles.backBtn}
@@ -315,7 +279,7 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
             type="button"
             className={styles.viewToggleBtn}
             data-active={viewMode === 'cells'}
-            {...(viewMode === 'cells' ? { 'aria-pressed': 'true' } : { 'aria-pressed': 'false' })}
+            aria-pressed={viewMode === 'cells'}
             onClick={() => viewMode !== 'cells' && onToggleViewMode()}
           >
             <BookOpen size={13} />
@@ -327,7 +291,7 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
             type="button"
             className={styles.viewToggleBtn}
             data-active={viewMode === 'editor'}
-            {...(viewMode === 'editor' ? { 'aria-pressed': 'true' } : { 'aria-pressed': 'false' })}
+            aria-pressed={viewMode === 'editor'}
             onClick={() => viewMode !== 'editor' && onToggleViewMode()}
           >
             <FileCode size={13} />
@@ -395,7 +359,7 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
           : 'No split draft yet — run AI Split to generate one'}
         onOpenResult={handleReviewDraft}
         tone="green"
-        compact={tier >= 1}
+        compact={isCompact}
       />
       {splitPeekOpen && mdEditorPath && (
         <PromptPeekModal
@@ -439,7 +403,7 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
         }
         onOpenResult={() => setMdEditorAnalysisPanelOpen(!mdEditorAnalysisPanelOpen)}
         tone="amber"
-        compact={tier >= 1}
+        compact={isCompact}
       />
       {analyzePeekOpen && mdEditorPath && (
         <PromptPeekModal
@@ -483,7 +447,7 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
         }
         onOpenResult={() => setMdEditorDiagramPanelOpen(!mdEditorDiagramPanelOpen)}
         tone="green"
-        compact={tier >= 1}
+        compact={isCompact}
       />
       {diagramPeekOpen && mdEditorPath && (
         <PromptPeekModal
@@ -541,7 +505,7 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
         isSkillOrAgent={isSkillOrAgent}
         installState={exportState}
         onInstallSkill={handleExport}
-        compact={tier >= 2}
+        compact={isCompact}
       />
 
       {/* Deterministic "Split into cells" — parses the open file into editable cells. */}

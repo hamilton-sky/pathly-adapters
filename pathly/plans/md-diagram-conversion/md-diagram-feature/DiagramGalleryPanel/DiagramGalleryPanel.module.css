@@ -1,0 +1,111 @@
+/* Shape + chrome mirror AnalysisPanel.module.css so the two right-docked panels
+   are visually interchangeable. */
+
+.panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 380px;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-base);
+  border-left: var(--border);
+  z-index: 20;
+  box-shadow: -4px 0 20px rgba(0, 0, 0, 0.25);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 14px;
+  border-bottom: var(--border);
+  flex-shrink: 0;
+  background: var(--bg-mantle);
+}
+
+.title {
+  flex: 1;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  letter-spacing: 0.02em;
+}
+
+.newBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: transparent;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-md);
+  padding: 4px 9px;
+  font-size: var(--font-size-sm);
+  font-family: var(--font-family-base);
+  color: var(--accent);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.newBtn:hover {
+  background: var(--accent-bg);
+}
+
+.closeBtn {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.closeBtn:hover {
+  background: var(--bg-surface0);
+  color: var(--red);
+}
+
+.body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding-top: 48px;
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.emptyCta {
+  background: transparent;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-md);
+  padding: 5px 12px;
+  font-size: var(--font-size-sm);
+  font-family: var(--font-family-base);
+  color: var(--accent);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.emptyCta:hover {
+  background: var(--accent-bg);
+}
