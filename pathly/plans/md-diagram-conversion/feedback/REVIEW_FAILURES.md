@@ -97,3 +97,17 @@ will FAIL in Phase 8; either relax S-07 to match FEATURE_INDEX, or update the no
   schema-underspecification gap flagged in `ARCHITECTURE_PROPOSAL.md.analysis`.
 - **Header wiring:** 3rd `ActionPill` + `pendingRun.kind:'diagram'` → `SendPreviewModal` → `handleDiagram`;
   `PromptPeekModal` via `DIAGRAM_PRESETS`; CLI/preset persisted to localStorage. Complete.
+
+---
+
+## Resolution status (updated 2026-06-30)
+
+| # | Sev | Status |
+|---|---|---|
+| R1 | MED | ✅ Resolved — badge uses `data-style={entry.style}` + `.badge[data-style=…]` hue rules in `DiagramCard.module.css`; dot inherits via `currentColor`; `STYLE_COLOR_VAR` removed from `diagramTypes.ts`. No inline style. |
+| R2 | LOW-MED | ✅ Resolved — pan/zoom via `--tx/--ty/--zoom` custom properties (lightbox UX pass). |
+| R3 | LOW-MED | ⏳ Open — PlantUML notice wording is a product decision (S-07 exact text vs FEATURE_INDEX D6). |
+| R4 | LOW | ◻ Advisory — file lengths (`useEditorDiagramAction.ts` ~174; `EditorHeader.tsx` ~550). Follow-up split. |
+| R5 | LOW | ✅ Resolved — dangling `STORE_PATCH.md` reference removed from `useEditorDiagramAction.ts` header. |
+| R6 | ADV | ⏳ Open — Diagram prompts bypass fragment composition; adjudicate vs Split/Analyze. |
+| R7 | ADV | ◻ Advisory — `MermaidView.tsx` folder-convention nit. |

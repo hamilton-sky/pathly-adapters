@@ -27,10 +27,22 @@
   text-transform: lowercase;
 }
 
+/* Per-style hue (was an inline style prop). The dot inherits via currentColor. */
+.badge[data-style='mermaid'] {
+  color: var(--blue);
+}
+.badge[data-style='ascii'] {
+  color: var(--yellow);
+}
+.badge[data-style='plantuml'] {
+  color: var(--purple);
+}
+
 .dot {
   width: 6px;
   height: 6px;
   border-radius: var(--radius-full);
+  background: currentColor;
 }
 
 .status {

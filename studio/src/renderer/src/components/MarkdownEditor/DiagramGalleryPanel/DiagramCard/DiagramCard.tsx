@@ -5,7 +5,7 @@
 
 import React from 'react'
 import { Eye, RefreshCw, Trash2 } from 'lucide-react'
-import { type DiagramEntry, STYLE_COLOR_VAR } from '../../diagramTypes'
+import type { DiagramEntry } from '../../diagramTypes'
 import DiagramRender from '../DiagramRender/DiagramRender'
 import styles from './DiagramCard.module.css'
 
@@ -25,13 +25,11 @@ function formatDate(iso: string): string {
 }
 
 export default function DiagramCard({ entry, onView, onRegenerate, onDelete, busy }: Props) {
-  const styleColor = STYLE_COLOR_VAR[entry.style]
-
   return (
     <div className={styles.card}>
       <div className={styles.head}>
-        <span className={styles.badge} style={{ color: styleColor }}>
-          <span className={styles.dot} style={{ background: styleColor }} />
+        <span className={styles.badge} data-style={entry.style}>
+          <span className={styles.dot} />
           {entry.style}
         </span>
         {entry.status === 'kept' && <span className={styles.status}>ok</span>}

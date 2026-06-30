@@ -34,10 +34,3 @@ export const SIDECAR_SUFFIX = '.diagrams.json'
 export function sidecarPathFor(filePath: string): string {
   return filePath + SIDECAR_SUFFIX
 }
-
-/** Pipeline-state colour token per render style (matches tokens.css signal hues). */
-export const STYLE_COLOR_VAR: Record<DiagramStyle, string> = {
-  mermaid: 'var(--blue)',
-  ascii: 'var(--yellow)',
-  plantuml: 'var(--purple)',
-}

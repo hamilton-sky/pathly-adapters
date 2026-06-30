@@ -2,11 +2,9 @@
 // useEditorAgentActions.ts. It launches the agent in a terminal tab, polls the
 // sidecar until it parses with >= 1 diagram, then opens the gallery panel.
 //
-// Path assumes: src/components/MarkdownEditor/EditorHeader/hooks/useEditorDiagramAction.ts
-//
-// REQUIRES the uiStore additions documented in ../../DiagramGalleryPanel/STORE_PATCH.md:
-//   - 'diagram' added to the MdEditorActionRecord + setMdEditorAction action union
-//   - setMdEditorDiagramPath(path, forFile) + mdEditorDiagramPanelOpen + selectMdEditorDiagram
+// Relies on the uiStore 'diagram' additions (store/uiStore.ts): the MdEditorActionRecord +
+// setMdEditorAction action union, setMdEditorDiagramPath(path, forFile),
+// mdEditorDiagramPanelOpen, and selectMdEditorDiagram.
 
 import { useCallback, useEffect } from 'react'
 import { useTerminalStore } from '../../../../store/terminalStore'
