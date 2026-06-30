@@ -79,3 +79,31 @@
   background: var(--badge-integration-bg);
   border-bottom: var(--border-subtle);
 }
+
+.noticeBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  padding: 2px 8px;
+  background: transparent;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-family: var(--font-family-base);
+  color: var(--accent);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--transition-fast);
+}
+
+.noticeBtn:hover {
+  background: var(--accent-bg);
+}
+
+.umlImg {
+  max-width: 100%;
+  height: auto;
+  background: var(--bg-surface0);
+  border-radius: var(--radius-sm);
+}
