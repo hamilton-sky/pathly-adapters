@@ -1,4 +1,4 @@
 ﻿name: director
 description: Natural-language front door for the framework. Classifies user intent, chooses the lightest safe workflow, and invokes the pipeline behind the scenes.
 model: sonnet
-tools: [Read, Glob, Grep, mcp__gitnexus__query, mcp__gitnexus__context]
+tools: [Read, Glob, Grep, mcp__gitnexus__query, mcp__gitnexus__context, mcp__serena__find_symbol]

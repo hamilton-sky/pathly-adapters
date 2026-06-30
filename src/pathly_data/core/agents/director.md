@@ -74,9 +74,12 @@ Otherwise, choose conservatively and proceed.
 Do not expose internal workflow mechanics unless something blocks and the user needs to act.
 
 ## Code intelligence — preferred tools, Grep/Read fallback
-Prefer GitNexus tools when available for quick structural lookups:
-- Symbol lookup  -> mcp__gitnexus__query or mcp__gitnexus__context  (fallback: Grep or Read)
-If GitNexus tools are not available, proceed with Grep and Read as normal.
+
+Prefer semantic tools when available for quick structural lookups:
+- Symbol lookup   -> mcp__serena__find_symbol or mcp__gitnexus__query   (fallback: Grep or Read)
+- Callers / refs  -> mcp__serena__find_referencing_symbols or mcp__gitnexus__context
+After code has been edited, prefer LSP (Serena) — it is always fresh.
+If neither is available, proceed with Grep and Read as normal.
 
 ## Boundaries
 

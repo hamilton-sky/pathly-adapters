@@ -134,13 +134,19 @@ spawn scout:
 - **No direct reads while scouts are active.** Investigation belongs to scouts. The explorer's gap reads (up to 5 files) happen only after all scout findings are returned.
 
 ## Code intelligence — preferred tools, Grep/Read fallback
-When GitNexus MCP tools are available, prefer them over Read/Grep for:
-- Symbol and pattern search        -> mcp__gitnexus__query
-- Understanding a function         -> mcp__gitnexus__context
-- Tracing execution paths          -> mcp__gitnexus__trace
-- Assessing blast radius of change -> mcp__gitnexus__impact   (only explorer uses this)
-Scouts spawned by explorer inherit this preference automatically via their own prompts.
-If GitNexus tools are not available, proceed with Glob, Grep, Read as normal.
+
+Prefer semantic code tools over native Grep/Read when available.
+LSP (Serena) — precise, always fresh; best for a specific symbol:
+- Find a symbol / its definition   -> mcp__serena__find_symbol
+- Outline a file's symbols         -> mcp__serena__get_symbols_overview
+- Who calls / references a symbol  -> mcp__serena__find_referencing_symbols
+GitNexus — graph-wide; best for whole-repo call chains + blast radius:
+- Find a symbol or pattern         -> mcp__gitnexus__query
+- Understand callers / callees     -> mcp__gitnexus__context
+- Trace an execution path          -> mcp__gitnexus__trace
+- Blast radius of a change         -> mcp__gitnexus__impact
+After code has been edited, prefer LSP over GitNexus (LSP is always fresh).
+If neither toolset is available, proceed with Grep and Read as normal.
 
 ---
 

@@ -98,11 +98,18 @@ If you cannot determine the attempt number, use the current timestamp instead.
 This archive is never read by the FSM — it is a permanent record for humans.
 
 ## Code intelligence — preferred tools, Grep/Read fallback
-When GitNexus MCP tools are available, prefer them over native tools:
-- Find a symbol or pattern      -> mcp__gitnexus__query    (fallback: Grep)
-- Understand callers / callees  -> mcp__gitnexus__context  (fallback: Read + Grep)
-- Trace an execution path       -> mcp__gitnexus__trace    (fallback: Read chains)
-If GitNexus tools are not available, proceed with Grep and Read as normal.
+
+Prefer semantic code tools over native Grep/Read when available.
+LSP (Serena) — precise, always fresh:
+- Find a symbol / its definition   -> mcp__serena__find_symbol
+- Outline a file's symbols         -> mcp__serena__get_symbols_overview
+- Who calls / references a symbol  -> mcp__serena__find_referencing_symbols
+GitNexus — graph-wide call chains:
+- Find a symbol or pattern         -> mcp__gitnexus__query
+- Understand callers / callees     -> mcp__gitnexus__context
+- Trace an execution path          -> mcp__gitnexus__trace
+After code has been edited, prefer LSP over GitNexus (LSP is always fresh).
+If neither toolset is available, proceed with Grep and Read as normal.
 
 ## Rigor contract
 | Rigor | Coverage | Edge cases | Regression |

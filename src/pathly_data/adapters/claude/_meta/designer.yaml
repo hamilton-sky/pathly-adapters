@@ -1,5 +1,5 @@
 name: designer
 description: UI/UX design intelligence agent. Generates design systems (style, palette, typography, UX rules) using UI UX Pro Max, writes DESIGN.md and DESIGN_REVIEW.md. Spawned for design system generation, UI review, component specs, and accessibility audits.
 model: sonnet
-tools: [Read, Glob, Grep, Write, Bash, mcp__gitnexus__query, mcp__gitnexus__context]
+tools: [Read, Glob, Grep, Write, Bash, mcp__gitnexus__query, mcp__gitnexus__context, mcp__serena__find_symbol]
 can_spawn: [quick]
