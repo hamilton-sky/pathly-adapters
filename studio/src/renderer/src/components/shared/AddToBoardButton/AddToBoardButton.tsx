@@ -3,7 +3,7 @@
 // the caller (Suggested · derived, Global, Project, each feature) so this stays presentational.
 
 import React, { useState } from 'react'
-import { LayoutDashboard, Check } from 'lucide-react'
+import { LayoutDashboard } from 'lucide-react'
 import BoardTargetMenu from './BoardTargetMenu'
 import s from './AddToBoardButton.module.css'
 
@@ -38,7 +38,9 @@ export default function AddToBoardButton({ onBoard, targets, onPick, label, disa
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
 
   function open(e: React.MouseEvent<HTMLButtonElement>): void {
-    if (onBoard || disabled) return
+    // Adding is a COPY — a diagram can live on several boards, so being on one board never
+    // locks the button; only an in-flight post (`disabled`) blocks it.
+    if (disabled) return
     const r = e.currentTarget.getBoundingClientRect()
     // Estimate the menu height (title + scopes + capped feature scroll) to decide flip + clamp.
     const featureCount = targets.filter((t) => t.target.board === 'feature').length
@@ -57,12 +59,12 @@ export default function AddToBoardButton({ onBoard, targets, onPick, label, disa
         data-on-board={onBoard ? 'true' : 'false'}
         {...(label ? { 'data-labeled': 'true' } : {})}
         onClick={open}
-        disabled={onBoard || disabled}
-        aria-label={onBoard ? 'On board' : 'Add to board'}
-        title={onBoard ? 'On board' : 'Add to board'}
+        disabled={disabled}
+        aria-label={onBoard ? 'On a board — add to another board' : 'Add to board'}
+        title={onBoard ? 'On a board — add to another board' : 'Add to board'}
         {...(menu ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
       >
-        {onBoard ? <Check size={12} /> : <LayoutDashboard size={12} />}
+        <LayoutDashboard size={12} />
         {label && <span>{label}</span>}
       </button>
       {menu && (

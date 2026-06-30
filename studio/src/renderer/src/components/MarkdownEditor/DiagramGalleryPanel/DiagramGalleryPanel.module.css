@@ -28,10 +28,28 @@
 
 .title {
   flex: 1;
+  display: inline-flex;
+  align-items: center;
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
   color: var(--text-primary);
   letter-spacing: 0.02em;
+}
+
+/* Count badge — how many diagrams the file has. */
+.count {
+  margin-left: 6px;
+  min-width: 18px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  background: var(--bg-surface1);
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0;
 }
 
 .newBtn {

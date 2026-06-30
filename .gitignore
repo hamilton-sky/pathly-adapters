@@ -31,3 +31,5 @@ pathly/plans/**/EVENTS.jsonl
 *.summary
 *.md.draft
 *.md.analysis
+# Board artifact copies — duplicates of plan diagrams, written on "Add to board"
+pathly/board-artifacts/

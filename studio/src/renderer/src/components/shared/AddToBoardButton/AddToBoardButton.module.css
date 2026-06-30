@@ -35,9 +35,14 @@
   opacity: 0.6;
 }
 
-/* On board — green, non-interactive. Last so it wins over :hover (equal specificity). */
+/* On a board — green tint as an "already added" hint, but STILL interactive: a diagram is a
+   copy and can be added to other boards too. Declared after :hover so the tint wins at rest. */
 .btn[data-on-board='true'] {
   color: var(--green);
   border-color: var(--green);
-  cursor: default;
+}
+
+.btn[data-on-board='true']:hover {
+  color: var(--accent);
+  border-color: var(--accent);
 }

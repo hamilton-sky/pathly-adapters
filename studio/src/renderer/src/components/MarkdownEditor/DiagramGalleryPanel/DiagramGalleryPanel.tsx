@@ -74,7 +74,10 @@ export default function DiagramGalleryPanel({ onNew, onRegenerate, busy }: Props
   return (
     <div className={styles.panel}>
       <div className={styles.header}>
-        <span className={styles.title}>Diagrams</span>
+        <span className={styles.title}>
+          Diagrams
+          {diagrams.length > 0 && <span className={styles.count}>{diagrams.length}</span>}
+        </span>
         <ActionPill
           state={diagState === 'success' ? 'done' : diagState}
           progress={progress}
