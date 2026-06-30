@@ -21,6 +21,16 @@
   overflow: hidden;
 }
 
+.frame[data-size='large'] {
+  width: min(1400px, 95vw);
+  height: min(940px, 92vh);
+}
+
+.frame[data-size='full'] {
+  width: 98vw;
+  height: 96vh;
+}
+
 .header {
   display: flex;
   align-items: center;
@@ -70,6 +80,26 @@
 .back:hover {
   color: var(--accent);
   border-color: var(--accent);
+}
+
+.size {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.size:hover {
+  background: var(--bg-surface0);
+  color: var(--accent);
 }
 
 .close {

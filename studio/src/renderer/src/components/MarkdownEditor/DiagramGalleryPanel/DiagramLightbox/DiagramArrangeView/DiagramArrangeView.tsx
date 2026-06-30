@@ -1,9 +1,10 @@
 // Interactive "Arrange" canvas for flowchart/graph Mermaid diagrams: parses the source
 // into nodes/edges, dagre-lays them out (or restores a saved layout), and renders a
-// draggable React Flow canvas. Reuses Studio's FlowEditor dagre helper. "Save layout"
-// persists node positions back to the .diagrams.json sidecar.
+// draggable React Flow canvas. Reuses Studio's FlowEditor dagre helper. A small toolbar
+// re-runs the layout in a chosen direction (TB/LR); "Save layout" persists node positions
+// back to the .diagrams.json sidecar.
 
-import React, { useCallback, useMemo } from 'react'
+import React, { useCallback, useMemo, useState } from 'react'
 import ReactFlow, {
   Background,
   BackgroundVariant,
@@ -13,6 +14,7 @@ import ReactFlow, {
   useEdgesState,
 } from 'reactflow'
 import type { Node, Edge } from 'reactflow'
+import { RefreshCw } from 'lucide-react'
 import 'reactflow/dist/style.css'
 import { applyDagreLayout } from '../../../../FlowEditor/utils/autoLayout'
 import { parseMermaidFlow } from './mermaidFlow'
@@ -62,11 +64,20 @@ export default function DiagramArrangeView({ content, savedLayout, onSaveLayout 
       savedLayout && rfNodes.every((n) => savedLayout[n.id])
         ? rfNodes.map((n) => ({ ...n, position: savedLayout[n.id] }))
         : applyDagreLayout(rfNodes, rfEdges, g.direction)
-    return { nodes: positioned, edges: rfEdges, count: g.nodes.length }
+    return { nodes: positioned, edges: rfEdges, count: g.nodes.length, direction: g.direction }
   }, [content, savedLayout])
 
-  const [nodes, , onNodesChange] = useNodesState(initial.nodes)
+  const [nodes, setNodes, onNodesChange] = useNodesState(initial.nodes)
   const [edges, , onEdgesChange] = useEdgesState(initial.edges)
+  const [dir, setDir] = useState<'TB' | 'LR'>(initial.direction)
+
+  const relayout = useCallback(
+    (d: 'TB' | 'LR') => {
+      setDir(d)
+      setNodes((nds) => applyDagreLayout(nds, edges, d))
+    },
+    [edges, setNodes],
+  )
 
   const save = useCallback(() => {
     const layout: Layout = {}
@@ -82,6 +93,35 @@ export default function DiagramArrangeView({ content, savedLayout, onSaveLayout 
 
   return (
     <div className={styles.wrap}>
+      <div className={styles.toolbar}>
+        <button
+          type="button"
+          className={styles.dirBtn}
+          data-active={dir === 'TB' ? 'true' : 'false'}
+          onClick={() => relayout('TB')}
+          title="Top-to-bottom layout"
+        >
+          TB
+        </button>
+        <button
+          type="button"
+          className={styles.dirBtn}
+          data-active={dir === 'LR' ? 'true' : 'false'}
+          onClick={() => relayout('LR')}
+          title="Left-to-right layout"
+        >
+          LR
+        </button>
+        <button
+          type="button"
+          className={styles.dirBtn}
+          onClick={() => relayout(dir)}
+          title="Re-run auto-layout"
+          aria-label="Re-run auto-layout"
+        >
+          <RefreshCw size={12} />
+        </button>
+      </div>
       <ReactFlow
         nodes={nodes}
         edges={edges}
