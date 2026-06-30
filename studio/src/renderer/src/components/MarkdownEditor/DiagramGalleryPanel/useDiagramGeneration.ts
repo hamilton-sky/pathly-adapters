@@ -76,7 +76,7 @@ export function useDiagramGeneration(mdEditorPath: string | null) {
   const addToBoard = useCallback(
     async (entry: DiagramEntry, target?: BoardTarget): Promise<boolean> => {
       if (!mdEditorPath) return false
-      const id = await addDiagramToBoard(mdEditorPath, entry, target)
+      const id = await addDiagramToBoard(mdEditorPath, entry, target, projectPath)
       if (id) {
         await markDiagramOnBoard(mdEditorPath, entry.id, { id, at: new Date().toISOString() })
         useToastStore
@@ -87,7 +87,7 @@ export function useDiagramGeneration(mdEditorPath: string | null) {
       useToastStore.getState().push('Could not add to board', 'error', { category: 'agent_done' })
       return false
     },
-    [mdEditorPath],
+    [mdEditorPath, projectPath],
   )
 
   const changeCli = useCallback((c: EditorCli) => {

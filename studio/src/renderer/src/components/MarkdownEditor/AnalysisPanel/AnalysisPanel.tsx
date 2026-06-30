@@ -1,9 +1,13 @@
-import React, { useEffect, useState } from 'react'
-import { X, RefreshCw, FileCode, Trash2, LayoutDashboard } from 'lucide-react'
+import React, { useEffect, useMemo, useState } from 'react'
+import { X, RefreshCw, FileCode, Trash2 } from 'lucide-react'
 import { useUiStore, selectMdEditorAnalysisPath } from '../../../store/uiStore'
 import { useToastStore } from '../../../store/toastStore'
+import { useCommsStore } from '../../../store/commsStore'
+import { useProjectStore } from '../../../store/projectStore'
 import { MarkdownPreview } from '../../Editor/MarkdownPreview'
-import { publishArtifactToBoard } from '../boardArtifacts'
+import { publishArtifactToBoard, boardArtifactPath } from '../boardArtifacts'
+import { buildBoardTargets } from '../boardTargets'
+import AddToBoardButton, { type BoardTarget } from '../../shared/AddToBoardButton/AddToBoardButton'
 import styles from './AnalysisPanel.module.css'
 
 export default function AnalysisPanel() {
@@ -14,9 +18,22 @@ export default function AnalysisPanel() {
   const setMdEditorPath     = useUiStore((s) => s.setMdEditorPath)
   const setMdEditorViewMode = useUiStore((s) => s.setMdEditorViewMode)
 
+  const features    = useCommsStore((s) => s.features)
+  const loadFeatures = useCommsStore((s) => s.loadFeatures)
+  const projectPath = useProjectStore((s) => s.projectPath)
+
   const [content, setContent] = useState('')
   const [loading, setLoading] = useState(false)
   const [posting, setPosting] = useState(false)
+
+  useEffect(() => {
+    if (projectPath && features.length === 0) void loadFeatures(projectPath)
+  }, [projectPath, features.length, loadFeatures])
+
+  const targets = useMemo(
+    () => (analysisPath ? buildBoardTargets(analysisPath, features.map((f) => f.id), projectPath) : []),
+    [analysisPath, features, projectPath],
+  )
 
   useEffect(() => {
     if (!analysisPath) return
@@ -42,13 +59,16 @@ export default function AnalysisPanel() {
 
   // Move to board: freeze a copy as a board artifact, then clear the report slot so a fresh
   // Analyze can run. The board references the frozen copy, not the (now-cleared) live report.
-  async function handleAddToBoard() {
+  // The copy lives in the project-level board-artifacts dir so it survives the source moving.
+  async function handleAddToBoard(target: BoardTarget) {
     if (!analysisPath || posting) return
     setPosting(true)
     const norm = analysisPath.replace(/\\/g, '/')
     const name = norm.split('/').pop() ?? 'report'
-    const frozenPath = `${norm}.board.${Date.now().toString(36)}.md`
-    const id = await publishArtifactToBoard(analysisPath, frozenPath, content, `Report: ${name}`, 'md')
+    const stem = name.replace(/\.[^/.]+$/, '')
+    const frozenName = `${stem}.board.${Date.now().toString(36)}.md`
+    const frozenPath = boardArtifactPath(projectPath, frozenName) || `${norm}.board.${Date.now().toString(36)}.md`
+    const id = await publishArtifactToBoard(analysisPath, frozenPath, content, `Report: ${name}`, 'md', target)
     setPosting(false)
     if (!id) {
       useToastStore.getState().push('Could not add report to board', 'error', { category: 'agent_done' })
@@ -86,16 +106,13 @@ export default function AnalysisPanel() {
         )}
       </div>
       <div className={styles.footer}>
-        <button
-          type="button"
-          className={styles.boardBtn}
-          onClick={() => void handleAddToBoard()}
+        <AddToBoardButton
+          onBoard={false}
           disabled={posting || loading}
-          title="Publish this report to the board and clear the slot"
-        >
-          <LayoutDashboard size={12} />
-          {posting ? 'Adding…' : 'Add to board'}
-        </button>
+          targets={targets}
+          onPick={(t) => void handleAddToBoard(t)}
+          label={posting ? 'Adding…' : 'Add to board'}
+        />
         <div className={styles.footerRight}>
           <button type="button" className={styles.openBtn} onClick={handleOpenInEditor}>
             <FileCode size={12} />

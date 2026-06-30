@@ -17,6 +17,18 @@ export function boardTargetForFile(filePath: string): {
 }
 
 /**
+ * Project-level home for board artifact copies — `<root>/pathly/board-artifacts/<fileName>`.
+ * Board copies live HERE, not next to the source, so archiving/moving a plan folder doesn't
+ * dangle the board card. `fs.write` creates the dir on demand. Returns '' when no root is
+ * known so callers can fall back to a next-to-source path.
+ */
+export function boardArtifactPath(projectRoot: string, fileName: string): string {
+  const root = projectRoot.replace(/\\/g, '/').replace(/\/$/, '')
+  if (!root) return ''
+  return `${root}/pathly/board-artifacts/${fileName}`
+}
+
+/**
  * Write `content` to `artifactPath`, then post it to the board. `target` overrides the
  * destination (the user's dropdown pick); when omitted the target is derived from
  * `sourceFile`'s location. Returns the board message id, or null on failure.

@@ -3,7 +3,7 @@
 // artifact. The card stays — this is a copy, not a move. (Board-side inline rendering of the
 // artifact is a follow-up that reuses DiagramRender.)
 
-import { publishArtifactToBoard } from '../boardArtifacts'
+import { publishArtifactToBoard, boardArtifactPath } from '../boardArtifacts'
 import type { DiagramEntry } from '../diagramTypes'
 import type { BoardTarget } from '../../shared/AddToBoardButton/AddToBoardButton'
 
@@ -13,16 +13,20 @@ const EXT: Record<DiagramEntry['style'], string> = {
   plantuml: 'puml',
 }
 
-/** Returns the new board message id, or null on failure. `target` is the user's board pick. */
+/** Returns the new board message id, or null on failure. `target` is the user's board pick;
+ *  `projectRoot` routes the copy into the project-level board-artifacts dir (survives archival). */
 export async function addDiagramToBoard(
   filePath: string,
   entry: DiagramEntry,
   target?: BoardTarget,
+  projectRoot?: string,
 ): Promise<string | null> {
   const norm = filePath.replace(/\\/g, '/')
   const ext = EXT[entry.style] ?? 'txt'
-  const base = norm.replace(/\.[^/.]+$/, '')
-  const artifactPath = `${base}.${entry.id}.${ext}`
+  const stem = (norm.split('/').pop() ?? 'diagram').replace(/\.[^/.]+$/, '')
+  const fileName = `${stem}.${entry.id}.${ext}`
+  const artifactPath =
+    boardArtifactPath(projectRoot ?? '', fileName) || `${norm.replace(/\.[^/.]+$/, '')}.${entry.id}.${ext}`
   const title = entry.title || `${entry.style} diagram`
   return publishArtifactToBoard(
     norm,

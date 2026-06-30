@@ -30,6 +30,11 @@
   cursor: default;
 }
 
+/* Labelled (report) button dims while a post is in flight; the icon/on-board state stays solid. */
+.btn[data-labeled='true']:disabled {
+  opacity: 0.6;
+}
+
 /* On board — green, non-interactive. Last so it wins over :hover (equal specificity). */
 .btn[data-on-board='true'] {
   color: var(--green);

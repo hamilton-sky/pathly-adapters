@@ -4,7 +4,7 @@
 
 import React, { useState } from 'react'
 import { LayoutDashboard, Check } from 'lucide-react'
-import { ContextMenu } from '../../ui/ContextMenu/ContextMenu'
+import BoardTargetMenu from './BoardTargetMenu'
 import s from './AddToBoardButton.module.css'
 
 /** A concrete board destination — the (feature, board, scope) triple apiPostArtifact needs. */
@@ -28,27 +28,26 @@ interface Props {
   onPick: (target: BoardTarget) => void
   /** Optional text label (report style). Icon-only when omitted (card style). */
   label?: string
+  /** Disable without the green "on board" treatment (e.g. while a post is in flight). */
+  disabled?: boolean
 }
 
-const MENU_W = 220
+const MENU_W = 240
 
-export default function AddToBoardButton({ onBoard, targets, onPick, label }: Props): JSX.Element {
+export default function AddToBoardButton({ onBoard, targets, onPick, label, disabled }: Props): JSX.Element {
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
 
   function open(e: React.MouseEvent<HTMLButtonElement>): void {
-    if (onBoard) return
+    if (onBoard || disabled) return
     const r = e.currentTarget.getBoundingClientRect()
-    // Right-docked panel: clamp so a wide menu never spills off-screen.
+    // Estimate the menu height (title + scopes + capped feature scroll) to decide flip + clamp.
+    const featureCount = targets.filter((t) => t.target.board === 'feature').length
+    const h = 86 + Math.min(featureCount * 32, 200)
     const x = Math.max(8, Math.min(r.left, window.innerWidth - MENU_W - 8))
-    const h = Math.min(targets.length * 30 + 8, 260)
-    const y = Math.min(r.bottom + 4, window.innerHeight - h - 8)
+    const fitsBelow = r.bottom + 4 + h <= window.innerHeight - 8
+    const y = fitsBelow ? r.bottom + 4 : Math.max(8, r.top - 4 - h)
     setMenu({ x, y })
   }
-
-  const items = targets.map((o) => ({
-    label: o.suggested ? `${o.label} · suggested` : o.label,
-    onClick: () => onPick(o.target),
-  }))
 
   return (
     <>
@@ -58,7 +57,7 @@ export default function AddToBoardButton({ onBoard, targets, onPick, label }: Pr
         data-on-board={onBoard ? 'true' : 'false'}
         {...(label ? { 'data-labeled': 'true' } : {})}
         onClick={open}
-        disabled={onBoard}
+        disabled={onBoard || disabled}
         aria-label={onBoard ? 'On board' : 'Add to board'}
         title={onBoard ? 'On board' : 'Add to board'}
         {...(menu ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
@@ -66,7 +65,14 @@ export default function AddToBoardButton({ onBoard, targets, onPick, label }: Pr
         {onBoard ? <Check size={12} /> : <LayoutDashboard size={12} />}
         {label && <span>{label}</span>}
       </button>
-      {menu && <ContextMenu items={items} position={menu} onClose={() => setMenu(null)} />}
+      {menu && (
+        <BoardTargetMenu
+          targets={targets}
+          position={menu}
+          onPick={onPick}
+          onClose={() => setMenu(null)}
+        />
+      )}
     </>
   )
 }

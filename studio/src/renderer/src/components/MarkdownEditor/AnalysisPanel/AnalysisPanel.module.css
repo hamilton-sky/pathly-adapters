@@ -129,27 +129,3 @@
   align-items: center;
   gap: 8px;
 }
-
-.boardBtn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  background: transparent;
-  border: 1px solid var(--accent-border);
-  border-radius: var(--radius-md);
-  padding: 4px 9px;
-  font-size: var(--font-size-sm);
-  font-family: var(--font-family-base);
-  color: var(--accent);
-  cursor: pointer;
-  transition: background var(--transition-fast);
-}
-
-.boardBtn:hover {
-  background: var(--accent-bg);
-}
-
-.boardBtn:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
