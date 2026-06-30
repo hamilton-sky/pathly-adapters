@@ -94,6 +94,7 @@ def comms_post():
                     {"director", "human"}
                     if board == "global"
                     else {
+                        "builder",
                         "tester",
                         "reviewer",
                         "explorer",

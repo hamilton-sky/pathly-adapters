@@ -71,6 +71,7 @@ _DEFAULT_WRITE_PERMISSIONS: dict[str, list[str]] = {
     "feature": ["*"],
     "project": sorted(
         [
+            "builder",
             "tester",
             "reviewer",
             "explorer",
