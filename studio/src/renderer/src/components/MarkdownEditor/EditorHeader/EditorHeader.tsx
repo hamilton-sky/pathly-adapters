@@ -3,11 +3,18 @@ import { useToastStore } from '../../../store/toastStore'
 import {
   ArrowLeft, Undo2, Redo2, Database, FileCode, BookOpen,
   ScanText, FileSearch, Scissors, Wand2, GitCompare,
+  // ── Diagram feature ──
+  Network, Image as ImageIcon,
 } from 'lucide-react'
 import { Tooltip } from '../../ui'
 import { useMarkdownEditorStore, BodyCell } from '../../../store/markdownEditorStore'
 import { useProjectStore } from '../../../store/projectStore'
-import { useUiStore, selectMdEditorSplitDraftPath, selectMdEditorAnalysisPath, selectMdEditorSplit, selectMdEditorAnalyze } from '../../../store/uiStore'
+import {
+  useUiStore,
+  selectMdEditorSplitDraftPath, selectMdEditorAnalysisPath, selectMdEditorSplit, selectMdEditorAnalyze,
+  // ── Diagram feature ──
+  selectMdEditorDiagramPath, selectMdEditorDiagram,
+} from '../../../store/uiStore'
 import { useTerminalStore } from '../../../store/terminalStore'
 import { useEditorAgentActions } from './hooks/useEditorAgentActions'
 import { apiFetch } from '../../../lib/config'
@@ -20,6 +27,11 @@ import { SPLIT_PRESETS, ANALYZE_LENSES } from './actionPresets'
 import { useElapsedProgress } from './editorProgress'
 import SkillSplitModal from '../../shared/SkillSplitModal/SkillSplitModal'
 import SendPreviewModal from '../../shared/SendPreviewModal/SendPreviewModal'
+// ── Diagram feature ──
+import { useEditorDiagramAction } from './hooks/useEditorDiagramAction'
+import { DIAGRAM_PRESETS, CLI_KEY_DIAGRAM, PRESET_KEY_DIAGRAM, STORAGE_KEY_DIAGRAM } from './diagramPresets'
+import { resolvePrompt } from '../../shared/PromptActionConfig/presetTypes'
+import { sidecarPathFor } from '../diagramTypes'
 import styles from './EditorHeader.module.css'
 
 export type MdEditorViewMode = 'cells' | 'editor'
@@ -44,6 +56,10 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
   const mdEditorAnalysisPath       = useUiStore(selectMdEditorAnalysisPath)
   const mdEditorAnalysisPanelOpen  = useUiStore(s => s.mdEditorAnalysisPanelOpen)
   const setMdEditorAnalysisPanelOpen = useUiStore(s => s.setMdEditorAnalysisPanelOpen)
+  // ── Diagram feature ──
+  const mdEditorDiagramPath        = useUiStore(selectMdEditorDiagramPath)
+  const mdEditorDiagramPanelOpen   = useUiStore(s => s.mdEditorDiagramPanelOpen)
+  const setMdEditorDiagramPanelOpen = useUiStore(s => s.setMdEditorDiagramPanelOpen)
 
   const [exportState, setExportState] = useState<'idle' | 'success' | 'error'>('idle')
   const [saveState,   setSaveState]   = useState<'idle' | 'success' | 'error'>('idle')
@@ -56,18 +72,26 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
   const [analyzeCli, setAnalyzeCli] = useState<EditorCli>(() => loadEditorCli(CLI_KEY_ANALYZE))
   const [splitPreset,   setSplitPreset]   = useState<string>(() => loadPreset(PRESET_KEY_SPLIT))
   const [analyzePreset, setAnalyzePreset] = useState<string>(() => loadPreset(PRESET_KEY_ANALYZE))
+  // ── Diagram feature state ──
+  const [diagramPeekOpen,  setDiagramPeekOpen]  = useState(false)
+  const [diagramOncePrompt, setDiagramOncePrompt] = useState<string | null>(null)
+  const [diagramCli,    setDiagramCli]    = useState<EditorCli>(() => loadEditorCli(CLI_KEY_DIAGRAM))
+  const [diagramPreset, setDiagramPreset] = useState<string>(() => loadPreset(PRESET_KEY_DIAGRAM))
   // Confirm-before-send: holds the action + previewed prompt while the modal is open.
-  const [pendingRun, setPendingRun] = useState<{ kind: 'split' | 'analyze'; prompt: string; engine: string; action: string } | null>(null)
+  const [pendingRun, setPendingRun] = useState<{ kind: 'split' | 'analyze' | 'diagram'; prompt: string; engine: string; action: string } | null>(null)
 
   const handleSplitCli   = (next: EditorCli) => { setSplitCli(next);   saveEditorCli(CLI_KEY_SPLIT, next) }
   const handleAnalyzeCli = (next: EditorCli) => { setAnalyzeCli(next); saveEditorCli(CLI_KEY_ANALYZE, next) }
+  const handleDiagramCli = (next: EditorCli) => { setDiagramCli(next); saveEditorCli(CLI_KEY_DIAGRAM, next) }
 
   const handleSplitPreset = (name: string) => { setSplitPreset(name); savePreset(PRESET_KEY_SPLIT, name) }
   const handleAnalyzePreset = (name: string) => { setAnalyzePreset(name); savePreset(PRESET_KEY_ANALYZE, name) }
+  const handleDiagramPreset = (name: string) => { setDiagramPreset(name); savePreset(PRESET_KEY_DIAGRAM, name) }
 
   // Pill titles follow the selected preset/lens, so the toolbar reflects what each run will do.
   const splitTitle   = SPLIT_PRESETS.find((p) => p.name === splitPreset)?.label ?? 'AI Split'
   const analyzeTitle = ANALYZE_LENSES.find((l) => l.name === analyzePreset)?.label ?? 'AI Analyze'
+  const diagramTitle = DIAGRAM_PRESETS.find((p) => p.name === diagramPreset)?.label ?? 'Diagram'
 
   const { handleSplit, handleAnalyze, stopSplit, stopAnalyze } = useEditorAgentActions(
     mdEditorPath,
@@ -78,6 +102,32 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
     splitCli,
     analyzeCli,
   )
+
+  // ── Diagram feature: spawn hook ──
+  const { handleDiagram, stopDiagram } = useEditorDiagramAction(
+    mdEditorPath,
+    diagramOncePrompt,
+    () => setDiagramOncePrompt(null),
+    diagramCli,
+    diagramPreset,
+  )
+
+  // Resolve the diagram prompt for the preview: stored override > selected preset, with
+  // {{FILE}} and {{SIDECAR}} substituted. (The peek modal only pre-fills {{FILE}}.)
+  const buildDiagramPreviewPrompt = (filePath: string): string => {
+    const norm = filePath.replace(/\\/g, '/')
+    const vars = { FILE: norm, SIDECAR: sidecarPathFor(norm) }
+    let template: string
+    try {
+      template = localStorage.getItem(STORAGE_KEY_DIAGRAM) ?? ''
+    } catch {
+      template = ''
+    }
+    if (!template) {
+      template = (DIAGRAM_PRESETS.find((p) => p.name === diagramPreset) ?? DIAGRAM_PRESETS[0]).prompt
+    }
+    return resolvePrompt(template, vars)
+  }
 
   // Open the confirm-preview for a run; the actual spawn fires only on submit.
   const openSplitPreview = () => {
@@ -90,24 +140,36 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
     const prompt = analyzeOncePrompt ?? getEffectivePrompt(buildAnalyzePrompt, STORAGE_KEY_ANALYZE, mdEditorPath)
     setPendingRun({ kind: 'analyze', prompt, engine: cliLabel(analyzeCli), action: analyzeTitle })
   }
+  const openDiagramPreview = () => {
+    if (!mdEditorPath) return
+    const norm = mdEditorPath.replace(/\\/g, '/')
+    const vars = { FILE: norm, SIDECAR: sidecarPathFor(norm) }
+    const prompt = diagramOncePrompt ? resolvePrompt(diagramOncePrompt, vars) : buildDiagramPreviewPrompt(mdEditorPath)
+    setPendingRun({ kind: 'diagram', prompt, engine: cliLabel(diagramCli), action: diagramTitle })
+  }
   const submitPendingRun = (prompt: string) => {
     const run = pendingRun
     setPendingRun(null)
     if (run?.kind === 'split') void handleSplit(prompt)
     else if (run?.kind === 'analyze') void handleAnalyze(prompt)
+    else if (run?.kind === 'diagram') void handleDiagram(prompt)
   }
 
   // Per-file run state — derived from the store so each open file shows only its own run.
   // A run that completes while the user is on another file updates that file's slot, never this one.
   const splitSlot    = useUiStore(selectMdEditorSplit)
   const analyzeSlot  = useUiStore(selectMdEditorAnalyze)
+  const diagramSlot  = useUiStore(selectMdEditorDiagram)
   const splitState   = splitSlot?.status ?? 'idle'
   const analyzeState = analyzeSlot?.status ?? 'idle'
+  const diagramState = diagramSlot?.status ?? 'idle'
   const splitStartedAt   = useTerminalStore((s) => s.tabs.find((t) => t.id === splitSlot?.tabId)?.startedAt)
   const analyzeStartedAt = useTerminalStore((s) => s.tabs.find((t) => t.id === analyzeSlot?.tabId)?.startedAt)
+  const diagramStartedAt = useTerminalStore((s) => s.tabs.find((t) => t.id === diagramSlot?.tabId)?.startedAt)
   // Elapsed timer is derived from the tab's startedAt so it survives navigation for free.
   const splitProgress   = useElapsedProgress(splitState === 'running' ? splitStartedAt : undefined)
   const analyzeProgress = useElapsedProgress(analyzeState === 'running' ? analyzeStartedAt : undefined)
+  const diagramProgress = useElapsedProgress(diagramState === 'running' ? diagramStartedAt : undefined)
 
   const headerRef = useRef<HTMLDivElement>(null)
   const [isCompact, setIsCompact] = useState(false)
@@ -360,6 +422,50 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
         />
       )}
 
+      {/* Diagram — one joined pill: run (title follows preset) │ gear │ Gallery result */}
+      <ActionPill
+        state={diagramState === 'success' ? 'done' : diagramState}
+        progress={diagramProgress}
+        hasPath={!!mdEditorPath}
+        title={diagramTitle}
+        runningVerb="Diagramming"
+        mainIcon={<Network size={13} />}
+        idleTip={`AI generates a visual diagram of “${skillName}” — opens a gallery of cards you can view full-screen`}
+        runningTip={`Generating a diagram of “${skillName}”…`}
+        ariaName="Diagram"
+        onRun={openDiagramPreview}
+        onStop={() => stopDiagram()}
+        configTip="Pick a diagram style or edit the prompt"
+        onToggleConfig={() => setDiagramPeekOpen(v => !v)}
+        resultIcon={<ImageIcon size={13} />}
+        resultLabel="Gallery"
+        resultReady={!!mdEditorDiagramPath}
+        resultTip={
+          !mdEditorDiagramPath ? 'No diagrams yet — run Diagram first'
+          : mdEditorDiagramPanelOpen ? 'Close diagram gallery'
+          : 'Diagrams ready — click to open the gallery'
+        }
+        onOpenResult={() => setMdEditorDiagramPanelOpen(!mdEditorDiagramPanelOpen)}
+        tone="green"
+        compact={isCompact}
+      />
+      {diagramPeekOpen && mdEditorPath && (
+        <PromptPeekModal
+          title="PROMPT — Diagram"
+          fileName={skillName + '.md'}
+          filePath={mdEditorPath}
+          storageKey={STORAGE_KEY_DIAGRAM}
+          presets={DIAGRAM_PRESETS}
+          selectedPreset={diagramPreset}
+          presetPersistKey={PRESET_KEY_DIAGRAM}
+          cli={diagramCli}
+          onCliChange={handleDiagramCli}
+          onClose={() => setDiagramPeekOpen(false)}
+          onUseOnce={(p) => { setDiagramOncePrompt(p); setDiagramPeekOpen(false) }}
+          onPresetChange={handleDiagramPreset}
+        />
+      )}
+
       {/* Save — both modes, different handlers */}
       {viewMode === 'cells' ? (
         <Tooltip label="Save" shortcut="Ctrl+S" placement="bottom">
@@ -423,14 +529,18 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
         />
       )}
 
-      {/* Confirm-before-send preview for AI Split / AI Analyze. */}
+      {/* Confirm-before-send preview for AI Split / AI Analyze / Diagram. */}
       {pendingRun && (
         <SendPreviewModal
           title={pendingRun.action}
           engineLabel={pendingRun.engine}
           fileName={skillName + '.md'}
           prompt={pendingRun.prompt}
-          submitLabel={pendingRun.kind === 'split' ? 'Run Split' : 'Run Analyze'}
+          submitLabel={
+            pendingRun.kind === 'split' ? 'Run Split'
+            : pendingRun.kind === 'analyze' ? 'Run Analyze'
+            : 'Run Diagram'
+          }
           onSubmit={submitPendingRun}
           onCancel={() => setPendingRun(null)}
         />

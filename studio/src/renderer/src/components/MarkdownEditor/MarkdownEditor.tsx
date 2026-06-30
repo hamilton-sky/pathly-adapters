@@ -8,6 +8,8 @@ import EditorCanvas from './EditorCanvas/EditorCanvas'
 import PreviewPanel from './PreviewPanel/PreviewPanel'
 import EditorLanding from './EditorLanding/EditorLanding'
 import AnalysisPanel from './AnalysisPanel/AnalysisPanel'
+// ── Diagram feature ──
+import DiagramGalleryPanel from './DiagramGalleryPanel/DiagramGalleryPanel'
 import { Editor } from '../Editor'
 import { usePreviewResize } from './usePreviewResize'
 
@@ -26,6 +28,11 @@ export default function MarkdownEditorPanel() {
   return (
     <div className={styles.root}>
       <AnalysisPanel />
+      {/* ── Diagram feature: right-docked gallery, shares the slot with AnalysisPanel.
+            Self-contained — View, Delete, "+ New" and per-card Regenerate all work without
+            props (generation uses a panel-local hook seeded from the persisted CLI/preset).
+            The Diagram pill in EditorHeader is the primary, confirm-modal run path. ── */}
+      <DiagramGalleryPanel />
       <EditorHeader
         viewMode={viewMode}
         onToggleViewMode={() => setViewMode(viewMode === 'cells' ? 'editor' : 'cells')}

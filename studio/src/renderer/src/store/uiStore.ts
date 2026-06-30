@@ -29,7 +29,7 @@ function loadSidebarTab(): 'library' | 'workspace' {
   } catch { return 'library' }
 }
 
-/** Lifecycle status of a notebook one-shot AI action (AI Split / AI Analyze). */
+/** Lifecycle status of a notebook one-shot AI action (AI Split / AI Analyze / Diagram). */
 export type MdEditorActionStatus = 'idle' | 'running' | 'success' | 'error'
 
 /** Per-file, per-action run state. The single source of truth for an in-flight run. */
@@ -44,7 +44,12 @@ export interface MdEditorActionSlot {
 export interface MdEditorActionRecord {
   split?: MdEditorActionSlot
   analyze?: MdEditorActionSlot
+  // ── Diagram feature ──
+  diagram?: MdEditorActionSlot
 }
+
+/** Editor one-shot action keys (widened from 'split' | 'analyze' for the Diagram feature). */
+export type MdEditorAction = 'split' | 'analyze' | 'diagram'
 
 export interface UiState {
   sidebarCollapsed: boolean
@@ -72,6 +77,12 @@ export interface UiState {
   /** Analysis file paths per notebook file — keyed by mdEditorPath */
   mdEditorAnalysisPaths: Record<string, string>
   mdEditorAnalysisPanelOpen: boolean
+  // ── Diagram feature: sidecar paths per notebook file + gallery panel flag ──
+  /** Diagram sidecar (`<file>.diagrams.json`) paths per notebook file — keyed by mdEditorPath */
+  mdEditorDiagramPaths: Record<string, string>
+  mdEditorDiagramPanelOpen: boolean
+  setMdEditorDiagramPanelOpen: (v: boolean) => void
+  setMdEditorDiagramPath: (p: string | null, forFile?: string) => void
   /** Per-file, per-action run state — single source of truth for in-flight AI actions */
   mdEditorActions: Record<string, MdEditorActionRecord>
   setMdEditorAnalysisPanelOpen: (v: boolean) => void
@@ -90,7 +101,7 @@ export interface UiState {
   setMdEditorSplitDraftPath: (p: string | null, forFile?: string) => void
   setMdEditorAnalysisPath: (p: string | null, forFile?: string) => void
   /** Merge a patch into a file's action slot; pass null to clear the slot. */
-  setMdEditorAction: (filePath: string, action: 'split' | 'analyze', patch: Partial<MdEditorActionSlot> | null) => void
+  setMdEditorAction: (filePath: string, action: MdEditorAction, patch: Partial<MdEditorActionSlot> | null) => void
   requestMdEditorSave: () => void
   requestMdEditorOpenDraft: () => void
   requestMdEditorUndo: () => void
@@ -136,6 +147,9 @@ export const useUiStore = create<UiState>()(
       mdEditorSplitDraftPaths: {},
       mdEditorAnalysisPaths: {},
       mdEditorAnalysisPanelOpen: false,
+      // ── Diagram feature ──
+      mdEditorDiagramPaths: {},
+      mdEditorDiagramPanelOpen: false,
       mdEditorActions: {},
       mdEditorSaveRequested: 0,
       mdEditorOpenDraftRequested: 0,
@@ -173,6 +187,23 @@ export const useUiStore = create<UiState>()(
         }
         return update
       }),
+      // ── Diagram feature: mirror of setMdEditorAnalysisPath ──
+      setMdEditorDiagramPath: (p, forFile) => set((s) => {
+        const key = forFile ?? s.mdEditorPath ?? ''
+        if (!key) return {}
+        if (p === null) {
+          const next = { ...s.mdEditorDiagramPaths }
+          delete next[key]
+          return { mdEditorDiagramPaths: next }
+        }
+        const update: Partial<UiState> = {
+          mdEditorDiagramPaths: { ...s.mdEditorDiagramPaths, [key]: p },
+          // Auto-open the gallery only when the finished run is for the visible file.
+          ...(key === s.mdEditorPath ? { mdEditorDiagramPanelOpen: true } : {}),
+        }
+        return update
+      }),
+      setMdEditorDiagramPanelOpen: (v) => set({ mdEditorDiagramPanelOpen: v }),
       setMdEditorAction: (filePath, action, patch) =>
         set((s) => {
           if (!filePath) return {}
@@ -198,6 +229,8 @@ export const useUiStore = create<UiState>()(
       setMdEditorPath: (path) => set((s) => ({
         mdEditorPath: path,
         ...(path !== s.mdEditorPath ? { mdEditorAnalysisPanelOpen: false } : {}),
+        // ── Diagram feature: close the gallery on file switch, same as the report panel ──
+        ...(path !== s.mdEditorPath ? { mdEditorDiagramPanelOpen: false } : {}),
       })),
       setMdEditorViewMode: (mode) => set({ mdEditorViewMode: mode }),
       markDirty: (path) => set((s) => ({ dirtyItems: new Set([...s.dirtyItems, path]) })),
@@ -261,3 +294,10 @@ export const selectMdEditorSplit = (s: UiState): MdEditorActionSlot | undefined 
 
 export const selectMdEditorAnalyze = (s: UiState): MdEditorActionSlot | undefined =>
   s.mdEditorActions[s.mdEditorPath ?? '']?.analyze
+
+// ── Diagram feature selectors ──
+export const selectMdEditorDiagramPath = (s: UiState): string | null =>
+  s.mdEditorDiagramPaths[s.mdEditorPath ?? ''] ?? null
+
+export const selectMdEditorDiagram = (s: UiState): MdEditorActionSlot | undefined =>
+  s.mdEditorActions[s.mdEditorPath ?? '']?.diagram
