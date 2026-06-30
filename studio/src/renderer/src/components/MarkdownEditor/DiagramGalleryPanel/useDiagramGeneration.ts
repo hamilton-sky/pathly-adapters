@@ -3,7 +3,7 @@
 // / by-style / run-once helpers plus "add to board" (user-triggered, renderer-side — the
 // agent never posts). Keeps DiagramGalleryPanel presentational.
 
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useEditorDiagramAction } from '../EditorHeader/hooks/useEditorDiagramAction'
 import {
   loadEditorCli,
@@ -15,7 +15,11 @@ import {
 import { DIAGRAM_PRESETS, CLI_KEY_DIAGRAM, PRESET_KEY_DIAGRAM } from '../EditorHeader/diagramPresets'
 import { resolvePrompt } from '../../shared/PromptActionConfig/presetTypes'
 import { useToastStore } from '../../../store/toastStore'
+import { useCommsStore } from '../../../store/commsStore'
+import { useProjectStore } from '../../../store/projectStore'
 import { sidecarPathFor, type DiagramEntry } from '../diagramTypes'
+import { buildBoardTargets } from '../boardTargets'
+import type { BoardTarget } from '../../shared/AddToBoardButton/AddToBoardButton'
 import { addDiagramToBoard } from './addDiagramToBoard'
 import { markDiagramOnBoard } from './diagramSidecar'
 
@@ -24,6 +28,21 @@ export function useDiagramGeneration(mdEditorPath: string | null) {
   const [localCli, setLocalCli] = useState<EditorCli>(() => loadEditorCli(CLI_KEY_DIAGRAM))
   const [localPreset, setLocalPreset] = useState<string>(() => loadPreset(PRESET_KEY_DIAGRAM))
   const { handleDiagram, stopDiagram } = useEditorDiagramAction(mdEditorPath, null, () => {}, localCli, localPreset)
+
+  // Board-target list for the "Add to board" dropdown (Global / Project / each feature, with
+  // the path-derived board marked "suggested"). Lazy-load the feature list if it's empty.
+  const features = useCommsStore((s) => s.features)
+  const loadFeatures = useCommsStore((s) => s.loadFeatures)
+  const projectPath = useProjectStore((s) => s.projectPath)
+
+  useEffect(() => {
+    if (projectPath && features.length === 0) void loadFeatures(projectPath)
+  }, [projectPath, features.length, loadFeatures])
+
+  const boardTargets = useMemo(
+    () => (mdEditorPath ? buildBoardTargets(mdEditorPath, features.map((f) => f.id), projectPath) : []),
+    [mdEditorPath, features, projectPath],
+  )
 
   const fromPreset = useCallback(
     (name: string) => {
@@ -55,9 +74,9 @@ export function useDiagramGeneration(mdEditorPath: string | null) {
   // Post one diagram to the board (copy — the card stays). Persists the marker so it
   // survives reload. Returns true on success so the caller can refresh the cards.
   const addToBoard = useCallback(
-    async (entry: DiagramEntry): Promise<boolean> => {
+    async (entry: DiagramEntry, target?: BoardTarget): Promise<boolean> => {
       if (!mdEditorPath) return false
-      const id = await addDiagramToBoard(mdEditorPath, entry)
+      const id = await addDiagramToBoard(mdEditorPath, entry, target)
       if (id) {
         await markDiagramOnBoard(mdEditorPath, entry.id, { id, at: new Date().toISOString() })
         useToastStore
@@ -90,6 +109,7 @@ export function useDiagramGeneration(mdEditorPath: string | null) {
     fromStyle,
     runOnce,
     addToBoard,
+    boardTargets,
     stopDiagram,
     changeCli,
     changePreset,

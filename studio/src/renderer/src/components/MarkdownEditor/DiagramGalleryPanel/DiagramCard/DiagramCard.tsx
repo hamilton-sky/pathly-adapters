@@ -5,15 +5,21 @@
 // Path assumes: src/components/MarkdownEditor/DiagramGalleryPanel/DiagramCard/DiagramCard.tsx
 
 import React from 'react'
-import { Eye, RefreshCw, Trash2, LayoutDashboard, Check } from 'lucide-react'
+import { Eye, RefreshCw, Trash2 } from 'lucide-react'
 import type { DiagramEntry } from '../../diagramTypes'
 import DiagramRender from '../DiagramRender/DiagramRender'
+import AddToBoardButton, {
+  type BoardTarget,
+  type BoardTargetOption,
+} from '../../../shared/AddToBoardButton/AddToBoardButton'
 import styles from './DiagramCard.module.css'
 
 interface Props {
   entry: DiagramEntry
   onView: (entry: DiagramEntry) => void
-  onAddToBoard: (entry: DiagramEntry) => void
+  onAddToBoard: (entry: DiagramEntry, target: BoardTarget) => void
+  /** Board destinations for the Add-to-board dropdown (Global / Project / features). */
+  targets: BoardTargetOption[]
   onRegenerate: (entry: DiagramEntry) => void
   onDelete: (entry: DiagramEntry) => void
   /** Regenerate is disabled while another run for this file is in flight. */
@@ -30,6 +36,7 @@ export default function DiagramCard({
   entry,
   onView,
   onAddToBoard,
+  targets,
   onRegenerate,
   onDelete,
   busy,
@@ -59,17 +66,11 @@ export default function DiagramCard({
           <Eye size={12} />
           View
         </button>
-        <button
-          type="button"
-          className={styles.addBtn}
-          data-on-board={onBoard ? 'true' : 'false'}
-          onClick={() => onAddToBoard(entry)}
-          disabled={onBoard}
-          aria-label={onBoard ? 'On board' : 'Add to board'}
-          title={onBoard ? 'On board' : 'Add to board'}
-        >
-          {onBoard ? <Check size={12} /> : <LayoutDashboard size={12} />}
-        </button>
+        <AddToBoardButton
+          onBoard={onBoard}
+          targets={targets}
+          onPick={(t) => onAddToBoard(entry, t)}
+        />
         <button
           type="button"
           className={styles.iconBtn}

@@ -1,0 +1,38 @@
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  border: var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+}
+
+/* Label variant (report style): auto width with text. */
+.btn[data-labeled='true'] {
+  width: auto;
+  padding: 5px 9px;
+  font-size: var(--font-size-sm);
+  font-family: var(--font-family-base);
+}
+
+.btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.btn:disabled {
+  cursor: default;
+}
+
+/* On board — green, non-interactive. Last so it wins over :hover (equal specificity). */
+.btn[data-on-board='true'] {
+  color: var(--green);
+  border-color: var(--green);
+  cursor: default;
+}

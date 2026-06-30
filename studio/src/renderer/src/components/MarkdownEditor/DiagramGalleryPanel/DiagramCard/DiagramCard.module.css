@@ -135,28 +135,3 @@
   color: var(--red);
   border-color: var(--red);
 }
-
-.addBtn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  background: transparent;
-  border: var(--border);
-  border-radius: var(--radius-md);
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: color var(--transition-fast), border-color var(--transition-fast);
-}
-
-.addBtn:hover {
-  color: var(--accent);
-  border-color: var(--accent);
-}
-
-.addBtn[data-on-board='true'] {
-  color: var(--green);
-  border-color: var(--green);
-  cursor: default;
-}

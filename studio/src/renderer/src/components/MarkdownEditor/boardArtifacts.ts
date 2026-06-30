@@ -17,8 +17,9 @@ export function boardTargetForFile(filePath: string): {
 }
 
 /**
- * Write `content` to `artifactPath`, then post it to the board (target derived from
- * `sourceFile`'s location). Returns the board message id, or null on failure.
+ * Write `content` to `artifactPath`, then post it to the board. `target` overrides the
+ * destination (the user's dropdown pick); when omitted the target is derived from
+ * `sourceFile`'s location. Returns the board message id, or null on failure.
  */
 export async function publishArtifactToBoard(
   sourceFile: string,
@@ -26,12 +27,13 @@ export async function publishArtifactToBoard(
   content: string,
   text: string,
   type: string,
+  target?: { feature: string; board: string; scope: string },
 ): Promise<string | null> {
   try {
     await writeFile(artifactPath, content)
   } catch {
     return null
   }
-  const { feature, board, scope } = boardTargetForFile(sourceFile)
+  const { feature, board, scope } = target ?? boardTargetForFile(sourceFile)
   return apiPostArtifact(feature, board, scope, text, artifactPath, type)
 }
