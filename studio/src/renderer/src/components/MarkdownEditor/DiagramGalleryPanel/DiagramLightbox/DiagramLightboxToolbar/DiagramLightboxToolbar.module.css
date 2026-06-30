@@ -65,6 +65,12 @@
   border-color: var(--accent);
 }
 
+.action[data-active='true'] {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+
 .hint {
   margin-left: auto;
   padding-left: 10px;

@@ -63,3 +63,19 @@ export async function removeDiagram(
   await writeFile(sidecarPathFor(filePath), JSON.stringify(next, null, 2))
   return next
 }
+
+/**
+ * Persist Arrange-mode node positions for one diagram (a UI-only field, not content).
+ * Renderer read-modify-write, same shape as removeDiagram. No-op if the sidecar/entry
+ * is gone — never throws into the caller.
+ */
+export async function updateDiagramLayout(
+  filePath: string,
+  id: string,
+  layout: Record<string, { x: number; y: number }>,
+): Promise<void> {
+  const sidecar = await readSidecar(filePath)
+  if (!sidecar) return
+  const diagrams = sidecar.diagrams.map((d) => (d.id === id ? { ...d, layout } : d))
+  await writeFile(sidecarPathFor(filePath), JSON.stringify({ ...sidecar, diagrams }, null, 2))
+}

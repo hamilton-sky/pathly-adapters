@@ -1,11 +1,21 @@
-// Footer action bar for the diagram lightbox: zoom controls, reset, copy-source, and
-// (mermaid only) SVG export. Self-contained — owns its transient "copied" feedback.
+// Footer action bar for the diagram lightbox: zoom controls, reset, copy-source, SVG
+// export (mermaid), and an Arrange toggle (flowchart/graph mermaid -> React Flow canvas).
+// Self-contained — owns its transient "copied" feedback.
 //
 // Path assumes:
 //   src/components/MarkdownEditor/DiagramGalleryPanel/DiagramLightbox/DiagramLightboxToolbar/DiagramLightboxToolbar.tsx
 
 import React, { useState } from 'react'
-import { ZoomIn, ZoomOut, RotateCcw, Copy, Check, Download } from 'lucide-react'
+import {
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
+  Copy,
+  Check,
+  Download,
+  Workflow,
+  Image as ImageIcon,
+} from 'lucide-react'
 import styles from './DiagramLightboxToolbar.module.css'
 
 interface Props {
@@ -16,6 +26,10 @@ interface Props {
   onCopySource: () => void
   /** Null for non-mermaid styles (no rendered SVG to export). */
   onDownloadSvg: (() => void) | null
+  /** Diagram is a flowchart/graph mermaid that can be arranged. */
+  canArrange: boolean
+  arranging: boolean
+  onToggleArrange: () => void
 }
 
 export default function DiagramLightboxToolbar({
@@ -25,6 +39,9 @@ export default function DiagramLightboxToolbar({
   onReset,
   onCopySource,
   onDownloadSvg,
+  canArrange,
+  arranging,
+  onToggleArrange,
 }: Props) {
   const [copied, setCopied] = useState(false)
 
@@ -36,31 +53,48 @@ export default function DiagramLightboxToolbar({
 
   return (
     <div className={styles.bar}>
-      <button type="button" className={styles.icon} onClick={onZoomOut} aria-label="Zoom out" title="Zoom out">
-        <ZoomOut size={14} />
-      </button>
-      <span className={styles.readout}>{Math.round(zoom * 100)}%</span>
-      <button type="button" className={styles.icon} onClick={onZoomIn} aria-label="Zoom in" title="Zoom in">
-        <ZoomIn size={14} />
-      </button>
-      <button type="button" className={styles.icon} onClick={onReset} aria-label="Reset view" title="Reset view">
-        <RotateCcw size={14} />
-      </button>
-
-      <span className={styles.divider} />
+      {!arranging && (
+        <>
+          <button type="button" className={styles.icon} onClick={onZoomOut} aria-label="Zoom out" title="Zoom out">
+            <ZoomOut size={14} />
+          </button>
+          <span className={styles.readout}>{Math.round(zoom * 100)}%</span>
+          <button type="button" className={styles.icon} onClick={onZoomIn} aria-label="Zoom in" title="Zoom in">
+            <ZoomIn size={14} />
+          </button>
+          <button type="button" className={styles.icon} onClick={onReset} aria-label="Reset view" title="Reset view">
+            <RotateCcw size={14} />
+          </button>
+          <span className={styles.divider} />
+        </>
+      )}
 
       <button type="button" className={styles.action} onClick={copy} title="Copy diagram source">
         {copied ? <Check size={13} /> : <Copy size={13} />}
         {copied ? 'Copied' : 'Copy'}
       </button>
-      {onDownloadSvg && (
+      {!arranging && onDownloadSvg && (
         <button type="button" className={styles.action} onClick={onDownloadSvg} title="Download as SVG">
           <Download size={13} />
           SVG
         </button>
       )}
+      {canArrange && (
+        <button
+          type="button"
+          className={styles.action}
+          data-active={arranging ? 'true' : 'false'}
+          onClick={onToggleArrange}
+          title={arranging ? 'Back to SVG view' : 'Arrange nodes (drag to reposition)'}
+        >
+          {arranging ? <ImageIcon size={13} /> : <Workflow size={13} />}
+          {arranging ? 'SVG' : 'Arrange'}
+        </button>
+      )}
 
-      <span className={styles.hint}>scroll: zoom · drag: pan</span>
+      <span className={styles.hint}>
+        {arranging ? 'drag nodes · controls bottom-left' : 'scroll: zoom · drag: pan'}
+      </span>
     </div>
   )
 }

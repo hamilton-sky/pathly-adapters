@@ -20,6 +20,8 @@ export interface DiagramEntry {
   model: string | null
   /** ISO-8601 timestamp. */
   createdAt: string
+  /** Saved React Flow node positions from Arrange mode (node id -> x/y). Optional. */
+  layout?: Record<string, { x: number; y: number }>
 }
 
 export interface DiagramSidecar {

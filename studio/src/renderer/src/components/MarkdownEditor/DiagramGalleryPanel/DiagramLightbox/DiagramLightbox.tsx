@@ -1,34 +1,39 @@
-// Full-resolution overlay for one diagram. Scroll-wheel zooms, drag pans, Esc or a
-// backdrop click closes. The diagram fits the viewport at 100% (see DiagramRender.full)
-// and scales up to MAX_ZOOM. Pan/zoom is carried via CSS custom properties (no inline
-// transform string). A footer toolbar adds zoom controls, reset, copy-source, and SVG
-// export (mermaid only).
+// Full-resolution overlay for one diagram. Default view is the static SVG with wheel-zoom
+// + drag-pan (carried via CSS custom properties — no inline transform string). For
+// flowchart/graph mermaid, an "Arrange" toggle swaps in a draggable React Flow canvas
+// (DiagramArrangeView). Esc or a backdrop click closes. Footer toolbar holds the controls.
 //
 // Path assumes: src/components/MarkdownEditor/DiagramGalleryPanel/DiagramLightbox/DiagramLightbox.tsx
 
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import type { DiagramEntry } from '../../diagramTypes'
 import DiagramRender from '../DiagramRender/DiagramRender'
 import DiagramLightboxToolbar from './DiagramLightboxToolbar/DiagramLightboxToolbar'
+import DiagramArrangeView from './DiagramArrangeView/DiagramArrangeView'
+import { isArrangeable } from './DiagramArrangeView/mermaidFlow'
+import { useSvgPanZoom } from './useSvgPanZoom'
 import styles from './DiagramLightbox.module.css'
+
+type Layout = Record<string, { x: number; y: number }>
 
 interface Props {
   entry: DiagramEntry
   fileName: string
   onClose: () => void
+  /** Persist Arrange-mode positions back to the sidecar. */
+  onSaveLayout?: (entryId: string, layout: Layout) => void
 }
 
-const MIN_ZOOM = 0.5
-const MAX_ZOOM = 8
-
-const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n))
-
-export default function DiagramLightbox({ entry, fileName, onClose }: Props) {
-  const [zoom, setZoom] = useState(1)
-  const [pan, setPan] = useState({ x: 0, y: 0 })
-  const drag = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null)
+export default function DiagramLightbox({ entry, fileName, onClose, onSaveLayout }: Props) {
   const stageRef = useRef<HTMLDivElement>(null)
+  const { zoom, pan, onWheel, onPointerDown, onPointerMove, onPointerUp, reset, zoomIn, zoomOut } =
+    useSvgPanZoom()
+  const canArrange = useMemo(() => isArrangeable(entry.style, entry.content), [entry.style, entry.content])
+  const [arranging, setArranging] = useState(false)
+
+  // SVG is the default view; reset to it whenever the shown diagram changes.
+  useEffect(() => setArranging(false), [entry.id])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -38,44 +43,11 @@ export default function DiagramLightbox({ entry, fileName, onClose }: Props) {
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
-  const onWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault()
-    setZoom((z) => clamp(z - Math.sign(e.deltaY) * 0.15 * z, MIN_ZOOM, MAX_ZOOM))
-  }, [])
-
-  const onPointerDown = useCallback(
-    (e: React.PointerEvent) => {
-      drag.current = { x: e.clientX, y: e.clientY, ox: pan.x, oy: pan.y }
-      ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
-    },
-    [pan],
-  )
-
-  const onPointerMove = useCallback((e: React.PointerEvent) => {
-    if (!drag.current) return
-    setPan({
-      x: drag.current.ox + (e.clientX - drag.current.x),
-      y: drag.current.oy + (e.clientY - drag.current.y),
-    })
-  }, [])
-
-  const onPointerUp = useCallback(() => {
-    drag.current = null
-  }, [])
-
-  const resetView = useCallback(() => {
-    setZoom(1)
-    setPan({ x: 0, y: 0 })
-  }, [])
-
-  const zoomIn = useCallback(() => setZoom((z) => clamp(z * 1.25, MIN_ZOOM, MAX_ZOOM)), [])
-  const zoomOut = useCallback(() => setZoom((z) => clamp(z / 1.25, MIN_ZOOM, MAX_ZOOM)), [])
-
-  const copySource = useCallback(() => {
+  const copySource = () => {
     void navigator.clipboard?.writeText(entry.content)
-  }, [entry.content])
+  }
 
-  const downloadSvg = useCallback(() => {
+  const downloadSvg = () => {
     const svg = stageRef.current?.querySelector('svg')
     if (!svg) return
     const xml = new XMLSerializer().serializeToString(svg)
@@ -88,7 +60,7 @@ export default function DiagramLightbox({ entry, fileName, onClose }: Props) {
     a.download = `${(entry.title || 'diagram').replace(/[^\w.-]+/g, '_')}.svg`
     a.click()
     URL.revokeObjectURL(url)
-  }, [entry.title])
+  }
 
   return (
     <div className={styles.backdrop} onClick={onClose}>
@@ -103,33 +75,47 @@ export default function DiagramLightbox({ entry, fileName, onClose }: Props) {
           </button>
         </div>
 
-        <div
-          className={styles.viewport}
-          onWheel={onWheel}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerLeave={onPointerUp}
-        >
-          <div
-            ref={stageRef}
-            className={styles.stage}
-            style={
-              { '--tx': `${pan.x}px`, '--ty': `${pan.y}px`, '--zoom': zoom } as React.CSSProperties
-            }
-          >
-            <DiagramRender entry={entry} mode="full" />
+        {arranging && canArrange ? (
+          <div className={styles.arrangeArea}>
+            <DiagramArrangeView
+              key={entry.id}
+              content={entry.content}
+              savedLayout={entry.layout ?? null}
+              onSaveLayout={(l) => onSaveLayout?.(entry.id, l)}
+            />
           </div>
-        </div>
+        ) : (
+          <div
+            className={styles.viewport}
+            onWheel={onWheel}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerLeave={onPointerUp}
+          >
+            <div
+              ref={stageRef}
+              className={styles.stage}
+              style={
+                { '--tx': `${pan.x}px`, '--ty': `${pan.y}px`, '--zoom': zoom } as React.CSSProperties
+              }
+            >
+              <DiagramRender entry={entry} mode="full" />
+            </div>
+          </div>
+        )}
 
         <div className={styles.footer}>
           <DiagramLightboxToolbar
             zoom={zoom}
             onZoomIn={zoomIn}
             onZoomOut={zoomOut}
-            onReset={resetView}
+            onReset={reset}
             onCopySource={copySource}
-            onDownloadSvg={entry.style === 'mermaid' ? downloadSvg : null}
+            onDownloadSvg={entry.style === 'mermaid' && !arranging ? downloadSvg : null}
+            canArrange={canArrange}
+            arranging={arranging}
+            onToggleArrange={() => setArranging((v) => !v)}
           />
         </div>
       </div>

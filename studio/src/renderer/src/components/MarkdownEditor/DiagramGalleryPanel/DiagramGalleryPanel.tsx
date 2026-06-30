@@ -17,6 +17,7 @@ import {
   selectMdEditorDiagram,
 } from '../../../store/uiStore'
 import { useDiagramSidecar } from './useDiagramSidecar'
+import { updateDiagramLayout } from './diagramSidecar'
 import { type DiagramEntry, type DiagramStyle, sidecarPathFor } from '../diagramTypes'
 import { useEditorDiagramAction } from '../EditorHeader/hooks/useEditorDiagramAction'
 import { loadEditorCli, loadPreset } from '../EditorHeader/editorCli'
@@ -81,6 +82,11 @@ export default function DiagramGalleryPanel({ onNew, onRegenerate, busy }: Props
     if (remaining === 0) setPanelOpen(false)
   }
 
+  function saveLayout(id: string, layout: Record<string, { x: number; y: number }>) {
+    if (!mdEditorPath) return
+    void updateDiagramLayout(mdEditorPath, id, layout).then(reload)
+  }
+
   return (
     <div className={styles.panel}>
       <div className={styles.header}>
@@ -127,7 +133,12 @@ export default function DiagramGalleryPanel({ onNew, onRegenerate, busy }: Props
       </div>
 
       {lightbox && (
-        <DiagramLightbox entry={lightbox} fileName={fileName} onClose={() => setLightbox(null)} />
+        <DiagramLightbox
+          entry={lightbox}
+          fileName={fileName}
+          onClose={() => setLightbox(null)}
+          onSaveLayout={saveLayout}
+        />
       )}
     </div>
   )

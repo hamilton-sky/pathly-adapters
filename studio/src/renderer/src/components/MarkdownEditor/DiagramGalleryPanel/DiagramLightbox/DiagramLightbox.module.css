@@ -102,6 +102,13 @@
   will-change: transform;
 }
 
+.arrangeArea {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: var(--bg-base);
+}
+
 .footer {
   display: flex;
   align-items: center;
