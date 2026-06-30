@@ -53,6 +53,31 @@
   background: var(--accent-bg);
 }
 
+.gearBtn {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.gearBtn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.gearBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .closeBtn {
   width: 24px;
   height: 24px;

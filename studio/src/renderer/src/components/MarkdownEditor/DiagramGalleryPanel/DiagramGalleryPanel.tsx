@@ -1,28 +1,21 @@
-// Right-docked gallery panel — shares the slot/shape with AnalysisPanel. Lists the
-// current file's diagram cards from the sidecar, opens the lightbox on View, removes
-// cards on Delete (closing itself when the last card goes), and regenerates / adds
-// diagrams via a panel-local spawn-hook instance.
-//
-// New / Regenerate are self-contained here (seeded from the persisted CLI + preset),
-// so the panel works whether or not EditorHeader passes handlers. Pass onNew /
-// onRegenerate to override with the header's confirm-modal flow instead.
-//
-// Path assumes: src/components/MarkdownEditor/DiagramGalleryPanel/DiagramGalleryPanel.tsx
+// Right-docked gallery panel (mirrors AnalysisPanel): lists the file's diagram cards;
+// View opens the lightbox, Delete removes (closing on the last card). Header: [+ New]
+// generates with the selected preset; the gear opens the shared PromptPeekModal (preset /
+// prompt / engine; "Use once" generates now). Generation lives in useDiagramGeneration.
 
 import React, { useEffect, useState } from 'react'
-import { X, Plus, Image as ImageIcon } from 'lucide-react'
+import { X, Plus, Settings, Image as ImageIcon } from 'lucide-react'
 import {
   useUiStore,
   selectMdEditorDiagramPath,
   selectMdEditorDiagram,
 } from '../../../store/uiStore'
 import { useDiagramSidecar } from './useDiagramSidecar'
+import { useDiagramGeneration } from './useDiagramGeneration'
 import { updateDiagramLayout } from './diagramSidecar'
-import { type DiagramEntry, type DiagramStyle, sidecarPathFor } from '../diagramTypes'
-import { useEditorDiagramAction } from '../EditorHeader/hooks/useEditorDiagramAction'
-import { loadEditorCli, loadPreset } from '../EditorHeader/editorCli'
-import { DIAGRAM_PRESETS, CLI_KEY_DIAGRAM, PRESET_KEY_DIAGRAM } from '../EditorHeader/diagramPresets'
-import { resolvePrompt } from '../../shared/PromptActionConfig/presetTypes'
+import type { DiagramEntry } from '../diagramTypes'
+import { DIAGRAM_PRESETS, PRESET_KEY_DIAGRAM, STORAGE_KEY_DIAGRAM } from '../EditorHeader/diagramPresets'
+import PromptPeekModal from '../EditorHeader/PromptPeekModal/PromptPeekModal'
 import DiagramCard from './DiagramCard/DiagramCard'
 import DiagramLightbox from './DiagramLightbox/DiagramLightbox'
 import styles from './DiagramGalleryPanel.module.css'
@@ -44,18 +37,13 @@ export default function DiagramGalleryPanel({ onNew, onRegenerate, busy }: Props
   const slot = useUiStore(selectMdEditorDiagram)
 
   const { diagrams, loading, reload, remove } = useDiagramSidecar(mdEditorPath)
+  const gen = useDiagramGeneration(mdEditorPath)
   const [lightbox, setLightbox] = useState<DiagramEntry | null>(null)
-
-  // Panel-local generation — seeded once from the persisted CLI + preset so the panel
-  // can New/Regenerate without prop-drilling from the header.
-  const [localCli] = useState(() => loadEditorCli(CLI_KEY_DIAGRAM))
-  const [localPreset] = useState(() => loadPreset(PRESET_KEY_DIAGRAM))
-  const { handleDiagram } = useEditorDiagramAction(mdEditorPath, null, () => {}, localCli, localPreset)
 
   const isBusy = busy ?? slot?.status === 'running'
 
-  // Refresh the cards when a run completes (the file path is unchanged, so the sidecar
-  // hook's own filePath effect won't re-fire — watch the slot transition instead).
+  // Refresh the cards when a run completes (file path unchanged → the sidecar hook's own
+  // effect won't re-fire; watch the slot transition instead).
   useEffect(() => {
     if (slot?.status === 'success') reload()
   }, [slot?.status, reload])
@@ -63,18 +51,8 @@ export default function DiagramGalleryPanel({ onNew, onRegenerate, busy }: Props
   if (!diagramPath || !panelOpen) return null
 
   const fileName = (mdEditorPath ?? '').replace(/\\/g, '/').split('/').pop() ?? 'file'
-
-  // Build a prompt for a given style and spawn a run (append, not overwrite).
-  function generate(style: DiagramStyle) {
-    if (!mdEditorPath) return
-    const preset = DIAGRAM_PRESETS.find((p) => p.style === style) ?? DIAGRAM_PRESETS[0]
-    const norm = mdEditorPath.replace(/\\/g, '/')
-    const prompt = resolvePrompt(preset.prompt, { FILE: norm, SIDECAR: sidecarPathFor(norm) })
-    void handleDiagram(prompt)
-  }
-
-  const handleNew = onNew ?? (() => generate(DIAGRAM_PRESETS[0].style))
-  const handleRegenerate = onRegenerate ?? ((entry: DiagramEntry) => generate(entry.style))
+  const handleNew = onNew ?? (() => gen.fromPreset(gen.localPreset))
+  const handleRegenerate = onRegenerate ?? ((entry: DiagramEntry) => gen.fromStyle(entry.style))
 
   async function handleDelete(entry: DiagramEntry) {
     const remaining = await remove(entry.id)
@@ -94,6 +72,16 @@ export default function DiagramGalleryPanel({ onNew, onRegenerate, busy }: Props
         <button type="button" className={styles.newBtn} onClick={handleNew} disabled={isBusy || !mdEditorPath}>
           <Plus size={12} />
           New
+        </button>
+        <button
+          type="button"
+          className={styles.gearBtn}
+          onClick={() => gen.setPeekOpen(true)}
+          disabled={!mdEditorPath}
+          aria-label="Configure diagram preset and prompt"
+          title="Preset / prompt / engine"
+        >
+          <Settings size={13} />
         </button>
         <button
           type="button"
@@ -138,6 +126,23 @@ export default function DiagramGalleryPanel({ onNew, onRegenerate, busy }: Props
           fileName={fileName}
           onClose={() => setLightbox(null)}
           onSaveLayout={saveLayout}
+        />
+      )}
+
+      {gen.peekOpen && mdEditorPath && (
+        <PromptPeekModal
+          title="PROMPT — Diagram"
+          fileName={fileName}
+          filePath={mdEditorPath}
+          storageKey={STORAGE_KEY_DIAGRAM}
+          presets={DIAGRAM_PRESETS}
+          selectedPreset={gen.localPreset}
+          presetPersistKey={PRESET_KEY_DIAGRAM}
+          cli={gen.localCli}
+          onCliChange={gen.changeCli}
+          onClose={() => gen.setPeekOpen(false)}
+          onUseOnce={gen.runOnce}
+          onPresetChange={gen.changePreset}
         />
       )}
     </div>
