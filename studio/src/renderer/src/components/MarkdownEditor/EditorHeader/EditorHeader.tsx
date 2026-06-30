@@ -172,14 +172,26 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
   const diagramProgress = useElapsedProgress(diagramState === 'running' ? diagramStartedAt : undefined)
 
   const headerRef = useRef<HTMLDivElement>(null)
-  const [isCompact, setIsCompact] = useState(false)
+  // Responsive collapse tier: 0 = full labels · 1 = AI pills + Visual/Source + Split-cells drop to
+  // icons (Save & Export keep labels) · 2 = icon-only everything. Content-driven, NOT a magic
+  // breakpoint: collapse when the toolbar actually overflows (scrollWidth > clientWidth). The 1020
+  // floor is the measured fully-labeled width (~990–1010px) + a small buffer, so labels drop just
+  // BEFORE they clip — and hold collapsed on the way back up until there is real room — instead of
+  // the old 760px flip that let the header overflow by ~250px first.
+  const [tier, setTier] = useState(0)
 
   useEffect(() => {
     const el = headerRef.current
     if (!el) return
-    const obs = new ResizeObserver(entries => {
-      setIsCompact(entries[0].contentRect.width < 760)
-    })
+    const measure = (): void => {
+      const node = headerRef.current
+      if (!node) return
+      const w = node.clientWidth
+      const overflows = node.scrollWidth > node.clientWidth + 1
+      setTier(w < 640 ? 2 : (overflows || w < 1020 ? 1 : 0))
+    }
+    measure()
+    const obs = new ResizeObserver(measure)
     obs.observe(el)
     return () => obs.disconnect()
   }, [])
@@ -254,7 +266,7 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
   }
 
   return (
-    <div ref={headerRef} className={styles.headerRoot} data-compact={isCompact}>
+    <div ref={headerRef} className={styles.headerRoot} data-tier={tier}>
       <button
         type="button"
         className={styles.backBtn}
@@ -359,7 +371,7 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
           : 'No split draft yet — run AI Split to generate one'}
         onOpenResult={handleReviewDraft}
         tone="green"
-        compact={isCompact}
+        compact={tier >= 1}
       />
       {splitPeekOpen && mdEditorPath && (
         <PromptPeekModal
@@ -403,7 +415,7 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
         }
         onOpenResult={() => setMdEditorAnalysisPanelOpen(!mdEditorAnalysisPanelOpen)}
         tone="amber"
-        compact={isCompact}
+        compact={tier >= 1}
       />
       {analyzePeekOpen && mdEditorPath && (
         <PromptPeekModal
@@ -447,7 +459,7 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
         }
         onOpenResult={() => setMdEditorDiagramPanelOpen(!mdEditorDiagramPanelOpen)}
         tone="green"
-        compact={isCompact}
+        compact={tier >= 1}
       />
       {diagramPeekOpen && mdEditorPath && (
         <PromptPeekModal
@@ -505,7 +517,7 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
         isSkillOrAgent={isSkillOrAgent}
         installState={exportState}
         onInstallSkill={handleExport}
-        compact={isCompact}
+        compact={tier >= 2}
       />
 
       {/* Deterministic "Split into cells" — parses the open file into editable cells. */}

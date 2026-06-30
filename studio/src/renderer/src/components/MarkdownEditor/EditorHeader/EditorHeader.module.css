@@ -33,6 +33,9 @@
   display: flex;
   align-items: center;
   min-width: 0;
+  /* Cap so a long file name truncates (it already has overflow:ellipsis) instead of eating
+     toolbar width and pressuring the right-side controls before the collapse tiers kick in. */
+  max-width: 200px;
 }
 
 .breadcrumbText {
@@ -254,25 +257,22 @@
 .exportBtn[data-state='success'] { background: var(--green); }
 .exportBtn[data-state='error']   { background: var(--red); }
 
-/* ── Compact mode — collapse text labels to icon-only ──────────────────────── */
-.headerRoot[data-compact='true'] .btnLabel {
+/* ── Responsive collapse — content-driven, two tiers (see EditorHeader.tsx) ────
+   tier 1 — the AI pills (via their own `compact` prop), the Visual/Source toggle, and Split-cells
+   drop labels to icons. Save & Export KEEP labels here: Save's label is STATE (Save / Saved /
+   Error), not just identity, and Export is the primary CTA.
+   tier 2 — icon-only everything, Save & Export included. */
+.headerRoot[data-tier='1'] .viewToggleBtn .btnLabel,
+.headerRoot[data-tier='1'] .cellsBtn .btnLabel {
   display: none;
 }
+.headerRoot[data-tier='1'] .cellsBtn { padding: 4px 7px; }
+.headerRoot[data-tier='1'] .viewToggleBtn { padding: 3px 7px; }
 
-.headerRoot[data-compact='true'] .cellsBtn {
-  padding: 4px 7px;
+.headerRoot[data-tier='2'] .btnLabel {
+  display: none;
 }
-
-
-.headerRoot[data-compact='true'] .saveBtn {
-  padding: 4px 7px;
-  min-width: unset;
-}
-
-.headerRoot[data-compact='true'] .exportBtn {
-  padding: 4px 8px;
-}
-
-.headerRoot[data-compact='true'] .viewToggleBtn {
-  padding: 3px 7px;
-}
+.headerRoot[data-tier='2'] .cellsBtn { padding: 4px 7px; }
+.headerRoot[data-tier='2'] .viewToggleBtn { padding: 3px 7px; }
+.headerRoot[data-tier='2'] .saveBtn { padding: 4px 7px; min-width: unset; }
+.headerRoot[data-tier='2'] .exportBtn { padding: 4px 8px; }
