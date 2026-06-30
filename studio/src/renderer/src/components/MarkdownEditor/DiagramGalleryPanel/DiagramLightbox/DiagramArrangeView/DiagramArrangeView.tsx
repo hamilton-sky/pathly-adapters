@@ -28,13 +28,17 @@ interface Props {
 
 // React Flow applies these as the node's inline style — CSS vars resolve against :root,
 // so the canvas re-themes with Studio. (Node `style` is React Flow config, not JSX style.)
-const NODE_STYLE = {
+const NODE_STYLE: React.CSSProperties = {
   background: 'var(--bg-surface1)',
   color: 'var(--text-primary)',
   border: '1px solid var(--border-color)',
   borderRadius: 8,
   fontSize: 12,
   width: 160,
+  padding: '6px 10px',
+  textAlign: 'center',
+  whiteSpace: 'pre-line',
+  lineHeight: 1.3,
 }
 
 export default function DiagramArrangeView({ content, savedLayout, onSaveLayout }: Props) {

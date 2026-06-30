@@ -28,7 +28,9 @@ function parseNodeToken(tok: string): { id: string; label: string }[] {
       const idm = s.match(/^([A-Za-z0-9_]+)/)
       const id = idm ? idm[1] : s
       const lblm = s.match(/[[({>]+\s*"?([^"\]})]*?)"?\s*[\])}]*$/)
-      const label = lblm && lblm[1].trim() ? lblm[1].trim() : id
+      const raw = lblm && lblm[1].trim() ? lblm[1].trim() : id
+      // Mermaid uses \n and <br> as line breaks inside node labels.
+      const label = raw.replace(/\\n/g, '\n').replace(/<br\s*\/?>/gi, '\n')
       return { id, label }
     })
 }

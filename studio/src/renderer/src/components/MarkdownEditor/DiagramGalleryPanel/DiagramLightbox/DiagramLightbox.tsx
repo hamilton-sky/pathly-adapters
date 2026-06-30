@@ -1,12 +1,12 @@
 // Full-resolution overlay for one diagram. Default view is the static SVG with wheel-zoom
 // + drag-pan (carried via CSS custom properties — no inline transform string). For
 // flowchart/graph mermaid, an "Arrange" toggle swaps in a draggable React Flow canvas
-// (DiagramArrangeView). Esc or a backdrop click closes. Footer toolbar holds the controls.
+// (DiagramArrangeView); a header Back button returns to the SVG. Esc or a backdrop click closes.
 //
 // Path assumes: src/components/MarkdownEditor/DiagramGalleryPanel/DiagramLightbox/DiagramLightbox.tsx
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { X } from 'lucide-react'
+import { X, ArrowLeft } from 'lucide-react'
 import type { DiagramEntry } from '../../diagramTypes'
 import DiagramRender from '../DiagramRender/DiagramRender'
 import DiagramLightboxToolbar from './DiagramLightboxToolbar/DiagramLightboxToolbar'
@@ -66,6 +66,18 @@ export default function DiagramLightbox({ entry, fileName, onClose, onSaveLayout
     <div className={styles.backdrop} onClick={onClose}>
       <div className={styles.frame} onClick={(e) => e.stopPropagation()}>
         <div className={styles.header}>
+          {arranging && (
+            <button
+              type="button"
+              className={styles.back}
+              onClick={() => setArranging(false)}
+              title="Back to SVG view"
+              aria-label="Back to SVG view"
+            >
+              <ArrowLeft size={14} />
+              SVG
+            </button>
+          )}
           <span className={styles.title}>
             {entry.title}
             <span className={styles.file}> — {fileName}</span>

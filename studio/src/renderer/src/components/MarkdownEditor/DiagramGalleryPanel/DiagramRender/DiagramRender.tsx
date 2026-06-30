@@ -38,11 +38,11 @@ export default function DiagramRender({ entry, mode }: Props) {
   // plantuml — source only until a render engine is bundled.
   return (
     <div className={cls}>
+      <pre className={styles.mono}>{entry.content}</pre>
       <div className={styles.notice}>
         <AlertTriangle size={12} />
-        PlantUML render engine not bundled yet — showing source
+        PlantUML render engine not bundled. Paste source into plantuml.com to render.
       </div>
-      <pre className={styles.mono}>{entry.content}</pre>
     </div>
   )
 }

@@ -1,21 +1,13 @@
 // Footer action bar for the diagram lightbox: zoom controls, reset, copy-source, SVG
-// export (mermaid), and an Arrange toggle (flowchart/graph mermaid -> React Flow canvas).
-// Self-contained — owns its transient "copied" feedback.
+// export (mermaid), and (in SVG view) an "Arrange" button that opens the React Flow canvas.
+// Exiting Arrange is handled by the lightbox header's Back button. Self-contained — owns
+// its transient "copied" feedback.
 //
 // Path assumes:
 //   src/components/MarkdownEditor/DiagramGalleryPanel/DiagramLightbox/DiagramLightboxToolbar/DiagramLightboxToolbar.tsx
 
 import React, { useState } from 'react'
-import {
-  ZoomIn,
-  ZoomOut,
-  RotateCcw,
-  Copy,
-  Check,
-  Download,
-  Workflow,
-  Image as ImageIcon,
-} from 'lucide-react'
+import { ZoomIn, ZoomOut, RotateCcw, Copy, Check, Download, Workflow } from 'lucide-react'
 import styles from './DiagramLightboxToolbar.module.css'
 
 interface Props {
@@ -79,16 +71,15 @@ export default function DiagramLightboxToolbar({
           SVG
         </button>
       )}
-      {canArrange && (
+      {canArrange && !arranging && (
         <button
           type="button"
           className={styles.action}
-          data-active={arranging ? 'true' : 'false'}
           onClick={onToggleArrange}
-          title={arranging ? 'Back to SVG view' : 'Arrange nodes (drag to reposition)'}
+          title="Arrange nodes (drag to reposition)"
         >
-          {arranging ? <ImageIcon size={13} /> : <Workflow size={13} />}
-          {arranging ? 'SVG' : 'Arrange'}
+          <Workflow size={13} />
+          Arrange
         </button>
       )}
 

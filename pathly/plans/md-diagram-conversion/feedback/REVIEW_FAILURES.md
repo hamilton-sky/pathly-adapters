@@ -106,8 +106,8 @@ will FAIL in Phase 8; either relax S-07 to match FEATURE_INDEX, or update the no
 |---|---|---|
 | R1 | MED | ✅ Resolved — badge uses `data-style={entry.style}` + `.badge[data-style=…]` hue rules in `DiagramCard.module.css`; dot inherits via `currentColor`; `STYLE_COLOR_VAR` removed from `diagramTypes.ts`. No inline style. |
 | R2 | LOW-MED | ✅ Resolved — pan/zoom via `--tx/--ty/--zoom` custom properties (lightbox UX pass). |
-| R3 | LOW-MED | ⏳ Open — PlantUML notice wording is a product decision (S-07 exact text vs FEATURE_INDEX D6). |
+| R3 | LOW-MED | ✅ Resolved — notice now uses S-07's exact text, below the source ("PlantUML render engine not bundled. Paste source into plantuml.com to render."). |
 | R4 | LOW | ◻ Advisory — file lengths (`useEditorDiagramAction.ts` ~174; `EditorHeader.tsx` ~550). Follow-up split. |
 | R5 | LOW | ✅ Resolved — dangling `STORE_PATCH.md` reference removed from `useEditorDiagramAction.ts` header. |
-| R6 | ADV | ⏳ Open — Diagram prompts bypass fragment composition; adjudicate vs Split/Analyze. |
+| R6 | ADV | ⏳ Adjudicated, decision pending — confirmed Diagram is the OUTLIER: Split/Analyze compose via `composeClientSkill` (fragments, `useEditorAgentActions.ts:28`); Diagram uses `resolvePrompt` over `DIAGRAM_PRESETS`. Options: (a) keep presets (recommended — user-editable + prompt-preview, self-contained) and correct ARCHITECTURE_PROPOSAL §5/§11; (b) wire Diagram onto fragments (needs a `'diagram'` kind in `skillCompose.ts` + a `development/diagram` skill). Behavior-changing — left for owner's call. |
 | R7 | ADV | ◻ Advisory — `MermaidView.tsx` folder-convention nit. |

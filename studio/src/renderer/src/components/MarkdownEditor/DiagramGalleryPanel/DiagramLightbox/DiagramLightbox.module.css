@@ -50,6 +50,28 @@
   color: var(--text-muted);
 }
 
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 9px;
+  background: transparent;
+  border: var(--border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-family-base);
+  color: var(--text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.back:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
 .close {
   width: 26px;
   height: 26px;
