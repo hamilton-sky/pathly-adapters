@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Check, History, FileText, Search, Eye, ChevronRight } from 'lucide-react'
 import type { Message } from '../../../types'
 import MarkdownRenderer from '../../../../shared/MarkdownRenderer/MarkdownRenderer'
+import BoardDiagramArtifact, { diagramArtifactStyle } from './BoardDiagramArtifact/BoardDiagramArtifact'
 import s from './MsgCard.module.css'
 
 export interface CardBodyProps {
@@ -17,6 +18,15 @@ export function CardBody({ message: m, onAnswer, onResolve }: CardBodyProps) {
     : null
 
   if (m.type === 'artifact') {
+    const diagramStyle = diagramArtifactStyle(m)
+    if (diagramStyle) {
+      return (
+        <>
+          {supersededBanner}
+          <BoardDiagramArtifact message={m} style={diagramStyle} />
+        </>
+      )
+    }
     return (
       <>
         {supersededBanner}
