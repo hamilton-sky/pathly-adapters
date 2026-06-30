@@ -82,7 +82,7 @@ export interface UiState {
   mdEditorDiagramPaths: Record<string, string>
   mdEditorDiagramPanelOpen: boolean
   setMdEditorDiagramPanelOpen: (v: boolean) => void
-  setMdEditorDiagramPath: (p: string | null, forFile?: string) => void
+  setMdEditorDiagramPath: (p: string | null, forFile?: string, opts?: { open?: boolean }) => void
   /** Per-file, per-action run state — single source of truth for in-flight AI actions */
   mdEditorActions: Record<string, MdEditorActionRecord>
   setMdEditorAnalysisPanelOpen: (v: boolean) => void
@@ -188,7 +188,7 @@ export const useUiStore = create<UiState>()(
         return update
       }),
       // ── Diagram feature: mirror of setMdEditorAnalysisPath ──
-      setMdEditorDiagramPath: (p, forFile) => set((s) => {
+      setMdEditorDiagramPath: (p, forFile, opts) => set((s) => {
         const key = forFile ?? s.mdEditorPath ?? ''
         if (!key) return {}
         if (p === null) {
@@ -196,10 +196,12 @@ export const useUiStore = create<UiState>()(
           delete next[key]
           return { mdEditorDiagramPaths: next }
         }
+        // `open` defaults true: a finished run pops the gallery. On-open hydration passes
+        // open:false — it lights up the header chip without covering the editor.
+        const open = opts?.open ?? true
         const update: Partial<UiState> = {
           mdEditorDiagramPaths: { ...s.mdEditorDiagramPaths, [key]: p },
-          // Auto-open the gallery only when the finished run is for the visible file.
-          ...(key === s.mdEditorPath ? { mdEditorDiagramPanelOpen: true } : {}),
+          ...(open && key === s.mdEditorPath ? { mdEditorDiagramPanelOpen: true } : {}),
         }
         return update
       }),

@@ -10,6 +10,7 @@ import EditorLanding from './EditorLanding/EditorLanding'
 import AnalysisPanel from './AnalysisPanel/AnalysisPanel'
 // ── Diagram feature ──
 import DiagramGalleryPanel from './DiagramGalleryPanel/DiagramGalleryPanel'
+import { useDiagramHydrate } from './DiagramGalleryPanel/useDiagramHydrate'
 import { Editor } from '../Editor'
 import { usePreviewResize } from './usePreviewResize'
 
@@ -20,6 +21,10 @@ export default function MarkdownEditorPanel() {
   const previewOpen = useUiStore((s) => s.mdEditorPreviewOpen)
   const togglePreview = useUiStore((s) => s.toggleMdEditorPreview)
   const preview = usePreviewResize()
+
+  // Reopened files keep their saved diagrams: hydrate the Gallery chip from the on-disk
+  // sidecar (the in-memory path map isn't persisted across sessions).
+  useDiagramHydrate(mdEditorPath)
 
   if (!mdEditorPath) {
     return <EditorLanding />
