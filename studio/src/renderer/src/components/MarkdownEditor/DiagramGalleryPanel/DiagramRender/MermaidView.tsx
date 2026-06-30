@@ -8,6 +8,7 @@
 // Path assumes: src/components/MarkdownEditor/DiagramGalleryPanel/DiagramRender/MermaidView.tsx
 
 import React, { useEffect, useRef, useState } from 'react'
+import { AlertTriangle } from 'lucide-react'
 import { useUiStore } from '../../../../store/uiStore'
 import styles from './DiagramRender.module.css'
 
@@ -73,10 +74,18 @@ export default function MermaidView({ id, content }: Props) {
   }, [id, content, theme])
 
   if (error) {
+    // Surface WHY it failed instead of silently showing raw text — some Mermaid types
+    // (mindmap, timeline, …) are lazy-loaded chunks that can fail to load in the bundle.
     return (
-      <pre className={styles.mono} data-mermaid-error>
-        {content}
-      </pre>
+      <>
+        <pre className={styles.mono} data-mermaid-error>
+          {content}
+        </pre>
+        <div className={styles.notice}>
+          <AlertTriangle size={12} />
+          Mermaid couldn’t render this diagram: {error}
+        </div>
+      </>
     )
   }
 
