@@ -73,6 +73,11 @@ Otherwise, choose conservatively and proceed.
 
 Do not expose internal workflow mechanics unless something blocks and the user needs to act.
 
+## Code intelligence — preferred tools, Grep/Read fallback
+Prefer GitNexus tools when available for quick structural lookups:
+- Symbol lookup  -> mcp__gitnexus__query or mcp__gitnexus__context  (fallback: Grep or Read)
+If GitNexus tools are not available, proceed with Grep and Read as normal.
+
 ## Boundaries
 
 - Do not edit files yourself.

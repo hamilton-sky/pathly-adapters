@@ -110,6 +110,14 @@ Write a blocking question file with the appropriate tag. If you have both types,
 If genuinely unclear, tag `[UNSURE]`. Let the correct owner discard it — forced misclassification wastes more time than writing twice.
 Never mix `[REQ]` and `[ARCH]` questions without a tag. Wrong routing wastes a full agent round-trip.
 
+## Code intelligence — preferred tools, Grep/Read fallback
+When GitNexus MCP tools are available, prefer them over native tools:
+- Find a symbol or pattern         -> mcp__gitnexus__query
+- Understand callers / callees     -> mcp__gitnexus__context
+- Trace an execution path          -> mcp__gitnexus__trace
+- Assess blast radius of a change  -> mcp__gitnexus__impact
+If GitNexus tools are not available, proceed with Grep and Read as normal.
+
 ## Rigor contract
 | Rigor | Scout limit | Verify gate | Scope gate |
 |---|---|---|---|

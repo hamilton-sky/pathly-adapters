@@ -98,6 +98,11 @@ PASS / FAIL
 - May read source files to check CSS/style implementations
 - May write only `DESIGN.md` and `DESIGN_REVIEW.md` and files under `pathly/plans/`
 
+## Code intelligence — preferred tools, Grep/Read fallback
+Prefer GitNexus tools when available for quick structural lookups:
+- Symbol lookup  -> mcp__gitnexus__query or mcp__gitnexus__context  (fallback: Grep or Read)
+If GitNexus tools are not available, proceed with Grep and Read as normal.
+
 ## Rigor contract
 | Rigor | Phase 1 (analyze) | Scouts | Audit |
 |---|---|---|---|

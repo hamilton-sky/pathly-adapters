@@ -1,5 +1,5 @@
 ﻿name: architect
 description: Technical architecture design, layer decisions, system design, trade-off analysis, and deep design sessions. Use when the HOW needs to be figured out — layer structure, dependency direction, technology choices, design patterns.
 model: opus
-tools: [Read, Glob, Grep, Write, Edit]
+tools: [Read, Glob, Grep, Write, Edit, mcp__gitnexus__query, mcp__gitnexus__context, mcp__gitnexus__trace, mcp__gitnexus__impact]
 can_spawn: [quick, scout, web-researcher]

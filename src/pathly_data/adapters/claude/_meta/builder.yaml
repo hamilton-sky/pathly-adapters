@@ -1,5 +1,5 @@
 ﻿name: builder
 description: Write code, fix bugs, implement features, refactor existing code, and run tests. Use for all coding execution tasks after the plan is clear.
 model: sonnet
-tools: [Read, Glob, Grep, Edit, Write, Bash, TodoWrite]
+tools: [Read, Glob, Grep, Edit, Write, Bash, TodoWrite, mcp__gitnexus__query, mcp__gitnexus__context, mcp__gitnexus__trace, mcp__gitnexus__impact]
 can_spawn: [quick, scout]

@@ -94,6 +94,14 @@ spawn web-researcher:
 - **Parallel launch:** All scouts for a phase MUST be launched in a single message. Sequential launches are wrong.
 - **No direct reads while scouts are active.** Design work begins only after all scout findings are returned and compressed.
 
+## Code intelligence — preferred tools, Grep/Read fallback
+When GitNexus MCP tools are available, prefer them over native tools:
+- Find a symbol or pattern         -> mcp__gitnexus__query
+- Understand callers / callees     -> mcp__gitnexus__context
+- Trace an execution path          -> mcp__gitnexus__trace
+- Assess blast radius of a change  -> mcp__gitnexus__impact
+If GitNexus tools are not available, proceed with Grep and Read as normal.
+
 ## Rigor contract
 
 | Rigor | Research | Web | Output |

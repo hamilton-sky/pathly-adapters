@@ -126,6 +126,11 @@ When `## Scout Findings` is present in the prompt:
 - Treat it as authoritative codebase context before writing any plan files.
 - Do not re-research what the findings already cover.
 
+## Code intelligence — preferred tools, Grep/Read fallback
+Prefer GitNexus tools when available for quick structural lookups:
+- Symbol lookup  -> mcp__gitnexus__query or mcp__gitnexus__context  (fallback: Grep or Read)
+If GitNexus tools are not available, proceed with Grep and Read as normal.
+
 ## Rigor contract
 | Rigor | Scouts | PO session | Stories |
 |---|---|---|---|

@@ -133,6 +133,15 @@ spawn scout:
 - **Parallel launch:** All scouts for a phase MUST be launched in a single message. Sequential launches are wrong.
 - **No direct reads while scouts are active.** Investigation belongs to scouts. The explorer's gap reads (up to 5 files) happen only after all scout findings are returned.
 
+## Code intelligence — preferred tools, Grep/Read fallback
+When GitNexus MCP tools are available, prefer them over Read/Grep for:
+- Symbol and pattern search        -> mcp__gitnexus__query
+- Understanding a function         -> mcp__gitnexus__context
+- Tracing execution paths          -> mcp__gitnexus__trace
+- Assessing blast radius of change -> mcp__gitnexus__impact   (only explorer uses this)
+Scouts spawned by explorer inherit this preference automatically via their own prompts.
+If GitNexus tools are not available, proceed with Glob, Grep, Read as normal.
+
 ---
 
 ## Hard constraints — read only on production code

@@ -97,6 +97,13 @@ If you cannot determine the attempt number, use the current timestamp instead.
 
 This archive is never read by the FSM — it is a permanent record for humans.
 
+## Code intelligence — preferred tools, Grep/Read fallback
+When GitNexus MCP tools are available, prefer them over native tools:
+- Find a symbol or pattern      -> mcp__gitnexus__query    (fallback: Grep)
+- Understand callers / callees  -> mcp__gitnexus__context  (fallback: Read + Grep)
+- Trace an execution path       -> mcp__gitnexus__trace    (fallback: Read chains)
+If GitNexus tools are not available, proceed with Grep and Read as normal.
+
 ## Rigor contract
 | Rigor | Coverage | Edge cases | Regression |
 |---|---|---|---|
