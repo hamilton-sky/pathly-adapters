@@ -25,7 +25,9 @@ default, safe-off). Later phases extend it *by adding*, not by rewriting:
 
 from __future__ import annotations
 
+import concurrent.futures
 import hashlib
+import json
 import logging
 import os
 import shutil
@@ -40,7 +42,10 @@ _DEFAULT_BUDGET = 1500
 
 # `cli` backend bounds — keep the shell-out cheap and never let it hang the
 # prompt: at most N files queried, each subprocess call hard-capped in seconds.
-_CLI_TIMEOUT_S = 12
+# Node-based tools (gitnexus) cost ~5s just on process startup, so the per-file
+# impact+context pair runs CONCURRENTLY (see _file_section) to keep one query
+# near a single call's latency rather than the sum.
+_CLI_TIMEOUT_S = 8
 _CLI_MAX_FILES = 2
 
 # Phase 3 — content-hash cache for the cli backend. Key = (path, sha1-of-bytes),
@@ -58,6 +63,20 @@ def _file_hash(path: str) -> str:
         with open(path, "rb") as fh:
             return hashlib.sha1(fh.read()).hexdigest()
     except OSError:
+        return ""
+
+
+def _await_or_empty(fut: "concurrent.futures.Future[str]") -> str:
+    """Return the future's result, or ``""`` if it overruns the deadline.
+
+    The backstop for a code-intel CLI that hangs: a subprocess timeout does not
+    reliably kill a node tool's whole process tree (notably on Windows), so the
+    calling thread bounds the WAIT and degrades to ``""`` — the response stays
+    bounded even when the tool won't die ("never hang the prompt").
+    """
+    try:
+        return fut.result(timeout=_CLI_TIMEOUT_S + 2)
+    except Exception:
         return ""
 
 
@@ -111,20 +130,23 @@ class NoneProvider:
 
 
 class CliProvider:
-    """``cli`` backend: shells out to a code-intelligence CLI (gitnexus) for the
-    blast-radius (``impact``) and callers/callees (``context``) of the in-scope
-    files.
+    """``cli`` backend over **codebase-memory-mcp**: queries the pre-built code
+    graph for the in-scope files — each file's functions/methods/classes with
+    their caller (``in_degree``) and callee (``out_degree``) counts.
 
     Degrades to ``""`` on every failure mode — missing binary, un-indexed repo,
-    non-zero exit, timeout, or empty output — so it is always safe to enable.
-    The work is bounded (``_CLI_MAX_FILES`` files, ``_CLI_TIMEOUT_S`` per call)
-    so it can never hang or bloat prompt assembly.
+    query error, or timeout — so it is always safe to enable. Work is bounded
+    (``_CLI_MAX_FILES`` files; each query deadline-capped) and never hangs.
+
+    The repo must be indexed first (``codebase-memory-mcp cli index_repository``);
+    Pathly re-indexes at stage boundaries (cheap — a static binary over SQLite).
+    ``tool`` selects the binary name, so the source can be swapped through the
+    ``code_context.tool`` setting (e.g. back to ``gitnexus`` on Linux/CI).
     """
 
     name = "cli"
 
-    def __init__(self, tool: str = "gitnexus") -> None:
-        # `code_context.tool` (gitnexus | serena); Phase 4 supplies it from config.
+    def __init__(self, tool: str = "codebase-memory-mcp") -> None:
         self.tool = tool
 
     def build_block(
@@ -134,52 +156,89 @@ class CliProvider:
         role: str,
         budget: int,
     ) -> str:
-        # scope/role steer caching + per-role tiering at the gateway (Phase 8/9),
-        # not the raw query — the cli backend only needs the files.
+        # scope/role steer caching + per-role tiering at the gateway, not the
+        # raw query — the cli backend only needs the files.
         del scope, role
         if not files:
             return ""
         exe = shutil.which(self.tool)
         if not exe:
             return ""  # binary not installed -> safe no-op
+        project = self._project(exe, list(files)[0])
+        if not project:
+            return ""  # repo not indexed yet -> no block (caller degrades to Grep)
         sections: list[str] = []
         for path in list(files)[:_CLI_MAX_FILES]:
-            section = self._file_section(exe, path)
+            section = self._file_section(exe, project, path)
             if section:
                 sections.append(section)
         if not sections:
-            return ""  # no structural data (e.g. repo not indexed) -> no block
+            return ""
         block = (
             "## Code structure (advisory — verify before acting)\n"
             + "\n\n".join(sections)
         )
-        budget = max(0, int(budget))
-        return block[:budget]
+        return block[: max(0, int(budget))]
 
-    def _file_section(self, exe: str, path: str) -> str:
-        """Rendered structure section for ``path`` — served from the content-hash
-        cache when unchanged (Phase 3), else freshly queried via gitnexus and
-        cached. Only non-empty sections are cached."""
+    def _project(self, exe: str, sample_file: str) -> str:
+        """Indexed project whose root contains ``sample_file`` (longest-prefix
+        match), or ``""`` when the repo is not indexed."""
+        out = self._run(exe, ["cli", "list_projects", "{}"])
+        try:
+            projects = json.loads(out).get("projects", []) if out else []
+        except Exception:
+            return ""
+        target = os.path.abspath(sample_file).replace("\\", "/")
+        best_name, best_len = "", -1
+        for proj in projects:
+            root = str(proj.get("root_path") or "").replace("\\", "/").rstrip("/")
+            if root and (target == root or target.startswith(root + "/")):
+                if len(root) > best_len:
+                    best_name, best_len = str(proj.get("name") or ""), len(root)
+        return best_name
+
+    def _file_section(self, exe: str, project: str, path: str) -> str:
+        """Cached-or-fresh structure section for ``path`` (Phase 3 content-hash
+        cache). One deadline-bounded graph query; only non-empty sections cached."""
         file_hash = _file_hash(path)
         key = (path, file_hash)
         if file_hash and key in _CLI_CACHE:
             return _CLI_CACHE[key]
-        impact = self._run(exe, ["impact", path])
-        callers = self._run(exe, ["context", path])
-        parts = []
-        if impact:
-            parts.append(f"- blast radius (impact):\n{impact}")
-        if callers:
-            parts.append(f"- callers / callees (context):\n{callers}")
-        section = (f"### {path}\n" + "\n".join(parts)) if parts else ""
+        # Match on the last two path segments so repo-relative vs absolute paths
+        # both resolve against the graph's stored (index-root-relative) file_path.
+        tail = "/".join(path.replace("\\", "/").rstrip("/").split("/")[-2:])
+        cypher = (
+            'MATCH (n) WHERE n.file_path CONTAINS "' + tail + '" '
+            'AND n.label IN ["Function","Method","Class"] '
+            "RETURN n.name, n.in_degree, n.out_degree "
+            "ORDER BY n.in_degree DESC LIMIT 12"
+        )
+        payload = json.dumps({"project": project, "query": cypher})
+        # Deadline-bounded so a stuck query can never block prompt assembly.
+        pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        try:
+            out = _await_or_empty(
+                pool.submit(self._run, exe, ["cli", "query_graph", payload])
+            )
+        finally:
+            pool.shutdown(wait=False, cancel_futures=True)
+        try:
+            rows = json.loads(out).get("rows", []) if out else []
+        except Exception:
+            rows = []
+        lines = [
+            f"- {r[0]}  (callers:{r[1]}, callees:{r[2]})"
+            for r in rows
+            if isinstance(r, list) and len(r) >= 3 and r[0]
+        ]
+        section = (f"### {path}\n" + "\n".join(lines)) if lines else ""
         if file_hash and section:
             _CLI_CACHE[key] = section
         return section
 
     def _run(self, exe: str, args: list[str]) -> str:
-        """Run ``<exe> <args...>`` and return trimmed stdout, or ``""`` on any
-        failure — missing index, non-zero exit, timeout, and OS errors all
-        collapse to ``""`` (never raises)."""
+        """Run ``<exe> <args…>`` and return trimmed stdout, or ``""`` on any
+        failure (non-zero exit, timeout, OS error) — never raises."""
         try:
             proc = subprocess.run(
                 [exe, *args],
@@ -192,10 +251,7 @@ class CliProvider:
             return ""
         if proc.returncode != 0:
             return ""
-        out = (proc.stdout or "").strip()
-        if not out or "not indexed" in out.lower():
-            return ""
-        return out
+        return (proc.stdout or "").strip()
 
 
 # Static backend registry. ``none`` is a singleton; the ``cli`` backend is built
@@ -252,12 +308,14 @@ def _resolve_backend() -> str:
 
 
 def _resolve_tool() -> str:
-    """Return the ``code_context.tool`` setting (``gitnexus`` | ``serena``).
+    """Return the ``code_context.tool`` setting — the cli backend's binary name.
 
-    Defaults to ``gitnexus``; an unrecognised value falls back to it.
+    Defaults to ``codebase-memory-mcp`` (the cross-platform graph engine that
+    replaced gitnexus); ``gitnexus`` stays available (e.g. Linux/CI). An
+    unrecognised value falls back to the default.
     """
-    key = _get_setting("code_context.tool", "gitnexus").strip().lower()
-    return key if key in ("gitnexus", "serena") else "gitnexus"
+    key = _get_setting("code_context.tool", "codebase-memory-mcp").strip().lower()
+    return key if key in ("codebase-memory-mcp", "gitnexus") else "codebase-memory-mcp"
 
 
 def build_block(
