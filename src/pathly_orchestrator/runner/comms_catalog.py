@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 # Max artifact rows shown inline in the catalog index (recency-ordered). The agent
 # can list the rest via the GET URL — this bounds prompt size the way
-# _CONTEXT_CHAR_BUDGET bounds the 💡 channel.
+# _CONTEXT_CHAR_BUDGET bounds the Context channel.
 _CATALOG_INDEX_MAX = 12
 # Per-entry summary truncation so one long summary can't dominate the index.
 _CATALOG_SUMMARY_CHARS = 140

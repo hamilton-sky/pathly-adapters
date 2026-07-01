@@ -211,7 +211,7 @@ def test_comms_context_channels_context_section_advisory_label(client, monkeypat
     )
 
     # If the block is non-empty and has context items, check label
-    if "💡 Context" in block:
+    if "### Context" in block:
         assert "verify before acting" in block
 
 
@@ -311,7 +311,7 @@ def test_comms_context_channels_governance_does_not_starve_context(client, monke
 
     assert "Use Redis for caching" in block, "governance decision should appear"
     assert (
-        "💡 Context" in block
+        "### Context" in block
     ), "context section should not be starved by the decision"
     assert (
         "Cache layer added to the API" in block
