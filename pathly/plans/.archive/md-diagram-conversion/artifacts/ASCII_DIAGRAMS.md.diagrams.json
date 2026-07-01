@@ -136,7 +136,21 @@
       "status": "kept",
       "engine": "claude",
       "model": null,
-      "createdAt": "2026-06-30T18:00:00Z"
+      "createdAt": "2026-06-30T18:00:00Z",
+      "board": {
+        "id": "2722e618-8ae5-429e-89d5-e14665490bf1",
+        "at": "2026-06-30T20:20:03.137Z"
+      }
+    },
+    {
+      "id": "dg_u8tq2",
+      "title": "Component Architecture (PlantUML)",
+      "style": "plantuml",
+      "content": "@startuml\nskinparam componentStyle rectangle\n\npackage \"MarkdownEditor.tsx\" {\n  [EditorHeader] as Header\n  [AnalysisPanel] as Analysis\n  [DiagramGalleryPanel] as Gallery\n}\n\npackage \"EditorHeader\" {\n  [ActionPill: Split] as PillSplit\n  [ActionPill: Analyze] as PillAnalyze\n  [ActionPill: Diagram] as PillDiagram\n  [PromptPeekModal] as PromptModal\n  [SendPreviewModal] as SendModal\n}\n\npackage \"DiagramGalleryPanel\" {\n  [DiagramCard] as Card\n  [DiagramRender] as Render\n  [MermaidView] as Mermaid\n  [DiagramLightbox] as Lightbox\n}\n\npackage \"State & IO\" {\n  [uiStore] as Store\n  [useDiagramSidecar] as SidecarHook\n  [diagramSidecar.ts] as SidecarIO\n  database \"<file>.diagrams.json\" as Sidecar\n}\n\nHeader --> PillSplit\nHeader --> PillAnalyze\nHeader --> PillDiagram\nPillDiagram --> PromptModal : gear\nPromptModal --> SendModal : confirm\nSendModal ..> Store : setMdEditorAction(running)\nPillDiagram --> Store : Run\n\nGallery --> Card\nCard --> Render\nRender --> Mermaid : style=mermaid\nCard --> Lightbox : View\nLightbox --> Render : mode=full\n\nGallery --> SidecarHook\nSidecarHook --> SidecarIO : read\nSidecarIO --> Sidecar : read / remove / write\nStore --> Gallery : panelOpen flag\nSidecar ..> SidecarHook : diagrams[]\n\n@enduml",
+      "status": "kept",
+      "engine": "claude",
+      "model": null,
+      "createdAt": "2026-06-30T21:00:00Z"
     }
   ]
 }
