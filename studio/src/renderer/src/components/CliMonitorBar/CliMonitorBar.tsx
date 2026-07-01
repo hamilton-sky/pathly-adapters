@@ -107,10 +107,10 @@ export function CliMonitorBar(): JSX.Element | null {
       className={s.bar}
       style={{ '--bar-x': `${pos.x}px`, '--bar-y': `${pos.y}px` } as React.CSSProperties}
     >
-      <div className={s.header} onMouseDown={onDragStart} role="toolbar" aria-label="CLI Engines">
+      <div className={s.header} onMouseDown={onDragStart} role="toolbar" aria-label="Command Center">
         <GripHorizontal size={12} className={s.grip} aria-hidden="true" />
         <Cpu size={12} className={s.headerIcon} aria-hidden="true" />
-        <span className={s.title}>CLI Engines</span>
+        <span className={s.title}>Command Center</span>
         <span className={s.activeCount}>{spawnQueue.total}/{spawnQueue.caps.global}</span>
         {spawnQueue.queued.length > 0 && (
           <span className={s.queuedCount}>{spawnQueue.queued.length} queued</span>

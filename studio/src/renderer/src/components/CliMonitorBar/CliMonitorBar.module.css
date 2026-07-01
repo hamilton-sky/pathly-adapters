@@ -3,7 +3,7 @@
   left: var(--bar-x);
   top: var(--bar-y);
   z-index: 900;
-  width: 288px;
+  width: 320px;
   background: var(--bg-mantle);
   border: var(--border);
   border-radius: var(--radius-lg, 8px);
@@ -103,7 +103,7 @@
 /* ── Body ── */
 .body {
   padding: 4px;
-  max-height: 340px;
+  max-height: 480px;
   overflow-y: auto;
 }
 
