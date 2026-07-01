@@ -245,6 +245,25 @@ def test_dispatch_team_board_busy():
         board_lock.release("feature", scope, "someone-else")
 
 
+def test_dispatch_project_busy_serializes_features():
+    """Features build one at a time per project: a second run is refused while another
+    feature holds the project gate (pre-isolation safety net)."""
+    from pathly_orchestrator.db.connection import get_db
+    from pathly_orchestrator.supervisor import board_lock
+    from pathly_orchestrator.supervisor.goal_run import start_goal_run
+
+    conn = get_db()
+    goal = _make_goal(conn, "gr_proj_busy", executor="single")
+    # Another feature's build already holds the project gate (project_root="" -> "project").
+    board_lock.acquire("project", "project", "feature-A-run")
+    try:
+        result = start_goal_run(goal, project_root="", spawn_fn=lambda **k: {}, block=True)
+        assert result["ok"] is False
+        assert result["reason"] == "project_busy"
+    finally:
+        board_lock.release("project", "project", "feature-A-run")
+
+
 def test_dispatch_goal_not_found():
     from pathly_orchestrator.supervisor.goal_run import start_goal_run
 

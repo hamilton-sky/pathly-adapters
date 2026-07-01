@@ -121,6 +121,7 @@ def comms_goals_run():
             "not_found": 404,
             "not_goal": 400,
             "board_busy": 409,
+            "project_busy": 409,
             "unknown_executor": 400,
             "unknown_flow": 400,
         }.get(reason, 400)

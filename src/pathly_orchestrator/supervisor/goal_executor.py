@@ -116,33 +116,73 @@ def start_goal_run(
     else:
         executor = (row["executor"] or "single").strip().lower()
 
-    if executor == "single":
-        return _run_single(
-            goal_id, board, scope, goal_text,
-            project_root=project_root, adapter=adapter, model=model, progress=progress,
-            broadcast_fn=broadcast_fn, on_start=on_start, on_done=on_done,
-            spawn_fn=spawn_fn, block=block,
-        )
-    if executor == "loop":
-        return _run_loop(
-            goal_id, board, scope,
-            project_root=project_root, adapter=adapter, model=model,
-            broadcast_fn=broadcast_fn, event_broadcast_fn=event_broadcast_fn,
-            on_start=on_start, on_done=on_done, spawn_fn=spawn_fn, block=block,
-        )
-    if executor == "team":
-        return _run_team(
-            goal_id, board, scope,
-            flow=(flow_override or _TEAM_FLOW),
-            project_root=project_root, adapter=adapter, model=model,
-            broadcast_fn=broadcast_fn, on_start=on_start, on_done=on_done,
-            start_fn=start_fn,
-        )
-    return {
-        "ok": False,
-        "reason": "unknown_executor",
-        "error": f"unknown executor {executor!r} (expected single|loop|team)",
-    }
+    if executor not in ("single", "loop", "team"):
+        return {
+            "ok": False,
+            "reason": "unknown_executor",
+            "error": f"unknown executor {executor!r} (expected single|loop|team)",
+        }
+
+    # ── Project-level serialization (pre-isolation safety net) ────────────────
+    # Only ONE feature's build runs at a time per project, so concurrent features
+    # cannot stomp the shared working tree. Atomic via the project board-lock; the
+    # wrapped on_done frees it on async completion. Honest default until worktree-
+    # per-feature isolation (parallel-fleet) lands — then this gate is lifted.
+    from pathly_orchestrator.supervisor import board_lock
+
+    _proj_scope = project_root or "project"
+    _proj_run = str(uuid.uuid4())
+    if not board_lock.acquire("project", _proj_scope, _proj_run):
+        return {
+            "ok": False,
+            "reason": "project_busy",
+            "error": "another feature is building in this project — features build one at a time",
+            "holder": board_lock.holder("project", _proj_scope),
+        }
+
+    def _release_project() -> None:
+        board_lock.release("project", _proj_scope, _proj_run)
+
+    def _on_done_release(*args) -> None:
+        try:
+            _release_project()
+        finally:
+            _safe_call(on_done, *args)
+
+    try:
+        if executor == "single":
+            result = _run_single(
+                goal_id, board, scope, goal_text,
+                project_root=project_root, adapter=adapter, model=model, progress=progress,
+                broadcast_fn=broadcast_fn, on_start=on_start, on_done=_on_done_release,
+                spawn_fn=spawn_fn, block=block,
+            )
+        elif executor == "loop":
+            result = _run_loop(
+                goal_id, board, scope,
+                project_root=project_root, adapter=adapter, model=model,
+                broadcast_fn=broadcast_fn, event_broadcast_fn=event_broadcast_fn,
+                on_start=on_start, on_done=_on_done_release, spawn_fn=spawn_fn, block=block,
+            )
+        else:  # team
+            result = _run_team(
+                goal_id, board, scope,
+                flow=(flow_override or _TEAM_FLOW),
+                project_root=project_root, adapter=adapter, model=model,
+                broadcast_fn=broadcast_fn, on_start=on_start, on_done=_on_done_release,
+                start_fn=start_fn,
+            )
+    except Exception:
+        _release_project()
+        raise
+
+    # Free the project gate when on_done will NOT fire it asynchronously:
+    #  • block=True → the run already finished synchronously (idempotent if on_done did it);
+    #  • dispatch refused/failed → on_done never fires.
+    # A successful async run (block=False) keeps the gate until its on_done releases it.
+    if block or not (isinstance(result, dict) and result.get("ok")):
+        _release_project()
+    return result
 
 
 def _run_single(
