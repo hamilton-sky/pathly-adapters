@@ -1,6 +1,6 @@
 version: 1
 flow: team
-storage_path: pathly/plans/{topic}/
+storage_path: pathly/features/{topic}/plans/
 states:
   - STORMING
   - PLANNING

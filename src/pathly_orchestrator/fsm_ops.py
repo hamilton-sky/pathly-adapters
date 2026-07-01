@@ -70,6 +70,7 @@ def _resolve_storage_path(flow_config: dict, project_root: str, topic: str) -> P
     topic = _safe_topic(topic)
     root = Path(project_root)
     for candidate in (
+        root / "pathly" / "features" / topic / "plans",
         root / "pathly" / topic,
         root / "pathly" / "goals" / topic,
         root / "pathly" / "plans" / topic,

@@ -61,13 +61,12 @@ def _scan(cwd: Path) -> tuple[list[dict], list[dict]]:
     active: list[dict] = []
     done: list[dict] = []
 
-    for state_file, flow in iter_state_files(cwd):
+    for state_file, flow, topic in iter_state_files(cwd):
         try:
             data = json.loads(state_file.read_text(encoding="utf-8"))
         except Exception:
             continue
 
-        topic = state_file.parent.name
         state = data.get("current", "UNKNOWN")
         conv = data.get("current_conversation", 0)
         mtime = state_file.stat().st_mtime
