@@ -144,6 +144,24 @@ def _changed_files(project_root: str, limit: int = 3) -> list[str]:
         return []
 
 
+def _project_root_from_storage(storage_path: Path) -> str:
+    """Project root = everything above the ``pathly/`` storage anchor.
+
+    Robust to nesting depth — flat ``pathly/<topic>``, Phase-1 ``pathly/features/<f>/plans``,
+    or Phase-2 ``pathly/features/<f>/goals/<slug>`` all yield the same root. The old
+    ``storage_path.parent.parent.parent`` assumed the flat 3-level layout and misderived
+    the root for any nested path (a latent bug the moment ``features/<name>/plans`` shipped).
+    Uses the LAST ``pathly`` path segment so a project dir like ``…/pathly-adapters`` (whose
+    own name is not exactly ``pathly``) is never mistaken for the anchor.
+    """
+    parts = storage_path.parts
+    for i in range(len(parts) - 1, -1, -1):
+        if parts[i] == "pathly":
+            return str(Path(*parts[:i])) if i > 0 else str(storage_path.anchor or ".")
+    # No 'pathly' anchor (unexpected) — fall back to the legacy flat-layout assumption.
+    return str(storage_path.parent.parent.parent)
+
+
 def build_prompt(
     flow_config: dict,
     state_name: str,
@@ -152,7 +170,7 @@ def build_prompt(
 ) -> str:
     agent = flow_config["agent_map"][state_name]
     feature = storage_path.name
-    project_root = str(storage_path.parent.parent.parent)
+    project_root = _project_root_from_storage(storage_path)
     # Board scope the stage posts to / retrieves context from. A plain feature
     # pipeline: this IS the feature (the storage dir name). A goal-decompose run
     # (the consultation FSM): the on-disk topic is the goal slug for run isolation,

@@ -845,9 +845,12 @@ const BLOCKER_FILES = new Set([
   'HUMAN_QUESTIONS.md', 'IMPL_QUESTIONS.md', 'DESIGN_QUESTIONS.md',
 ])
 
-/** Resolve the storage path for a feature: new-style pathly/<id>/ wins if it exists,
- *  otherwise falls back to pathly/plans/<id>/. Mirrors _resolve_storage_path in fsm_ops.py. */
+/** Resolve the storage path for a feature. Mirrors _resolve_storage_path in fsm_ops.py:
+ *  features/<id>/plans wins, then new-style pathly/<id>/, then legacy pathly/plans/<id>/. */
 export async function resolveFeaturePath(projectPath: string, featureId: string): Promise<string> {
+  // Feature-centric layout (storage-restructure): pathly/features/<id>/plans holds STATE.json.
+  const featurePlans = `${projectPath}/pathly/features/${featureId}/plans`
+  if (await readFile(`${featurePlans}/STATE.json`) !== null) return featurePlans
   const newStyle = `${projectPath}/pathly/${featureId}`
   // listDir on the dir itself returns [] when the dir doesn't exist, but we need to know
   // if the dir exists. Writing a .keep file ensures the new-style dir exists, so we check

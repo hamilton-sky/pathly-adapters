@@ -237,16 +237,26 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
       const legacyNames = await listDirs(plansDir).catch(() => [] as string[])
       const legacyIds = legacyNames.filter((n) => n !== '.archive')
 
-      // New-style features live directly under pathly/<id>/
-      // Exclude reserved names so we don't pick up "plans" or hidden dirs.
-      const RESERVED = new Set(['plans', '.archive', 'goals', 'lessons', 'explorations', 'debugs', 'pipeline-walkthrough'])
+      // New-style features live directly under pathly/<id>/. Exclude the structural
+      // container dirs (mirror _RESERVED_TOPICS in storage_paths.py) so we never surface
+      // "plans"/"features"/"goals"/… as a bogus feature card.
+      const RESERVED = new Set([
+        'features', 'project', 'plans', 'debugs', 'explorations', 'fixes',
+        'goals', 'lessons', 'board-artifacts', 'pipeline-walkthrough', '.archive',
+      ])
       const pathlyDir = `${projectPath}/pathly`
       const topLevelNames = await listDirs(pathlyDir).catch(() => [] as string[])
       const newStyleIds = topLevelNames.filter((n) => !RESERVED.has(n))
 
-      // Merge: new-style takes precedence; legacy ids not already covered are appended.
-      const seen = new Set(newStyleIds)
-      const allIds = [...newStyleIds, ...legacyIds.filter((id) => !seen.has(id))]
+      // Feature-centric layout (storage-restructure Phase 1+): features live under
+      // pathly/features/<id>/. This is what makes Phase-1 features show in the sidebar.
+      const featureNames = await listDirs(`${pathlyDir}/features`).catch(() => [] as string[])
+      const featureIds = featureNames.filter((n) => n !== '.archive')
+
+      // Merge: features/ and new-style top-level take precedence; legacy plans/ ids appended.
+      const primary = [...new Set([...featureIds, ...newStyleIds])]
+      const seen = new Set(primary)
+      const allIds = [...primary, ...legacyIds.filter((id) => !seen.has(id))]
 
       // Enrich each feature from its STATE.json (stage + conv) and feedback/ (blocked).
       const features: Feature[] = await Promise.all(

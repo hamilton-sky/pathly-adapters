@@ -8,6 +8,27 @@ _DEFAULT_MODEL = "claude-sonnet-4-6"
 _CONSULTATION_FLOW = "consultation"
 
 
+def _goal_storage_dir(project_root: str, board: str, scope: str, slug: str) -> str:
+    """Where a goal-decompose writes its plan + artifacts (storage-restructure Phase 2).
+
+    Feature-tier goals nest under their feature: ``pathly/features/<feature>/goals/<slug>``
+    (the feature = the goal's parent board scope). Project/global-tier goals stay at the
+    legacy ``pathly/goals/<slug>`` until their scope homes are stood up (a follow-up).
+
+    Only the board-run decompose paths (planner/plan) use this — they pass the result to
+    ``start_board_run`` explicitly AND post their artifacts with absolute paths, so goal
+    EXECUTION (which reads context via the board, not by re-resolving a goal dir) stays
+    consistent wherever this points. The consultation path routes through the FSM resolver
+    (``_resolve_storage_path``) and is NOT nested here — that needs feature-threading through
+    the resolver + the fsm_compose root derivation, a documented follow-up.
+    """
+    import os
+
+    if board == "feature" and scope:
+        return os.path.join(project_root, "pathly", "features", scope, "goals", slug)
+    return os.path.join(project_root, "pathly", "goals", slug)
+
+
 def start_goal_decompose(
     goal_id: str,
     *,
@@ -124,7 +145,7 @@ def _decompose_planner(
             from pathly_orchestrator.supervisor.slug import ensure_goal_slug
             import os
             _slug = ensure_goal_slug(get_db(project_root or None), goal_id)
-            _goal_dir = os.path.join(project_root, "pathly", "goals", _slug)
+            _goal_dir = _goal_storage_dir(project_root, board, scope, _slug)
             os.makedirs(_goal_dir, exist_ok=True)
             _storage_path_str = _goal_dir
         except Exception:
@@ -198,7 +219,7 @@ def _decompose_plan(
             from pathly_orchestrator.supervisor.slug import ensure_goal_slug
             import os
             _slug = ensure_goal_slug(get_db(project_root or None), goal_id)
-            _goal_dir = os.path.join(project_root, "pathly", "goals", _slug)
+            _goal_dir = _goal_storage_dir(project_root, board, scope, _slug)
             os.makedirs(_goal_dir, exist_ok=True)
             _storage_path_str = _goal_dir
         except Exception:
