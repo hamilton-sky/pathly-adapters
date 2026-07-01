@@ -7,7 +7,6 @@ import { IconButton } from '../../ui'
 import { SectionHeader } from '../shared/SectionHeader'
 import { SubdirRow } from '../items/SubdirRow'
 import { WorkspaceItem } from '../items/WorkspaceItem'
-import { PlanSection } from '../items/PlanSection'
 import { InlineCreateInput } from '../shared/InlineCreateInput'
 import { WORKSPACE_FILE_SECTIONS, PROTECTED_FILENAMES } from '../constants'
 import type { Section } from '../types'
@@ -100,33 +99,9 @@ export function WorkspacePanel(props: Props): JSX.Element {
         />
       )}
 
-      <PlanSection
-        planFolders={planFolders}
-        selectedItem={selectedItem}
-        dirtyItems={dirtyItems}
-        lowerFilter={lowerFilter}
-        activeTopic={activeTopic}
-        renamingPath={renamingPath}
-        renameValue={renameValue}
-        planOpen={planOpen}
-        inlineCreate={inlineCreate}
-        onTogglePlan={onTogglePlan}
-        onToggleFolder={onToggleFolder}
-        onFolderClick={onFolderClick}
-        onNewPlan={onNewPlan}
-        onCreatePlanFile={onCreatePlanFile}
-        onInlineCreateSubmit={onInlineCreateSubmit}
-        onInlineCreateCancel={onInlineCreateCancel}
-        onDeletePlanFolder={onDeletePlanFolder}
-        onTogglePlanSubdir={onTogglePlanSubdir}
-        onSelect={onSelect}
-        onRenameChange={onRenameChange}
-        onRenameCommit={onRenameCommit}
-        onRenameCancel={onRenameCancel}
-        onStartRename={onStartRename}
-        onStartDelete={onStartDelete}
-        onSplitIntoCells={onSplitIntoCells}
-      />
+      {/* The legacy "Plan" section was dropped in the storage-restructure: features now live under
+          pathly/features/ and surface via the auto-discovered "Features" section below, so
+          PlanSection (which scanned the retired pathly/plans/) was a duplicate. */}
 
       {WORKSPACE_FILE_SECTIONS.map((section) => {
         const state = sections[section.label]
