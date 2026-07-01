@@ -55,7 +55,7 @@ POST /shutdown                       ← graceful server shutdown (health bluepr
 
 ### Comms board endpoints (multi-agent message board)
 
-The comms blueprint (`blueprints/comms.py`) backs the Studio comms board — agents and
+The comms blueprint package (`blueprints/comms/`) backs the Studio comms board — agents and
 humans post messages, ask/answer questions, decompose DAG tasks, and supersede stale notes.
 
 ```
@@ -167,17 +167,22 @@ pathly_orchestrator/
     interactions.py        # _await_agent_question
     orchestrator.py        # _loop, _resolve_stage_supervised
     api.py                 # start_run, pause_run, resume_run, abort_run, supply_decision, reroute_run
-    goal_run.py            # Board→Goals→Task-DAG executor dispatcher (Phase 1):
+    goal_run.py            # thin re-export shim (start_goal_run / start_goal_decompose) → the two modules below
+    goal_executor.py       # Board→Goals→Task-DAG executor dispatcher:
                            #   start_goal_run(goal_id, executor_override=…) reads the goal's
                            #   `executor` field and routes to one of three strategies:
                            #   single → one agent drains the whole DAG (start_board_run + drain-dag skill)
-                           #   loop   → supervisor owns the frontier via scheduler_loop (SerialIsolation)
+                           #   loop   → supervisor owns the frontier via scheduler_loop + _run_loop
                            #   team   → runs an FSM flow (default 'team-build') via start_run
-                           #   Also: start_goal_decompose() bridges an analyzed goal into a DAG
-                           #   (mode='planner' or mode='consultation').
+    goal_decomposer.py     # start_goal_decompose() bridges an analyzed goal into a DAG
+                           #   (mode='planner' or mode='consultation')
     scheduler.py           # DAG frontier loop (scheduler_loop): event-driven, blocks on completion_q;
-                           #   at most one worker per lane (LaneIsolation); goal_id= scopes the
-                           #   frontier to a single goal's tasks. Used by goal_run._run_loop.
+                           #   at most one worker per lane; goal_id= scopes the frontier to one goal's tasks
+    isolation.py           # lane / serial isolation strategies for the frontier loop
+    file_claims.py         # per-file claim tracking so parallel tasks don't collide on writes
+    artifact_reconcile.py  # reconcile board artifacts after a stage / goal run
+    slug.py                # scope / slug helpers for goal + board addressing
+    orchestrator_stage.py  # single-stage resolution helpers split out of orchestrator.py
     board_run.py           # start_board_run: board-lock + skill compose + async spawn helper
     board_lock.py          # Per-board/scope advisory lock (acquire/release/holder)
   http_server/             # Flask HTTP server: FSM endpoints + SSE + runner routes
@@ -186,21 +191,15 @@ pathly_orchestrator/
     sse.py                 # SSE globals (_clients, _runner_clients, _menu_clients) + broadcast helpers
     pricing.py             # MODEL_PRICING, compute_cost_usd()
     feedback.py            # _feedback_watcher, _process_feedback_file
-    blueprints/            # registered in app.py:36-46
-      health.py            # GET /health, GET /status, POST /shutdown
-      fsm.py               # POST /next_action, POST /complete_stage
-      runner.py            # 13 /runner/* routes (start, pause, resume, advance, decision,
-                           #   agent-answer, reroute, retry, abort, event, status, terminal/started, terminal/result)
-      telemetry.py         # POST /record_activity|/record_phase|/record_phase_summary, GET /telemetry/trends|/telemetry/pricing
-      skills/              # skills blueprint package (editor.py is a re-export shim)
-        editor_render.py   # /skills/catalog, /skills/parse, /skills/preview, /skills/compose, /skills/summary-format/<style>
-        editor_io.py       # /skills/save, /skills/export
-      flows.py             # GET/POST/DELETE /flows/stage-config (per-stage agent/model overrides)
-      menu.py              # GET /menu/<name>, GET /metrics, GET /metrics/json
-      db_api.py            # /db/* read API: stats, features, features/<f>/{events,agents,otel,runs}, stats/trends, query, settings
-      comms.py             # ~29 /comms/* routes — board + goals/DAG (goals/run|stop|decompose), context hydration (artifacts/<id>/section), memory consolidation (consolidate); see "Comms board endpoints" above
-      chat.py              # POST /chat
-      streams.py           # GET /events/menu|runner|history|stream|comms
+    blueprints/            # registered in app.py via the all_blueprints list
+      core/                # health.py (GET /health,/status; POST /shutdown); fsm.py (POST /next_action,/complete_stage)
+      runner/              # api.py + api_lifecycle.py + api_control.py — 13 /runner/* routes; streams.py (GET /events/menu|runner|history|stream|comms)
+      flows/               # defs.py (flow CRUD); stage_configs.py (per-stage agent/model overrides)
+      catalog/             # items.py (file-tree catalog)
+      skills/              # editor.py re-export shim; editor_render.py (/skills/catalog|parse|preview|compose|summary-format/<style>); editor_io.py (/skills/save|export)
+      comms/               # board + goals/DAG, split by domain: messages*.py, tasks.py, artifacts*.py, runs.py, goals.py, settings.py, context.py (+ _helpers.py); see "Comms board endpoints" above
+      ops/                 # telemetry*.py (/record_activity, /record_phase*, /telemetry/*); menu.py (/menu, /metrics); db_api*.py (/db/* read API); chat.py (/chat); export.py
+      code/                # query.py (POST /code/query — codebase-intelligence)
 ```
 
 **Layer rules:**

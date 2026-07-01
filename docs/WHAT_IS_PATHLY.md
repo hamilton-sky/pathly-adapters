@@ -103,8 +103,15 @@ An agent's prompt is **composed**, not hand-written: a stage **skill body** is s
 | `feedback-protocol` | honor the feedback-file gate + escalation routing |
 | `spawn-rules` | delegate to sub-agents (gated on adapter `can_spawn`) |
 | `scout-choreography` | three-phase parallel context gathering |
+| `board-init` | seed a new board / feature with its initial context |
+| `board-start-context` | inject the board's starting context block at run start |
+| `task-dag-post` | post decomposed tasks as a `depends_on` DAG (planner path) |
+| `artifact-register` | register a produced file as a board artifact |
+| `artifact-transform` | transform / derive an artifact (summarize, split, analyze) |
+| `client-file-output` | capture engine output via a file, not the stdout tail |
+| `consult` | mid-flow consultation with another role |
 
-> The standing goal: **every prompt that Pathly sends to a CLI should flow through these fragments**, so all agents connect to the board the same way. (Closing the last bare-prompt call-sites is the *Unified CLI Composition* initiative — see `pathly/plans/unified-cli-composition/`.)
+> The standing goal: **every prompt that Pathly sends to a CLI should flow through these fragments**, so all agents connect to the board the same way. (This was the *Unified CLI Composition* initiative — now largely shipped; design archived under `pathly/features/.archive/unified-cli-composition/` + `unified-cli-finish/`.)
 
 ---
 
@@ -125,7 +132,7 @@ In runner mode Pathly is the single source of truth for prompt content; the CLI 
 
 - **Board** — the `comms_messages` substrate; the Command Center surface; injected into every prompt.
 - **Goal → Task-DAG → Executor** — a goal decomposes into a dependency-ordered task DAG, drained by a `single` / `loop` / `team` executor.
-- **Feature** — the unit of work (`project_root` + feature key); its state + artifacts live directly under `pathly/features/<feature>/` (STATE.json, plan docs, `feedback/`, `goals/`, …). Legacy features under `pathly/plans/<feature>/` are still resolved until the Phase-3 migration.
+- **Feature** — the unit of work (`project_root` + feature key); its state + artifacts live directly under `pathly/features/<feature>/` (STATE.json, plan docs, `feedback/`, `goals/`, …). Legacy features under `pathly/plans/<feature>/` are still resolved for back-compat.
 - **FSM** — the passive pipeline brain (`STORM → PLAN → DESIGN → BUILD → REVIEW → TEST → RETRO → DONE`); computes the next step, never spawns.
 - **Supervisor** — the loop that actually drives: poll FSM → spawn the stage's CLI → read the result → advance.
 - **Adapter** — a CLI back-end (`claude`, `codex`, `copilot`, `antigravity`); the same flow can route stages to different adapters.

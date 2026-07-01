@@ -1,5 +1,69 @@
 # Changelog
 
+## 2.18.1
+
+### SOLID — 400-line limit enforced
+
+- `refactor(solid)`: split oversized modules across the orchestrator (supervisor, fsm,
+  blueprints) to hold the 400-line-per-file rule.
+
+### Studio — summary depth + artifact cards
+
+- Summary depth picker in the Artifacts toolbar (app-default, persisted).
+- Collapsible artifact banners + per-section copy; card shows the description only.
+- Drag-to-board summary honors the selected depth and uses file capture (like Re-summarize).
+- Derive a description when the model omits the `## Description` section.
+
+### Python — DB migration safety
+
+- Migrate per db-path so test-swapped DBs never skip schema init.
+
+## 2.18.0
+
+### Structured summaries — depth formats + retrieval
+
+- Three summary-depth styles (gist / topic-map / detailed) with per-artifact persistence;
+  depth selector in the gear popover and on artifact cards; depth actually changes the
+  compose prompt and renders as styled markdown.
+- One structured-summary contract for all paths (markdown, not JSON); single-sourced
+  output-format templates per depth; summarize also rewrites the artifact description.
+- Summary capture via an engine-written file, not stdout tail (P0b/c); transient capture
+  files gitignored + deleted after read.
+- Hierarchical chunked embeddings — one parent vector (message + summary) plus per-bullet /
+  per-section child vectors; board context surfaces the matched per-topic chunk.
+
+### Skill composition — compose endpoint + fragments
+
+- `POST /skills/compose` endpoint + `composeClientSkill` client seam (P0a).
+- `client-file-output` + `artifact-transform` fragments + transform skills (P0b).
+- `no_defaults` opt-out drops `progress-logging` from pure-transform skills.
+- DB-backed fragment overrides + per-project skill-editor scoping — stop rewriting packaged YAML.
+- On-demand skill export to adapters + auto-commit toggle + VERIFY template.
+
+### FSM
+
+- `complete_stage` returns `next_state` so multi-stage headless runs advance (fixes the
+  driver contract that stalled every multi-stage run).
+- Proactive exit-requirement + gated, scoped auto-commit.
+
+### Studio — Command Center + AI routing
+
+- Rename the HQ panel tree → **CommandCenter**; CommsPanel refactor into per-component
+  subfolders with a `cards/` tree (GoalCard / MsgCard / TaskCard).
+- Unify AI routing — Model Manager + Router; retire the server-side summarizer.
+- Unify board spawn controls + Evaluate confirm-preview; copy-to-clipboard and copy-file-path
+  on artifact cards; Stop cancels queued CLI engines (not only running PTYs).
+
+### Docs
+
+- Lead with Pathly's primary goal (board-driven headless orchestration); align narrative
+  docs/READMEs with headless-primary + the agnostic-skills principle.
+
+### Chore / CI
+
+- Remove the differ scaffold placeholder; black-format `src/` + `tests/`, pin black / mypy /
+  bandit to stop CI drift; suppress a false-positive bandit B310.
+
 ## 2.17.0
 
 ### Comms board — Goals → Task-DAG → pluggable executors

@@ -3,7 +3,7 @@
 This document records the security/reliability posture for pathly-adapters and
 the remaining hardening work before a production-ready label.
 
-Current status: public beta candidate (core install path stable at 2.14.1).
+Current status: public beta candidate (core install path stable at 2.18.1).
 
 The adapter architecture has good safety properties: thin adapters, an explicit
 stitch pipeline, dry-run support, a Pathly-owned-file manifest, and atomic
@@ -44,11 +44,11 @@ The FSM server uses SQLite in WAL mode at `~/.pathly/pathly.db`.
 
 **Design:**
 
-- Each Flask thread gets its own `sqlite3.Connection` via `threading.local()`. There is no shared connection pool and no application-level write lock.
+- Each Flask thread gets its own `sqlite3.Connection` via `threading.local()`; there is no shared connection pool. A single process-wide `threading.RLock` (`_global_write_lock`, reentrant) serializes all in-process writers (added in 2.16.2).
 - `PRAGMA journal_mode=WAL` — readers never block writers; writers never block readers.
 - `PRAGMA busy_timeout=5000` — a write that finds the WAL locked will retry for up to 5 seconds before raising `SQLITE_BUSY`.
 - `PRAGMA foreign_keys=ON` — referential integrity enforced at the DB layer.
-- A background daemon thread runs `PRAGMA wal_checkpoint(PASSIVE)` every 30 seconds to keep the WAL file from growing unbounded.
+- A background daemon thread runs `PRAGMA wal_checkpoint(PASSIVE)` every 5 minutes to keep the WAL file from growing unbounded.
 
 **Risk:**
 

@@ -166,7 +166,7 @@ the instance.
 1. Update adapter package version in `pyproject.toml`
 2. Update Studio app version in `studio/package.json` and `studio/package-lock.json` when the release includes Studio changes
 3. Update root `package.json` version to match `pyproject.toml`
-4. Update version references in `README.md`, `docs/SECURITY.md`, `docs/PRODUCTION_READINESS.md`, and `docs/SYSTEM_REVIEW.md`
+4. Update version references in `README.md`, `CLAUDE.md`, `docs/SECURITY.md`, and `docs/PRODUCTION_READINESS.md`, then run `python scripts/check_version_sync.py` to confirm the JSON manifests (`package.json`, `studio/package.json`, codex `plugin.json`) match `pyproject.toml`
 5. Add a `CHANGELOG.md` entry describing the changes
 6. Commit and tag: `git tag v<version>`
 7. Push tag: `git push origin v<version>`

@@ -3,7 +3,7 @@
 ## What this repo is
 
 `pathly-adapters` is the monorepo for the **Pathly AI development framework**:
-- Python package (`pathly-adapters` v2.16.x) — FSM orchestrator, telemetry, install CLI
+- Python package (`pathly-adapters` v2.18.x) — FSM orchestrator, telemetry, install CLI
 - Electron app (`studio/`) — the supervisory **board / Command Center** through which a human drives *headless* multi-agent runs (the visual flow builder + AI chat panel are surfaces within it)
 - Agent/skill source (`src/pathly_data/`) — canonical role contracts, skill markdown, adapter configs
 
@@ -83,6 +83,7 @@ In runner mode Pathly is the single source of truth for skill content. The CLI r
 | designer | sonnet | UI/UX design systems |
 | explorer | sonnet | traces code paths, structural questions |
 | web-researcher | sonnet | external knowledge gathering |
+| evaluator | sonnet | classifies a board's context (CODE/RESEARCH/BOTH) → analysis artifact + next-step task posts |
 | quick / scout | haiku | fast lookups |
 | orchestrator | haiku | deterministic FSM recovery |
 | human | — | placeholder for human-in-the-loop steps |
@@ -93,15 +94,17 @@ In runner mode Pathly is the single source of truth for skill content. The CLI r
 
 ## Comms board (orchestration substrate)
 
-A DB-backed message board (`comms_messages` + `comms_artifacts` tables, `/comms/*` routes) where agents and humans post decisions, discoveries, artifacts, and DAG tasks. It is the Studio **Command Center** surface and is injected into every agent prompt as governance + semantic context (`retrieve_board_context`). The **Board → Goals → per-goal Task-DAG → pluggable-executors** model is **live** (`goal_id`/`executor` columns; executors = `single`/`loop`/`team`, dispatched by `supervisor/goal_run.py`; goals decompose via planner/consultation, run with a per-goal executor + CLI-engine selector, and stop via `/comms/goals/stop`). Also live: a **context-retrieval** layer (per-task `context_refs` manifest → `/comms/artifacts/<id>/section` hydration → Board Catalog → client-side AI-Router summaries) and a **memory-consolidation** layer (relevance-gated 💡 channel, near-duplicate dedup + a manual reflection pass via `/comms/consolidate`). Only **P3** (parallel: across-goal lanes → worktree fan-in) remains. Design + roadmap live in `pathly/plans/comms-board/` (see `ROADMAP.md`). Details: [src/pathly_orchestrator/CLAUDE.md](src/pathly_orchestrator/CLAUDE.md).
+A DB-backed message board (`comms_messages` + `comms_artifacts` tables, `/comms/*` routes) where agents and humans post decisions, discoveries, artifacts, and DAG tasks. It is the Studio **Command Center** surface and is injected into every agent prompt as governance + semantic context (`retrieve_board_context`). The **Board → Goals → per-goal Task-DAG → pluggable-executors** model is **live** (`goal_id`/`executor` columns; executors = `single`/`loop`/`team`, dispatched by `supervisor/goal_executor.py` (`goal_run.py` is a thin re-export shim; goals decompose via `goal_decomposer.py`); goals decompose via planner/consultation, run with a per-goal executor + CLI-engine selector, and stop via `/comms/goals/stop`). Also live: a **context-retrieval** layer (per-task `context_refs` manifest → `/comms/artifacts/<id>/section` hydration → Board Catalog → client-side AI-Router summaries) and a **memory-consolidation** layer (relevance-gated 💡 channel, near-duplicate dedup + a manual reflection pass via `/comms/consolidate`). Only **P3** (parallel: across-goal lanes → worktree fan-in) remains. Design + roadmap live in `pathly/features/comms-board/` (see `ROADMAP.md`). Details: [src/pathly_orchestrator/CLAUDE.md](src/pathly_orchestrator/CLAUDE.md).
 
 ---
 
 ## Feature plans (feature-centric layout)
 
 Storage mirrors board scope — **one home per feature**. New features live under
-`pathly/features/<name>/`. Legacy `pathly/plans/<name>/` is still *resolved* for back-compat
-(the resolver + Studio discovery probe both) until the Phase-3 migration deletes the fallback.
+`pathly/features/<name>/` (flat — no `plans/` subfolder). Phase 3 migrated all feature *data*
+out of `pathly/plans/` and dropped the feature-discovery fallback; the `pathly/plans/` path is
+still referenced by a few subsystems (event log, artifact hydration, feedback/health probes),
+so it is not fully removed from the code.
 Design + phases: [pathly/features/storage-restructure/SPEC.md](pathly/features/storage-restructure/SPEC.md).
 
 ```
@@ -119,7 +122,7 @@ pathly/features/.archive/<name>/   completed features (mirrors the shape above)
 pathly/project/                    PROJECT scope (cross-feature): goals/, board-artifacts/, lessons/
 ~/.pathly/                         GLOBAL scope (cross-project): pathly.db, lessons/
 
-# Legacy, still resolved until Phase 3 completes: pathly/plans/<name>/ (e.g. comms-board)
+# Legacy, still resolved for back-compat: pathly/plans/<name>/
 ```
 
 ---
@@ -170,8 +173,9 @@ blueprints/
   flows/      defs (flow CRUD), stage_configs (per-stage overrides)
   catalog/    items (file-tree catalog)
   skills/     editor (skill notebook routes)
-  comms/      messages, tasks, artifacts, runs, goals, settings (board subsystems)
-  ops/        telemetry, menu, db_api, chat (operational/infra)
+  comms/      messages, tasks, artifacts, runs, goals, settings, context (board subsystems)
+  ops/        telemetry, menu, db_api, chat, export (operational/infra)
+  code/       query (codebase-intelligence query)
 ```
 A new endpoint goes into the matching domain file. If no domain matches, create a new domain file — do not add it to an unrelated file.
 

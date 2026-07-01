@@ -10,27 +10,26 @@ core/
                   building/   builder, designer
                   planning/   architect, planner, po
                   quality/    reviewer, tester
-                  research/   scout, explorer, web-researcher
+                  research/   scout, explorer, web-researcher, evaluator
                   support/    orchestrator, quick, human
                   director.md (top-level router)
 
   skills/       skill markdown, grouped by category:
                   controls/     start, go, ff, back, pause, end, status
                   development/  build, review, test, design, debug, explore, fix,
-                                build-debug, verify-debug
-                  planning/     plan, po, prd-import, storm, retro
-                  team/         team, discover, team-discover, team-plan, team-design,
-                                team-build, team-review, team-test
+                                quick-fix, execute-task, drain-dag, analyze, split,
+                                summarize (+ -gist / -detailed), commit
+                  planning/     plan, po, prd-import, storm, retro, evaluate,
+                                consolidate, create-feature, dag-sketch
+                  team/         team, discover, plan, design, architect, research,
+                                build, review, test, retro
                   utilities/    archive, log, log-agent-done, lessons, meet,
                                 verify-state, fsm-call, scout-path, reflect,
                                 commit, dispatch, help, pathly
-                  fix/          fix variants
-                  fix-hutk/     hook-triggered fix variants
+                  fix/          fix (blocked-feedback quick fix)
                   custom/       user-defined custom skills
-                  debug/        debug-specific skills
+                  debug/        debug-specific skills (build, verify)
                   fragments/    reusable prompt fragments
-                  hello/        onboarding/welcome skills
-                  planning-hello/ planning onboarding skills
 
   templates/    plan file templates:
                   plan/   USER_STORIES, IMPLEMENTATION_PLAN, CONVERSATION_PROMPTS,
@@ -42,11 +41,13 @@ core/
                              also served raw by GET /skills/summary-format/<style>
 
   flows/        flow YAML files read by the FSM:
-                  team.flow.yaml      full pipeline (STORMING→PLANNING→DESIGNING→BUILDING→REVIEWING→TESTING→RETRO→DONE)
-                  debug.flow.yaml     debug flow
-                  explore.flow.yaml   exploration flow
-                  test.flow.yaml      test-only flow
-                  quick-fix.flow.yaml nano/lite fast path
+                  team.flow.yaml         full pipeline (STORMING→PLANNING→DESIGNING→BUILDING→REVIEWING→TESTING→RETRO→DONE)
+                  team-build.flow.yaml   trimmed team flow used by the goal `team` executor
+                  consultation.flow.yaml PO→architect→researcher→designer→planner goal decompose
+                  debug.flow.yaml        debug flow
+                  explore.flow.yaml      exploration flow
+                  test.flow.yaml         test-only flow
+                  quick-fix.flow.yaml    nano/lite fast path
 
   design/       UI/UX design subsystem — powers `pathly-design` command:
                   data/   colors.csv, google-fonts.csv, styles.csv, typography.csv,
