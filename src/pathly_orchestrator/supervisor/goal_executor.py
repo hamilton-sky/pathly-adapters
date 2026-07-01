@@ -390,16 +390,27 @@ def _run_team(
             "error": f"a pipeline run is already active for {scope!r} (status={existing.status})",
         }
 
-    # Slug: stable on-disk topic under pathly/goals/<slug>
+    # Board-scoped on-disk home + FSM topic for the goal (storage-restructure): feature-tier
+    # nests under the feature (pathly/features/<feature>/goals/<slug>), project/global under
+    # pathly/project/goals/<slug>. Mirrors _decompose_consultation — the scope-nested topic
+    # makes _resolve_storage_path land the run there; the slug is the run identity within it.
+    from pathly_orchestrator.supervisor.goal_decomposer import _goal_topic
+
     slug = scope  # fallback
     if project_root and goal_id:
         try:
             from pathly_orchestrator.db.connection import get_db
             from pathly_orchestrator.supervisor.slug import ensure_goal_slug
-            import os
+
             slug = ensure_goal_slug(get_db(project_root or None), goal_id)
-            _goal_dir = os.path.join(project_root, "pathly", "goals", slug)
-            os.makedirs(_goal_dir, exist_ok=True)
+        except Exception:
+            pass
+    topic = _goal_topic(board, scope, slug)
+    if project_root:
+        try:
+            import os
+
+            os.makedirs(os.path.join(project_root, "pathly", *topic.split("/")), exist_ok=True)
         except Exception:
             pass
 
@@ -418,11 +429,11 @@ def _run_team(
     if _start is None:
         from pathly_orchestrator.supervisor.api import start_run as _start
         # Only re-seed when driving the REAL FSM — a test start_fn owns its own state.
-        _reset_fsm_state_for_flow(flow, slug, project_root)
+        _reset_fsm_state_for_flow(flow, topic, project_root)
 
     try:
         state = _start(
-            topic=slug,
+            topic=topic,
             flow=flow,
             project_root=project_root or "",
             model=model or _DEFAULT_MODEL,

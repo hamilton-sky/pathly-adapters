@@ -1,6 +1,6 @@
 version: 1
 flow: team-build
-storage_path: pathly/plans/{topic}/
+storage_path: pathly/{topic}/
 # Trimmed team flow — the `team` executor (GOALS-DAG-EXECUTORS §3, §6). Runs
 # build → review → test → retro on a goal whose decomposition (plan + task DAG)
 # already exists (from the consultation flow or a single planner run). The upfront

@@ -1,6 +1,6 @@
 version: 1
 flow: test
-storage_path: "pathly/plans/{topic}/"
+storage_path: "pathly/features/{topic}/"
 
 states:
   - STORMING

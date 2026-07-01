@@ -206,11 +206,12 @@ def test_dispatch_team_routes_to_team_build_flow():
     assert (
         captured["flow"] == "team-build"
     ), "team executor must run the trimmed team-build flow"
-    # T6: topic is now the goal slug (filesystem-safe), NOT the raw scope string
+    # topic is the scope-nested goal path (features/<scope>/goals/<slug>), so the team-build run's
+    # storage nests under the feature the goal lives on — not the raw scope, not a flat slug.
     topic = captured["topic"]
-    assert topic != "gr_team", "topic must be the slug, not the raw scope"
-    assert goal[:8] in topic, "slug must contain the goal id prefix"
-    assert " " not in topic and "/" not in topic
+    assert topic.startswith("features/gr_team/goals/"), "team-build storage nests under the feature"
+    assert goal[:8] in topic, "the slug (with the goal id prefix) is the trailing segment"
+    assert topic != "gr_team" and " " not in topic  # filesystem-safe scope-nested path
 
 
 def test_dispatch_team_custom_flow():
