@@ -7,9 +7,6 @@ import { ReroutePopover } from './ReroutePopover'
 import { RunnerBtn } from './RunnerBtn'
 import styles from './FlowControlBar.module.css'
 import { apiFetch } from '../../../lib/config'
-import { useAutoCommitSetting } from './hooks/useAutoCommitSetting'
-import { useCodeContextSettings } from '../../Settings/hooks/useCodeContextSettings'
-import type { CodeContextReindex } from '../../Settings/hooks/useCodeContextSettings'
 
 type Action = 'start' | 'pause' | 'resume' | 'advance' | 'retry'
 
@@ -29,8 +26,6 @@ export function FlowControlBar(): JSX.Element {
   const setRunnerMode = useRunnerStore((s) => s.setRunnerMode)
   const [showAbort, setShowAbort] = useState(false)
   const [showReroute, setShowReroute] = useState(false)
-  const { enabled: autoCommit, toggle: toggleAutoCommit } = useAutoCommitSetting()
-  const { reindex, setReindex } = useCodeContextSettings()
   const selectedFlow = useUiStore((s) => flowNameFromPath(s.lastUsedFlowPath))
 
   async function postAction(action: Action, extraBody: Record<string, unknown> = {}): Promise<void> {
@@ -136,36 +131,6 @@ export function FlowControlBar(): JSX.Element {
         <RunnerBtn label="Abort" tooltip="Stop the run completely" enabled={abortEnabled} onClick={() => setShowAbort((v) => !v)} abortStyle>
           <Square size={14} />
         </RunnerBtn>
-      </div>
-
-      <div className={styles.settingsRow}>
-        <button
-          type="button"
-          role="switch"
-          className={`${styles.switchTrack} ${autoCommit ? styles.switchOn : ''}`}
-          onClick={toggleAutoCommit}
-          title="When on, the runner commits after the build stage. Off = changes stay in your working tree for review."
-          aria-label="Auto-commit at stage end"
-          {...(autoCommit ? { 'aria-checked': 'true' } : { 'aria-checked': 'false' })}
-        >
-          <span className={styles.switchThumb} />
-        </button>
-        <span className={styles.settingsLabel}>Auto-commit at stage end</span>
-
-        <div className={styles.sep} />
-
-        <span className={styles.settingsLabel}>Re-index:</span>
-        {(['off', 'stage', 'auto'] as CodeContextReindex[]).map((opt) => (
-          <button
-            key={opt}
-            type="button"
-            aria-label={`Set re-index to ${opt}`}
-            className={`${styles.reindexBtn} ${reindex === opt ? styles.reindexBtnActive : ''}`}
-            onClick={() => setReindex(opt)}
-          >
-            {opt === 'stage' ? 'stage' : opt}
-          </button>
-        ))}
       </div>
 
       {topic === null && (

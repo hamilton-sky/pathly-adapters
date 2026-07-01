@@ -8,6 +8,7 @@ import type { CliAdapter } from '../../services/cliEngine'
 import { useCliMonitor } from './useCliMonitor'
 import type { CliSession, SessionRecord } from './useCliMonitor'
 import { SpawnQueuePanel } from './SpawnQueuePanel'
+import { CodeIntelControl } from './CodeIntelControl'
 import s from './CliMonitorBar.module.css'
 
 function fmtAgo(ms: number): string {
@@ -120,6 +121,7 @@ export function CliMonitorBar(): JSX.Element | null {
       </div>
 
       <div className={s.body}>
+        <CodeIntelControl />
         {rateLimited && (
           <div className={s.rateLimitBanner}>Rate-limited — backing off, runs are queued</div>
         )}

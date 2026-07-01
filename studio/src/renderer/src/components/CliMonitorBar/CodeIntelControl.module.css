@@ -1,0 +1,86 @@
+/* ── Code intelligence control block ── */
+.block {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
+  margin-bottom: 2px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px 4px;
+  min-width: 0;
+}
+
+.fieldLabel {
+  font-size: 10px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+/* ── On/Off toggle ── */
+.toggle {
+  position: relative;
+  width: 24px;
+  height: 14px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-surface0);
+  cursor: pointer;
+  padding: 0;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.toggleOn {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.toggleThumb {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text-secondary);
+  transition: transform var(--transition-fast), background var(--transition-fast);
+}
+
+.toggleOn .toggleThumb {
+  transform: translateX(10px);
+  background: var(--accent-fg, #fff);
+}
+
+/* ── Re-index segmented buttons ── */
+.segmented {
+  display: flex;
+  gap: 2px;
+  min-width: 0;
+}
+
+.segBtn {
+  font-size: 10px;
+  padding: 1px 5px;
+  height: 16px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: var(--transition-fast);
+}
+
+.segBtn:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.segBtnActive {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-bg, rgba(99, 102, 241, 0.08));
+}
