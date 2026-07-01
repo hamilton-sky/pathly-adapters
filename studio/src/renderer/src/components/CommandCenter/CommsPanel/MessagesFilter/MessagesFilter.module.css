@@ -1,0 +1,49 @@
+.btn {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  border: var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 120ms ease-out, border-color 120ms ease-out, color 120ms ease-out;
+}
+
+.btn:hover {
+  background: color-mix(in srgb, var(--accent) 15%, var(--bg-surface1));
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.btn:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.btn[data-active] {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* Count badge — how many types the thread is filtered to. */
+.count {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  min-width: 13px;
+  height: 13px;
+  padding: 0 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  background: var(--accent);
+  color: var(--bg-base);
+  font: 600 9px/1 var(--font-family-mono);
+}

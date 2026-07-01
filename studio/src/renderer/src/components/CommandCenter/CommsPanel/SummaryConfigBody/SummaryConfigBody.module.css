@@ -1,0 +1,88 @@
+.heading {
+  font: 600 10px/1 var(--font-family-base);
+  color: var(--text-muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 8px 10px 7px;
+  border-bottom: var(--border);
+}
+
+.body {
+  padding: 8px 10px;
+}
+
+/* Pads the shared StylePicker (Gist / Topic map / Detailed) into the popover column. */
+.styleWrap {
+  padding: 8px 10px;
+}
+
+/* Output-shape preview — renders the selected depth's template (the SAME contract compose
+   injects) as formatted markdown, with a small style-name header. */
+.formatBox {
+  margin: 0 10px 8px;
+  padding: 7px 9px 3px;
+  background: var(--bg-surface0);
+  border: var(--border);
+  border-radius: var(--radius-md);
+  max-height: 138px;
+  overflow: auto;
+}
+
+.formatTitle {
+  font: 700 9px/1 var(--font-family-base);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 3px;
+}
+
+/* Compact overrides for the rendered template — two classes deep to defeat
+   MarkdownRenderer's default (larger) element sizes. */
+.formatBox .formatMd p {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  margin: 2px 0 5px;
+}
+.formatBox .formatMd ul {
+  padding-left: 15px;
+  margin: 2px 0 5px;
+}
+.formatBox .formatMd li {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+  margin: 1px 0;
+}
+.formatBox .formatMd h3 {
+  font-size: 11px;
+  color: var(--text-primary);
+  margin: 4px 0 2px;
+}
+.formatBox .formatMd code {
+  font-size: 10.5px;
+}
+.formatBox .formatMd > :first-child { margin-top: 0; }
+.formatBox .formatMd > :last-child { margin-bottom: 3px; }
+
+.note {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  resize: vertical;
+  padding: 6px 8px;
+  font: 400 12px/1.4 var(--font-family-base);
+  color: var(--text-primary);
+  background: var(--bg-surface0);
+  border: var(--border);
+  border-radius: var(--radius-md);
+}
+
+.note:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.note::placeholder {
+  color: var(--text-muted);
+}

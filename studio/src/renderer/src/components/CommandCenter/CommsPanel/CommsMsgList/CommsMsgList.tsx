@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Star, MessageSquare, Trash2 } from 'lucide-react'
-import type { BoardScope, Message } from '../../types'
+import type { BoardScope, Message, MessageType } from '../../types'
 import { agentMeta } from '../../constants'
 import { MsgCard } from '../cards/MsgCard/MsgCard'
 import { PhaseRow } from '../cards/PhaseRow/PhaseRow'
@@ -14,6 +14,8 @@ export interface CommsMsgListProps {
   searchResults?: Message[] | null
   searchTerm?: string
   flashId?: string | null
+  /** Message types to show; empty/undefined = show all. Pinned messages are exempt. */
+  typeFilter?: MessageType[]
   onAnswer?: (messageId: string, optionId: string) => void
   onResolve?: (messageId: string, mode: 'block' | 'note' | 'ignore') => void
   onDelete?: (messageId: string) => void
@@ -21,7 +23,7 @@ export interface CommsMsgListProps {
 }
 
 // Pinned decisions tray + the message thread.
-export function CommsMsgList({ scope, messages, searchResults, searchTerm, flashId, onAnswer, onResolve, onDelete, onSupersede }: CommsMsgListProps) {
+export function CommsMsgList({ scope, messages, searchResults, searchTerm, flashId, typeFilter, onAnswer, onResolve, onDelete, onSupersede }: CommsMsgListProps) {
   // Pinned-message delete confirmation (cards manage their own confirm state).
   const [confirmPinId, setConfirmPinId] = useState<string | null>(null)
 
@@ -51,8 +53,10 @@ export function CommsMsgList({ scope, messages, searchResults, searchTerm, flash
   const pins = messages.filter((m) => m.pinned)
   // Goals and tasks live in the dedicated "Goals & Tasks" board view, not the
   // message thread — filter them out here so the Messages view stays a clean log.
+  // An optional type filter (empty = all) narrows the thread further; pins are exempt.
+  const typeSet = typeFilter && typeFilter.length > 0 ? new Set(typeFilter) : null
   const thread = messages.filter(
-    (m) => !m.pinned && m.type !== 'goal' && m.type !== 'task',
+    (m) => !m.pinned && m.type !== 'goal' && m.type !== 'task' && (!typeSet || typeSet.has(m.type)),
   )
 
   return (
@@ -105,7 +109,7 @@ export function CommsMsgList({ scope, messages, searchResults, searchTerm, flash
         : (
           <div className={s.empty}>
             <MessageSquare size={22} />
-            <p>No messages on this board yet.</p>
+            <p>{typeSet ? 'No messages match the current filter.' : 'No messages on this board yet.'}</p>
           </div>
         )}
 

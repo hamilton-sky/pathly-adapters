@@ -88,6 +88,7 @@ export async function summarizeArtifactById(
   selection: AiSelection,
   cwd?: string,
   style: SummaryStyle = SUMMARY_STYLE_DEFAULT,
+  note?: string,
 ): Promise<boolean> {
   if (isOff(selection)) return false
   const name = artifactPath.split(/[/\\]/).pop() ?? artifactPath
@@ -97,6 +98,13 @@ export async function summarizeArtifactById(
     const abs = resolveArtifactPath(artifactPath, cwd)
     const text = await readFile(abs)
     if (!text || !text.trim()) return false
+
+    // The board's per-board default instruction is appended mid-prompt (after the
+    // dash-safe composed body) so it can never break argv parsing — mirrors the
+    // per-artifact "special request" in useResummarize.
+    const noteSuffix = note && note.trim()
+      ? `\n\n## Additional request from the user\n${note.trim()}`
+      : ''
 
     // CLI ENGINE: compose the depth skill and have the engine WRITE its summary to a sibling
     // file, then read it — the reliable file-based capture the Re-summarize path uses. Falls
@@ -111,7 +119,7 @@ export async function summarizeArtifactById(
         { projectRoot: cwd },
       )
       if (composed) {
-        await runJob({ kind: 'summarize', prompt: composed, cwd }, selection)
+        await runJob({ kind: 'summarize', prompt: composed + noteSuffix, cwd }, selection)
         const fileText = await pollSummaryFile(outAbs)
         void deleteFile(outAbs).catch(() => {})
         if (fileText == null) return false
@@ -124,7 +132,7 @@ export async function summarizeArtifactById(
     // MODEL target, or engine fallback when compose is unreachable: bare prompt + returned text.
     if (raw == null) {
       const result = await runJob(
-        { kind: 'summarize', prompt: buildSummarizePrompt(text, style), cwd },
+        { kind: 'summarize', prompt: buildSummarizePrompt(text, style) + noteSuffix, cwd },
         selection,
       )
       raw = (result.text ?? '').trim()
@@ -161,6 +169,8 @@ export interface SummarizeArtifactArgs {
   cwd?: string
   /** Summary depth; defaults to the app default (topic-map) when omitted. */
   style?: SummaryStyle
+  /** Per-board default instruction appended to the summary prompt (optional). */
+  note?: string
 }
 
 /**
@@ -169,7 +179,7 @@ export interface SummarizeArtifactArgs {
  * Never throws — drop/upload must not be blocked by a summary failure.
  */
 export async function summarizeArtifact(args: SummarizeArtifactArgs): Promise<boolean> {
-  const { messageId, path, atype, selection, cwd, style } = args
+  const { messageId, path, atype, selection, cwd, style, note } = args
   if (isOff(selection)) return false
   const name = path.split(/[/\\]/).pop() ?? path
   if (!isSummarizable(atype, name)) return false
@@ -177,7 +187,7 @@ export async function summarizeArtifact(args: SummarizeArtifactArgs): Promise<bo
   const artifactId = await artifactIdForMessage(messageId)
   if (!artifactId) return false
 
-  return summarizeArtifactById(messageId, artifactId, path, selection, cwd, style)
+  return summarizeArtifactById(messageId, artifactId, path, selection, cwd, style, note)
 }
 
 /** Parse a stored summary_selection JSON string into an AiSelection, or null. */

@@ -125,6 +125,11 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
     // or 'global' / projectRoot basename for wider boards.
     const featureParam = scope === 'feature' ? key : (scope === 'global' ? 'global' : key)
     const messages = await fetchBoard(featureParam, params.board, params.scope)
+    // Change-guard: the fallback poll calls this every few seconds. Skip the set (and
+    // the store-wide re-render it triggers) when the board is byte-identical to what's
+    // already loaded, so an idle poll costs a fetch + compare and nothing else.
+    const prev = get().boards[boardId]
+    if (prev && prev.length === messages.length && JSON.stringify(prev) === JSON.stringify(messages)) return
     set((s) => ({ boards: { ...s.boards, [boardId]: messages } }))
   },
 
@@ -157,6 +162,9 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
           return buildFeature(id, state, blocked, last)
         }),
       )
+      // Change-guard (see loadBoard): the periodic refresh calls this on an interval;
+      // skip the set when the feature list is unchanged so the sidebar doesn't re-render.
+      if (JSON.stringify(get().features) === JSON.stringify(features)) return
       set({ features })
     } catch {
       // leave existing features list intact on error

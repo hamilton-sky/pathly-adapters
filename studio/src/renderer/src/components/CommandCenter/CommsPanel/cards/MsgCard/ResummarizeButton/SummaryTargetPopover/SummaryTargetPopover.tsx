@@ -1,11 +1,8 @@
-import { useEffect, useRef, useState, useLayoutEffect } from 'react'
+import { useEffect, useRef, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { AiTargetSelector } from '../../../../../../shared/AiTargetSelector/AiTargetSelector'
-import { StylePicker, STYLE_OPTIONS } from '../../../../../../shared/StylePicker/StylePicker'
 import type { AiSelection } from '../../../../../../../services/aiRouter'
 import type { SummaryStyle } from '../../../../../../../store/commsApi'
-import { fetchSummaryFormat } from '../../../../../../../services/summaryFormat'
-import MarkdownRenderer from '../../../../../../shared/MarkdownRenderer/MarkdownRenderer'
+import { SummaryConfigBody } from '../../../../SummaryConfigBody/SummaryConfigBody'
 import s from './SummaryTargetPopover.module.css'
 
 interface Props {
@@ -19,24 +16,14 @@ interface Props {
   onClose: () => void
 }
 
-const POPOVER_WIDTH = 220
+const POPOVER_WIDTH = 320
 
-// Gear-anchored popover for the per-artifact AI target selector. Portals to body,
-// positioned relative to the gear button (above or below depending on viewport space).
-// Outside-click + Escape to close, matching DecomposeConfigPopover's idiom.
+// Gear-anchored popover for the per-artifact summary config. Portals to body,
+// positioned relative to the gear button (above or below depending on viewport
+// space). Outside-click + Escape to close. The inner sections come from the shared
+// SummaryConfigBody so this and the board-level SummaryConfig stay identical.
 export function SummaryTargetPopover({ anchorEl, value, onChange, style, onStyleChange, note, onNoteChange, onClose }: Props): JSX.Element | null {
   const ref = useRef<HTMLDivElement>(null)
-  // Local draft — persist on blur (one POST per edit, not per keystroke).
-  const [noteDraft, setNoteDraft] = useState(note)
-  const activeStyle = STYLE_OPTIONS.find((o) => o.value === style) ?? STYLE_OPTIONS[1]
-  // The output-format preview is the SAME contract the agent receives — fetched from the depth's
-  // template file (core/templates/summary/<style>.md), never hardcoded, so they can't drift.
-  const [formatPreview, setFormatPreview] = useState('')
-  useEffect(() => {
-    let alive = true
-    void fetchSummaryFormat(style).then((f) => { if (alive) setFormatPreview(f) })
-    return () => { alive = false }
-  }, [style])
 
   useLayoutEffect(() => {
     if (!anchorEl || !ref.current) return
@@ -68,37 +55,17 @@ export function SummaryTargetPopover({ anchorEl, value, onChange, style, onStyle
 
   return createPortal(
     <div ref={ref} className={s.popover} role="dialog" aria-label="Choose AI target and summary depth">
-      <div className={s.heading}>Summary depth</div>
-      <div className={s.styleWrap}>
-        <StylePicker value={style} onChange={onStyleChange} />
-      </div>
-      {formatPreview && (
-        <div className={s.formatBox} aria-label={`${activeStyle.label} output format`}>
-          <div className={s.formatTitle}>{activeStyle.label}</div>
-          <MarkdownRenderer
-            content={
-              `**Description** — a 1–2 sentence “what it is & why it matters” ` +
-              `(refreshes the card’s Description).\n\n**Summary**\n${formatPreview}`
-            }
-            className={s.formatMd}
-          />
-        </div>
-      )}
-      <div className={s.heading}>AI target for this artifact</div>
-      <div className={s.body}>
-        <AiTargetSelector value={value} onChange={(sel) => { onChange(sel) }} allowOff />
-      </div>
-      <div className={s.heading}>Special request (optional)</div>
-      <div className={s.body}>
-        <textarea
-          className={s.note}
-          value={noteDraft}
-          rows={3}
-          placeholder="e.g. focus on the security parts; write for a non-technical reader"
-          onChange={(e) => setNoteDraft(e.target.value)}
-          onBlur={() => { if (noteDraft !== note) onNoteChange(noteDraft) }}
-        />
-      </div>
+      <SummaryConfigBody
+        style={style}
+        onStyleChange={onStyleChange}
+        selection={value}
+        onSelectionChange={onChange}
+        note={note}
+        onNoteChange={onNoteChange}
+        targetLabel="AI target for this artifact"
+        noteLabel="Special request (optional)"
+        notePlaceholder="e.g. focus on the security parts; write for a non-technical reader"
+      />
     </div>,
     document.body,
   )

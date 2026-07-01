@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { BoardScope, Message, MessageType } from '../../types'
 import { useCommsStore } from '../../../../store/commsStore'
+import { scopeToParams } from '../../../../store/commsApi'
 import { useProjectStore } from '../../../../store/projectStore'
 import { PATHLY_API_BASE } from '../../../../lib/config'
 import { handleSummaryRequest } from '../ArtifactsView/handleSummaryRequest'
@@ -31,9 +32,15 @@ export function useCommsPanel(scope: BoardScope, mainFeature: string) {
 
     void store.loadBoard(scope, key, projectRoot)
 
+    // Subscribe to the SAME scope the server broadcasts under — the canonical DB
+    // scope from scopeToParams, NOT the raw key. For feature/global these are equal,
+    // but a project board is stored under the normalized project path, so subscribing
+    // to 'project' (the key) would never receive its COMMS_UPDATE events.
+    const sseScope = scopeToParams(scope, scope === 'project' ? projectRoot : key).scope
+
     let es: EventSource | null = null
     try {
-      es = new EventSource(`${PATHLY_API_BASE}/events/comms?scope=${encodeURIComponent(key)}`)
+      es = new EventSource(`${PATHLY_API_BASE}/events/comms?scope=${encodeURIComponent(sseScope)}`)
       es.onmessage = (e: MessageEvent) => {
         try {
           const data = JSON.parse(e.data as string) as { type: string; event?: string; phase?: string; goal_id?: string; message_id?: string; error?: string; artifact_id?: string; artifact_path?: string; selection?: { type?: string; id?: string } }
@@ -72,7 +79,14 @@ export function useCommsPanel(scope: BoardScope, mainFeature: string) {
       es.onerror = () => { /* EventSource auto-reconnects */ }
     } catch { /* EventSource not available — silently skip */ }
 
-    return () => { es?.close() }
+    // Fallback poll. The SSE push can silently stall — most commonly the browser's
+    // ~6-concurrent-connection HTTP/1.1 cap, hit once several EventSource streams are
+    // open (per-board + spawn + menu + runner) — which leaves the board stale until
+    // remount. A light periodic reload keeps it live regardless: instant when the SSE
+    // delivers, ≤5s behind when it doesn't. GET /comms is a small loopback read.
+    const poll = window.setInterval(() => { loadRef.current() }, 5000)
+
+    return () => { es?.close(); window.clearInterval(poll) }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scope, key, projectRoot])
 

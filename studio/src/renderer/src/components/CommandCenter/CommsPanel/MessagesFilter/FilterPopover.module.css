@@ -1,0 +1,106 @@
+.popover {
+  position: fixed;
+  top: var(--pop-top);
+  left: var(--pop-left);
+  width: 268px;
+  max-width: calc(100vw - 16px);
+  max-height: 60vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 11px;
+  background: var(--bg-mantle);
+  border: var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  z-index: 9999;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.title {
+  font: 600 11px/1 var(--font-family-base);
+  color: var(--text-secondary);
+}
+
+.clear {
+  padding: 2px 6px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--accent);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.clear:hover {
+  background: var(--bg-surface1);
+}
+
+/* Category groups — subheader over a wrapped chip row. */
+.groups {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.groupLabel {
+  font: 600 9px/1 var(--font-family-mono);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-width: 0;
+}
+
+/* Each chip wraps a full-opacity MessageTypeBadge (so muted types like 'status'
+   stay legible). Selected = accent ring + tint + a leading check; the check slot
+   is always reserved so chips don't shift when toggled. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 5px 2px 3px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  cursor: pointer;
+  transition: background 120ms ease-out, border-color 120ms ease-out;
+}
+
+.chip:hover {
+  background: var(--bg-surface1);
+}
+
+.chip[data-on] {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+
+.checkSlot {
+  width: 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--accent);
+}

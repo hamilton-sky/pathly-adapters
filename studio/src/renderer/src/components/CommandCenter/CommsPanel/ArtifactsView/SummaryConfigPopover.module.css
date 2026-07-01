@@ -1,0 +1,19 @@
+/* Portal shell for the board-level summary config. Inner section styles live in
+   SummaryConfigBody.module.css (shared with the per-artifact popover). */
+.popover {
+  position: fixed;
+  top: var(--pop-top);
+  left: var(--pop-left);
+  width: 320px;
+  max-width: calc(100vw - 16px);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-mantle);
+  border: var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  z-index: 9999;
+  /* visible (not hidden): the AI-target dropdown can open upward and would be
+     clipped at the popover's top edge by overflow:hidden. */
+  overflow: visible;
+}

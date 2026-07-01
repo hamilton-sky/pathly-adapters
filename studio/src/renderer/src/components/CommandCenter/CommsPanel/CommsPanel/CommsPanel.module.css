@@ -1,3 +1,22 @@
+/* Persistent header row: search bar (grows) + the board-global Evaluate pill.
+   Owns the bottom border so the underline spans the whole row (search + pill),
+   not just the search field. */
+.headerRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  min-width: 0;
+  border-bottom: var(--border);
+  background: var(--bg-mantle);
+}
+
+/* Let the search bar grow and shrink; the pill keeps its intrinsic width. */
+.searchWrap {
+  flex: 1;
+  min-width: 0;
+}
+
 .foot {
   flex-shrink: 0;
   /* Pin the compose footer to the bottom of the panel in EVERY board view —

@@ -10,8 +10,11 @@ import { GoalsView } from '../GoalsView/GoalsView'
 import { NewGoalButton } from '../GoalsView/NewGoalButton'
 import { EvaluateBoardButton } from '../GoalsView/EvaluateBoardButton'
 import { ArtifactsView } from '../ArtifactsView/ArtifactsView'
+import { SummaryConfig } from '../ArtifactsView/SummaryConfig'
+import { MessagesFilter } from '../MessagesFilter/MessagesFilter'
 import { summarizeArtifact } from '../ArtifactsView/summarizeArtifact'
 import { useArtifactSummaryTarget } from '../hooks/useArtifactSummaryTarget'
+import { useBoardSummaryNote } from '../hooks/useBoardSummaryNote'
 import { useCommsPanel } from '../hooks/useCommsPanel'
 import { useStore } from '../../../../store'
 import { apiStartFlow, apiPostArtifact, resolveFeaturePath, scopeToParams } from '../../../../store/commsApi'
@@ -70,6 +73,9 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
   const [type, setType] = useState<MessageType>(scope === 'feature' ? 'nudge' : 'decision')
   const [composeText, setComposeText] = useState('')
   const [boardView, setBoardView] = useState<BoardView>('messages')
+  // Message-thread type filter (empty = show all). Persists across tab switches so
+  // switching to Goals and back keeps the filter; the trigger shows a count badge.
+  const [typeFilter, setTypeFilter] = useState<MessageType[]>([])
   const projectPath = useStore((st) => st.projectPath)
   // The AI target that summarizes dropped artifacts (app-default, persisted).
   const {
@@ -78,6 +84,9 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
   } = useArtifactSummaryTarget()
 
   const boardKey = scope === 'feature' ? mainFeature : scope
+  // Per-board default instruction for artifact summaries (localStorage-backed);
+  // appended to every artifact dropped on this board. Target + depth stay app-wide.
+  const [summaryNote, setSummaryNote] = useBoardSummaryNote(boardKey)
 
   // Send to agent: the message comes from the modal (NOT the board input box).
   // Post it to the board as a nudge so there's a record, then run the configured
@@ -108,7 +117,7 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
   // there). Off ⇒ skip — filename/title only. Best-effort; never blocks the drop.
   const summarizePosted = async (messageId: string, path: string, atype: string): Promise<void> => {
     if (isOff(summarySelection)) return
-    await summarizeArtifact({ messageId, path, atype, selection: summarySelection, cwd: projectRoot, style: summaryStyle })
+    await summarizeArtifact({ messageId, path, atype, selection: summarySelection, cwd: projectRoot, style: summaryStyle, note: summaryNote })
   }
 
   // Drop files onto the Artifacts view → copy each into the feature's artifacts/
@@ -181,13 +190,35 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
 
   return (
     <>
-      <SearchBar value={searchTerm} onSearch={runSearch} onClear={clearSearch} />
+      {/* Persistent header: search + the board-global Evaluate pill (spawns a CLI
+          agent that reads the whole board). Evaluate stays visible on every tab —
+          it is board-scoped, not tab-scoped — while the toggle row below carries
+          each tab's own control (filter / new goal / summary settings). */}
+      <div className={s.headerRow}>
+        <div className={s.searchWrap}>
+          <SearchBar value={searchTerm} onSearch={runSearch} onClear={clearSearch} />
+        </div>
+        <EvaluateBoardButton boardKey={boardKey} />
+      </div>
       <BoardViewToggle
         view={boardView}
         onChange={setBoardView}
-        rightAction={boardView === 'goals' || boardView === 'artifacts'
-          ? <>{boardView === 'goals' && <NewGoalButton onCreate={(text) => post('goal', text)} />}<EvaluateBoardButton boardKey={boardKey} /></>
-          : undefined}
+        rightAction={
+          boardView === 'goals' ? (
+            <NewGoalButton onCreate={(text) => post('goal', text)} />
+          ) : boardView === 'artifacts' ? (
+            <SummaryConfig
+              selection={summarySelection}
+              onSelectionChange={setSummarySelection}
+              style={summaryStyle}
+              onStyleChange={setSummaryStyle}
+              note={summaryNote}
+              onNoteChange={setSummaryNote}
+            />
+          ) : (
+            <MessagesFilter value={typeFilter} onChange={setTypeFilter} />
+          )
+        }
       />
 
       {boardView === 'messages' && (
@@ -197,6 +228,7 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
           searchResults={searchResults}
           searchTerm={searchTerm}
           flashId={flashId}
+          typeFilter={typeFilter}
           onAnswer={answer}
           onResolve={resolve}
           onDelete={del}
@@ -219,10 +251,6 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
           onSupersede={supersede}
           onDropFiles={handleDropFiles}
           onDropPaths={handleDropPaths}
-          summarySelection={summarySelection}
-          onSummarySelectionChange={setSummarySelection}
-          summaryStyle={summaryStyle}
-          onSummaryStyleChange={setSummaryStyle}
         />
       )}
 

@@ -2,10 +2,6 @@ import { useState, type DragEvent } from 'react'
 import { FileText, Upload } from 'lucide-react'
 import type { Message } from '../../types'
 import { PATHLY_DRAG_MIME } from '../../../../types'
-import { AiTargetSelector } from '../../../shared/AiTargetSelector/AiTargetSelector'
-import { StylePicker } from '../../../shared/StylePicker/StylePicker'
-import type { AiSelection } from '../../../../services/aiRouter'
-import type { SummaryStyle } from '../../../../store/commsApi'
 import { MsgCard } from '../cards/MsgCard/MsgCard'
 import s from './ArtifactsView.module.css'
 
@@ -17,12 +13,6 @@ interface Props {
   onDropFiles?: (files: File[]) => void
   /** Project files dragged from the workspace tree — referenced in place (no copy). */
   onDropPaths?: (items: { path: string; name: string }[]) => void
-  /** The AI target used to summarize dropped artifacts (app-default, persisted upstream). */
-  summarySelection: AiSelection | null
-  onSummarySelectionChange: (sel: AiSelection) => void
-  /** The depth used to summarize dropped artifacts (app-default, persisted upstream). */
-  summaryStyle: SummaryStyle
-  onSummaryStyleChange: (style: SummaryStyle) => void
 }
 
 // The "Artifacts" board view: type='artifact' messages as a filtered card list,
@@ -30,12 +20,10 @@ interface Props {
 // card — board content the evaluator can then read. Two drag sources:
 //   • OS files (from Explorer/Finder) → copied into the feature's artifacts/.
 //   • Workspace-tree files (internal drag, PATHLY_DRAG_MIME) → referenced in place.
-// The toolbar selector picks the AI target that summarizes each dropped artifact
-// (client-side via aiRouter); "Off" skips summarization. Conv 3 replaced the old
-// localStorage backend dropdown with this unified AiTargetSelector.
+// The AI target + depth that summarize each dropped artifact are configured via the
+// SummaryConfig popover in the board's view-toggle row (top right), not here.
 export function ArtifactsView({
   messages, onDelete, onSupersede, onDropFiles, onDropPaths,
-  summarySelection, onSummarySelectionChange, summaryStyle, onSummaryStyleChange,
 }: Props): JSX.Element {
   const artifacts = messages.filter((m) => m.type === 'artifact')
   const [dragOver, setDragOver] = useState(false)
@@ -77,26 +65,6 @@ export function ArtifactsView({
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
     >
-      <div className={s.toolbar}>
-        <div className={s.toolbarRow}>
-          <label className={s.toolbarLabel} htmlFor="av-summary-target">Summarize with:</label>
-          <div className={s.toolbarControl}>
-            <AiTargetSelector
-              id="av-summary-target"
-              ariaLabel="Artifact summary AI target"
-              value={summarySelection}
-              onChange={onSummarySelectionChange}
-              allowOff
-            />
-          </div>
-        </div>
-        <div className={s.toolbarRow}>
-          <span className={s.toolbarLabel}>Depth:</span>
-          <div className={s.toolbarControl}>
-            <StylePicker value={summaryStyle} onChange={onSummaryStyleChange} ariaLabel="Artifact summary depth" />
-          </div>
-        </div>
-      </div>
       {artifacts.length === 0 ? (
         <div className={s.empty}>
           <FileText size={22} />

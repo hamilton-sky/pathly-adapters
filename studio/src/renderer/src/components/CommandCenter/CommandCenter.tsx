@@ -71,7 +71,13 @@ export function CommandCenter() {
   }, [projectPath, store, cc])
 
   useEffect(() => {
-    if (projectPath) void store.loadFeatures(projectPath)
+    if (!projectPath) return
+    void store.loadFeatures(projectPath)
+    // The features list (stages, blocked status, newly-created features) has no live
+    // push channel — refresh it periodically so the sidebar/cards don't go stale
+    // until a manual action or remount.
+    const id = window.setInterval(() => { void store.loadFeatures(projectPath) }, 10000)
+    return () => window.clearInterval(id)
   }, [projectPath, store.loadFeatures])
 
   useEffect(() => {
