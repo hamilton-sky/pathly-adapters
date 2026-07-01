@@ -222,7 +222,7 @@ def complete_stage(args: dict) -> dict:
     if next_state == "DONE":
         return {"done": True}
 
-    instructions = _fops.build_prompt(flow_config, next_state, storage_path)
+    instructions = _fops.build_prompt(flow_config, next_state, storage_path, goal_id or "")
     agent = flow_config["agent_map"][next_state]
     menu = _fops.build_menu_payload(flow_config, next_state, storage_path)
     result = _fops._response_envelope(

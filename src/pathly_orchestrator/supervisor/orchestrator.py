@@ -99,7 +99,12 @@ def _loop(state: RunnerState, broadcast_fn: Optional[Callable]) -> None:
             # ── Call FSM next_action ──────────────────────────────────────────
             try:
                 response = fhc.next_action(
-                    {"flow": flow, "topic": topic, "project_root": project_root}
+                    {
+                        "flow": flow,
+                        "topic": topic,
+                        "project_root": project_root,
+                        "goal_id": state.goal_id or None,
+                    }
                 )
             except RuntimeError as exc:
                 with _lock:

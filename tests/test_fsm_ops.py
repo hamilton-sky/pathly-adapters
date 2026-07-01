@@ -644,6 +644,34 @@ def test_build_prompt_includes_pipeline_history(tmp_path):
     assert "smoke test entry" in result, f"History entry missing from prompt:\n{result}"
 
 
+def test_build_prompt_threads_goal_id_into_composition(tmp_path):
+    """Regression: the FSM/consultation path must thread goal_id into the caps so the
+    terminal planner keeps its goal_id-gated task-dag-post fragment. Before the fix,
+    build_prompt passed the bare adapter string → goal_id absent → DAG-seeding dropped →
+    a `decompose via consultation` run finished without ever seeding the board DAG."""
+    from pathly_orchestrator.fsm_ops import build_prompt
+
+    feature = "goal-decompose-feature"
+    plan_dir = tmp_path / "pathly" / "plans" / feature
+    plan_dir.mkdir(parents=True, exist_ok=True)
+    flow_config = {
+        "agent_map": {"PLANNING": "planning/plan"},
+        "composition": {},
+    }
+
+    _MARKER = "## Posting the task DAG to the Comms Board"
+
+    with_goal = build_prompt(flow_config, "PLANNING", plan_dir, "goal-123")
+    assert _MARKER in with_goal, (
+        "task-dag-post fragment was dropped even though goal_id was supplied — "
+        "goal_id is not reaching compose_skill"
+    )
+
+    # No goal_id (ordinary feature run) → gated fragment correctly stays dropped.
+    without_goal = build_prompt(flow_config, "PLANNING", plan_dir, "")
+    assert _MARKER not in without_goal
+
+
 # ── T2.4 — FSM loads flow from rows (Phase 2 regression) ─────────────────────
 
 

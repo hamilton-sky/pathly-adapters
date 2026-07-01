@@ -123,6 +123,7 @@ def next_action(args: dict) -> dict:
     flow_name = args["flow"]
     topic = args["topic"]
     project_root = args["project_root"]
+    goal_id = args.get("goal_id") or ""
 
     flow_config = _load_flow(flow_name, project_root)
     storage_path = _resolve_storage_path(flow_config, project_root, topic)
@@ -295,7 +296,9 @@ def next_action(args: dict) -> dict:
     if state_info["current_state"] == "DONE":
         return {"done": True}
 
-    instructions = build_prompt(flow_config, state_info["current_state"], storage_path)
+    instructions = build_prompt(
+        flow_config, state_info["current_state"], storage_path, goal_id
+    )
     agent = flow_config["agent_map"][state_info["current_state"]]
     menu = build_menu_payload(flow_config, state_info["current_state"], storage_path)
     result = _response_envelope(

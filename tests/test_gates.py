@@ -189,7 +189,7 @@ def test_complete_stage_gate_blocks(tmp_path, monkeypatch):
     monkeypatch.setattr(
         fsm_ops,
         "build_prompt",
-        lambda fc, state, sp: f"instructions for {state}",
+        lambda fc, state, sp, goal_id="": f"instructions for {state}",
     )
 
     storage = _storage(tmp_path)
@@ -224,7 +224,7 @@ def test_complete_stage_gate_then_advance(tmp_path, monkeypatch):
     monkeypatch.setattr(
         fsm_ops,
         "build_prompt",
-        lambda fc, state, sp: f"instructions for {state}",
+        lambda fc, state, sp, goal_id="": f"instructions for {state}",
     )
 
     storage = _storage(tmp_path)

@@ -144,7 +144,12 @@ def _changed_files(project_root: str, limit: int = 3) -> list[str]:
         return []
 
 
-def build_prompt(flow_config: dict, state_name: str, storage_path: Path) -> str:
+def build_prompt(
+    flow_config: dict,
+    state_name: str,
+    storage_path: Path,
+    goal_id: str = "",
+) -> str:
     agent = flow_config["agent_map"][state_name]
     feature = storage_path.name
     project_root = str(storage_path.parent.parent.parent)
@@ -157,19 +162,26 @@ def build_prompt(flow_config: dict, state_name: str, storage_path: Path) -> str:
 
     if "/" in agent:
         from pathly_orchestrator.compose import (
+            build_adapter_caps,
             compose_skill,
             compose_skill_with_block,
             load_effective_manifest,
         )
 
         adapter = _resolve_adapter(flow_config, state_name) or "claude"
+        # Thread goal_id into the caps so goal_id-gated fragments (task-dag-post,
+        # board-start-context) survive composition on the FSM/consultation path —
+        # mirroring the start_board_run decompose path. Without this the terminal
+        # planner stage loses its DAG-seeding fragment and no task DAG ever lands
+        # on the board (the whole point of a goal decompose/executor run).
+        caps = build_adapter_caps(adapter, goal_id=goal_id or "")
         manifest = load_effective_manifest(project_root)
         composition = flow_config.get("composition", {})
         block_name = composition.get(state_name)
         if block_name:
             try:
                 agent_text = compose_skill_with_block(
-                    agent, block_name, adapter, manifest=manifest
+                    agent, block_name, caps, manifest=manifest
                 )
             except KeyError:
                 logging.getLogger(__name__).warning(
@@ -177,9 +189,9 @@ def build_prompt(flow_config: dict, state_name: str, storage_path: Path) -> str:
                     block_name,
                     state_name,
                 )
-                agent_text = compose_skill(agent, adapter, manifest=manifest)
+                agent_text = compose_skill(agent, caps, manifest=manifest)
         else:
-            agent_text = compose_skill(agent, adapter, manifest=manifest)
+            agent_text = compose_skill(agent, caps, manifest=manifest)
     else:
         agent_text = _load_agent_text(agent)
 
