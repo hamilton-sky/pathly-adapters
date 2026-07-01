@@ -31,6 +31,20 @@ def test_iter_finds_all_three_layouts(tmp_path):
     assert found == {"new-feat", "legacy-feat", "flat-feat"}
 
 
+def test_iter_finds_flat_feature_centric(tmp_path):
+    # current layout: pathly/features/<name>/STATE.json (no plans/ subfolder)
+    _mk(tmp_path, "pathly/features/flat-feat")
+    _mk(tmp_path, "pathly/features/.archive/old-feat")  # archived → excluded
+    found = {topic for _sf, _flow, topic in iter_state_files(tmp_path)}
+    assert found == {"flat-feat"}
+
+
+def test_find_topic_prefers_flat_feature_root(tmp_path):
+    _mk(tmp_path, "pathly/features/myfeat")
+    res = find_topic_dir(tmp_path, "myfeat")
+    assert res == (tmp_path / "pathly" / "features" / "myfeat", "team")
+
+
 def test_find_topic_prefers_feature_root(tmp_path):
     _mk(tmp_path, "pathly/features/myfeat/plans")
     res = find_topic_dir(tmp_path, "myfeat")

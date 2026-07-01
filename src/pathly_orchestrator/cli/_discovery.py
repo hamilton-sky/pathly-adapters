@@ -1,14 +1,15 @@
 """Shared feature-discovery for the pathly-* CLI shortcuts (status / ff / back / log).
 
-Covers three storage layouts so a feature is found wherever it lives:
-  - feature-centric (new):  pathly/features/<name>/plans/STATE.json
-  - type-nested (legacy):   pathly/plans|debugs|explorations/<name>/STATE.json
-  - flat (legacy):          pathly/<name>/STATE.json
+Covers four storage layouts so a feature is found wherever it lives:
+  - feature-centric flat (current):   pathly/features/<name>/STATE.json
+  - feature-centric nested (legacy):  pathly/features/<name>/plans/STATE.json
+  - type-nested (legacy):             pathly/plans|debugs|explorations/<name>/STATE.json
+  - flat (legacy):                    pathly/<name>/STATE.json
 
 Reserved container dirs under pathly/ are skipped; results de-dupe by resolved path.
 Each result carries its own ``topic`` (the FEATURE name) because it is NOT always
-``state_file.parent.name`` — for the feature-centric layout the name is the grandparent
-(``pathly/features/<name>/plans/``), not the immediate parent (``plans``).
+``state_file.parent.name`` — for the nested feature-centric layout the name is the
+grandparent (``pathly/features/<name>/plans/``), not the immediate parent (``plans``).
 """
 
 from __future__ import annotations
@@ -36,9 +37,12 @@ def iter_state_files(cwd: Path) -> Iterator[tuple[Path, str, str]]:
     seen: set[str] = set()
     triples: list[tuple[Path, str, str]] = []
 
-    # feature-centric: pathly/features/<name>/plans/STATE.json  → topic = <name>
+    # feature-centric flat (current):   pathly/features/<name>/STATE.json        → topic = <name>
+    # feature-centric nested (legacy):  pathly/features/<name>/plans/STATE.json  → topic = <name>
     features = cwd / "pathly" / "features"
     if features.is_dir():
+        for sf in features.glob("*/STATE.json"):
+            triples.append((sf, "team", sf.parent.name))
         for sf in features.glob("*/plans/STATE.json"):
             triples.append((sf, "team", sf.parent.parent.name))
 
@@ -82,8 +86,11 @@ def find_most_recent_state(cwd: Path) -> tuple[Path, str, str] | None:
 
 
 def find_topic_dir(cwd: Path, topic: str) -> tuple[Path, str] | None:
-    """``(storage_path, flow)`` for a named topic — feature-centric first, then legacy
-    flat, then the type-nested roots."""
+    """``(storage_path, flow)`` for a named topic — feature-centric (flat, then nested)
+    first, then legacy flat, then the type-nested roots."""
+    feat_flat = cwd / "pathly" / "features" / topic
+    if (feat_flat / "STATE.json").exists():
+        return feat_flat, "team"
     feat = cwd / "pathly" / "features" / topic / "plans"
     if (feat / "STATE.json").exists():
         return feat, "team"
