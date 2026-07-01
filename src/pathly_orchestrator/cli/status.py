@@ -24,11 +24,7 @@ _FEEDBACK_PRIORITY = [
     "TEST_FAILURES",
 ]
 
-_SCAN_ROOTS = [
-    ("pathly/plans", "team"),
-    ("pathly/debugs", "debug"),
-    ("pathly/explorations", "explore"),
-]
+from pathly_orchestrator.cli._discovery import iter_state_files
 
 _SEP = "─" * 57
 
@@ -65,37 +61,31 @@ def _scan(cwd: Path) -> tuple[list[dict], list[dict]]:
     active: list[dict] = []
     done: list[dict] = []
 
-    for root_rel, flow in _SCAN_ROOTS:
-        root = cwd / root_rel
-        if not root.is_dir():
+    for state_file, flow in iter_state_files(cwd):
+        try:
+            data = json.loads(state_file.read_text(encoding="utf-8"))
+        except Exception:
             continue
-        for state_file in root.glob("*/STATE.json"):
-            if ".archive" in str(state_file):
-                continue
-            try:
-                data = json.loads(state_file.read_text(encoding="utf-8"))
-            except Exception:
-                continue
 
-            topic = state_file.parent.name
-            state = data.get("current", "UNKNOWN")
-            conv = data.get("current_conversation", 0)
-            mtime = state_file.stat().st_mtime
-            feedback = _find_feedback(state_file.parent)
+        topic = state_file.parent.name
+        state = data.get("current", "UNKNOWN")
+        conv = data.get("current_conversation", 0)
+        mtime = state_file.stat().st_mtime
+        feedback = _find_feedback(state_file.parent)
 
-            entry = {
-                "topic": topic,
-                "flow": flow,
-                "state": state,
-                "conv": conv,
-                "mtime": mtime,
-                "feedback": feedback,
-            }
+        entry = {
+            "topic": topic,
+            "flow": flow,
+            "state": state,
+            "conv": conv,
+            "mtime": mtime,
+            "feedback": feedback,
+        }
 
-            if state == "DONE":
-                done.append(entry)
-            else:
-                active.append(entry)
+        if state == "DONE":
+            done.append(entry)
+        else:
+            active.append(entry)
 
     active.sort(key=lambda e: e["mtime"], reverse=True)
     return active, done

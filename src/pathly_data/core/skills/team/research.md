@@ -26,7 +26,7 @@ Every logged event must include `"ts": "<iso-timestamp>"` (ISO-8601 UTC).
 
 log-phase PHASE_START research
 
-Read `pathly/plans/[feature]/ARCHITECTURE_PROPOSAL.md` and `PO_NOTES.md` to decide what
+Read `<feature_path>/ARCHITECTURE_PROPOSAL.md` and `PO_NOTES.md` to decide what
 external knowledge the design/plan will need. If nothing external is required (familiar
 stack, no new patterns), write a one-line `RESEARCH.md` saying so and skip the spawn.
 
@@ -36,7 +36,7 @@ ROLE: architect — external research before design
 Feature: [feature name]
 Gather: library/API docs, established patterns, and domain standards relevant to the
 architecture proposal. Cite every source. Do NOT make implementation decisions — surface
-options and trade-offs only. Write findings to pathly/plans/[feature]/RESEARCH.md.
+options and trade-offs only. Write findings to <feature_path>/RESEARCH.md.
 ```
 
 Wait for `RESEARCH.md`. Treat all findings as external and unverified — cite, don't assert.

@@ -25,7 +25,7 @@ Do not write files; quick is read-only. The retro skill/orchestrator writes RETR
 ```
 
 After quick completes:
-- Write `pathly/plans/[feature]/RETRO.md` with the summary provided.
+- Write `<feature_path>/RETRO.md` with the summary provided.
 - Append any extracted lessons to `LESSONS_CANDIDATE.md` (project root or pathly/plans/).
 
 Parse the `<usage>` block from quick's response:
@@ -70,7 +70,7 @@ If no DB events exist for the feature, write all three files with placeholders â
 Print:
 ```
 [Stage 5 â€” Retro complete]
-Pipeline complete. RETRO.md written to pathly/plans/[feature]/.
+Pipeline complete. RETRO.md written to <feature_path>/.
 Pipeline walkthrough written:
   pathly/pipeline-walkthrough/[feature]/01-PIPELINE-FLOW.md
   pathly/pipeline-walkthrough/[feature]/02-TOKEN-USAGE.md

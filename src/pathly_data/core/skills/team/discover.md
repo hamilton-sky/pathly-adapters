@@ -92,7 +92,7 @@ Wait for path. Route to `prd-import [FEATURE] [path] [rigor]`.
 
 After import returns, print:
 ```
-PRD imported. Plan files ready in pathly/plans/[feature]/
+PRD imported. Plan files ready in <feature_path>/
 
 The PRD covers your requirements. How do you want to proceed?
   [A] Skip to build — PRD is sufficient, go straight to implementation
@@ -110,9 +110,9 @@ Route back to `team [FEATURE] [rigor] [autoFlow]`.
 **B** → Call `pathly-fsm-call complete-stage --flow team --topic [FEATURE] --project-root <project_root>`. **Spawn** `po`:
 ```
 Run PO mode for the feature: [feature name]
-A PRD has already been imported. Read pathly/plans/[feature]/USER_STORIES.md as the baseline.
+A PRD has already been imported. Read <feature_path>/USER_STORIES.md as the baseline.
 Focus only on gaps: missing edge cases, unclear acceptance criteria, unstated constraints.
-The user will type "stop notes" when satisfied to write pathly/plans/[feature]/PO_NOTES.md.
+The user will type "stop notes" when satisfied to write <feature_path>/PO_NOTES.md.
 Remind them of this at the start.
 ```
 After PO completes: call `pathly-fsm-call complete-stage --flow team --topic [FEATURE] --project-root <project_root>`.
@@ -167,7 +167,7 @@ Call `pathly-fsm-call complete-stage --flow team --topic [FEATURE] --project-roo
 ```
 Run PO mode for the feature: [feature name]
 Probe requirements interactively — problem, users, MVP scope, out-of-scope, constraints, edge cases.
-The user will type "stop notes" when satisfied to write pathly/plans/[feature]/PO_NOTES.md.
+The user will type "stop notes" when satisfied to write <feature_path>/PO_NOTES.md.
 Remind them of this at the start.
 ```
 After PO completes: call `pathly-fsm-call complete-stage --flow team --topic [FEATURE] --project-root <project_root>`.
@@ -175,7 +175,7 @@ After PO completes: call `pathly-fsm-call complete-stage --flow team --topic [FE
 If not autoFlow — pause:
 ```
 [Phase 1 — PO Discussion complete]
-Requirements captured in pathly/plans/[feature]/PO_NOTES.md.
+Requirements captured in <feature_path>/PO_NOTES.md.
 Ready for architect storm? Reply 'yes' to continue, or 'no' to stop here.
 ```
 On 'no': log human response "stop". Halt.

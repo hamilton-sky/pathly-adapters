@@ -22,7 +22,7 @@ Logging is mandatory — each `log-phase` call is part of the pipeline contract.
 
 Events are logged to the central DB via `pathly_orchestrator.eventlog.append_event`.
 Every event must include `"ts": "<iso-timestamp>"` using the current ISO-8601 UTC time.
-State snapshots are written to `pathly/plans/<feature>/STATE.json` by the FSM after each transition.
+State snapshots are written to `<feature_path>/STATE.json` by the FSM after each transition.
 
 - **Log event:** `python3 -c "from pathly_orchestrator.eventlog import append_event; append_event('<feature_path>', {'type': 'FILE_CREATED', 'file': '<filename>', 'ts': '<iso-timestamp>'})"`
 - **Log retry:** Same pattern with `{'type': 'RETRY', 'key': 'conv-N:FILE.md', 'ts': '<iso-timestamp>'}`.
@@ -70,7 +70,7 @@ DAG (older plans) working exactly as before.
 
 ### Conversation fallback
 
-Read `pathly/plans/[feature]/PROGRESS.md`. Find the first conversation row with status TODO. This is Conv N.
+Read `<feature_path>/PROGRESS.md`. Find the first conversation row with status TODO. This is Conv N.
 
 ### Phase 1 — Analyze
 
@@ -110,8 +110,8 @@ Execute conversation N only. Verify. Do NOT update PROGRESS.md — the orchestra
 ## Scout Findings
 [compressed summary — or "none" if Phase 2 was skipped]
 
-If you hit requirement ambiguity (what should this do?): write pathly/plans/[feature]/feedback/IMPL_QUESTIONS.md
-If you hit a technical blocker (how is this possible?): write pathly/plans/[feature]/feedback/DESIGN_QUESTIONS.md
+If you hit requirement ambiguity (what should this do?): write <feature_path>/feedback/IMPL_QUESTIONS.md
+If you hit a technical blocker (how is this possible?): write <feature_path>/feedback/DESIGN_QUESTIONS.md
 Use the shared feedback protocol formats, then report blocked.
 Report: files changed, verify result, stories delivered.
 ```
@@ -126,18 +126,18 @@ Feedback protocol fragment. Route the highest-priority open file to the agent be
 **If `IMPL_QUESTIONS.md` exists** ([REQ] tagged):
 **Spawn** `planner`:
 ```
-Read pathly/plans/[feature]/feedback/IMPL_QUESTIONS.md.
+Read <feature_path>/feedback/IMPL_QUESTIONS.md.
 Answer each [REQ] question — clarify in USER_STORIES.md or CONVERSATION_PROMPTS.md.
-Delete pathly/plans/[feature]/feedback/IMPL_QUESTIONS.md when resolved.
+Delete <feature_path>/feedback/IMPL_QUESTIONS.md when resolved.
 ```
 After resolved: log file deleted for IMPL_QUESTIONS.md. Re-run Phase 3. Do not log retry.
 
 **If `DESIGN_QUESTIONS.md` exists** ([ARCH] tagged):
 **Spawn** `architect`:
 ```
-Read pathly/plans/[feature]/feedback/DESIGN_QUESTIONS.md.
+Read <feature_path>/feedback/DESIGN_QUESTIONS.md.
 Resolve each [ARCH] question — update ARCHITECTURE_PROPOSAL.md (or IMPLEMENTATION_PLAN.md for lite plans).
-Delete pathly/plans/[feature]/feedback/DESIGN_QUESTIONS.md when resolved.
+Delete <feature_path>/feedback/DESIGN_QUESTIONS.md when resolved.
 ```
 After resolved: log file deleted for DESIGN_QUESTIONS.md. Re-run Phase 3. Do not log retry.
 
@@ -149,7 +149,7 @@ After Phase 3 completes with no blocking feedback files:
 
 ### Phase 3.5 — Write VERIFY.md
 
-Write `pathly/plans/<feature>/VERIFY.md` with this exact content (first line must be exact):
+Write `<feature_path>/VERIFY.md` with this exact content (first line must be exact):
 ```
 RESULT: PASS
 Verified: conversation N complete — <one-sentence summary of what was verified and the outcome>

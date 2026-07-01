@@ -10,41 +10,12 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-_SCAN_ROOTS = [
-    ("pathly/plans", "team"),
-    ("pathly/debugs", "debug"),
-    ("pathly/explorations", "explore"),
-]
+from pathly_orchestrator.cli._discovery import (
+    find_most_recent_state as _find_most_recent_state,
+    find_topic_dir as _find_topic_dir,
+)
 
 _SEP = "─" * 57
-
-
-def _find_most_recent_state(cwd: Path) -> tuple[Path, str, str] | None:
-    best_mtime = -1.0
-    best: tuple[Path, str, str] | None = None
-
-    for root_rel, flow in _SCAN_ROOTS:
-        root = cwd / root_rel
-        if not root.is_dir():
-            continue
-        for state_file in root.glob("*/STATE.json"):
-            if ".archive" in str(state_file):
-                continue
-            mtime = state_file.stat().st_mtime
-            if mtime > best_mtime:
-                best_mtime = mtime
-                best = (state_file.parent, state_file.parent.name, flow)
-
-    return best
-
-
-def _find_topic_dir(cwd: Path, topic: str) -> tuple[Path, str] | None:
-    for root_rel, flow in _SCAN_ROOTS:
-        root = cwd / root_rel
-        candidate = root / topic
-        if (candidate / "STATE.json").exists():
-            return candidate, flow
-    return None
 
 
 def _ts(event: dict) -> str:

@@ -19,14 +19,33 @@ def _parse_json_file(path: Path) -> dict:
     return json.loads(raw)
 
 
+# Direct children of pathly/ that are containers, not features.
+_RESERVED_PATHLY_SUBDIRS = {
+    "plans", "debugs", "explorations", "goals", ".archive", "pipeline-walkthrough"
+}
+
+
 def _scan_filesystem_features(project_root: str) -> list[dict]:
-    """Scan pathly/plans/*/STATE.json for features not yet in the DB."""
+    """Scan for features not yet in the DB — the legacy ``pathly/plans/<feature>/`` root
+    AND the new top-level ``pathly/<feature>/`` root (reserved container dirs skipped)."""
     results: list[dict] = []
-    plans_dir = Path(project_root) / "pathly" / "plans"
-    if not plans_dir.is_dir():
+    pathly_dir = Path(project_root) / "pathly"
+    if not pathly_dir.is_dir():
         return results
 
-    for state_file in sorted(plans_dir.glob("*/STATE.json")):
+    state_files = list((pathly_dir / "plans").glob("*/STATE.json"))
+    state_files += [
+        sf
+        for sf in pathly_dir.glob("*/STATE.json")
+        if sf.parent.name not in _RESERVED_PATHLY_SUBDIRS
+    ]
+
+    seen: set[str] = set()
+    for state_file in sorted(state_files):
+        key = str(state_file.resolve())
+        if key in seen:
+            continue
+        seen.add(key)
         feature_name = state_file.parent.name
         try:
             state = _parse_json_file(state_file)

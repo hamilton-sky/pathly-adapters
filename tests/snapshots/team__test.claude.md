@@ -21,7 +21,7 @@ Logging is mandatory — each `log-phase` call is part of the pipeline contract.
 
 Events are logged to the central DB via `pathly_orchestrator.eventlog.append_event`.
 Every event must include `"ts": "<iso-timestamp>"` using the current ISO-8601 UTC time.
-State snapshots are written to `pathly/plans/<feature>/STATE.json`.
+State snapshots are written to `<feature_path>/STATE.json`.
 
 - **Log file created:** Append `{"type": "FILE_CREATED", "file": "<filename>", "ts": "<iso-timestamp>"}`.
 - **Log file deleted:** Append `{"type": "FILE_DELETED", "file": "<filename>", "ts": "<iso-timestamp>"}`.
@@ -34,7 +34,7 @@ Run: `python -c "import time; print(int(time.time()))"` and note the integer as 
 
 ## Pre-gate
 
-Read `pathly/plans/<feature>/PROGRESS.md`. Check every conversation row in the Conversation Breakdown table.
+Read `<feature_path>/PROGRESS.md`. Check every conversation row in the Conversation Breakdown table.
 If any row status is not DONE: stop and report:
 ```
 Not all conversations are complete. Route to team <feature> build first. Incomplete: Conv N
@@ -64,7 +64,7 @@ log-phase PHASE_START analyze
 **Spawn** `tester` with `phase: analyze` (see Scout choreography for the NEEDS_CONTEXT contract):
 ```
 phase: analyze
-Read pathly/plans/[feature]/USER_STORIES.md.
+Read <feature_path>/USER_STORIES.md.
 List what test infrastructure and context you need before verifying — output NEEDS_CONTEXT block only.
 
 Always include at minimum:
@@ -93,14 +93,14 @@ Track `testRetryCount = 0`.
 **Spawn** `tester` with `phase: test` and scout findings injected:
 ```
 phase: test
-Read pathly/plans/[feature]/USER_STORIES.md.
+Read <feature_path>/USER_STORIES.md.
 Run /test to verify each acceptance criterion.
 
 ## Test Context
 [compressed findings]
 
 For each criterion: PASS / FAIL / NOT COVERED.
-If any FAIL or NOT COVERED: write pathly/plans/[feature]/feedback/TEST_FAILURES.md
+If any FAIL or NOT COVERED: write <feature_path>/feedback/TEST_FAILURES.md
 using the shared feedback protocol format.
 ```
 
@@ -118,9 +118,9 @@ Log file created for TEST_FAILURES.md.
 
 **Spawn** `builder`:
 ```
-Read pathly/plans/[feature]/feedback/TEST_FAILURES.md.
+Read <feature_path>/feedback/TEST_FAILURES.md.
 Fix each failing or uncovered criterion.
-Delete pathly/plans/[feature]/feedback/TEST_FAILURES.md when resolved.
+Delete <feature_path>/feedback/TEST_FAILURES.md when resolved.
 ```
 After builder resolves: log file deleted for TEST_FAILURES.md. Re-spawn tester.
 

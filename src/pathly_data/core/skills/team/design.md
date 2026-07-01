@@ -9,7 +9,7 @@ Parse `$ARGUMENTS`: `FEATURE`, `rigor`, `autoFlow`.
 
 Events are logged to the central DB via `pathly_orchestrator.eventlog.append_event`.
 Every event must include `"ts": "<iso-timestamp>"` using the current ISO-8601 UTC time.
-State snapshots are mirrored to `pathly/plans/<feature>/STATE.json` by the FSM server after each transition.
+State snapshots are mirrored to `<feature_path>/STATE.json` by the FSM server after each transition.
 
 - **Log event:** `python3 -c "from pathly_orchestrator.eventlog import append_event; append_event('<feature_path>', {'type': 'FILE_CREATED', 'file': 'DESIGN.md', 'ts': '<iso-timestamp>'})"`
 - **Never** append `STATE_TRANSITION` events — the FSM writes all state transitions after your AGENT_DONE.
@@ -26,8 +26,8 @@ Logging is mandatory — each `log-phase` call is part of the pipeline contract.
 ## Step 1 — Extract feature description
 
 Read in order of preference:
-1. `pathly/plans/<feature>/USER_STORIES.md` — use the one-line goal from the first story
-2. `pathly/plans/<feature>/IMPLEMENTATION_PLAN.md` — use the first paragraph
+1. `<feature_path>/USER_STORIES.md` — use the one-line goal from the first story
+2. `<feature_path>/IMPLEMENTATION_PLAN.md` — use the first paragraph
 3. Fallback: humanize the feature slug (kebab → spaces)
 
 ## Step 2 — Detect tech stack
@@ -68,7 +68,7 @@ Capture the full output. If both methods fail, write a minimal `DESIGN.md` with 
 
 ## Step 4 — Write DESIGN.md
 
-Write `pathly/plans/<feature>/DESIGN.md`:
+Write `<feature_path>/DESIGN.md`:
 
 ```markdown
 # Design System — <feature>
@@ -105,15 +105,15 @@ Report completion to the FSM:
 pathly-fsm-call complete-stage --flow team --topic <feature> --project-root <project_root>
 ```
 
-The FSM reads its transition_rules (DESIGNING → next state per the team flow definition), updates the central DB, and mirrors the new state to `pathly/plans/<feature>/STATE.json`. The skill no longer writes STATE.json directly.
+The FSM reads its transition_rules (DESIGNING → next state per the team flow definition), updates the central DB, and mirrors the new state to `<feature_path>/STATE.json`. The skill no longer writes STATE.json directly.
 
 Print:
 ```
-[DESIGNING] Complete. Design system written to pathly/plans/<feature>/DESIGN.md
+[DESIGNING] Complete. Design system written to <feature_path>/DESIGN.md
 Transitioning → BUILDING
 ```
 
 ## Failure handling
 
-- If `pathly/plans/<feature>/` does not exist: print error, do not create DESIGN.md, do not transition.
+- If `<feature_path>/` does not exist: print error, do not create DESIGN.md, do not transition.
 - If search.py fails: write DESIGN.md with a note that generation failed, still log FILE_CREATED and transition — pipeline must not stall on a design step.

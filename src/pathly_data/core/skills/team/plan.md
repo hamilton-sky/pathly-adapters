@@ -50,8 +50,8 @@ log-phase PHASE_START storm-analyze
 ```
 phase: analyze
 Feature: [feature name]
-Read pathly/plans/[feature]/PO_NOTES.md if it exists.
-Read pathly/plans/[feature]/STORM_SEED.md if it exists.
+Read <feature_path>/PO_NOTES.md if it exists.
+Read <feature_path>/STORM_SEED.md if it exists.
 List what codebase research and external information you need before storming — output NEEDS_CONTEXT block only.
 
 NEEDS_CONTEXT format (one entry per line):
@@ -125,10 +125,10 @@ Record start time: run `python -c "import time; print(int(time.time()))"` and no
 
 log-phase PHASE_START po
 
-Before planner analysis, check whether `pathly/plans/<feature>/PO_NOTES.md` exists.
+Before planner analysis, check whether `<feature_path>/PO_NOTES.md` exists.
 If it exists, skip this phase entirely and proceed to Phase 1 — Analyze.
 
-If `PO_NOTES.md` does not exist, check `pathly/plans/<feature>/STORM_SEED.md`
+If `PO_NOTES.md` does not exist, check `<feature_path>/STORM_SEED.md`
 richness:
 - Rich STORM_SEED.md: spawn `po` in confirmation-pass mode.
 - Thin or absent STORM_SEED.md: spawn `po` in full-interactive mode.
@@ -151,8 +151,8 @@ log-phase PHASE_START plan-analyze
 ```
 phase: analyze
 Feature: [feature name], rigor: [rigor]
-Read pathly/plans/[feature]/STORM_SEED.md if it exists.
-Read pathly/plans/[feature]/PO_NOTES.md if it exists.
+Read <feature_path>/STORM_SEED.md if it exists.
+Read <feature_path>/PO_NOTES.md if it exists.
 If pathly/explorations/[feature]/CONCLUSIONS.md exists, read it as prior exploration context — treat its findings as established facts and do not re-investigate what it already covers.
 List what codebase context you need before writing the plan — output NEEDS_CONTEXT block only.
 
@@ -188,8 +188,8 @@ log-phase PHASE_START plan
 ```
 phase: plan
 Route to plan [feature name] [rigor].
-If pathly/plans/[feature]/STORM_SEED.md exists, consume it as pre-filled answers.
-Read pathly/plans/[feature]/PO_NOTES.md as the authoritative source of user stories.
+If <feature_path>/STORM_SEED.md exists, consume it as pre-filled answers.
+Read <feature_path>/PO_NOTES.md as the authoritative source of user stories.
 If pathly/explorations/[feature]/CONCLUSIONS.md exists, treat it as prior exploration: do not re-investigate what it covers; use its Recommendation and Evidence sections to anchor scope and risk decisions.
 Decompose — do not re-author stories.
 
@@ -213,7 +213,7 @@ log-phase PHASE_DONE plan
 If not autoFlow — pause:
 ```
 [Stage 2 — Plan complete]
-pathly/plans/[feature]/ created with the selected rigor's required files.
+<feature_path>/ created with the selected rigor's required files.
 Review USER_STORIES.md and CONVERSATION_PROMPTS.md.
 Reply 'go' to start implementation, or 'stop' to pause here.
 ```
@@ -264,7 +264,7 @@ Does NOT fire for pure UI/label mentions (e.g. "auth button label", "payment ico
 
 ### Offer (interactive mode)
 
-If any signal fires, write `pathly/plans/<feature>/feedback/HUMAN_QUESTIONS.md`:
+If any signal fires, write `<feature_path>/feedback/HUMAN_QUESTIONS.md`:
 ```
 [RIGOR ESCALATOR] — recommended additions for <feature>
 

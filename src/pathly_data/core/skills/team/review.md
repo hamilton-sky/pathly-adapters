@@ -23,7 +23,7 @@ Logging is mandatory — each `log-phase` call is part of the pipeline contract.
 
 Events are logged to the central DB via `pathly_orchestrator.eventlog.append_event`.
 Every event must include `"ts": "<iso-timestamp>"` using the current ISO-8601 UTC time.
-State snapshots are written to `pathly/plans/<feature>/STATE.json` by the FSM server (the skill never writes STATE.json directly).
+State snapshots are written to `<feature_path>/STATE.json` by the FSM server (the skill never writes STATE.json directly).
 
 - **Log event:** `python3 -c "from pathly_orchestrator.eventlog import append_event; append_event('<feature_path>', {'type': 'FILE_CREATED', 'file': '<filename>', 'ts': '<iso-timestamp>'})"`
 - **Log retry:** Same pattern with `{'type': 'RETRY', 'key': 'conv-N:FILE.md', 'ts': '<iso-timestamp>'}`.
@@ -63,11 +63,11 @@ log-phase PHASE_START analyze
 phase: analyze
 Conv N of [feature] — scan the diff to identify what context you need before reviewing.
 Run: git diff HEAD~1 HEAD
-Read pathly/plans/[feature]/ARCHITECTURE_PROPOSAL.md if it exists.
+Read <feature_path>/ARCHITECTURE_PROPOSAL.md if it exists.
 List what you need — output NEEDS_CONTEXT block only.
 
 Always include at minimum:
-  - type: scout | scope: CLAUDE.md, .claude/rules/, pathly/plans/[feature]/ARCHITECTURE_PROPOSAL.md | question: what architectural rules and coding conventions apply to the changed files?
+  - type: scout | scope: CLAUDE.md, .claude/rules/, <feature_path>/ARCHITECTURE_PROPOSAL.md | question: what architectural rules and coding conventions apply to the changed files?
 
 Output `none` if the default rules scout above is sufficient.
 ```
@@ -102,9 +102,9 @@ and read the returned `text` field (the full advisory spec — edge cases / happ
 for the phase the builder implemented). The `summary` is a pointer, not the spec —
 read `text`. These are the same refs the builder hydrated; review against the same spec.
 
-Check against these rules and pathly/plans/[feature]/ARCHITECTURE_PROPOSAL.md.
-If architectural violations found: write pathly/plans/[feature]/feedback/ARCH_FEEDBACK.md
-If implementation violations found: write pathly/plans/[feature]/feedback/REVIEW_FAILURES.md
+Check against these rules and <feature_path>/ARCHITECTURE_PROPOSAL.md.
+If architectural violations found: write <feature_path>/feedback/ARCH_FEEDBACK.md
+If implementation violations found: write <feature_path>/feedback/REVIEW_FAILURES.md
 Use the shared feedback protocol formats.
 If all clear: report PASS.
 ```
@@ -120,11 +120,11 @@ HUMAN_QUESTIONS.md when the retry limit is exceeded).
 
 After the retry guard, **spawn** `architect`:
 ```
-Read pathly/plans/[feature]/feedback/ARCH_FEEDBACK.md.
-Redesign the affected architecture in pathly/plans/[feature]/ARCHITECTURE_PROPOSAL.md,
-or pathly/plans/[feature]/IMPLEMENTATION_PLAN.md for lite plans without ARCHITECTURE_PROPOSAL.md.
+Read <feature_path>/feedback/ARCH_FEEDBACK.md.
+Redesign the affected architecture in <feature_path>/ARCHITECTURE_PROPOSAL.md,
+or <feature_path>/IMPLEMENTATION_PLAN.md for lite plans without ARCHITECTURE_PROPOSAL.md.
 If phases need to change, update IMPLEMENTATION_PLAN.md.
-Delete pathly/plans/[feature]/feedback/ARCH_FEEDBACK.md when resolved.
+Delete <feature_path>/feedback/ARCH_FEEDBACK.md when resolved.
 Report: what changed in the design.
 ```
 After architect resolves: log file deleted for ARCH_FEEDBACK.md.
@@ -134,9 +134,9 @@ Return. Orchestrator determines next state from transition_rules.
 
 After the retry guard, **spawn** `builder`:
 ```
-Read pathly/plans/[feature]/feedback/REVIEW_FAILURES.md.
+Read <feature_path>/feedback/REVIEW_FAILURES.md.
 Fix each violation listed. Do not change anything outside the listed violations.
-Delete pathly/plans/[feature]/feedback/REVIEW_FAILURES.md when all fixed.
+Delete <feature_path>/feedback/REVIEW_FAILURES.md when all fixed.
 ```
 
 **Guard — zero-diff stall check** (before re-spawning reviewer):
@@ -145,7 +145,7 @@ git diff HEAD -- . ":(exclude)pathly/plans/"
 ```
 - If command fails: skip check, print `[FSM WARNING] git diff failed — skipping zero-diff check`.
 - If output is **empty** (no code changed):
-  Write `pathly/plans/[feature]/feedback/HUMAN_QUESTIONS.md`:
+  Write `<feature_path>/feedback/HUMAN_QUESTIONS.md`:
   ```
   [STALL] Conversation N — builder and reviewer in zero-diff loop.
   Builder claimed to fix REVIEW_FAILURES.md but no code changed.
@@ -173,7 +173,7 @@ Reply 'continue' for the next conversation, or 'stop' to pause here.
 
 If autoFlow: log human response "auto-advance".
 
-Mark Conv N as DONE in `pathly/plans/[feature]/PROGRESS.md`.
+Mark Conv N as DONE in `<feature_path>/PROGRESS.md`.
 
 **Write-or-delete transition artifacts:**
 - If REVIEW_FAILURES.md was written this run: it already exists — keep it.

@@ -30,11 +30,11 @@ log-phase PHASE_START architect
 ```
 phase: storm
 Feature: [feature name], rigor: [rigor]
-Read pathly/plans/[feature]/PO_NOTES.md as the authoritative requirements (if present).
+Read <feature_path>/PO_NOTES.md as the authoritative requirements (if present).
 Produce the technical design: layers touched, dependency direction, key decisions,
-trade-offs, and risks. Write it to pathly/plans/[feature]/ARCHITECTURE_PROPOSAL.md.
+trade-offs, and risks. Write it to <feature_path>/ARCHITECTURE_PROPOSAL.md.
 If a decision needs product input you cannot resolve, write an ARCH_QUESTION block to
-pathly/plans/[feature]/feedback/HUMAN_QUESTIONS.md and stop; otherwise finish the design.
+<feature_path>/feedback/HUMAN_QUESTIONS.md and stop; otherwise finish the design.
 ```
 
 Wait for `ARCHITECTURE_PROPOSAL.md` to be written.
