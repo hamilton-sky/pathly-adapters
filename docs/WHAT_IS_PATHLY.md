@@ -125,7 +125,7 @@ In runner mode Pathly is the single source of truth for prompt content; the CLI 
 
 - **Board** — the `comms_messages` substrate; the Command Center surface; injected into every prompt.
 - **Goal → Task-DAG → Executor** — a goal decomposes into a dependency-ordered task DAG, drained by a `single` / `loop` / `team` executor.
-- **Feature** — the unit of work (`project_root` + feature key); its state + artifacts live under `pathly/plans/<feature>/`.
+- **Feature** — the unit of work (`project_root` + feature key); its state + artifacts live under `pathly/features/<feature>/` (`plans/`, `goals/`, …). Legacy features under `pathly/plans/<feature>/` are still resolved until the Phase-3 migration.
 - **FSM** — the passive pipeline brain (`STORM → PLAN → DESIGN → BUILD → REVIEW → TEST → RETRO → DONE`); computes the next step, never spawns.
 - **Supervisor** — the loop that actually drives: poll FSM → spawn the stage's CLI → read the result → advance.
 - **Adapter** — a CLI back-end (`claude`, `codex`, `copilot`, `antigravity`); the same flow can route stages to different adapters.

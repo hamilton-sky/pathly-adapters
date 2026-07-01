@@ -9,7 +9,7 @@ Features advance through: `STORMING -> PLANNING -> DESIGNING -> BUILDING -> REVI
 Each transition is driven by events written to the central SQLite DB (`~/.pathly/pathly.db`).
 
 **State & flow storage — the DB is authoritative:**
-- **FSM state** lives in the `fsm_state` table (source of truth). `STATE.json` in `pathly/plans/<feature>/` is a **synchronized mirror** written after every transition (`eventlog.write_state` writes the DB first, then the file atomically). `next_action`/`complete_stage` read the DB and only fall back to `STATE.json` when the DB has no row. The file is still read *directly* by the scope gate (`build_baseline`), Studio feature-discovery, and the CLI — a mirror, not redundant; removing it would need a migration, not a delete.
+- **FSM state** lives in the `fsm_state` table (source of truth). `STATE.json` in the feature's `plans/` dir (`pathly/features/<feature>/plans/`; legacy `pathly/plans/<feature>/`, still resolved) is a **synchronized mirror** written after every transition (`eventlog.write_state` writes the DB first, then the file atomically). `next_action`/`complete_stage` read the DB and only fall back to `STATE.json` when the DB has no row. The file is still read *directly* by the scope gate (`build_baseline`), Studio feature-discovery, and the CLI — a mirror, not redundant; removing it would need a migration, not a delete.
 - **Flows** load **DB-first at runtime** (`_load_flow`): `flow_nodes`/`flow_edges` → `flow_yaml` blob → packaged `.flow.yaml`. The `core/flows/*.flow.yaml` files are the **version-controlled seed**, re-synced into the DB on every server start (`_refresh_flows`). The filesystem read is a seed + resilience fallback (DB-unavailable / `project_root=None` CLI), not live config.
 
 ## HTTP endpoints

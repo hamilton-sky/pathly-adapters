@@ -35,7 +35,7 @@ Full narrative + diagrams: [docs/WHAT_IS_PATHLY.md](docs/WHAT_IS_PATHLY.md). Whe
 User → /pathly <cmd>           skills (installed at ~/.claude/skills/pathly-*)
      → pathly-fsm MCP server   HTTP FSM at http://127.0.0.1:8765
      → Agent(subagent_type=…)  Claude Code sub-agents (architect, builder, reviewer, …)
-     → pathly/plans/<feature>/ filesystem state
+     → pathly/features/<feature>/plans/  filesystem state (legacy: pathly/plans/<feature>/)
 
 Studio → Start button          FlowControlBar → POST /runner/start
        → supervisor/            drives FSM + spawns agents as visible terminals
@@ -97,19 +97,30 @@ A DB-backed message board (`comms_messages` + `comms_artifacts` tables, `/comms/
 
 ---
 
-## Feature plans
+## Feature plans (feature-centric layout)
+
+Storage mirrors board scope — **one home per feature**. New features live under
+`pathly/features/<name>/`. Legacy `pathly/plans/<name>/` is still *resolved* for back-compat
+(the resolver + Studio discovery probe both) until the Phase-3 migration deletes the fallback.
+Design + phases: [pathly/plans/storage-restructure/SPEC.md](pathly/plans/storage-restructure/SPEC.md).
 
 ```
-pathly/plans/
-  <feature>/
-    STATE.json              current FSM state
-    EVENTS.jsonl            append-only event log
-    PROGRESS.md             conversation status table (TODO / DONE)
-    CONVERSATION_PROMPTS.md per-conversation builder prompts
-    USER_STORIES.md         acceptance criteria
+pathly/features/<name>/            FEATURE scope
+  plans/                           team pipeline
+    STATE.json                     current FSM state
+    EVENTS.jsonl                   append-only event log
+    PROGRESS.md                    conversation status table (TODO / DONE)
+    CONVERSATION_PROMPTS.md        per-conversation builder prompts
+    USER_STORIES.md                acceptance criteria
     IMPLEMENTATION_PLAN.md
-    feedback/               REVIEW_FAILURES.md, TEST_FAILURES.md
-  .archive/                 completed features
+    feedback/                      REVIEW_FAILURES.md, TEST_FAILURES.md
+  goals/<slug>/                    per-goal decompose (planner/plan → nested here)
+  debugs/<slug>/  explorations/<slug>/  fixes/<slug>/
+  .archive/<name>/                 completed features (mirrors the shape above)
+pathly/project/                    PROJECT scope (cross-feature): goals/, board-artifacts/, lessons/
+~/.pathly/                         GLOBAL scope (cross-project): pathly.db, lessons/
+
+# Legacy, still resolved until Phase 3: pathly/plans/<name>/ + pathly/plans/.archive/
 ```
 
 ---
@@ -175,7 +186,7 @@ A new endpoint goes into the matching domain file. If no domain matches, create 
 
 - **Never push to master without explicit user request.**
 - Always confirm branch target before pushing.
-- Plans go in `pathly/plans/<feature>/`, never in `plans/<feature>/`.
+- Plans go in `pathly/features/<feature>/plans/` (feature-centric layout), never bare `plans/<feature>/`. Legacy `pathly/plans/<feature>/` is still resolved for back-compat, but new plans do NOT go there.
 - `studio/*.tsbuildinfo` files are build artifacts — do not commit them.
 
 ---
