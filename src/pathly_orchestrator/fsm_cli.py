@@ -127,8 +127,11 @@ def _main_code_query(args: argparse.Namespace) -> int:
     )
     try:
         ensure_server_running(host=args.host, port=args.port)
+        # Code queries can shell out to a slow code-intel tool; allow more than
+        # the 10s default so a legitimately-slow backend completes rather than
+        # the client timing out mid-query.
         raw = _request_raw(
-            "POST", _CODE_QUERY_PATH, payload, host=args.host, port=args.port
+            "POST", _CODE_QUERY_PATH, payload, host=args.host, port=args.port, timeout=30.0
         )
     except _ServerUnreachable:
         # Degrade to a safe-null envelope so the calling agent falls back to Grep
