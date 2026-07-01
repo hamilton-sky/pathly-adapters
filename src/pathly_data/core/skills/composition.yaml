@@ -123,6 +123,13 @@ skills:
     fragments:
       - comms-post
 
+  # Stand up feature boards on demand — a user can spawn a CLI agent and ask it to create
+  # one or many features. board-init owns the board-materialization (root-goal) mechanics.
+  planning/create-feature:
+    no_defaults: true
+    fragments:
+      - board-init
+
   planning/plan:
     fragments:
       - { name: task-dag-post, requires: goal_id }
