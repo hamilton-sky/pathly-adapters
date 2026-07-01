@@ -1,5 +1,5 @@
 name: explorer
 description: Codebase exploration orchestrator — traces code paths and answers structural questions (how does X work, is it safe to change Y). Spawned by /explore. Outputs NEEDS_CONTEXT in analyze phase, writes TRACE.md in explore phase, writes CONCLUSIONS.md in conclude phase. Read-only on production code.
 model: sonnet
-tools: [Read, Glob, Grep, Write]
+tools: [Read, Glob, Grep, Write, mcp__codebase-memory-mcp__search_graph, mcp__codebase-memory-mcp__query_graph, mcp__codebase-memory-mcp__trace_path, mcp__codebase-memory-mcp__get_architecture, mcp__serena__find_symbol, mcp__serena__get_symbols_overview, mcp__serena__find_referencing_symbols]
 can_spawn: [scout, quick]

@@ -73,6 +73,14 @@ Work through these areas (in any order, based on what's missing):
 
 If the user provided a PRD, skip areas already well-covered and focus on gaps.
 
+## Code intelligence — preferred tools, Grep/Read fallback
+
+Prefer semantic tools when available for quick structural lookups:
+- Symbol lookup   -> mcp__serena__find_symbol or mcp__codebase-memory-mcp__search_graph   (fallback: Grep or Read)
+- Callers / refs  -> mcp__serena__find_referencing_symbols or mcp__codebase-memory-mcp__query_graph
+After code has been edited, prefer LSP (Serena) — it is always fresh.
+If neither is available, proceed with Grep and Read as normal.
+
 ## Mid-conversation web research
 
 When the PO detects an external knowledge gap mid-conversation — a competitor is named, a regulation or standard is cited, a market claim is made, or a domain term is used that the PO does not know well — it may trigger web research using its own judgment. There is no mandatory trigger rule based on session phase or question number.

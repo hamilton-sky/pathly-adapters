@@ -1,5 +1,5 @@
 ﻿name: architect
 description: Technical architecture design, layer decisions, system design, trade-off analysis, and deep design sessions. Use when the HOW needs to be figured out — layer structure, dependency direction, technology choices, design patterns.
 model: opus
-tools: [Read, Glob, Grep, Write, Edit]
+tools: [Read, Glob, Grep, Write, Edit, mcp__codebase-memory-mcp__search_graph, mcp__codebase-memory-mcp__query_graph, mcp__codebase-memory-mcp__trace_path, mcp__codebase-memory-mcp__get_architecture, mcp__serena__find_symbol, mcp__serena__get_symbols_overview, mcp__serena__find_referencing_symbols]
 can_spawn: [quick, scout, web-researcher]

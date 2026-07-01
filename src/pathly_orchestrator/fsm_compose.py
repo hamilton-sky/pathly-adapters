@@ -117,6 +117,33 @@ def _inject_prompt_vars(
     return text
 
 
+def _changed_files(project_root: str, limit: int = 3) -> list[str]:
+    """Return up to ``limit`` code files changed in the working tree — the task's
+    file scope for the 🧭 code-structure channel — or ``[]`` on any failure.
+
+    Bounded and never raises: a git failure or non-repo just yields no scope, so
+    the channel is simply absent (the "never break the prompt" idiom).
+    """
+    try:
+        import subprocess
+
+        out = subprocess.run(
+            ["git", "-C", project_root, "diff", "--name-only", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if out.returncode != 0:
+            return []
+        exts = (".py", ".ts", ".tsx", ".js", ".jsx")
+        files = [
+            ln.strip() for ln in out.stdout.splitlines() if ln.strip().endswith(exts)
+        ]
+        return files[:limit]
+    except Exception:
+        return []
+
+
 def build_prompt(flow_config: dict, state_name: str, storage_path: Path) -> str:
     agent = flow_config["agent_map"][state_name]
     feature = storage_path.name
@@ -201,9 +228,34 @@ def build_prompt(flow_config: dict, state_name: str, storage_path: Path) -> str:
     except Exception:
         pass
 
+    # 🧭 Code structure channel (B-inject). Shares the runner.code_context
+    # backend with the C proxy. Gated on a configured backend so the default
+    # (off) path stays zero-cost — no git call, no block — exactly as before.
+    code_block = ""
+    try:
+        from pathly_orchestrator.runner.code_context import (
+            build_block as _code_build_block,
+            maybe_reindex as _code_maybe_reindex,
+            _resolve_backend as _code_resolve_backend,
+        )
+
+        if _code_resolve_backend() != "none":
+            # Freshness bridge: async, non-blocking; refreshes the graph for the
+            # next stage per the code_context.reindex setting (no-op unless stage).
+            _code_maybe_reindex(project_root)
+            _code_files = _changed_files(project_root)
+            if _code_files:
+                code_block = _code_build_block(
+                    feature, _code_files, agent_role, 1200
+                )
+    except Exception:
+        pass
+
     prompt = agent_text + context + history
     if board_block:
         prompt += "\n" + board_block
+    if code_block:
+        prompt += "\n" + code_block
     return prompt
 
 

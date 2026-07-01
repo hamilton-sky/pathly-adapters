@@ -8,6 +8,8 @@ skills:
 templates:
   destination: ~/.claude/plugins/pathly/templates
 telemetry: true
+mcp:
+  destination: ~/.claude/mcp.json
 hooks:
   settings_dest: ~/.claude/settings.json
   Stop:

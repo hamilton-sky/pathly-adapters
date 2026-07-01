@@ -17,6 +17,7 @@ from .fsm_http_client import (
     _filter_none,
     _inprocess,
     _request_raw,
+    _CODE_QUERY_PATH,
     _COMPLETE_STAGE_PATH,
     _NEXT_ACTION_PATH,
     _RECORD_ACTIVITY_PATH,
@@ -115,6 +116,41 @@ def _main_record_phase(args: argparse.Namespace) -> int:
     return 0
 
 
+def _main_code_query(args: argparse.Namespace) -> int:
+    payload = _filter_none(
+        {
+            "op": args.op,
+            "target": args.target,
+            "role": args.role,
+            "scope": args.scope,
+        }
+    )
+    try:
+        ensure_server_running(host=args.host, port=args.port)
+        # Code queries can shell out to a slow code-intel tool; allow more than
+        # the 10s default so a legitimately-slow backend completes rather than
+        # the client timing out mid-query.
+        raw = _request_raw(
+            "POST", _CODE_QUERY_PATH, payload, host=args.host, port=args.port, timeout=30.0
+        )
+    except _ServerUnreachable:
+        # Degrade to a safe-null envelope so the calling agent falls back to Grep
+        # instead of crashing — mirrors the /code/query route's never-500 contract.
+        print(
+            json.dumps(
+                {
+                    "ok": True,
+                    "result": None,
+                    "backend": "none",
+                    "reason": "server-unreachable",
+                }
+            )
+        )
+        return 0
+    print(raw)
+    return 0
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="pathly-fsm-call",
@@ -172,6 +208,24 @@ def main() -> None:
     record_phase_parser.add_argument("--project-root", default=None, dest="project_root")
     _add_common_net_args(record_phase_parser)
     record_phase_parser.set_defaults(func=_main_record_phase)
+
+    code_query_parser = subparsers.add_parser(
+        "code-query", help="Call POST /code/query (code-intelligence proxy)."
+    )
+    code_query_parser.add_argument(
+        "--op", required=True, help="Query op: impact | callers | symbol | pattern."
+    )
+    code_query_parser.add_argument(
+        "--target", required=True, help="File path or symbol the query is about."
+    )
+    code_query_parser.add_argument(
+        "--role", default=None, help="Calling agent role (gates per-role tiering; Phase 8)."
+    )
+    code_query_parser.add_argument(
+        "--scope", default=None, help="Feature/goal scope key for caching and board logging."
+    )
+    _add_common_net_args(code_query_parser)
+    code_query_parser.set_defaults(func=_main_code_query)
 
     args = parser.parse_args()
     try:

@@ -1,5 +1,5 @@
 ﻿name: po
 description: Product Owner advisor — interactive requirements discussion. Probes what to build, who needs it, MVP scope, and edge cases through back-and-forth conversation. Challenges assumptions and surfaces gaps before architecture begins.
 model: opus
-tools: [Read, Write]
+tools: [Read, Write, mcp__codebase-memory-mcp__search_graph, mcp__codebase-memory-mcp__query_graph, mcp__serena__find_symbol]
 can_spawn: [web-researcher]

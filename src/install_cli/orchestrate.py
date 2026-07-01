@@ -108,6 +108,58 @@ def _apply_hooks(host: str, hooks_cfg: dict, *, dry_run: bool, repair: bool) -> 
     print(f"[{host}] Updated hooks in {settings_path}")
 
 
+def _run_mcp(host: str, mcp_cfg: dict, *, dry_run: bool, repair: bool) -> None:
+    """Deep-merge each adapters/<host>/_mcp/*.json into the host's MCP config.
+
+    Each template is ``{"mcpServers": {"<name>": {...}}}``. Servers from the
+    templates are Pathly-owned: added when absent, overwritten on ``repair=True``;
+    all other (pre-existing) servers in the host config are preserved. The
+    destination comes from the adapter's ``install.yaml`` ``mcp.destination``.
+    Because it globs ``_mcp/*.json``, dropping more templates (e.g. serena.json)
+    alongside gitnexus.json merges them all in one run — no code change needed.
+    """
+    dest_str = mcp_cfg.get("destination")
+    if not dest_str:
+        return
+    mcp_dir = adapter_path(host) / "_mcp"
+    templates = sorted(mcp_dir.glob("*.json")) if mcp_dir.is_dir() else []
+    incoming: dict[str, dict] = {}
+    for tf in templates:
+        try:
+            data = json.loads(tf.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+        for name, spec in (data.get("mcpServers") or {}).items():
+            incoming[name] = spec
+    if not incoming:
+        return
+
+    dest_path = Path(dest_str).expanduser()
+    config: dict = {}
+    if dest_path.exists():
+        try:
+            config = json.loads(dest_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            config = {}
+    servers: dict = dict(config.get("mcpServers") or {})
+
+    changed = False
+    for name, spec in incoming.items():
+        if name not in servers or repair:
+            servers[name] = spec
+            changed = True
+    if not changed:
+        return
+    config["mcpServers"] = servers
+
+    if dry_run:
+        print(f"[{host}] Would merge {len(incoming)} MCP server(s) into {dest_path}")
+        return
+    dest_path.parent.mkdir(parents=True, exist_ok=True)
+    dest_path.write_text(json.dumps(config, indent=2), encoding="utf-8")
+    print(f"[{host}] Merged {len(incoming)} MCP server(s) into {dest_path}")
+
+
 _AGENT_GROUPS = {
     "architect": "planning",
     "builder": "building",
@@ -378,6 +430,9 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
         hooks_cfg = install_cfg.get("hooks", {})
         if hooks_cfg:
             _apply_hooks(host, hooks_cfg, dry_run=True, repair=repair)
+        mcp_cfg = install_cfg.get("mcp", {})
+        if mcp_cfg:
+            _run_mcp(host, mcp_cfg, dry_run=True, repair=repair)
         return
 
     written_dests: list[Path] = []
@@ -435,6 +490,10 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
         hooks_cfg = install_cfg.get("hooks", {})
         if hooks_cfg:
             _apply_hooks(host, hooks_cfg, dry_run=False, repair=repair)
+
+        mcp_cfg = install_cfg.get("mcp", {})
+        if mcp_cfg:
+            _run_mcp(host, mcp_cfg, dry_run=False, repair=repair)
 
     except Exception:
         print(f"[{host}] Install failed — rolling back.", file=sys.stderr)

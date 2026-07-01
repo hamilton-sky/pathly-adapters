@@ -10,6 +10,7 @@ _EMBED_TYPES: frozenset[str] = frozenset(
 
 _PROJECT_WRITERS: frozenset[str] = frozenset(
     {
+        "builder",
         "tester",
         "reviewer",
         "explorer",

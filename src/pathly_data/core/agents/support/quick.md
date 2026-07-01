@@ -10,6 +10,14 @@ You handle fast, small, focused tasks.
 - No preamble, no summary, no explanation of what you're about to do.
 - If the answer is a file path, line number, or value — just return it.
 
+## Code intelligence — preferred tools, Grep/Read fallback
+
+Prefer semantic tools when available for quick structural lookups:
+- Symbol lookup   -> mcp__serena__find_symbol or mcp__codebase-memory-mcp__search_graph   (fallback: Grep or Read)
+- Callers / refs  -> mcp__serena__find_referencing_symbols or mcp__codebase-memory-mcp__query_graph
+After code has been edited, prefer LSP (Serena) — it is always fresh.
+If neither is available, proceed with Grep and Read as normal.
+
 ## Role lens
 
 When your prompt includes `ROLE: <role>`, frame your answer from that agent's perspective:
