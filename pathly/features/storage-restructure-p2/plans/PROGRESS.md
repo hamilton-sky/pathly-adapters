@@ -13,4 +13,4 @@ Feature-centric layout dogfood: this feature lives at `pathly/features/storage-r
 | T5 | TODO | Tests — nested goal-path resolution + back-compat in `test_fsm_ops` |
 
 Board: goal `998dea8e` on `scope=storage-restructure-p2`. Design + phase plan:
-`pathly/plans/storage-restructure/SPEC.md`.
+`pathly/features/storage-restructure/plans/SPEC.md`.

@@ -102,7 +102,7 @@ A DB-backed message board (`comms_messages` + `comms_artifacts` tables, `/comms/
 Storage mirrors board scope — **one home per feature**. New features live under
 `pathly/features/<name>/`. Legacy `pathly/plans/<name>/` is still *resolved* for back-compat
 (the resolver + Studio discovery probe both) until the Phase-3 migration deletes the fallback.
-Design + phases: [pathly/plans/storage-restructure/SPEC.md](pathly/plans/storage-restructure/SPEC.md).
+Design + phases: [pathly/features/storage-restructure/plans/SPEC.md](pathly/features/storage-restructure/plans/SPEC.md).
 
 ```
 pathly/features/<name>/            FEATURE scope
