@@ -54,7 +54,8 @@ ROUTING_FLOW = {
 
 
 def _storage_path(tmp_path: Path, topic: str = "test-topic") -> Path:
-    p = tmp_path / "pathly" / "plans" / topic
+    # Feature-centric layout: the team flow resolves a topic to pathly/features/<topic>/.
+    p = tmp_path / "pathly" / "features" / topic
     p.mkdir(parents=True, exist_ok=True)
     return p
 
@@ -673,11 +674,12 @@ def test_build_prompt_threads_goal_id_into_composition(tmp_path):
 
 
 def test_build_prompt_uses_parent_board_scope_for_goal(tmp_path):
-    """A goal-decompose run's on-disk topic is the goal slug (run isolation), but its
-    stage agents must post to / read the PARENT board the goal lives on. build_prompt
-    must inject the parent scope as <feature>, not the slug, when goal_id is given —
-    otherwise the consultation's artifacts orphan onto a throwaway slug-scoped board
-    instead of the feature board it was spawned from."""
+    """A goal-decompose run's on-disk storage nests under the parent feature
+    (pathly/features/<feature>/goals/<slug>) and its dir name is the goal slug (run
+    isolation), but its stage agents must post to / read the PARENT board the goal lives
+    on. build_prompt must inject the parent scope as <feature>, not the slug, when goal_id
+    is given — otherwise the consultation's artifacts orphan onto a throwaway slug-scoped
+    board instead of the feature board it was spawned from."""
     from unittest.mock import patch
     from pathly_orchestrator.fsm_ops import build_prompt
     from pathly_orchestrator.db.connection import get_db
@@ -692,8 +694,8 @@ def test_build_prompt_uses_parent_board_scope_for_goal(tmp_path):
         type="goal", text="Studio CliMonitorBar review",
     )
 
-    # On-disk topic/storage is the slug dir (isolation), NOT the parent feature.
-    slug_dir = tmp_path / "pathly" / "goals" / slug
+    # On-disk storage nests under the parent feature; the run's dir name is the slug (isolation).
+    slug_dir = tmp_path / "pathly" / "features" / parent / "goals" / slug
     slug_dir.mkdir(parents=True, exist_ok=True)
     flow_config = {"agent_map": {"ARCHITECTING": "quick"}, "composition": {}}
 

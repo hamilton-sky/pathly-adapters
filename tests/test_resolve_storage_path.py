@@ -11,23 +11,32 @@ import pathly_orchestrator.fsm_ops as fsm_ops
 FLOW = {"storage_path": "pathly/plans/{topic}/"}
 
 
-def test_prefers_goals_tier_when_dir_exists(tmp_path):
-    """pathly/goals/<slug> is returned when that dir exists."""
+def test_flat_pathly_goals_no_longer_resolves(tmp_path):
+    """The flat pathly/goals/<slug> candidate is DROPPED — goals nest by board scope now. A bare
+    slug with a stray pathly/goals/<slug> dir falls through to the flow template default."""
     slug = "my-goal-slug"
     goal_dir = tmp_path / "pathly" / "goals" / slug
     goal_dir.mkdir(parents=True)
     result = fsm_ops._resolve_storage_path(FLOW, str(tmp_path), slug)
-    assert result == goal_dir
+    assert result != goal_dir
+    assert result == tmp_path / "pathly" / "plans" / slug  # FLOW template fallback
 
 
-def test_goals_tier_has_exactly_two_components_under_pathly(tmp_path):
-    """Storage path is pathly/goals/<slug> — exactly 2 components under pathly."""
-    slug = "two-components"
-    goal_dir = tmp_path / "pathly" / "goals" / slug
-    goal_dir.mkdir(parents=True)
-    result = fsm_ops._resolve_storage_path(FLOW, str(tmp_path), slug)
-    # parent.parent.parent must equal project_root (watcher invariant)
-    assert result.parent.parent.parent == tmp_path
+def test_scope_nested_feature_goal_topic_resolves(tmp_path):
+    """A consultation's feature-tier topic (features/<f>/goals/<slug>) lands at the nested dir
+    via the pathly/<topic> candidate."""
+    nested = tmp_path / "pathly" / "features" / "my-feature" / "goals" / "g-slug"
+    nested.mkdir(parents=True)
+    result = fsm_ops._resolve_storage_path(FLOW, str(tmp_path), "features/my-feature/goals/g-slug")
+    assert result == nested
+
+
+def test_scope_nested_project_goal_topic_resolves(tmp_path):
+    """A project-tier goal topic (project/goals/<slug>) resolves under pathly/project/."""
+    nested = tmp_path / "pathly" / "project" / "goals" / "g-slug"
+    nested.mkdir(parents=True)
+    result = fsm_ops._resolve_storage_path(FLOW, str(tmp_path), "project/goals/g-slug")
+    assert result == nested
 
 
 def test_absolute_topic_raises(tmp_path):

@@ -8,25 +8,33 @@ _DEFAULT_MODEL = "claude-sonnet-4-6"
 _CONSULTATION_FLOW = "consultation"
 
 
+def _goal_topic(board: str, scope: str, slug: str) -> str:
+    """The pathly-relative storage topic for a goal, scoped to its board (storage-restructure).
+
+    Feature-tier nests under the feature (``features/<feature>/goals/<slug>``); project/global
+    under the project home (``project/goals/<slug>``). There is no flat ``goals/<slug>`` anymore.
+
+    Doubles as the FSM topic for a consultation run: because it is a pathly-relative path,
+    ``_resolve_storage_path``'s ``pathly/<topic>`` candidate lands the run at the nested dir —
+    so the consultation's PO→…→planner storage sits under the same board the goal lives on
+    (matching where its board artifacts already post, via B1's goal_id → board_scope). The slug
+    remains the goal's run identity within that path.
+    """
+    if board == "feature" and scope:
+        return f"features/{scope}/goals/{slug}"
+    return f"project/goals/{slug}"
+
+
 def _goal_storage_dir(project_root: str, board: str, scope: str, slug: str) -> str:
-    """Where a goal-decompose writes its plan + artifacts (storage-restructure Phase 2).
-
-    Feature-tier goals nest under their feature: ``pathly/features/<feature>/goals/<slug>``
-    (the feature = the goal's parent board scope). Project/global-tier goals stay at the
-    legacy ``pathly/goals/<slug>`` until their scope homes are stood up (a follow-up).
-
-    Only the board-run decompose paths (planner/plan) use this — they pass the result to
-    ``start_board_run`` explicitly AND post their artifacts with absolute paths, so goal
-    EXECUTION (which reads context via the board, not by re-resolving a goal dir) stays
-    consistent wherever this points. The consultation path routes through the FSM resolver
-    (``_resolve_storage_path``) and is NOT nested here — that needs feature-threading through
-    the resolver + the fsm_compose root derivation, a documented follow-up.
+    """Absolute on-disk home for a goal-decompose's plan + artifacts — the board-scoped location
+    from ``_goal_topic`` (feature: ``pathly/features/<feature>/goals/<slug>``; project/global:
+    ``pathly/project/goals/<slug>``). Used by planner/plan (passed to ``start_board_run``) and by
+    consultation (which also uses ``_goal_topic`` as its FSM topic). Goal EXECUTION reads context
+    via the board, not by re-resolving this dir, so it stays consistent wherever this points.
     """
     import os
 
-    if board == "feature" and scope:
-        return os.path.join(project_root, "pathly", "features", scope, "goals", slug)
-    return os.path.join(project_root, "pathly", "goals", slug)
+    return os.path.join(project_root, "pathly", *_goal_topic(board, scope, slug).split("/"))
 
 
 def start_goal_decompose(
@@ -283,17 +291,23 @@ def _decompose_consultation(
             "error": f"a pipeline run is already active for {scope!r} (status={existing.status})",
         }
 
-    # Route on-disk storage to pathly/goals/<slug> so the project path never
-    # becomes a FSM topic (which collapses to itself via Path joining).
+    # Board-scoped on-disk home + FSM topic for this goal (storage-restructure): feature-tier
+    # nests under the feature, project/global under pathly/project/. The scope-nested topic makes
+    # _resolve_storage_path land the consultation run there; the slug is the run identity within it.
+    import os
+
     try:
         from pathly_orchestrator.db.connection import get_db
         from pathly_orchestrator.supervisor.slug import ensure_goal_slug
-        import os
+
         slug = ensure_goal_slug(get_db(project_root or None), goal_id)
-        _goal_dir = os.path.join(project_root, "pathly", "goals", slug)
-        os.makedirs(_goal_dir, exist_ok=True)
     except Exception:
-        slug = scope  # fallback: old behavior
+        slug = scope  # fallback
+    topic = _goal_topic(board, scope, slug)
+    try:
+        os.makedirs(os.path.join(project_root, "pathly", *topic.split("/")), exist_ok=True)
+    except Exception:
+        pass
 
     _start = start_fn
     if _start is None:
@@ -304,11 +318,11 @@ def _decompose_consultation(
             _reset_fsm_state_for_flow,
         )
 
-        _reset_fsm_state_for_flow(_CONSULTATION_FLOW, slug, project_root)
+        _reset_fsm_state_for_flow(_CONSULTATION_FLOW, topic, project_root)
 
     try:
         state = _start(
-            topic=slug,
+            topic=topic,
             flow=_CONSULTATION_FLOW,
             project_root=project_root or "",
             model=model or _DEFAULT_MODEL,

@@ -57,33 +57,31 @@ def test_ensure_goal_slug_is_idempotent(tmp_path):
     assert slug1 == slug2
 
 
-def test_slug_produces_pathly_goals_dir(tmp_path):
-    """Once slug is resolved, pathly/goals/<slug> can be created under project root."""
+def test_project_goal_nests_under_project(tmp_path):
+    """A project-tier goal's storage nests under pathly/project/goals/<slug> (no flat pathly/goals)."""
     conn = _make_test_db(tmp_path)
     goal_id = str(uuid.uuid4())
     _insert_goal(conn, goal_id, str(tmp_path), board="project")
 
     from pathly_orchestrator.supervisor.slug import ensure_goal_slug
+    from pathly_orchestrator.supervisor.goal_decomposer import _goal_storage_dir
     slug = ensure_goal_slug(conn, goal_id)
+    goal_dir = _goal_storage_dir(str(tmp_path), "project", str(tmp_path), slug).replace("\\", "/")
 
-    goal_dir = tmp_path / "pathly" / "goals" / slug
-    goal_dir.mkdir(parents=True, exist_ok=True)
-
-    assert goal_dir.is_dir()
-    # Two components under pathly (for watcher compatibility)
-    assert goal_dir.parent.parent.parent == tmp_path
+    expected = str(tmp_path / "pathly" / "project" / "goals" / slug).replace("\\", "/")
+    assert goal_dir == expected
+    assert "pathly/goals/" not in goal_dir  # the flat pathly/goals home is gone
 
 
-def test_resolve_storage_path_finds_goals_tier(tmp_path):
-    """_resolve_storage_path returns pathly/goals/<slug> when that dir exists."""
-    slug = "my-feature-abc12345"
-    goals_dir = tmp_path / "pathly" / "goals" / slug
-    goals_dir.mkdir(parents=True)
+def test_resolve_nested_project_goal_topic(tmp_path):
+    """A project-tier goal's scope-nested topic (project/goals/<slug>) resolves under pathly/project/."""
+    nested = tmp_path / "pathly" / "project" / "goals" / "g-slug"
+    nested.mkdir(parents=True)
 
     from pathly_orchestrator.fsm_ops import _resolve_storage_path
-    flow = {"storage_path": "pathly/plans/{topic}/"}
-    result = _resolve_storage_path(flow, str(tmp_path), slug)
-    assert result == goals_dir
+    flow = {"storage_path": "pathly/{topic}/"}
+    result = _resolve_storage_path(flow, str(tmp_path), "project/goals/g-slug")
+    assert result == nested
 
 
 def test_feature_slug_still_resolves_plans(tmp_path):

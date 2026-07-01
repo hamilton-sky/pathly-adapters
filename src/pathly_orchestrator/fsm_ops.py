@@ -72,14 +72,14 @@ def _resolve_storage_path(flow_config: dict, project_root: str, topic: str) -> P
     for candidate in (
         root / "pathly" / "features" / topic,
         root / "pathly" / topic,
-        root / "pathly" / "goals" / topic,
     ):
         if candidate.is_dir():
             return candidate
-    # None exists — fall through to the flow's template default. For the team pipeline that
-    # is now the feature-centric home (pathly/features/<topic>); debug/explore/consultation keep
-    # their own subdir templates (pathly/debugs, pathly/explorations, pathly/plans for decompose).
-    # The legacy pathly/plans/<topic> FEATURE probe was removed once all features migrated.
+    # None exists — fall through to the flow's template default. Team pipeline → pathly/features/
+    # <topic>; a goal decompose (consultation) uses a scope-nested topic (features/<f>/goals/<slug>
+    # or project/goals/<slug>) which the pathly/<topic> candidate above resolves; debug/explore keep
+    # their own subdir templates. Both legacy FEATURE (pathly/plans/<topic>) and flat GOAL
+    # (pathly/goals/<topic>) candidates were removed once features + goals nest by scope.
     template = flow_config["storage_path"]
     return root / template.format(topic=topic)
 

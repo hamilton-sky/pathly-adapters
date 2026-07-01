@@ -1,6 +1,6 @@
 version: 1
 flow: consultation
-storage_path: pathly/plans/{topic}/
+storage_path: pathly/{topic}/
 # Consultation flow — the HEAVY decomposer (GOALS-DAG-EXECUTORS §2, §6).
 # PO → architect → researcher → designer → planner fills the board with the goal's
 # knowledge artifacts AND the task DAG (the planner is the terminal stage; its

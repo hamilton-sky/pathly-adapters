@@ -9,7 +9,7 @@ Covers the two safe, self-contained changes:
 
 from pathlib import Path
 
-from pathly_orchestrator.supervisor.goal_decomposer import _goal_storage_dir
+from pathly_orchestrator.supervisor.goal_decomposer import _goal_storage_dir, _goal_topic
 from pathly_orchestrator.fsm_compose import _project_root_from_storage
 
 ROOT = str(Path("/proj").resolve())
@@ -19,28 +19,35 @@ def _n(p: str) -> str:
     return p.replace("\\", "/")
 
 
-# ── _goal_storage_dir ────────────────────────────────────────────────
+# ── _goal_topic + _goal_storage_dir (board-scoped; no flat pathly/goals) ──────
+
+def test_goal_topic_feature_tier():
+    assert _goal_topic("feature", "my-feature", "goal-slug") == "features/my-feature/goals/goal-slug"
+
+
+def test_goal_topic_project_tier():
+    # Project-tier scope is the project root path; the topic uses the singular 'project' home.
+    assert _goal_topic("project", "/some/root", "goal-slug") == "project/goals/goal-slug"
+
+
+def test_goal_topic_global_tier():
+    assert _goal_topic("global", "global", "goal-slug") == "project/goals/goal-slug"
+
+
+def test_goal_topic_feature_empty_scope_falls_back():
+    # Defensive: a feature board with an empty scope must not build features//goals/…
+    assert _goal_topic("feature", "", "goal-slug") == "project/goals/goal-slug"
+
 
 def test_feature_tier_nests_under_feature():
     d = _goal_storage_dir(ROOT, "feature", "my-feature", "goal-slug")
     assert _n(d).endswith("pathly/features/my-feature/goals/goal-slug")
 
 
-def test_project_tier_stays_legacy():
+def test_project_tier_nests_under_project():
     d = _goal_storage_dir(ROOT, "project", "/some/root", "goal-slug")
-    assert _n(d).endswith("pathly/goals/goal-slug")
-    assert "features" not in _n(d)
-
-
-def test_global_tier_stays_legacy():
-    d = _goal_storage_dir(ROOT, "global", "global", "goal-slug")
-    assert _n(d).endswith("pathly/goals/goal-slug")
-
-
-def test_feature_tier_empty_scope_falls_back():
-    # Defensive: a feature board with an empty scope must not build features//goals/…
-    d = _goal_storage_dir(ROOT, "feature", "", "goal-slug")
-    assert _n(d).endswith("pathly/goals/goal-slug")
+    assert _n(d).endswith("pathly/project/goals/goal-slug")
+    assert "pathly/goals/" not in _n(d)  # the flat pathly/goals home is gone
 
 
 # ── _project_root_from_storage ───────────────────────────────────────
