@@ -235,10 +235,14 @@ def build_prompt(flow_config: dict, state_name: str, storage_path: Path) -> str:
     try:
         from pathly_orchestrator.runner.code_context import (
             build_block as _code_build_block,
+            maybe_reindex as _code_maybe_reindex,
             _resolve_backend as _code_resolve_backend,
         )
 
         if _code_resolve_backend() != "none":
+            # Freshness bridge: async, non-blocking; refreshes the graph for the
+            # next stage per the code_context.reindex setting (no-op unless stage).
+            _code_maybe_reindex(project_root)
             _code_files = _changed_files(project_root)
             if _code_files:
                 code_block = _code_build_block(
