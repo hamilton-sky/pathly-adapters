@@ -146,6 +146,18 @@ skills:
       - artifact-register
       - comms-post
 
+  # Consultation-flow artifact producers — previously RAW (they POSTed to the board
+  # from their own body). Now agnostic: comms-post owns the board write-back and
+  # completion-report owns AGENT_DONE. (unified-cli-finish Phase 1)
+  team/architect:
+    fragments:
+      - completion-report
+      - comms-post
+  team/research:
+    fragments:
+      - completion-report
+      - comms-post
+
   # ── Gap 1: silent-skill board write-back ────────────────────────────────────
   # These five were previously loaded raw (no fragments). Adding them to the map
   # gives them the `progress-logging` default plus `comms-post`. Verified safe:

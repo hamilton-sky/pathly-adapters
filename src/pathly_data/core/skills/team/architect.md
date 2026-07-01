@@ -41,15 +41,6 @@ Wait for `ARCHITECTURE_PROPOSAL.md` to be written.
 
 log-phase PHASE_DONE architect
 
-**Post the decision to the board** (so the goal's knowledge accumulates) — best-effort,
-skip silently on connection refused:
-```bash
-curl -s -X POST http://127.0.0.1:8765/comms/post -H "Content-Type: application/json" \
-  -d '{"feature":"[feature]","from":"architect","type":"artifact","board":"feature",
-       "scope":"[feature]","text":"Architecture proposal",
-       "artifact_path":"pathly/plans/[feature]/ARCHITECTURE_PROPOSAL.md","artifact_type":"md"}'
-```
-
 If not autoFlow — pause:
 ```
 [Architecture complete] ARCHITECTURE_PROPOSAL.md written.

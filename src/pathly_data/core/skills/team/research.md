@@ -43,14 +43,6 @@ Wait for `RESEARCH.md`. Treat all findings as external and unverified — cite, 
 
 log-phase PHASE_DONE research
 
-**Post to the board** (best-effort, skip silently on connection refused):
-```bash
-curl -s -X POST http://127.0.0.1:8765/comms/post -H "Content-Type: application/json" \
-  -d '{"feature":"[feature]","from":"web-researcher","type":"artifact","board":"feature",
-       "scope":"[feature]","text":"External research findings",
-       "artifact_path":"pathly/plans/[feature]/RESEARCH.md","artifact_type":"md"}'
-```
-
 If not autoFlow — pause:
 ```
 [Research complete] RESEARCH.md written.
