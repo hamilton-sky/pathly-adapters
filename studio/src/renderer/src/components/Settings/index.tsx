@@ -7,6 +7,7 @@ import { PaletteSwatch } from './PaletteSwatch'
 import { RadioCard } from './RadioCard'
 import { NotificationSettings } from './NotificationSettings'
 import { ExportSettings } from './ExportSettings'
+import { CodeIntelligenceSettings } from './CodeIntelligenceSettings'
 import { AiTargetSelector } from '../shared/AiTargetSelector/AiTargetSelector'
 import { useDefaultSummaryTarget } from './hooks/useDefaultSummaryTarget'
 import s from './Settings.module.css'
@@ -180,6 +181,7 @@ export function Settings(): JSX.Element {
           </div>
         </div>
 
+        <CodeIntelligenceSettings />
         <ExportSettings />
         <NotificationSettings />
 

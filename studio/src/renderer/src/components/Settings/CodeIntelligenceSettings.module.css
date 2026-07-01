@@ -1,0 +1,13 @@
+.subLabel {
+  font-size: 11px;
+  color: var(--theme-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 14px 0 8px;
+}
+
+.hint {
+  font-size: 11px;
+  color: var(--theme-text-muted);
+  margin: 4px 0 10px;
+}
