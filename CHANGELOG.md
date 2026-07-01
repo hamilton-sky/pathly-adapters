@@ -1,5 +1,29 @@
 # Changelog
 
+## 2.19.0
+
+### Studio — Workspace sidebar rebuilt as a real file tree
+
+- The Workspace tab is now a plain, lazy-loaded project file tree (folders/files),
+  replacing the curated-sections panel. Animated icons; single-click selects, with
+  Open / New / Rename / Delete / Move via the right-click + ⋯ menu.
+- Pinned `pathly/` section at the top (independent expand) plus the folder in place.
+- Project-wide search with an All/pathly scope chip and a tree/list results toggle;
+  true collapse-all. Feature folders get an "Open board" action (→ Command Center).
+- New projects scaffold a `pathly/` workspace (features/debugs/explorations/lessons).
+- Bottom-nav icons aligned in fixed slots; `Sidebar.tsx` trimmed (~700→~300 lines).
+
+### Storage — feature-centric layout
+
+- Features live flat at `pathly/features/<name>/`; goals nest under their feature;
+  comms-board relocated; legacy `pathly/plans/` retired. CLI discovers flat features.
+
+### Studio — board redesign & board-scoped planning
+
+- Board readability pass (filter, header Evaluate, unified summary popover);
+  consultation board-scope + board-level planning UI; project-level run lock
+  (features build one at a time); CLI Command Center toolbar refinements.
+
 ## 2.18.1
 
 ### SOLID — 400-line limit enforced
