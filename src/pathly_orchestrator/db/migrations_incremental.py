@@ -89,6 +89,10 @@ def _add_additive_migrations(conn: sqlite3.Connection) -> None:
         # comms-board context-retrieval: advisory artifact links carried on the task.
         # Phase 2 — SHAPE guard only; resolve-against-index gate lands in Phase 3.
         ("comms_messages", "context_refs", "TEXT"),
+        # cross-feature file-claims: JSON list of files/dir-globs a task will touch.
+        # Gates concurrent feature builds — disjoint sets run in parallel, overlaps
+        # serialize; NULL/absent = undeclared (treated as "touches everything").
+        ("comms_messages", "files", "TEXT"),
         # T5 goal-slug: stable filesystem slug for goal messages.
         ("comms_messages", "slug", "TEXT"),
         # Phase 3 — staleness fingerprints for the section index (§3.4).

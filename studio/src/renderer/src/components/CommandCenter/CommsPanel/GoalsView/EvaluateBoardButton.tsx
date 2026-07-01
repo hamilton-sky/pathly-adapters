@@ -1,136 +1,95 @@
-import { useState, useRef } from 'react'
 import { Sparkles } from 'lucide-react'
-import { useCommsStore } from '../../../../store/commsStore'
-import { useElapsedProgress } from '../../../shared/RunPill/progress'
-import type { PillState } from '../../../shared/RunPill/RunPill'
 import ActionPill from '../../../shared/ActionPill/ActionPill'
-import {
-  type EditorCli,
-  loadEditorCli,
-  saveEditorCli,
-  cliLabel,
-} from '../.././../MarkdownEditor/EditorHeader/editorCli'
 import SendPreviewModal from '../../../shared/SendPreviewModal/SendPreviewModal'
+import { ConfirmModal } from '../../../shared/ConfirmModal/ConfirmModal'
+import { cliLabel } from '../.././../MarkdownEditor/EditorHeader/editorCli'
 import { EvalConfigPopover } from './EvalConfigPopover'
-import { useEvaluatePreview } from './useEvaluatePreview'
-import { EVAL_LENSES } from '../SingleAgentButton/agentFormData'
+import { useEvaluateBoardButton } from './hooks/useEvaluateBoardButton'
 
-// Persistent localStorage key for the evaluate button's engine choice.
-const CLI_KEY_EVAL = 'pathly.comms.cli.eval'
+export interface GoalStub {
+  id: string
+  text: string
+}
 
 interface Props {
   boardKey: string
+  /** Goals on this board — used to populate the Target selector in the popover. */
+  goals?: GoalStub[]
 }
 
-// Evaluate the board → propose tasks. Uses the shared ActionPill ([✦ Evaluate… 0:03][⚙↔■]),
-// the same run+gear+stop control as the editor's AI Split/Analyze. The gear opens
-// EvalConfigPopover (agent/skill/engine/extra), anchored to the gear button via gearRef.
-export function EvaluateBoardButton({ boardKey }: Props): JSX.Element {
-  const runEvaluator = useCommsStore((st) => st.runEvaluator)
-  const stopBoard = useCommsStore((st) => st.stopBoard)
-  const boardRunState = useCommsStore((st) => st.boardRunState)
-  const boardRunStart = useCommsStore((st) => st.boardRunStart)
-
-  const runState = (boardRunState[boardKey] ?? 'idle') as PillState
-  const running = runState === 'running'
-  const progress = useElapsedProgress(boardRunStart[boardKey] || undefined)
-
-  const [selectedLens, setSelectedLens] = useState('')
-  const [lensText, setLensText] = useState('')   // editable lens-prompt text
-  const [extraPrompt, setExtraPrompt] = useState('')
-  const [selectedCli, setSelectedCli] = useState<EditorCli>(() => loadEditorCli(CLI_KEY_EVAL))
-  const [configOpen, setConfigOpen] = useState(false)
-  const [confirmOpen, setConfirmOpen] = useState(false)
-  const gearRef = useRef<HTMLButtonElement>(null)
-
-  const lensLabel = EVAL_LENSES.find((l) => l.name === selectedLens && l.name)?.label
-  const activeLabel = lensLabel ?? 'Evaluate'
-
-  // Faithful read-only preview of the server-assembled evaluator prompt (fetched only
-  // while the confirm modal is open).
-  const previewPrompt = useEvaluatePreview(confirmOpen, lensText, extraPrompt)
-
-  function handleCliChange(cli: EditorCli): void {
-    setSelectedCli(cli)
-    saveEditorCli(CLI_KEY_EVAL, cli)
-  }
-
-  // Selecting a lens seeds the editable text; the user can then tweak it inline.
-  function pickLens(name: string): void {
-    setSelectedLens(name)
-    setLensText(EVAL_LENSES.find((l) => l.name === name)?.prompt ?? '')
-  }
-
-  function handleRun(): void {
-    const adapter = selectedCli !== 'claude' ? selectedCli : undefined
-    runEvaluator(boardKey, {
-      adapter,
-      systemPrompt: lensText || undefined,
-      instructions: extraPrompt || undefined,
-    })
-  }
-
-  function handleConfigRun(): void {
-    setConfigOpen(false)
-    handleRun()
-  }
-
-  function handleReset(): void {
-    setSelectedLens('')
-    setLensText('')
-    setExtraPrompt('')
-  }
+// Evaluate the board → propose tasks. Also dispatches per-goal decompose when the
+// user picks a specific goal as the target. Uses the shared ActionPill, the same
+// run+gear+stop control as the editor's AI Split/Analyze. The gear opens
+// EvalConfigPopover (rigor, target, lens, engine). All state + handlers live in
+// useEvaluateBoardButton; this component is the JSX shell.
+export function EvaluateBoardButton({ boardKey, goals = [] }: Props): JSX.Element {
+  const e = useEvaluateBoardButton(boardKey)
 
   return (
     <>
       <ActionPill
-        state={runState}
-        progress={progress}
+        state={e.runState}
+        progress={e.progress}
         hasPath
-        title={activeLabel}
-        runningVerb={activeLabel}
+        title={e.activeLabel}
+        runningVerb={e.targetGoalId ? 'Planning' : e.activeLabel}
         mainIcon={<Sparkles size={13} />}
-        idleTip={lensLabel
-          ? `Evaluate board — ${lensLabel}`
+        idleTip={e.lensLabel
+          ? `Evaluate board — ${e.lensLabel}`
           : 'Evaluate board — analyze everything and propose concrete tasks'}
-        runningTip="Analyzing the board…"
+        runningTip={e.targetGoalId ? 'Planning goal…' : 'Analyzing the board…'}
         ariaName="Evaluate"
-        onRun={() => setConfirmOpen(true)}
-        onStop={() => stopBoard(boardKey)}
+        onRun={e.onPillRun}
+        onStop={e.handleStop}
         configTip="Configure evaluator"
-        onToggleConfig={() => setConfigOpen((v) => !v)}
-        gearRef={gearRef}
+        onToggleConfig={() => e.setConfigOpen((v) => !v)}
+        gearRef={e.gearRef}
       />
 
-      {configOpen && (
+      {e.configOpen && (
         <EvalConfigPopover
-          anchorEl={gearRef.current}
-          selectedLens={selectedLens}
-          lensText={lensText}
-          extraPrompt={extraPrompt}
-          selectedCli={selectedCli}
-          running={running}
-          onSelectLens={pickLens}
-          onLensTextChange={setLensText}
-          onExtraPromptChange={setExtraPrompt}
-          onCliChange={handleCliChange}
-          onReset={handleReset}
-          onRun={handleConfigRun}
-          onClose={() => setConfigOpen(false)}
+          anchorEl={e.gearRef.current}
+          selectedLens={e.selectedLens}
+          lensText={e.lensText}
+          extraPrompt={e.extraPrompt}
+          selectedCli={e.selectedCli}
+          running={e.running}
+          goals={goals}
+          targetGoalId={e.targetGoalId}
+          rigorMode={e.rigorMode}
+          onSelectLens={e.pickLens}
+          onLensTextChange={e.setLensText}
+          onExtraPromptChange={e.setExtraPrompt}
+          onCliChange={e.handleCliChange}
+          onTargetChange={e.setTargetGoalId}
+          onRigorChange={e.setRigorMode}
+          onReset={e.handleReset}
+          onRun={e.onConfigRun}
+          onClose={() => e.setConfigOpen(false)}
         />
       )}
 
-      {confirmOpen && (
+      {e.confirmOpen && !e.targetGoalId && (
         <SendPreviewModal
-          title={activeLabel}
-          engineLabel={cliLabel(selectedCli)}
+          title={e.activeLabel}
+          engineLabel={cliLabel(e.selectedCli)}
           fileName={boardKey}
-          prompt={previewPrompt}
+          prompt={e.previewPrompt}
           readOnly
-          meta={[{ label: 'Lens', value: lensLabel ?? 'Built-in evaluator' }]}
+          meta={[{ label: 'Lens', value: e.lensLabel ?? 'Built-in evaluator' }]}
           submitLabel="Run Evaluate"
-          onSubmit={() => { setConfirmOpen(false); handleRun() }}
-          onCancel={() => setConfirmOpen(false)}
+          onSubmit={e.confirmWholeBoard}
+          onCancel={e.cancelWholeBoard}
+        />
+      )}
+
+      {e.confirmGoalOpen && e.targetGoalId && (
+        <ConfirmModal
+          title="Run a full consultation?"
+          message="Consultation decomposes this goal with the full team (PO → architect → research → design → planner). It spawns several agents and can take a while before the task DAG appears."
+          confirmLabel="Run consultation"
+          onConfirm={e.confirmGoal}
+          onCancel={e.cancelGoal}
         />
       )}
     </>

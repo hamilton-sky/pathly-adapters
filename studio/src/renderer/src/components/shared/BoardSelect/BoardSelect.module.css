@@ -31,6 +31,15 @@
   border-color: var(--accent-border, var(--accent));
 }
 
+.trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.trigger:disabled:hover {
+  border-color: var(--border);
+}
+
 .trigger:focus-visible {
   outline: var(--focus-ring);
   outline-offset: 1px;

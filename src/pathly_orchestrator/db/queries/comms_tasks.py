@@ -241,3 +241,57 @@ def reclaim_stale_claims(conn: sqlite3.Connection, board: str, scope: str) -> li
         )
         conn.commit()
     return ids
+
+
+def feature_task_files(
+    conn: sqlite3.Connection, scope: str, goal_id: str | None = None
+) -> set[str]:
+    """Union of declared ``files`` across a feature's non-terminal tasks (pending/in_progress).
+
+    Empty when nothing was declared — the caller treats that as "touches everything"
+    (conservative serialize) via the file-claims WILDCARD.
+    """
+    sql = (
+        "SELECT files FROM comms_messages WHERE board='feature' AND scope=? "
+        "AND type='task' AND task_status IN ('pending','in_progress') AND deleted_at IS NULL"
+    )
+    params: list = [scope]
+    if goal_id is not None:
+        sql += " AND goal_id=?"
+        params.append(goal_id)
+    out: set[str] = set()
+    for r in conn.execute(sql, params).fetchall():
+        try:
+            for f in json.loads(r["files"] or "[]"):
+                if str(f).strip():
+                    out.add(str(f).strip())
+        except (json.JSONDecodeError, TypeError):
+            continue
+    return out
+
+
+def get_active_file_claims(
+    conn: sqlite3.Connection, exclude_scope: str | None = None
+) -> dict[str, list[str]]:
+    """``{scope: [files]}`` declared by OTHER features' active (pending/in_progress) tasks.
+
+    Feeds the planner-awareness view — what files sibling features intend to touch, so a
+    planner can design its DAG to avoid overlap.
+    """
+    rows = conn.execute(
+        "SELECT scope, files FROM comms_messages WHERE board='feature' AND type='task' "
+        "AND task_status IN ('pending','in_progress') AND deleted_at IS NULL "
+        "AND files IS NOT NULL"
+    ).fetchall()
+    claims: dict[str, set[str]] = {}
+    for r in rows:
+        s = r["scope"]
+        if not s or s == exclude_scope:
+            continue
+        try:
+            fs = [str(f).strip() for f in json.loads(r["files"] or "[]") if str(f).strip()]
+        except (json.JSONDecodeError, TypeError):
+            fs = []
+        if fs:
+            claims.setdefault(s, set()).update(fs)
+    return {s: sorted(fs) for s, fs in claims.items()}

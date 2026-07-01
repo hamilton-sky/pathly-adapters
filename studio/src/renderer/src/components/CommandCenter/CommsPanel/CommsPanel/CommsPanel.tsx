@@ -198,7 +198,12 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
         <div className={s.searchWrap}>
           <SearchBar value={searchTerm} onSearch={runSearch} onClear={clearSearch} />
         </div>
-        <EvaluateBoardButton boardKey={boardKey} />
+        <EvaluateBoardButton
+          boardKey={boardKey}
+          goals={messages
+            .filter((m) => m.type === 'goal')
+            .map((g) => ({ id: g.id, text: g.text }))}
+        />
       </div>
       <BoardViewToggle
         view={boardView}

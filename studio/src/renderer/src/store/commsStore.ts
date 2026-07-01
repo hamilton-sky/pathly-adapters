@@ -20,6 +20,7 @@ import {
   apiAttach,
   apiRunBoard,
   apiStopBoard,
+  apiBoardRunStatus,
   apiRunGoal,
   apiStopGoal,
   apiDecomposeGoal,
@@ -104,6 +105,102 @@ export interface CommsState {
     status: 'summarizing' | 'ready' | 'failed',
     error?: string,
   ) => void
+}
+
+// ── Board-run completion watchers ─────────────────────────────────────
+// A board run (Evaluate / single-agent) is fire-and-forget server-side: the pill
+// clears only when markBoardRunPhase('done') fires from the PER-BOARD comms SSE — so
+// if you navigate away (the board unmounts) or the SSE stalls, the 'done' is missed
+// and the pill sticks on 'running'. These watchers live in the store (which never
+// unmounts), poll the authoritative board-lock status, and clear the pill when the
+// run releases the lock — the store-side analogue of the editor's client pollForFile.
+const _runWatchers = new Map<string, number>()
+
+function _stopRunWatch(key: string): void {
+  const id = _runWatchers.get(key)
+  if (id !== undefined) {
+    window.clearInterval(id)
+    _runWatchers.delete(key)
+  }
+}
+
+function _startRunWatch(key: string, runId?: string): void {
+  _stopRunWatch(key)
+  const isFeature = key !== 'project' && key !== 'global'
+  const scope: BoardScope = isFeature ? 'feature' : (key as BoardScope)
+  const params = scopeToParams(scope, key)
+  const id = window.setInterval(() => {
+    void (async () => {
+      const st = useCommsStore.getState().boardRunState[key]
+      // Already cleared (SSE 'done' won, or Stop was pressed) → stop watching.
+      if (st !== 'running' && st !== 'busy') { _stopRunWatch(key); return }
+      const status = await apiBoardRunStatus(params.board, params.scope)
+      if (!status) return // unreachable (e.g. older server) — keep watching, never false-complete
+      // Still ours while the lock is held by our run (or by anyone, if we lack the id).
+      if (status.running && (!runId || !status.holder || status.holder === runId)) return
+      _stopRunWatch(key)
+      // Re-check to avoid a double 'done' if the SSE completed it between poll + now.
+      if (useCommsStore.getState().boardRunState[key] === 'running') {
+        useCommsStore.getState().markBoardRunPhase(key, 'done')
+      }
+    })()
+  }, 4000)
+  _runWatchers.set(key, id)
+}
+
+// ── Goal-run completion watchers ──────────────────────────────────────
+// Same rationale as the board watchers, for goal decompose/run: the "Planning…" pill
+// clears only when markGoalRunPhase('done') fires from the comms SSE, so a missed 'done'
+// (board unmounted / SSE stalled) strands the goal card on "Planning…" forever. A goal
+// decompose/run holds its parent BOARD lock (board_busy guards concurrency), so we poll
+// the same board-lock status and clear the pill once the lock releases.
+const _goalWatchers = new Map<string, number>()
+
+function _stopGoalWatch(goalId: string): void {
+  const id = _goalWatchers.get(goalId)
+  if (id !== undefined) {
+    window.clearInterval(id)
+    _goalWatchers.delete(goalId)
+  }
+}
+
+// The (board, scope) a goal's lock is held under. A goal's message is loaded on exactly
+// one board, so we find that board key and map it the way _startRunWatch does. Returns
+// null when the goal isn't in any loaded board — the caller then relies on the SSE alone
+// (no regression versus before this watcher existed).
+function _goalBoardParams(goalId: string): { board: string; scope: string } | null {
+  const boards = useCommsStore.getState().boards
+  for (const [key, msgs] of Object.entries(boards)) {
+    if (msgs.some((m) => m.id === goalId)) {
+      const isFeature = key !== 'project' && key !== 'global'
+      const scope: BoardScope = isFeature ? 'feature' : (key as BoardScope)
+      return scopeToParams(scope, key)
+    }
+  }
+  return null
+}
+
+function _startGoalWatch(goalId: string, runId?: string): void {
+  _stopGoalWatch(goalId)
+  const params = _goalBoardParams(goalId)
+  if (!params) return
+  const id = window.setInterval(() => {
+    void (async () => {
+      const st = useCommsStore.getState().goalRunState[goalId]
+      // Already cleared (SSE phase won, or Stop was pressed) → stop watching.
+      if (st !== 'running' && st !== 'busy') { _stopGoalWatch(goalId); return }
+      const status = await apiBoardRunStatus(params.board, params.scope)
+      if (!status) return // unreachable — keep watching, never false-complete
+      // Lock still held by our run (or by anyone, if we lack the id) → the run is live.
+      if (status.running && (!runId || !status.holder || status.holder === runId)) return
+      _stopGoalWatch(goalId)
+      // Lock released with no 'done' SSE → force-clear (re-check to avoid a double 'done').
+      if (useCommsStore.getState().goalRunState[goalId] === 'running') {
+        useCommsStore.getState().markGoalRunPhase(goalId, 'done')
+      }
+    })()
+  }, 4000)
+  _goalWatchers.set(goalId, id)
 }
 
 export const useCommsStore = create<CommsState>()((set, get) => ({
@@ -391,8 +488,10 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
         }
         // /comms/run returns 'started' immediately (the run is async). Stay 'running'
         // so the control stays green and Stop is enabled while the agent CLI is open.
-        // The run clears when the board_run 'done'/'stopped' phase arrives over the
-        // comms SSE → markBoardRunPhase. (No auto-flip to done on the start ack.)
+        // The pill clears when the board_run 'done' phase arrives over the comms SSE →
+        // markBoardRunPhase — or, if that's missed (navigated away / SSE stalled), via
+        // this store-owned completion watch, which polls the board-lock and survives unmount.
+        if (res.ok) _startRunWatch(key, res.run_id)
       })
       .catch(() => {
         set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' } }))
@@ -417,8 +516,11 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
         }
         if (!res.ok && res.error === 'board_busy') {
           set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'busy' } }))
+          return
         }
-        // Otherwise stays 'running' until the board_run 'done' phase arrives via SSE.
+        // Stays 'running' until board_run 'done' arrives via SSE, or the store-owned
+        // completion watch (board-lock poll) clears it if that SSE event is missed.
+        if (res.ok) _startRunWatch(key, res.run_id)
       })
       .catch(() => {
         set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' } }))
@@ -434,6 +536,7 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
         boardRunStart: s.boardRunStart[key] ? s.boardRunStart : { ...s.boardRunStart, [key]: now },
       }))
     } else if (phase === 'done' || phase === 'stopped') {
+      _stopRunWatch(key)
       useToastStore.getState().push(
         phase === 'done' ? 'Agent done' : 'Agent stopped',
         phase === 'done' ? 'success' : 'info',
@@ -447,6 +550,7 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
   },
 
   stopBoard: (key) => {
+    _stopRunWatch(key)
     const isFeature = key !== 'project' && key !== 'global'
     const scope: BoardScope = isFeature ? 'feature' : key as BoardScope
     const params = scopeToParams(scope, key)
@@ -481,7 +585,12 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
           set((s) => ({ goalRunState: { ...s.goalRunState, [goal_id]: 'idle' } }))
           return
         }
-        // ok=true: stay 'running'; SSE goal_run phase drives the transition to done/idle
+        // ok=true: stay 'running'; the SSE goal_run phase drives done/idle. Only the 'single'
+        // executor drains the DAG via start_board_run (board-lock held), so only it gets the
+        // store-owned board-lock completion watch. loop/team run through the scheduler / FSM and
+        // don't hold the board lock across the run — a board-lock poll there would false-complete,
+        // so they rely on the SSE alone.
+        if (res.ok && executor === 'single') _startGoalWatch(goal_id, res.run_id)
       })
       .catch(() => {
         set((s) => ({ goalRunState: { ...s.goalRunState, [goal_id]: 'idle' } }))
@@ -496,6 +605,7 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
         goalRunStart: s.goalRunStart[goal_id] ? s.goalRunStart : { ...s.goalRunStart, [goal_id]: now },
       }))
     } else if (phase === 'done' || phase === 'stopped') {
+      _stopGoalWatch(goal_id)
       useToastStore.getState().push(
         phase === 'done' ? 'Goal run complete' : 'Goal run stopped',
         phase === 'done' ? 'success' : 'info',
@@ -509,6 +619,7 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
       // A failed run MUST drop the elapsed timer at once — otherwise the "Decomposing…"
       // clock runs forever (the reported bug: it kept counting after the run died). Reset
       // the pill to idle and zero the start time so useElapsedProgress stops.
+      _stopGoalWatch(goal_id)
       useToastStore.getState().push('Goal run failed', 'error', { category: 'runner_state' })
       set((s) => ({
         goalRunState: { ...s.goalRunState, [goal_id]: 'idle' },
@@ -518,6 +629,7 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
   },
 
   stopGoal: (goal_id) => {
+    _stopGoalWatch(goal_id)
     set((s) => ({ goalRunState: { ...s.goalRunState, [goal_id]: 'idle' } }))
     apiStopGoal(goal_id).catch(() => undefined)
   },
@@ -570,6 +682,11 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
           return
         }
         // ok=true: stay 'running'; the goal_decompose SSE phase drives done/idle (+ done toast).
+        // planner/plan run one agent via start_board_run (board-lock held), so they get the
+        // store-owned board-lock completion watch as an SSE backstop. consultation runs the FSM
+        // flow (no board lock) — a board-lock poll would false-complete it — so it relies on the
+        // SSE alone.
+        if (mode === 'planner' || mode === 'plan') _startGoalWatch(goal_id)
       })
       .catch(() => {
         set((s) => ({ goalRunState: { ...s.goalRunState, [goal_id]: 'idle' }, goalRunStart: { ...s.goalRunStart, [goal_id]: 0 } }))

@@ -1,4 +1,7 @@
-/* Portal/positioning shell — all inner styles live in PromptActionConfig.module.css */
+/* Portal/positioning shell for the evaluator config popover. The whole-board inner
+   controls live in PromptActionConfig.module.css; the goal-target rows + Plan-now
+   footer live in GoalTargetConfig.module.css. This module owns only the shell + the
+   always-shown Target selector row. */
 .popover {
   position: fixed;
   top: var(--pop-top);
@@ -16,8 +19,19 @@
   overflow: visible;
 }
 
-/* Used by the footerNote JSX rendered in EvalConfigPopover */
-.redirectIcon {
-  color: var(--accent);
-  flex-shrink: 0;
+/* The always-shown Target selector row. */
+.section {
+  padding: 8px 12px;
+  border-bottom: var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.sectionLabel {
+  font: 600 9px/1 var(--font-family-base);
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  text-transform: uppercase;
 }

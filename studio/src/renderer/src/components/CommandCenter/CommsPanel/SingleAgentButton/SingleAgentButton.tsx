@@ -29,7 +29,8 @@ type Mode = 'agent' | 'flow'
  *  - Single agent — configure + send one prompt to one agent (board-scoped /comms/run).
  *  - Flow — pick a board-scoped flow, preview it, and run the whole pipeline (/runner/start).
  *
- * Neither depends on a goal or task DAG — that's the goal card's Decompose/Run.
+ * Neither depends on a goal or task DAG — goal planning is the board's Evaluate control
+ * (target a goal), and goal execution is the goal card's Run.
  */
 export function SingleAgentButton({ boardKey, onRun, onRunFlow }: Props): JSX.Element {
   const [open, setOpen] = useState(false)

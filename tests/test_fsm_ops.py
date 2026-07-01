@@ -672,6 +672,45 @@ def test_build_prompt_threads_goal_id_into_composition(tmp_path):
     assert _MARKER not in without_goal
 
 
+def test_build_prompt_uses_parent_board_scope_for_goal(tmp_path):
+    """A goal-decompose run's on-disk topic is the goal slug (run isolation), but its
+    stage agents must post to / read the PARENT board the goal lives on. build_prompt
+    must inject the parent scope as <feature>, not the slug, when goal_id is given —
+    otherwise the consultation's artifacts orphan onto a throwaway slug-scoped board
+    instead of the feature board it was spawned from."""
+    from unittest.mock import patch
+    from pathly_orchestrator.fsm_ops import build_prompt
+    from pathly_orchestrator.db.connection import get_db
+    from pathly_orchestrator.db.queries.comms_messages import post_message
+
+    parent = "cli-command-center"
+    slug = "studio-climonitorbar-review-3453c9bb"
+
+    # The goal lives on the parent FEATURE board.
+    goal_id = post_message(
+        get_db(), board="feature", scope=parent, from_agent="human",
+        type="goal", text="Studio CliMonitorBar review",
+    )
+
+    # On-disk topic/storage is the slug dir (isolation), NOT the parent feature.
+    slug_dir = tmp_path / "pathly" / "goals" / slug
+    slug_dir.mkdir(parents=True, exist_ok=True)
+    flow_config = {"agent_map": {"ARCHITECTING": "quick"}, "composition": {}}
+
+    with patch(
+        "pathly_orchestrator.fsm_compose._load_agent_text", return_value="base agent text"
+    ):
+        with_goal = build_prompt(flow_config, "ARCHITECTING", slug_dir, goal_id)
+        without_goal = build_prompt(flow_config, "ARCHITECTING", slug_dir, "")
+
+    # goal_id present → board scope resolves to the parent feature.
+    assert f"Feature: {parent}" in with_goal
+    assert f"Feature: {slug}" not in with_goal
+    # No goal_id (ordinary run) → board scope = storage dir name, byte-identical to before.
+    assert f"Feature: {slug}" in without_goal
+    assert f"Feature: {parent}" not in without_goal
+
+
 # ── T2.4 — FSM loads flow from rows (Phase 2 regression) ─────────────────────
 
 

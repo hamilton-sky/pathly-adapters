@@ -628,6 +628,26 @@ export async function apiRunBoard(
   }
 }
 
+/**
+ * Whether a board currently has an active runner (the board-lock is held), plus the
+ * holding run id. Used by the store's completion watcher to clear a board-run pill
+ * without depending on the comms SSE. Returns null when unreachable (e.g. an older
+ * server without this route) so the caller keeps watching rather than false-completing.
+ */
+export async function apiBoardRunStatus(
+  board: string,
+  scope: string,
+): Promise<{ running: boolean; holder: string | null } | null> {
+  try {
+    const r = await apiFetch(`/comms/run/status?board=${encodeURIComponent(board)}&scope=${encodeURIComponent(scope)}`)
+    if (!r.ok) return null
+    const j = (await r.json()) as { running?: boolean; holder?: string | null }
+    return { running: Boolean(j.running), holder: j.holder ?? null }
+  } catch {
+    return null
+  }
+}
+
 /** Stop the agent currently running on a board. */
 export async function apiStopBoard(board: string, scope: string): Promise<boolean> {
   try {

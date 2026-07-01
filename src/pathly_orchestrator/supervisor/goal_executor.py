@@ -123,25 +123,41 @@ def start_goal_run(
             "error": f"unknown executor {executor!r} (expected single|loop|team)",
         }
 
-    # ── Project-level serialization (pre-isolation safety net) ────────────────
-    # Only ONE feature's build runs at a time per project, so concurrent features
-    # cannot stomp the shared working tree. Atomic via the project board-lock; the
-    # wrapped on_done frees it on async completion. Honest default until worktree-
-    # per-feature isolation (parallel-fleet) lands — then this gate is lifted.
-    from pathly_orchestrator.supervisor import board_lock
+    # ── Cross-feature collision gate (overlap-aware, pre-isolation) ───────────
+    # Features whose file sets are DISJOINT (e.g. a backend feature vs a frontend
+    # feature) run in PARALLEL; a feature that would touch files an ACTIVE feature is
+    # already claiming is serialized (reason=project_busy). A feature that declared
+    # no files claims "*" → overlaps everything → conservative serialize. Flip the
+    # `serialize_feature_builds` setting to false to drop the gate entirely (full
+    # parallel — you accept the risk). Superseded by worktree isolation later.
+    from pathly_orchestrator.db.queries.app_settings import get_setting
+    from pathly_orchestrator.db.queries.comms_tasks import feature_task_files
+    from pathly_orchestrator.supervisor import file_claims
 
-    _proj_scope = project_root or "project"
-    _proj_run = str(uuid.uuid4())
-    if not board_lock.acquire("project", _proj_scope, _proj_run):
-        return {
-            "ok": False,
-            "reason": "project_busy",
-            "error": "another feature is building in this project — features build one at a time",
-            "holder": board_lock.holder("project", _proj_scope),
-        }
+    _serialize = (
+        (get_setting(conn, "serialize_feature_builds", "true") or "true")
+        .strip()
+        .lower()
+        not in ("false", "0", "off", "no")
+    )
+    _claimed_scope = scope or (project_root or "project")
+    if _serialize:
+        _my_files = feature_task_files(conn, scope, goal_id) if scope else set()
+        _conflict = file_claims.try_claim(_claimed_scope, _my_files)
+        if _conflict is not None:
+            return {
+                "ok": False,
+                "reason": "project_busy",
+                "error": (
+                    f"feature {scope!r} overlaps files an active feature "
+                    f"({_conflict!r}) is editing — overlapping features build one at a time"
+                ),
+                "holder": _conflict,
+            }
 
     def _release_project() -> None:
-        board_lock.release("project", _proj_scope, _proj_run)
+        if _serialize:
+            file_claims.release(_claimed_scope)
 
     def _on_done_release(*args) -> None:
         try:

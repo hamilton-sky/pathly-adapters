@@ -20,6 +20,16 @@ def _no_async_embed(monkeypatch):
     monkeypatch.setattr(_emb_mod, "embed_async", lambda *a, **k: None)
 
 
+@pytest.fixture(autouse=True)
+def _clear_file_claims():
+    """Isolate the module-level file-claim registry between tests."""
+    from pathly_orchestrator.supervisor import file_claims
+
+    file_claims._claims.clear()
+    yield
+    file_claims._claims.clear()
+
+
 @pytest.fixture()
 def client():
     from pathly_orchestrator.http_server import app
@@ -245,23 +255,58 @@ def test_dispatch_team_board_busy():
         board_lock.release("feature", scope, "someone-else")
 
 
-def test_dispatch_project_busy_serializes_features():
-    """Features build one at a time per project: a second run is refused while another
-    feature holds the project gate (pre-isolation safety net)."""
+def test_dispatch_gate_serializes_on_file_overlap():
+    """A feature whose files overlap an ACTIVE feature's claim is refused (project_busy)."""
     from pathly_orchestrator.db.connection import get_db
-    from pathly_orchestrator.supervisor import board_lock
+    from pathly_orchestrator.supervisor import file_claims
     from pathly_orchestrator.supervisor.goal_run import start_goal_run
 
     conn = get_db()
-    goal = _make_goal(conn, "gr_proj_busy", executor="single")
-    # Another feature's build already holds the project gate (project_root="" -> "project").
-    board_lock.acquire("project", "project", "feature-A-run")
+    goal = _make_goal(conn, "gr_overlap", executor="single")
+    _make_task(conn, "gr_overlap", "edit x", goal)  # no files declared -> wildcard
+    file_claims.try_claim("feature-A", {"src/x.ts"})  # a sibling is already editing src/x.ts
+    result = start_goal_run(goal, project_root="", spawn_fn=lambda **k: {}, block=True)
+    assert result["ok"] is False
+    assert result["reason"] == "project_busy"
+    assert result["holder"] == "feature-A"
+
+
+def test_dispatch_gate_allows_disjoint_files_in_parallel():
+    """Two features touching DISJOINT files (e.g. backend vs frontend) run in parallel."""
+    from pathly_orchestrator.db.connection import get_db
+    from pathly_orchestrator.db.queries.comms import post_message
+    from pathly_orchestrator.supervisor import file_claims
+    from pathly_orchestrator.supervisor.goal_run import start_goal_run
+
+    conn = get_db()
+    goal = _make_goal(conn, "gr_frontend", executor="single")
+    post_message(
+        conn, board="feature", scope="gr_frontend", from_agent="planner",
+        type="task", text="edit UI", goal_id=goal, files=["studio/src/app.tsx"],
+    )
+    file_claims.try_claim("feature-backend", {"src/pathly_orchestrator/x.py"})  # disjoint
+    result = start_goal_run(goal, project_root="", spawn_fn=lambda **k: {}, block=True)
+    assert result["ok"] is True  # disjoint -> runs in parallel, not refused
+    assert result["executor"] == "single"
+
+
+def test_dispatch_gate_off_allows_overlap(monkeypatch):
+    """serialize_feature_builds=false drops the gate entirely (overlap allowed)."""
+    from pathly_orchestrator.db.connection import get_db
+    from pathly_orchestrator.db.queries.app_settings import set_setting
+    from pathly_orchestrator.supervisor import file_claims
+    from pathly_orchestrator.supervisor.goal_run import start_goal_run
+
+    conn = get_db()
+    set_setting(conn, "serialize_feature_builds", "false")
     try:
+        goal = _make_goal(conn, "gr_toggle", executor="single")
+        _make_task(conn, "gr_toggle", "edit x", goal)
+        file_claims.try_claim("feature-A", {"src/x.ts"})  # would overlap, but gate is OFF
         result = start_goal_run(goal, project_root="", spawn_fn=lambda **k: {}, block=True)
-        assert result["ok"] is False
-        assert result["reason"] == "project_busy"
+        assert result["ok"] is True  # gate off -> runs despite overlap
     finally:
-        board_lock.release("project", "project", "feature-A-run")
+        set_setting(conn, "serialize_feature_builds", "true")
 
 
 def test_dispatch_goal_not_found():

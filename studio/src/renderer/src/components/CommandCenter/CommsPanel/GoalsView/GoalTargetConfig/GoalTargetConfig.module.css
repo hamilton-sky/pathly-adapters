@@ -1,30 +1,6 @@
-/* Gear-anchored popover shell — mirrors EvalConfigPopover's portal/positioning idiom. */
-.popover {
-  position: fixed;
-  top: var(--pop-top);
-  left: var(--pop-left);
-  width: 260px;
-  background: var(--bg-mantle);
-  border: var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
-  z-index: 9999;
-  display: flex;
-  flex-direction: column;
-  /* visible (not hidden): the CliSelect engine dropdown opens upward and would be
-     clipped at the popover's top edge by overflow:hidden. */
-  overflow: visible;
-}
-
-.heading {
-  font: 600 11px/1 var(--font-family-base);
-  color: var(--text-muted);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  padding: 10px 12px 8px;
-  border-bottom: var(--border);
-}
-
+/* Section rows for the Target / Rigor / Engine selectors + the Plan-now footer.
+   Rendered inside EvalConfigPopover's portal shell (overflow:visible for the upward
+   CliSelect menu), so these own only the row layout, not positioning. */
 .section {
   padding: 8px 12px;
   border-bottom: var(--border);

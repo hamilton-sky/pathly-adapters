@@ -1,0 +1,39 @@
+/* Muted status pill shown on a goal card with no tasks yet.
+   Mirrors the ActionPill visual weight but is non-interactive. */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 99px;
+  font: 500 11px/1 var(--font-family-base);
+  color: var(--text-muted);
+  background: var(--bg-surface1);
+  border: var(--border);
+  white-space: nowrap;
+  min-width: 0;
+  cursor: default;
+}
+
+/* "Planning…" state — accented + pulsing dot to indicate activity */
+.pill[data-state='planning'] {
+  color: var(--accent);
+  border-color: var(--accent-border, var(--accent));
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+.pill[data-state='planning'] .dot {
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}

@@ -22,6 +22,8 @@ interface Props {
   placeholder?: string
   /** Extra class on the trigger button — lets a caller flatten it into a grouped control. */
   triggerClassName?: string
+  /** When true the trigger is inert (e.g. locked while a run it dispatched is active). */
+  disabled?: boolean
 }
 
 interface Pos { top: number; left: number; width: number; up: boolean; maxH: number }
@@ -33,7 +35,7 @@ interface Pos { top: number; left: number; width: number; up: boolean; maxH: num
  * Escape, and single-key typeahead. The menu portals to <body> so an overflow:auto
  * modal body can't clip it; it closes on outside-click, scroll, and resize.
  */
-export function BoardSelect({ value, options, onChange, id, ariaLabel, leadingIcon, placeholder, triggerClassName }: Props): JSX.Element {
+export function BoardSelect({ value, options, onChange, id, ariaLabel, leadingIcon, placeholder, triggerClassName, disabled }: Props): JSX.Element {
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState<Pos | null>(null)
   const [activeIdx, setActiveIdx] = useState(0)
@@ -157,6 +159,7 @@ export function BoardSelect({ value, options, onChange, id, ariaLabel, leadingIc
         id={id}
         className={triggerClassName ? `${s.trigger} ${triggerClassName}` : s.trigger}
         aria-haspopup="listbox"
+        disabled={disabled}
         {...(open ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
         {...(ariaLabel ? { 'aria-label': ariaLabel } : {})}
         onClick={() => (open ? close() : openMenu())}

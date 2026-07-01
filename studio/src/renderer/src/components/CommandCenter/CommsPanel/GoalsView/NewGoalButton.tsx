@@ -8,9 +8,9 @@ interface Props {
 }
 
 // "+ New goal" trigger for the Goals board. Opens a create popover anchored under
-// the button; on create it posts a type='goal' message, which then shows its
-// Decompose control (0 tasks), completing create → decompose → run. The label
-// collapses to an icon (with this tooltip) when the panel is narrow.
+// the button; on create it posts a type='goal' message, which starts with 0 tasks and
+// a "Not planned" pill — planning is launched from the board's Evaluate control (target
+// that goal). The label collapses to an icon (with this tooltip) when the panel is narrow.
 export function NewGoalButton({ onCreate }: Props): JSX.Element {
   const btnRef = useRef<HTMLButtonElement>(null)
   const [open, setOpen] = useState(false)

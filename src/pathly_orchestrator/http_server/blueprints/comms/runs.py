@@ -183,3 +183,36 @@ def comms_run_stop():
     except Exception as exc:
         logging.exception("comms_run_stop error")
         return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
+@bp.route("/comms/run/status", methods=["GET"])
+def comms_run_status():
+    """Report whether a board currently has an active runner (board-lock held).
+
+    Lets Studio reconcile a board-run pill WITHOUT depending on the comms SSE: the
+    store polls this while a run is 'running' and clears the pill once the lock
+    releases — so a run that finishes while the board is unmounted (the user
+    navigated away) still lands. Mirrors the editor's client-side completion poll.
+    """
+    try:
+        from pathly_orchestrator.supervisor import board_lock
+
+        board = request.args.get("board", "feature")
+        scope = request.args.get("scope", "")
+        if board not in ("feature", "project", "global"):
+            board = "feature"
+        if not isinstance(scope, str) or not scope.strip():
+            return jsonify({"error": "Field 'scope' is required"}), 400
+        return (
+            jsonify(
+                {
+                    "ok": True,
+                    "running": board_lock.is_locked(board, scope),
+                    "holder": board_lock.holder(board, scope),
+                }
+            ),
+            200,
+        )
+    except Exception as exc:
+        logging.exception("comms_run_status error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500

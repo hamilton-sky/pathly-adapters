@@ -1,32 +1,35 @@
 import { useEffect, useRef, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowRight } from 'lucide-react'
+import { Target } from 'lucide-react'
 import { type EditorCli } from '../.././../MarkdownEditor/EditorHeader/editorCli'
-import { PromptBanner, usePromptContent } from '../../../shared/PromptPreview/PromptPreview'
-import { PromptActionConfig } from '../../../shared/PromptActionConfig/PromptActionConfig'
-import { useSkillCatalog } from '../../../Monitor/ConfigurePhaseModal/hooks/usePhaseModalCatalog'
-import { useStore } from '../../../../store'
-import { useUiStore } from '../../../../store/uiStore'
-import { EVAL_LENSES } from '../SingleAgentButton/agentFormData'
+import { BoardSelect } from '../../../shared/BoardSelect/BoardSelect'
+import type { DecomposeMode } from '../../../../store/commsApi'
+import type { GoalStub } from './EvaluateBoardButton'
+import { BoardEvalConfig } from './BoardEvalConfig/BoardEvalConfig'
+import { GoalTargetConfig } from './GoalTargetConfig/GoalTargetConfig'
 import s from './EvalConfigPopover.module.css'
 
-// The default "Propose tasks" lens runs the built-in evaluator, whose task body is
-// this skill file — previewed (and opened) like an agent/skill, not edited inline.
-const EVAL_SKILL_REL = 'planning/evaluate'
+// Max chars shown for a goal title in the Target dropdown.
+const GOAL_LABEL_MAX = 42
 
 interface Props {
   anchorEl: HTMLElement | null
-  /** Selected evaluation lens (EvalLens.name); '' = the default evaluator. */
   selectedLens: string
-  /** The (possibly edited) lens prompt text used for the run. */
   lensText: string
   extraPrompt: string
   selectedCli: EditorCli
   running: boolean
+  /** Goals on this board — populates the Target selector. */
+  goals: GoalStub[]
+  /** '' = whole board; otherwise = a goal id. */
+  targetGoalId: string
+  rigorMode: DecomposeMode
   onSelectLens: (name: string) => void
   onLensTextChange: (v: string) => void
   onExtraPromptChange: (v: string) => void
   onCliChange: (cli: EditorCli) => void
+  onTargetChange: (goalId: string) => void
+  onRigorChange: (mode: DecomposeMode) => void
   onReset: () => void
   onRun: () => void
   onClose: () => void
@@ -34,38 +37,30 @@ interface Props {
 
 const POPOVER_WIDTH = 290
 
+// Target options: "Whole board" first, then each goal (text truncated).
+function buildTargetOptions(goals: GoalStub[]): { value: string; label: string; hint?: string }[] {
+  return [
+    { value: '', label: 'Whole board', hint: 'Evaluate everything and propose tasks' },
+    ...goals.map((g) => ({
+      value: g.id,
+      label: g.text.length > GOAL_LABEL_MAX ? `${g.text.slice(0, GOAL_LABEL_MAX)}…` : g.text,
+      hint: 'Decompose this goal into a task DAG',
+    })),
+  ]
+}
+
+// Portal shell + positioning for the evaluator config popover. Always shows the Target
+// selector, then branches: whole board → BoardEvalConfig (lens/engine/preview); a specific
+// goal → GoalTargetConfig (rigor/engine/Plan-now).
 export function EvalConfigPopover({
   anchorEl, selectedLens, lensText, extraPrompt, selectedCli,
-  running, onSelectLens, onLensTextChange, onExtraPromptChange, onCliChange,
-  onReset, onRun, onClose,
+  running, goals, targetGoalId, rigorMode,
+  onSelectLens, onLensTextChange, onExtraPromptChange, onCliChange,
+  onTargetChange, onRigorChange, onReset, onRun, onClose,
 }: Props): JSX.Element | null {
   const ref = useRef<HTMLDivElement>(null)
+  const isGoalTarget = Boolean(targetGoalId)
 
-  const projectPath = useStore((st) => st.projectPath)
-  const setMdEditorPath = useUiStore((st) => st.setMdEditorPath)
-  const setActivePanel = useUiStore((st) => st.setActivePanel)
-  const skillCatalog = useSkillCatalog(projectPath)
-
-  // A named lens ('') injects an inline, editable directive. The default lens runs
-  // the built-in evaluator → preview its skill file (read-only) with an editor link.
-  const lensPrompt = EVAL_LENSES.find((l) => l.name === selectedLens)?.prompt ?? ''
-  const isDefaultLens = !lensPrompt
-
-  const evaluateContent = usePromptContent(
-    isDefaultLens ? EVAL_SKILL_REL : '',
-    'src/pathly_data/core/skills', skillCatalog,
-    { [EVAL_SKILL_REL]: EVAL_SKILL_REL }, {}, projectPath,
-  )
-  const evaluateMdPath = projectPath ? `${projectPath}/src/pathly_data/core/skills/${EVAL_SKILL_REL}.md` : null
-
-  function openEvaluateSkill(): void {
-    if (!evaluateMdPath) return
-    setMdEditorPath(evaluateMdPath)
-    setActivePanel('markdown-editor')
-    onClose()
-  }
-
-  // Position below the anchor, right-aligned.
   useLayoutEffect(() => {
     if (!anchorEl || !ref.current) return
     const r = anchorEl.getBoundingClientRect()
@@ -76,12 +71,9 @@ export function EvalConfigPopover({
     ref.current.style.setProperty('--pop-left', `${l}px`)
   }, [anchorEl])
 
-  // Outside-click and Escape close.
   useEffect(() => {
     const onDown = (e: MouseEvent) => {
       const t = e.target as Node
-      // The lens dropdown portals its menu outside this popover — clicks there must
-      // not be read as "outside" or selecting a lens would close the whole popover.
       if (t instanceof Element && t.closest('[data-board-select-menu]')) return
       if (ref.current && !ref.current.contains(t) && anchorEl && !anchorEl.contains(t)) onClose()
     }
@@ -94,21 +86,6 @@ export function EvalConfigPopover({
     }
   }, [anchorEl, onClose])
 
-  const footerNote = (
-    <>
-      <ArrowRight size={12} className={s.redirectIcon} />
-      Need an agent or skill? Use <strong>Run on this board</strong>
-    </>
-  )
-
-  const bannerSlot = isDefaultLens ? (
-    <PromptBanner
-      content={evaluateContent}
-      mdEditorPath={evaluateMdPath}
-      onOpenMdEditor={openEvaluateSkill}
-    />
-  ) : undefined
-
   return createPortal(
     <div
       ref={ref}
@@ -116,25 +93,45 @@ export function EvalConfigPopover({
       role="dialog"
       aria-label="Configure evaluator"
     >
-      <PromptActionConfig
-        heading="Configure evaluator"
-        presetLabel="LENS"
-        presets={EVAL_LENSES}
-        selectedPreset={selectedLens}
-        promptText={lensText}
-        extra={extraPrompt}
-        cli={selectedCli}
-        running={running}
-        primaryLabel="Run now"
-        onSelectPreset={onSelectLens}
-        onPromptTextChange={onLensTextChange}
-        onExtraChange={onExtraPromptChange}
-        onCliChange={onCliChange}
-        onReset={onReset}
-        onPrimary={onRun}
-        bannerSlot={bannerSlot}
-        footerNote={footerNote}
-      />
+      {/* ── Target selector (always shown; locked while a dispatched run is live) ── */}
+      <section className={s.section}>
+        <label className={s.sectionLabel} htmlFor="eval-target">TARGET</label>
+        <BoardSelect
+          id="eval-target"
+          ariaLabel="Evaluate target"
+          value={targetGoalId}
+          options={buildTargetOptions(goals)}
+          onChange={(v) => onTargetChange(v)}
+          leadingIcon={<Target size={13} />}
+          disabled={running}
+        />
+      </section>
+
+      {isGoalTarget ? (
+        <GoalTargetConfig
+          rigorMode={rigorMode}
+          selectedCli={selectedCli}
+          running={running}
+          onRigorChange={onRigorChange}
+          onCliChange={onCliChange}
+          onRun={onRun}
+        />
+      ) : (
+        <BoardEvalConfig
+          selectedLens={selectedLens}
+          lensText={lensText}
+          extraPrompt={extraPrompt}
+          selectedCli={selectedCli}
+          running={running}
+          onSelectLens={onSelectLens}
+          onLensTextChange={onLensTextChange}
+          onExtraPromptChange={onExtraPromptChange}
+          onCliChange={onCliChange}
+          onReset={onReset}
+          onRun={onRun}
+          onClose={onClose}
+        />
+      )}
     </div>,
     document.body,
   )

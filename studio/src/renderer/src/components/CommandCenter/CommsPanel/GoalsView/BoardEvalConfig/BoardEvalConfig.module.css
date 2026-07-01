@@ -1,0 +1,6 @@
+/* Used by the footerNote redirect hint ("Run on this board"). The whole-board config's
+   inner controls are styled by PromptActionConfig.module.css. */
+.redirectIcon {
+  color: var(--accent);
+  flex-shrink: 0;
+}

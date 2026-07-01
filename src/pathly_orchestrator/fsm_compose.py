@@ -153,6 +153,34 @@ def build_prompt(
     agent = flow_config["agent_map"][state_name]
     feature = storage_path.name
     project_root = str(storage_path.parent.parent.parent)
+    # Board scope the stage posts to / retrieves context from. A plain feature
+    # pipeline: this IS the feature (the storage dir name). A goal-decompose run
+    # (the consultation FSM): the on-disk topic is the goal slug for run isolation,
+    # but board writes must target the parent feature/project board the goal lives
+    # on — else the PO/architect/… artifacts orphan onto a throwaway slug-scoped
+    # board instead of the board the consultation was spawned from (the bug fix).
+    board_scope = feature
+    if goal_id:
+        try:
+            from pathly_orchestrator.db.connection import get_db as _gd
+            from pathly_orchestrator.db.queries.comms_messages import (
+                get_goal_board_scope as _ggbs,
+            )
+
+            _bs = _ggbs(_gd(project_root or None), goal_id)
+            if _bs is not None:
+                # _bs = (board_tier, scope). We take only the scope: the board-post
+                # fragments (comms-post, board-init) and record-phase hardcode
+                # board='feature', so the *feature*-tier goal path is what's fully
+                # supported here. A project/global-tier goal decompose is an edge case
+                # (project goals normally become features, not DAG-decomposed): its
+                # posts would land under scope=<project_root> on the feature board, and
+                # its project-board context is still surfaced via retrieve_board_context's
+                # own project channel. Threading _bs[0] through to the post sites is a
+                # follow-up (needs a `<board>` fragment variable), not done here.
+                board_scope = _bs[1]
+        except Exception:
+            board_scope = feature
     _role = _SKILL_AGENT_ROLE.get(agent)
     agent_role: str = (
         _role
@@ -196,13 +224,13 @@ def build_prompt(
         agent_text = _load_agent_text(agent)
 
     agent_text = _inject_prompt_vars(
-        agent_text, feature, project_root, agent_role, storage_path=storage_path,
+        agent_text, board_scope, project_root, agent_role, storage_path=storage_path,
         skill=(agent if "/" in agent else None),
     )
 
     context = (
         f"\n\n## Current task\n"
-        f"Feature: {feature}\n"
+        f"Feature: {board_scope}\n"
         f"State: {state_name}\n"
         f"Storage path: {storage_path}\n"
         "\n"
@@ -220,6 +248,11 @@ def build_prompt(
     from pathly_orchestrator.runner import build_pipeline_history_block
     import os
 
+    # Pipeline history is the RUN's own inter-stage progress, keyed by the run identity
+    # (the storage/topic name = `feature`), NOT the board scope. A multi-stage consultation
+    # must see its OWN earlier stages (PO → architect → …), not the parent feature's
+    # unrelated pipeline history — so this read intentionally stays on `feature`, while
+    # board writes/context/telemetry above use `board_scope`.
     feature_dir = os.path.join(project_root, "pathly", "plans", feature)
     history = build_pipeline_history_block(feature_dir)
 
@@ -230,9 +263,9 @@ def build_prompt(
         from pathly_orchestrator.runner.comms_context import retrieve_board_context
 
         _conn = _get_db_comms()
-        _scope = get_board_scope(_conn, project_root, feature)
+        _scope = get_board_scope(_conn, project_root, board_scope)
         board_block = retrieve_board_context(
-            topic=feature,
+            topic=board_scope,
             project_root=project_root,
             task_description=context,
             board_scope=_scope,
@@ -258,7 +291,7 @@ def build_prompt(
             _code_files = _changed_files(project_root)
             if _code_files:
                 code_block = _code_build_block(
-                    feature, _code_files, agent_role, 1200
+                    board_scope, _code_files, agent_role, 1200
                 )
     except Exception:
         pass

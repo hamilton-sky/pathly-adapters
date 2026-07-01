@@ -5,9 +5,10 @@ import { Tooltip } from '../../../../ui'
 import { ConfirmModal } from '../../../../shared/ConfirmModal/ConfirmModal'
 import { CopyTextButton } from '../../../../shared/CopyTextButton/CopyTextButton'
 import { GoalRunButton } from '../../GoalRunButton/GoalRunButton'
-import { GoalDecomposeButton } from '../../GoalDecomposeButton/GoalDecomposeButton'
+import { GoalPlanStatus } from '../../GoalPlanStatus/GoalPlanStatus'
 import { EditableGoalTitle } from './EditableGoalTitle'
 import { computeRollup, serializeTasks } from '../../GoalsView/goalsViewUtils'
+import { useCommsStore } from '../../../../../store/commsStore'
 import s from './GoalCard.module.css'
 
 interface Props {
@@ -22,11 +23,16 @@ interface Props {
 
 // Goal header: collapse toggle + title, then a single right-aligned action group (edit · view-DAG
 // · copy-all · delete) — uniform icon buttons that hold their place in view and edit mode. Row 2
-// carries the task rollup + executor/Run (or Decompose when empty).
+// carries the task rollup + executor/Run, or a non-interactive plan-status pill while the goal has
+// no tasks yet (planning is launched from the board's Evaluate control, not from the card).
 export function GoalCardHeader({ goal, tasks, open, onToggle, onEditGoal, onDeleteGoal, onOpenDetail }: Props): JSX.Element {
   const r = computeRollup(tasks)
   const [confirming, setConfirming] = useState(false)
   const [editing, setEditing] = useState(false)
+  const goalRunState = useCommsStore((st) => st.goalRunState)
+  // Any non-idle run state (running · busy while board-locked · done during the 3s reload
+  // window) reads as "Planning…" so the pill never flashes "Not planned" mid-decompose.
+  const isPlanning = (goalRunState[goal.id] ?? 'idle') !== 'idle'
   return (
     <div className={s.header}>
       <div className={s.titleRow}>
@@ -71,10 +77,9 @@ export function GoalCardHeader({ goal, tasks, open, onToggle, onEditGoal, onDele
           {r.failed > 0 ? ` · ${r.failed} blocked` : ''}
         </span>
         <div className={s.controls}>
-          {/* No tasks yet → Decompose the goal into a DAG; once it has tasks → Run it. */}
-          {tasks.length === 0
-            ? <GoalDecomposeButton goalId={goal.id} goalText={goal.text} />
-            : <GoalRunButton goalId={goal.id} defaultExecutor={goal.executor ?? 'single'} />}
+          {tasks.length > 0
+            ? <GoalRunButton goalId={goal.id} defaultExecutor={goal.executor ?? 'single'} />
+            : <GoalPlanStatus state={isPlanning ? 'planning' : 'idle'} />}
         </div>
       </div>
       {confirming && (
