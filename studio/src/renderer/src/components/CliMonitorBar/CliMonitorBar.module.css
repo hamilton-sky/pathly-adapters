@@ -12,6 +12,11 @@
   user-select: none;
 }
 
+/* ── Flow controls (relocated from the HQ FlowControlBar) ── */
+.flowSection {
+  padding-top: 4px;
+}
+
 /* ── Header (drag handle) ── */
 .header {
   display: flex;

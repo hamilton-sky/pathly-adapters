@@ -9,6 +9,7 @@ import { useCliMonitor } from './useCliMonitor'
 import type { CliSession, SessionRecord } from './useCliMonitor'
 import { SpawnQueuePanel } from './SpawnQueuePanel'
 import { CodeIntelControl } from './CodeIntelControl'
+import { FlowControlBar } from '../HQ/FlowControlBar/FlowControlBar'
 import s from './CliMonitorBar.module.css'
 
 function fmtAgo(ms: number): string {
@@ -121,6 +122,10 @@ export function CliMonitorBar(): JSX.Element | null {
       </div>
 
       <div className={s.body}>
+        <div className={s.flowSection}>
+          <div className={s.sectionLabel}>FLOW</div>
+          <FlowControlBar />
+        </div>
         <CodeIntelControl />
         {rateLimited && (
           <div className={s.rateLimitBanner}>Rate-limited — backing off, runs are queued</div>

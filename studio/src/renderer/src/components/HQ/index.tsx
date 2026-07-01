@@ -7,7 +7,6 @@ import { MatchCard } from './MatchCard/MatchCard'
 import { PathlyMenuCard } from './PathlyMenuCard/PathlyMenuCard'
 import { AutomationCard } from './AutomationCard/AutomationCard'
 import { StepQueue } from './StepQueue/StepQueue'
-import { FlowControlBar } from './FlowControlBar/FlowControlBar'
 import { StageStatusStrip } from './StageStatusStrip/StageStatusStrip'
 import { RunnerLogCard } from './RunnerLogCard/RunnerLogCard'
 import { AgentQuestionCard } from './AgentQuestionCard/AgentQuestionCard'
@@ -31,7 +30,6 @@ export function HQ(): JSX.Element {
       <div className={styles.resizeHandle} onMouseDown={chat.onDragStart} />
       <div className={styles.panelInner}>
       <ChatHeader hasClaudeTab={chat.hasClaudeTab} hasCodexTab={chat.hasCodexTab} hasShellTab={chat.hasShellTab} hasAntigravityTab={chat.hasAntigravityTab} targetKind={chat.targetKind} onSetTarget={chat.setTargetKind} onToggleChat={chat.toggleChat} onClearChat={chat.handleClearAll} sessions={chat.brightskyAuthenticated ? [] : undefined} onSelectSession={(id) => useBrightskyStore.getState().setSessionId(id)} />
-      <FlowControlBar />
       <StageStatusStrip />
       <RunnerLogCard docked />
       {agentQuestion && (
