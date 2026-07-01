@@ -61,6 +61,8 @@ export interface WorkspaceTreeController {
   filter: string
   /** Which tree the search box filters: the whole project, or only pathly/. */
   searchScope: 'project' | 'pathly'
+  /** How search results render: filtered tree (in place) or a flat results list. */
+  searchView: 'tree' | 'list'
   editValue: string
   createValue: string
   createPlaceholder: string
@@ -70,6 +72,7 @@ export interface WorkspaceTreeController {
 
   setFilter(v: string): void
   setSearchScope(scope: 'project' | 'pathly'): void
+  setSearchView(view: 'tree' | 'list'): void
   /** Highlight a file (no open), or toggle a folder. Single-click never opens. */
   select(row: WsRow): void
   /** Open a file in the matching editor panel — explicit menu/right-click action. */

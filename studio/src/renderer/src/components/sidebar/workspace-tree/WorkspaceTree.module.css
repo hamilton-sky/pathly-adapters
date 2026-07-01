@@ -103,6 +103,47 @@
   border-radius: 3px;
 }
 
+/* Search results header (count + tree/list view toggle) */
+.resultsHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 8px 6px 10px;
+}
+.resultsCount {
+  font: 500 11px 'Geist', system-ui, sans-serif;
+  color: var(--text-muted);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.viewToggle {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.viewBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 3px;
+  border-radius: var(--radius-sm, 4px);
+}
+.viewBtn:hover {
+  background: var(--bg-surface0);
+  color: var(--text-primary);
+}
+.viewBtn[data-active='true'] {
+  background: var(--bg-surface1);
+  color: var(--accent);
+}
+
 /* Pinned pathly/ section (rendered above the project root) */
 .pinnedLabel {
   padding: 4px 10px 2px;

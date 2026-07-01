@@ -36,6 +36,7 @@ export function useWorkspaceTree(): { controller: WorkspaceTreeController } {
   const [toast, setToast] = useState<string | null>(null)
   const [allLoaded, setAllLoaded] = useState(false)
   const [searchScope, setSearchScope] = useState<'project' | 'pathly'>('project')
+  const [searchView, setSearchView] = useState<'tree' | 'list'>('tree')
 
   const toastTimer = useRef<ReturnType<typeof setTimeout>>()
 
@@ -237,8 +238,8 @@ export function useWorkspaceTree(): { controller: WorkspaceTreeController } {
   const createPlaceholder = creating?.type === 'folder' ? 'folder-name' : 'filename.ext'
 
   const controller: WorkspaceTreeController = {
-    rows, pinnedRows, filter, searchScope, editValue, createValue, createPlaceholder, menu, deleteTarget, toast,
-    setFilter, setSearchScope, select, open, openBoard, toggle, collapseAll,
+    rows, pinnedRows, filter, searchScope, searchView, editValue, createValue, createPlaceholder, menu, deleteTarget, toast,
+    setFilter, setSearchScope, setSearchView, select, open, openBoard, toggle, collapseAll,
     openMenu, closeMenu,
     startCreate, setCreateValue, submitCreate, cancelCreate,
     startRename, setEditValue, submitRename, cancelRename,
