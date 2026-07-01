@@ -232,11 +232,6 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
 
   loadFeatures: async (projectPath: string) => {
     try {
-      // Legacy features live under pathly/plans/<id>/
-      const plansDir = `${projectPath}/pathly/plans`
-      const legacyNames = await listDirs(plansDir).catch(() => [] as string[])
-      const legacyIds = legacyNames.filter((n) => n !== '.archive')
-
       // New-style features live directly under pathly/<id>/. Exclude the structural
       // container dirs (mirror _RESERVED_TOPICS in storage_paths.py) so we never surface
       // "plans"/"features"/"goals"/… as a bogus feature card.
@@ -253,10 +248,8 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
       const featureNames = await listDirs(`${pathlyDir}/features`).catch(() => [] as string[])
       const featureIds = featureNames.filter((n) => n !== '.archive')
 
-      // Merge: features/ and new-style top-level take precedence; legacy plans/ ids appended.
-      const primary = [...new Set([...featureIds, ...newStyleIds])]
-      const seen = new Set(primary)
-      const allIds = [...primary, ...legacyIds.filter((id) => !seen.has(id))]
+      // Feature-centric pathly/features/<id>/ + any new-style top-level pathly/<id>/.
+      const allIds = [...new Set([...featureIds, ...newStyleIds])]
 
       // Enrich each feature from its STATE.json (stage + conv) and feedback/ (blocked).
       const features: Feature[] = await Promise.all(

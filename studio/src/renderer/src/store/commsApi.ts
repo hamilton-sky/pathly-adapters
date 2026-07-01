@@ -846,7 +846,7 @@ const BLOCKER_FILES = new Set([
 ])
 
 /** Resolve the storage path for a feature. Mirrors _resolve_storage_path in fsm_ops.py:
- *  features/<id>/plans wins, then new-style pathly/<id>/, then legacy pathly/plans/<id>/. */
+ *  the feature-centric home pathly/features/<id>/ wins, then new-style pathly/<id>/. */
 export async function resolveFeaturePath(projectPath: string, featureId: string): Promise<string> {
   // Feature-centric layout (storage-restructure): pathly/features/<id>/ holds STATE.json + plan files.
   const featureDir = `${projectPath}/pathly/features/${featureId}`
@@ -860,7 +860,8 @@ export async function resolveFeaturePath(projectPath: string, featureId: string)
   // Also accept new-style dirs that have any files already (e.g. STATE.json written by FSM)
   const anyFile = await readFile(`${newStyle}/STATE.json`)
   if (anyFile !== null) return newStyle
-  return `${projectPath}/pathly/plans/${featureId}`
+  // Default to the feature-centric home (legacy pathly/plans/<id>/ fallback removed post-migration).
+  return featureDir
 }
 
 /** Read a feature's STATE.json (filesystem) — current stage + conversation count. */

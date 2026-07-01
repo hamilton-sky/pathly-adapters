@@ -15,16 +15,10 @@ export function registerWatcherHandlers(win: BrowserWindow): void {
         // file may be transiently locked during write
       }
     }
-    // Feature-centric layout keeps STATE.json/EVENTS.jsonl directly under
-    // pathly/features/<topic>/; legacy features keep them under pathly/plans/<topic>/.
-    // Watch both so the live FSM view updates wherever the feature lives.
-    const bases = [
-      join(projectPath, 'pathly/features', topic),
-      join(projectPath, 'pathly/plans', topic),
-    ]
-    const targets = bases.flatMap((base) => [join(base, 'STATE.json'), join(base, 'EVENTS.jsonl')])
+    // Feature-centric layout keeps STATE.json/EVENTS.jsonl directly under pathly/features/<topic>/.
+    const base = join(projectPath, 'pathly/features', topic)
     chokidar
-      .watch(targets)
+      .watch([join(base, 'STATE.json'), join(base, 'EVENTS.jsonl')])
       .on('add', send)
       .on('change', send)
   })

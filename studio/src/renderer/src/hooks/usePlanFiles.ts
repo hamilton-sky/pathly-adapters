@@ -67,17 +67,11 @@ export function usePlanFiles(): {
     }
 
     try {
+      // Feature-centric layout: files live directly under pathly/features/<name>/.
       const featuresDir = `${projectPath}/pathly/features`
-      const legacyDir = `${projectPath}/pathly/plans`
       const featureNames = (await listDirs(featuresDir).catch(() => [] as string[])).filter((n) => n !== '.archive')
-      const legacyNames = (await listDirs(legacyDir).catch(() => [] as string[])).filter((n) => n !== '.archive')
-
-      // Feature-centric first (files live directly under pathly/features/<name>/); legacy
-      // names not already covered are appended (files under pathly/plans/<name>/).
-      const seen = new Set(featureNames)
       const folders: PlanFolder[] = []
       for (const name of featureNames) folders.push(await scanContent(name, `${featuresDir}/${name}`))
-      for (const name of legacyNames) if (!seen.has(name)) folders.push(await scanContent(name, `${legacyDir}/${name}`))
       setPlanFolders(folders)
     } catch {
       setPlanFolders([])

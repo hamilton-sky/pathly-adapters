@@ -73,13 +73,13 @@ def _resolve_storage_path(flow_config: dict, project_root: str, topic: str) -> P
         root / "pathly" / "features" / topic,
         root / "pathly" / topic,
         root / "pathly" / "goals" / topic,
-        root / "pathly" / "plans" / topic,
     ):
         if candidate.is_dir():
             return candidate
     # None exists — fall through to the flow's template default. For the team pipeline that
-    # is now the feature-centric home (pathly/features/<topic>); debug/explore keep their own
-    # subdir templates (pathly/debugs, pathly/explorations).
+    # is now the feature-centric home (pathly/features/<topic>); debug/explore/consultation keep
+    # their own subdir templates (pathly/debugs, pathly/explorations, pathly/plans for decompose).
+    # The legacy pathly/plans/<topic> FEATURE probe was removed once all features migrated.
     template = flow_config["storage_path"]
     return root / template.format(topic=topic)
 
