@@ -136,12 +136,12 @@ LSP (Serena) — precise, always fresh; best for a specific symbol:
 - Find a symbol / its definition   -> mcp__serena__find_symbol
 - Outline a file's symbols         -> mcp__serena__get_symbols_overview
 - Who calls / references a symbol  -> mcp__serena__find_referencing_symbols
-GitNexus — graph-wide; best for whole-repo call chains + blast radius:
-- Find a symbol or pattern         -> mcp__gitnexus__query
-- Understand callers / callees     -> mcp__gitnexus__context
-- Trace an execution path          -> mcp__gitnexus__trace
-- Blast radius of a change         -> mcp__gitnexus__impact
-After code has been edited, prefer LSP over GitNexus (LSP is always fresh).
+Code graph (codebase-memory-mcp) — whole-repo structure, fast, 158 languages:
+- Find a symbol or pattern         -> mcp__codebase-memory-mcp__search_graph
+- Callers / callees / references   -> mcp__codebase-memory-mcp__query_graph
+- Trace a call path                -> mcp__codebase-memory-mcp__trace_path
+- Architecture / blast radius      -> mcp__codebase-memory-mcp__get_architecture
+After code has been edited, prefer LSP over the graph (LSP is always fresh).
 If neither toolset is available, proceed with Grep and Read as normal.
 
 ## Rigor contract

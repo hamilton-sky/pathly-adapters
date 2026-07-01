@@ -1,5 +1,5 @@
 ﻿name: reviewer
 description: Adversarial reviewer — finds contract violations and reports them without fixing. Checks dependency direction, structural rules, and security concerns. Can write feedback files, but cannot edit source or run Bash.
 model: sonnet
-tools: [Read, Glob, Grep, Write, mcp__gitnexus__query, mcp__gitnexus__context, mcp__gitnexus__trace, mcp__gitnexus__impact, mcp__serena__find_symbol, mcp__serena__get_symbols_overview, mcp__serena__find_referencing_symbols]
+tools: [Read, Glob, Grep, Write, mcp__codebase-memory-mcp__search_graph, mcp__codebase-memory-mcp__query_graph, mcp__codebase-memory-mcp__trace_path, mcp__codebase-memory-mcp__get_architecture, mcp__serena__find_symbol, mcp__serena__get_symbols_overview, mcp__serena__find_referencing_symbols]
 can_spawn: [quick, scout]

@@ -1,9 +1,0 @@
-{
-  "mcpServers": {
-    "gitnexus": {
-      "command": "gitnexus",
-      "args": ["mcp"],
-      "description": "Codebase knowledge graph — query symbols, callers/callees, call chains, and impact analysis"
-    }
-  }
-}

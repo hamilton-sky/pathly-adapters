@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "codebase-memory-mcp": {
+      "command": "codebase-memory-mcp",
+      "args": [],
+      "description": "Code knowledge graph — symbols, callers/callees, call paths, architecture, impact (158 languages, local static binary)"
+    }
+  }
+}

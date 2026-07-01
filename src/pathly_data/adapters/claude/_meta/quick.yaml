@@ -1,4 +1,4 @@
 ﻿name: quick
 description: Simple lookups, quick questions, single-file reads, short summaries, and small focused tasks that need one or two tool calls. Use when the task is narrow and well-defined.
 model: haiku
-tools: [Read, Glob, Grep, mcp__gitnexus__query, mcp__gitnexus__context, mcp__serena__find_symbol]
+tools: [Read, Glob, Grep, mcp__codebase-memory-mcp__search_graph, mcp__codebase-memory-mcp__query_graph, mcp__serena__find_symbol]

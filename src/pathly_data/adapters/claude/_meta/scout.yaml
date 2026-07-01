@@ -1,4 +1,4 @@
 ﻿name: scout
 description: Codebase pattern investigator — reads across multiple files and directories to answer a structural question. Use when builder needs 3+ file reads before making implementation decisions. Returns Structured Findings, never writes.
 model: haiku
-tools: [Read, Glob, Grep, mcp__gitnexus__query, mcp__gitnexus__context, mcp__gitnexus__trace, mcp__serena__find_symbol, mcp__serena__get_symbols_overview, mcp__serena__find_referencing_symbols]
+tools: [Read, Glob, Grep, mcp__codebase-memory-mcp__search_graph, mcp__codebase-memory-mcp__query_graph, mcp__codebase-memory-mcp__trace_path, mcp__serena__find_symbol, mcp__serena__get_symbols_overview, mcp__serena__find_referencing_symbols]

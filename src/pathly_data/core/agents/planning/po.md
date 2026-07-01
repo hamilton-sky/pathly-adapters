@@ -76,8 +76,8 @@ If the user provided a PRD, skip areas already well-covered and focus on gaps.
 ## Code intelligence — preferred tools, Grep/Read fallback
 
 Prefer semantic tools when available for quick structural lookups:
-- Symbol lookup   -> mcp__serena__find_symbol or mcp__gitnexus__query   (fallback: Grep or Read)
-- Callers / refs  -> mcp__serena__find_referencing_symbols or mcp__gitnexus__context
+- Symbol lookup   -> mcp__serena__find_symbol or mcp__codebase-memory-mcp__search_graph   (fallback: Grep or Read)
+- Callers / refs  -> mcp__serena__find_referencing_symbols or mcp__codebase-memory-mcp__query_graph
 After code has been edited, prefer LSP (Serena) — it is always fresh.
 If neither is available, proceed with Grep and Read as normal.
 

@@ -104,11 +104,11 @@ LSP (Serena) — precise, always fresh:
 - Find a symbol / its definition   -> mcp__serena__find_symbol
 - Outline a file's symbols         -> mcp__serena__get_symbols_overview
 - Who calls / references a symbol  -> mcp__serena__find_referencing_symbols
-GitNexus — graph-wide call chains:
-- Find a symbol or pattern         -> mcp__gitnexus__query
-- Understand callers / callees     -> mcp__gitnexus__context
-- Trace an execution path          -> mcp__gitnexus__trace
-After code has been edited, prefer LSP over GitNexus (LSP is always fresh).
+Code graph (codebase-memory-mcp):
+- Find a symbol or pattern         -> mcp__codebase-memory-mcp__search_graph
+- Callers / callees / references   -> mcp__codebase-memory-mcp__query_graph
+- Trace a call path                -> mcp__codebase-memory-mcp__trace_path
+After code has been edited, prefer LSP over the graph (LSP is always fresh).
 If neither toolset is available, proceed with Grep and Read as normal.
 
 ## Rigor contract
