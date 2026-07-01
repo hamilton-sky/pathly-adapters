@@ -7,7 +7,6 @@ let workspaceWatcher: FSWatcher | null = null
 
 export function registerWatcherHandlers(win: BrowserWindow): void {
   ipcMain.handle('watch:start', (_event, projectPath: string, topic: string) => {
-    const base = join(projectPath, 'pathly/plans', topic)
     const send = (filePath: string): void => {
       try {
         const content = readFileSync(filePath, 'utf-8')
@@ -16,8 +15,16 @@ export function registerWatcherHandlers(win: BrowserWindow): void {
         // file may be transiently locked during write
       }
     }
+    // Feature-centric layout keeps STATE.json/EVENTS.jsonl directly under
+    // pathly/features/<topic>/; legacy features keep them under pathly/plans/<topic>/.
+    // Watch both so the live FSM view updates wherever the feature lives.
+    const bases = [
+      join(projectPath, 'pathly/features', topic),
+      join(projectPath, 'pathly/plans', topic),
+    ]
+    const targets = bases.flatMap((base) => [join(base, 'STATE.json'), join(base, 'EVENTS.jsonl')])
     chokidar
-      .watch([join(base, 'STATE.json'), join(base, 'EVENTS.jsonl')])
+      .watch(targets)
       .on('add', send)
       .on('change', send)
   })

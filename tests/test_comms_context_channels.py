@@ -152,7 +152,7 @@ def test_comms_context_channels_decision_in_governance(client):
     )
 
     assert "## Communication Board" in block
-    assert "🔒 Governance" in block
+    assert "### Governance" in block
     assert "Use SQLite for all persistence" in block
 
 
@@ -169,7 +169,7 @@ def test_comms_context_channels_escalation_in_governance(client):
         board_scope={"feature": True, "project": False, "global": False},
     )
 
-    assert "🔒 Governance" in block
+    assert "### Governance" in block
     assert "Need human sign-off before proceeding" in block
     assert "Open escalations" in block
 
@@ -269,7 +269,7 @@ def test_comms_context_channels_governance_and_context_both_present(
         board_scope={"feature": True, "project": False, "global": False},
     )
 
-    assert "🔒 Governance" in block
+    assert "### Governance" in block
     assert "No external API calls" in block
     # Context section may or may not appear depending on recency path logic —
     # verify the block is non-empty at minimum

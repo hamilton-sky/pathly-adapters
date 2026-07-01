@@ -30,50 +30,54 @@ export function usePlanFiles(): {
 
   const loadPlanFiles = useCallback(async (): Promise<void> => {
     if (!projectPath) { setPlanFolders([]); return }
-    const plansDir = `${projectPath}/pathly/plans`
+
+    // Read a feature's plan files + subdirs from wherever its content lives. In the
+    // feature-centric layout that is pathly/features/<name>/ directly; legacy features
+    // keep their files in pathly/plans/<name>/.
+    async function scanContent(name: string, contentDir: string): Promise<PlanFolder> {
+      let files: PathlyItem[] = []
+      try {
+        const fileNames = await listDir(contentDir)
+        files = fileNames.map((fname) => ({ name: fname, path: `${contentDir}/${fname}`, type: 'plan' as const }))
+      } catch { /* empty folder */ }
+      const subdirs: PlanSubdir[] = []
+      try {
+        const subdirNames = await listDirs(contentDir)
+        for (const sdName of subdirNames) {
+          const sdPath = `${contentDir}/${sdName}`
+          let sdFiles: PathlyItem[] = []
+          try {
+            const sdFileNames = await listDir(sdPath)
+            sdFiles = sdFileNames.map((fname) => ({ name: fname, path: `${sdPath}/${fname}`, type: 'plan' as const }))
+          } catch { /* empty subdir */ }
+          subdirs.push({ name: sdName, files: sdFiles, open: false })
+        }
+      } catch { /* no subdirs */ }
+      let convTotal = 0
+      let convDone = 0
+      try {
+        const md = await readFile(`${contentDir}/PROGRESS.md`)
+        if (md) {
+          const convs = parseProgressMd(md)
+          convTotal = convs.length
+          convDone = convs.filter((c) => c.status === 'DONE').length
+        }
+      } catch { /* no PROGRESS.md */ }
+      return { name, path: contentDir, files, subdirs, convTotal, convDone, open: false }
+    }
+
     try {
-      const folderNames = await listDirs(plansDir)
+      const featuresDir = `${projectPath}/pathly/features`
+      const legacyDir = `${projectPath}/pathly/plans`
+      const featureNames = (await listDirs(featuresDir).catch(() => [] as string[])).filter((n) => n !== '.archive')
+      const legacyNames = (await listDirs(legacyDir).catch(() => [] as string[])).filter((n) => n !== '.archive')
+
+      // Feature-centric first (files live directly under pathly/features/<name>/); legacy
+      // names not already covered are appended (files under pathly/plans/<name>/).
+      const seen = new Set(featureNames)
       const folders: PlanFolder[] = []
-      for (const name of folderNames) {
-        const folderPath = `${plansDir}/${name}`
-        let files: PathlyItem[] = []
-        let convTotal = 0
-        let convDone = 0
-        try {
-          const fileNames = await listDir(folderPath)
-          files = fileNames.map((fname) => ({
-            name: fname,
-            path: `${folderPath}/${fname}`,
-            type: 'plan' as const,
-          }))
-        } catch { /* empty folder */ }
-        let subdirs: PlanSubdir[] = []
-        try {
-          const subdirNames = await listDirs(folderPath)
-          for (const sdName of subdirNames) {
-            const sdPath = `${folderPath}/${sdName}`
-            let sdFiles: PathlyItem[] = []
-            try {
-              const sdFileNames = await listDir(sdPath)
-              sdFiles = sdFileNames.map((fname) => ({
-                name: fname,
-                path: `${sdPath}/${fname}`,
-                type: 'plan' as const,
-              }))
-            } catch { /* empty subdir */ }
-            subdirs.push({ name: sdName, files: sdFiles, open: false })
-          }
-        } catch { /* no subdirs */ }
-        try {
-          const md = await readFile(`${folderPath}/PROGRESS.md`)
-          if (md) {
-            const convs = parseProgressMd(md)
-            convTotal = convs.length
-            convDone = convs.filter((c) => c.status === 'DONE').length
-          }
-        } catch { /* no PROGRESS.md */ }
-        folders.push({ name, path: folderPath, files, subdirs, convTotal, convDone, open: false })
-      }
+      for (const name of featureNames) folders.push(await scanContent(name, `${featuresDir}/${name}`))
+      for (const name of legacyNames) if (!seen.has(name)) folders.push(await scanContent(name, `${legacyDir}/${name}`))
       setPlanFolders(folders)
     } catch {
       setPlanFolders([])

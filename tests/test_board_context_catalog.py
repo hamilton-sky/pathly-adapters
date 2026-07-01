@@ -94,7 +94,7 @@ def test_catalog_channel_emitted_with_artifact(client):
         task_description="build the thing",
         counts=counts,
     )
-    assert "📚 Catalog" in block
+    assert "### Catalog" in block
     assert "pathly/plans/cat_present/DESIGN.md" in block
     # The scoped pull URL is handed to the agent already bounded to its board.
     assert "board=feature&scope=cat_present" in block

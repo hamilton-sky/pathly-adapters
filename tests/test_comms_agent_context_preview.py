@@ -118,4 +118,4 @@ def test_preview_reflects_catalog(client):
     assert r.status_code == 200, r.data
     body = json.loads(r.data)
     assert body["channels"]["catalog"] >= 1
-    assert "📚 Catalog" in body["block"]
+    assert "### Catalog" in body["block"]

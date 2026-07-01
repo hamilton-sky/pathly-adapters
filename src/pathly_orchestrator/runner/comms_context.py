@@ -194,7 +194,7 @@ def retrieve_board_context(
     lines: list[str] = ["## Communication Board", ""]
 
     if decisions or escalations:
-        lines.append("### 🔒 Governance (always applies — do not override)")
+        lines.append("### Governance (always applies — do not override)")
         lines.append("Active decisions and open escalations injected unconditionally.")
         lines.append("")
         if decisions:
@@ -222,7 +222,7 @@ def retrieve_board_context(
         lines.append("")
 
     if hydrate_lines:
-        lines.append("### 📎 Referenced context (authoritative for this task)")
+        lines.append("### Referenced context (authoritative for this task)")
         lines.append(
             "Full section text from the task's context_refs. Read `text`, not `summary`."
         )

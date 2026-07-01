@@ -576,8 +576,8 @@ def test_backward_compat_no_task_id_no_pinned_marker():
         board_scope={"feature": True, "project": False, "global": False},
         task_id=None,
     )
-    # No 📎 channel when task_id=None
-    assert "📎" not in block
+    # No Referenced channel when task_id=None
+    assert "### Referenced context" not in block
 
 
 def test_backward_compat_task_id_set_but_no_context_refs(client):
@@ -608,7 +608,7 @@ def test_backward_compat_task_id_set_but_no_context_refs(client):
         board_scope={"feature": True, "project": False, "global": False},
         task_id=task_id,
     )
-    assert "📎" not in block, "no 📎 channel when context_refs is NULL"
+    assert "### Referenced context" not in block, "no referenced channel when context_refs is NULL"
 
 
 def test_backward_compat_task_id_none_identical_to_before(client):
@@ -636,8 +636,8 @@ def test_backward_compat_task_id_none_identical_to_before(client):
         board_scope={"feature": True, "project": False, "global": False},
         task_id=None,
     )
-    # Regardless of task_id=None: no 📎 channel
-    assert "📎" not in block_no_task_id
+    # Regardless of task_id=None: no Referenced channel
+    assert "### Referenced context" not in block_no_task_id
     # The governance decision should still appear
     assert "Use SQLite" in block_no_task_id
 
@@ -680,7 +680,7 @@ def test_context_refs_emits_pinned_channel(client, conn, plan_dir):
         board_scope={"feature": True, "project": False, "global": False},
         task_id=task_id,
     )
-    assert "📎 Referenced context" in block, block
+    assert "### Referenced context" in block, block
     assert "EDGE_CASES.md" in block
     # the lossless HYDRATE payload — the full section body, not a summary
     assert "edge case body for phase one" in block

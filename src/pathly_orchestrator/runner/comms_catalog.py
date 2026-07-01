@@ -56,7 +56,7 @@ def build_catalog_channel(conn: Any, board: str, scope: str) -> tuple[list[str],
     overflow = len(rows) - len(shown)
 
     lines: list[str] = [
-        "### 📚 Catalog (you may pull more — scoped to your board)",
+        "### Catalog (you may pull more — scoped to your board)",
         "Artifacts on your board you can pull on demand. Pull narrowly — only what "
         "the task needs.",
         "",
@@ -78,7 +78,7 @@ def build_catalog_channel(conn: Any, board: str, scope: str) -> tuple[list[str],
         "&artifact=<path>&anchor=<anchor>` (omit anchor for the whole file)."
     )
     lines.append(
-        "The 📎 references above are already hydrated — don't refetch them. Append "
+        "The referenced items above are already hydrated — don't refetch them. Append "
         "`&trail=<task_id>` to a pull so the board records what you read."
     )
     return lines, len(rows)
