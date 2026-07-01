@@ -1,0 +1,118 @@
+.wrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Search (with scope chip) + row actions on one line */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 8px 10px;
+  flex-shrink: 0;
+}
+.search {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+.searchIcon {
+  position: absolute;
+  left: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+.searchInput {
+  width: 100%;
+  min-width: 0;
+  background: var(--bg-base);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md, 6px);
+  padding: 5px 58px 5px 28px;
+  color: var(--text-primary);
+  font: 400 13px 'Geist', system-ui, sans-serif;
+  outline: none;
+}
+.searchInput:focus {
+  border-color: var(--accent);
+}
+.scopeChip {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  height: 19px;
+  padding: 0 7px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm, 4px);
+  background: var(--bg-surface0);
+  color: var(--text-muted);
+  font: 600 10px 'Geist Mono', ui-monospace, monospace;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+.scopeChip:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.scopeChip[data-scope='pathly'] {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+.iconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius-sm, 4px);
+}
+.iconBtn:hover {
+  background: var(--bg-surface0);
+  color: var(--accent);
+}
+.iconBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.tree {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-bottom: 6px;
+}
+.tree::-webkit-scrollbar {
+  width: 5px;
+}
+.tree::-webkit-scrollbar-thumb {
+  background: var(--bg-surface1);
+  border-radius: 3px;
+}
+
+/* Pinned pathly/ section (rendered above the project root) */
+.pinnedLabel {
+  padding: 4px 10px 2px;
+  font: 600 10px 'Geist', system-ui, sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.pinnedDivider {
+  height: 1px;
+  background: var(--border-subtle-color, var(--bg-surface0));
+  margin: 6px 10px 4px;
+}

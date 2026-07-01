@@ -312,6 +312,7 @@
 .bottomRow {
   display: flex;
   align-items: center;
+  gap: 10px;
   width: 100%;
   background: none;
   border: none;
@@ -336,10 +337,26 @@
   font-weight: 600;
 }
 
+.bottomIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+.bottomLabel {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .monitorDot {
-  color: var(--green);
-  margin-right: 7px;
-  font-size: 10px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--green);
 }
 
 .collapseBtn {

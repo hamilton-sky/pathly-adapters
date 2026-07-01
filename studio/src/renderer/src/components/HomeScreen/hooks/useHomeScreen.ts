@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useStore } from '../../../store'
-import { pickFolder, openWindow } from '../../../services/pathlyApi'
+import { pickFolder, openWindow, scaffoldPathlyWorkspace } from '../../../services/pathlyApi'
 import type { ProjectEntry } from '../../../types'
 
 type Tab = 'projects' | 'getting-started' | 'settings'
@@ -31,6 +31,7 @@ export function useHomeScreen() {
   async function handleOpenFolder(): Promise<void> {
     const folderPath = await pickFolder()
     if (!folderPath) return
+    await scaffoldPathlyWorkspace(folderPath)
     const name = folderPath.split(/[/\\]/).filter(Boolean).pop() ?? folderPath
     addProject({ path: folderPath, name, lastOpened: Date.now() })
   }

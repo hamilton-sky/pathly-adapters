@@ -20,7 +20,8 @@ export function BottomNav({ activePanel, onMonitor, onSettings, onDbExplorer, on
         className={`${styles.bottomRow} ${activePanel === 'monitor' ? styles.bottomRowActive : ''}`}
         onClick={onMonitor}
       >
-        <span className={styles.monitorDot}>●</span> Monitor
+        <span className={styles.bottomIcon}><span className={styles.monitorDot} /></span>
+        <span className={styles.bottomLabel}>Monitor</span>
       </button>
 
       <button
@@ -29,8 +30,8 @@ export function BottomNav({ activePanel, onMonitor, onSettings, onDbExplorer, on
         className={`${styles.bottomRow} ${activePanel === 'command-center' ? styles.bottomRowActive : ''}`}
         onClick={onCommandCenter}
       >
-        <MessageSquare size={15} />
-        Command Center
+        <span className={styles.bottomIcon}><MessageSquare size={15} strokeWidth={2} /></span>
+        <span className={styles.bottomLabel}>Command Center</span>
       </button>
 
       <button
@@ -39,8 +40,8 @@ export function BottomNav({ activePanel, onMonitor, onSettings, onDbExplorer, on
         className={`${styles.bottomRow} ${activePanel === 'db-explorer' ? styles.bottomRowActive : ''}`}
         onClick={onDbExplorer}
       >
-        <Database size={15} />
-        DB Explorer
+        <span className={styles.bottomIcon}><Database size={15} strokeWidth={2} /></span>
+        <span className={styles.bottomLabel}>DB Explorer</span>
       </button>
 
       <button
@@ -49,8 +50,8 @@ export function BottomNav({ activePanel, onMonitor, onSettings, onDbExplorer, on
         className={`${styles.bottomRow} ${activePanel === 'settings' ? styles.bottomRowActive : ''}`}
         onClick={onSettings}
       >
-        <Settings size={15} />
-        Settings
+        <span className={styles.bottomIcon}><Settings size={15} strokeWidth={2} /></span>
+        <span className={styles.bottomLabel}>Settings</span>
       </button>
 
       <div className={styles.divider} />

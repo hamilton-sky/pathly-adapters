@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ChevronDown, Check, FolderOpen, ExternalLink, FolderPlus } from 'lucide-react'
 import { useStore } from '../../store'
-import { openWindow, pickFolder } from '../../services/pathlyApi'
+import { openWindow, pickFolder, scaffoldPathlyWorkspace } from '../../services/pathlyApi'
 import type { ProjectEntry } from '../../types'
 import styles from './ProjectSelector.module.css'
 
@@ -67,6 +67,7 @@ export function ProjectSelector({ compact }: ProjectSelectorProps): JSX.Element 
     setOpen(false)
     const folderPath = await pickFolder()
     if (!folderPath) return
+    await scaffoldPathlyWorkspace(folderPath)
     const name = folderPath.split(/[/\\]/).filter(Boolean).pop() ?? folderPath
     addProject({ path: folderPath, name, lastOpened: Date.now() })
     setProjectPath(folderPath)

@@ -1,0 +1,82 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.dialog {
+  min-width: 320px;
+  max-width: 400px;
+  padding: 22px 24px 18px;
+  background: var(--bg-surface1);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xl, 14px);
+  box-shadow: var(--shadow-modal, 0 24px 60px rgba(0, 0, 0, 0.5));
+}
+
+.title {
+  margin: 0 0 8px;
+  font: 600 15px 'Geist', system-ui, sans-serif;
+  color: var(--text-primary);
+}
+
+.body {
+  margin: 0 0 10px;
+  font: 400 13px/1.5 'Geist', system-ui, sans-serif;
+  color: var(--text-secondary);
+}
+
+.name {
+  color: var(--text-primary);
+  font-family: 'Geist Mono', ui-monospace, monospace;
+}
+
+.path {
+  font: 400 11px 'Geist Mono', ui-monospace, monospace;
+  color: var(--text-muted);
+  background: var(--bg-mantle);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md, 6px);
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.warn {
+  margin: 0 0 18px;
+  font: 400 12px 'Geist', system-ui, sans-serif;
+  color: var(--red);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.cancel,
+.confirm {
+  cursor: pointer;
+  border-radius: var(--radius-md, 6px);
+  padding: 6px 14px;
+  font: 400 13px 'Geist', system-ui, sans-serif;
+}
+
+.cancel {
+  background: var(--bg-surface0);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+}
+
+.confirm {
+  background: var(--red-bg);
+  border: 1px solid var(--red-border);
+  color: var(--red);
+  font-weight: 600;
+}

@@ -17,6 +17,26 @@ export const fsmPing         = (): Promise<boolean>                             
 export const watchStart      = (projectPath: string, topic: string): Promise<void>                           => window.pathly.watch.start(projectPath, topic)
 export const onWatchEvent    = (cb: (data: { path: string; content: string }) => void): (() => void)         => window.pathly.watch.onEvent(cb)
 
+/** Directories a fresh Pathly workspace ships with. */
+const PATHLY_SCAFFOLD_DIRS = ['features', 'debugs', 'explorations', 'lessons']
+
+/**
+ * Ensure a picked folder is a Pathly workspace: if it has no pathly/ directory,
+ * create pathly/ with its core sub-dirs so the workspace sidebar (and its pinned
+ * pathly section) always has something to show. Best-effort — never blocks open.
+ */
+export async function scaffoldPathlyWorkspace(root: string): Promise<void> {
+  try {
+    const dirs = await window.pathly.fs.listDirs(root).catch(() => [] as string[])
+    if (dirs.includes('pathly')) return
+    for (const d of PATHLY_SCAFFOLD_DIRS) {
+      await window.pathly.fs.write(`${root}/pathly/${d}/.gitkeep`, '')
+    }
+  } catch {
+    /* ignore — scaffolding is best-effort */
+  }
+}
+
 export { PATHLY_API_BASE, apiFetch } from '../lib/config'
 
 export async function fetchFlow(name: string): Promise<{ name: string; flow_yaml: string; file_path: string } | null> {
