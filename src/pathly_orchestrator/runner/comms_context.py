@@ -12,14 +12,18 @@ from __future__ import annotations
 
 import logging
 
-from .comms_formatters import _collect_hydrate_channel, _format_age
+from .comms_formatters import _collect_hydrate_channel, _confidence_label, _format_age
 
 logger = logging.getLogger(__name__)
 
-# Cosine DISTANCE cutoff (sqlite-vec vec_distance_cosine, 0=identical … ~1.0+=unrelated).
-# Drops weak semantic tail so marginal matches don't fill the k slots. Keyword/recency
-# hits (no _distance) are always kept.
-_SEMANTIC_MAX_DISTANCE = 0.75
+# Per-tier cosine DISTANCE cutoffs (sqlite-vec vec_distance_cosine, 0=identical … ~1.0+=unrelated).
+# The agent's OWN board is presumed relevant (feature 0.75); cross-tier boards must clear a
+# stricter bar so project/global slots don't fill with tangential matches (ISSUE-1). Calibrated
+# against the live board (2026-07-02): same-board matches land ~0.48–0.67, tangential cross-tier
+# matches ~0.68–0.79, so project 0.55 / global 0.50 admit only genuinely-close cross-tier items.
+# NOTE: keyword/recency hits carry no _distance and bypass this gate — see CT4 for the keyword bound.
+_SEMANTIC_MAX_DISTANCE = {"feature": 0.75, "project": 0.55, "global": 0.50}
+_SEMANTIC_MAX_DISTANCE_DEFAULT = 0.75
 # Caps the rendered Context body so a long board can't bloat the prompt.
 _CONTEXT_CHAR_BUDGET = 2000
 
@@ -145,8 +149,22 @@ def retrieve_board_context(
             if not _is_context(row):
                 continue
             dist = row.get("_distance")
-            if dist is not None and dist > _SEMANTIC_MAX_DISTANCE:
-                continue
+            if dist is None:
+                # CT4: a row with no cosine score. When semantic search is ACTIVE
+                # (task_embedding present), an unscored cross-tier row is a BM25-only
+                # keyword match that bypassed the distance gate — the ISSUE-1 leak — so
+                # drop it on cross-tier boards (keep on the agent's OWN feature board for
+                # lexical recall). When semantic search is INACTIVE (no embedding — the
+                # whole board is in recency fallback), keep the row so cross-tier context
+                # isn't starved in degraded mode.
+                if task_embedding is not None and board_type != "feature":
+                    continue
+            else:
+                cutoff = _SEMANTIC_MAX_DISTANCE.get(
+                    board_type, _SEMANTIC_MAX_DISTANCE_DEFAULT
+                )
+                if dist > cutoff:
+                    continue
             seen_ids.add(row_id)
             context_msgs.append(row)
             kept += 1
@@ -232,10 +250,25 @@ def retrieve_board_context(
         lines.append("")
 
     if context_msgs:
-        lines.append("### Context (possibly relevant — verify before acting)")
-        lines.append(
-            "Semantic matches for this task. Inform but do not override governance above."
-        )
+        # T3b: when a task carries NO curated context_refs (hydrate_count == 0), the
+        # semantic matches ARE the task's context — surface them under a distinct
+        # UNVERIFIED header so the agent knows they're auto-derived guesses, never
+        # authoritative. Transient: computed here, never persisted onto the task row.
+        autoderived = task_id is not None and hydrate_count == 0
+        if autoderived:
+            lines.append(
+                "### Auto-derived context (UNVERIFIED — no curated refs for this task)"
+            )
+            lines.append(
+                "This task has no context_refs, so these semantic matches are auto-derived "
+                "guesses — NOT authoritative. Verify before relying; pull artifacts from the "
+                "catalog as needed."
+            )
+        else:
+            lines.append("### Context (possibly relevant — verify before acting)")
+            lines.append(
+                "Semantic matches for this task. Inform but do not override governance above."
+            )
         lines.append("")
         used = 0
         shown = 0
@@ -250,6 +283,12 @@ def retrieve_board_context(
                 parts.append(stage)
             if age:
                 parts.append(age)
+            # CT2: surface match confidence as a coarse bucket (strong/moderate/weak),
+            # not a raw float — legible in the /preview audit AND to the agent, without
+            # implying false precision. Absent for keyword/recency hits (no _distance).
+            confidence = _confidence_label(msg.get("_distance"))
+            if confidence:
+                parts.append(confidence)
             header = ", ".join(parts)
             text = msg.get("text", "")
             entry = f"  • {text}  [{header}]"

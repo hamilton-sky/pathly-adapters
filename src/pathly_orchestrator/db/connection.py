@@ -71,20 +71,35 @@ class _WriteGuard:
 
 
 def _load_vec(conn: sqlite3.Connection) -> bool:
-    """Try to load sqlite_vec into *conn*. Returns True on success."""
-    try:
-        conn.enable_load_extension(True)
-        import sqlite_vec
+    """Load sqlite_vec into *conn* and confirm it works. Returns True on success.
 
-        sqlite_vec.load(conn)
-        conn.enable_load_extension(False)
-        return True
+    Retries a few times: on Windows the first extension load in a fresh process/thread
+    intermittently fails (native DLL init race) while an immediate retry succeeds. Because
+    a permanent ``_VEC_AVAILABLE=False`` latch SILENTLY disables every embedding write and
+    all semantic search (store_embedding/search_by_embedding no-op / fall back to recency),
+    the probe must be robust, not one-shot. We also run ``vec_version()`` to confirm the
+    extension actually registered — ``load()`` returning without raising is not sufficient.
+    """
+    try:
+        import sqlite_vec
     except Exception:
-        try:
-            conn.enable_load_extension(False)
-        except Exception:
-            pass
         return False
+    last_exc: Exception | None = None
+    for _ in range(3):
+        try:
+            conn.enable_load_extension(True)
+            sqlite_vec.load(conn)
+            conn.enable_load_extension(False)
+            conn.execute("SELECT vec_version()").fetchone()  # confirm it registered
+            return True
+        except Exception as exc:
+            last_exc = exc
+            try:
+                conn.enable_load_extension(False)
+            except Exception:
+                pass
+    logging.debug("sqlite-vec load failed after retries: %r", last_exc)
+    return False
 
 
 def _make_conn(db_path: str) -> sqlite3.Connection:
@@ -238,3 +253,25 @@ def _get_write_lock(conn: sqlite3.Connection) -> "_WriteGuard":
     `with _get_write_lock(conn): conn.execute(...); conn.commit()`.
     """
     return _WriteGuard(conn)
+
+
+def retrieval_status(conn: sqlite3.Connection | None = None) -> dict:
+    """Report semantic-retrieval health for /health and operators.
+
+    Surfaces whether the sqlite-vec / FTS extensions loaded on this process AND how
+    many embedding rows exist — so a silently-dark semantic channel (0 embeddings /
+    vec unavailable) is observable instead of masquerading as recency results.
+    """
+    status: dict = {
+        "vec_available": _VEC_AVAILABLE,
+        "fts_available": _FTS_AVAILABLE,
+        "embeddings_rows": None,
+    }
+    try:
+        c = conn or get_db()
+        status["embeddings_rows"] = c.execute(
+            "SELECT COUNT(*) FROM comms_embeddings"
+        ).fetchone()[0]
+    except Exception:
+        pass
+    return status

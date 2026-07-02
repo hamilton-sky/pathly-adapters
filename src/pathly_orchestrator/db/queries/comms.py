@@ -46,6 +46,7 @@ from .comms_tasks import (  # noqa: F401
     fail_task,
     reclaim_stale_claims,
     count_tasks_for_goal,
+    goal_refs_coverage,
 )
 from .comms_embeddings import (  # noqa: F401
     _RRF_K,

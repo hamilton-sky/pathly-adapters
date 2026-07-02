@@ -131,6 +131,26 @@ def comms_goals_run():
         return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
 
 
+@bp.route("/comms/goals/refs-coverage", methods=["GET"])
+def comms_goals_refs_coverage():
+    """Report per-goal context_refs coverage (tasks-with-refs / total) — CT3/T3c.
+
+    Makes the ISSUE-4 gap visible to a human before dispatch: a low coverage_pct means
+    many tasks have no curated refs and will fall back to unverified auto-derived context.
+    """
+    try:
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.queries.comms import goal_refs_coverage as _coverage
+
+        goal_id = (request.args.get("goal_id") or "").strip()
+        if not goal_id:
+            return jsonify({"error": "Query parameter 'goal_id' is required"}), 400
+        return jsonify(_coverage(_get_db(), goal_id)), 200
+    except Exception as exc:
+        logging.exception("comms_goals_refs_coverage error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
 @bp.route("/comms/goals/stop", methods=["POST"])
 def comms_goals_stop():
     """Stop the executor running for a goal."""

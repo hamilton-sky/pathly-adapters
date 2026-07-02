@@ -78,6 +78,147 @@ def test_keyword_hit_without_distance_is_kept(monkeypatch):
     assert "keyword lexical match" in block
 
 
+def test_keyword_hit_dropped_on_cross_tier(monkeypatch):
+    """CT4: a keyword/recency hit (no _distance) is kept on the feature board but dropped
+    on cross-tier project/global boards — closing the per-tier-gate bypass (ISSUE-1b)."""
+    cq = _stub_common(monkeypatch)
+    import pathly_orchestrator.runner.comms_context as cc
+
+    def fake_hybrid(conn, text, emb_vec, boards, scopes, k):
+        b = boards[0]
+        return [
+            {
+                "id": f"{b}-kw",
+                "text": f"{b} keyword only",
+                "from_agent": "a",
+                "to_agent": "*",
+            }  # no _distance key → keyword/recency hit
+        ]
+
+    monkeypatch.setattr(cq, "search_by_hybrid", fake_hybrid)
+    block = cc.retrieve_board_context(
+        "feat",
+        "C:/p",
+        "q",
+        board_scope={"feature": True, "project": True, "global": True},
+    )
+    assert "feature keyword only" in block  # own board keeps keyword hits
+    assert "project keyword only" not in block  # cross-tier keyword hit dropped
+    assert "global keyword only" not in block
+
+
+def test_per_tier_gate_drops_midrange_cross_tier(monkeypatch):
+    """CT1: a 0.60 match is kept on the feature board (cutoff 0.75) but dropped on the
+    project (0.55) and global (0.50) boards — cross-tier requires a stricter distance."""
+    cq = _stub_common(monkeypatch)
+    import pathly_orchestrator.runner.comms_context as cc
+
+    def fake_hybrid(conn, text, emb_vec, boards, scopes, k):
+        b = boards[0]
+        return [
+            {
+                "id": f"{b}-mid",
+                "text": f"{b} midrange match",
+                "from_agent": "a",
+                "to_agent": "*",
+                "_distance": 0.60,
+            }
+        ]
+
+    monkeypatch.setattr(cq, "search_by_hybrid", fake_hybrid)
+    block = cc.retrieve_board_context(
+        "feat",
+        "C:/p",
+        "q",
+        board_scope={"feature": True, "project": True, "global": True},
+    )
+    assert "feature midrange match" in block  # 0.60 <= 0.75
+    assert "project midrange match" not in block  # 0.60 > 0.55
+    assert "global midrange match" not in block  # 0.60 > 0.50
+
+
+def test_per_tier_gate_keeps_close_cross_tier(monkeypatch):
+    """CT1: a genuinely-close project match (0.50 <= 0.55) still passes the project gate."""
+    cq = _stub_common(monkeypatch)
+    import pathly_orchestrator.runner.comms_context as cc
+
+    def fake_hybrid(conn, text, emb_vec, boards, scopes, k):
+        b = boards[0]
+        return [
+            {
+                "id": f"{b}-close",
+                "text": f"{b} close match",
+                "from_agent": "a",
+                "to_agent": "*",
+                "_distance": 0.50,
+            }
+        ]
+
+    monkeypatch.setattr(cq, "search_by_hybrid", fake_hybrid)
+    block = cc.retrieve_board_context(
+        "feat",
+        "C:/p",
+        "q",
+        board_scope={"feature": False, "project": True, "global": False},
+    )
+    assert "project close match" in block  # 0.50 <= 0.55 project cutoff
+
+
+def test_confidence_label_buckets():
+    """CT2: _confidence_label maps distance to coarse buckets, empty for None."""
+    from pathly_orchestrator.runner.comms_formatters import _confidence_label
+
+    assert _confidence_label(None) == ""
+    assert _confidence_label(0.30) == "match: strong"
+    assert _confidence_label(0.55) == "match: strong"
+    assert _confidence_label(0.68) == "match: moderate"
+    assert _confidence_label(0.90) == "match: weak"
+
+
+def test_confidence_bucket_shown_for_semantic_not_keyword(monkeypatch):
+    """CT2: semantic lines carry a confidence bucket (not a raw float); a keyword hit
+    (no _distance) carries none."""
+    cq = _stub_common(monkeypatch)
+    import pathly_orchestrator.runner.comms_context as cc
+
+    def fake_hybrid(conn, text, emb_vec, boards, scopes, k):
+        return [
+            {
+                "id": "s",
+                "text": "strong semantic match",
+                "from_agent": "a",
+                "to_agent": "*",
+                "_distance": 0.30,
+            },
+            {
+                "id": "m",
+                "text": "moderate semantic match",
+                "from_agent": "b",
+                "to_agent": "*",
+                "_distance": 0.68,
+            },
+            {
+                "id": "k",
+                "text": "keyword only match",
+                "from_agent": "c",
+                "to_agent": "*",
+            },  # no _distance
+        ]
+
+    monkeypatch.setattr(cq, "search_by_hybrid", fake_hybrid)
+    block = cc.retrieve_board_context(
+        "feat",
+        "C:/p",
+        "q",
+        board_scope={"feature": True, "project": False, "global": False},
+    )
+    assert "match: strong" in block
+    assert "match: moderate" in block
+    assert "0.30" not in block and "0.68" not in block  # no raw floats leak
+    # The keyword line is present but tagged with no confidence bucket.
+    assert "keyword only match" in block
+
+
 def test_context_char_budget_truncates(monkeypatch):
     cq = _stub_common(monkeypatch)
     import pathly_orchestrator.runner.comms_context as cc

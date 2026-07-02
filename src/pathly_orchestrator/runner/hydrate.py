@@ -21,7 +21,13 @@ import os
 import threading
 import uuid
 
-from .hydrate_helpers import _is_md, _read_file_text, _resolve_plan_root, safe_plan_path  # noqa: F401
+from .hydrate_helpers import (  # noqa: F401
+    _is_md,
+    _read_file_text,
+    _resolve_plan_root,
+    safe_artifact_path,
+    safe_plan_path,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -163,7 +169,10 @@ def hydrate_section(
                 }
 
             # ── Path-traversal guard (§4.3) ───────────────────────────────
-            safe = safe_plan_path(scope, artifact, project_root)
+            # safe_artifact_path handles both full repo-relative refs
+            # (pathly/features/<f>/PROPOSAL.md) and bare basenames, and looks under
+            # the current pathly/features/<scope>/ home as well as legacy plans/.
+            safe = safe_artifact_path(scope, artifact, project_root)
             if safe is None:
                 return {
                     "body": {

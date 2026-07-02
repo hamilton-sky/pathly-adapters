@@ -196,7 +196,7 @@ def comms_post():
                 )
                 from pathly_orchestrator.runner.hydrate import (
                     ensure_indexed as _ensure_indexed,
-                    safe_plan_path as _safe_plan_path,
+                    safe_artifact_path as _safe_artifact_path,
                 )
 
                 _project_root = project_root or os.getcwd()
@@ -208,7 +208,7 @@ def comms_post():
                         resolved_refs.append(ref)
                         continue
                     try:
-                        art_path = _safe_plan_path(scope, art_name, _project_root)
+                        art_path = _safe_artifact_path(scope, art_name, _project_root)
                         if art_path is None:
                             resolved_refs.append(ref)
                             continue
@@ -338,7 +338,19 @@ def comms_post():
             },
         )
 
-        return jsonify({"ok": True, "message_id": message_id}), 200
+        # T3a: server-side context_refs enforcement for DAG tasks. A task posted with no
+        # refs (and no explicit no_refs justification) will fall back to unverified
+        # auto-derived context — surface that as a NON-BLOCKING warning so the gap is
+        # visible to the poster instead of silently degrading context quality (ISSUE-4).
+        resp = {"ok": True, "message_id": message_id}
+        if msg_type == "task":
+            _has_refs = isinstance(context_refs, list) and len(context_refs) > 0
+            if not _has_refs and not data.get("no_refs"):
+                resp["ref_warning"] = (
+                    "task has no context_refs; agents will fall back to unverified "
+                    "auto-derived context — add context_refs or pass no_refs=<reason>"
+                )
+        return jsonify(resp), 200
     except Exception as exc:
         logging.exception("comms_post error")
         return jsonify({"error": str(exc), "type": type(exc).__name__}), 500

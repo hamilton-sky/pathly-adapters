@@ -217,6 +217,40 @@ def count_tasks_for_goal(conn: sqlite3.Connection, goal_id: str) -> int:
     return int(row["n"]) if row else 0
 
 
+def goal_refs_coverage(conn: sqlite3.Connection, goal_id: str) -> dict:
+    """Per-goal context_refs coverage: how many of a goal's tasks carry ≥1 ref (T3c).
+
+    Surfaces the ISSUE-4 gap — tasks with no context_refs fall back to weaker
+    (auto-derived/semantic) context — so a human can see it BEFORE dispatching a goal.
+    Counts non-deleted type='task' rows for the goal; a task counts as covered when
+    context_refs is a non-empty JSON array.
+    """
+    rows = conn.execute(
+        "SELECT context_refs FROM comms_messages "
+        "WHERE goal_id=? AND type='task' AND deleted_at IS NULL",
+        (goal_id,),
+    ).fetchall()
+    total = len(rows)
+    with_refs = 0
+    for r in rows:
+        raw = r["context_refs"]
+        if not raw:
+            continue
+        try:
+            refs = json.loads(raw) if isinstance(raw, str) else raw
+        except (ValueError, TypeError):
+            refs = None
+        if isinstance(refs, list) and len(refs) > 0:
+            with_refs += 1
+    return {
+        "goal_id": goal_id,
+        "total": total,
+        "with_refs": with_refs,
+        "without_refs": total - with_refs,
+        "coverage_pct": round(100.0 * with_refs / total, 1) if total else None,
+    }
+
+
 def reclaim_stale_claims(conn: sqlite3.Connection, board: str, scope: str) -> list[str]:
     """On scheduler startup, revert in_progress tasks back to pending.
 

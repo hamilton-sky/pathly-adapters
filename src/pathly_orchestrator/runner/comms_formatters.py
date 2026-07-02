@@ -26,6 +26,25 @@ def _format_age(ts_str: str) -> str:
         return ""
 
 
+def _confidence_label(distance: float | None) -> str:
+    """Bucket a cosine distance into a legible confidence tag for the 💡 Context line.
+
+    Raw MiniLM cosine values aren't intuitively scaled (a 0.42 "sim" can be a decent
+    match), so we surface a coarse bucket — NOT a float — that reads cleanly in the
+    human /preview audit AND gives the agent a light signal without implying false
+    precision. Empty string for keyword/recency hits (no _distance). Thresholds are
+    calibrated to the live board: same-board matches ~0.48–0.67, tangential cross-tier
+    ~0.68–0.79 (so ≤0.55 = strong, ≤0.70 = moderate, else weak).
+    """
+    if distance is None:
+        return ""
+    if distance <= 0.55:
+        return "match: strong"
+    if distance <= 0.70:
+        return "match: moderate"
+    return "match: weak"
+
+
 def _format_decision(msg: dict) -> str:
     tier = msg.get("board", "feature")
     text = msg.get("text", "")
@@ -142,7 +161,11 @@ def _collect_hydrate_channel(
                         hydrate_lines.append("")
                     else:
                         anchor_label = f" §{anc}" if anc else ""
-                        hydrate_lines.append(f"- ⚠ {art}{anchor_label} — section not found")
+                        # Surface the ACTUAL resolution error (artifact_not_found /
+                        # path_out_of_scope / anchor_not_found) rather than a blanket
+                        # "section not found" that hides a path-resolution failure.
+                        err = (result.get("body") or {}).get("error", "unavailable")
+                        hydrate_lines.append(f"- ⚠ {art}{anchor_label} — {err}")
                 except Exception:
                     _logger.debug("hydrate_section failed for ref %r", ref, exc_info=True)
                     art = ref.get("artifact", "?")

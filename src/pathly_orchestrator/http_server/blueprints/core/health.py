@@ -39,6 +39,12 @@ def health():
         root = Path(project_root)
         checks["project_root_exists"] = root.exists()
         checks["project_root_writable"] = os.access(project_root, os.W_OK)
+    try:
+        from pathly_orchestrator.db.connection import retrieval_status
+
+        checks["retrieval"] = retrieval_status()
+    except Exception:
+        logger.debug("health: retrieval_status failed", exc_info=True)
     return jsonify(checks), 200
 
 

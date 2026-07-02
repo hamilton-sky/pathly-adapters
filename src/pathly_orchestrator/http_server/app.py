@@ -109,5 +109,19 @@ def main() -> None:
 
     threading.Thread(target=_warm_embeddings, daemon=True).start()
 
+    # Eagerly open the DB on the MAIN thread NOW, before serving requests. The first
+    # get_db() runs the one-time sqlite-vec probe; when that happens lazily inside a
+    # Flask worker thread (threaded=True), the extension load intermittently fails and
+    # latches _VEC_AVAILABLE=False for the whole process — silently disabling every
+    # embedding write and all semantic search (they fall back to recency). Probing here
+    # on the main thread at startup makes it deterministic. Best-effort: never blocks boot.
+    try:
+        from pathly_orchestrator.db.connection import get_db, retrieval_status
+
+        get_db()
+        logger.info("retrieval status: %s", retrieval_status())
+    except Exception:
+        logger.debug("startup DB/vec warm failed", exc_info=True)
+
     # Run Flask in non-debug mode, with warnings suppressed
     app.run(host=host, port=port, debug=False, use_reloader=False, threaded=True)

@@ -10,7 +10,7 @@ from __future__ import annotations
 import sqlite3
 
 from .. import connection as _connection_module
-from ..connection import _VEC_AVAILABLE, _get_write_lock
+from ..connection import _get_write_lock
 from .comms_messages import supersede_message
 
 _RRF_K = 60
@@ -46,7 +46,7 @@ def search_by_embedding(
     """
     if not boards or not scopes:
         return []
-    if _VEC_AVAILABLE:
+    if _connection_module._VEC_AVAILABLE:
         board_ph = ",".join("?" * len(boards))
         scope_ph = ",".join("?" * len(scopes))
         import struct
@@ -173,7 +173,7 @@ def store_embedding(
     chunk_text: str = "",
 ) -> None:
     """Insert or replace an embedding row in comms_embeddings. No-op if vec unavailable."""
-    if not _VEC_AVAILABLE:
+    if not _connection_module._VEC_AVAILABLE:
         return
     import struct
 
@@ -193,7 +193,7 @@ def store_chunk_embeddings(
     chunks: list[tuple[str, list[float]]],
 ) -> None:
     """Replace child-chunk embeddings for *message_id*. No-op when vec unavailable."""
-    if not _VEC_AVAILABLE:
+    if not _connection_module._VEC_AVAILABLE:
         return
     import struct
 

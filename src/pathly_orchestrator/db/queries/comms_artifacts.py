@@ -172,7 +172,17 @@ def find_or_create_artifact_by_path(
         return None
 
     normalized_path = path.replace("\\", "/")
-    if "/pathly/plans/" not in normalized_path and "/pathly/goals/" not in normalized_path:
+    # Sentinel rows are created only for artifacts under a known pathly/ subtree.
+    # The storage-restructure moved feature homes to pathly/features/ (project scope
+    # to pathly/project/), so those must be recognized alongside the legacy plans/goals
+    # dirs — otherwise context_refs pointing at pathly/features/<f>/*.md 404 on hydrate.
+    _allowed_roots = (
+        "/pathly/features/",
+        "/pathly/plans/",
+        "/pathly/goals/",
+        "/pathly/project/",
+    )
+    if not any(seg in normalized_path for seg in _allowed_roots):
         return None
 
     sentinel_artifact_id = str(uuid.uuid4())
