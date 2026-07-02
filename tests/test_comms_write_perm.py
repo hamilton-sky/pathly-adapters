@@ -89,11 +89,11 @@ def test_comms_write_perm_check_project_writers_allowed():
         ), f"Role '{role}' should be allowed on project board"
 
 
-def test_comms_write_perm_check_builder_blocked_on_project():
-    """_check_write_permission returns False for 'builder' on 'project' board."""
+def test_comms_write_perm_check_builder_allowed_on_project():
+    """_check_write_permission returns True for 'builder' on 'project' board (d5159971)."""
     from pathly_orchestrator.http_server.blueprints.comms import _check_write_permission
 
-    assert _check_write_permission("builder", "project") is False
+    assert _check_write_permission("builder", "project") is True
 
 
 def test_comms_write_perm_check_global_writers_allowed():
@@ -200,17 +200,18 @@ def test_comms_write_perm_builder_global_403_allowed_roles_are_global_writers(cl
     assert set(body["allowed_roles"]) == set(_GLOBAL_WRITERS)
 
 
-def test_comms_write_perm_builder_project_returns_403(client):
-    """builder posting to 'project' board returns 403."""
+def test_comms_write_perm_builder_project_returns_200(client):
+    """builder posting to 'project' board is allowed — returns 200 (d5159971)."""
     r = _post_msg(client, "builder", "project", scope="myproject")
-    assert r.status_code == 403, f"builder→project should be 403, got {r.status_code}"
+    assert r.status_code == 200, f"builder→project should be 200, got {r.status_code}: {r.data}"
 
 
-def test_comms_write_perm_builder_project_403_allowed_roles_are_project_writers(client):
+def test_comms_write_perm_project_403_allowed_roles_are_project_writers(client):
     """For project board rejection, allowed_roles lists _PROJECT_WRITERS sorted."""
     from pathly_orchestrator.http_server.blueprints.comms import _PROJECT_WRITERS
 
-    r = _post_msg(client, "builder", "project", scope="myproject")
+    # web-researcher is not a project writer, so it is rejected on 'project'.
+    r = _post_msg(client, "web-researcher", "project", scope="myproject")
     assert r.status_code == 403
     body = json.loads(r.data)
     assert set(body["allowed_roles"]) == set(_PROJECT_WRITERS)
@@ -342,6 +343,7 @@ def test_comms_write_perm_project_writers_constant():
     from pathly_orchestrator.http_server.blueprints.comms import _PROJECT_WRITERS
 
     expected = {
+        "builder",
         "tester",
         "reviewer",
         "explorer",
