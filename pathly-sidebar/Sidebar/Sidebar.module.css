@@ -1,0 +1,132 @@
+.sidebar {
+  flex: 0 0 auto;
+  width: 264px;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  background: var(--bg-mantle);
+  border-right: 1px solid var(--border-color);
+  font-family: 'Geist', system-ui, sans-serif;
+  color: var(--text-primary);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  padding: 10px 8px 8px 12px;
+  border-bottom: 1px solid var(--border-subtle-color);
+}
+
+.headerLabel {
+  flex: 1;
+  font: 600 11px/1 'Geist', system-ui, sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.iconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 3px 4px;
+  border-radius: var(--radius-sm, 4px);
+}
+.iconBtn:hover {
+  background: var(--bg-surface0);
+  color: var(--accent);
+}
+
+.filter {
+  position: relative;
+  padding: 8px 10px;
+  flex-shrink: 0;
+}
+.filterIcon {
+  position: absolute;
+  left: 19px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+}
+.filterInput {
+  width: 100%;
+  background: var(--bg-base);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md, 6px);
+  padding: 5px 9px 5px 30px;
+  color: var(--text-primary);
+  font: 400 13px 'Geist', system-ui, sans-serif;
+  outline: none;
+}
+.filterInput:focus {
+  border-color: var(--accent);
+}
+
+.tree {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 6px;
+}
+.tree::-webkit-scrollbar {
+  width: 5px;
+}
+.tree::-webkit-scrollbar-thumb {
+  background: var(--bg-surface1);
+  border-radius: 3px;
+}
+
+.nav {
+  border-top: 1px solid var(--border-subtle-color);
+  padding: 4px 0;
+  flex-shrink: 0;
+}
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  background: none;
+  border: none;
+  border-left: 2px solid transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font: 500 13px 'Geist', system-ui, sans-serif;
+  padding: 7px 12px;
+  text-align: left;
+}
+.navItem:hover {
+  background: var(--bg-surface0);
+  color: var(--text-primary);
+}
+.navFlex {
+  flex: 1;
+}
+.liveDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  flex-shrink: 0;
+  animation: pwblink 1.6s ease-in-out infinite;
+}
+.liveCount {
+  font: 600 10px 'Geist Mono', ui-monospace, monospace;
+  color: var(--runtime);
+}
+
+@keyframes pwblink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}

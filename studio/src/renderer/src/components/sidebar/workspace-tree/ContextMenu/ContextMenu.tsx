@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import type { CSSProperties } from 'react'
 import { ClipboardCopy, Code2, FilePlus, FolderPlus, LayoutGrid, Pencil, Trash2 } from 'lucide-react'
 import type { WorkspaceTreeController } from '../types'
+import { Tooltip } from '../../../ui/Tooltip/Tooltip'
 import styles from './ContextMenu.module.css'
 
 const MENU_W = 224
@@ -27,17 +28,20 @@ export function ContextMenu({ controller }: Props): JSX.Element | null {
   const top = Math.min(m.y, window.innerHeight - MENU_H)
   const pos = { '--menu-left': `${left}px`, '--menu-top': `${top}px` } as CSSProperties
   const hasOpenAction = !row.isFolder || row.isFeature
+  const pathText = row.isRoot ? 'workspace root' : row.fsPath
 
   return (
     <>
       <div className={styles.scrim} onMouseDown={controller.closeMenu} onContextMenu={controller.closeMenu} />
       <div className={styles.menu} style={pos} role="menu">
-        <div className={styles.header}>
-          <div className={styles.headerText}>
-            <span className={styles.headerName}>{row.name}</span>
-            <span className={styles.headerPath}>{row.isRoot ? 'workspace root' : row.fsPath}</span>
+        <Tooltip label={row.name} description={row.fsPath} placement="top">
+          <div className={styles.header}>
+            <div className={styles.headerText}>
+              <span className={styles.headerName}>{row.name}</span>
+              <span className={styles.headerPath}>{pathText}</span>
+            </div>
           </div>
-        </div>
+        </Tooltip>
 
         {!row.isFolder && (
           <button type="button" className={styles.item} onClick={() => controller.open(row)}>
