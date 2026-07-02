@@ -170,9 +170,15 @@ def events_stream():
         return jsonify({"error": "topic and project_root are required"}), 400
 
     resolved_root = Path(project_root).resolve()
-    events_path = (
-        resolved_root / "pathly" / "plans" / topic / "EVENTS.jsonl"
-    ).resolve()
+    try:
+        from pathly_orchestrator.fsm_ops import _resolve_storage_path
+
+        events_path = (
+            _resolve_storage_path(None, str(resolved_root), topic) / "EVENTS.jsonl"
+        ).resolve()
+    except ValueError:
+        # _safe_topic rejects traversal / unsafe slugs — reject cleanly, don't 500.
+        return jsonify({"error": "Invalid topic"}), 400
     if not events_path.is_relative_to(resolved_root):
         return jsonify({"error": "Invalid project_root"}), 400
 

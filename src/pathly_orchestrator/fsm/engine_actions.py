@@ -287,7 +287,13 @@ def _scope_clean(
         extra_prefixes = flow.get("scope_gate", {}).get("exempt_prefixes", []) or []
 
     def _is_exempt(p: str) -> bool:
-        if p.startswith("pathly/plans/") or p.endswith(".tsbuildinfo"):
+        # A feature's own storage tree is exempt from the builder scope gate: the flat home
+        # (pathly/features/<name>/) and the legacy base (pathly/plans/<name>/) both count.
+        if (
+            p.startswith("pathly/features/")
+            or p.startswith("pathly/plans/")
+            or p.endswith(".tsbuildinfo")
+        ):
             return True
         return any(p.startswith(prefix) for prefix in extra_prefixes)
 
@@ -330,7 +336,7 @@ def run_gates(
                 reason = (
                     f"VERIFY gate failed: `{gate['artifact']}` is missing or its first line "
                     f"is not exactly {marker!r}.\n\n"
-                    f"**Action required:** Write `pathly/plans/{storage_path.name}/{gate['artifact']}` "
+                    f"**Action required:** Write `{storage_path / gate['artifact']}` "
                     f"so that line 1 is exactly:\n\n"
                     f"```\n{marker}\n```\n\n"
                     f"No YAML frontmatter, no blank lines before it."

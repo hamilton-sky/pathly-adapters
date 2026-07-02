@@ -32,7 +32,11 @@ def _find_active_feature_dir_db(project_root: str) -> Path | None:
         ).fetchone()
         if row:
             feature = row["feature"] if hasattr(row, "keys") else row[0]
-            return Path(project_root) / "pathly" / "plans" / feature
+            # Resolve the feature's flat home via the single resolver (pathly/features/<name>/),
+            # not the legacy hardcoded pathly/plans/<name> — the feature lives under features/.
+            from pathly_orchestrator.fsm_ops import _resolve_storage_path
+
+            return _resolve_storage_path(None, project_root, feature)
     except Exception:
         pass
     return None

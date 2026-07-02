@@ -207,7 +207,6 @@ def export_span_async(event: dict) -> None:
 def cli_main() -> None:
     import argparse
     import sys
-    from pathlib import Path
 
     parser = argparse.ArgumentParser(prog="pathly-otel-export")
     parser.add_argument("--feature", required=True, help="feature name")
@@ -219,7 +218,9 @@ def cli_main() -> None:
     args = parser.parse_args()
 
     project_root = args.project_root if args.project_root is not None else os.getcwd()
-    feature_dir = Path(project_root) / "pathly" / "plans" / args.feature
+    from pathly_orchestrator.fsm_ops import _resolve_storage_path
+
+    feature_dir = _resolve_storage_path(None, project_root, args.feature)
 
     if not feature_dir.exists():
         print(f"error: feature directory not found: {feature_dir}", file=sys.stderr)

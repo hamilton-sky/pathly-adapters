@@ -280,10 +280,16 @@ def _run_loop(
     if project_root and goal_id:
         try:
             from pathly_orchestrator.db.connection import get_db
+            from pathly_orchestrator.supervisor.goal_decomposer import _goal_storage_dir
             from pathly_orchestrator.supervisor.slug import ensure_goal_slug
             import os
             slug = ensure_goal_slug(get_db(project_root or None), goal_id)
-            _goal_dir = os.path.join(project_root, "pathly", "goals", slug)
+            # Board-scoped goal home (storage-restructure): feature-tier nests under the feature
+            # (pathly/features/<feature>/goals/<slug>), project/global under pathly/project/goals/
+            # <slug>. Route through the ONE goal-dir resolver — every other goal path (decompose
+            # planner/plan/consultation, _run_team) already does — instead of the flat
+            # pathly/goals/<slug> this used to hardcode.
+            _goal_dir = _goal_storage_dir(project_root, board, scope, slug)
             os.makedirs(_goal_dir, exist_ok=True)
         except Exception:
             pass

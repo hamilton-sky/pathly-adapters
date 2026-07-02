@@ -41,7 +41,7 @@ def _write_supervisor_phase_summary(
             flow_config = _load_flow("team")
             feature_dir = _resolve_storage_path(flow_config, project_root, topic)
         except Exception:
-            feature_dir = Path(project_root) / "pathly" / "plans" / topic
+            feature_dir = Path(project_root) / "pathly" / "features" / topic
         if not feature_dir.exists():
             return
         conn = _db.get_db()
@@ -298,10 +298,12 @@ def _run_stage_via_terminal(
             )
 
         if feature_flags.early_advance:
+            from pathly_orchestrator.fsm_ops import _resolve_storage_path
+
             feature_dir = (
                 Path(state.storage_path)
                 if state.storage_path
-                else Path(state.project_root) / "pathly" / "plans" / state.topic
+                else _resolve_storage_path(None, state.project_root, state.topic)
             )
             feature = state.topic
 
@@ -342,7 +344,7 @@ def _run_stage_via_terminal(
                 storage_path = (
                     Path(state.storage_path)
                     if state.storage_path
-                    else Path(state.project_root) / "pathly" / "plans" / state.topic
+                    else _resolve_storage_path(None, state.project_root, state.topic)
                 )
                 agent_done_data = read_last_agent_done(storage_path) or {}
                 result_for_fsm = {

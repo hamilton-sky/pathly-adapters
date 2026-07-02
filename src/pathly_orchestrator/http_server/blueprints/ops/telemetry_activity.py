@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 import time
-from pathlib import Path
 
 from flask import jsonify, request
 
@@ -41,7 +40,9 @@ def _append_agent_done_event(
 ) -> None:
     """Append an AGENT_DONE event to the feature's EVENTS.jsonl so SSE subscribers see it."""
     try:
-        feature_dir = Path(project_root) / "pathly" / "plans" / feature
+        from pathly_orchestrator.fsm_ops import _resolve_storage_path
+
+        feature_dir = _resolve_storage_path(None, project_root, feature)
         if not feature_dir.exists():
             return
         event: dict[str, object] = {

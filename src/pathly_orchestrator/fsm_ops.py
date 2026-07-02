@@ -66,7 +66,9 @@ def _load_flow(flow_name: str, project_root: str | None = None) -> dict:
     return yaml.safe_load(text)
 
 
-def _resolve_storage_path(flow_config: dict, project_root: str, topic: str) -> Path:
+def _resolve_storage_path(
+    flow_config: dict | None, project_root: str, topic: str
+) -> Path:
     topic = _safe_topic(topic)
     root = Path(project_root)
     for candidate in (
@@ -80,7 +82,12 @@ def _resolve_storage_path(flow_config: dict, project_root: str, topic: str) -> P
     # or project/goals/<slug>) which the pathly/<topic> candidate above resolves; debug/explore keep
     # their own subdir templates. Both legacy FEATURE (pathly/plans/<topic>) and flat GOAL
     # (pathly/goals/<topic>) candidates were removed once features + goals nest by scope.
-    template = flow_config["storage_path"]
+    #
+    # flow_config may be None: flow-less callers (telemetry, health, runner streams, /runner/event,
+    # the otel CLI) only need "where does feature <topic> live" — not a flow template — so they get
+    # the canonical flat home. The default MUST match team.flow.yaml's storage_path
+    # (pathly/features/{topic}/) so a not-yet-created feature never resolves to legacy pathly/plans.
+    template = (flow_config or {}).get("storage_path") or "pathly/features/{topic}/"
     return root / template.format(topic=topic)
 
 

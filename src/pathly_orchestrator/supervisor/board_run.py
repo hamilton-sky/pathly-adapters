@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import threading
 import uuid
-from pathlib import Path
 from typing import Callable, Optional
 
 
@@ -254,12 +253,13 @@ def start_board_run(
     if storage_path:
         where_line = f"Your working directory is: {storage_path}"
     elif board == "feature" and project_root:
-        # feature inline fallback (byte-identical to pre-T5)
-        feature_path = (
-            Path(project_root) / "pathly" / scope
-            if (Path(project_root) / "pathly" / scope).is_dir()
-            else Path(project_root) / "pathly" / "plans" / scope
-        )
+        # feature inline fallback — route through the shared resolver so it finds the flat
+        # home (pathly/features/<scope>/) first. The old inline probe checked pathly/<scope>
+        # then legacy pathly/plans/<scope> and NEVER pathly/features/<scope>, so it missed
+        # every current feature dir.
+        from pathly_orchestrator.fsm_ops import _resolve_storage_path
+
+        feature_path = _resolve_storage_path(None, project_root, scope)
         where_line = f"Your working directory is: {feature_path}"
     else:
         where_line = ""

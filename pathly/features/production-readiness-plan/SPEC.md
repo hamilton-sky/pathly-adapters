@@ -133,6 +133,77 @@ Evidence gathered during the 2026-07-01 doc audit:
   expose it as a debugging tool).
 - Make hook/telemetry failures **observable** (they are currently silent by design).
 
+#### Telemetry connectivity audit (2026-07-03) — *"is cost/token telemetry actually wired so I can see it in the app?"*
+
+A code trace of the full cost/token chain (stop hook → runner → DB → SSE → Studio) was run to answer
+this directly. **Verdict: the read/display half is fully built and connected; the write/emit half has
+one blocking break and two latent ones.** The app *can* show telemetry — but only when the events
+actually reach the DB, and in the app-driven headless flow they often do not today. So the panels exist
+and are correctly wired, yet a user can watch a run finish and still see `$…` / empty cost.
+
+**What works — display side (verified, `file:line`):**
+- Studio subscribes to the live SSE stream (`GET /events/stream`) with an `/events/history` catch-up on
+  connect and a `/telemetry/trends` historical query
+  (`studio/.../Monitor/hooks/useMonitorSession.ts`; `blueprints/runner/streams.py`).
+- Both `AGENT_DONE` and `BILLING_UPDATE` are handled; `mergeBillingUpdate` overlays the reconciled
+  cost/tokens onto the matching `AGENT_DONE` so the user sees one reconciled entry, not duplicates
+  (`Monitor/utils.ts:116-135`).
+- Live surfaces render: `MetricsStrip` (COST / TOKENS / WALL tiles, `MetricsStrip.tsx:7-23`), per-agent
+  cost in `EventLog` (`EventLog.tsx:177-179`), and the historical `CostChart`
+  (`CostChart.tsx:92`, reading `agent_invocations` daily aggregates via `/telemetry/trends`).
+- The write helpers key every event by `(project_root = feature_dir.parent.parent.parent,
+  feature = feature_dir.name)` and write to the **SQLite DB**, not a path-bound file
+  (`eventlog.append_event`, `runner/events.py::_patch_last_agent_done`) — so a DB row lands on the
+  correct feature even when the path *prefix* is wrong. This is why B3 below is latent, not fatal.
+
+**What is broken — write/emit side (the reason the app can look empty):**
+- **B1 — `PATHLY_PROJECT_ROOT` is never set by Studio (BLOCKING).** The stop hook is registered
+  (`.claude/settings.json` `Stop`) and is the source of the *authoritative* Claude Code session cost,
+  but it exits early when `PATHLY_PROJECT_ROOT` is empty (`stop_telemetry.py:129-131`). Electron spawns
+  the FSM server (`studio/src/main/index.ts`) and every CLI child (`studio/src/main/ipc/terminal.ts`)
+  with an unmodified `process.env`, and only ever *reads* the var (`ipc/db.ts`) — it never exports it.
+  **Result:** in the app-driven headless flow no `BILLING_UPDATE` is written, so `MetricsStrip` can sit
+  at `$…` ("billing pending") indefinitely unless the CLI's `--output-format json` stdout cost happened
+  to be captured into the earlier `AGENT_DONE`. This single unset env var is why an otherwise-complete
+  display chain shows nothing.
+- **B2 — `/record_phase` + `/record_phase_summary` hard-reject after the flatten.** Both build
+  `feature_dir = <root>/pathly/plans/<feature>` and return **HTTP 400** when that directory does not
+  exist (`telemetry_phase.py:98-106,170-176`). Post-flatten the feature lives at
+  `pathly/features/<name>/`, so phase telemetry is silently 400'd. Unlike `append_event` (which
+  `mkdir`s and DB-keys correctly), these endpoints gate on `.exists()` against the legacy path.
+- **B3 — hardcoded `pathly/plans/` in the telemetry paths (LATENT, same class as G2).**
+  `stop_telemetry.py:35`, `otel_export.py:222`, and the phase endpoints all hardcode the legacy `plans/`
+  prefix. For the DB-keyed writes this is currently *cosmetic* — the row still lands correctly, but a
+  stray empty `pathly/plans/<feature>/` dir gets created, and any future path-bound reader will break.
+  `otel_export.py` is additionally **dormant** (it no-ops unless `PATHLY_OTEL_ENDPOINT` is set).
+
+**UX gaps (non-blocking, but they make correct data look wrong):**
+- "Billing pending" is inferred from `totalCost === 0` (`MetricsStrip.tsx:9`), so a genuinely
+  zero-cost agent shows a perpetual `$…`, and a `BILLING_UPDATE` carrying `cost=0` never clears it.
+- Interactive (PTY REPL) runs are not wired to the SSE telemetry path at all — no live cost is shown
+  for them (`FlowControlBar.tsx`); only headless runs stream telemetry.
+
+**Solution (folds into this phase — ordered by leverage):**
+1. **Export `PATHLY_PROJECT_ROOT` from Studio** when spawning the FSM server *and* every CLI child (set
+   it in the `env` passed in `index.ts` / `ipc/terminal.ts`) and pass it through to the stop hook. This
+   is the single highest-leverage fix — it turns the whole already-built display chain on. Gate it with
+   a smoke assertion that a headless run produces ≥1 `BILLING_UPDATE` with non-null cost.
+2. **Route the telemetry paths through the single storage resolver** (the Phase 2 / T2 work): drop the
+   `pathly/plans/` prefix in `stop_telemetry.py`, `otel_export.py`, and the phase endpoints, and replace
+   the `/record_phase*` `.exists()` gate with the resolved feature dir (or drop the gate). B2 and B3
+   disappear once §5's resolver work lands.
+3. **Make the emit side observable** (the existing Phase 5 bullet, made concrete): when the stop hook
+   no-ops (missing root, zero usage) or a `/record_*` endpoint 400s, emit a one-line structured
+   `TELEMETRY_SKIPPED` breadcrumb instead of exiting silently — a missing-cost display should be
+   diagnosable, not invisible.
+4. **Disambiguate "pending" vs "free"** in `MetricsStrip` by keying the pending state off `cost_source`
+   / the presence of a reconciling event rather than off a zero value, and decide whether interactive
+   runs should carry live cost.
+
+This audit maps to backlog **T9** (`schema_version` + observability); **B1 is the acceptance blocker**
+for gate §6.6 ("every run is replayable") actually surfacing cost/tokens in the UI, and should ride
+alongside the Phase 1 golden-path smoke test.
+
 ### Phase 6 — Positioning
 - Lead every surface with the **headless-board** story (done in narrative docs; carry it to the site/
   README hero + a 60-second "why the board" demo). Crisp one-liner beats feature lists vs. Agent HQ.
@@ -159,8 +230,16 @@ A build is "production-grade" when **all** hold:
 
 **P0 — trust the core**
 - T1. End-to-end golden-path smoke test (real FSM, all stages). *(G1, G10)*
-- T2. Single storage resolver; delete 6 hardcoded `pathly/plans/` bases + fix create-feature. *(G2)*
-- T3. Layout-invariant test across all subsystems. *(G2, G10)*
+- T2. ✅ DELIVERED (2026-07-03) — Single storage resolver (`_resolve_storage_path`, now
+  flow-less-capable) is the one home; ~15 hardcoded `pathly/plans/` bases across telemetry
+  (`record_phase`/`record_phase_summary`/`record_activity`, `stop_telemetry`, `otel_export`),
+  health `/status`, runner `/events/stream` + `/runner/event`, supervisor (`terminal`,
+  `board_run`, `registry`), and `fsm_compose`/`engine_actions` routed through it (listings —
+  `/api/project/open`, feedback-watcher, registry recover — widened to `features/ ∪ plans/`);
+  create-feature skill + `board-init` fragment + new-flow template flattened. *(G2)*
+- T3. ✅ DELIVERED (2026-07-03) — Layout-invariant safety-net test
+  `tests/test_storage_layout_invariant.py` pins discovery, resolver, goal-dir, telemetry,
+  health, runner streams/event, and feedback to the one flat feature home. *(G2, G10)*
 
 **P1 — stop the drift**
 - T4. CI: 400-line gate; extend version-sync to prose docs. *(G7, G3)*

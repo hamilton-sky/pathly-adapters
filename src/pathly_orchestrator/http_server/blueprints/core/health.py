@@ -59,29 +59,20 @@ def status_endpoint():
         return jsonify({"current_state": "unknown"}), 200
 
     resolved_root = Path(project_root).resolve()
-    plans_dir = resolved_root / "pathly" / "plans"
-    if not plans_dir.resolve().is_relative_to(resolved_root):
-        return jsonify({"error": "Invalid project_root"}), 400
-    if not plans_dir.exists():
-        return (
-            jsonify(
-                {
-                    "current_state": "no-feature",
-                    "feature": "",
-                    "project_root": project_root,
-                    "menu": _NO_FEATURE_MENU,
-                }
-            ),
-            200,
-        )
+
+    # Feature homes resolve through the shared resolver (pathly/features/<name>/ first). The
+    # endpoint no longer gates on a legacy pathly/plans/ dir existing — that made it report
+    # "no-feature" for a project whose features live only under pathly/features/. The
+    # downstream `best_state is None` path handles the genuine no-feature case.
+    from pathly_orchestrator.fsm_ops import _resolve_storage_path
 
     topic = request.args.get("topic", "").strip()
     best_state: dict | None = None
     best_state_dir: Path | None = None
 
     if topic:
-        topic_dir = plans_dir / topic
         try:
+            topic_dir = _resolve_storage_path(None, str(resolved_root), topic)
             if not topic_dir.resolve().is_relative_to(resolved_root):
                 return jsonify({"error": "Invalid topic"}), 400
         except Exception:
@@ -100,7 +91,9 @@ def status_endpoint():
             rows = _read_all(_get_db(project_root), project_root)
             if rows:
                 best_state = rows[0]["state"]
-                best_state_dir = plans_dir / rows[0]["feature"]
+                best_state_dir = _resolve_storage_path(
+                    None, str(resolved_root), rows[0]["feature"]
+                )
         except Exception:
             logger.debug("status: error reading fsm_state", exc_info=True)
             return jsonify({"current_state": "unknown"}), 200
@@ -132,7 +125,7 @@ def status_endpoint():
             .joinpath("core/flows/team.flow.yaml")
             .read_text(encoding="utf-8")
         )
-        storage_path = resolved_root / "pathly" / "plans" / feature
+        storage_path = _resolve_storage_path(None, str(resolved_root), feature)
         menu = build_menu_payload(
             flow_config,
             best_state.get("current", "unknown"),

@@ -6,7 +6,7 @@ def _make_test_db(tmp_path, n_events=2):
     from pathly_orchestrator import db as _db
 
     feature = "test-feature"
-    feature_dir = tmp_path / "pathly" / "plans" / feature
+    feature_dir = tmp_path / "pathly" / "features" / feature
     feature_dir.mkdir(parents=True)
     conn = _db.get_db()
     project_root = str(tmp_path)
@@ -111,7 +111,7 @@ def test_cli_zero_events(tmp_path, capsys):
     from pathly_orchestrator import db as _db
 
     feature = "test-feature"
-    feature_dir = tmp_path / "pathly" / "plans" / feature
+    feature_dir = tmp_path / "pathly" / "features" / feature
     feature_dir.mkdir(parents=True)
     conn = _db.get_db()
     _db.append_event(
@@ -169,7 +169,7 @@ def test_cli_non_agent_done_events_skipped(tmp_path, monkeypatch):
     from pathly_orchestrator import db as _db
 
     feature = "test-feature"
-    feature_dir = tmp_path / "pathly" / "plans" / feature
+    feature_dir = tmp_path / "pathly" / "features" / feature
     feature_dir.mkdir(parents=True)
     conn = _db.get_db()
     project_root = str(tmp_path)

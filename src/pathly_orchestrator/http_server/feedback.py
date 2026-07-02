@@ -71,12 +71,24 @@ def _process_feedback_file(path: Path) -> None:
         logger.warning("feedback file write failed: %s", path, exc_info=True)
 
 
+def _iter_feedback_files(project_root: str):
+    """Yield every feedback markdown file across a feature's flat home (pathly/features/<name>/
+    feedback/) AND the legacy base (pathly/plans/<name>/feedback/), so the watcher processes
+    feedback wherever a feature lives. Previously it globbed pathly/plans/ only and never saw
+    feedback under a current, flat feature dir."""
+    pathly_root = Path(project_root) / "pathly"
+    for base in ("features", "plans"):
+        base_dir = pathly_root / base
+        if not base_dir.is_dir():
+            continue
+        yield from base_dir.glob("*/feedback/*.md")
+
+
 def _feedback_watcher(project_root: str, stop: threading.Event) -> None:
-    plans_dir = Path(project_root) / "pathly" / "plans"
     seen: dict[Path, float] = {}
     while not stop.is_set():
         try:
-            for md_file in plans_dir.glob("*/feedback/*.md"):
+            for md_file in _iter_feedback_files(project_root):
                 mtime = md_file.stat().st_mtime
                 if seen.get(md_file) != mtime:
                     seen[md_file] = mtime

@@ -114,8 +114,10 @@ def recover_stale_mirrors(project_root: str) -> None:
     """
     from pathly_orchestrator import db as _db
 
-    plans_dir = Path(project_root) / "pathly" / "plans"
-    if not plans_dir.is_dir():
+    pathly_root = Path(project_root) / "pathly"
+    # Feature homes under the flat layout (pathly/features/) AND the legacy base (pathly/plans/).
+    bases = [pathly_root / "features", pathly_root / "plans"]
+    if not any(b.is_dir() for b in bases):
         return
 
     handled: set = set()
@@ -127,26 +129,34 @@ def recover_stale_mirrors(project_root: str) -> None:
     except Exception as exc:
         logger.warning("recover_stale_mirrors: SQLite mark failed: %s", exc)
 
-    for mirror in plans_dir.glob("*/RUNNER_STATE.json"):
-        if mirror.parent in handled:
+    for base in bases:
+        if not base.is_dir():
             continue
-        try:
-            data = json.loads(mirror.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            continue
-        if data.get("status") == "running":
-            data["status"] = "error"
-            data["error_kind"] = "stale_restart"
-            mirror.write_text(json.dumps(data, indent=2), encoding="utf-8")
-            logger.info("Rewrote stale mirror for topic %s → error", data.get("topic"))
+        for mirror in base.glob("*/RUNNER_STATE.json"):
+            if mirror.parent in handled:
+                continue
+            try:
+                data = json.loads(mirror.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            if data.get("status") == "running":
+                data["status"] = "error"
+                data["error_kind"] = "stale_restart"
+                mirror.write_text(json.dumps(data, indent=2), encoding="utf-8")
+                logger.info(
+                    "Rewrote stale mirror for topic %s → error", data.get("topic")
+                )
 
 
 def _write_mirror(state: RunnerState) -> None:
     try:
         from pathly_orchestrator import db as _db
 
-        feature_dir = Path(state.project_root) / "pathly" / "plans" / state.topic
-        feature_dir.mkdir(parents=True, exist_ok=True)
+        # runner_state is DB-backed (write_runner_state → SQLite) — there is no on-disk
+        # RUNNER_STATE.json to create, so no feature dir is materialized here. A prior mkdir
+        # of the feature dir was vestigial; resolving it via the flow-less resolver would mkdir
+        # a features/<topic> *decoy* that then wins _resolve_storage_path's existence probe and
+        # hijacks storage resolution for debug/fix/goal runs whose home lives elsewhere.
         conn = _db.get_db()
         _db.write_runner_state(
             conn, state.project_root, state.topic, state.public_dict()

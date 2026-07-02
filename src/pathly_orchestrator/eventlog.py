@@ -73,7 +73,18 @@ def _now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def append_event(storage_path: str, event: dict, flow: dict | None = None) -> None:
+def append_event(
+    storage_path: str, event: dict, flow: dict | None = None, create_dir: bool = True
+) -> None:
+    """Append an event to the central DB (keyed by project_root + feature name).
+
+    ``create_dir`` (default True) materializes the feature dir. The event itself is DB-backed,
+    so the mkdir is only a convenience for callers that also drop files there. Pass
+    ``create_dir=False`` when the caller only has a feature NAME and the feature's real on-disk
+    home may live outside ``pathly/features/`` (debug/fix/goal runs): mkdir-ing the resolved
+    ``features/<name>`` default would plant an empty decoy that then wins
+    ``_resolve_storage_path``'s existence probe and hijacks that topic's real storage.
+    """
     if event.get("type") == "STATE_TRANSITION":
         to_state = event.get("to")
         if to_state is not None:
@@ -89,7 +100,8 @@ def append_event(storage_path: str, event: dict, flow: dict | None = None) -> No
     if "ts" not in event:
         event["ts"] = _now()
 
-    feature_dir.mkdir(parents=True, exist_ok=True)
+    if create_dir:
+        feature_dir.mkdir(parents=True, exist_ok=True)
     conn = _db.get_db()
     feature = feature_dir.name
     project_root = _norm_root(feature_dir.parent.parent.parent)

@@ -237,7 +237,7 @@ def test_record_activity_negative_total_tokens_rejected(client):
 
 def test_record_activity_appends_complete_agent_done_event(client):
     c, tmp = client
-    events_dir = tmp / "pathly" / "plans" / "feature-a"
+    events_dir = tmp / "pathly" / "features" / "feature-a"
     events_dir.mkdir(parents=True)
 
     r = c.post(
@@ -279,7 +279,7 @@ def test_record_activity_appends_complete_agent_done_event(client):
 
 def test_record_activity_uses_total_tokens_when_split_is_missing(client):
     c, tmp = client
-    events_dir = tmp / "pathly" / "plans" / "feature-b"
+    events_dir = tmp / "pathly" / "features" / "feature-b"
     events_dir.mkdir(parents=True)
 
     r = c.post(

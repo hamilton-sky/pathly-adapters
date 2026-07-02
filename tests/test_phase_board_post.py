@@ -40,7 +40,7 @@ def _phase_messages(scope):
 def test_record_phase_posts_phase_message_to_board(client, tmp_path):
     feature = f"phasebd-{uuid.uuid4().hex[:8]}"
     # record_phase requires the feature dir to exist.
-    (tmp_path / "pathly" / "plans" / feature).mkdir(parents=True)
+    (tmp_path / "pathly" / "features" / feature).mkdir(parents=True)
 
     r = client.post(
         "/record_phase",
@@ -64,7 +64,7 @@ def test_record_phase_posts_phase_message_to_board(client, tmp_path):
 
 def test_phase_done_also_posts(client, tmp_path):
     feature = f"phasebd-{uuid.uuid4().hex[:8]}"
-    (tmp_path / "pathly" / "plans" / feature).mkdir(parents=True)
+    (tmp_path / "pathly" / "features" / feature).mkdir(parents=True)
     root = str(tmp_path).replace("\\", "/")
 
     for evt in ("PHASE_START", "PHASE_DONE"):

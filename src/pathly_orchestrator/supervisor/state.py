@@ -96,7 +96,9 @@ class RunnerState:
     # told to seed THIS existing goal's DAG instead of finding-or-creating its own.
     goal_id: str = ""
 
-    # Resolved on-disk storage dir for this run (goal-tier: pathly/goals/<slug>)
+    # Resolved on-disk storage dir for this run. Goal-tier is board-scoped and nested:
+    # pathly/features/<feature>/goals/<slug> (feature) or pathly/project/goals/<slug>
+    # (project/global) — see goal_decomposer._goal_storage_dir. Never the flat pathly/goals/.
     storage_path: str = ""
 
     # Active terminal tab id — set while a terminal-mode stage is in flight

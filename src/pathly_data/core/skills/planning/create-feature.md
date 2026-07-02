@@ -17,7 +17,8 @@ feature the user listed — if they asked for several, loop over all of them.
 2. **Create the board** — follow the "Creating a feature board" steps composed below. That
    posts the feature's root goal, which materializes the board and its Studio card; reuse the
    goal if one already exists.
-3. **Create the workspace** `pathly/features/<name>/plans/` if it is absent.
+3. **Create the workspace** `pathly/features/<name>/` if it is absent (feature files live
+   FLAT directly under it — STATE.json, PROGRESS.md, EVENTS.jsonl, feedback/ — no `plans/` subdir).
 
 ## Report
 

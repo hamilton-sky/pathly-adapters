@@ -264,8 +264,8 @@ def runner_retry():
 def runner_event():
     """Accept an event from an agent and persist it via eventlog."""
     try:
-        from pathlib import Path
         from pathly_orchestrator import eventlog as _evtlog
+        from pathly_orchestrator.fsm_ops import _resolve_storage_path
 
         data = request.get_json()
         if not data:
@@ -293,8 +293,13 @@ def runner_event():
         if not isinstance(payload, dict):
             return jsonify({"error": "Field 'payload' must be a JSON object"}), 400
 
-        storage_path = str(Path(project_root) / "pathly" / "plans" / feature)
-        _evtlog.append_event(storage_path, payload)
+        # Record to the DB keyed by (project_root, feature). create_dir=False: this endpoint
+        # only has a feature NAME, and debug/fix/goal agents post here too — mkdir-ing the
+        # resolved features/<feature> for a run whose real home is elsewhere would plant a decoy
+        # that hijacks _resolve_storage_path's existence probe. The event is DB-backed, so no
+        # dir is needed to persist it.
+        storage_path = str(_resolve_storage_path(None, project_root, feature))
+        _evtlog.append_event(storage_path, payload, create_dir=False)
         return jsonify({"ok": True}), 200
     except Exception as exc:
         logging.exception("runner_event error")

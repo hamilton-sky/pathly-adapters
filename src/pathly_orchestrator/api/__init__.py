@@ -127,10 +127,17 @@ def api_skill_override():
 def project_open():
     body = request.get_json(force=True) or {}
     project_root = body.get("project_root", "")
-    features = []
-    plans_dir = Path(project_root) / "pathly" / "plans"
-    if plans_dir.exists():
-        for entry in sorted(plans_dir.iterdir()):
-            if entry.is_dir() and not entry.name.startswith("."):
+    features: list[str] = []
+    seen: set[str] = set()
+    pathly_root = Path(project_root) / "pathly"
+    # Enumerate feature homes from the flat layout (pathly/features/) AND the legacy base
+    # (pathly/plans/) so current and legacy features both list. De-dupe by name.
+    for base in ("features", "plans"):
+        base_dir = pathly_root / base
+        if not base_dir.exists():
+            continue
+        for entry in sorted(base_dir.iterdir()):
+            if entry.is_dir() and not entry.name.startswith(".") and entry.name not in seen:
+                seen.add(entry.name)
                 features.append(entry.name)
     return jsonify({"features": features}), 200

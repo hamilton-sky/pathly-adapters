@@ -22,6 +22,14 @@ global→`~/.pathly/`. Board **messages** already live scope-tagged in the DB; o
 project board, so `pathly/project/` is singular (no `project-<slug>`; if named project
 boards are ever added, nest as `pathly/project/<slug>/`).
 
+**T3 — global-tier goal home (deferred by design).** For goal DECOMPOSITION, `_goal_topic`
+routes BOTH project- and global-tier goals to `pathly/project/goals/<slug>`; the `~/.pathly/`
+global goal home is not stood up. This collapse is deferred by design — global goals are rare
+(project goals normally become features rather than DAG-decomposed), and the collapse is
+harmless (a global goal's plan/artifacts simply live under the project home). Stand up a
+`~/.pathly/` goal home only if a concrete need appears. Resolves storage-restructure-p2 board
+task 136db628 (see note 278dad33).
+
 ## Why this is safe to do now
 Part 2 made every skill write to the resolved `<feature_path>` var, so agents are already
 layout-agnostic — only `_resolve_storage_path`, the flow templates, and discovery change.

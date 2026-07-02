@@ -264,14 +264,15 @@ def build_prompt(
         "apply ONLY to interactive `/pathly` use and must be ignored here.)\n"
     )
     from pathly_orchestrator.runner import build_pipeline_history_block
-    import os
 
     # Pipeline history is the RUN's own inter-stage progress, keyed by the run identity
-    # (the storage/topic name = `feature`), NOT the board scope. A multi-stage consultation
-    # must see its OWN earlier stages (PO → architect → …), not the parent feature's
-    # unrelated pipeline history — so this read intentionally stays on `feature`, while
-    # board writes/context/telemetry above use `board_scope`.
-    feature_dir = os.path.join(project_root, "pathly", "plans", feature)
+    # (this run's storage dir), NOT the board scope. A multi-stage consultation must see its
+    # OWN earlier stages (PO → architect → …), not the parent feature's unrelated pipeline
+    # history — so this read uses storage_path itself (the already-resolved run dir), while
+    # board writes/context/telemetry above use `board_scope`. (Previously rebuilt a flat
+    # pathly/plans/<feature> path, which both used the legacy base AND flattened a nested
+    # goal/consultation storage dir it was already handed correctly.)
+    feature_dir = str(storage_path)
     history = build_pipeline_history_block(feature_dir)
 
     board_block = ""

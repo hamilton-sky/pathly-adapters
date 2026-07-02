@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 import os
 import time
-from pathlib import Path
 
 from flask import jsonify, request
 
@@ -94,10 +93,9 @@ def record_phase_endpoint():
         project_root = data.get("project_root") or os.environ.get(
             "PATHLY_PROJECT_ROOT", ""
         )
-        if project_root:
-            feature_dir = Path(project_root) / "pathly" / "plans" / feature
-        else:
-            feature_dir = Path("pathly") / "plans" / feature
+        from pathly_orchestrator.fsm_ops import _resolve_storage_path
+
+        feature_dir = _resolve_storage_path(None, project_root or ".", feature)
 
         if not feature_dir.exists():
             return (
@@ -167,7 +165,9 @@ def record_phase_summary_endpoint():
         project_root = data.get("project_root") or os.environ.get(
             "PATHLY_PROJECT_ROOT", ""
         )
-        feature_dir = Path(project_root) / "pathly" / "plans" / feature
+        from pathly_orchestrator.fsm_ops import _resolve_storage_path
+
+        feature_dir = _resolve_storage_path(None, project_root or ".", feature)
 
         if not feature_dir.exists():
             return (

@@ -34,8 +34,9 @@ Record the returned `"message_id"` as `$GOAL_ID` — later task/artifact posts s
 
 ### 2. Workspace
 
-The feature's workspace is `<feature_path>` (e.g. `pathly/features/<feature>/plans/`). Write the
-feature's files there — never invent a different location. Create it if it does not exist.
+The feature's workspace is `<feature_path>` (the flat feature home, e.g.
+`pathly/features/<feature>/`). Write the feature's files directly there — never invent a
+different location, and do not nest them under a `plans/` subdir. Create it if it does not exist.
 
 ### Creating several features in one run
 

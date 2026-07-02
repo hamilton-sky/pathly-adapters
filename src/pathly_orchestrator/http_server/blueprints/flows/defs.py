@@ -223,7 +223,7 @@ def create_flow():
 ---
 version: 1
 flow: {name}
-storage_path: "pathly/plans/{{topic}}/"
+storage_path: "pathly/features/{{topic}}/"
 states:
   - STORMING
   - PLANNING

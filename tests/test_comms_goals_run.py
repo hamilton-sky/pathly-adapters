@@ -130,6 +130,36 @@ def test_dispatch_loop_runs_scheduler_in_order():
     assert order == [a, b], "A must run before B (B depends on A)"
 
 
+def test_dispatch_loop_creates_nested_goal_dir(tmp_path):
+    """T6: the loop executor materializes its goal dir at the board-scoped nested home
+    (pathly/features/<feature>/goals/<slug>) via _goal_storage_dir — never the flat
+    pathly/goals/<slug> it used to hardcode. Every other goal path already nests; the loop
+    was the one straggler. project_root must be set for the dir to be created at all (the
+    existing loop tests pass '' and so never exercised this)."""
+    from pathly_orchestrator.db.connection import get_db
+    from pathly_orchestrator.supervisor.goal_run import start_goal_run
+
+    conn = get_db()
+    scope = "gr_loop_dir"
+    goal = _make_goal(conn, scope, executor="loop")
+    _make_task(conn, scope, "task-A", goal)
+
+    result = start_goal_run(
+        goal,
+        project_root=str(tmp_path),
+        spawn_fn=lambda *a, **k: {"ok": True},
+        block=True,
+    )
+    assert result["ok"] is True
+
+    nested = tmp_path / "pathly" / "features" / scope / "goals"
+    assert nested.is_dir(), "loop goal dir must nest under pathly/features/<feature>/goals/"
+    assert list(nested.iterdir()), "the goal-slug dir must exist under features/<f>/goals/"
+    assert not (
+        tmp_path / "pathly" / "goals"
+    ).exists(), "the flat pathly/goals/ home must not be created"
+
+
 def test_dispatch_loop_scopes_to_goal():
     """A loop run drains only ITS goal's tasks, not a sibling goal in the same scope."""
     from pathly_orchestrator.db.connection import get_db

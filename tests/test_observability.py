@@ -22,7 +22,9 @@ def client(tmp_path, monkeypatch):
 
 
 def _feature_dir(tmp_path: Path, feature: str = "my-feature") -> Path:
-    d = tmp_path / "pathly" / "plans" / feature
+    # Canonical flat feature home (storage consolidation): /record_phase resolves the feature
+    # dir via _resolve_storage_path, which locates pathly/features/<name>/, not legacy plans/.
+    d = tmp_path / "pathly" / "features" / feature
     d.mkdir(parents=True, exist_ok=True)
     return d
 
