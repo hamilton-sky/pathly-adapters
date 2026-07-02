@@ -1,7 +1,8 @@
 """Hook: classify feedback questions as [REQ] or [ARCH].
 
 Receives a JSON payload on stdin with a "file" or "path" key.
-Validates the path stays inside the project's plans/ directory.
+Validates the path stays inside the project's feature workspace (pathly/features/ or
+legacy pathly/plans/).
 If ANTHROPIC_API_KEY is not set, exits silently (classification is optional).
 """
 
@@ -46,12 +47,16 @@ def main() -> None:
         _log_skip("PATHLY_PROJECT_ROOT not set")
         sys.exit(0)
 
-    plans_dir = (Path(project_root_env) / "pathly" / "plans").resolve()
+    pathly_root = (Path(project_root_env) / "pathly").resolve()
+    # A feature's feedback lives at pathly/features/<name>/feedback/ (flat, current) or the
+    # legacy pathly/plans/<name>/feedback/. Accept a path under EITHER; reject anything outside
+    # both (traversal, or an absolute path elsewhere) — the write-path containment guard.
+    allowed_roots = (pathly_root / "features", pathly_root / "plans")
     resolved = Path(raw_path).resolve()
 
-    if not resolved.is_relative_to(plans_dir):
+    if not any(resolved.is_relative_to(root) for root in allowed_roots):
         print(
-            f"pathly-hook: rejected path outside plans/: {resolved}",
+            f"pathly-hook: rejected path outside features/ or plans/: {resolved}",
             file=sys.stderr,
         )
         sys.exit(1)

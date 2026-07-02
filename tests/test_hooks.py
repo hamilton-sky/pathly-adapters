@@ -42,12 +42,12 @@ def _run_hook(
 
 
 # ---------------------------------------------------------------------------
-# test_hook_rejects_path_outside_plans
+# test_hook_rejects_path_outside_workspace
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize("hook", HOOKS, ids=["classify", "inject_ttl"])
-def test_hook_rejects_path_outside_plans(hook, tmp_path):
+def test_hook_rejects_path_outside_workspace(hook, tmp_path):
     plans_dir = tmp_path / "pathly" / "plans"
     plans_dir.mkdir(parents=True)
 
@@ -59,11 +59,11 @@ def test_hook_rejects_path_outside_plans(hook, tmp_path):
         env={"PATHLY_PROJECT_ROOT": str(tmp_path)},
     )
     assert result.returncode != 0
-    assert "pathly-hook: rejected path outside plans/:" in result.stderr
+    assert "pathly-hook: rejected path outside features/ or plans/:" in result.stderr
 
 
 # ---------------------------------------------------------------------------
-# test_hook_accepts_valid_path
+# test_hook_accepts_valid_path (legacy plans/ + flat features/)
 # ---------------------------------------------------------------------------
 
 
@@ -81,6 +81,23 @@ def test_hook_accepts_valid_path(hook, tmp_path):
         env={"PATHLY_PROJECT_ROOT": str(tmp_path)},
     )
     assert result.returncode == 0
+
+
+@pytest.mark.parametrize("hook", HOOKS, ids=["classify", "inject_ttl"])
+def test_hook_accepts_flat_features_feedback(hook, tmp_path):
+    """Post-flatten, feedback lives at pathly/features/<name>/feedback/ — the hooks must
+    accept it, not reject it as 'outside plans/'."""
+    fb_dir = tmp_path / "pathly" / "features" / "my-feature" / "feedback"
+    fb_dir.mkdir(parents=True)
+    feedback_file = fb_dir / "REVIEW_FAILURES.md"
+    feedback_file.write_text("# feedback\n", encoding="utf-8")
+
+    result = _run_hook(
+        hook,
+        {"file": str(feedback_file)},
+        env={"PATHLY_PROJECT_ROOT": str(tmp_path)},
+    )
+    assert result.returncode == 0, result.stderr
 
 
 # ---------------------------------------------------------------------------
