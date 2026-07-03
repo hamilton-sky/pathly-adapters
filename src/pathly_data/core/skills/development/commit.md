@@ -6,7 +6,7 @@ Adapter skills should load and follow this prompt instead of duplicating workflo
 ## Input contract
 
 - `message` — commit message string
-- `storage_path` — absolute path to the feature's plan folder (e.g. `pathly/plans/<feature>/`)
+- `storage_path` — absolute path to the feature's plan folder (e.g. `pathly/features/<feature>/`)
 - `topic` — feature name string
 
 ---

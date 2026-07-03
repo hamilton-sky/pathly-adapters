@@ -26,7 +26,7 @@ Do not write files; quick is read-only. The retro skill/orchestrator writes RETR
 
 After quick completes:
 - Write `<feature_path>/RETRO.md` with the summary provided.
-- Append any extracted lessons to `LESSONS_CANDIDATE.md` (project root or pathly/plans/).
+- Append any extracted lessons to `LESSONS_CANDIDATE.md` (project root or pathly/features/).
 
 Parse the `<usage>` block from quick's response:
 - `total_tokens`: the number after `total_tokens:` (0 if absent)

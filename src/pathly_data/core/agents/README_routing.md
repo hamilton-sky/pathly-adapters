@@ -21,7 +21,7 @@ that role.
 | `architect` | architect | opus | Read, Glob, Grep, Write, Edit, Agent | Technical design, layer decisions, trade-offs, system design |
 | `designer` | designer | sonnet | Read, Glob, Grep, Write, Bash | UI/UX design systems, palette/typography/style generation via UI UX Pro Max, design reviews |
 | `po` | po | opus | Read, Write | Interactive requirements discussion; probes scope, challenges assumptions, validates PRDs |
-| `planner` | product-owner | sonnet | Read, Glob, Grep, Write, Edit, Agent | Requirements, user stories, conversation decomposition, pathly/plans/ folder |
+| `planner` | product-owner | sonnet | Read, Glob, Grep, Write, Edit, Agent | Requirements, user stories, conversation decomposition, pathly/features/ folder |
 | `builder` | executor | sonnet | Read, Glob, Grep, Edit, Write, Bash, Agent, TodoWrite | Coding, verification, staying in scope |
 | `tester` | tester | sonnet | Read, Glob, Grep, Bash, Write, Agent | Verifying acceptance criteria, test plans, coverage gaps |
 | `reviewer` | reviewer | sonnet | Read, Glob, Grep, Write, Agent | Adversarial review, feedback files, scout delegation |
@@ -82,7 +82,7 @@ storm (architect)
   -> STORM_SEED.md
 
 plan (planner)
-  -> pathly/plans/<feature>/
+  -> pathly/features/<feature>/
        USER_STORIES.md
        IMPLEMENTATION_PLAN.md
        CONVERSATION_PROMPTS.md

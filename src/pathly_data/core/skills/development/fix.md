@@ -11,7 +11,7 @@ Parse `$ARGUMENTS`:
 - First non-keyword word = TOPIC (if present).
 
 If TOPIC was not in `$ARGUMENTS`, auto-detect:
-1. Read `pathly/plans/*/STATE.json` files, sorted by modification time (newest first).
+1. Read `pathly/features/*/STATE.json` files, sorted by modification time (newest first).
    Use the most recent feature whose state is not `IDLE` or `DONE`.
 2. If none found: stop →
    `No active feature found. Start with /pathly go to describe what you want to build.`
@@ -40,7 +40,7 @@ Exit.
 ## Step 4 — If blocked, target_agent == "human"
 
 If `action.blocked` is true and `action.target_agent == "human"`:
-- Print the full contents of `pathly/plans/<topic>/feedback/<action.file>`.
+- Print the full contents of `pathly/features/<topic>/feedback/<action.file>`.
 - Print:
   ```
   Human decision required — resolve manually, delete feedback/<file>, then run /pathly go.
@@ -71,7 +71,7 @@ Wait for user reply. Route to the matching step below.
 
 a. Follow the instructions returned by `action` for the target agent.
    Spawn the appropriate agent (`action.target_agent`) with those instructions,
-   passing the feedback file path `pathly/plans/<topic>/feedback/<file>` as context.
+   passing the feedback file path `pathly/features/<topic>/feedback/<file>` as context.
 
 b. After the agent completes, invoke the `fsm-call` skill with:
    ```json
@@ -116,12 +116,12 @@ c. Handle `stage_result`:
 
 ## Step 7 — On [2] View
 
-Print the full contents of `pathly/plans/<topic>/feedback/<file>`.
+Print the full contents of `pathly/features/<topic>/feedback/<file>`.
 Show the blocked panel again (return to Step 5).
 
 ## Step 8 — On [3] Escalate
 
-Write `pathly/plans/<topic>/feedback/HUMAN_QUESTIONS.md` with the following content:
+Write `pathly/features/<topic>/feedback/HUMAN_QUESTIONS.md` with the following content:
 
 ```
 Escalated by /fix: feedback/<file> could not be auto-resolved. Manual intervention required.

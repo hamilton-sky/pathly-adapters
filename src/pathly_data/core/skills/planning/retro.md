@@ -10,19 +10,19 @@ for rendering those routes in their host-native form.
 
 ## Skill Contract
 
-**Consumes:** `pathly/plans/<FEATURE>/PROGRESS.md` + `pathly/plans/<FEATURE>/CONVERSATION_PROMPTS.md`
-**Produces:** `pathly/plans/<FEATURE>/RETRO.md`
+**Consumes:** `pathly/features/<FEATURE>/PROGRESS.md` + `pathly/features/<FEATURE>/CONVERSATION_PROMPTS.md`
+**Produces:** `pathly/features/<FEATURE>/RETRO.md`
 **Consumed by:** `storm` skill (user pastes RETRO.md as context for next storm session)
 
 ## Feature detection
 
 If `$ARGUMENTS` contains a non-keyword word, use it as `FEATURE`.
 Otherwise auto-detect:
-1. Read `pathly/plans/*/STATE.json` files, sorted by modification time (newest first).
+1. Read `pathly/features/*/STATE.json` files, sorted by modification time (newest first).
    Use the most recent feature whose state is not `IDLE` or `DONE`.
-2. If none found, use the most recently modified `pathly/plans/*/` folder (excluding `.archive/`).
+2. If none found, use the most recently modified `pathly/features/*/` folder (excluding `.archive/`).
 3. If multiple candidates exist: list them numbered and ask "Which feature? [1/2/…]"
-4. If no `pathly/plans/` folder exists or is empty: stop →
+4. If no `pathly/features/` folder exists or is empty: stop →
    `No active feature found. Start with /pathly go to describe what you want to build.`
 
 Run a retrospective on the **FEATURE** plan.
@@ -30,10 +30,10 @@ Run a retrospective on the **FEATURE** plan.
 ## Step 1: Read the plan
 
 Read both files:
-1. `pathly/plans/$ARGUMENTS/PROGRESS.md` — overall status, what was completed
-2. `pathly/plans/$ARGUMENTS/CONVERSATION_PROMPTS.md` — the prompts that were used
+1. `pathly/features/$ARGUMENTS/PROGRESS.md` — overall status, what was completed
+2. `pathly/features/$ARGUMENTS/CONVERSATION_PROMPTS.md` — the prompts that were used
 
-If the plan folder doesn't exist, list all `pathly/plans/*/` folders and ask which one the user meant.
+If the plan folder doesn't exist, list all `pathly/features/*/` folders and ask which one the user meant.
 If PROGRESS.md status is not COMPLETE, warn: "This plan is not marked COMPLETE — retro may be incomplete."
 
 ## Step 2: Ask 3 questions
@@ -67,7 +67,7 @@ Aggregate per agent:
 
 If any events have `cost_usd > 0`, build a cost table. Otherwise omit the Cost section.
 
-Write `pathly/plans/$ARGUMENTS/RETRO.md`:
+Write `pathly/features/$ARGUMENTS/RETRO.md`:
 
 ```markdown
 # [Feature Name] — Retrospective
@@ -213,7 +213,7 @@ Read its `summaries` carefully. Ask: what does the agent's own description of it
 - Start with an action word: Before / After / Always / Never / Check / Verify
 - Stay scoped to that stage only
 
-**Write `pathly/plans/$ARGUMENTS/INSTRUCTION_PATCHES.md`:**
+**Write `pathly/features/$ARGUMENTS/INSTRUCTION_PATCHES.md`:**
 
 ```markdown
 # Instruction Patches — $ARGUMENTS
@@ -252,13 +252,13 @@ This file accumulates patches across all features. It is the longitudinal signal
 ## Step 6: Report
 
 ```
-Retro written: pathly/plans/$ARGUMENTS/RETRO.md
+Retro written: pathly/features/$ARGUMENTS/RETRO.md
 Pipeline walkthrough written:
   pathly/pipeline-walkthrough/$ARGUMENTS/01-PIPELINE-FLOW.md
   pathly/pipeline-walkthrough/$ARGUMENTS/02-TOKEN-USAGE.md
   pathly/pipeline-walkthrough/$ARGUMENTS/03-ARTIFACT-MAP.md
 Lessons appended: LESSONS_CANDIDATE.md
-Instruction patches written: pathly/plans/$ARGUMENTS/INSTRUCTION_PATCHES.md
+Instruction patches written: pathly/features/$ARGUMENTS/INSTRUCTION_PATCHES.md
 Evolution log updated: pathly/INSTRUCTION_EVOLUTION.md
 
 To use in your next storm session:

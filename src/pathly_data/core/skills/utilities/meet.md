@@ -16,12 +16,12 @@ not update source code, and does not change workflow state on its own.
 ## Step 1: Detect context
 
 1. Infer `FEATURE` from `$ARGUMENTS` if provided.
-2. If `$ARGUMENTS` does not name a feature, scan `pathly/plans/` and use the most
+2. If `$ARGUMENTS` does not name a feature, scan `pathly/features/` and use the most
    recently modified active feature folder.
 3. Read these files when present:
-   - `pathly/plans/$FEATURE/PROGRESS.md`
-   - `pathly/plans/$FEATURE/feedback/`
-   - `pathly/plans/$FEATURE/STATE.json`
+   - `pathly/features/$FEATURE/PROGRESS.md`
+   - `pathly/features/$FEATURE/feedback/`
+   - `pathly/features/$FEATURE/STATE.json`
 4. Infer the current workflow state in plain language:
    - planning
    - building
@@ -222,7 +222,7 @@ Consultation rules for every role:
 
 Write the consultation note to two locations simultaneously:
 
-1. `pathly/plans/$FEATURE/consults/YYYYMMDD-HHMMSS-<role>.md` — live reference for planner/architect promotion
+1. `pathly/features/$FEATURE/consults/YYYYMMDD-HHMMSS-<role>.md` — live reference for planner/architect promotion
 2. `pathly/pipeline-walkthrough/$FEATURE/artifacts/YYYYMMDD-HHMMSS-<role>-consult.md` — permanent pipeline record
 
 Create `pathly/pipeline-walkthrough/$FEATURE/artifacts/` if it does not exist.
@@ -264,7 +264,7 @@ After writing the consult note, print:
 
 ```text
 Meet note written:
-  pathly/plans/<feature>/consults/<timestamp>-<role>.md
+  pathly/features/<feature>/consults/<timestamp>-<role>.md
   pipeline-walkthrough/<feature>/artifacts/<timestamp>-<role>-consult.md
 
 What do you want to do next?
@@ -315,9 +315,9 @@ Map the user's choice to a filename:
 | 3      | IMPL_QUESTIONS.md   | planner      |
 
 Read the consult note from the most recently written file in
-`pathly/plans/$FEATURE/consults/` for this feature (the file written in Step 4).
+`pathly/features/$FEATURE/consults/` for this feature (the file written in Step 4).
 
-Target file: `pathly/plans/$FEATURE/feedback/<chosen>.md`
+Target file: `pathly/features/$FEATURE/feedback/<chosen>.md`
 
 - If the target file **already exists**: append the following block to it:
   ```

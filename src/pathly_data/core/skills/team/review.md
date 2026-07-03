@@ -141,7 +141,7 @@ Delete <feature_path>/feedback/REVIEW_FAILURES.md when all fixed.
 
 **Guard — zero-diff stall check** (before re-spawning reviewer):
 ```bash
-git diff HEAD -- . ":(exclude)pathly/plans/"
+git diff HEAD -- . ":(exclude)pathly/features/"
 ```
 - If command fails: skip check, print `[FSM WARNING] git diff failed — skipping zero-diff check`.
 - If output is **empty** (no code changed):

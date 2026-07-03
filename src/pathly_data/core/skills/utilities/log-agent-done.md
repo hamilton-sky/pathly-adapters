@@ -12,7 +12,7 @@ from token counts using a built-in pricing table (Claude models only).
 
 `$ARGUMENTS` is a JSON object with these fields:
 - `agent` (required): agent name — `"builder"`, `"reviewer"`, `"tester"`, `"planner"`, `"designer"`, `"quick"`
-- `feature` (required): feature slug matching the pathly/plans/ folder name
+- `feature` (required): feature slug matching the pathly/features/ folder name
 - `conversation` (required): conversation number (integer); use 0 for non-build stages
 - `result` (required): `"DONE"` or `"PASS"`
 - `model` (optional): model ID used by the agent (e.g. `"claude-sonnet-4-6"`, `"gpt-4o"`, `"gemini-2.0-flash"`); used for cost computation; defaults to `"claude-sonnet-4-6"`
@@ -105,25 +105,25 @@ except Exception:
 if not _written:
     try:
         from pathly_orchestrator.eventlog import append_event as _ae
-        _ae('pathly/plans/<feature>', event)
+        _ae('pathly/features/<feature>', event)
         print('AGENT_DONE written to DB (fallback)')
     except Exception as _exc:
         # Last resort: write directly to EVENTS.jsonl
-        path = pathlib.Path('pathly/plans/<feature>/EVENTS.jsonl')
+        path = pathlib.Path('pathly/features/<feature>/EVENTS.jsonl')
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, 'a', encoding='utf-8') as _f:
             _f.write(json.dumps(event) + chr(10))
         print(f'AGENT_DONE written to EVENTS.jsonl (last resort: {_exc})')
 
 # AC2.5 dual-write: always append to EVENTS.jsonl as backup
-path = pathlib.Path('pathly/plans/<feature>/EVENTS.jsonl')
+path = pathlib.Path('pathly/features/<feature>/EVENTS.jsonl')
 path.parent.mkdir(parents=True, exist_ok=True)
 with open(path, 'a', encoding='utf-8') as _f:
     _f.write(json.dumps(event) + chr(10))
 "
 ```
 
-If the directory `pathly/plans/<feature>/` does not exist, stop with an error before running the above.
+If the directory `pathly/features/<feature>/` does not exist, stop with an error before running the above.
 
 ## Step 4 — POST telemetry to HTTP backend
 

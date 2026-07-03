@@ -112,7 +112,7 @@ Reads project state, classifies intent, chooses the lightest safe workflow.
       │
       ▼ (ask if empty)
   Read project state
-  pathly/plans/, PROGRESS.md, git status
+  pathly/features/, PROGRESS.md, git status
       │
       ▼
   Classify intent:
@@ -148,7 +148,7 @@ Cleanly suspends the active session without losing state.
 /pathly pause
       │
       ▼
-  Scan pathly/plans/ (skip .archive/)
+  Scan pathly/features/ (skip .archive/)
       │
   ┌───┴──────────────────┐
   ▼                      ▼
@@ -202,7 +202,7 @@ Ask one named role a bounded question without touching code or pipeline state.
       │
       ▼
   Write consult note:
-  pathly/plans/<feature>/consults/
+  pathly/features/<feature>/consults/
   YYYYMMDD-HHMMSS-<role>.md
       │
       ▼
@@ -230,7 +230,7 @@ Wraps up the session; offers retro.
 /pathly end
       │
       ▼
-  Scan pathly/plans/ for IN PROGRESS
+  Scan pathly/features/ for IN PROGRESS
       │
   ┌───┴──────────────────────┐
   ▼                          ▼
@@ -457,7 +457,7 @@ guide to next       to commit"
 
 ## 12. team — Full Feature Pipeline
 
-Thin orchestrator. Reads `pathly/plans/<feature>/STATE.json`, routes to the correct
+Thin orchestrator. Reads `pathly/features/<feature>/STATE.json`, routes to the correct
 sub-skill for the current FSM state, then re-reads state and routes again until DONE.
 Each sub-skill lives in `core/skills/team/` and handles exactly one stage.
 
@@ -513,8 +513,8 @@ Sub-skill responsibilities:
                       → writes STATE.json → DONE, routes back
 
 State is stored in two files per feature (filesystem-native, no Python required):
-  pathly/plans/<feature>/STATE.json    — current FSM state snapshot
-  pathly/plans/<feature>/EVENTS.jsonl  — append-only event log
+  pathly/features/<feature>/STATE.json    — current FSM state snapshot
+  pathly/features/<feature>/EVENTS.jsonl  — append-only event log
 ```
 
 ---
@@ -721,7 +721,7 @@ lessons
 
 ## 18. archive — Feature Archiver
 
-Moves a completed feature out of `pathly/plans/` after all gates pass.
+Moves a completed feature out of `pathly/features/` after all gates pass.
 
 ```
 archive <feature>
@@ -729,7 +729,7 @@ archive <feature>
       ▼
   Validate (all must pass):
   ┌──────────────────────────────┐
-  │ ✓ pathly/plans/<feature>/ exists   │
+  │ ✓ pathly/features/<feature>/ exists   │
   │ ✓ RETRO.md exists           │
   │ ✓ All conversations DONE    │
   │ ✓ No open feedback files    │
@@ -737,12 +737,12 @@ archive <feature>
   (any fails → stop + explain)
       │
       ▼
-  mv pathly/plans/<feature>/
-     → pathly/plans/.archive/<feature>/
+  mv pathly/features/<feature>/
+     → pathly/features/.archive/<feature>/
       │
       ▼
   "Archived. Recoverable: git checkout"
-  "pathly/plans/ is clean."
+  "pathly/features/ is clean."
 ```
 
 ---
@@ -841,7 +841,7 @@ po [feature]
       │
       ▼
   Detect feature context
-  (from args or active pathly/plans/)
+  (from args or active pathly/features/)
       │
       ▼
   Spawn po agent:
@@ -854,7 +854,7 @@ po [feature]
       │
       ▼
   Write PO_NOTES.md:
-  pathly/plans/<feature>/PO_NOTES.md
+  pathly/features/<feature>/PO_NOTES.md
       │
       ▼
   "Next: /pathly plan <feature>"
@@ -898,7 +898,7 @@ from `STATE.json` or accepts an explicit topic argument.
 fix [feature]
       │
       ▼
-  Resolve TOPIC (arg or auto-detect from pathly/plans/)
+  Resolve TOPIC (arg or auto-detect from pathly/features/)
       │
       ▼
   Read feedback/ for open files
@@ -1007,7 +1007,7 @@ design [feature]
     typography | interactions
       │
       ▼
-  Write pathly/plans/<feature>/DESIGN.md
+  Write pathly/features/<feature>/DESIGN.md
   "Next: /pathly build <feature>"
 ```
 
@@ -1037,7 +1037,7 @@ log-agent-done $ARGUMENTS   (JSON object)
       │
       ▼
   Append AGENT_DONE to EVENTS.jsonl:
-  pathly/plans/<feature>/EVENTS.jsonl
+  pathly/features/<feature>/EVENTS.jsonl
       │
       ▼
   POST to http://127.0.0.1:8765/record_activity
@@ -1106,17 +1106,17 @@ Invoked by the orchestrator on: `RETRO->DONE` (team), `VERIFYING->DONE` (debug),
   INPUT                SKILL          OUTPUT
   ─────────────────────────────────────────────────────
   idea / intent   ──►  storm     ──►  STORM_SEED.md
-  STORM_SEED.md   ──►  plan      ──►  pathly/plans/<feature>/
-  any PRD file    ──►  prd-import──►  pathly/plans/<feature>/
-  pathly/plans/<feature> ──►  build     ──►  code + PROGRESS.md
-  pathly/plans/<feature> ──►  team ──►  full pipeline
+  STORM_SEED.md   ──►  plan      ──►  pathly/features/<feature>/
+  any PRD file    ──►  prd-import──►  pathly/features/<feature>/
+  pathly/features/<feature> ──►  build     ──►  code + PROGRESS.md
+  pathly/features/<feature> ──►  team ──►  full pipeline
   git diff        ──►  review    ──►  violations report
   PROGRESS.md     ──►  retro     ──►  RETRO.md
   RETRO.md files  ──►  lessons   ──►  LESSONS.md
   LESSONS.md      ──►  plan      ──►  (injected silently)
-  RETRO.md + done ──►  archive   ──►  pathly/plans/.archive/
+  RETRO.md + done ──►  archive   ──►  pathly/features/.archive/
   question        ──►  explore   ──►  CONCLUSIONS.md
-  pathly/plans/<feature> ──►  test      ──►  test report + TEST_FAILURES.md
+  pathly/features/<feature> ──►  test      ──►  test report + TEST_FAILURES.md
   bug symptom     ──►  debug     ──►  fix + FIX.md
   any feature     ──►  verify-   ──►  health report
                        state
@@ -1150,7 +1150,7 @@ Invoked by the orchestrator on: `RETRO->DONE` (team), `VERIFYING->DONE` (debug),
 ## Feedback File Protocol
 
 All pipeline communication between agents happens through files in
-`pathly/plans/<feature>/feedback/`. A file present = issue open. Deleted = resolved.
+`pathly/features/<feature>/feedback/`. A file present = issue open. Deleted = resolved.
 
 ```
 Priority order (highest to lowest):

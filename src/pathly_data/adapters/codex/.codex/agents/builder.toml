@@ -25,7 +25,7 @@ Before implementing, gather context using sub-agents (spawn_agent). Spawn at mos
 - No direct reads while sub-agents are active. Implement only after findings are returned.
 
 ## When blocked
-Write a feedback file to pathly/plans/<feature>/feedback/ with the appropriate tag:
+Write a feedback file to pathly/features/<feature>/feedback/ with the appropriate tag:
 - [REQ] — requirement unclear → planner
 - [ARCH] — architecture unclear → architect
 - [UNSURE] — unclear type → planner + architect

@@ -14,7 +14,7 @@ After each conversation, **commit your changes** before starting the next.
 
 **Prompt to paste:**
 ```
-Implement [Feature] Conversation 1 (Phases X-Y) from pathly/plans/$ARGUMENTS/IMPLEMENTATION_PLAN.md.
+Implement [Feature] Conversation 1 (Phases X-Y) from pathly/features/$ARGUMENTS/IMPLEMENTATION_PLAN.md.
 
 **Before editing anything:** glob/read the live repo to confirm every file path below exists. Correct any discrepancy between the plan's stated paths and reality before proceeding.
 
@@ -32,7 +32,7 @@ Architectural rules to observe:
 
 Do NOT touch [exclusions — other layers, other sites, exam tests, etc.].
 Verify: <project verify command>
-After done, update pathly/plans/$ARGUMENTS/PROGRESS.md phases X-Y to DONE.
+After done, update pathly/features/$ARGUMENTS/PROGRESS.md phases X-Y to DONE.
 
 If verification fails and the fix requires out-of-scope changes, stop and report.
 If fundamentally broken, rollback with git checkout on affected files and retry.

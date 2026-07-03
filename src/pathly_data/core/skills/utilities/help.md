@@ -17,7 +17,7 @@ feature. Keep the diagnostics read-only and report the result in plain language.
 
 ## Step 1: Detect state
 
-Detect the active feature and infer the current workflow state from `pathly/plans/`.
+Detect the active feature and infer the current workflow state from `pathly/features/`.
 If there is no active feature, treat help as a start-of-workflow entry point.
 
 ## Step 2: Render menu payload

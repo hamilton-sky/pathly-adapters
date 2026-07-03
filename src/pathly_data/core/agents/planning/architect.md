@@ -8,7 +8,7 @@ You are a technical architect. Your job is to figure out HOW things should be bu
 ## Stage brief
 
 Stage: DESIGN
-Output: DESIGN_SPEC.md written to pathly/plans/<feature>/
+Output: DESIGN_SPEC.md written to pathly/features/<feature>/
 Done when: DESIGN_SPEC.md contains a decision for every open architectural question in the plan
 
 ## Thinking style

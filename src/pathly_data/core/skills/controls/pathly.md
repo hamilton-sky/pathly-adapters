@@ -110,7 +110,7 @@ and follow its procedure from Step 0.
 
 **Step 1 — Find in-progress feature**
 
-Scan `pathly/plans/` (skip `.archive/`). For each feature folder, read `PROGRESS.md`.
+Scan `pathly/features/` (skip `.archive/`). For each feature folder, read `PROGRESS.md`.
 Look for `status: IN PROGRESS` or `Status: IN PROGRESS`.
 
 **Step 2 — If a feature is in progress**
@@ -143,7 +143,7 @@ Nothing in progress. All done.
 
 ## Behavior: pause
 
-Scan `pathly/plans/` for a feature whose `PROGRESS.md` contains `status: IN PROGRESS`.
+Scan `pathly/features/` for a feature whose `PROGRESS.md` contains `status: IN PROGRESS`.
 If found, write `status: PAUSED` to that feature's `PROGRESS.md`.
 
 Print:
@@ -156,9 +156,9 @@ Session paused. Resume with /pathly go when ready.
 
 ## Behavior: meet
 
-Scan `pathly/plans/*/STATE.json` sorted by modification time (most recent first).
+Scan `pathly/features/*/STATE.json` sorted by modification time (most recent first).
 Pick the active feature and run the meet workflow: consult one relevant role,
-write a read-only consult note to `pathly/plans/<feature>/feedback/CONSULT_<role>.md`.
+write a read-only consult note to `pathly/features/<feature>/feedback/CONSULT_<role>.md`.
 
 ---
 
@@ -166,15 +166,15 @@ write a read-only consult note to `pathly/plans/<feature>/feedback/CONSULT_<role
 
 **Step 1 — Detect state**
 
-1. If `args` is provided, use it as `FEATURE`. Otherwise scan `pathly/plans/` for the
+1. If `args` is provided, use it as `FEATURE`. Otherwise scan `pathly/features/` for the
    most recently modified feature folder.
-2. Read `pathly/plans/$FEATURE/PROGRESS.md` if it exists.
-3. Check `pathly/plans/$FEATURE/feedback/` for open files.
+2. Read `pathly/features/$FEATURE/PROGRESS.md` if it exists.
+3. Check `pathly/features/$FEATURE/feedback/` for open files.
 4. Infer rigor: **lite** (4 required files only), **standard** (all 8 files),
    **strict** (8 files + audit markers), **unknown** (no plan folder).
 5. Classify state:
-   - **no-feature** — no pathly/plans/ folder or no feature found
-   - **storm-done** — `pathly/plans/STORM_SEED.md` exists, no plans folder yet
+   - **no-feature** — no pathly/features/ folder or no feature found
+   - **storm-done** — `pathly/features/STORM_SEED.md` exists, no plans folder yet
    - **plan-done** — plans folder exists, conversations TODO, no open feedback
    - **feedback-open** — feedback file(s) present
    - **build-done** — all conversations DONE, no RETRO.md yet

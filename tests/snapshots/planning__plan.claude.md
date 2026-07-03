@@ -10,9 +10,9 @@ for rendering those routes in their host-native form.
 
 ## Skill Contract
 
-**Consumes (optional):** `pathly/plans/STORM_SEED.md` - pre-filled answers for the interview
-**Produces:** `pathly/plans/$FEATURE/` - FEATURE_INDEX.md + 4 files in lite, FEATURE_INDEX.md + 8 files in standard/strict
-**Consumed by:** `build` skill reads `pathly/plans/$FEATURE/FEATURE_INDEX.md` first, then `CONVERSATION_PROMPTS.md` and `PROGRESS.md`
+**Consumes (optional):** `pathly/features/STORM_SEED.md` - pre-filled answers for the interview
+**Produces:** `pathly/features/$FEATURE/` - FEATURE_INDEX.md + 4 files in lite, FEATURE_INDEX.md + 8 files in standard/strict
+**Consumed by:** `build` skill reads `pathly/features/$FEATURE/FEATURE_INDEX.md` first, then `CONVERSATION_PROMPTS.md` and `PROGRESS.md`
 
 ## Step 0: Parse Arguments
 
@@ -25,7 +25,7 @@ Parse `$ARGUMENTS`:
 
 Use `FEATURE` for the folder name, not the full `$ARGUMENTS` string.
 
-If `pathly/plans/$FEATURE/` already exists, treat this as a rigor change or plan completion task:
+If `pathly/features/$FEATURE/` already exists, treat this as a rigor change or plan completion task:
 - `lite -> standard`: keep existing files and add missing standard files.
 - `standard -> strict`: keep existing files and add strict risk, rollback, approval, and verification mapping.
 - `strict -> standard` or `standard -> lite`: do not delete files; report that downgrades change future gates only.
@@ -40,7 +40,7 @@ If two lessons conflict, prefer the one with more sources listed.
 
 ## Step 2: Understand The Feature
 
-Check if `pathly/plans/STORM_SEED.md` exists.
+Check if `pathly/features/STORM_SEED.md` exists.
 
 If it exists: read it, pre-fill interview answers, confirm with user, then delete the seed file.
 
@@ -101,7 +101,7 @@ All template reads below use `$TEMPLATE_BASE/<FILE>.template.md`.
 
 ## Step 4: Create The Plans Folder
 
-Create `pathly/plans/$FEATURE/` if it does not exist. If it exists, add or update only the files/sections needed for the selected rigor.
+Create `pathly/features/$FEATURE/` if it does not exist. If it exists, add or update only the files/sections needed for the selected rigor.
 
 ### Rigor File Sets
 
@@ -135,7 +135,7 @@ Strict produces the same 8 files plus stronger audit expectations:
 - Keep all assumptions and unresolved questions visible.
 - Do not mark ambiguous requirements as implementation-ready.
 
-Conversation cap rule: max 4 conversations per folder. If more are needed, split into `pathly/plans/$FEATURE-part-1/` and `pathly/plans/$FEATURE-part-2/`.
+Conversation cap rule: max 4 conversations per folder. If more are needed, split into `pathly/features/$FEATURE-part-1/` and `pathly/features/$FEATURE-part-2/`.
 
 ### 4a. FEATURE_INDEX.md ← write this first
 
@@ -187,7 +187,7 @@ Read `{{TEMPLATES_DIR}}/plan/CONVERSATION_PROMPTS.template.md` for the exact fil
 
 Each prompt must be self-contained. Start every prompt with:
 ```
-Read pathly/plans/$FEATURE/FEATURE_INDEX.md first to orient yourself and verify codebase paths.
+Read pathly/features/$FEATURE/FEATURE_INDEX.md first to orient yourself and verify codebase paths.
 ```
 Do not re-list all codebase files in the prompt — they live in FEATURE_INDEX.md.
 
@@ -260,9 +260,9 @@ Keep decomposition small enough for builder reliability:
 
 ## Step 5: Verify Structure
 
-- `FEATURE_INDEX.md` exists in `pathly/plans/$FEATURE/` for all rigor levels.
-- If `rigor = lite`, all 5 required files exist in `pathly/plans/$FEATURE/`.
-- If `rigor = standard` or `strict`, all 9 files exist in `pathly/plans/$FEATURE/`.
+- `FEATURE_INDEX.md` exists in `pathly/features/$FEATURE/` for all rigor levels.
+- If `rigor = lite`, all 5 required files exist in `pathly/features/$FEATURE/`.
+- If `rigor = standard` or `strict`, all 9 files exist in `pathly/features/$FEATURE/`.
 - `CONVERSATION_PROMPTS.md` has no more than 4 conversations.
 - Conversation prompts reference correct phase numbers.
 - `PROGRESS.md` conversation table matches `CONVERSATION_PROMPTS.md`.
@@ -343,7 +343,7 @@ curl -s -X POST http://127.0.0.1:8765/comms/post \
     "text": "Advisory artifact: edge cases for $FEATURE",
     "board": "feature",
     "scope": "$FEATURE",
-    "artifact_path": "pathly/plans/$FEATURE/EDGE_CASES.md",
+    "artifact_path": "pathly/features/$FEATURE/EDGE_CASES.md",
     "artifact_type": "plan_artifact"
   }'
 
@@ -357,7 +357,7 @@ curl -s -X POST http://127.0.0.1:8765/comms/post \
     "text": "Advisory artifact: happy flow for $FEATURE",
     "board": "feature",
     "scope": "$FEATURE",
-    "artifact_path": "pathly/plans/$FEATURE/HAPPY_FLOW.md",
+    "artifact_path": "pathly/features/$FEATURE/HAPPY_FLOW.md",
     "artifact_type": "plan_artifact"
   }'
 
@@ -371,7 +371,7 @@ curl -s -X POST http://127.0.0.1:8765/comms/post \
     "text": "Advisory artifact: architecture proposal for $FEATURE",
     "board": "feature",
     "scope": "$FEATURE",
-    "artifact_path": "pathly/plans/$FEATURE/ARCHITECTURE_PROPOSAL.md",
+    "artifact_path": "pathly/features/$FEATURE/ARCHITECTURE_PROPOSAL.md",
     "artifact_type": "plan_artifact"
   }'
 ```
@@ -397,7 +397,7 @@ The `context_refs` and `depends_on` derivation rules are unchanged:
 ## Step 7: Report
 
 ```text
-## Plans folder created: pathly/plans/$FEATURE/
+## Plans folder created: pathly/features/$FEATURE/
 
 Rigor: [lite / standard / strict]
 
@@ -452,7 +452,7 @@ pathly-fsm-call record-phase \
   --project-root "<project_root>"
 ```
 
-- `<feature>` — the feature slug (folder name under `pathly/plans/`)
+- `<feature>` — the feature slug (folder name under `pathly/features/`)
 - `<agent>` — the current agent role (`builder`, `reviewer`, `tester`, `designer`, etc.)
 - `<phase>` — one of `analyze`, `scout`, `implement`, `review`, `test`, `plan`, `design`, `storm`
 
@@ -597,17 +597,17 @@ except Exception:
 if not _written:
     try:
         from pathly_orchestrator.eventlog import append_event as _ae
-        _ae('pathly/plans/<feature>', event)
+        _ae('<feature_path>', event)
         print('AGENT_DONE written to DB (fallback)')
     except Exception as _exc:
-        path = pathlib.Path('pathly/plans/<feature>/EVENTS.jsonl')
+        path = pathlib.Path('<feature_path>/EVENTS.jsonl')
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, 'a', encoding='utf-8') as _f:
             _f.write(json.dumps(event) + chr(10))
         print(f'AGENT_DONE written to EVENTS.jsonl (last resort: {_exc})')
 
 # Always dual-write to EVENTS.jsonl as backup
-path = pathlib.Path('pathly/plans/<feature>/EVENTS.jsonl')
+path = pathlib.Path('<feature_path>/EVENTS.jsonl')
 path.parent.mkdir(parents=True, exist_ok=True)
 with open(path, 'a', encoding='utf-8') as _f:
     _f.write(json.dumps(event) + chr(10))

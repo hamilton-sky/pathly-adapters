@@ -14,7 +14,7 @@ Pause the current session cleanly without losing state.
 
 ## Step 1 — Find in-progress feature
 
-Scan `pathly/plans/` (skip `.archive/`). For each feature folder, read `PROGRESS.md` if present.
+Scan `pathly/features/` (skip `.archive/`). For each feature folder, read `PROGRESS.md` if present.
 Look for a feature whose `PROGRESS.md` contains `status: IN PROGRESS` or `Status: IN PROGRESS`.
 
 ## Step 2 — If a feature is in progress

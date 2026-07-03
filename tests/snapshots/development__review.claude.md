@@ -56,7 +56,7 @@ Run the appropriate git diff command based on `$ARGUMENTS`.
 ## Step 2 — Load project rules
 
 Read (if present):
-1. The `ARCHITECTURE_PROPOSAL.md` in the `pathly/plans/*/` folder that most closely matches the changed files — defines the intended architecture for in-progress work
+1. The `ARCHITECTURE_PROPOSAL.md` in the `pathly/features/*/` folder that most closely matches the changed files — defines the intended architecture for in-progress work
 2. Project rule files — project-wide architectural contracts
 
 If neither exists, review against general software engineering good practices and note the absence.
@@ -108,7 +108,7 @@ If violations found: list each one. Do NOT auto-fix. Report only.
 
 **On PASS:**
 
-1. Update `pathly/plans/<feature>/PROGRESS.md` — in the Conversation Breakdown table, find the row for conversation `<N>` and change its Status cell from `TODO` to `DONE`.
+1. Update `pathly/features/<feature>/PROGRESS.md` — in the Conversation Breakdown table, find the row for conversation `<N>` and change its Status cell from `TODO` to `DONE`.
 2. Check PROGRESS.md: if all conversation rows are now `DONE`, next state = `"TESTING"`; otherwise next state = `"BUILDING"`.
 3. Report completion to the FSM:
    ```bash
@@ -122,7 +122,7 @@ If violations found: list each one. Do NOT auto-fix. Report only.
 
 **On FAIL:**
 
-1. Write violations to `pathly/plans/<feature>/feedback/REVIEW_FAILURES.md`.
+1. Write violations to `pathly/features/<feature>/feedback/REVIEW_FAILURES.md`.
 2. Report completion to the FSM:
    ```bash
    pathly-fsm-call complete-stage --flow team --topic <feature> --project-root <project_root>
@@ -154,7 +154,7 @@ pathly-fsm-call record-phase \
   --project-root "<project_root>"
 ```
 
-- `<feature>` — the feature slug (folder name under `pathly/plans/`)
+- `<feature>` — the feature slug (folder name under `pathly/features/`)
 - `<agent>` — the current agent role (`builder`, `reviewer`, `tester`, `designer`, etc.)
 - `<phase>` — one of `analyze`, `scout`, `implement`, `review`, `test`, `plan`, `design`, `storm`
 

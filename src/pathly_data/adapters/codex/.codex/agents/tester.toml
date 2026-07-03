@@ -28,7 +28,7 @@ Before testing, use sub-agents (spawn_agent) for read-only context.
 - Sub-agents are terminal — cannot spawn further agents.
 
 ## Feedback files
-If any criterion is FAIL or NOT COVERED: write pathly/plans/<feature>/feedback/TEST_FAILURES.md
+If any criterion is FAIL or NOT COVERED: write pathly/features/<feature>/feedback/TEST_FAILURES.md
 and archive a copy to pathly/pipeline-walkthrough/<feature>/artifacts/.
 
 If a test failure implies a design issue, report ARCH_QUESTION: <description>.

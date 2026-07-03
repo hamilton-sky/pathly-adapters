@@ -43,7 +43,7 @@ Before entering the FSM loop:
 6. **Guard 5 — Pre-BUILDING prerequisite check.** Before entering BUILDING state for the
    first time (not a retry): verify `<storage_path>/IMPLEMENTATION_PLAN.md` exists.
    If it does not exist and `entryStage` was not explicitly set to `build`:
-   write `pathly/plans/{topic}/feedback/HUMAN_QUESTIONS.md`:
+   write `pathly/features/{topic}/feedback/HUMAN_QUESTIONS.md`:
    ```
    No implementation plan found. The planner has not run yet.
    Re-run: /pathly-team {topic} plan

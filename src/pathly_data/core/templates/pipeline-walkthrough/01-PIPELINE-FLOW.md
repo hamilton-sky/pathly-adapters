@@ -20,10 +20,10 @@ User intent: "{{USER_INTENT}}"
 │  [Stage 1 — Planning]
 ├─► Planner agent
 │   Produces:
-│     pathly/plans/{{FEATURE}}/USER_STORIES.md
-│     pathly/plans/{{FEATURE}}/IMPLEMENTATION_PLAN.md
-│     pathly/plans/{{FEATURE}}/CONVERSATION_PROMPTS.md
-│     pathly/plans/{{FEATURE}}/PROGRESS.md
+│     pathly/features/{{FEATURE}}/USER_STORIES.md
+│     pathly/features/{{FEATURE}}/IMPLEMENTATION_PLAN.md
+│     pathly/features/{{FEATURE}}/CONVERSATION_PROMPTS.md
+│     pathly/features/{{FEATURE}}/PROGRESS.md
 │
 {{ARCHITECT_CONSULT_TRACE}}
 │  [Stage 2–3 — Build + Review]
@@ -35,7 +35,7 @@ User intent: "{{USER_INTENT}}"
 │
 │  [Stage 5 — Retro]
 └─► Retro agent
-    Writes: pathly/plans/{{FEATURE}}/RETRO.md
+    Writes: pathly/features/{{FEATURE}}/RETRO.md
             pipeline-walkthrough/{{FEATURE}}/  ← this folder
 ```
 

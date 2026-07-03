@@ -53,7 +53,7 @@ Files in the live repo that this feature reads or modifies.
 
 ## Feedback files (transient — deleted after resolution)
 
-Live in `pathly/plans/[feature]/feedback/`. A file existing = issue open.
+Live in `pathly/features/[feature]/feedback/`. A file existing = issue open.
 
 | File | Written by | Resolved by |
 |---|---|---|

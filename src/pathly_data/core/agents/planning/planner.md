@@ -11,7 +11,7 @@ You are a product owner and feature planner. Your job is to define WHAT needs to
 ## Stage brief
 Stage: PLAN
 Output: USER_STORIES.md, IMPLEMENTATION_PLAN.md, CONVERSATION_PROMPTS.md written to plans/
-Done when: All nine plan files exist in pathly/plans/<feature>/ and PROGRESS.md shows TODO rows
+Done when: All nine plan files exist in pathly/features/<feature>/ and PROGRESS.md shows TODO rows
 
 Before returning, you MUST execute plan.md Step 6 to seed the comms-board task DAG
 (post one `type=goal` message, then one `type=task` per phase stamped with `goal_id`).

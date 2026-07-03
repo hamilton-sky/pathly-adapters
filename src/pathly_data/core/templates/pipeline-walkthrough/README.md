@@ -21,11 +21,11 @@ It documents every agent spawn, feedback loop, token cost, and artifact produced
 
 | Artifact | Stage | Role |
 |---|---|---|
-| [pathly/plans/{{FEATURE}}/USER_STORIES.md](../../pathly/plans/{{FEATURE}}/USER_STORIES.md) | Planning | Acceptance criteria |
-| [pathly/plans/{{FEATURE}}/IMPLEMENTATION_PLAN.md](../../pathly/plans/{{FEATURE}}/IMPLEMENTATION_PLAN.md) | Planning | Exact code changes |
-| [pathly/plans/{{FEATURE}}/CONVERSATION_PROMPTS.md](../../pathly/plans/{{FEATURE}}/CONVERSATION_PROMPTS.md) | Planning | Verbatim builder prompts |
-| [pathly/plans/{{FEATURE}}/PROGRESS.md](../../pathly/plans/{{FEATURE}}/PROGRESS.md) | Pipeline | Conversation status |
-| [pathly/plans/{{FEATURE}}/RETRO.md](../../pathly/plans/{{FEATURE}}/RETRO.md) | Retro | Human retrospective |
+| [pathly/features/{{FEATURE}}/USER_STORIES.md](../../pathly/features/{{FEATURE}}/USER_STORIES.md) | Planning | Acceptance criteria |
+| [pathly/features/{{FEATURE}}/IMPLEMENTATION_PLAN.md](../../pathly/features/{{FEATURE}}/IMPLEMENTATION_PLAN.md) | Planning | Exact code changes |
+| [pathly/features/{{FEATURE}}/CONVERSATION_PROMPTS.md](../../pathly/features/{{FEATURE}}/CONVERSATION_PROMPTS.md) | Planning | Verbatim builder prompts |
+| [pathly/features/{{FEATURE}}/PROGRESS.md](../../pathly/features/{{FEATURE}}/PROGRESS.md) | Pipeline | Conversation status |
+| [pathly/features/{{FEATURE}}/RETRO.md](../../pathly/features/{{FEATURE}}/RETRO.md) | Retro | Human retrospective |
 | [lessons/LESSONS.md](../../lessons/LESSONS.md) | Lessons | Promoted patterns for next planner |
 
 ---

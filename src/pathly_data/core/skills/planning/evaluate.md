@@ -46,7 +46,7 @@ When in doubt between `RESEARCH` and `BOTH`, choose `BOTH`.
 
 ## Step 3 — Write and post the analysis artifact
 
-Write the analysis to `pathly/plans/<feature>/artifacts/BOARD_EVAL.md`:
+Write the analysis to `pathly/features/<feature>/artifacts/BOARD_EVAL.md`:
 
 ```markdown
 # Board Evaluation
@@ -146,7 +146,7 @@ After all posts succeed (or are skipped), output:
 ## Evaluation complete
 
 Classification: <CODE | RESEARCH | BOTH>
-Analysis artifact: pathly/plans/<feature>/artifacts/BOARD_EVAL.md
+Analysis artifact: pathly/features/<feature>/artifacts/BOARD_EVAL.md
 Goal posted: <goal text> (id: <$GOAL_ID>)
 Tasks posted: <N>
 
@@ -159,6 +159,6 @@ Tasks posted: <N>
 ## Constraints
 
 - Never execute the proposed tasks yourself. Propose only.
-- Write only to `pathly/plans/<feature>/artifacts/`. Do not touch plan files or state files.
+- Write only to `pathly/features/<feature>/artifacts/`. Do not touch plan files or state files.
 - One analysis artifact per run — overwrite BOARD_EVAL.md, never append.
 - One post per finding. Do not batch multiple findings into a single board message.

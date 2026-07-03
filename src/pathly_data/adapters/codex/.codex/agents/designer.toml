@@ -32,7 +32,7 @@ Always run --design-system before doing component or page work.
 - Does not define data models or API contracts (architect/planner own those).
 - Does not run tests (tester owns that).
 - May read source files to check CSS/style implementations.
-- May write only DESIGN.md, DESIGN_REVIEW.md, and files under pathly/plans/.
+- May write only DESIGN.md, DESIGN_REVIEW.md, and files under pathly/features/.
 
 ## Failure behavior
 - If pathly-design fails: note the error, provide best-effort design guidance, continue.

@@ -15,9 +15,9 @@ curl -s -X POST http://127.0.0.1:8765/record_phase \
 ```
 
 **Read existing plan artifacts (if present):**
-- Read `pathly/plans/<feature>/USER_STORIES.md` — extract acceptance criteria that constrain the design
-- Read `pathly/plans/<feature>/IMPLEMENTATION_PLAN.md` — note any architecture decisions that affect UI shape
-- Glob `pathly/plans/<feature>/DESIGN*.md` — identify any prior design artifacts to avoid duplicating work
+- Read `pathly/features/<feature>/USER_STORIES.md` — extract acceptance criteria that constrain the design
+- Read `pathly/features/<feature>/IMPLEMENTATION_PLAN.md` — note any architecture decisions that affect UI shape
+- Glob `pathly/features/<feature>/DESIGN*.md` — identify any prior design artifacts to avoid duplicating work
 
 **Summarize design constraints** in 3–5 bullet points covering:
 - Target user / use case from the stories
@@ -40,14 +40,14 @@ curl -s -X POST http://127.0.0.1:8765/record_phase \
 ## Step 1 — Resolve Feature & Stack
 
 **Find active feature:**
-1. List folders in `pathly/plans/` (skip `.archive/`)
+1. List folders in `pathly/features/` (skip `.archive/`)
 2. Read `PROGRESS.md` in each — find `status: IN PROGRESS` or `Status: IN PROGRESS`
 3. If none found and `$ARGUMENTS` names a feature, use that
 4. If still none found, ask: `Which feature are we designing for?`
 
 **Extract description:**
-- Read `pathly/plans/<feature>/USER_STORIES.md` if present — extract the one-line goal
-- Else read `pathly/plans/<feature>/IMPLEMENTATION_PLAN.md` first paragraph
+- Read `pathly/features/<feature>/USER_STORIES.md` if present — extract the one-line goal
+- Else read `pathly/features/<feature>/IMPLEMENTATION_PLAN.md` first paragraph
 - Else use the feature folder name, humanized (kebab → spaces)
 
 **Detect tech stack:**
@@ -95,7 +95,7 @@ Capture the full output.
 
 ## Step 3 — Write DESIGN.md
 
-Write `pathly/plans/<feature>/DESIGN.md` with this structure:
+Write `pathly/features/<feature>/DESIGN.md` with this structure:
 
 ```markdown
 # Design System — <feature>
@@ -123,7 +123,7 @@ Design step complete.
 
   Feature : <feature>
   Stack   : <stack>
-  Output  : pathly/plans/<feature>/DESIGN.md
+  Output  : pathly/features/<feature>/DESIGN.md
 
 Next step: /pathly build
 ```

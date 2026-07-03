@@ -10,7 +10,7 @@ instructions locally (Case A) or emits a handoff packet for a different adapter
 ## Arguments
 
 `$ARGUMENTS` is a JSON object:
-- `feature` (required): feature slug matching the `pathly/plans/` folder, e.g. `"my-feature"`
+- `feature` (required): feature slug matching the `pathly/features/` folder, e.g. `"my-feature"`
 - `current_adapter` (required): adapter this skill is running in — `"claude"`, `"codex"`, or `"copilot"`
 - `flow` (optional): flow name (default: `"team"`)
 - `project_root` (optional): absolute path to the project directory (default: cwd)

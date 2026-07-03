@@ -142,7 +142,7 @@ pathly-fsm-call record-phase \
   --project-root "<project_root>"
 ```
 
-- `<feature>` — the feature slug (folder name under `pathly/plans/`)
+- `<feature>` — the feature slug (folder name under `pathly/features/`)
 - `<agent>` — the current agent role (`builder`, `reviewer`, `tester`, `designer`, etc.)
 - `<phase>` — one of `analyze`, `scout`, `implement`, `review`, `test`, `plan`, `design`, `storm`
 
@@ -253,17 +253,17 @@ except Exception:
 if not _written:
     try:
         from pathly_orchestrator.eventlog import append_event as _ae
-        _ae('pathly/plans/<feature>', event)
+        _ae('<feature_path>', event)
         print('AGENT_DONE written to DB (fallback)')
     except Exception as _exc:
-        path = pathlib.Path('pathly/plans/<feature>/EVENTS.jsonl')
+        path = pathlib.Path('<feature_path>/EVENTS.jsonl')
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, 'a', encoding='utf-8') as _f:
             _f.write(json.dumps(event) + chr(10))
         print(f'AGENT_DONE written to EVENTS.jsonl (last resort: {_exc})')
 
 # Always dual-write to EVENTS.jsonl as backup
-path = pathlib.Path('pathly/plans/<feature>/EVENTS.jsonl')
+path = pathlib.Path('<feature_path>/EVENTS.jsonl')
 path.parent.mkdir(parents=True, exist_ok=True)
 with open(path, 'a', encoding='utf-8') as _f:
     _f.write(json.dumps(event) + chr(10))

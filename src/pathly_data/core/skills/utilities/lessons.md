@@ -10,7 +10,7 @@ for rendering those routes in their host-native form.
 
 ## Skill Contract
 
-**Consumes:** `LESSONS_CANDIDATE.md` + `pathly/plans/.archive/*/RETRO.md` (up to last 6)
+**Consumes:** `LESSONS_CANDIDATE.md` + `pathly/features/.archive/*/RETRO.md` (up to last 6)
 **Produces:** `LESSONS.md` (active lessons, planner reads this)
 **When to run:** After any `retro` workflow, or manually when you want to update active lessons.
 
@@ -20,7 +20,7 @@ for rendering those routes in their host-native form.
 
 Read in order:
 1. `LESSONS_CANDIDATE.md` — all candidate lessons (may not exist yet)
-2. Up to 6 most recent `pathly/plans/.archive/*/RETRO.md` files — scan the "What to Improve Next Time" sections
+2. Up to 6 most recent `pathly/features/.archive/*/RETRO.md` files — scan the "What to Improve Next Time" sections
 
 If neither exists, report: "No lessons found. Run retro on completed features first." and stop.
 

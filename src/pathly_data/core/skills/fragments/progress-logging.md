@@ -22,7 +22,7 @@ pathly-fsm-call record-phase \
   --project-root "<project_root>"
 ```
 
-- `<feature>` — the feature slug (folder name under `pathly/plans/`)
+- `<feature>` — the feature slug (folder name under `pathly/features/`)
 - `<agent>` — the current agent role (`builder`, `reviewer`, `tester`, `designer`, etc.)
 - `<phase>` — one of `analyze`, `scout`, `implement`, `review`, `test`, `plan`, `design`, `storm`
 

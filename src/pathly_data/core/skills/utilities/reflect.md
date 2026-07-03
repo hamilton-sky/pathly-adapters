@@ -13,7 +13,7 @@ Host-neutral Pathly route names. Adapters render these in their host-native form
 ## Skill Contract
 
 **Consumes:** latest AGENT_DONE event for the active feature + corresponding stage artifacts
-**Produces:** `pathly/plans/<FEATURE>/feedback/REFLECT_CRITIQUE.md` (issues found) — absent means PASS
+**Produces:** `pathly/features/<FEATURE>/feedback/REFLECT_CRITIQUE.md` (issues found) — absent means PASS
 **Side effect:** if verdict is PASS and REFLECT_CRITIQUE.md already exists, deletes it (issue resolved)
 
 ## Arguments
@@ -28,13 +28,13 @@ Example: `reflect my-feature build`, `reflect`, `reflect --clear`
 ## Step 1: Resolve feature and target stage
 
 **Feature detection:** parse `$ARGUMENTS` for a non-keyword word, else auto-detect:
-1. Read `pathly/plans/*/STATE.json` sorted by modification time (newest first).
+1. Read `pathly/features/*/STATE.json` sorted by modification time (newest first).
    Use the most recent feature whose state is not `IDLE` or `DONE`.
-2. If none found, use the most recently modified `pathly/plans/*/` folder.
-3. If no `pathly/plans/` folder exists: stop →
+2. If none found, use the most recently modified `pathly/features/*/` folder.
+3. If no `pathly/features/` folder exists: stop →
    `reflect: no active feature found. Start with /pathly go first.`
 
-**`--clear` flag:** if present, delete `pathly/plans/<FEATURE>/feedback/REFLECT_CRITIQUE.md`
+**`--clear` flag:** if present, delete `pathly/features/<FEATURE>/feedback/REFLECT_CRITIQUE.md`
 if it exists, print `reflect: cleared REFLECT_CRITIQUE.md for <FEATURE>.` and stop.
 
 **Stage detection:**
@@ -70,12 +70,12 @@ Read the relevant output files for the target agent:
 
 | Agent | Artifacts to read |
 |---|---|
-| `planner` | `pathly/plans/<FEATURE>/USER_STORIES.md`, `pathly/plans/<FEATURE>/IMPLEMENTATION_PLAN.md` |
-| `architect` | `pathly/plans/<FEATURE>/ARCHITECTURE_PROPOSAL.md` |
-| `designer` | `pathly/plans/<FEATURE>/DESIGN_SYSTEM.md` (if exists) |
+| `planner` | `pathly/features/<FEATURE>/USER_STORIES.md`, `pathly/features/<FEATURE>/IMPLEMENTATION_PLAN.md` |
+| `architect` | `pathly/features/<FEATURE>/ARCHITECTURE_PROPOSAL.md` |
+| `designer` | `pathly/features/<FEATURE>/DESIGN_SYSTEM.md` (if exists) |
 | `builder` | `git diff HEAD~1 HEAD --stat` + diff of up to 3 most-changed files |
-| `reviewer` | `pathly/plans/<FEATURE>/feedback/REVIEW_FAILURES.md` (if exists), else empty |
-| `tester` | `pathly/plans/<FEATURE>/feedback/TEST_FAILURES.md` (if exists), else empty |
+| `reviewer` | `pathly/features/<FEATURE>/feedback/REVIEW_FAILURES.md` (if exists), else empty |
+| `tester` | `pathly/features/<FEATURE>/feedback/TEST_FAILURES.md` (if exists), else empty |
 
 If the primary artifact file does not exist, note "artifact not found" for that slot and continue.
 
@@ -124,7 +124,7 @@ Stage contract sentences:
 Parse the reviewer's output for the `VERDICT:` line.
 
 **On VERDICT: PASS:**
-- If `pathly/plans/<FEATURE>/feedback/REFLECT_CRITIQUE.md` exists, delete it.
+- If `pathly/features/<FEATURE>/feedback/REFLECT_CRITIQUE.md` exists, delete it.
 - Print:
   ```
   reflect: PASS — <agent> output looks good. No issues found.
@@ -132,7 +132,7 @@ Parse the reviewer's output for the `VERDICT:` line.
 - Stop.
 
 **On VERDICT: CRITIQUE:**
-Write `pathly/plans/<FEATURE>/feedback/REFLECT_CRITIQUE.md`:
+Write `pathly/features/<FEATURE>/feedback/REFLECT_CRITIQUE.md`:
 
 ```markdown
 # Reflect Critique — <agent>
@@ -156,7 +156,7 @@ Stage: <agent> | Feature: <FEATURE> | Timestamp: <iso-timestamp>
 Print:
 ```
 reflect: CRITIQUE — issues found in <agent> output.
-Written: pathly/plans/<FEATURE>/feedback/REFLECT_CRITIQUE.md
+Written: pathly/features/<FEATURE>/feedback/REFLECT_CRITIQUE.md
 
 The FSM feedback guard will route this before the pipeline advances.
 Run `pathly reflect --clear` to dismiss once resolved manually.

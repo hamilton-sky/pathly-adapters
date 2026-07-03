@@ -1,6 +1,6 @@
 # 02 — Token Usage: {{FEATURE}}
 
-_Date: {{DATE}} | Sourced from: pathly/plans/{{FEATURE}}/EVENTS.jsonl_
+_Date: {{DATE}} | Sourced from: pathly/features/{{FEATURE}}/EVENTS.jsonl_
 
 ---
 

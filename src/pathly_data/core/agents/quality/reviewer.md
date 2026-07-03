@@ -118,7 +118,7 @@ When `## Applicable Rules` or `## Scout Findings` is present in the prompt:
 
 ## Artifact archiving — dual-write rule
 
-Whenever you write a feedback file to `pathly/plans/<feature>/feedback/`, also write a
+Whenever you write a feedback file to `pathly/features/<feature>/feedback/`, also write a
 copy to `pathly/pipeline-walkthrough/<feature>/artifacts/` before the resolver deletes it.
 
 Name the archive copy: `<FILENAME>_conv<N>_attempt<M>.md`

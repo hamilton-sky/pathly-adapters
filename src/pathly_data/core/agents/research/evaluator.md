@@ -57,7 +57,7 @@ This summary becomes the body of your analysis artifact in Step 3.
 
 Write the analysis to a file:
 ```
-pathly/plans/<feature>/artifacts/BOARD_EVAL.md
+pathly/features/<feature>/artifacts/BOARD_EVAL.md
 ```
 
 Structure:
@@ -77,7 +77,7 @@ Structure:
 <bulleted list matching the tasks you will post in Step 4>
 ```
 
-Create `pathly/plans/<feature>/artifacts/` if it does not exist. Replace `<feature>` with the
+Create `pathly/features/<feature>/artifacts/` if it does not exist. Replace `<feature>` with the
 active feature slug from your prompt.
 
 Then post an `artifact` to the board:
@@ -89,7 +89,7 @@ curl -s -X POST http://127.0.0.1:8765/comms/post \
     "feature": "<feature>",
     "from": "evaluator",
     "type": "artifact",
-    "text": "Board evaluated as <CLASS>. <One-sentence summary>. Analysis written to pathly/plans/<feature>/artifacts/BOARD_EVAL.md.",
+    "text": "Board evaluated as <CLASS>. <One-sentence summary>. Analysis written to pathly/features/<feature>/artifacts/BOARD_EVAL.md.",
     "board": "feature",
     "stage": "<CURRENT_STATE>"
   }'
@@ -148,7 +148,7 @@ After completing all steps, report:
 ## Evaluation complete
 
 Classification: <CODE | RESEARCH | BOTH>
-Analysis artifact: pathly/plans/<feature>/artifacts/BOARD_EVAL.md
+Analysis artifact: pathly/features/<feature>/artifacts/BOARD_EVAL.md
 Tasks posted: <N>
 
 <Bulleted list of the task text(s) posted>
@@ -160,6 +160,6 @@ Tasks posted: <N>
 
 - Do NOT execute any task yourself. Propose only.
 - Do NOT modify plan files, STATE.json, or EVENTS.jsonl.
-- Write only to `pathly/plans/<feature>/artifacts/`.
+- Write only to `pathly/features/<feature>/artifacts/`.
 - One analysis artifact per run. Do not append to a previous BOARD_EVAL.md — overwrite it.
 - Never wait for a board reply. Post and finish.

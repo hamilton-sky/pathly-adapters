@@ -33,7 +33,7 @@ Before writing any code, verify the live state of all files this feature touches
 
 3. Record any TypeScript compile errors visible in the files (do not fix them).
 
-4. Update `pathly/plans/chat-stop-proxy/PROGRESS.md` — mark Conv 0 items complete
+4. Update `pathly/features/chat-stop-proxy/PROGRESS.md` — mark Conv 0 items complete
    and note any pre-existing issues found.
 
 ### Done when
@@ -131,13 +131,13 @@ Manually verify (or write a dev test) for each acceptance criterion:
 - AC-02e: Click Stop before first token → message resolves to `done`, content may be empty.
 - AC-03a–03c: Partial text visible in bubble; no `streaming` state in store.
 
-After all pass, write `pathly/plans/chat-stop-proxy/VERIFY.md`:
+After all pass, write `pathly/features/chat-stop-proxy/VERIFY.md`:
 ```
 RESULT: PASS
 Conv 1 verified: Stop button transforms Send, aborts stream, preserves partial text, no orphaned streaming state.
 ```
 
-Update `pathly/plans/chat-stop-proxy/PROGRESS.md` — mark all Conv 1 items complete.
+Update `pathly/features/chat-stop-proxy/PROGRESS.md` — mark all Conv 1 items complete.
 
 ---
 
@@ -275,13 +275,13 @@ Manually verify each acceptance criterion:
 - AC-06d: After 12s idle, bubble closes to `done`.
 - AC-06e: `CC` badge visible on Claude Code bubbles only.
 
-After all pass, update `pathly/plans/chat-stop-proxy/VERIFY.md`:
+After all pass, update `pathly/features/chat-stop-proxy/VERIFY.md`:
 ```
 RESULT: PASS
 Conv 2 verified: mode toggle routes to PTY, output streams into bubble, CC badge present, LLM mode unaffected.
 ```
 
-Update `pathly/plans/chat-stop-proxy/PROGRESS.md` — mark all Conv 2 items complete.
+Update `pathly/features/chat-stop-proxy/PROGRESS.md` — mark all Conv 2 items complete.
 
 ---
 

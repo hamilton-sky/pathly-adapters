@@ -49,7 +49,7 @@ Do **not** ask the human anything and do **not** wait for replies.
 ## Step 1: Detect feature context
 
 1. Infer `FEATURE` from `$ARGUMENTS` if provided (first word, kebab-cased).
-2. If not provided, scan `pathly/plans/` and use the most recently modified active feature folder.
+2. If not provided, scan `pathly/features/` and use the most recently modified active feature folder.
 3. If no active feature exists, ask:
 
 ```text
@@ -59,9 +59,9 @@ What feature would you like to discuss with the PO?
 Wait for reply. Use the answer as the working feature name.
 
 4. Read when present:
-   - `pathly/plans/$FEATURE/USER_STORIES.md`
-   - `pathly/plans/$FEATURE/PO_NOTES.md`
-   - `pathly/plans/$FEATURE/PROGRESS.md`
+   - `pathly/features/$FEATURE/USER_STORIES.md`
+   - `pathly/features/$FEATURE/PO_NOTES.md`
+   - `pathly/features/$FEATURE/PROGRESS.md`
 
 ---
 
@@ -128,7 +128,7 @@ Does this look right? (y / edit):
 - **y**: proceed to write
 - **edit**: ask which item to correct, re-ask that question, re-summarise
 
-Write to `pathly/plans/$FEATURE/PO_NOTES.md`:
+Write to `pathly/features/$FEATURE/PO_NOTES.md`:
 
 ```markdown
 # PO Notes — <feature>
@@ -156,7 +156,7 @@ _Last updated: <YYYY-MM-DD>_
 ## Step 5: Print next choices
 
 ```text
-PO notes written: pathly/plans/<feature>/PO_NOTES.md
+PO notes written: pathly/features/<feature>/PO_NOTES.md
 
 What would you like to do next?
 
