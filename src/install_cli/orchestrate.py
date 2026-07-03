@@ -181,6 +181,7 @@ _SKILL_GROUPS = {
     "back": "controls",
     "build": "development",
     "commit": "development",
+    "dag-sketch": "planning",
     "debug": "development",
     "design": "development",
     "dispatch": "utilities",
