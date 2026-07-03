@@ -76,7 +76,7 @@ export function usePlanConversations(topicOverride?: string | null): { planConvs
     if (!projectPath || !topic) { setPlanConvs([]); return }
     async function loadPlan(): Promise<void> {
       try {
-        const md = await readFile(`${projectPath}/pathly/plans/${topic}/PROGRESS.md`)
+        const md = await readFile(`${projectPath}/pathly/features/${topic}/PROGRESS.md`)
         if (!md) { setPlanConvs([]); return }
         setPlanConvs(parseProgressMd(md))
       } catch { setPlanConvs([]) }

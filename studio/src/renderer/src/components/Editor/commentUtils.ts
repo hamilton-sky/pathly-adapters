@@ -79,8 +79,10 @@ export function deriveLineNumber(fileBody: string, anchorText: string): number {
 
 export function getSpawnCwd(filePath: string): string {
   const norm = filePath.replace(/\\/g, '/')
-  const planIdx = norm.indexOf('/pathly/plans/')
-  return planIdx !== -1 ? norm.slice(0, planIdx) : norm.slice(0, norm.lastIndexOf('/'))
+  // Anchor on the /pathly/ segment (features/, plans/, debugs/, …) so the spawn cwd is the
+  // project root for any feature-workspace tree, not just the legacy plans/ layout.
+  const pathlyIdx = norm.indexOf('/pathly/')
+  return pathlyIdx !== -1 ? norm.slice(0, pathlyIdx) : norm.slice(0, norm.lastIndexOf('/'))
 }
 
 export const STORAGE_KEY_SPLIT   = 'pathly:prompt_override_split'

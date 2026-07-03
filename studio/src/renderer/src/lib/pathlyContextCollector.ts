@@ -25,7 +25,7 @@ export type AppContext = {
 }
 
 function getPlanPath(projectPath: string, topic: string): string {
-  return `${projectPath}/pathly/plans/${topic}`
+  return `${projectPath}/pathly/features/${topic}`
 }
 
 export async function safeRead(path: string, maxChars: number): Promise<string> {

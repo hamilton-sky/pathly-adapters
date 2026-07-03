@@ -1,5 +1,5 @@
 // Shared artifact-path resolution. Agents post PROJECT-RELATIVE paths (e.g.
-// `pathly/plans/foo/APPROACH.md`), but the fs:read IPC does NOT resolve them — it
+// `pathly/features/foo/APPROACH.md`), but the fs:read IPC does NOT resolve them — it
 // passes the string straight to fs.readFileSync, which resolves a relative path
 // against the Electron main-process CWD (not the project root) and gets ENOENT.
 // Every consumer that reads a stored artifact path must funnel through here so a

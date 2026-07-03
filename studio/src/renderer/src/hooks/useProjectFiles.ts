@@ -109,7 +109,7 @@ async function loadSubdirAwareSection(
   }
 }
 
-const KNOWN_PATHLY_DIRS = new Set(['debugs', 'explorations', 'plans', 'agents', 'skills', 'templates', 'flows', 'lessons', 'pipeline-walkthrough'])
+const KNOWN_PATHLY_DIRS = new Set(['features', 'debugs', 'explorations', 'plans', 'agents', 'skills', 'templates', 'flows', 'lessons', 'pipeline-walkthrough'])
 
 export function useProjectFiles(): {
   sections: Record<string, SectionState>

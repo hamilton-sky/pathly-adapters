@@ -45,7 +45,7 @@ export const DEFAULT_SKILL_PATHS = new Set(Object.values(SKILL_FILE_PATHS))
 export const SKILL_PROMPTS: Record<string, string> = {
   'plan/storm':     '# plan/storm\nHost: Claude Code · Agent: planner\n\nRole: Stage orchestrator — Brainstorm.\nExplore the problem space. Generate options. No code yet.',
   'plan/scope':     '# plan/scope\nHost: Claude Code · Agent: planner\n\nRole: Stage orchestrator — Scope.\nDefine user stories, acceptance criteria, conversation breakdown.',
-  'fix/build':      '# fix/build\nHost: Claude Code · Agent: builder\n\nRole: Stage orchestrator — Quick Fix.\nApply a single, well-scoped change. No multi-conversation\nplanning, no PROGRESS.md churn.\n\n· Read the issue description in plans/<feature>/\n· Locate the code\n· Apply the minimal change',
+  'fix/build':      '# fix/build\nHost: Claude Code · Agent: builder\n\nRole: Stage orchestrator — Quick Fix.\nApply a single, well-scoped change. No multi-conversation\nplanning, no PROGRESS.md churn.\n\n· Read the issue description in features/<feature>/\n· Locate the code\n· Apply the minimal change',
   'team/build':     '# team/build\nHost: Claude Code · Agent: builder\n\nRole: Stage orchestrator — Build.\nFollow the implementation plan. Write tests. Ship it.',
   'review/quality': '# review/quality\nHost: Claude Code · Agent: reviewer\n\nRole: Stage orchestrator — Review.\nAdversarial code review. Find bugs, security issues, design gaps.\nWrite failures to REVIEW_FAILURES.md.',
   'test/verify':    '# test/verify\nHost: Claude Code · Agent: tester\n\nRole: Stage orchestrator — Test.\nRun acceptance criteria against implementation.\nWrite gaps to TEST_FAILURES.md.',

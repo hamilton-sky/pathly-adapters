@@ -4,7 +4,7 @@ import { listDirs, readFile } from '../../../services/pathlyApi'
 import type { PlanRow, ProjectPlans } from '../types'
 
 const ROOTS: Array<{ subdir: string; flowType: 'team' | 'debug' | 'explore' }> = [
-  { subdir: 'pathly/plans',        flowType: 'team'    },
+  { subdir: 'pathly/features',     flowType: 'team'    },
   { subdir: 'pathly/debugs',       flowType: 'debug'   },
   { subdir: 'pathly/explorations', flowType: 'explore' },
 ]

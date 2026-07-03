@@ -101,7 +101,7 @@ export function useMonitorSession(): { effectiveTopic: string | null; showTabBar
     }
 
     const roots = [
-      `${projectPath}/pathly/plans/${effectiveTopic}`,
+      `${projectPath}/pathly/features/${effectiveTopic}`,
       `${projectPath}/pathly/debugs/${effectiveTopic}`,
       `${projectPath}/pathly/explorations/${effectiveTopic}`,
     ]
@@ -239,7 +239,7 @@ export function useMonitorSession(): { effectiveTopic: string | null; showTabBar
     if (!topic || !path) return
 
     const roots = [
-      `${path}/pathly/plans/${topic}`,
+      `${path}/pathly/features/${topic}`,
       `${path}/pathly/debugs/${topic}`,
       `${path}/pathly/explorations/${topic}`,
     ]

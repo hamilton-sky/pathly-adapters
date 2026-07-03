@@ -33,7 +33,7 @@ export function usePlanFiles(): {
 
     // Read a feature's plan files + subdirs from wherever its content lives. In the
     // feature-centric layout that is pathly/features/<name>/ directly; legacy features
-    // keep their files in pathly/plans/<name>/.
+    // keep their files in pathly/features/<name>/.
     async function scanContent(name: string, contentDir: string): Promise<PlanFolder> {
       let files: PathlyItem[] = []
       try {

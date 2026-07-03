@@ -47,7 +47,7 @@ async function getFeaturePlan(): Promise<{
     return { userStories: '', implementationPlan: '', progress: '', success: true }
   }
 
-  const base = `${projectPath}/pathly/plans/${activeTopic}`
+  const base = `${projectPath}/pathly/features/${activeTopic}`
   const [userStories, implementationPlan, progress] = await Promise.all([
     safeRead(`${base}/USER_STORIES.md`, 2000),
     safeRead(`${base}/IMPLEMENTATION_PLAN.md`, 4000),
@@ -77,7 +77,7 @@ async function automationExecuteStep(params: unknown): Promise<unknown> {
 async function listPlans(): Promise<{ plans: Array<{ name: string; fsmStage: string; status: string }>; success: boolean }> {
   const { projectPath } = useProjectStore.getState()
   if (!projectPath) return { plans: [], success: true }
-  const plansDir = `${projectPath}/pathly/plans`
+  const plansDir = `${projectPath}/pathly/features`
   const folders = await window.pathly.fs.listDirs(plansDir).catch(() => [] as string[])
   const plans = await Promise.all(
     folders
@@ -106,7 +106,7 @@ async function getEvents(params: unknown): Promise<{ events: string; success: bo
   if (!projectPath) return { events: '', success: true }
   const topic = p?.feature ?? activeTopic
   if (!topic) return { events: '', success: true }
-  const raw = await safeRead(`${projectPath}/pathly/plans/${topic}/EVENTS.jsonl`, 50000)
+  const raw = await safeRead(`${projectPath}/pathly/features/${topic}/EVENTS.jsonl`, 50000)
   if (!raw) return { events: '', success: true }
   const lines = raw.split('\n').filter(Boolean)
   return { events: lines.slice(-limit).join('\n'), success: true }
@@ -119,7 +119,7 @@ async function getFailures(params: unknown): Promise<{ review: string; test: str
   if (!projectPath) return { review: '', test: '', success: true }
   const topic = p?.feature ?? activeTopic
   if (!topic) return { review: '', test: '', success: true }
-  const base = `${projectPath}/pathly/plans/${topic}/feedback`
+  const base = `${projectPath}/pathly/features/${topic}/feedback`
   const [review, test] = await Promise.all([
     type === 'test' ? Promise.resolve('') : safeRead(`${base}/REVIEW_FAILURES.md`, 3000),
     type === 'review' ? Promise.resolve('') : safeRead(`${base}/TEST_FAILURES.md`, 3000),
@@ -133,7 +133,7 @@ async function createPlan(params: unknown): Promise<{ path?: string; success: bo
   if (!featureName) return { success: false, error: 'featureName is required' }
   const { projectPath } = useProjectStore.getState()
   if (!projectPath) return { success: false, error: 'No project path' }
-  const plansDir = `${projectPath}/pathly/plans`
+  const plansDir = `${projectPath}/pathly/features`
   const existing = await window.pathly.fs.listDirs(plansDir).catch(() => [] as string[])
   if (existing.includes(featureName)) return { success: false, error: 'Plan already exists' }
   const planDir = `${plansDir}/${featureName}`
@@ -144,7 +144,7 @@ async function createPlan(params: unknown): Promise<{ path?: string; success: bo
     window.pathly.fs.write(`${planDir}/STATE.json`, stateJson),
     window.pathly.fs.write(`${planDir}/USER_STORIES.md`, storiesTemplate),
   ])
-  return { path: `pathly/plans/${featureName}`, success: true }
+  return { path: `pathly/features/${featureName}`, success: true }
 }
 
 async function runSkill(params: unknown): Promise<{ success: boolean; runId?: string; error?: string }> {

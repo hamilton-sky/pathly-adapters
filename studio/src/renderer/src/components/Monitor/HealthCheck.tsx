@@ -34,7 +34,7 @@ async function runHealthChecks(projectPath: string, topic: string | null): Promi
 
   // 2. STATE.json presence
   const roots = [
-    `${projectPath}/pathly/plans/${topic}`,
+    `${projectPath}/pathly/features/${topic}`,
     `${projectPath}/pathly/debugs/${topic}`,
     `${projectPath}/pathly/explorations/${topic}`,
   ]
@@ -58,7 +58,7 @@ async function runHealthChecks(projectPath: string, topic: string | null): Promi
 
   // 3. Open feedback files
   try {
-    const files = await listDir(`${projectPath}/pathly/plans/${topic}/feedback`)
+    const files = await listDir(`${projectPath}/pathly/features/${topic}/feedback`)
     const open = files.filter((f) => f.endsWith('.md'))
     items.push({
       label: 'Feedback files',
@@ -73,7 +73,7 @@ async function runHealthChecks(projectPath: string, topic: string | null): Promi
 
   // 4. Event log existence
   try {
-    const content = await readFile(`${projectPath}/pathly/plans/${topic}/EVENTS.jsonl`)
+    const content = await readFile(`${projectPath}/pathly/features/${topic}/EVENTS.jsonl`)
     const lines = content ? content.trim().split('\n').filter(Boolean).length : 0
     items.push({
       label: 'Event log',

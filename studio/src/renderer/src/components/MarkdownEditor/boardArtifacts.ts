@@ -5,13 +5,14 @@
 import { writeFile } from '../../services/pathlyApi'
 import { apiPostArtifact } from '../../store/commsApi'
 
-/** Artifact of `pathly/plans/<feature>/…` → that feature's board; anything else → global. */
+/** Artifact of `pathly/features/<feature>/…` (or legacy `pathly/plans/…`) → that feature's
+ *  board; anything else → global. */
 export function boardTargetForFile(filePath: string): {
   feature: string
   board: string
   scope: string
 } {
-  const m = filePath.replace(/\\/g, '/').match(/\/pathly\/plans\/([^/]+)\//)
+  const m = filePath.replace(/\\/g, '/').match(/\/pathly\/(?:features|plans)\/([^/]+)\//)
   if (m) return { feature: m[1], board: 'feature', scope: m[1] }
   return { feature: 'global', board: 'global', scope: 'global' }
 }

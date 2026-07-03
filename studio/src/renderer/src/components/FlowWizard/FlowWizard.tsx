@@ -43,7 +43,7 @@ export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
     { tag: 'TEST_FAILURES', agent: 'builder' },
   ])
   const [transitionRules, setTransitionRules] = useState<Record<string, TransitionRule>>({})
-  const [storagePath, setStoragePath] = useState('pathly/plans/{topic}/')
+  const [storagePath, setStoragePath] = useState('pathly/features/{topic}/')
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [stepErrors, setStepErrors] = useState<Record<number, Record<string, string>>>({})

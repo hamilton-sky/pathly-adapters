@@ -29,7 +29,7 @@ export function CommandCenter() {
     setArchivePending(null)
     if (!topic || !projectPath) return
 
-    // Detect whether this is a new-style (pathly/<topic>/) or legacy (pathly/plans/<topic>/) feature.
+    // Detect whether this is a new-style (pathly/<topic>/) or feature-centric (pathly/features/<topic>/) feature.
     // Mirror the resolveFeaturePath logic: check for .keep sentinel, then STATE.json.
     const newStyleBase = `${projectPath}/pathly/${topic}`
     const keep = await window.pathly.fs.read(`${newStyleBase}/.keep`)
@@ -38,10 +38,10 @@ export function CommandCenter() {
 
     const src = isNewStyle
       ? `${projectPath}/pathly/${topic}`
-      : `${projectPath}/pathly/plans/${topic}`
+      : `${projectPath}/pathly/features/${topic}`
     const dest = isNewStyle
       ? `${projectPath}/pathly/.archive/${topic}`
-      : `${projectPath}/pathly/plans/.archive/${topic}`
+      : `${projectPath}/pathly/features/.archive/${topic}`
 
     await window.pathly.fs.move(src, dest)
     await store.loadFeatures(projectPath)

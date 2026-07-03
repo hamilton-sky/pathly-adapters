@@ -142,7 +142,7 @@ export function PlanBoard(): JSX.Element {
       return
     }
 
-    const base = `${projectPath}/pathly/plans/${activeTopic}`
+    const base = `${projectPath}/pathly/features/${activeTopic}`
 
     try {
       const raw = await readFile(`${base}/STATE.json`)
