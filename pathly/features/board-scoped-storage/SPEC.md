@@ -21,8 +21,10 @@ where `kind ∈ {goals, explorations, debugs, fixes}`.
 
 1. **Board-less runs** (standalone `/pathly explore <x>` with no board context) default to the
    **PROJECT board** → `pathly/project/<kind>/<slug>/`. No new shared buckets.
-2. **Existing shared-bucket folders + stale DB refs** → **migrate into their boards** (dry-run
-   first; infer the board from the DB message scope, fall back to `project/`).
+2. **Existing shared-bucket folders** → **migrate into their boards** (dry-run first; infer the
+   board from the DB message scope, fall back to `project/`). **Verified 2026-07-05: P2 is a pure
+   folder move — 0 DB refs point at these folders** (the stale DB refs are all `pathly/plans/` =
+   retrieval-robustness S2, a *separate* DB-only repath — see §4).
 
 ## Problem (current state)
 
@@ -86,20 +88,37 @@ When a debug/explore/fix flow is launched **from a board**, build the topic via 
 (`project/<kind>/<slug>`). The interactive skills that establish the run dir must resolve through
 `<feature_path>` / the resolver, never a hardcoded `pathly/<kind>/` prefix.
 
-### 4. Migration (P2)
-For each entry under `pathly/{debugs,explorations,fixes}/<x>/`: look up its board+scope in the DB
-(`comms_messages` where the run posted), move the folder to `<board-dir>/<kind>/<x>/` (or
-`project/<kind>/<x>/` if board-less), and repath the DB refs (`comms_artifacts.path`,
-`comms_messages.artifact_path`, `context_refs`) to the new location — **dry-run first**, only where
-the file actually moves. (Subsumes retrieval-robustness S2.)
+### 4. Migration (P2) — dry-run findings (2026-07-05)
+
+Inventory via [`p2_inventory.py`](./p2_inventory.py) (co-located; read-only against the real
+`~/.pathly/pathly.db`; re-run before `--apply` since data may drift):
+
+- **9 shared-bucket folders on disk**: 2 `debugs/`, 7 `explorations/`, 0 `fixes/`.
+- **0 DB references to any of them.** Verified independently: `comms_artifacts.path`,
+  `comms_messages.artifact_path`, and `context_refs` contain **zero** hits for these folders. So
+  **P2 is a pure filesystem move — no DB repath, no transaction, no hydration-breakage risk.**
+- Board-inference: **8 → `project/<kind>/<slug>/`** (nothing references them ⇒ agreed default);
+  **1 → feature**: `explorations/production-readiness-plan/` slug-matches the
+  `production-readiness-plan` feature ⇒ `features/production-readiness-plan/explorations/production-readiness-plan/`
+  (doubled name — **confirm intent before moving**; otherwise send it to `project/` like the rest).
+
+**Disentangled from S2 (correction).** The DB's stale refs are all `pathly/plans/…` — that is
+retrieval-robustness **S2** / production-readiness **G2**, a **DB-only** repath handled by
+[`../retrieval-robustness/s2_repath.py`](../retrieval-robustness/s2_repath.py), *separate* from
+moving these folders. P2 does **not** subsume S2; they
+are two independent migrations that merely share the "stale storage path" theme.
+
+Move mechanics: `git mv` each folder to its target (preserves history, keeps the tree clean); no DB
+work. Apply is a separate reviewed step.
 
 ## Phases
 
 - **P1 — new runs nest.** `board_run_topic` + 3 flow templates + launch threading + a
   layout-invariant test (a debug/explore/fix run on a feature board resolves under
   `features/<f>/<kind>/<slug>`; board-less resolves under `project/<kind>/<slug>`). No data move.
-- **P2 — migrate existing.** Move the ~5 shared-bucket folders under their boards + repath the DB
-  refs (dry-run first). Retire retrieval-robustness S2 into this.
+- **P2 — migrate existing.** Move the **9** shared-bucket folders under their boards (8 → `project/`,
+  1 → feature). **Pure `git mv`; 0 DB refs to repath** (verified 2026-07-05, see §4). S2
+  (`pathly/plans/` DB refs) is a *separate* DB-only migration, **not** folded in here.
 - **P3 — retire the buckets.** Drop `debugs`/`explorations`/`fixes` from the shared-bucket discovery
   paths, add the nested kinds to Studio's `KNOWN_PATHLY_DIRS`, update docs. Keep the names in the
   reserved-name set (they are still structural sub-dirs, now under a board).
