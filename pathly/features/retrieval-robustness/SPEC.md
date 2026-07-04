@@ -5,6 +5,17 @@ finding below was verified by a 20-agent multi-probe pass (code read + independe
 probe against the real `~/.pathly/pathly.db`); all 14 load-bearing claims confirmed, none
 refuted. This spec turns the architectural assessment into scoped, buildable work._
 
+> **Relationship to [`production-readiness-plan`](../production-readiness-plan/SPEC.md).** That spec is
+> the whole-system hardening roadmap (thesis: _consolidation > expansion_; trust ONE loop first). This
+> one is a **subsystem deep-dive that sits under it**, not a competing plan. Two explicit links:
+> **S2 (repath stale `context_refs`) folds into its G2 / Phase 2** — the incomplete
+> `pathly/plans/` → `pathly/features/` storage migration; same root cause, so do them together rather
+> than twice. **S1 (loud degradation)** is a retrieval-specific instance of its **Phase 5** ("make
+> failures observable — currently silent by design"); the CT6 `/health` work already merged is the
+> shared down payment. Everything else here (S3–S6) is additive and lives only in this spec. Per
+> production-readiness's "trust the core first" ordering, **S1 + S2 align with its P0**; S3–S6 are
+> refinements that can wait behind the golden-path gate.
+
 ---
 
 ## A. How the retrieval system works (verified)
