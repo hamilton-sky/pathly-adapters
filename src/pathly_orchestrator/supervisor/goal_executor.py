@@ -9,6 +9,15 @@ from typing import Callable, Optional
 _DEFAULT_MODEL = "claude-sonnet-4-6"
 _TEAM_FLOW = "team-build"
 
+# Board-scoped run kind per flow (board-scoped-storage): a flow run ON a board nests under
+# features/<f>/<kind>/<slug>. debug/explore/quick-fix carry their own kind; every other flow
+# (team, team-build, consultation, test) is a goal/feature run and uses 'goals'.
+_FLOW_KIND = {"debug": "debugs", "explore": "explorations", "quick-fix": "fixes"}
+
+
+def _flow_kind(flow: str) -> str:
+    return _FLOW_KIND.get(flow or "", "goals")
+
 
 def _safe_call(fn: Optional[Callable], *args) -> None:
     """Invoke a lifecycle callback best-effort; a bad callback never breaks a run."""
@@ -396,11 +405,13 @@ def _run_team(
             "error": f"a pipeline run is already active for {scope!r} (status={existing.status})",
         }
 
-    # Board-scoped on-disk home + FSM topic for the goal (storage-restructure): feature-tier
-    # nests under the feature (pathly/features/<feature>/goals/<slug>), project/global under
-    # pathly/project/goals/<slug>. Mirrors _decompose_consultation — the scope-nested topic
-    # makes _resolve_storage_path land the run there; the slug is the run identity within it.
-    from pathly_orchestrator.supervisor.goal_decomposer import _goal_topic
+    # Board-scoped on-disk home + FSM topic for the run (board-scoped-storage): a flow run on a
+    # board nests under that board — features/<feature>/<kind>/<slug> (project/global under
+    # pathly/project/<kind>/<slug>), where <kind> is the flow's kind (debug->debugs,
+    # explore->explorations, quick-fix->fixes, else goals). The dir is materialized below, so
+    # _resolve_storage_path's pathly/<topic> candidate lands the run there regardless of the flow
+    # template; the slug is the run identity within it.
+    from pathly_orchestrator.supervisor.goal_decomposer import board_run_topic
 
     slug = scope  # fallback
     if project_root and goal_id:
@@ -411,7 +422,7 @@ def _run_team(
             slug = ensure_goal_slug(get_db(project_root or None), goal_id)
         except Exception:
             pass
-    topic = _goal_topic(board, scope, slug)
+    topic = board_run_topic(board, scope, _flow_kind(flow), slug)
     if project_root:
         try:
             import os

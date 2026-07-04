@@ -268,6 +268,32 @@ def test_dispatch_team_custom_flow():
     ), "the chosen flow runs, not the team-build default"
 
 
+def test_dispatch_debug_flow_nests_under_debugs(tmp_path):
+    """board-scoped-storage: a flow run ON a board nests under that board by the flow's KIND —
+    a debug flow lands at features/<f>/debugs/<slug>, NOT goals/<slug>."""
+    import types
+    from pathly_orchestrator.db.connection import get_db
+    from pathly_orchestrator.supervisor.goal_run import start_goal_run
+
+    conn = get_db()
+    goal = _make_goal(conn, "gr_dbg_nest", executor="team")
+    captured = {}
+
+    def fake_start(**kw):
+        captured.update(kw)
+        return types.SimpleNamespace(run_id="dbg-1")
+
+    result = start_goal_run(
+        goal, flow_override="debug", project_root=str(tmp_path), start_fn=fake_start, block=True
+    )
+    assert result["ok"] is True and result["flow"] == "debug"
+    topic = captured["topic"]
+    assert topic.startswith("features/gr_dbg_nest/debugs/"), topic
+    assert "/goals/" not in topic
+    # the nested board dir is materialized so _resolve_storage_path lands the run there
+    assert (tmp_path / "pathly" / "features" / "gr_dbg_nest" / "debugs").is_dir()
+
+
 def test_dispatch_team_board_busy():
     """team refuses when a run already holds the board lock (serial)."""
     from pathly_orchestrator.db.connection import get_db
