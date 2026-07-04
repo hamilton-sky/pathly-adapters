@@ -294,6 +294,29 @@ def test_dispatch_debug_flow_nests_under_debugs(tmp_path):
     assert (tmp_path / "pathly" / "features" / "gr_dbg_nest" / "debugs").is_dir()
 
 
+def test_dispatch_custom_flow_nests_under_flow_name(tmp_path):
+    """A custom/user-created flow gets its OWN name as the board folder kind:
+    features/<f>/<flow>/<slug>. New flows are self-describing on disk — no code change to add one."""
+    import types
+    from pathly_orchestrator.db.connection import get_db
+    from pathly_orchestrator.supervisor.goal_run import start_goal_run
+
+    conn = get_db()
+    goal = _make_goal(conn, "gr_custom", executor="team")
+    captured = {}
+
+    def fake_start(**kw):
+        captured.update(kw)
+        return types.SimpleNamespace(run_id="c-1")
+
+    result = start_goal_run(
+        goal, flow_override="audit", project_root=str(tmp_path), start_fn=fake_start, block=True
+    )
+    assert result["ok"] is True
+    assert captured["topic"].startswith("features/gr_custom/audit/"), captured["topic"]
+    assert (tmp_path / "pathly" / "features" / "gr_custom" / "audit").is_dir()
+
+
 def test_dispatch_team_board_busy():
     """team refuses when a run already holds the board lock (serial)."""
     from pathly_orchestrator.db.connection import get_db

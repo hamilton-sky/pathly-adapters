@@ -10,13 +10,20 @@ _DEFAULT_MODEL = "claude-sonnet-4-6"
 _TEAM_FLOW = "team-build"
 
 # Board-scoped run kind per flow (board-scoped-storage): a flow run ON a board nests under
-# features/<f>/<kind>/<slug>. debug/explore/quick-fix carry their own kind; every other flow
-# (team, team-build, consultation, test) is a goal/feature run and uses 'goals'.
+# features/<f>/<kind>/<slug>. Known run-flows map to their kind; goal/feature-decompose flows
+# use 'goals'; any OTHER (custom, user-created) flow gets its OWN name as the kind — a new flow
+# 'audit' nests at features/<f>/audit/<slug>, self-describing on disk with no code change.
 _FLOW_KIND = {"debug": "debugs", "explore": "explorations", "quick-fix": "fixes"}
+_GOAL_FLOWS = frozenset({"team", "team-build", "consultation", "test", ""})
 
 
 def _flow_kind(flow: str) -> str:
-    return _FLOW_KIND.get(flow or "", "goals")
+    f = flow or ""
+    if f in _FLOW_KIND:
+        return _FLOW_KIND[f]
+    if f in _GOAL_FLOWS:
+        return "goals"
+    return f
 
 
 def _safe_call(fn: Optional[Callable], *args) -> None:
