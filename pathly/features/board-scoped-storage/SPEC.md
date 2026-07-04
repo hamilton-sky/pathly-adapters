@@ -123,6 +123,13 @@ work. Apply is a separate reviewed step.
   paths, add the nested kinds to Studio's `KNOWN_PATHLY_DIRS`, update docs. Keep the names in the
   reserved-name set (they are still structural sub-dirs, now under a board).
 
+> **P2↔P3 ordering (verified 2026-07-05 — do P3's discovery changes WITH or BEFORE P2's move).**
+> The move is clean for *data* (0 DB refs) but not yet for *visibility*: `project` is **not** in
+> Studio's `KNOWN_PATHLY_DIRS` (`useProjectFiles.ts`), so `pathly/project/…` renders only as a generic
+> "custom" section; and `cli/_discovery.py` walks `features/*/STATE.json` (+ legacy `plans/`) but
+> **not** `features/*/<kind>/*`, so feature-nested runs aren't discovered until it learns the nested
+> kinds. Shipping P2 alone would make moved folders hard to see in Studio. Treat P2+P3 as one unit.
+
 ## Invariants / load-bearing (do not break)
 
 - Reserved-name set (`storage_paths.py`) keeps `debugs`/`explorations`/`fixes`/`goals` — they are
