@@ -25,6 +25,72 @@
       "engine": "plantuml",
       "model": null,
       "createdAt": "2026-06-30T10:00:00.000Z"
+    },
+    {
+      "id": "dg_k7m2q",
+      "title": "testing.md topic map",
+      "style": "mermaid",
+      "content": "mindmap\n  root((testing.md))\n    Conversation Prompts\n      chat-stop-proxy\n        Conv 0 Pre-flight\n          Verify live state of touched files\n          Confirm required files exist\n          Read files before edit\n          Record visible TypeScript issues\n          Update progress notes\n        Conv 1 Stop Button\n          Design pass for Stop button\n          ChatInput props update\n          Enter key guard during loading\n          useHQ stop handler\n          index prop wiring\n          Manual verification steps\n        Conv 2 Claude Code Proxy\n          Design pass for mode toggle\n          chatStore chatMode state\n          ChatInput mode toggle UI\n          useHQ routing for claude mode\n          index prop wiring for mode\n          CC badge in MessageList\n          Manual verification steps\n        Splitting rule\n          Separate conversations per file type",
+      "status": "kept",
+      "engine": "mermaid",
+      "model": null,
+      "createdAt": "2026-07-02T00:00:00.000Z"
+    },
+    {
+      "id": "dg_r8v4n",
+      "title": "chat-stop-proxy: Send / Stop / Mode Routing Flow",
+      "style": "mermaid",
+      "content": "flowchart LR\n    User([\"User\"]) --> ChatInput[\"ChatInput.tsx\"]\n    ChatInput -->|\"onModeChange\"| Store[\"chatStore.ts\"]\n    ChatInput -->|\"onSend / onStop\"| useHQ[\"useHQ.tsx\"]\n    useHQ -->|\"handleSend branches on chatMode\"| Mode{\"chatMode?\"}\n    Mode -->|\"llm\"| Bridge[\"llmBridge.ts\"]\n    Mode -->|\"claude\"| Launch[\"launchTerminal.ts\"]\n    Bridge -->|\"abortLlm / askLlm\"| LLM[\"Chat LLM\"]\n    Launch -->|\"writeToTerminal\"| PTY[\"Claude Code PTY\"]\n    useHQ -->|\"handleStop: abortLlm\"| Bridge\n    LLM -->|\"stream tokens\"| useHQ\n    PTY -->|\"onData lines\"| useHQ\n    useHQ -->|\"updateLastMessage / setLoading\"| Store\n    Store --> MessageList[\"MessageList.tsx\"]\n    MessageList -->|\"CC badge if source claude-code\"| User",
+      "status": "kept",
+      "engine": "mermaid",
+      "model": null,
+      "createdAt": "2026-07-02T00:00:00.000Z",
+      "layout": {
+        "User": {
+          "x": 493,
+          "y": 48
+        },
+        "ChatInput": {
+          "x": 428,
+          "y": 200
+        },
+        "Store": {
+          "x": 308,
+          "y": 504
+        },
+        "useHQ": {
+          "x": 538,
+          "y": 352
+        },
+        "Mode": {
+          "x": 548,
+          "y": 504
+        },
+        "Bridge": {
+          "x": 808,
+          "y": 656
+        },
+        "Launch": {
+          "x": 48,
+          "y": 656
+        },
+        "LLM": {
+          "x": 873,
+          "y": 808
+        },
+        "PTY": {
+          "x": 113,
+          "y": 808
+        },
+        "MessageList": {
+          "x": 493,
+          "y": 656
+        }
+      },
+      "board": {
+        "id": "3e5ec0c5-1f5c-4aa3-818d-75f140a4a2aa",
+        "at": "2026-07-02T20:52:35.670Z"
+      }
     }
   ]
 }

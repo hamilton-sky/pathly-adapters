@@ -1,0 +1,13 @@
+{
+  "comments": [
+    {
+      "id": "c-mr42uf1h-xpuy",
+      "lineNumber": 129,
+      "lineText": "Phase 5 — Observability & trust\nStructured, versioned events (add schema_version per the standing RISK_ASSESSMENT item) ",
+      "body": "i need you to go over the code and virify if the telemntry in pathly if fully conneted so i can see it in the app add to this spec your findigns and assemnts and solotion",
+      "resolved": true,
+      "createdAt": "2026-07-02T22:29:36.293Z",
+      "color": "blue"
+    }
+  ]
+}

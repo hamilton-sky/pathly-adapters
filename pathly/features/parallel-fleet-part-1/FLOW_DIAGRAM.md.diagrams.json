@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "source": "C:/Users/Yafit/pathly-adapters/pathly/features/parallel-fleet-part-1/FLOW_DIAGRAM.md",
+  "diagrams": [
+    {
+      "id": "dg_k7m4p",
+      "title": "Parallel Fleet Part 1 system flow",
+      "style": "mermaid",
+      "content": "flowchart LR\n  subgraph s1[\"Coordinator Layer\"]\n    n1[\"FleetCoordinator.run(units, base_commit)\"]\n    n2[\"overlap.decompose(units)\"]\n    n3[\"write_fleet_plan -> fleet.yaml\"]\n  end\n\n  subgraph s2[\"Worktree Boundary\"]\n    n4[\"WorktreeManager.create()\"]\n    n5[\"foundation worktree\"]\n    n6[\"parallel lane worktrees\"]\n    n7[\"WorktreeManager.check_footprint_violation()\"]\n  end\n\n  subgraph s3[\"Execution Phases\"]\n    n8[\"Foundation phase\"]\n    n9[\"FLEET phase\"]\n    n10[\"supervisor_start_fn(topic=\\\"<feature>__foundation\\\")\"]\n    n11[\"supervisor_start_fn x N lanes\"]\n  end\n\n  subgraph s4[\"Merge FSM\"]\n    n12[\"trigger integrate.flow.yaml\"]\n    n13[\"MERGING\"]\n    n14[\"INTEGRATION_TESTING\"]\n    n15[\"ESCALATED\"]\n    n16[\"DONE\"]\n  end\n\n  subgraph s5[\"Recovery and Teardown\"]\n    n17[\"WorktreeManager.remove()\"]\n    n18[\"WorktreeManager.reconcile()\"]\n    n19[\"FLEET_STATE.json\"]\n    n20[\"EVENTS.jsonl\"]\n    n21[\"feedback/HUMAN_QUESTIONS.md\"]\n  end\n\n  n1 --> n2 --> n3 --> n4\n  n4 --> n5\n  n4 --> n6\n  n5 --> n10 --> n8\n  n8 -->|status=done| n9\n  n8 -->|status=error| n15\n  n9 --> n7\n  n9 --> n11\n  n11 --> n7\n  n7 -->|violation| n15\n  n7 -->|clean| n12\n  n12 --> n13 --> n14\n  n14 -->|tests pass| n16\n  n14 -->|tests fail| n15\n  n15 --> n21\n  n15 --> n19\n  n15 --> n20\n  n16 --> n17 --> n18\n  n17 --> n19\n  n18 --> n19\n  n18 --> n20\n  n19 -->|resume| n1\n  n20 -->|audit trail| n1\n"
+    }
+  ]
+}

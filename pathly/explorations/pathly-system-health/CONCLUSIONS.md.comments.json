@@ -1,20 +1,3 @@
 {
-  "comments": [
-    {
-      "id": "c-mq5vos3m-z2eg",
-      "lineNumber": 5,
-      "lineText": "ture is coherent. However, before going to production, resolve the 7 concrete issues listed below.\n\nThe issues are not s",
-      "body": "xcvxcv",
-      "resolved": false,
-      "createdAt": "2026-06-09T00:05:05.986Z"
-    },
-    {
-      "id": "c-mq5ul298-cf3n",
-      "lineNumber": 20,
-      "lineText": "achine, event log, FSM engine)\nFlow & skills layer (YAML definitions, markdown skill prompts)\nTelemetry layer (HTTP serv",
-      "body": "cvvcv",
-      "resolved": true,
-      "createdAt": "2026-06-08T23:34:12.908Z"
-    }
-  ]
+  "comments": []
 }

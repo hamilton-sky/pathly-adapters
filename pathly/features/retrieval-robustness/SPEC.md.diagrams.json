@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "source": "SPEC.md",
+  "diagrams": [
+    {
+      "id": "dg_r7k2q",
+      "title": "Retrieval Robustness — layers and data flow",
+      "style": "mermaid",
+      "content": "flowchart LR\n  subgraph s_consumer[\"Consumer\"]\n    prompt[\"Agent prompt — ## Communication Board block\"]\n  end\n\n  subgraph s_assembly[\"Assembly — retrieve_board_context()\"]\n    direction TB\n    ch_gov[\"1. Governance — pending decisions + escalations\"]\n    ch_ref[\"2. Referenced — context_refs hydrated authoritative text\"]\n    ch_ctx[\"3. Context / Auto-derived — semantic, capped 2000 chars\"]\n    ch_cat[\"4. Catalog — up to 12 pull-on-demand pointers\"]\n  end\n\n  subgraph s_search[\"Search — hybrid retrieval\"]\n    direction TB\n    bm25[\"BM25 — FTS5 ORDER BY rank (search_by_keyword)\"]\n    vec[\"Vector cosine — sqlite-vec over all-MiniLM-L6-v2 (search_by_embedding)\"]\n    rrf[\"Reciprocal Rank Fusion — score = 1/(60+bm25_rank) + 1/(60+sem_rank)\"]\n    gates[\"Relevance gates — per-tier distance cutoff + CT4 keyword bound\"]\n  end\n\n  subgraph s_storage[\"Storage — ~/.pathly/pathly.db\"]\n    direction TB\n    t_msg[\"comms_messages — context_refs JSON\"]\n    t_emb[\"comms_embeddings — vector rows\"]\n    t_fts[\"comms_fts — external-content, trigger-synced\"]\n    t_chunk[\"comms_chunk_embeddings — subtopic rescue (empty / dormant)\"]\n  end\n\n  subgraph s_degrade[\"Degradation and health\"]\n    direction TB\n    latch[\"_VEC_AVAILABLE / _FTS_AVAILABLE — set-once latch, silent no-op\"]\n    health[\"retrieval_status() /health — fts_rows, integrity_ok, degraded\"]\n  end\n\n  t_msg -->|\"plain WHERE SQL, no ranking\"| ch_gov\n  t_msg -->|\"context_refs -> hydrate section\"| ch_ref\n\n  t_fts --> bm25\n  t_emb --> vec\n  t_chunk -.->|\"dormant merge\"| vec\n  bm25 --> rrf\n  vec --> rrf\n  rrf --> gates\n  gates --> ch_ctx\n  t_msg -->|\"pointers\"| ch_cat\n\n  ch_gov --> prompt\n  ch_ref --> prompt\n  ch_ctx --> prompt\n  ch_cat --> prompt\n\n  latch -.->|\"gates on/off\"| vec\n  latch -.->|\"gates on/off\"| bm25\n  vec -.->|\"vec down -> recency\"| gates\n  bm25 -.->|\"FTS down -> semantic-only\"| gates\n  latch --> health\n  t_fts -.->|\"integrity-check / rebuild\"| health\n  health -->|\"loud RUNNER_WARNING when degraded\"| prompt",
+      "status": "kept",
+      "engine": "mermaid",
+      "model": null,
+      "createdAt": "2026-07-03T00:00:00Z",
+      "board": {
+        "id": "03dbdc3c-09f4-48b2-9230-5b2efbce074d",
+        "at": "2026-07-02T22:08:49.721Z"
+      }
+    }
+  ]
+}
