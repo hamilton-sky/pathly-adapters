@@ -9,7 +9,12 @@ Covers the two safe, self-contained changes:
 
 from pathlib import Path
 
-from pathly_orchestrator.supervisor.goal_decomposer import _goal_storage_dir, _goal_topic
+from pathly_orchestrator.supervisor.goal_decomposer import (
+    _goal_storage_dir,
+    _goal_topic,
+    board_run_storage_dir,
+    board_run_topic,
+)
 from pathly_orchestrator.fsm_compose import _project_root_from_storage
 
 ROOT = str(Path("/proj").resolve())
@@ -48,6 +53,32 @@ def test_project_tier_nests_under_project():
     d = _goal_storage_dir(ROOT, "project", "/some/root", "goal-slug")
     assert _n(d).endswith("pathly/project/goals/goal-slug")
     assert "pathly/goals/" not in _n(d)  # the flat pathly/goals home is gone
+
+
+# ── board_run_topic — generalize goal nesting to every run kind (board-scoped-storage) ──
+
+
+def test_board_run_topic_nests_every_kind_under_the_board():
+    for kind in ("goals", "explorations", "debugs", "fixes"):
+        assert board_run_topic("feature", "my-feature", kind, "slug") == f"features/my-feature/{kind}/slug"
+        # project + global + empty-scope all collapse to the project home
+        assert board_run_topic("project", "/some/root", kind, "slug") == f"project/{kind}/slug"
+        assert board_run_topic("global", "global", kind, "slug") == f"project/{kind}/slug"
+        assert board_run_topic("feature", "", kind, "slug") == f"project/{kind}/slug"
+
+
+def test_goal_helpers_are_board_run_goals_wrappers():
+    # _goal_topic / _goal_storage_dir must stay byte-identical to the 'goals' kind.
+    assert _goal_topic("feature", "f", "s") == board_run_topic("feature", "f", "goals", "s")
+    assert _goal_topic("project", "/r", "s") == "project/goals/s"
+    assert _n(_goal_storage_dir(ROOT, "feature", "f", "s")) == _n(
+        board_run_storage_dir(ROOT, "feature", "f", "goals", "s")
+    )
+
+
+def test_board_run_storage_dir_absolute_nested():
+    d = board_run_storage_dir(ROOT, "feature", "my-feature", "explorations", "slug")
+    assert _n(d).endswith("pathly/features/my-feature/explorations/slug")
 
 
 # ── _project_root_from_storage ───────────────────────────────────────

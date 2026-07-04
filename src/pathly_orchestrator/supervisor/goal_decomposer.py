@@ -8,33 +8,50 @@ _DEFAULT_MODEL = "claude-sonnet-4-6"
 _CONSULTATION_FLOW = "consultation"
 
 
-def _goal_topic(board: str, scope: str, slug: str) -> str:
-    """The pathly-relative storage topic for a goal, scoped to its board (storage-restructure).
+def board_run_topic(board: str, scope: str, kind: str, slug: str) -> str:
+    """The pathly-relative storage topic for a board run of a given KIND, scoped to its board
+    (board-scoped-storage / storage-restructure Phase 2). ``kind`` ∈ {goals, explorations,
+    debugs, fixes}: a flow run ON a board writes UNDER that board's folder.
 
-    Feature-tier nests under the feature (``features/<feature>/goals/<slug>``); project/global
-    under the project home (``project/goals/<slug>``). There is no flat ``goals/<slug>`` anymore.
+    Feature-tier nests under the feature (``features/<scope>/<kind>/<slug>``); project/global
+    under the project home (``project/<kind>/<slug>``; the project/global collapse is deferred
+    per storage-restructure T3). There is no flat ``<kind>/<slug>`` anymore.
 
-    Doubles as the FSM topic for a consultation run: because it is a pathly-relative path,
-    ``_resolve_storage_path``'s ``pathly/<topic>`` candidate lands the run at the nested dir —
-    so the consultation's PO→…→planner storage sits under the same board the goal lives on
-    (matching where its board artifacts already post, via B1's goal_id → board_scope). The slug
-    remains the goal's run identity within that path.
+    Doubles as the FSM topic: because it is a pathly-relative path, ``_resolve_storage_path``'s
+    ``pathly/<topic>`` candidate lands the run at the nested dir — so the run's storage sits under
+    the same board it was launched from (matching where its board artifacts post). The slug is the
+    run identity within that path.
     """
     if board == "feature" and scope:
-        return f"features/{scope}/goals/{slug}"
-    return f"project/goals/{slug}"
+        return f"features/{scope}/{kind}/{slug}"
+    return f"project/{kind}/{slug}"
+
+
+def board_run_storage_dir(
+    project_root: str, board: str, scope: str, kind: str, slug: str
+) -> str:
+    """Absolute on-disk home for a board run of ``kind`` — the board-scoped location from
+    ``board_run_topic``. Execution reads context via the board, not by re-resolving this dir,
+    so it stays consistent wherever this points."""
+    import os
+
+    return os.path.join(
+        project_root, "pathly", *board_run_topic(board, scope, kind, slug).split("/")
+    )
+
+
+def _goal_topic(board: str, scope: str, slug: str) -> str:
+    """Back-compat wrapper: a goal is the ``goals`` kind. Retained because callers pass
+    (board, scope, slug) for goal decomposes/consultations. Behaviour is byte-identical to the
+    pre-generalization ``_goal_topic`` (feature: ``features/<feature>/goals/<slug>``;
+    project/global: ``project/goals/<slug>``)."""
+    return board_run_topic(board, scope, "goals", slug)
 
 
 def _goal_storage_dir(project_root: str, board: str, scope: str, slug: str) -> str:
-    """Absolute on-disk home for a goal-decompose's plan + artifacts — the board-scoped location
-    from ``_goal_topic`` (feature: ``pathly/features/<feature>/goals/<slug>``; project/global:
-    ``pathly/project/goals/<slug>``). Used by planner/plan (passed to ``start_board_run``) and by
-    consultation (which also uses ``_goal_topic`` as its FSM topic). Goal EXECUTION reads context
-    via the board, not by re-resolving this dir, so it stays consistent wherever this points.
-    """
-    import os
-
-    return os.path.join(project_root, "pathly", *_goal_topic(board, scope, slug).split("/"))
+    """Absolute on-disk home for a goal-decompose's plan + artifacts (the ``goals`` kind). Used by
+    planner/plan (passed to ``start_board_run``) and by consultation."""
+    return board_run_storage_dir(project_root, board, scope, "goals", slug)
 
 
 def start_goal_decompose(
