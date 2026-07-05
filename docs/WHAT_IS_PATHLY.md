@@ -99,6 +99,7 @@ An agent's prompt is **composed**, not hand-written: a stage **skill body** is s
 | `comms-post` | **write** to the board — decisions, discoveries, warnings, artifacts, questions |
 | `catalog-pull` | **read** board/catalog context on demand (artifact sections) |
 | `progress-logging` | emit **phase telemetry** (`PHASE_START`/`PHASE_DONE`) mid-run |
+| `task-progress` | post a per-task **status** (▶ started / ✔ done) — the task-executor analogue of phase telemetry, for the single/loop drain agents |
 | `completion-report` | write the **authoritative result** (`AGENT_DONE`: summary, tokens, cost) |
 | `feedback-protocol` | honor the feedback-file gate + escalation routing |
 | `spawn-rules` | delegate to sub-agents (gated on adapter `can_spawn`) |

@@ -195,13 +195,16 @@ skills:
   development/execute-task:
     fragments:
       - comms-post
+      - task-progress
       - completion-report
-  # drain-dag (single executor) already does its board CRUD inline — it IS the drain
-  # loop — so it only needs completion-report for a clean AGENT_DONE. no_defaults keeps
-  # the log-phase prose out: a drain loop has no pipeline phases.
+  # drain-dag (single executor) does its board CRUD inline — it IS the drain loop — so it needs
+  # no phase logging (a drain loop has no pipeline phases; no_defaults keeps that prose out). It
+  # DOES get task-progress so the single agent posts a ▶/✔ status per task it drains — otherwise
+  # a headless single-agent run shows no mid-run progress at all. completion-report stays LAST.
   development/drain-dag:
     no_defaults: true
     fragments:
+      - task-progress
       - completion-report
 
   # ── Unified CLI composition: client-side pure-transform actions ──────────────

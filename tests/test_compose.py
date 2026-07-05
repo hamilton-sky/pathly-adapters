@@ -257,6 +257,21 @@ def test_dev_skill_shared_sections_appear_at_most_once(skill):
         assert out.count(heading) <= 1, f"{skill}: {heading!r} duplicated"
 
 
+@pytest.mark.parametrize("skill", ["development/drain-dag", "development/execute-task"])
+def test_task_executors_include_task_progress_fragment(skill):
+    """Both task executors — the single `drain-dag` agent and the loop `execute-task` agent —
+    must compose the `task-progress` fragment so a headless run posts a ▶/✔ status per task.
+    `comms-post` mirrors findings and `progress-logging` marks pipeline phases; neither covers
+    per-task status, so without this a single/loop agent shows no mid-run progress at all."""
+    out = compose_skill(skill, "claude")
+    assert "Task progress (board status)" in out, f"{skill} is missing the task-progress fragment"
+    assert "▶ Started" in out and "✔ Done" in out, f"{skill} is missing the status markers"
+    # completion-report must remain LAST (it owns the "AGENT_DONE is your final act" rule).
+    assert out.index("Task progress (board status)") < out.index("Completion report (AGENT_DONE)"), (
+        f"{skill}: task-progress must compose BEFORE completion-report"
+    )
+
+
 def test_dev_build_includes_completion_scout_and_spawn():
     """development/build composes completion-report + scout-choreography + spawn-rules.
 
