@@ -192,3 +192,38 @@ def test_goal_loop_surfaces_deadlocked_dag(tmp_path):
     assert set(inner.get("deadlocked", [])) == {dangle, cyc}, inner
     assert _status(conn, dangle) == "blocked"
     assert _status(conn, cyc) == "blocked"
+
+
+def test_goal_loop_spawns_headless_not_interactive(tmp_path):
+    """The loop executor must spawn HEADLESS one-shots (interactive=False), like every other goal
+    executor (_run_team goal_executor.py, _decompose_consultation goal_decomposer.py). Its RunnerState
+    was built WITHOUT interactive=, so it defaulted to True (state.py) — which makes
+    _run_stage_via_terminal build an interactive REPL argv that carries NO task prompt. In a live
+    Studio run this spawned claude with no work to do; the process exited code 1 (terminal_exit_nonzero)
+    and wrote ZERO AGENT_DONE, so the task failed on the exit-code floor and its dependent cascaded to
+    blocked. Assert the executor hands the spawn a headless state so the real one-shot argv carries the
+    prompt."""
+    from pathly_orchestrator.db.connection import get_db
+    from pathly_orchestrator.supervisor.goal_executor import start_goal_run
+
+    conn = get_db()
+    scope = "loop-headless"
+    gid = _seed_goal(conn, scope)
+    _seed_task(conn, scope, gid, "task SOLO")
+
+    seen: dict = {}
+
+    def capture_spawn(state, _instructions, _adapter, _model, _run_id, _bfn):
+        seen["interactive"] = state.interactive
+        return {"cost_usd": 0.0}
+
+    result = start_goal_run(
+        gid, executor_override="loop", project_root=str(tmp_path),
+        spawn_fn=capture_spawn, block=True,
+    )
+
+    assert result["ok"] is True, result
+    assert seen.get("interactive") is False, (
+        "loop executor must spawn headless one-shots (interactive=False), not an interactive REPL "
+        "whose argv omits the task prompt"
+    )

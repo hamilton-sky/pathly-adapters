@@ -318,6 +318,11 @@ def _run_loop(
         timeout=600,
         run_id=run_id,
         current_adapter=adapter or "claude",
+        # Headless one-shot per task — never the interactive REPL. RunnerState.interactive
+        # defaults to True; leaving it unset made _run_stage_via_terminal build an interactive
+        # argv that omits the task prompt, so the spawned CLI exited nonzero with no AGENT_DONE.
+        # Every other goal executor is headless (_run_team, _decompose_consultation).
+        interactive=False,
     )
     # telemetry-three-tier: the loop owns its telemetry (no registry RunnerState →
     # api_lifecycle won't write it). Tag every task with the board's scope_tier and
