@@ -15,6 +15,21 @@ process to exit. So this is the **last thing you do**, with NOTHING after it:
 - The skill supplies only the *content* (role, result, conversation, summary, the `*_START` time);
   this fragment owns *when* (last) and *how* (below).
 
+## Set `outcome` — success or failed (REQUIRED)
+
+The AGENT_DONE carries an explicit `outcome` the supervisor's loop executor reads to decide
+whether your task **succeeded** or **failed**. A clean process exit is **not** taken as success on
+its own — you must say so. Judge honestly:
+
+- `outcome: 'success'` — you completed the task and its acceptance/goal is met. Leave `error` empty (`''`).
+- `outcome: 'failed'` — you could **not** complete it: a blocking dependency, an unmet requirement,
+  a build/test you could not get to pass, or a hard limit you hit. Put the one-sentence reason in
+  `error`. Still write the report — a reported failure lets the DAG block dependents loudly instead
+  of draining a broken branch as "done".
+
+When genuinely unsure between the two, prefer `failed` with an `error`: a false success hides broken
+work (the costlier mistake), while a false failure only re-surfaces the task.
+
 Write the AGENT_DONE event to the **central DB** via eventlog. This is **mandatory** — the
 supervisor reads it as the authoritative result.
 
@@ -58,6 +73,8 @@ event = {
   'model': 'MODEL_ID',
   'conversation': CONV_N,
   'result': 'DONE',
+  'outcome': 'OUTCOME',
+  'error': 'ERROR_REASON',
   'summary': 'SUMMARY_SENTENCE',
   'total_tokens': TOTAL_TOKENS,
   'tool_uses': TOOL_USES,
@@ -135,6 +152,8 @@ Replace the UPPER_CASE placeholders with actual values:
 - `AGENT_ROLE` — e.g. `builder`, `reviewer`, `tester`, `planner`
 - `MODEL_ID` — model used in this stage (e.g. `claude-sonnet-4-6`)
 - `CONV_N` — integer conversation number (0 for non-build stages like plan/review/test)
+- `OUTCOME` — `success` or `failed` (see "Set `outcome`" above) — the supervisor's authoritative pass/fail signal
+- `ERROR_REASON` — one-sentence failure reason when `OUTCOME` is `failed`; empty string `''` when `success`
 - `SUMMARY_SENTENCE` — one sentence: what was done and the outcome
 - `TOTAL_TOKENS`, `TOOL_USES`, `WALL_SECONDS` — from `<usage>` block or wall_seconds computation
 - `COST_USD` — computed in step 3

@@ -15,6 +15,8 @@ from token counts using a built-in pricing table (Claude models only).
 - `feature` (required): feature slug matching the pathly/features/ folder name
 - `conversation` (required): conversation number (integer); use 0 for non-build stages
 - `result` (required): `"DONE"` or `"PASS"`
+- `outcome` (optional): `"success"` or `"failed"` — the supervisor's authoritative pass/fail signal for the task; defaults to `"success"`. Set `"failed"` when the task could not be completed (blocking dependency, unmet requirement, build/test you could not get to pass).
+- `error` (optional): one-sentence failure reason when `outcome` is `"failed"`; default empty string `""`
 - `model` (optional): model ID used by the agent (e.g. `"claude-sonnet-4-6"`, `"gpt-4o"`, `"gemini-2.0-flash"`); used for cost computation; defaults to `"claude-sonnet-4-6"`
 - `cost_usd` (optional): cost in USD if already known from API response — **takes priority over computation**; default not set
 - `input_tokens` (optional): input token count; default 0
@@ -39,6 +41,8 @@ Compute final `wall_seconds`:
 
 Build `summary` if not provided: `"<agent> conv <conversation> <result>"`
 
+Default `outcome` to `"success"` and `error` to `""` when not provided.
+
 ## Step 2 — Compute cost_usd
 
 Pass `cost_usd` from the provider's output payload. Do not compute cost in the skill. The server resolves cost via the pricing registry.
@@ -61,6 +65,8 @@ event = {
     'model': '<model>',
     'conversation': <conversation>,
     'result': '<result>',
+    'outcome': '<outcome>',
+    'error': '<error>',
     'summary': '<summary>',
     'tokens_in': <tokens_in>,
     'tokens_out': <tokens_out>,

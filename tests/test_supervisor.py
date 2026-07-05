@@ -847,6 +847,82 @@ def test_early_advance_with_billing_reconciliation(tmp_path, monkeypatch):
     _sup.drop_run(run_id)
 
 
+def test_early_advance_surfaces_agent_reported_failure(tmp_path, monkeypatch):
+    """AGENT_DONE with outcome='failed' → _run_stage_via_terminal surfaces it in the returned
+    dict so the loop executor's _outcome_is_failure fails the task, instead of marking it done
+    just because the process exited cleanly (silent-failure guard #2, agent-reported half).
+
+    This closes the loop end-to-end: the completion-report fragment now SETS an explicit outcome
+    on the AGENT_DONE, and the spawn path must RELAY it back to scheduler_loop for the guard to
+    read. Without the relay the dict carries only cost/session/summary and the failure is lost."""
+    import pathly_orchestrator.supervisor as _sup
+    from pathly_orchestrator import db as _db
+    from pathly_orchestrator.supervisor.scheduler import _outcome_is_failure
+
+    monkeypatch.setenv("PATHLY_RUNNER_EARLY_ADVANCE", "1")
+    monkeypatch.setenv("PATHLY_RUNNER_INTERACTIVE", "0")
+
+    topic = "ea-agent-failure"
+    run_id = f"{topic}-001"
+    state = _make_state(tmp_path, topic=topic)
+    state.interactive = False  # non-interactive reconciliation path (mirrors the loop executor)
+
+    plan_dir = tmp_path / "pathly" / "plans" / topic
+    plan_dir.mkdir(parents=True, exist_ok=True)
+    project_root = str(tmp_path)
+
+    def fake_recon(run_, *_a, **_k):
+        # Don't block 600s on billing that never arrives — just release the run.
+        _sup.drop_run(run_.run_id)
+
+    def fake_broadcast(_, payload):
+        if payload.get("type") == "TERMINAL_SPAWN":
+            _simulate_pty_start(run_id)
+
+            def _write_event():
+                import time as _time
+
+                _time.sleep(0.05)
+                # Per-thread connection (sqlite3 check_same_thread) — see the sibling tests.
+                _thread_conn = _db.get_db()
+                _db.append_event(
+                    _thread_conn,
+                    project_root,
+                    topic,
+                    {
+                        "type": "AGENT_DONE",
+                        "agent": "builder",
+                        "conversation": 0,
+                        "summary": "could not finish the task",
+                        "outcome": "failed",
+                        "error": "clean process exit but the work failed",
+                        "cost_usd": 0.01,
+                        "ts": "2026-01-01T00:00:00Z",
+                    },
+                )
+
+            threading.Thread(target=_write_event, daemon=True).start()
+
+    with patch(
+        "pathly_orchestrator.supervisor.terminal._reconciliation_window",
+        side_effect=fake_recon,
+    ):
+        result = _run_stage_via_terminal(
+            state,
+            "do stuff",
+            "claude",
+            "claude-sonnet-4-6",
+            run_id,
+            broadcast_fn=fake_broadcast,
+        )
+
+    # The agent self-reported failure; the spawn MUST relay it so the scheduler fails the task.
+    assert result.get("outcome") == "failed", result
+    assert _outcome_is_failure(result) is True, result
+
+    _sup.drop_run(run_id)
+
+
 def test_early_advance_billing_timeout(tmp_path, monkeypatch):
     """Flag=1, reconciliation window expires; STAGE_RECONCILIATION_FAILURE written."""
     import pathly_orchestrator.supervisor as _sup

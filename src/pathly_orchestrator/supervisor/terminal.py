@@ -19,6 +19,21 @@ from .registry import (
 )
 
 
+def _pty_return(data: dict) -> dict:
+    """The PTY's result dict with the CLI exit_code relayed in.
+
+    Reached only on a zero/absent exit code — a nonzero exit raises upstream — so this never
+    masks a failure; it makes the returned-dict contract uniform so a caller that inspects the
+    result (the loop executor's _outcome_is_failure) always sees the exit code. The extra key
+    is inert for the FSM/team consumer, which reads only cost_usd/session_id/result."""
+    result = data.get("result")
+    result = dict(result) if isinstance(result, dict) else {}
+    exit_code = data.get("exit_code")
+    if exit_code is not None:
+        result.setdefault("exit_code", exit_code)
+    return result
+
+
 def _write_supervisor_phase_summary(
     *,
     project_root: str,
@@ -352,6 +367,15 @@ def _run_stage_via_terminal(
                     "session_id": agent_done_data.get("session_id"),
                     "result": agent_done_data.get("summary", ""),
                 }
+                # Relay the agent's self-reported outcome so the loop executor's
+                # _outcome_is_failure can FAIL a task whose agent reported failure but exited
+                # cleanly (silent-failure guard #2). Early-advance returns before the PTY exits,
+                # so the AGENT_DONE outcome — not an exit code — is the authoritative signal here.
+                # Only relayed when present; an absent outcome stays success (back-compat).
+                for _k in ("outcome", "error"):
+                    _v = agent_done_data.get(_k)
+                    if _v:
+                        result_for_fsm[_k] = _v
 
                 if broadcast_fn:
                     broadcast_fn(
@@ -437,7 +461,7 @@ def _run_stage_via_terminal(
             _emit_executor_telemetry(
                 data.get("result") or {}, float(data.get("wall_seconds") or 0)
             )
-            return data.get("result", {})
+            return _pty_return(data)
 
         # ── Slow path (early_advance disabled) ────────────────────────────────
         # Wait for PTY to report its result.  Without a timeout a crashed terminal
@@ -458,7 +482,7 @@ def _run_stage_via_terminal(
         _emit_executor_telemetry(
             data.get("result") or {}, float(data.get("wall_seconds") or 0)
         )
-        return data.get("result", {})
+        return _pty_return(data)
     finally:
         with _lock:
             state.active_tab_id = ""
