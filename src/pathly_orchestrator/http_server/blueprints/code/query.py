@@ -101,7 +101,24 @@ def _content_hash(target: str, project_root: str) -> str:
         return ""
 
 
-def _log_query(scope: str, op: str, target: str, role: str, backend: str) -> None:
+def _query_log_text(op: str, target: str, role: str, backend: str, hit: bool) -> str:
+    """The board-log line for one code query.
+
+    ``hit`` records whether the backend actually returned structure (``hit``) or
+    came back empty (``miss``). This is the observability signal: ``backend=cli``
+    alone means the backend is *wired*; the ``hit``/``miss`` marker is what tells a
+    human watching the board whether the query got *usable data* (or degraded to
+    Grep). Pure/stateless so it is unit-testable without a DB.
+    """
+    return (
+        f"code-query: {op} {target} "
+        f"(role={role or '?'}, backend={backend}, {'hit' if hit else 'miss'})"
+    )
+
+
+def _log_query(
+    scope: str, op: str, target: str, role: str, backend: str, hit: bool
+) -> None:
     """Log a fresh code query to the comms board as a discovery (best-effort).
 
     Makes code lookups shared board context. Never raises — a logging failure
@@ -117,7 +134,7 @@ def _log_query(scope: str, op: str, target: str, role: str, backend: str) -> Non
             scope=scope or "",
             from_agent="code-intel",
             type="discovery",
-            text=f"code-query: {op} {target} (role={role or '?'}, backend={backend})",
+            text=_query_log_text(op, target, role, backend, hit),
         )
     except Exception:
         logger.debug("code_query: board logging failed", exc_info=True)
@@ -192,9 +209,10 @@ def code_query():
             block = _cc.build_block(scope, [target], role, budget)
             result = block or None
             _QUERY_CACHE[key] = result
-            # Log fresh queries to the board (shared context). Cache hits are not
+            # Log fresh queries to the board (shared context) with a hit/miss marker
+            # so the board shows whether the backend returned data. Cache hits are not
             # re-logged — the board already carries the prior entry.
-            _log_query(scope, op.strip(), target.strip(), role, backend)
+            _log_query(scope, op.strip(), target.strip(), role, backend, bool(result))
 
         return (
             jsonify(
