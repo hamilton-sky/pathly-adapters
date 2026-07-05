@@ -317,6 +317,7 @@ def scheduler_loop(
                     "lane": lane,
                     "reason": reason,
                     "blocked": blocked_ids,
+                    "text": task_texts.get(task_id, ""),
                 },
             )
             _post_task_status(
@@ -330,7 +331,7 @@ def scheduler_loop(
                 event_broadcast_fn,
                 scope,
                 "task_done",
-                {"task_id": task_id, "lane": lane},
+                {"task_id": task_id, "lane": lane, "text": task_texts.get(task_id, "")},
             )
             _post_task_status(
                 conn, board, scope, f"✔ Done: {(task_texts.pop(task_id, '') or task_id)[:110]}"

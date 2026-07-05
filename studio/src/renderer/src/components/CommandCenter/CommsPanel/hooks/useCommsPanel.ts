@@ -3,6 +3,7 @@ import type { BoardScope, Message, MessageType } from '../../types'
 import { useCommsStore } from '../../../../store/commsStore'
 import { scopeToParams } from '../../../../store/commsApi'
 import { useProjectStore } from '../../../../store/projectStore'
+import { useToastStore } from '../../../../store/toastStore'
 import { PATHLY_API_BASE } from '../../../../lib/config'
 import { handleSummaryRequest } from '../ArtifactsView/handleSummaryRequest'
 
@@ -43,7 +44,7 @@ export function useCommsPanel(scope: BoardScope, mainFeature: string) {
       es = new EventSource(`${PATHLY_API_BASE}/events/comms?scope=${encodeURIComponent(sseScope)}`)
       es.onmessage = (e: MessageEvent) => {
         try {
-          const data = JSON.parse(e.data as string) as { type: string; event?: string; phase?: string; goal_id?: string; message_id?: string; error?: string; artifact_id?: string; artifact_path?: string; selection?: { type?: string; id?: string } }
+          const data = JSON.parse(e.data as string) as { type: string; event?: string; phase?: string; goal_id?: string; message_id?: string; error?: string; artifact_id?: string; artifact_path?: string; text?: string; reason?: string; selection?: { type?: string; id?: string } }
           if (data.type === 'COMMS_UPDATE') {
             // Server-initiated summary handoff (Conv 4): the server emits this
             // instead of running inference. Run the resolved target client-side and
@@ -71,6 +72,18 @@ export function useCommsPanel(scope: BoardScope, mainFeature: string) {
               const st = data.event === 'summarizing' ? 'summarizing'
                 : data.event === 'summary_ready' ? 'ready' : 'failed'
               useCommsStore.getState().markSummaryStatus(data.message_id, st, data.error)
+            }
+            // Loop/DAG task progress → toast on each task completion. The supervisor emits
+            // task_done / task_failed (with the task text) as it drains the DAG, so these fire
+            // regardless of whether the per-task agent posted its own status.
+            if (data.event === 'task_done' || data.event === 'task_failed') {
+              const label = (data.text || 'task').slice(0, 70)
+              if (data.event === 'task_done') {
+                useToastStore.getState().push(`✔ ${label}`, 'success', { category: 'agent_done' })
+              } else {
+                const why = data.reason ? ` — ${data.reason.slice(0, 60)}` : ''
+                useToastStore.getState().push(`✗ ${label}${why}`, 'error', { category: 'agent_done' })
+              }
             }
             loadRef.current()
           }

@@ -261,3 +261,29 @@ def test_goal_loop_posts_supervisor_progress(tmp_path):
     assert "✔ Done" in texts, texts
     # one start + one done for each of the 2 tasks → at least 4 supervisor status posts
     assert len(rows) >= 4, f"expected >=4 supervisor progress posts, got {len(rows)}: {texts}"
+
+
+def test_goal_loop_broadcast_task_done_carries_text(tmp_path):
+    """The loop's task_done/task_failed SSE events must carry the task TEXT, so Studio can toast a
+    meaningful label instead of a bare id. The renderer's task-completion toast reads `data.text`."""
+    from pathly_orchestrator.db.connection import get_db
+    from pathly_orchestrator.supervisor.goal_executor import start_goal_run
+
+    conn = get_db()
+    scope = "loop-bcast"
+    gid = _seed_goal(conn, scope)
+    _seed_task(conn, scope, gid, "task ALPHA")
+
+    events: list = []
+
+    def rec(_scope, payload):
+        events.append(payload)
+
+    result = start_goal_run(
+        gid, executor_override="loop", project_root=str(tmp_path),
+        spawn_fn=lambda *_a: {"cost_usd": 0.0}, event_broadcast_fn=rec, block=True,
+    )
+    assert result["ok"] is True, result
+    done = [e for e in events if e.get("event") == "task_done"]
+    assert done, f"no task_done event broadcast: {events}"
+    assert "task ALPHA" in (done[0].get("text") or ""), done[0]
