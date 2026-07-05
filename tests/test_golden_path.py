@@ -227,3 +227,37 @@ def test_goal_loop_spawns_headless_not_interactive(tmp_path):
         "loop executor must spawn headless one-shots (interactive=False), not an interactive REPL "
         "whose argv omits the task prompt"
     )
+
+
+def test_goal_loop_posts_supervisor_progress(tmp_path):
+    """The loop SUPERVISOR posts a guaranteed ▶ start / ✔ done status per task to the board.
+
+    The task-progress FRAGMENT relies on the per-task agent posting — which it can (and does) skip
+    for small tasks. The supervisor owns claim/complete, so it is the reliable source of mid-run
+    progress; without this, a headless loop run shows no board progress at all (only the final
+    card-drain), which is exactly what a live run exposed."""
+    from pathly_orchestrator.db.connection import get_db
+    from pathly_orchestrator.supervisor.goal_executor import start_goal_run
+
+    conn = get_db()
+    scope = "loop-progress"
+    gid = _seed_goal(conn, scope)
+    a = _seed_task(conn, scope, gid, "task ALPHA")
+    _seed_task(conn, scope, gid, "task BETA", depends_on=[a])
+
+    result = start_goal_run(
+        gid, executor_override="loop", project_root=str(tmp_path),
+        spawn_fn=lambda *_a: {"cost_usd": 0.0}, block=True,
+    )
+    assert result["ok"] is True, result
+
+    rows = conn.execute(
+        "SELECT text FROM comms_messages WHERE scope=? AND type='status' AND from_agent='supervisor' "
+        "AND deleted_at IS NULL ORDER BY rowid",
+        (scope,),
+    ).fetchall()
+    texts = " || ".join(r["text"] for r in rows)
+    assert "▶ Started" in texts and "task ALPHA" in texts, texts
+    assert "✔ Done" in texts, texts
+    # one start + one done for each of the 2 tasks → at least 4 supervisor status posts
+    assert len(rows) >= 4, f"expected >=4 supervisor progress posts, got {len(rows)}: {texts}"

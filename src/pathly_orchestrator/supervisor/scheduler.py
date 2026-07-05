@@ -44,6 +44,22 @@ def _outcome_is_failure(outcome) -> bool:
     return flag in ("failed", "error", "failure")
 
 
+def _post_task_status(conn, board: str, scope: str, text: str) -> None:
+    """Post a GUARANTEED per-task progress status to the board from the SUPERVISOR.
+
+    The loop supervisor owns claim/complete, so it — not the per-task agent — is the reliable source
+    of ▶/✔ progress: the task-progress fragment relies on agent compliance, which small-task agents
+    skip. Best-effort: never raises, never blocks the drain."""
+    try:
+        from pathly_orchestrator.db.queries.comms import post_message
+
+        post_message(
+            conn, board=board, scope=scope, from_agent="supervisor", type="status", text=text
+        )
+    except Exception:
+        logger.debug("scheduler: _post_task_status failed", exc_info=True)
+
+
 def scheduler_loop(
     state,
     board: str,
@@ -132,6 +148,9 @@ def scheduler_loop(
     # SAME lease on completion. Re-acquiring would create a phantom workspace
     # (a no-op for LaneIsolation, but it would leak a real worktree under P3).
     workspaces: dict[str, Any] = {}
+    # Short task text kept per in-flight task so the supervisor can name it in the ✔/✗ status it
+    # posts at completion (the completion_q item carries only ids, not the text).
+    task_texts: dict[str, str] = {}
 
     result_completed: list[str] = []
     result_failed: list[str] = []
@@ -227,6 +246,11 @@ def scheduler_loop(
                 "task_claimed",
                 {"task_id": task_id, "lane": lane, "board": board},
             )
+            # Guaranteed supervisor-side progress (not agent-dependent): ▶ on claim.
+            task_texts[task_id] = task.get("text", "") or ""
+            _post_task_status(
+                conn, board, scope, f"▶ Started: {(task.get('text') or task_id)[:110]}"
+            )
 
             ws = isolation.acquire(task, state)
             workspaces[task_id] = ws
@@ -295,6 +319,10 @@ def scheduler_loop(
                     "blocked": blocked_ids,
                 },
             )
+            _post_task_status(
+                conn, board, scope,
+                f"✗ Failed: {(task_texts.pop(task_id, '') or task_id)[:80]} — {reason[:80]}",
+            )
         else:
             complete_task(conn, task_id)
             result_completed.append(task_id)
@@ -303,6 +331,9 @@ def scheduler_loop(
                 scope,
                 "task_done",
                 {"task_id": task_id, "lane": lane},
+            )
+            _post_task_status(
+                conn, board, scope, f"✔ Done: {(task_texts.pop(task_id, '') or task_id)[:110]}"
             )
 
         # Release the SAME workspace lease we acquired for this task.
