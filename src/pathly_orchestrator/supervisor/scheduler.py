@@ -48,8 +48,9 @@ def _post_task_status(conn, board: str, scope: str, text: str) -> None:
     """Post a GUARANTEED per-task progress status to the board from the SUPERVISOR.
 
     The loop supervisor owns claim/complete, so it — not the per-task agent — is the reliable source
-    of started/done progress: the task-progress fragment relies on agent compliance, which small-task agents
-    skip. Best-effort: never raises, never blocks the drain."""
+    of started/done progress; there is no agent-side progress fragment (it would only duplicate this).
+    The single executor gets the equivalent via the /comms/tasks handlers (_helpers.post_task_status).
+    Best-effort: never raises, never blocks the drain."""
     try:
         from pathly_orchestrator.db.queries.comms import post_message
 

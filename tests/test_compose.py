@@ -258,18 +258,15 @@ def test_dev_skill_shared_sections_appear_at_most_once(skill):
 
 
 @pytest.mark.parametrize("skill", ["development/drain-dag", "development/execute-task"])
-def test_task_executors_include_task_progress_fragment(skill):
-    """Both task executors — the single `drain-dag` agent and the loop `execute-task` agent —
-    must compose the `task-progress` fragment so a headless run posts a started/done status per task.
-    `comms-post` mirrors findings and `progress-logging` marks pipeline phases; neither covers
-    per-task status, so without this a single/loop agent shows no mid-run progress at all."""
+def test_task_executors_do_not_compose_task_progress(skill):
+    """Task executors must NOT compose an agent-side progress fragment. Per-task progress is
+    guaranteed SERVER-SIDE — the loop via scheduler._post_task_status, the single via the
+    /comms/tasks/{claim,complete,fail} handlers (blueprints/comms/_helpers.post_task_status) — so an
+    agent-side fragment would only duplicate it. This guards against re-introducing that dup."""
     out = compose_skill(skill, "claude")
-    assert "Task progress (board status)" in out, f"{skill} is missing the task-progress fragment"
-    assert "Started:" in out and "Done:" in out, f"{skill} is missing the status markers"
-    # completion-report must remain LAST (it owns the "AGENT_DONE is your final act" rule).
-    assert out.index("Task progress (board status)") < out.index("Completion report (AGENT_DONE)"), (
-        f"{skill}: task-progress must compose BEFORE completion-report"
-    )
+    assert "Task progress (board status)" not in out, f"{skill} should not compose task-progress"
+    # It still composes code-query + completion-report (the latter stays last).
+    assert "Completion report (AGENT_DONE)" in out, f"{skill} missing completion-report"
 
 
 # Every skill whose agent reads / edits / reviews / traces CODE STRUCTURE composes the

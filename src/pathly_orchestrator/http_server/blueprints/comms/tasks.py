@@ -7,6 +7,7 @@ import logging
 from flask import Blueprint, jsonify, request
 
 from ...sse import _broadcast_comms
+from ._helpers import post_task_status
 
 bp = Blueprint("comms_tasks", __name__)
 
@@ -77,6 +78,9 @@ def comms_tasks_complete():
 
         conn = _get_db()
         newly_ready = _complete_task(conn, message_id=message_id)
+        # Guaranteed per-task progress for the single executor (the drain agent
+        # completes via this route). The loop posts the equivalent in-process.
+        post_task_status(conn, message_id, "Done")
 
         scope = data.get("feature") or data.get("scope") or ""
         for nrid in newly_ready:
@@ -119,6 +123,10 @@ def comms_tasks_claim():
 
         conn = _get_db()
         claimed = _claim_task(conn, message_id=message_id, run_id=run_id)
+        # Guaranteed 'Started' only on a real claim — a rejected double-claim
+        # (already in_progress) must not post a second status.
+        if claimed:
+            post_task_status(conn, message_id, "Started")
         return jsonify({"claimed": claimed}), 200
     except Exception as exc:
         logging.exception("comms_tasks_claim error")
@@ -153,6 +161,7 @@ def comms_tasks_fail():
         scope = row["scope"] if row is not None else ""
 
         blocked = _fail_task(conn, message_id=message_id, reason=reason)
+        post_task_status(conn, message_id, "Failed", reason=reason)
 
         _broadcast_comms(
             scope,

@@ -232,10 +232,10 @@ def test_goal_loop_spawns_headless_not_interactive(tmp_path):
 def test_goal_loop_posts_supervisor_progress(tmp_path):
     """The loop SUPERVISOR posts a guaranteed start / done status per task to the board.
 
-    The task-progress FRAGMENT relies on the per-task agent posting — which it can (and does) skip
-    for small tasks. The supervisor owns claim/complete, so it is the reliable source of mid-run
-    progress; without this, a headless loop run shows no board progress at all (only the final
-    card-drain), which is exactly what a live run exposed."""
+    Per-task progress is guaranteed SERVER-SIDE, never left to the agent: the supervisor owns
+    claim/complete for the loop, so it is the reliable source of mid-run progress; without this a
+    headless loop run shows no board progress at all (only the final card-drain), which is exactly
+    what a live run exposed. (The single executor gets the equivalent via the /comms/tasks handlers.)"""
     from pathly_orchestrator.db.connection import get_db
     from pathly_orchestrator.supervisor.goal_executor import start_goal_run
 

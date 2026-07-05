@@ -92,6 +92,52 @@ def norm_project_root(project_root: str) -> str:
     return project_root.replace("\\", "/").rstrip("/")
 
 
+def post_task_status(conn, message_id: str, verb: str, reason: str = "") -> None:
+    """Post a guaranteed board ``status`` line for a task state transition.
+
+    The SINGLE executor's drain agent transitions each task through
+    ``/comms/tasks/{claim,complete,fail}``; this makes each transition emit a
+    ``Started`` / ``Done`` / ``Failed`` status on the board, so a headless
+    single-agent run shows per-task progress WITHOUT relying on the agent posting
+    it. The LOOP executor emits the equivalent supervisor-side via
+    ``scheduler._post_task_status`` — the two paths are disjoint (loop claims
+    in-process, single via HTTP), so there is no double-post.
+
+    Best-effort: never raises — a status-post failure must not fail the task
+    transition. Matches the supervisor's format (Started/Done use text[:110];
+    Failed uses text[:80] + reason[:80]).
+    """
+    try:
+        from pathly_orchestrator.db.queries.comms import post_message
+
+        row = conn.execute(
+            "SELECT board, scope, text FROM comms_messages "
+            "WHERE id=? AND deleted_at IS NULL",
+            (message_id,),
+        ).fetchone()
+        if row is None:
+            return
+        text = row["text"] or message_id
+        if reason:
+            line = f"{verb}: {text[:80]} — {reason[:80]}"
+        else:
+            line = f"{verb}: {text[:110]}"
+        post_message(
+            conn,
+            board=row["board"] or "feature",
+            scope=row["scope"] or "",
+            from_agent="supervisor",
+            type="status",
+            text=line,
+        )
+    except Exception:
+        import logging
+
+        logging.getLogger("pathly.http").debug(
+            "post_task_status failed", exc_info=True
+        )
+
+
 def task_duration_seconds(task: dict) -> float | None:
     """Wall-clock seconds from claim to completion for a task row.
 
