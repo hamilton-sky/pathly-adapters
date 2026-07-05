@@ -24,6 +24,15 @@ def _load_model():
         return
     _model_load_attempted = True
     try:
+        import os
+
+        os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
+        try:
+            import transformers.utils.logging as _hf_log
+
+            _hf_log.set_verbosity_error()
+        except Exception:
+            pass
         from sentence_transformers import SentenceTransformer
 
         _model = SentenceTransformer("all-MiniLM-L6-v2")
