@@ -83,7 +83,7 @@ The FSM is a **passive decision layer** — it computes *what to do next* (state
 
 Key facts (each independently confirmed by reading the code):
 - The supervisor decides every next step; **a `human` target in headless mode is treated as an error** (`cannot block waiting for human in headless mode`).
-- The agent's semantic result is **`AGENT_DONE.summary`** written to the DB by the agent itself (via the `completion-report` fragment) — *not* scraped from stdout. Stdout is only used for `session_id` + `cost_usd`.
+- The agent's semantic result is **`AGENT_DONE.summary`** written to the DB by the agent itself (via the `completion-report` fragment) — *not* scraped from stdout. Stdout is only used for `session_id` + `cost_usd`. The same fragment writes an explicit **`AGENT_DONE.outcome`** (`success`/`failed`, + `error`) — the supervisor treats a clean process exit with `outcome:"failed"` as a task failure, not a success (silent-failure guard).
 - The same flow is **adapter-agnostic**: different stages can route to different CLI back-ends (`claude`, `codex`, …) via the flow's `adapter_map`.
 
 ---

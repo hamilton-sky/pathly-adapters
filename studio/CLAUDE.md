@@ -85,8 +85,8 @@ This guarantees the new server always starts, even against old server versions t
 - Uniform 28px bar height; topbar content is left (`PathlyLogo`), center (`ProjectSelector`, `EditorLauncher`, `PanelNav`), right (engine monitor, HQ chat, theme, terminal, publish).
 
 **Sidebar collapse/expand** lives inside the sidebar, not the topbar:
-- `TabBar` (`shell/TabBar.tsx`) — renders WORKSPACE / LIBRARY tabs plus a `PanelLeft` collapse button at the right of the tab bar.
-- `IconStrip` (`shell/IconStrip.tsx`) — the collapsed sidebar; shows a `PanelLeft` expand button at the top plus icon shortcuts for each panel.
+- `TabBar` (`sidebar/shell/TabBar.tsx`) — renders WORKSPACE / LIBRARY tabs plus a `PanelLeft` collapse button at the right of the tab bar.
+- `IconStrip` (`sidebar/shell/IconStrip.tsx`) — the collapsed sidebar; shows a `PanelLeft` expand button at the top plus icon shortcuts for each panel.
 
 ## CLI-engine spawn scheduler (`src/main/ipc/terminal.ts`)
 

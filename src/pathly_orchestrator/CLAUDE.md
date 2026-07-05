@@ -94,12 +94,12 @@ GET  /events/comms          ← SSE stream of comms board updates (streams bluep
 | Event type | Payload fields | Purpose |
 |---|---|---|
 | `RUN_STARTED` | `topic`, `run_id` | pipeline run began |
-| `RUN_COMPLETE` | `topic`, `run_id`, `status` | pipeline finished (done/aborted/error) |
 | `TERMINAL_SPAWN` | `tab_id`, `run_id`, `label`, `cwd`, `argv[]`, `adapter` | Studio should open a new terminal tab and spawn the PTY |
-| `TERMINAL_STARTED` | `tab_id`, `run_id` | PTY confirmed running |
 | `SESSION` | `kind` (new/continue), `session_id` | adapter session continuity signal |
 | `RUNNER_WARNING` | `message` | non-fatal warning to surface as a toast |
-| `STATUS` | `status`, `stage`, `adapter`, `cost_usd`, `session_kind` | periodic state sync |
+| `RUNNER_STATUS` | `status`, `topic` | status change + periodic state sync (`running`/`paused`/`done`/`aborted`/`error`) — `supervisor/registry.py` `_set_status` |
+
+> Pipeline completion is **not** a distinct SSE event — it is a `RUNNER_STATUS` carrying a terminal `status` (`done`/`aborted`/`error`). PTY-started confirmation is the `POST /runner/terminal/started` HTTP callback, not an SSE event.
 
 ## `/next_action` response contract
 
@@ -193,7 +193,7 @@ pathly_orchestrator/
     feedback.py            # _feedback_watcher, _process_feedback_file
     blueprints/            # registered in app.py via the all_blueprints list
       core/                # health.py (GET /health,/status; POST /shutdown); fsm.py (POST /next_action,/complete_stage)
-      runner/              # api.py + api_lifecycle.py + api_control.py — 13 /runner/* routes; streams.py (GET /events/menu|runner|history|stream|comms)
+      runner/              # api.py + api_lifecycle.py + api_control.py — 13 /runner/* routes; streams.py (GET /events/menu|runner|spawn|history|stream|comms)
       flows/               # defs.py (flow CRUD); stage_configs.py (per-stage agent/model overrides)
       catalog/             # items.py (file-tree catalog)
       skills/              # editor.py re-export shim; editor_render.py (/skills/catalog|parse|preview|compose|summary-format/<style>); editor_io.py (/skills/save|export)
@@ -244,7 +244,7 @@ Two sanitization sites:
 | Site | Function | Trigger |
 |---|---|---|
 | `adapters.py` `resolve_command` | `_dash_safe_prompt(prompt)` | every headless argv build |
-| `skills/compose.py` `convert_to_headless` | `_strip_leading_frontmatter(text)` | composed/skill path |
+| `skills/compose.py` (in `compose_skill` / `compose_block`) | `_strip_leading_frontmatter(text)` | composed/skill path |
 
 `_dash_safe_prompt` (in `adapters.py`): strips a leading YAML-frontmatter block (`---…---`)
 and then any remaining leading horizontal-rule lines, so the sanitized prompt is guaranteed
@@ -262,3 +262,5 @@ When a PTY stage exits, the supervisor merges two sources:
 The `summary` field is written by the agent via the `log-agent-done` skill to the central DB during its run.
 It is never subject to the PTY's 500-chunk rolling output buffer.
 If `summary` is absent (e.g. legacy agent), stdout `result` is used as a fallback.
+
+The runner→FSM result dict `_run_stage_via_terminal` returns also relays the agent's self-reported `outcome` (`success`/`failed`) + `error` from `AGENT_DONE`, so the loop executor's `_outcome_is_failure` (`supervisor/scheduler.py`) fails a task that exited cleanly but reported failure (silent-failure guard #2); a `_pty_return()` helper merges the CLI `exit_code` into the same returned dict for that check.

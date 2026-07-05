@@ -141,7 +141,7 @@ driving Pathly workflows:
 - **Conductor**: chat-driven workflow control with Claude, Codex, and shell targets.
 - **Terminal**: full bottom terminal plus chat mini-terminal cards that share the
   same xterm/PTY tab through `xtermRegistry`.
-- **HQ / Runner**: visual pipeline control panel — Start, Pause, Resume, Advance, Reroute, Abort. Each pipeline stage spawns a visible terminal tab with the agent running non-interactively; you can watch the output in real time. Skills are injected via argv at spawn time — no disk-installed skill files required for automated runs. When a stage completes, `cost_usd` and `session_id` are read from `--output-format=json` stdout; the semantic result text is read from the last `AGENT_DONE` event in `EVENTS.jsonl` — which is never subject to PTY output truncation. A CLI-engine spawn scheduler (dual-cap gate in `terminal.ts`) bounds concurrent engines: global ≤ 8, headless one-shots ≤ 5 (queued FIFO with priority), interactive sessions ≤ 5 (rejected over cap). Queue management UI lives in `SpawnQueuePanel`.
+- **HQ / Runner**: visual pipeline control panel — Start, Pause, Resume, Advance, Reroute, Abort. Each pipeline stage spawns a visible terminal tab with the agent running non-interactively; you can watch the output in real time. Skills are injected via argv at spawn time — no disk-installed skill files required for automated runs. When a stage completes, `cost_usd` and `session_id` are read from `--output-format=json` stdout; the semantic result text is read from the last `AGENT_DONE` event in `EVENTS.jsonl` — which is never subject to PTY output truncation. The agent's self-reported `outcome` (`success`/`failed`, + `error`) is read from that same event to gate task pass/fail. A CLI-engine spawn scheduler (dual-cap gate in `terminal.ts`) bounds concurrent engines: global ≤ 8, headless one-shots ≤ 5 (queued FIFO with priority), interactive sessions ≤ 5 (rejected over cap). Queue management UI lives in `SpawnQueuePanel`.
 
 Studio terminal behavior is intentionally shared, not duplicated: the mini card
 and full terminal reparent one xterm instance per `tabId`. The chat card can be
@@ -202,7 +202,7 @@ see [github.com/hamilton-sky/pathly](https://github.com/hamilton-sky/pathly) —
 
 ## Release Status
 
-Current version: **2.18.1**. Four adapters ship: Claude Code, Codex, Copilot,
+Current version: **2.19.0**. Four adapters ship: Claude Code, Codex, Copilot,
 and Antigravity. Core install path (`--dry-run`, `--apply`, `--uninstall`) is
 verified with full rollback on failure. Copilot destination paths follow the VS
 Code Copilot agent spec and may require `--repair` after a VS Code update.

@@ -3,7 +3,7 @@
 ## What this repo is
 
 `pathly-adapters` is the monorepo for the **Pathly AI development framework**:
-- Python package (`pathly-adapters` v2.18.x) — FSM orchestrator, telemetry, install CLI
+- Python package (`pathly-adapters` v2.19.x) — FSM orchestrator, telemetry, install CLI
 - Electron app (`studio/`) — the supervisory **board / Command Center** through which a human drives *headless* multi-agent runs (the visual flow builder + AI chat panel are surfaces within it)
 - Agent/skill source (`src/pathly_data/`) — canonical role contracts, skill markdown, adapter configs
 
@@ -66,6 +66,7 @@ In runner mode Pathly is the single source of truth for skill content. The CLI r
 - `agent_hint.role` — `"worker"` or `"explorer"` (host-neutral delegation signal)
 - `agent_hint.instructions` — full prompt for the next agent (Pathly role, phase, artifacts, limits)
 - `AGENT_DONE.summary` in EVENTS.jsonl — authoritative semantic result text (not truncated by PTY buffer); `--output-format=json` stdout is only used for `session_id` and `cost_usd`
+- `AGENT_DONE.outcome` — `"success"` or `"failed"` (+ `error`); the authoritative pass/fail signal the supervisor's loop executor reads via `_outcome_is_failure`. A clean process exit that self-reports `outcome:"failed"` still fails the task (silent-failure guard #2)
 - `decision` — `"continue"` / `"block"` / `"escalate"` (automation gate)
 - `codex_subagent` — legacy compat field with frozen keys; new adapters should read `agent_hint`
 
@@ -191,6 +192,24 @@ A new endpoint goes into the matching domain file. If no domain matches, create 
 - Always confirm branch target before pushing.
 - Plans go in `pathly/features/<feature>/` (feature-centric layout — files directly under the feature dir, no `plans/` subfolder), never bare `plans/<feature>/`. Legacy `pathly/plans/<feature>/` is still resolved for back-compat, but new plans do NOT go there.
 - `studio/*.tsbuildinfo` files are build artifacts — do not commit them.
+
+---
+
+## Documentation sync
+
+**When you change code, update the matching *living* doc in the same change.** These docs are contracts about the *current* codebase and are loaded into agent context — drift silently misleads both humans and agents.
+
+| Code you touched | Living doc to check |
+|---|---|
+| Root behavior / architecture / pipeline | this `CLAUDE.md` |
+| Frontend (Electron/React) | [studio/CLAUDE.md](studio/CLAUDE.md) |
+| Data / adapters / skills / composition | [src/pathly_data/CLAUDE.md](src/pathly_data/CLAUDE.md) |
+| FSM / orchestrator / HTTP / supervisor | [src/pathly_orchestrator/CLAUDE.md](src/pathly_orchestrator/CLAUDE.md) |
+| User-facing behavior / install / value | `README.md`, [docs/WHAT_IS_PATHLY.md](docs/WHAT_IS_PATHLY.md) |
+
+- **Verify-then-fix, don't rewrite:** check each claim against the code and change only what's demonstrably stale — a blind rewrite introduces drift instead of removing it.
+- **Records are off-limits:** `pathly/features/*/SPEC.md`, retros, `pipeline-walkthrough/`, and `.archive/` are point-in-time records — never "sync" them to current code.
+- A doc fix rides in the **same commit** as the code change it describes, not a separate pass.
 
 ---
 
