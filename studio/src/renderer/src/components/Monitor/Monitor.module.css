@@ -114,6 +114,26 @@
 
 .tab:focus-visible { outline: var(--focus-ring); outline-offset: -2px; }
 
+.tabTopic {
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* Flow shown as a subtle badge next to the feature name (replaces the old `plan/<topic>`
+   label that read like the retired pathly/plans/ folder path). */
+.tabFlowBadge {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-family: system-ui, -apple-system, sans-serif;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--bg-surface1);
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+.tabFlowBadge[data-flow='explore'] { color: var(--runtime); }
+
 .tabActive {
   color: var(--text-primary);
   border-bottom-color: var(--runtime);

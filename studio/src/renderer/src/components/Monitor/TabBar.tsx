@@ -38,7 +38,6 @@ export function TabBar({ sessions, activeTab, onTabSelect }: Props): JSX.Element
   }, [keys, onTabSelect])
 
   const visible = keys.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
-  const allSameTopic = keys.length > 0 && keys.every((k) => extractTopic(k) === extractTopic(keys[0]))
   const rangeStart = page * PAGE_SIZE + 1
   const rangeEnd = Math.min((page + 1) * PAGE_SIZE, keys.length)
 
@@ -68,9 +67,8 @@ export function TabBar({ sessions, activeTab, onTabSelect }: Props): JSX.Element
           const session = sessions[sessionKey]
           const globalIdx = page * PAGE_SIZE + idx
           const isActive = activeTab === sessionKey || (activeTab === null && globalIdx === 0)
-          const label = allSameTopic
-            ? flowTypeLabel(session.flowKey)
-            : `${flowTypeLabel(session.flowKey)}/${truncate(extractTopic(sessionKey), 10)}`
+          const topic = extractTopic(sessionKey)
+          const flow = flowTypeLabel(session.flowKey)
           return (
             <button
               key={sessionKey}
@@ -81,8 +79,12 @@ export function TabBar({ sessions, activeTab, onTabSelect }: Props): JSX.Element
               onClick={() => onTabSelect(sessionKey)}
               onKeyDown={(e) => handleKeyDown(e, globalIdx)}
               className={`${styles.tab} ${isActive ? styles.tabActive : ''}`}
+              title={`${topic} · ${flow} flow`}
             >
-              {label}
+              {/* Feature/topic first (the thing the user cares about), flow as a subtle badge.
+                  Was `${flow}/${topic}` which read like the retired pathly/plans/ folder path. */}
+              <span className={styles.tabTopic}>{truncate(topic, 14)}</span>
+              <span className={styles.tabFlowBadge} data-flow={flow}>{flow}</span>
               {session.isRunning && (
                 <span className={styles.tabDot} aria-hidden="true">●</span>
               )}

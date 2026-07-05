@@ -86,8 +86,10 @@ export function extractTopic(sessionKey: string): string {
 }
 
 export function flowTypeLabel(flowKey: string): string {
-  const t = flowKey.replace('.flow.yaml', '')
-  return t === 'team' ? 'plan' : t
+  // The flow's real name (team/debug/explore/…). Historically the team flow was
+  // relabeled 'plan' here, which rendered as `plan/<topic>` — indistinguishable from
+  // the retired pathly/plans/ folder. Show the honest flow name instead.
+  return flowKey.replace('.flow.yaml', '') || 'team'
 }
 
 export function fmtTokens(n: number): string {
