@@ -129,9 +129,9 @@ export function ModelCard({
           }}
         >
           {isCached
-            ? `✓ ${isOllamaInstalled ? 'Installed via Ollama' : 'Downloaded'}  —  click to remove`
+            ? `${isOllamaInstalled ? 'Installed via Ollama' : 'Downloaded'}  —  click to remove`
             : !canDownload
-              ? '⚠ Install Ollama to download models'
+              ? 'Install Ollama to download models'
               : ollamaAvailable
                 ? isSelected ? '↓ Pull via Ollama' : '↓ Pull & cache via Ollama'
                 : isSelected ? '↓ Download & use this model' : '↓ Download & cache'}

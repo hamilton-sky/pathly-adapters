@@ -2,7 +2,7 @@
 
 context_refs store artifact paths as full repo-relative strings
 (``pathly/features/<f>/PROPOSAL.md``), and the storage-restructure moved feature homes
-out of ``pathly/plans/``. Two defects made the 📎 Referenced (authoritative) channel emit
+out of ``pathly/plans/``. Two defects made the Referenced (authoritative) channel emit
 "section not found":
   1. ``safe_plan_path`` rejected any artifact containing '/' and only looked under
      ``pathly/plans/<scope>/`` → ``safe_artifact_path`` supersedes it.

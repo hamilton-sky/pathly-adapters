@@ -235,7 +235,7 @@ def comms_post():
                                     from_agent="system",
                                     type="nudge",
                                     text=(
-                                        f"⚠ context_refs validate-at-write: "
+                                        f"context_refs validate-at-write: "
                                         f"{art_name} §{anc} unresolved → hydrating whole file. "
                                         f"Check heading conventions (§3.1)."
                                     ),

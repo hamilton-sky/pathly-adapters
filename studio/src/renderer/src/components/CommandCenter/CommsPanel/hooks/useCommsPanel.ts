@@ -79,10 +79,10 @@ export function useCommsPanel(scope: BoardScope, mainFeature: string) {
             if (data.event === 'task_done' || data.event === 'task_failed') {
               const label = (data.text || 'task').slice(0, 70)
               if (data.event === 'task_done') {
-                useToastStore.getState().push(`✔ ${label}`, 'success', { category: 'agent_done' })
+                useToastStore.getState().push(`${label}`, 'success', { category: 'agent_done' })
               } else {
                 const why = data.reason ? ` — ${data.reason.slice(0, 60)}` : ''
-                useToastStore.getState().push(`✗ ${label}${why}`, 'error', { category: 'agent_done' })
+                useToastStore.getState().push(`${label}${why}`, 'error', { category: 'agent_done' })
               }
             }
             loadRef.current()

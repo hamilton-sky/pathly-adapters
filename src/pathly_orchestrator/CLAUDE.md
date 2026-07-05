@@ -156,7 +156,7 @@ pathly_orchestrator/
     history.py             # build_pipeline_history_block
     invoke.py              # invoke_agent(abort_callback=None, proc_callback=None)
     embeddings.py          # embed()/warm() — local embedding model; chunk_summary() splits a summary into child chunks (per-bullet for topic-map, per-### for detailed, none for gist); embed_artifact_async() stores one PARENT vector (whole message text + summary) in comms_embeddings + CHILD vectors per chunk in comms_chunk_embeddings
-    comms_context.py       # assembles board context (🔒 governance + 📎 referenced + 💡 semantic, relevance-gated); _matched_chunk surfaced as "↳ matched topic: …" via comms_formatters.py
+    comms_context.py       # assembles board context (governance + referenced + semantic, relevance-gated); _matched_chunk surfaced as "matched topic: …" via comms_formatters.py
     sections.py            # parse_sections/slugify_heading/structure_key — markdown section index (anchors)
     hydrate.py             # hydrate_section/ensure_indexed — /section payload + staleness; index_artifact_async (eager, section-index only)
     cli.py                 # run_flow, main, resolve_stage, handle_blocked, handle_decide

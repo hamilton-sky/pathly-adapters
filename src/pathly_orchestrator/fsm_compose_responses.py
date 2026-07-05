@@ -184,7 +184,7 @@ def _blocked_response(
                 "code": "feedback_stale",
                 "file": feedback["file"],
                 "age_hours": age,
-                "message": f"⚠ {feedback['file']} has been open for {age}h — review before continuing.",
+                "message": f"{feedback['file']} has been open for {age}h — review before continuing.",
             }
         )
     result = {

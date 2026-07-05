@@ -817,14 +817,14 @@ verify-state [feature | all]
       │
       ▼
   Report:
-  ✓  All clear
-  ⚠  [ORPHAN FEEDBACK]
-  ⚠  [EXPIRED FEEDBACK]
-  ⚠  [STALE FEEDBACK]
-  ⚠  [PROGRESS DRIFT]
-  ⚠  [DEAD REFERENCE]
-  ⚠  [STATE DRIFT]
-  ⚠  [CORRUPT STATE / EVENTS]
+  All clear
+  [ORPHAN FEEDBACK]
+  [EXPIRED FEEDBACK]
+  [STALE FEEDBACK]
+  [PROGRESS DRIFT]
+  [DEAD REFERENCE]
+  [STATE DRIFT]
+  [CORRUPT STATE / EVENTS]
 
   (report only — never auto-fix)
 ```

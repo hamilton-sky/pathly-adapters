@@ -327,7 +327,7 @@ def comms_consolidate():
 
             def _on_start(_run_id: str) -> None:
                 _board_post(
-                    "🤖 reflector started synthesizing this board…", phase="running"
+                    "reflector started synthesizing this board…", phase="running"
                 )
 
             def _on_done(_run_id: str, res) -> None:
@@ -335,7 +335,7 @@ def comms_consolidate():
                 if isinstance(res, dict):
                     summary = str(res.get("result") or res.get("summary") or "done")
                 _board_post(
-                    f"✅ reflector finished synthesis — {summary[:280]}", phase="done"
+                    f"reflector finished synthesis — {summary[:280]}", phase="done"
                 )
 
             result = start_board_run(

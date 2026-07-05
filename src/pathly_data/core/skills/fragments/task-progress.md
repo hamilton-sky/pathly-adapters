@@ -9,13 +9,13 @@ and from phase logging (which marks *pipeline phases* you do not have here).
   ```bash
   curl -s -X POST http://127.0.0.1:8765/comms/post -H "Content-Type: application/json" -d '{
     "feature": "<feature>", "from": "<your-role>", "board": "feature",
-    "type": "status", "text": "▶ Started: <what you are about to do>" }'
+    "type": "status", "text": "Started: <what you are about to do>" }'
   ```
 - **When you FINISH it** (right before you complete / hand off the task), post the outcome:
   ```bash
   curl -s -X POST http://127.0.0.1:8765/comms/post -H "Content-Type: application/json" -d '{
     "feature": "<feature>", "from": "<your-role>", "board": "feature",
-    "type": "status", "text": "✔ Done: <what changed / the result>" }'
+    "type": "status", "text": "Done: <what changed / the result>" }'
   ```
 
 Rules:

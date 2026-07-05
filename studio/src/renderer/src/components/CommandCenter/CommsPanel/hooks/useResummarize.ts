@@ -157,7 +157,7 @@ export function useResummarize(messageId: string): ResummarizeHook {
     if (pillState === 'running') return
     setPillState('running')
     setStartedAt(Date.now())
-    // Drive the per-artifact badge + toast (📝 ready / ⚠ failed). markSummaryStatus owns
+    // Drive the per-artifact badge + toast (ready / failed). markSummaryStatus owns
     // the toasts, so this hook never pushes its own — one feedback source, no double toast.
     const markStatus = useCommsStore.getState().markSummaryStatus
     markStatus(messageId, 'summarizing')

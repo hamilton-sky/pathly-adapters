@@ -566,7 +566,7 @@ def _stub_embed(monkeypatch):
 
 
 def test_backward_compat_no_task_id_no_pinned_marker():
-    """§7(b): retrieve_board_context called without task_id → 📎 marker is absent."""
+    """§7(b): retrieve_board_context called without task_id → Referenced marker is absent."""
     from pathly_orchestrator.runner.comms_context import retrieve_board_context
 
     block = retrieve_board_context(
@@ -581,7 +581,7 @@ def test_backward_compat_no_task_id_no_pinned_marker():
 
 
 def test_backward_compat_task_id_set_but_no_context_refs(client):
-    """§7(c): task with NO context_refs + task_id → no 📎 channel emitted."""
+    """§7(c): task with NO context_refs + task_id → no Referenced channel emitted."""
     import json
 
     # Post a task with no context_refs
@@ -612,7 +612,7 @@ def test_backward_compat_task_id_set_but_no_context_refs(client):
 
 
 def test_backward_compat_task_id_none_identical_to_before(client):
-    """§7(a): task_id=None produces output byte-identical (📎 absent) on same board."""
+    """§7(a): task_id=None produces output byte-identical (Referenced absent) on same board."""
     from pathly_orchestrator.runner.comms_context import retrieve_board_context
 
     # Post a decision so the board is non-empty (triggers Governance)
@@ -643,7 +643,7 @@ def test_backward_compat_task_id_none_identical_to_before(client):
 
 
 def test_context_refs_emits_pinned_channel(client, conn, plan_dir):
-    """§5.1 positive path: a task WITH a resolvable context_refs emits the 📎 Referenced
+    """§5.1 positive path: a task WITH a resolvable context_refs emits the Referenced
     context channel containing the hydrated FULL section text. This is the path the loop
     executor now exercises — scheduler threads task_id → board_context_for →
     retrieve_board_context (regression for the dropped-task_id wiring bug)."""

@@ -72,7 +72,7 @@ function HistoryRow({ record, expanded, onToggle }: { record: SessionRecord; exp
   return (
     <div className={s.rowGroup}>
       <button type="button" className={s.historyRow} onClick={onToggle} aria-expanded={expanded ? 'true' : 'false'}>
-        <span className={s.historyStatus} data-status={record.status}>{record.status === 'done' ? '✓' : '✗'}</span>
+        <span className={s.historyStatus} data-status={record.status}>{record.status === 'done' ? 'done' : 'fail'}</span>
         <span className={s.badge} data-adapter={adapter}>{adapterLabel(adapter)}</span>
         <span className={s.rowLabel}>{record.label}</span>
         <span className={s.timeAgo}>{fmtAgo(record.finishedAt)}</span>

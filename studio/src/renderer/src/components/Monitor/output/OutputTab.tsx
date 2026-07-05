@@ -86,7 +86,7 @@ function HistoricalRunSection({ run, index, viewMode, onSelect }: { run: Histori
         onClick={() => setExpanded((v) => !v)}
         {...(expanded ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
       >
-        <span className={styles.chevron}>{expanded ? '▼' : '▶'}</span>
+        <span className={styles.chevron}>{expanded ? '-' : '+'}</span>
         <span className={styles.historicalRunLabel}>Run {index} — {stageCount} stage{stageCount !== 1 ? 's' : ''}</span>
         <span className={styles.rowMeta}>{timeStr}</span>
         <span className={styles.rowMeta}>${run.cost.toFixed(3)}</span>

@@ -15,7 +15,7 @@ export function Step5Review({
   const checklist = [
     { icon: '✓', text: 'Name: the YAML updates live as you move through the wizard.' },
     { icon: '✓', text: 'Stages: the current state order is mirrored in the sidebar preview.' },
-    { icon: '⚠', text: 'Agents: unassigned non-terminal states can still save, but may stall the flow.' },
+    { icon: '!', text: 'Agents: unassigned non-terminal states can still save, but may stall the flow.' },
     { icon: '✓', text: 'Transitions: gates, routes, and rules are already included in the generated output.' },
     { icon: '✓', text: 'Quality: optional checks stay out of the way until you expand them.' }
   ]

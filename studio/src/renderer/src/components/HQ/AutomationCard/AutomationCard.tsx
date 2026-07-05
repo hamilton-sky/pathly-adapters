@@ -31,7 +31,7 @@ export function AutomationCard({
           title={!schemaAvailable ? 'Studio schema unavailable' : undefined}
           onClick={onRunAll}
         >
-          ▶ Run All
+          Run All
         </button>
         <button
           type="button"

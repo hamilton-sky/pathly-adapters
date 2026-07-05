@@ -122,8 +122,8 @@ Print a structured summary:
   verify-state — $FEATURE (or: all features)
 ╚══════════════════════════════════════════╝
 
-✓  No issues        ← if everything clean
-⚠  N issue(s) found ← if problems detected
+No issues        ← if everything clean
+N issue(s) found ← if problems detected
 
 [ORPHAN FEEDBACK]   pathly/features/.../feedback/REVIEW_FAILURES.md — event 2026-04-28T10:00:00Z not in current event log → safe to delete
 [EXPIRED FEEDBACK]  pathly/features/.../feedback/ARCH_FEEDBACK.md — TTL expired at 2026-04-29T10:00:00Z → safe to delete

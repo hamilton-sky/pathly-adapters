@@ -9,11 +9,11 @@ from pathlib import Path
 def handle_blocked(response: dict) -> None:
     if response.get("target_agent") == "human":
         print(
-            f"\n⚠  Human checkpoint:\n{response.get('instructions', '')}\nFile: {response['file']}"
+            f"\nHuman checkpoint:\n{response.get('instructions', '')}\nFile: {response['file']}"
         )
     else:
         print(
-            f"⚠ Blocked on {response['file']} → routed to {response.get('target_agent')}"
+            f"Blocked on {response['file']} → routed to {response.get('target_agent')}"
         )
 
 
@@ -82,7 +82,7 @@ def resolve_stage(
             file = result["file"]
 
             if target == "human":
-                print(f"\n⚠  Human checkpoint — {file}")
+                print(f"\nHuman checkpoint — {file}")
                 print(result.get("instructions", "(see file)"))
                 input("\nPress Enter when resolved: ")
                 resolved = [file]
@@ -91,7 +91,7 @@ def resolve_stage(
             feedback_rounds += 1
             if feedback_rounds > MAX_FEEDBACK_ROUNDS:
                 print(
-                    f"⚠  Feedback loop exceeded {MAX_FEEDBACK_ROUNDS} rounds on {file}. Escalating to human."
+                    f"Feedback loop exceeded {MAX_FEEDBACK_ROUNDS} rounds on {file}. Escalating to human."
                 )
                 storage = _mod._storage_path(flow, project_root, topic)
                 escalation = storage / "feedback" / "HUMAN_QUESTIONS.md"
@@ -193,7 +193,7 @@ def run_flow(
             handle_blocked(result)
             return 1
 
-        print(f"⚠ Unexpected result: {result}")
+        print(f"Unexpected result: {result}")
         return 1
 
 

@@ -77,7 +77,7 @@ def comms_run():
 
         def _on_start(_run_id: str) -> None:
             _board_post(
-                f"🤖 {label} started on this board… (via {adapter})", phase="running"
+                f"{label} started on this board… (via {adapter})", phase="running"
             )
 
         def _on_done(_run_id: str, res) -> None:
@@ -85,7 +85,7 @@ def comms_run():
             if isinstance(res, dict):
                 summary = str(res.get("result") or res.get("summary") or "done")
             _board_post(
-                f"✅ {label} finished via {adapter} — {summary[:280]}", phase="done"
+                f"{label} finished via {adapter} — {summary[:280]}", phase="done"
             )
 
         result = start_board_run(

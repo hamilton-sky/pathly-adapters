@@ -66,7 +66,7 @@ Storage path    : <storage_path>
 Target adapter  : <preferred_adapter>
 Current adapter : <current_adapter>
 
-⚠  If <preferred_adapter> is not installed, paste the Instructions block into
+If <preferred_adapter> is not installed, paste the Instructions block into
    any available adapter — it will run correctly in any environment.
    Do not silently skip the stage.
 

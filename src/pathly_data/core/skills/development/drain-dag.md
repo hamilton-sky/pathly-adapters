@@ -52,9 +52,9 @@ the board catalog — you are scoped to your own board, so this is safe:
 GET /comms/artifacts?board=feature&scope=$SCOPE          # list what's available
 GET /comms/artifacts/section?scope=$SCOPE&artifact=<path>&anchor=<anchor>&trail=<message_id>
 ```
-The 📚 Catalog block in your context already lists the top artifacts inline — read that
+The Catalog block in your context already lists the top artifacts inline — read that
 first and pull only the section you need. Append `&trail=<message_id>` (the task id) so
-the board records what you read. Pull narrowly; don't refetch the 📎 references above.
+the board records what you read. Pull narrowly; don't refetch the references above.
 
 Carry out the task: make the change, then verify it
 (run the relevant build/test/lint). Post brief progress to the board as you go so the

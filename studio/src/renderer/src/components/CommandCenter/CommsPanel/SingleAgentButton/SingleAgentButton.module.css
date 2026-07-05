@@ -281,7 +281,7 @@
   cursor: not-allowed;
 }
 
-/* ── Inline Start ▸ gear segmented control (sits at the right of the Reads row) ── */
+/* ── Inline Start gear segmented control (sits at the right of the Reads row) ── */
 .row {
   display: flex;
   align-items: center;

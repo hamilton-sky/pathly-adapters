@@ -27,7 +27,7 @@ def _format_age(ts_str: str) -> str:
 
 
 def _confidence_label(distance: float | None) -> str:
-    """Bucket a cosine distance into a legible confidence tag for the 💡 Context line.
+    """Bucket a cosine distance into a legible confidence tag for the Context line.
 
     Raw MiniLM cosine values aren't intuitively scaled (a 0.42 "sim" can be a decent
     match), so we surface a coarse bucket — NOT a float — that reads cleanly in the
@@ -72,7 +72,7 @@ def _format_context_line(msg: dict) -> str:
         snippet = " ".join(matched.split())
         if len(snippet) > 200:
             snippet = snippet[:200] + "…"
-        line += f"\n    ↳ matched topic: {snippet}"
+        line += f"\n    matched topic: {snippet}"
     return line
 
 
@@ -113,7 +113,7 @@ def _collect_hydrate_channel(
     project_root: str,
     conn,
 ) -> tuple[list[str], int]:
-    """Build the 📎 Referenced context channel from a task's context_refs manifest.
+    """Build the Referenced context channel from a task's context_refs manifest.
 
     Returns (lines, count). Lines is empty when task_id is None or no refs found.
     """
@@ -165,13 +165,13 @@ def _collect_hydrate_channel(
                         # path_out_of_scope / anchor_not_found) rather than a blanket
                         # "section not found" that hides a path-resolution failure.
                         err = (result.get("body") or {}).get("error", "unavailable")
-                        hydrate_lines.append(f"- ⚠ {art}{anchor_label} — {err}")
+                        hydrate_lines.append(f"- {art}{anchor_label} — {err}")
                 except Exception:
                     _logger.debug("hydrate_section failed for ref %r", ref, exc_info=True)
                     art = ref.get("artifact", "?")
                     anc = ref.get("anchor")
                     anchor_label = f" §{anc}" if anc else ""
-                    hydrate_lines.append(f"- ⚠ {art}{anchor_label} — hydration error (skipped)")
+                    hydrate_lines.append(f"- {art}{anchor_label} — hydration error (skipped)")
     except Exception:
         _logger.debug("comms_context: task_id hydration failed", exc_info=True)
     return hydrate_lines, hydrate_count

@@ -89,7 +89,7 @@ function formatEvent(ev: FsmEvent, retrograde?: boolean): string {
       if (INNER_PHASES.has(phase)) {
         return `${ts}  ${pad('·', 14)}  ${phase}`
       }
-      return `${ts}  ${pad('PHASE', 14)}  ${agent}${convSuffix}  ${phase} ▸`
+      return `${ts}  ${pad('PHASE', 14)}  ${agent}${convSuffix}  ${phase}`
     }
     case 'PHASE_DONE': {
       const phase = (ev as Record<string, unknown>).phase as string | undefined ?? '?'

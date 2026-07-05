@@ -1,4 +1,4 @@
-"""Relevance gate on the 💡 Context channel (memory-consolidation phase).
+"""Relevance gate on the Context channel (memory-consolidation phase).
 
 Verifies _SEMANTIC_MAX_DISTANCE drops weak semantic hits and _CONTEXT_CHAR_BUDGET
 caps the channel body — by injecting rows with controlled `_distance` values.
@@ -11,7 +11,7 @@ def _stub_common(monkeypatch):
     import pathly_orchestrator.db.queries.comms as cq
     import pathly_orchestrator.runner.embeddings as emb
 
-    # No governance, so only the 💡 channel matters.
+    # No governance, so only the Context channel matters.
     monkeypatch.setattr(cq, "get_pending_decisions", lambda *a, **k: [])
     monkeypatch.setattr(cq, "get_active_escalations", lambda *a, **k: [])
     # Non-None embedding so the semantic path runs (value unused — search is stubbed).

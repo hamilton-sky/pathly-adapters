@@ -51,7 +51,7 @@ def retrieve_board_context(
         Defaults to all-enabled when None or absent.
     task_id:
         Optional task message ID. When set, reads context_refs from the task
-        and emits the 📎 Referenced context channel (§5). Default None ⇒
+        and emits the Referenced context channel (§5). Default None ⇒
         output byte-identical to today.
     counts:
         Optional mutable dict. When provided, it is populated with per-channel

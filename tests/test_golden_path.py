@@ -230,7 +230,7 @@ def test_goal_loop_spawns_headless_not_interactive(tmp_path):
 
 
 def test_goal_loop_posts_supervisor_progress(tmp_path):
-    """The loop SUPERVISOR posts a guaranteed ▶ start / ✔ done status per task to the board.
+    """The loop SUPERVISOR posts a guaranteed start / done status per task to the board.
 
     The task-progress FRAGMENT relies on the per-task agent posting — which it can (and does) skip
     for small tasks. The supervisor owns claim/complete, so it is the reliable source of mid-run
@@ -257,8 +257,8 @@ def test_goal_loop_posts_supervisor_progress(tmp_path):
         (scope,),
     ).fetchall()
     texts = " || ".join(r["text"] for r in rows)
-    assert "▶ Started" in texts and "task ALPHA" in texts, texts
-    assert "✔ Done" in texts, texts
+    assert "Started:" in texts and "task ALPHA" in texts, texts
+    assert "Done:" in texts, texts
     # one start + one done for each of the 2 tasks → at least 4 supervisor status posts
     assert len(rows) >= 4, f"expected >=4 supervisor progress posts, got {len(rows)}: {texts}"
 

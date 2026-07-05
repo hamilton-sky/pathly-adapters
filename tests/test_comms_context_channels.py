@@ -1,8 +1,8 @@
 """Tests for Phase 1.4c — labeled governance/semantic channels.
 
 retrieve_board_context() must produce a ## Communication Board block with:
-  - 🔒 Governance section containing decisions + escalations (always injected)
-  - 💡 Context section containing semantic matches (labeled as advisory)
+  - Governance section containing decisions + escalations (always injected)
+  - Context section containing semantic matches (labeled as advisory)
   - Escalations must NOT appear in the context pool (only in governance)
 """
 
@@ -139,7 +139,7 @@ def test_comms_context_channels_get_active_escalations_no_boards():
 
 
 def test_comms_context_channels_decision_in_governance(client):
-    """A pending decision appears under the 🔒 Governance section."""
+    """A pending decision appears under the Governance section."""
     _post(client, "decision", "Use SQLite for all persistence")
 
     from pathly_orchestrator.runner.comms_context import retrieve_board_context
@@ -157,7 +157,7 @@ def test_comms_context_channels_decision_in_governance(client):
 
 
 def test_comms_context_channels_escalation_in_governance(client):
-    """An active escalation appears under the 🔒 Governance section."""
+    """An active escalation appears under the Governance section."""
     _post(client, "escalation", "Need human sign-off before proceeding")
 
     from pathly_orchestrator.runner.comms_context import retrieve_board_context
@@ -191,7 +191,7 @@ def test_comms_context_channels_governance_label_not_in_context(client):
 
 
 def test_comms_context_channels_context_section_advisory_label(client, monkeypatch):
-    """The 💡 Context section carries 'verify before acting' advisory text."""
+    """The Context section carries 'verify before acting' advisory text."""
     # Inject a discovery so retrieve_board_context has something in the context pool
     _post(client, "discovery", "Auth bug: session tokens expire too fast")
 
@@ -229,7 +229,7 @@ def test_comms_context_channels_empty_board_returns_empty_string():
 
 
 def test_comms_context_channels_superseded_decision_absent_from_governance(client):
-    """A superseded decision does NOT appear in the 🔒 Governance section."""
+    """A superseded decision does NOT appear in the Governance section."""
     old_id = _post(client, "decision", "Use PostgreSQL")
     new_id = _post(client, "decision", "Use SQLite")
 
@@ -280,7 +280,7 @@ def test_comms_context_channels_governance_does_not_starve_context(client, monke
     """Governance messages must not displace advisory context out of the k-cap.
 
     On the global board (k=1), a decision posted *after* a discovery must not
-    starve the 💡 Context section. Because decisions are embedded, a naive
+    starve the Context section. Because decisions are embedded, a naive
     fetch-then-filter would let the newer decision fill the single slot and then
     drop it as governance, leaving zero context. retrieve_board_context()
     over-fetches before filtering, so the discovery survives (Phase 1.4c fix).

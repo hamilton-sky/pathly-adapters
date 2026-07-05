@@ -119,7 +119,7 @@ def _inject_prompt_vars(
 
 def _changed_files(project_root: str, limit: int = 3) -> list[str]:
     """Return up to ``limit`` code files changed in the working tree — the task's
-    file scope for the 🧭 code-structure channel — or ``[]`` on any failure.
+    file scope for the code-structure channel — or ``[]`` on any failure.
 
     Bounded and never raises: a git failure or non-repo just yields no scope, so
     the channel is simply absent (the "never break the prompt" idiom).
@@ -292,7 +292,7 @@ def build_prompt(
     except Exception:
         pass
 
-    # 🧭 Code structure channel (B-inject). Shares the runner.code_context
+    # Code structure channel (B-inject). Shares the runner.code_context
     # backend with the C proxy. Gated on a configured backend so the default
     # (off) path stays zero-cost — no git call, no block — exactly as before.
     code_block = ""

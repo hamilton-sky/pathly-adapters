@@ -42,8 +42,8 @@ function normalizeStatus(status: string): 'done' | 'active' | 'blocked' | undefi
 function statusIconChar(status: string, isNext: boolean): string {
   if (status === 'DONE') return '✓'
   if (status === 'IN_PROGRESS' || status === 'REVIEWING' || status === 'BUILDING') return '●'
-  if (status === 'BLOCKED') return '✗'
-  if (isNext) return '▶'
+  if (status === 'BLOCKED') return 'x'
+  if (isNext) return '>'
   return '○'
 }
 

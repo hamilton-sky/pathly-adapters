@@ -72,7 +72,7 @@ def comms_goals_run():
                 logging.debug("goal_run lifecycle post failed", exc_info=True)
 
         def _on_start(_run_id: str) -> None:
-            _board_post("▶ goal run started — dispatching executor…", phase="running")
+            _board_post("goal run started — dispatching executor…", phase="running")
 
         def _on_done(_run_id: str, res) -> None:
             # A user stop / crash must still clear the board's "Running…" timer pill —
@@ -88,9 +88,9 @@ def comms_goals_run():
                     or "abort" in low
                     or "kill" in low
                 ):
-                    _board_post("⏹ goal run stopped", phase="stopped")
+                    _board_post("goal run stopped", phase="stopped")
                     return
-                _board_post(f"❌ goal run failed — {err[:300]}", phase="error")
+                _board_post(f"goal run failed — {err[:300]}", phase="error")
                 return
             summary = ""
             if isinstance(res, dict):
@@ -99,7 +99,7 @@ def comms_goals_run():
                 summary = f"executor={ex}"
                 if isinstance(done, list):
                     summary += f", completed={len(done)}"
-            _board_post(f"✅ goal run finished — {summary}", phase="done")
+            _board_post(f"goal run finished — {summary}", phase="done")
 
         result = start_goal_run(
             goal_id,
@@ -327,11 +327,11 @@ def comms_goals_decompose():
                     or "abort" in low
                     or "kill" in low
                 ):
-                    _board_post("⏹ decomposition stopped", phase="stopped")
+                    _board_post("decomposition stopped", phase="stopped")
                     return
-                _board_post(f"❌ decomposition failed — {err[:300]}", phase="error")
+                _board_post(f"decomposition failed — {err[:300]}", phase="error")
                 return
-            _board_post("✅ decomposition finished — task DAG seeded", phase="done")
+            _board_post("decomposition finished — task DAG seeded", phase="done")
 
         result = start_goal_decompose(
             goal_id,

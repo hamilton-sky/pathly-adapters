@@ -185,7 +185,7 @@ export function NodePanel({
               <option key={a.name} value={a.name}>{a.name}</option>
             ))}
             {currentAgent && !agents.some((a) => a.name === currentAgent) && (
-              <option value={currentAgent}>{currentAgent} ⚠</option>
+              <option value={currentAgent}>{currentAgent} (unknown)</option>
             )}
           </select>
           <span className={s.ctrlSelectChevron} aria-hidden="true">▾</span>

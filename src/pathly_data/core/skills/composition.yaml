@@ -212,7 +212,7 @@ skills:
       - completion-report
   # drain-dag (single executor) does its board CRUD inline — it IS the drain loop — so it needs
   # no phase logging (a drain loop has no pipeline phases; no_defaults keeps that prose out). It
-  # DOES get task-progress so the single agent posts a ▶/✔ status per task it drains — otherwise
+  # DOES get task-progress so the single agent posts a started/done status per task it drains — otherwise
   # a headless single-agent run shows no mid-run progress at all. completion-report stays LAST.
   development/drain-dag:
     no_defaults: true

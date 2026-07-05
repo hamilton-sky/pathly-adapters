@@ -640,10 +640,10 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
   markSummaryStatus: (messageId, status, error) => {
     set((s) => ({ summaryStatus: { ...s.summaryStatus, [messageId]: status } }))
     if (status === 'ready') {
-      useToastStore.getState().push('📝 Summary ready', 'success', { category: 'db_crud' })
+      useToastStore.getState().push('Summary ready', 'success', { category: 'db_crud' })
     } else if (status === 'failed') {
       useToastStore.getState().push(
-        `⚠ Summary failed${error ? `: ${error}` : ''}`,
+        `Summary failed${error ? `: ${error}` : ''}`,
         'error',
         { category: 'runner_state' },
       )
