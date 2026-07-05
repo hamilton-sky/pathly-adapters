@@ -175,7 +175,16 @@ def scheduler_loop(
             from pathly_orchestrator.skills.compose import compose_skill
 
             _body = compose_skill("development/execute-task", adapter or "claude")
-            instructions = f"{_body}\n\n## Your task\n\n{task_text}"
+            # Stamp a concrete Pathly role so fragments that reference the agent's role
+            # resolve to a recognized, full-tier value — notably code-query's `role`
+            # field. A loop task agent otherwise has no role, so its code-query was
+            # silently gated (the gate also now defaults unknown roles to a usable tier).
+            instructions = (
+                f"{_body}\n\n## Your task\n\n"
+                "(Your Pathly role for this task is **builder** — use it wherever a "
+                "fragment asks for your role, e.g. the code-query `role` field.)\n\n"
+                f"{task_text}"
+            )
         except Exception:
             instructions = task_text
         # Inject the same scope-aware board context (governance + memory, honoring

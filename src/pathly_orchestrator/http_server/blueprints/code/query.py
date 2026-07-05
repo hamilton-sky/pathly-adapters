@@ -52,6 +52,10 @@ _TIER_OPS: dict[str, frozenset[str]] = {
 }
 _ROLE_TIER: dict[str, str] = {
     "architect": "full", "builder": "full", "reviewer": "full", "explorer": "full",
+    # "worker"/"explorer" are the FSM/loop host-neutral roles (agent_hint.role); a
+    # worker does implementation → full, like builder. Without this, a loop task agent
+    # that passes its host-neutral role was silently gated and code-query never fired.
+    "worker": "full",
     "scout": "chain", "tester": "chain",
     "quick": "lookup", "director": "lookup", "planner": "lookup",
     "designer": "lookup", "po": "lookup",
@@ -59,16 +63,26 @@ _ROLE_TIER: dict[str, str] = {
     "evaluator": "excluded", "human": "excluded",
 }
 
+# Fallback tier for an unrecognized / empty role. A Pathly agent that didn't name its
+# role (e.g. a loop task agent) must still get BASIC, board-logged code-query — a silent
+# "disabled" no-op is why code-query never fired in loop runs. Only EXPLICITLY excluded
+# roles are denied outright.
+_DEFAULT_TIER = "lookup"
+
 
 def _gate(role: str, op: str) -> str | None:
     """Return a denial reason, or None when (role, op) is permitted.
 
-    Unknown / empty / excluded roles are denied with ``"disabled"``; a known
-    role requesting an op outside its tier is denied ``"op-not-permitted"``.
+    An EXPLICITLY excluded role (web-researcher, orchestrator, evaluator, human) is
+    denied ``"disabled"``. An unknown / empty role falls back to the ``lookup`` tier —
+    it still gets basic, logged code-query instead of a silent off. A known role
+    requesting an op outside its tier is denied ``"op-not-permitted"``.
     """
     tier = _ROLE_TIER.get(role.strip().lower())
-    if tier is None or tier == "excluded":
+    if tier == "excluded":
         return "disabled"
+    if tier is None:
+        tier = _DEFAULT_TIER
     if op.strip().lower() not in _TIER_OPS[tier]:
         return "op-not-permitted"
     return None
