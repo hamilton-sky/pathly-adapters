@@ -57,6 +57,5 @@ update snapshots deliberately).
 
 ## Relationship
 
-Independent of [board-scoped-storage] and the possible Pathly→Bright-sky product rename — but the
-same discipline applies (alias-first, dual-read, golden-snapshot guard, adapters rebuilt last). If a
-product rename is coming, sequence this *before or with* it so the two renames don't interleave.
+Independent of [board-scoped-storage]. Same discipline as any cross-cutting rename in this repo:
+alias-first, dual-read, golden-snapshot guard, adapters rebuilt last.
