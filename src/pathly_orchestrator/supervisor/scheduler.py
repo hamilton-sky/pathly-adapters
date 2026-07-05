@@ -85,6 +85,7 @@ def scheduler_loop(
         complete_task,
         fail_task,
         get_ready_tasks,
+        get_tasks,
         reclaim_stale_claims,
     )
 
@@ -118,6 +119,7 @@ def scheduler_loop(
     result_completed: list[str] = []
     result_failed: list[str] = []
     result_blocked: list[str] = []
+    aborted = False
 
     def _worker(task: dict, task_run_id: str, ws) -> None:
         """Run in a daemon thread. Calls spawn_fn and pushes result onto completion_q."""
@@ -178,6 +180,7 @@ def scheduler_loop(
             logger.info(
                 "scheduler: abort signalled, exiting loop for %s/%s", board, scope
             )
+            aborted = True
             break
 
         ready = get_ready_tasks(conn, boards=[board], scopes=[scope], goal_id=goal_id)
@@ -242,6 +245,7 @@ def scheduler_loop(
             continue
 
         if item is _ABORT_SENTINEL:
+            aborted = True
             break
 
         task_id, lane, _outcome, exc = item
@@ -284,10 +288,38 @@ def scheduler_loop(
             except Exception:
                 pass
 
+    # ── Deadlock guard ──────────────────────────────────────────────────────────
+    # After a NORMAL drain (not an abort), any task still 'pending' has an unsatisfiable
+    # dependency — a cycle, or a depends_on that will never complete. get_ready_tasks
+    # silently excludes such tasks (unmet deps), so without this the loop returns a
+    # clean-looking result while the work sits stuck forever. Surface it LOUDLY: mark
+    # each blocked with a reason, report it, and warn.
+    result_deadlocked: list[str] = []
+    if not aborted:
+        for row in get_tasks(conn, board, scope, task_status="pending", goal_id=goal_id):
+            tid = row["id"]
+            conn.execute(
+                "UPDATE comms_messages SET task_status='blocked', fail_reason=? WHERE id=?",
+                ("deadlocked: unsatisfiable dependency (cycle or missing depends_on)", tid),
+            )
+            result_deadlocked.append(tid)
+            result_blocked.append(tid)
+        if result_deadlocked:
+            conn.commit()
+            logger.warning(
+                "scheduler: %d task(s) DEADLOCKED in %s/%s (unsatisfiable deps): %s",
+                len(result_deadlocked), board, scope, result_deadlocked,
+            )
+            _broadcast(
+                event_broadcast_fn, scope, "task_deadlocked",
+                {"tasks": result_deadlocked, "board": board},
+            )
+
     return {
         "completed": result_completed,
         "failed": result_failed,
         "blocked": result_blocked,
+        "deadlocked": result_deadlocked,
     }
 
 

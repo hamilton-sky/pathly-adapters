@@ -14,6 +14,8 @@ runs the drain synchronously in the test thread — no thread-join races.
 """
 from __future__ import annotations
 
+import json
+
 import pytest
 
 
@@ -129,3 +131,33 @@ def test_goal_loop_cascades_block_on_failure(tmp_path):
     assert _status(conn, a) == "failed"
     assert _status(conn, b) == "blocked"   # cascade from its failed dependency
     assert _status(conn, c) == "done"      # independent branch still drains
+
+
+def test_goal_loop_surfaces_deadlocked_dag(tmp_path):
+    """SILENT-FAILURE GUARD: a task with an unsatisfiable dependency — a dangling ref or a cycle —
+    never becomes ready, so the frontier drains leaving it pending forever. The executor must
+    SURFACE that as deadlocked/blocked, not return a clean-looking result that hides stuck work."""
+    from pathly_orchestrator.db.connection import get_db
+    from pathly_orchestrator.supervisor.goal_executor import start_goal_run
+
+    conn = get_db()
+    scope = "golden-path-deadlock"
+    gid = _seed_goal(conn, scope)
+    ok = _seed_task(conn, scope, gid, "task OK")                       # no deps -> completes
+    dangle = _seed_task(conn, scope, gid, "task DANGLE", depends_on=["nonexistent-id"])
+    cyc = _seed_task(conn, scope, gid, "task CYCLE")                   # made self-cyclic below
+    conn.execute("UPDATE comms_messages SET depends_on=? WHERE id=?", (json.dumps([cyc]), cyc))
+    conn.commit()
+
+    result = start_goal_run(
+        gid, executor_override="loop", project_root=str(tmp_path),
+        spawn_fn=lambda *_a: {}, block=True,
+    )
+
+    assert result["ok"] is True, result
+    inner = result["result"]
+    assert _status(conn, ok) == "done"            # the healthy task still drains
+    # The two unsatisfiable tasks are surfaced, not silently left pending.
+    assert set(inner.get("deadlocked", [])) == {dangle, cyc}, inner
+    assert _status(conn, dangle) == "blocked"
+    assert _status(conn, cyc) == "blocked"
