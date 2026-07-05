@@ -152,18 +152,40 @@ def get_section(conn: sqlite3.Connection, artifact_id: str, anchor: str) -> dict
     return dict(row) if row is not None else None
 
 
+def canonical_artifact_path(path: str) -> str:
+    """Project-relative ``pathly/...`` form of an artifact path.
+
+    Absolute and relative refs to the SAME file must resolve to ONE artifact row. An absolute
+    path is trimmed at its ``/pathly/`` segment; a path already relative to the project (or with
+    no ``pathly/`` segment) is returned forward-slashed and otherwise unchanged."""
+    p = (path or "").replace("\\", "/")
+    idx = p.rfind("/pathly/")
+    return p[idx + 1:] if idx != -1 else p
+
+
 def find_or_create_artifact_by_path(
     conn: sqlite3.Connection, scope: str, path: str
 ) -> dict | None:
-    """Resolve a comms_artifacts row by (scope, path), creating a sentinel for legacy plans."""
+    """Resolve a comms_artifacts row by (scope, path), creating a sentinel for legacy plans.
+
+    The LOOKUP matches the exact path OR its canonical project-relative form
+    (``canonical_artifact_path``), so an absolute ref — as ``hydrate_section`` passes after
+    ``safe_artifact_path`` resolves it — finds the existing relative-path row instead of minting
+    a duplicate absolute-path sentinel on every board-context build. A newly created sentinel
+    stores the path AS PASSED (readers use ``row["path"]`` to read the file, so it must stay
+    readable); canonicalization is for matching + the catalog display only."""
     import os
 
+    canonical = canonical_artifact_path(path)
+    # Match the exact path OR its canonical (project-relative) form, so an absolute ref — as
+    # hydrate_section passes — finds the existing RELATIVE-path row (agents store relative paths)
+    # instead of missing it and minting a duplicate absolute-path sentinel on every call.
     row = conn.execute(
         "SELECT a.* FROM comms_artifacts a "
         "JOIN comms_messages m ON m.id = a.message_id "
-        "WHERE m.scope=? AND a.path=? "
+        "WHERE m.scope=? AND a.path IN (?, ?) "
         "ORDER BY a.created_at DESC LIMIT 1",
-        (scope, path),
+        (scope, path, canonical),
     ).fetchone()
     if row is not None:
         return dict(row)
@@ -187,6 +209,9 @@ def find_or_create_artifact_by_path(
 
     sentinel_artifact_id = str(uuid.uuid4())
     sentinel_msg_id = str(uuid.uuid4())
+    # Store the path AS PASSED (readers use row["path"] to read the file, so it must stay
+    # absolute/readable) — the canonical form is only for the dedup LOOKUP above and the
+    # display-layer catalog dedup, never the stored value.
     title = path.replace("\\", "/").rsplit("/", 1)[-1]
     now = _now()
     with _get_write_lock(conn):

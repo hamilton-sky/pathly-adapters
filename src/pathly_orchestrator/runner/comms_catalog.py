@@ -43,7 +43,9 @@ def build_catalog_channel(conn: Any, board: str, scope: str) -> tuple[list[str],
             scope,
             exposed_boards=[board],
             order="recency",
-            limit=_CATALOG_INDEX_MAX + 1,
+            # Over-fetch: the dedup below collapses same-file rows, so we need headroom to
+            # still fill the index after duplicates are removed.
+            limit=_CATALOG_INDEX_MAX * 4 + 1,
         )
     except Exception:
         logger.debug("catalog channel: list_artifacts_catalog failed", exc_info=True)
@@ -51,6 +53,21 @@ def build_catalog_channel(conn: Any, board: str, scope: str) -> tuple[list[str],
 
     if not rows:
         return [], 0
+
+    # One catalog line per FILE: dedup by canonical (project-relative) path so the same SPEC
+    # can't appear two/three times (goal-attached + note-attached, or a legacy absolute-path
+    # dup). Recency-ordered, so the first (newest/richest) row for each file wins.
+    from pathly_orchestrator.db.queries.comms_artifacts import canonical_artifact_path
+
+    seen: set[str] = set()
+    deduped: list[dict] = []
+    for r in rows:
+        key = canonical_artifact_path(r.get("path") or r.get("title") or "")
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(r)
+    rows = deduped
 
     shown = rows[:_CATALOG_INDEX_MAX]
     overflow = len(rows) - len(shown)

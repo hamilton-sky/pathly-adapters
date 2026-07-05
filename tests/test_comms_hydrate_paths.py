@@ -73,3 +73,52 @@ def test_find_or_create_accepts_features_path(tmp_path):
     p = _mk(tmp_path, "pathly", "features", "feat", "A.md")
     row = find_or_create_artifact_by_path(get_db(), "feat", str(p))
     assert row is not None and row["type"] == "md"
+
+
+def test_find_or_create_canonicalizes_absolute_to_existing_relative(tmp_path):
+    """An ABSOLUTE-path lookup for a file that already has a relative-path artifact row must
+    return that SAME row — not mint a 'system' sentinel keyed by the absolute path. That
+    per-hydrate duplicate was the "same SPEC listed 3x in the catalog" bug: hydrate_section
+    passes the resolved absolute path, and the old exact-string match never found the relative
+    row so it created a new sentinel on every board_context_for call."""
+    from pathly_orchestrator.db.connection import get_db
+    from pathly_orchestrator.db.queries.comms import find_or_create_artifact_by_path, post_message
+    from pathly_orchestrator.db.queries.comms_artifacts import insert_artifact
+
+    conn = get_db()
+    p = _mk(tmp_path, "pathly", "features", "feat", "SPEC.md")
+    rel = "pathly/features/feat/SPEC.md"
+    mid = post_message(conn, board="feature", scope="feat", from_agent="architect",
+                       type="artifact", text="spec", artifact_path=rel)
+    insert_artifact(conn, mid, path=rel, type="spec", title="SPEC.md")
+
+    row = find_or_create_artifact_by_path(conn, "feat", str(p))  # absolute path (as hydrate passes)
+    assert row is not None
+    assert row["path"] == rel, f"expected the existing relative row, got {row['path']!r}"
+    n = conn.execute(
+        "SELECT COUNT(*) FROM comms_artifacts a JOIN comms_messages m ON m.id=a.message_id "
+        "WHERE m.scope='feat'"
+    ).fetchone()[0]
+    assert n == 1, f"a duplicate artifact row was minted (found {n})"
+
+
+def test_catalog_channel_dedups_same_file(tmp_path):
+    """The catalog channel lists ONE entry per file even when several comms_artifacts rows point
+    at the same path (goal-attached + note-attached, or a legacy absolute-path dup) — otherwise the
+    agent's context shows the same SPEC two/three times."""
+    from pathly_orchestrator.db.connection import get_db
+    from pathly_orchestrator.db.queries.comms import post_message
+    from pathly_orchestrator.db.queries.comms_artifacts import insert_artifact
+    from pathly_orchestrator.runner.comms_catalog import build_catalog_channel
+
+    conn = get_db()
+    rel = "pathly/features/feat/SPEC.md"
+    for i in range(2):
+        mid = post_message(conn, board="feature", scope="feat", from_agent="architect",
+                           type="artifact", text=f"a{i}", artifact_path=rel)
+        insert_artifact(conn, mid, path=rel, type="spec", title="SPEC.md")
+
+    lines, count = build_catalog_channel(conn, "feature", "feat")
+    entries = [ln for ln in lines if "•" in ln and "SPEC.md" in ln]
+    assert len(entries) == 1, f"expected 1 catalog entry for SPEC.md, got {len(entries)}: {entries}"
+    assert count == 1, f"expected catalog count 1, got {count}"
