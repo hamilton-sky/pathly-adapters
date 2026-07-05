@@ -272,17 +272,32 @@ def test_task_executors_include_task_progress_fragment(skill):
     )
 
 
-@pytest.mark.parametrize("skill", ["development/drain-dag", "development/execute-task"])
-def test_task_executors_include_code_query_fragment(skill):
-    """Both task executors compose the code-query fragment, so a loop/single agent asks Pathly's
+# Every skill whose agent reads / edits / reviews / traces CODE STRUCTURE composes the
+# code-query fragment, so the agent asks Pathly's code graph (POST /code/query) for
+# structure before Grep — safe-nulling back to Grep when the backend is off. Design /
+# research / planning / summarize skills are intentionally excluded (no code structure).
+_CODE_TOUCHING_SKILLS = [
+    "team/build", "team/review", "team/test", "team/architect",
+    "development/build", "development/review", "development/test",
+    "development/explore", "development/debug",
+    "development/execute-task", "development/drain-dag",
+    "debug/build", "debug/verify", "fix/build",
+]
+
+
+@pytest.mark.parametrize("skill", _CODE_TOUCHING_SKILLS)
+def test_code_touching_skills_include_code_query_fragment(skill):
+    """Any code-structure skill must compose the code-query fragment, so its agent asks Pathly's
     code graph (POST /code/query) for structure before Grep — safe-nulling back to Grep when the
-    backend is off. Without this, agents never use Pathly's code-intelligence."""
+    backend is off. Without this, that agent never uses Pathly's code-intelligence."""
     out = compose_skill(skill, "claude")
     assert "Code intelligence (ask Pathly's code graph before Grep)" in out, f"{skill} missing code-query"
     assert "/code/query" in out, f"{skill} missing the /code/query endpoint"
-    assert out.index("/code/query") < out.index("Completion report (AGENT_DONE)"), (
-        f"{skill}: code-query must compose before completion-report"
-    )
+    # completion-report, where present, owns the "final act" slot — code-query composes before it.
+    if "Completion report (AGENT_DONE)" in out:
+        assert out.index("/code/query") < out.index("Completion report (AGENT_DONE)"), (
+            f"{skill}: code-query must compose before completion-report"
+        )
 
 
 def test_dev_build_includes_completion_scout_and_spawn():
