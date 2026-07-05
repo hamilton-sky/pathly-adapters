@@ -62,9 +62,8 @@ class CliProvider:
     graph for the in-scope files' symbols + caller/callee counts.
 
     The repo must be indexed first (``codebase-memory-mcp cli index_repository``);
-    ``code_context.maybe_reindex`` refreshes it at stage boundaries. ``tool``
-    selects the binary name, so the source can be swapped through the
-    ``code_context.tool`` setting (e.g. back to ``gitnexus`` on Linux/CI).
+    ``code_context.maybe_reindex`` refreshes it at stage boundaries. The binary is
+    always ``codebase-memory-mcp`` — Pathly's sole code-graph engine (gitnexus removed).
     """
 
     name = "cli"

@@ -34,6 +34,6 @@ pathly/plans/**/EVENTS.jsonl
 # Board artifact copies — duplicates of plan diagrams, written on "Add to board"
 pathly/board-artifacts/
 
-# gitnexus/serena local index + project cache
+# code-intel (codebase-memory-mcp) + serena local index + project cache
 .serena/
-.gitnexus/
+.codebase-memory-mcp/

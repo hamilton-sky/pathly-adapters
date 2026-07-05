@@ -4,7 +4,7 @@ import { useToastStore } from '../../../store/toastStore'
 
 export type CodeContextBackend = 'off' | 'cli'
 export type CodeContextReindex = 'off' | 'stage' | 'auto'
-export type CodeContextTool = 'codebase-memory-mcp' | 'gitnexus'
+export type CodeContextTool = 'codebase-memory-mcp'
 
 const KEY_BACKEND = 'code_context.backend'
 const KEY_REINDEX = 'code_context.reindex'
@@ -23,8 +23,9 @@ function parseReindex(v: string | undefined): CodeContextReindex {
   return DEFAULT_REINDEX
 }
 
-function parseTool(v: string | undefined): CodeContextTool {
-  return v === 'gitnexus' ? 'gitnexus' : DEFAULT_TOOL
+function parseTool(_v: string | undefined): CodeContextTool {
+  // codebase-memory-mcp is the only supported tool (gitnexus removed); any legacy value maps to it.
+  return DEFAULT_TOOL
 }
 
 interface CodeContextSettings {

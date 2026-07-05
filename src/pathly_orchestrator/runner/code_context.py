@@ -135,14 +135,13 @@ def _resolve_backend() -> str:
 
 
 def _resolve_tool() -> str:
-    """Return the ``code_context.tool`` setting — the cli backend's binary name.
+    """The code-context CLI backend's binary name — always ``codebase-memory-mcp``.
 
-    Defaults to ``codebase-memory-mcp`` (the cross-platform graph engine that
-    replaced gitnexus); ``gitnexus`` stays available (e.g. Linux/CI). An
-    unrecognised value falls back to the default.
-    """
-    key = _get_setting("code_context.tool", "codebase-memory-mcp").strip().lower()
-    return key if key in ("codebase-memory-mcp", "gitnexus") else "codebase-memory-mcp"
+    ``codebase-memory-mcp`` is Pathly's single cross-platform code-graph engine (symbols,
+    callers/callees, call paths, impact; 158 languages). It is the ONLY supported tool —
+    ``gitnexus`` was removed. Kept as a function (not a constant) so a future multi-tool setting
+    could slot back in here; any legacy ``code_context.tool`` value is ignored."""
+    return "codebase-memory-mcp"
 
 
 def _resolve_reindex() -> str:

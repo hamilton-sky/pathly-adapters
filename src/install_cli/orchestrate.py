@@ -116,7 +116,7 @@ def _run_mcp(host: str, mcp_cfg: dict, *, dry_run: bool, repair: bool) -> None:
     all other (pre-existing) servers in the host config are preserved. The
     destination comes from the adapter's ``install.yaml`` ``mcp.destination``.
     Because it globs ``_mcp/*.json``, dropping more templates (e.g. serena.json)
-    alongside gitnexus.json merges them all in one run — no code change needed.
+    alongside codebase-memory-mcp.json merges them all in one run — no code change needed.
     """
     dest_str = mcp_cfg.get("destination")
     if not dest_str:

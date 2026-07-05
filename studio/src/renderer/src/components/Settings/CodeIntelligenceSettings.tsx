@@ -53,15 +53,9 @@ export function CodeIntelligenceSettings(): JSX.Element {
       <div className={ss.radioGroup}>
         <RadioCard
           active={tool === 'codebase-memory-mcp'}
-          label="codebase-memory-mcp (recommended)"
-          description="MCP-based code memory"
+          label="codebase-memory-mcp"
+          description="Code knowledge graph — symbols, callers/callees, impact (158 languages)"
           onClick={() => setTool('codebase-memory-mcp')}
-        />
-        <RadioCard
-          active={tool === 'gitnexus'}
-          label="gitnexus"
-          description="Git-native code index"
-          onClick={() => setTool('gitnexus')}
         />
       </div>
     </div>
