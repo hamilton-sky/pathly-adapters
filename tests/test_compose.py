@@ -272,6 +272,19 @@ def test_task_executors_include_task_progress_fragment(skill):
     )
 
 
+@pytest.mark.parametrize("skill", ["development/drain-dag", "development/execute-task"])
+def test_task_executors_include_code_query_fragment(skill):
+    """Both task executors compose the code-query fragment, so a loop/single agent asks Pathly's
+    code graph (POST /code/query) for structure before Grep — safe-nulling back to Grep when the
+    backend is off. Without this, agents never use Pathly's code-intelligence."""
+    out = compose_skill(skill, "claude")
+    assert "Code intelligence (ask Pathly's code graph before Grep)" in out, f"{skill} missing code-query"
+    assert "/code/query" in out, f"{skill} missing the /code/query endpoint"
+    assert out.index("/code/query") < out.index("Completion report (AGENT_DONE)"), (
+        f"{skill}: code-query must compose before completion-report"
+    )
+
+
 def test_dev_build_includes_completion_scout_and_spawn():
     """development/build composes completion-report + scout-choreography + spawn-rules.
 

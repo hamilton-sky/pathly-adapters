@@ -195,6 +195,7 @@ skills:
   development/execute-task:
     fragments:
       - comms-post
+      - code-query
       - task-progress
       - completion-report
   # drain-dag (single executor) does its board CRUD inline — it IS the drain loop — so it needs
@@ -204,6 +205,7 @@ skills:
   development/drain-dag:
     no_defaults: true
     fragments:
+      - code-query
       - task-progress
       - completion-report
 
