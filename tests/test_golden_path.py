@@ -133,6 +133,37 @@ def test_goal_loop_cascades_block_on_failure(tmp_path):
     assert _status(conn, c) == "done"      # independent branch still drains
 
 
+def test_goal_loop_fails_task_on_failure_outcome(tmp_path):
+    """SILENT-FAILURE GUARD #2: a spawn that returns NORMALLY but whose outcome signals failure
+    (explicit error / non-zero exit / outcome='failed') must mark the task FAILED — not 'done' just
+    because the process didn't raise. A clean process exit over broken work is the exact hole."""
+    from pathly_orchestrator.db.connection import get_db
+    from pathly_orchestrator.supervisor.goal_executor import start_goal_run
+
+    conn = get_db()
+    scope = "golden-path-fail-outcome"
+    gid = _seed_goal(conn, scope)
+    a = _seed_task(conn, scope, gid, "task ALPHA")
+    b = _seed_task(conn, scope, gid, "task BETA", depends_on=[a])
+    c = _seed_task(conn, scope, gid, "task GAMMA")
+
+    def outcome_fail_spawn(_s, instructions, _a, _m, _r, _b):
+        if "task ALPHA" in instructions:
+            return {"outcome": "failed", "error": "clean exit but the work failed"}
+        return {"cost_usd": 0.0}
+
+    result = start_goal_run(
+        gid, executor_override="loop", project_root=str(tmp_path),
+        spawn_fn=outcome_fail_spawn, block=True,
+    )
+
+    assert result["ok"] is True, result
+    assert a in result["result"]["failed"]
+    assert _status(conn, a) == "failed"     # failed via the OUTCOME, not a raised exception
+    assert _status(conn, b) == "blocked"    # cascade from the failed dependency
+    assert _status(conn, c) == "done"       # independent branch still drains
+
+
 def test_goal_loop_surfaces_deadlocked_dag(tmp_path):
     """SILENT-FAILURE GUARD: a task with an unsatisfiable dependency — a dangling ref or a cycle —
     never becomes ready, so the frontier drains leaving it pending forever. The executor must

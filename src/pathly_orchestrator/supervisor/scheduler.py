@@ -27,6 +27,23 @@ logger = logging.getLogger("pathly.scheduler")
 _ABORT_SENTINEL = object()
 
 
+def _outcome_is_failure(outcome) -> bool:
+    """A worker's spawn returned normally, but its OUTCOME reports the task did not succeed — an
+    explicit ``error``, a non-zero ``exit_code``, or an ``outcome``/``status`` flag of failed/error.
+    Treated as a failure so a clean process exit over broken work is NOT marked done (silent-failure
+    guard #2). Missing/empty signals default to success (back-compat with spawns that only return
+    cost/session id)."""
+    if not isinstance(outcome, dict):
+        return False
+    if outcome.get("error"):
+        return True
+    exit_code = outcome.get("exit_code")
+    if isinstance(exit_code, int) and exit_code != 0:
+        return True
+    flag = str(outcome.get("outcome") or outcome.get("status") or "").lower()
+    return flag in ("failed", "error", "failure")
+
+
 def scheduler_loop(
     state,
     board: str,
@@ -248,14 +265,21 @@ def scheduler_loop(
             aborted = True
             break
 
-        task_id, lane, _outcome, exc = item
+        task_id, lane, outcome, exc = item
         in_flight_count -= 1
         in_flight_lanes.discard(lane)
         ws = workspaces.pop(task_id, None)
 
-        succeeded = exc is None
+        # Success requires BOTH: the worker did not raise AND its outcome does not report failure.
+        # (silent-failure guard #2 — a clean process exit over broken work is not "done".)
+        succeeded = exc is None and not _outcome_is_failure(outcome)
         if not succeeded:
-            reason = str(exc)[:500]
+            if exc is not None:
+                reason = str(exc)[:500]
+            else:
+                reason = str(
+                    outcome.get("error") or outcome.get("outcome") or "task reported failure"
+                )[:500]
             logger.warning("scheduler: task %s failed: %s", task_id, reason)
             blocked_ids = fail_task(conn, task_id, reason=reason)
             result_failed.append(task_id)
