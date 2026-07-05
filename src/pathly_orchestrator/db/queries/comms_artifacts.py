@@ -157,7 +157,10 @@ def canonical_artifact_path(path: str) -> str:
 
     Absolute and relative refs to the SAME file must resolve to ONE artifact row. An absolute
     path is trimmed at its ``/pathly/`` segment; a path already relative to the project (or with
-    no ``pathly/`` segment) is returned forward-slashed and otherwise unchanged."""
+    no ``pathly/`` segment) is returned forward-slashed and otherwise unchanged.
+
+    Used by ``find_or_create_artifact_by_path`` (dedup lookup) and ``build_catalog_channel``
+    (catalog dedup) to normalize paths before comparison."""
     p = (path or "").replace("\\", "/")
     idx = p.rfind("/pathly/")
     return p[idx + 1:] if idx != -1 else p
