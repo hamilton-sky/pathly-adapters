@@ -94,9 +94,14 @@ Inventory via [`p2_inventory.py`](./p2_inventory.py) (co-located; read-only agai
 `~/.pathly/pathly.db`; re-run before `--apply` since data may drift):
 
 - **9 shared-bucket folders on disk**: 2 `debugs/`, 7 `explorations/`, 0 `fixes/`.
-- **0 DB references to any of them.** Verified independently: `comms_artifacts.path`,
-  `comms_messages.artifact_path`, and `context_refs` contain **zero** hits for these folders. So
-  **P2 is a pure filesystem move — no DB repath, no transaction, no hydration-breakage risk.**
+- **0 references in the COMMS-BOARD tables** — `comms_artifacts.path`, `comms_messages.artifact_path`,
+  and `context_refs` all have **zero** hits (no board-hydration risk).
+- **`fsm_state` was overlooked in the first pass (correction 2026-07-05).** 2 folders with a
+  `STATE.json` (`codebase-architecture` = PLANNING, `unified-cli-composition` = DONE) have
+  authoritative rows in the runtime FSM-state table. `STATE.json` is only a *mirror*; `fsm_state`
+  (keyed by `(project_root, feature)`) is the source of truth. A naive move would orphan those rows
+  because `eventlog` derived `project_root` by a depth-hardcoded "3 levels up" — see §5. So the move
+  is safe **only after** the §5 foundation fix.
 - Board-inference: **8 → `project/<kind>/<slug>/`** (nothing references them ⇒ agreed default);
   **1 → feature**: `explorations/production-readiness-plan/` slug-matches the
   `production-readiness-plan` feature ⇒ `features/production-readiness-plan/explorations/production-readiness-plan/`
@@ -108,8 +113,35 @@ retrieval-robustness **S2** / production-readiness **G2**, a **DB-only** repath 
 moving these folders. P2 does **not** subsume S2; they
 are two independent migrations that merely share the "stale storage path" theme.
 
-Move mechanics: `git mv` each folder to its target (preserves history, keeps the tree clean); no DB
-work. Apply is a separate reviewed step.
+Move mechanics: with §5 landed, `git mv` each folder to its target (preserves history **and** the
+correct `fsm_state` key, since the basename is unchanged); the 1 renamed slug has no `fsm_state` row.
+Apply is a separate reviewed step.
+
+### 5. Foundation: nesting-aware state keying (prerequisite — discovered mid-P2, FIXED 2026-07-05)
+
+`eventlog` keys the authoritative `fsm_state` table (and the event log) by `(project_root, feature)`,
+deriving `project_root = feature_dir.parent.parent.parent` — a **hardcoded "3 levels up"** that only
+holds for the flat `pathly/<container>/<name>` depth. For a nested run it mis-derives:
+
+| run dir | old (3-up) `project_root` | correct |
+|---|---|---|
+| `pathly/features/<n>` (flat) | `<root>` | ✅ |
+| `pathly/project/<kind>/<n>` | `<root>/pathly` | ❌ |
+| `pathly/features/<f>/<kind>/<n>` | `<root>/pathly/features` | ❌ |
+
+This is a **split-brain**: the `STATE.json` mirror moves with the folder, but the DB lookup at the new
+depth computes a different key and misses. P2 surfaced it (2 folders carry `fsm_state`), but it is
+really a **latent P1 bug** — every *new* nested debug/explore/goal run would key its state under the
+wrong root. (`fsm_state` already holds mis-derived rows: `project_root=C:/` and `.../studio`.)
+
+**Fix:** `eventlog._project_root_of(feature_dir)` finds the ancestor directly above the `pathly/`
+segment at any depth — byte-identical for flat/legacy paths, correct for nested. Guarded by
+`test_eventlog_keys_nested_run_by_true_project_root`. Because it preserves the `feature` basename key,
+existing rows are untouched and the P2 move needs **no re-keying**.
+
+**Known follow-up (not fixed here):** the `feature` key is the basename only, so two nested runs with
+the same slug under different boards collide on `(project_root, slug)`. Rare with descriptive slugs;
+the durable fix keys by the board-relative path. Tracked, out of scope for this fix.
 
 ## Phases
 

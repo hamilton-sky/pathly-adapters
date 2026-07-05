@@ -69,6 +69,24 @@ def _resolve_path(storage_path: str) -> Path:
     return Path(storage_path)
 
 
+def _project_root_of(feature_dir: Path) -> str:
+    """Project root for a feature/run dir at ANY nesting depth.
+
+    A run lives under ``<project_root>/pathly/…`` — flat (``pathly/features/<n>``) or nested
+    (``pathly/project/<kind>/<n>``, ``pathly/features/<f>/<kind>/<n>``). The root is the ancestor
+    directly ABOVE the ``pathly/`` segment, located by finding that segment rather than counting a
+    fixed number of levels. The old ``feature_dir.parent.parent.parent`` matched only the flat depth
+    and mis-derived nested runs — keying ``fsm_state``/events by ``<root>/pathly`` and orphaning the
+    authoritative row (the board-scoped-storage split-brain). Behavior is IDENTICAL for flat/legacy
+    paths; only genuinely-nested paths change. Falls back to the legacy 3-levels-up when there is no
+    ``pathly/`` segment (unchanged for those)."""
+    parts = feature_dir.parts
+    for i in range(len(parts) - 1, 0, -1):
+        if parts[i] == "pathly":
+            return _norm_root(Path(*parts[:i]))
+    return _norm_root(feature_dir.parent.parent.parent)
+
+
 def _now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -104,7 +122,7 @@ def append_event(
         feature_dir.mkdir(parents=True, exist_ok=True)
     conn = _db.get_db()
     feature = feature_dir.name
-    project_root = _norm_root(feature_dir.parent.parent.parent)
+    project_root = _project_root_of(feature_dir)
     # Full event dict is stored as a JSON blob in the payload column — no key whitelisting.
     # New optional fields (cost_source, cache_read_tokens, cache_write_tokens) pass through transparently.
     _db.append_event(conn, project_root, feature, event)
@@ -143,7 +161,7 @@ def _write_state_db(feature_dir: Path, feature: str, state: dict) -> None:
     if "updated_at" not in state:
         state["updated_at"] = _now()
     conn = _db.get_db()
-    project_root = _norm_root(feature_dir.parent.parent.parent)
+    project_root = _project_root_of(feature_dir)
     _db.write_state(conn, project_root, feature, state)
     # Always write STATE.json — agents and the scope gate read it directly.
     path = feature_dir / "STATE.json"
@@ -195,7 +213,7 @@ write_state.__wrapped__ = _write_state_db  # type: ignore[attr-defined]
 
 def read_events(storage_path: str) -> list[dict]:
     feature_dir = _resolve_path(storage_path).resolve()
-    project_root = _norm_root(feature_dir.parent.parent.parent)
+    project_root = _project_root_of(feature_dir)
     conn = _db.get_db()
     events = _db.read_events(conn, project_root, feature_dir.name)
     for event in events:
@@ -218,7 +236,7 @@ def read_events(storage_path: str) -> list[dict]:
 
 def read_state(storage_path: str) -> dict | None:
     feature_dir = _resolve_path(storage_path).resolve()
-    project_root = _norm_root(feature_dir.parent.parent.parent)
+    project_root = _project_root_of(feature_dir)
     conn = _db.get_db()
     return _db.read_state(conn, project_root, feature_dir.name)
 

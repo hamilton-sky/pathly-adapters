@@ -1,7 +1,9 @@
 """Shared feature-discovery for the pathly-* CLI shortcuts (status / ff / back / log).
 
-Covers four storage layouts so a feature is found wherever it lives:
+Covers the storage layouts so a feature/run is found wherever it lives:
   - feature-centric flat (current):   pathly/features/<name>/STATE.json
+  - board-scoped nested run (current): pathly/features/<f>/<kind>/<slug>/STATE.json
+                                       pathly/project/<kind>/<slug>/STATE.json
   - feature-centric nested (legacy):  pathly/features/<name>/plans/STATE.json
   - type-nested (legacy):             pathly/plans|debugs|explorations/<name>/STATE.json
   - flat (legacy):                    pathly/<name>/STATE.json
@@ -17,12 +19,25 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Iterator
 
-# (relative root, flow label) for the legacy type-nested layout.
+# (relative root, flow label) for the legacy type-nested layout. debugs/explorations stay here for
+# back-compat DISCOVERY of runs still sitting in the old top-level buckets; they get retired only
+# once board-scoped-storage P2 MOVES those runs under their board (retiring the root before the move
+# would make the still-present runs invisible — the P2<->P3 coupling). New/moved runs are found by
+# the board-scoped globs in iter_state_files below.
 SCAN_ROOTS = [
     ("pathly/plans", "team"),
     ("pathly/debugs", "debug"),
     ("pathly/explorations", "explore"),
 ]
+
+# Run kinds and their flow label, for board-scoped nested discovery
+# (pathly/features/<f>/<kind>/<slug> and pathly/project/<kind>/<slug>).
+_KIND_FLOW = (
+    ("goals", "team"),
+    ("debugs", "debug"),
+    ("explorations", "explore"),
+    ("fixes", "quick-fix"),
+)
 
 # Direct children of pathly/ that are containers, not features.
 _RESERVED = {
@@ -45,6 +60,17 @@ def iter_state_files(cwd: Path) -> Iterator[tuple[Path, str, str]]:
             triples.append((sf, "team", sf.parent.name))
         for sf in features.glob("*/plans/STATE.json"):
             triples.append((sf, "team", sf.parent.parent.name))
+        # board-scoped nested runs: features/<f>/<kind>/<slug>/STATE.json → topic = <slug>
+        for kind, flow in _KIND_FLOW:
+            for sf in features.glob(f"*/{kind}/*/STATE.json"):
+                triples.append((sf, flow, sf.parent.name))
+
+    # project board: pathly/project/<kind>/<slug>/STATE.json → topic = <slug>
+    project = cwd / "pathly" / "project"
+    if project.is_dir():
+        for kind, flow in _KIND_FLOW:
+            for sf in (project / kind).glob("*/STATE.json"):
+                triples.append((sf, flow, sf.parent.name))
 
     # legacy type-nested roots  → topic = parent.name
     for root_rel, flow in SCAN_ROOTS:
@@ -97,6 +123,11 @@ def find_topic_dir(cwd: Path, topic: str) -> tuple[Path, str] | None:
     flat = cwd / "pathly" / topic
     if (flat / "STATE.json").exists():
         return flat, "team"
+    # board-scoped project runs: pathly/project/<kind>/<topic>/STATE.json
+    for kind, flow in _KIND_FLOW:
+        cand = cwd / "pathly" / "project" / kind / topic
+        if (cand / "STATE.json").exists():
+            return cand, flow
     for root_rel, flow in SCAN_ROOTS:
         candidate = cwd / root_rel / topic
         if (candidate / "STATE.json").exists():

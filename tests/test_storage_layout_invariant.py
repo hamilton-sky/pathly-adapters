@@ -223,6 +223,57 @@ def test_runner_event_creates_no_decoy_for_absent_feature(client):
     assert any(e.get("type") == "AGENT_DONE" for e in events)
 
 
+def test_eventlog_keys_nested_run_by_true_project_root(tmp_path):
+    """board-scoped-storage FOUNDATION: eventlog keys fsm_state by (project_root, feature). It must
+    derive the REAL project root for a run NESTED under its board — the legacy '3 levels up' rule
+    mis-derives <root>/pathly for a project/<kind>/<slug> run (and <root>/pathly/features for a
+    feature-nested run), orphaning the authoritative DB row from the true root. That split-brain is
+    what breaks both a folder move AND P1's new nested runs. Assert the stored key is the true root,
+    not a depth artifact."""
+    from pathly_orchestrator import eventlog
+
+    true_root = str(tmp_path).replace("\\", "/")
+    conn = eventlog._db.get_db()
+
+    proj_run = tmp_path / "pathly" / "project" / "explorations" / "nested-proj-run"
+    feat_run = tmp_path / "pathly" / "features" / "some-feat" / "debugs" / "nested-feat-run"
+    for run_dir in (proj_run, feat_run):
+        run_dir.mkdir(parents=True)
+        eventlog.write_state(str(run_dir), {"current": "DONE", "feature": run_dir.name})
+
+    keyed = {
+        r[1]: r[0]
+        for r in conn.execute(
+            "SELECT project_root, feature FROM fsm_state "
+            "WHERE feature IN ('nested-proj-run','nested-feat-run')"
+        )
+    }
+    assert keyed.get("nested-proj-run") == true_root, keyed
+    assert keyed.get("nested-feat-run") == true_root, keyed
+
+
+def test_discovery_finds_board_nested_runs(tmp_path):
+    """board-scoped-storage P3: a run nested under its board — feature (features/<f>/<kind>/<slug>)
+    or project (project/<kind>/<slug>) — must be discoverable, so moving a legacy shared-bucket run
+    under its board does not make it vanish from `/pathly status` & friends."""
+    from pathly_orchestrator import eventlog
+    from pathly_orchestrator.cli._discovery import find_topic_dir, iter_state_files
+
+    feat_run = tmp_path / "pathly" / "features" / "feat-x" / "explorations" / "trace-1"
+    feat_run.mkdir(parents=True)
+    eventlog.write_state(str(feat_run), {"current": "DONE", "feature": "trace-1"})
+
+    proj_run = tmp_path / "pathly" / "project" / "debugs" / "bug-1"
+    proj_run.mkdir(parents=True)
+    eventlog.write_state(str(proj_run), {"current": "DONE", "feature": "bug-1"})
+
+    found = {(sf.parent.resolve(), flow, topic) for sf, flow, topic in iter_state_files(tmp_path)}
+    assert (feat_run.resolve(), "explore", "trace-1") in found
+    assert (proj_run.resolve(), "debug", "bug-1") in found
+    # named lookup resolves the project run to its nested home
+    assert find_topic_dir(tmp_path, "bug-1") == (proj_run, "debug")
+
+
 def test_feedback_watcher_scans_features(tmp_path):
     """The feedback watcher must discover feedback files under a flat feature home. Pre-
     consolidation it globs pathly/plans/*/feedback/*.md only and never sees them."""
