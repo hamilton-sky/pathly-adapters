@@ -50,6 +50,20 @@ def _loop(state: RunnerState, broadcast_fn: Optional[Callable]) -> None:
             except Exception as exc:
                 logger.warning("broadcast_fn error: %s", exc)
 
+    def _fail(reason: str, message: str) -> None:
+        """Terminate the run in error with a SPECIFIC reason (not the old catch-all "subprocess").
+
+        `reason` becomes ``state.error_kind`` → the board's "goal run failed — <reason>" text (via the
+        run's on_done), so it must name the real cause: fsm_unreachable / fsm_blocked / spawn_failed /
+        no_next_state / loop_crashed. Also surfaced as the RUNNER_ERROR ``kind`` for parity.
+        """
+        with _lock:
+            state.error_kind = reason
+            _set_status(state, "error", broadcast_fn)
+        _broadcast(
+            {"type": "RUNNER_ERROR", "topic": topic, "message": message, "kind": reason}
+        )
+
     try:
         while True:
             # ── Boundary: check abort ──────────────────────────────────────────
@@ -107,17 +121,7 @@ def _loop(state: RunnerState, broadcast_fn: Optional[Callable]) -> None:
                     }
                 )
             except RuntimeError as exc:
-                with _lock:
-                    state.error_kind = "subprocess"
-                    _set_status(state, "error", broadcast_fn)
-                _broadcast(
-                    {
-                        "type": "RUNNER_ERROR",
-                        "topic": topic,
-                        "message": str(exc),
-                        "kind": "subprocess",
-                    }
-                )
+                _fail("fsm_unreachable", str(exc))
                 return
 
             if response.get("done"):
@@ -126,17 +130,7 @@ def _loop(state: RunnerState, broadcast_fn: Optional[Callable]) -> None:
                 return
 
             if response.get("blocked"):
-                with _lock:
-                    state.error_kind = "subprocess"
-                    _set_status(state, "error", broadcast_fn)
-                _broadcast(
-                    {
-                        "type": "RUNNER_ERROR",
-                        "topic": topic,
-                        "message": f"FSM blocked: {response.get('file', '')}",
-                        "kind": "subprocess",
-                    }
-                )
+                _fail("fsm_blocked", f"FSM blocked: {response.get('file', '')}")
                 return
 
             current_fsm_state = response.get("current_state", "")
@@ -219,17 +213,7 @@ def _loop(state: RunnerState, broadcast_fn: Optional[Callable]) -> None:
                     autonomy=autonomy_for_adapter,
                 )
             except RuntimeError as exc:
-                with _lock:
-                    state.error_kind = "subprocess"
-                    _set_status(state, "error", broadcast_fn)
-                _broadcast(
-                    {
-                        "type": "RUNNER_ERROR",
-                        "topic": topic,
-                        "message": str(exc),
-                        "kind": "subprocess",
-                    }
-                )
+                _fail("spawn_failed", str(exc))
                 return
 
             # ── Handle agent questions ────────────────────────────────────────
@@ -272,17 +256,7 @@ def _loop(state: RunnerState, broadcast_fn: Optional[Callable]) -> None:
                         autonomy=autonomy_for_adapter,
                     )
                 except RuntimeError as exc:
-                    with _lock:
-                        state.error_kind = "subprocess"
-                        _set_status(state, "error", broadcast_fn)
-                    _broadcast(
-                        {
-                            "type": "RUNNER_ERROR",
-                            "topic": topic,
-                            "message": str(exc),
-                            "kind": "subprocess",
-                        }
-                    )
+                    _fail("spawn_failed", str(exc))
                     return
 
             # ── Update cost + session from invoke result ───────────────────────
@@ -323,17 +297,7 @@ def _loop(state: RunnerState, broadcast_fn: Optional[Callable]) -> None:
                 return
 
             if result.get("blocked"):
-                with _lock:
-                    state.error_kind = "subprocess"
-                    _set_status(state, "error", broadcast_fn)
-                _broadcast(
-                    {
-                        "type": "RUNNER_ERROR",
-                        "topic": topic,
-                        "message": f"Blocked: {result.get('file', '')}",
-                        "kind": "subprocess",
-                    }
-                )
+                _fail("blocked", f"Blocked: {result.get('file', '')}")
                 return
 
             _write_supervisor_phase_summary(
@@ -348,15 +312,19 @@ def _loop(state: RunnerState, broadcast_fn: Optional[Callable]) -> None:
             if result.get("next_state"):
                 continue
 
-            with _lock:
-                state.error_kind = "subprocess"
-                _set_status(state, "error", broadcast_fn)
+            # complete_stage returned no next_state — not done, not blocked. The FSM had nowhere to
+            # go (e.g. a terminal state with no outgoing transition). Fail with a nameable reason
+            # instead of the old catch-all "subprocess".
+            _fail(
+                "no_next_state",
+                f"Stage {state.current_state or '?'} resolved with no next state",
+            )
             return
 
     except Exception as exc:
-        logger.exception("Supervisor loop crashed for topic %s", topic)
+        logger.exception("Supervisor loop crashed for topic %s: %s", topic, exc)
         with _lock:
-            state.error_kind = "subprocess"
+            state.error_kind = "loop_crashed"
             try:
                 _set_status(state, "error", broadcast_fn)
             except Exception:

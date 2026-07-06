@@ -1,0 +1,1 @@
+No external research required — all technology choices (Electron/React/CSS Modules/Zustand/CSS-only transitions) are established in the existing codebase; every decision in ARCHITECTURE_PROPOSAL.md is derivable from current source without external docs.

@@ -152,6 +152,16 @@ skills:
       - artifact-register
       - completion-report
 
+  # Terminal emitter for feature → goals decomposition. Posts type=goal siblings to the
+  # feature board. One skill covers all tiers: light (standalone), consultation (after PO
+  # →architect→researcher→designer write feature artifacts). Board write-back via comms-post;
+  # AGENT_DONE via completion-report. no_defaults: no pipeline phases in a terminal emitter.
+  planning/feature-decompose:
+    no_defaults: true
+    fragments:
+      - comms-post
+      - completion-report
+
   team/plan:
     fragments:
       - completion-report

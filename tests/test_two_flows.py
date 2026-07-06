@@ -115,3 +115,30 @@ def test_team_build_escalation_survives_db_backed_load(tmp_path):
     flow = _load_flow("team-build", project_root=str(tmp_path))
     assert flow.get("escalation_routing", {}).get("REVIEW_FAILURES") == "planner"
     assert flow.get("escalation_routing", {}).get("TEST_FAILURES") == "po"
+
+
+def _gate_on_fail_target(flow: dict, transition: str) -> str:
+    """Role a gate's on_fail file routes to (via feedback_routing). 'human' ⇒ a headless
+    run dead-ends there (human target is an error in headless mode)."""
+    gates = flow.get("gates", {}).get(transition, [])
+    assert gates, f"no gate on {transition}"
+    on_fail = gates[0]["on_fail"]
+    stem = on_fail[:-3] if on_fail.endswith(".md") else on_fail
+    return flow.get("feedback_routing", {}).get(stem, "human")
+
+
+def test_review_gate_does_not_deadend_headless():
+    """Regression (goal run failed — subprocess): REVIEWING->TESTING used require_artifact on
+    REVIEW.md, but NOTHING ever wrote REVIEW.md, and on_fail routed to HUMAN_QUESTIONS.md →
+    human. So every headless team/team-build run died at the first review boundary. The gate
+    must now verify REVIEW.md (which the reviewer writes on a clean pass) and route a miss back
+    to the reviewer for a RE-REVIEW — never to a human checkpoint."""
+    for flow_name in ("team-build", "team"):
+        flow = _load(flow_name)
+        gate = flow["gates"]["REVIEWING->TESTING"][0]
+        assert gate["type"] == "verify_gate", flow_name
+        assert gate["artifact"] == "REVIEW.md", flow_name
+        assert gate["pass_marker"] == "RESULT: PASS", flow_name
+        # The critical property: a missing/failed REVIEW.md re-reviews; it does NOT strand a
+        # headless run at a human checkpoint the way the old require_artifact→human gate did.
+        assert _gate_on_fail_target(flow, "REVIEWING->TESTING") == "reviewer", flow_name

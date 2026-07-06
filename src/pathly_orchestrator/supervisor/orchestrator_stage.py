@@ -37,6 +37,19 @@ def _resolve_stage_supervised(
             except Exception as exc:
                 logger.warning("broadcast_fn error: %s", exc)
 
+    def _fail(reason: str, message: str) -> None:
+        """Terminate the stage in error with a SPECIFIC reason (not the catch-all "subprocess").
+
+        `reason` becomes ``state.error_kind`` → the board's "goal run failed — <reason>" text:
+        fsm_unreachable / human_checkpoint / feedback_exhausted / spawn_failed.
+        """
+        with _lock:
+            state.error_kind = reason
+            _set_status(state, "error", broadcast_fn)
+        _broadcast(
+            {"type": "RUNNER_ERROR", "topic": topic, "message": message, "kind": reason}
+        )
+
     while True:
         # Abort check before each FSM call
         with _lock:
@@ -57,17 +70,7 @@ def _resolve_stage_supervised(
                 }
             )
         except RuntimeError as exc:
-            with _lock:
-                state.error_kind = "subprocess"
-                _set_status(state, "error", broadcast_fn)
-            _broadcast(
-                {
-                    "type": "RUNNER_ERROR",
-                    "topic": topic,
-                    "message": str(exc),
-                    "kind": "subprocess",
-                }
-            )
+            _fail("fsm_unreachable", str(exc))
             return None
 
         resolved = []
@@ -120,17 +123,7 @@ def _resolve_stage_supervised(
                     }
                 )
             except RuntimeError as exc:
-                with _lock:
-                    state.error_kind = "subprocess"
-                    _set_status(state, "error", broadcast_fn)
-                _broadcast(
-                    {
-                        "type": "RUNNER_ERROR",
-                        "topic": topic,
-                        "message": str(exc),
-                        "kind": "subprocess",
-                    }
-                )
+                _fail("fsm_unreachable", str(exc))
                 return None
 
             return decision_result
@@ -141,31 +134,14 @@ def _resolve_stage_supervised(
             file_ = result.get("file", "")
 
             if target == "human":
-                with _lock:
-                    state.error_kind = "subprocess"
-                    _set_status(state, "error", broadcast_fn)
-                _broadcast(
-                    {
-                        "type": "RUNNER_ERROR",
-                        "topic": topic,
-                        "message": f"Human checkpoint required: {file_}",
-                        "kind": "subprocess",
-                    }
-                )
+                _fail("human_checkpoint", f"Human checkpoint required: {file_}")
                 return None
 
             feedback_rounds += 1
             if feedback_rounds > MAX_FEEDBACK_ROUNDS:
-                with _lock:
-                    state.error_kind = "subprocess"
-                    _set_status(state, "error", broadcast_fn)
-                _broadcast(
-                    {
-                        "type": "RUNNER_ERROR",
-                        "topic": topic,
-                        "message": f"Feedback loop exceeded {MAX_FEEDBACK_ROUNDS} rounds on {file_}",
-                        "kind": "subprocess",
-                    }
+                _fail(
+                    "feedback_exhausted",
+                    f"Feedback loop exceeded {MAX_FEEDBACK_ROUNDS} rounds on {file_}",
                 )
                 return None
 
@@ -192,17 +168,7 @@ def _resolve_stage_supervised(
                     autonomy=autonomy_for_adapter,
                 )
             except RuntimeError as exc:
-                with _lock:
-                    state.error_kind = "subprocess"
-                    _set_status(state, "error", broadcast_fn)
-                _broadcast(
-                    {
-                        "type": "RUNNER_ERROR",
-                        "topic": topic,
-                        "message": str(exc),
-                        "kind": "subprocess",
-                    }
-                )
+                _fail("spawn_failed", str(exc))
                 return None
 
             resolved = [file_]

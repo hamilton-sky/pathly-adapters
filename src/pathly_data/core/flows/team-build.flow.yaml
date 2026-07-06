@@ -48,6 +48,7 @@ feedback_routing:
   ACCEPTANCE_QUESTION: po      # tester asks the PO whether the criteria themselves are right
   IMPL_QUESTIONS: planner
   REFLECT_CRITIQUE: builder
+  REVIEW_INCOMPLETE: reviewer   # REVIEWING->TESTING gate: REVIEW.md missing/not-PASS -> reviewer re-reviews & writes it
   REVIEW_FAILURES: builder
   SCOPE_VIOLATION: builder
   TEST_FAILURES: builder
@@ -80,7 +81,12 @@ scope_gate:
   exempt_prefixes: []
 gates:
   REVIEWING->TESTING:
-    - type: require_artifact
+    # The reviewer writes REVIEW.md (RESULT: PASS) ONLY on a clean pass; a failing review leaves
+    # REVIEW_FAILURES.md instead (and deletes any stale REVIEW.md). If REVIEW.md is missing/not-PASS
+    # the gate routes to REVIEW_INCOMPLETE.md -> reviewer (NOT human), so a builder-fixed review is
+    # RE-REVIEWED before advancing instead of dead-ending the headless run at a human checkpoint.
+    - type: verify_gate
       artifact: REVIEW.md
-      on_fail: HUMAN_QUESTIONS.md
+      pass_marker: 'RESULT: PASS'
+      on_fail: REVIEW_INCOMPLETE.md
 _comments: []

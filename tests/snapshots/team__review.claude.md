@@ -157,7 +157,16 @@ git diff HEAD -- . ":(exclude)pathly/features/"
 
 ### If no feedback files — PASS
 
-Run the Completion report with `agent: reviewer`, `result: PASS`, using `REVIEW_START` from Phase 0.
+**Write `<feature_path>/REVIEW.md`** with this exact content (first line must be exact):
+```
+RESULT: PASS
+Reviewed: conversation N — <one-sentence summary of what was reviewed and the verdict>
+```
+The first line **must** be `RESULT: PASS` verbatim (case-sensitive, no leading whitespace). This is the
+review-pass artifact the `REVIEWING → TESTING` gate (`verify_gate`) checks — without it the flow cannot
+advance to testing. (Mirror of the builder's `VERIFY.md`.)
+
+Then run the Completion report with `agent: reviewer`, `result: PASS`, using `REVIEW_START` from Phase 0.
 
 ## Advance
 
@@ -176,8 +185,10 @@ If autoFlow: log human response "auto-advance".
 Mark Conv N as DONE in `<feature_path>/PROGRESS.md`.
 
 **Write-or-delete transition artifacts:**
-- If REVIEW_FAILURES.md was written this run: it already exists — keep it.
-  If reviewer passed cleanly (no REVIEW_FAILURES.md written): delete `<storage_path>/feedback/REVIEW_FAILURES.md` if it exists.
+- If reviewer PASSED (no REVIEW_FAILURES.md written this run): `REVIEW.md` (RESULT: PASS) was written above — keep it,
+  and delete `<storage_path>/feedback/REVIEW_FAILURES.md` if it exists.
+- If reviewer FAILED (REVIEW_FAILURES.md written this run): keep it, and **delete any stale `<feature_path>/REVIEW.md`**
+  from a previous pass — a failing review must never leave a passing artifact that would wave the flow through the gate.
 
 Return. Orchestrator determines next state from transition_rules.
 
