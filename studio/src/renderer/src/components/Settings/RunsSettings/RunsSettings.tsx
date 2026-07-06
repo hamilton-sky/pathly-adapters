@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useRunnerStore } from '../../../store/runnerStore'
 import { RadioCard } from '../RadioCard'
 import { ProgressSelect } from '../../shared/ProgressSelect/ProgressSelect'
+import { SpawnLimitsSection } from '../SpawnLimitsSection/SpawnLimitsSection'
 import { useDefaultProgress } from '../hooks/useDefaultProgress'
 import s from '../Settings.module.css'
 
@@ -92,6 +93,8 @@ export function RunsSettings(): JSX.Element {
           <ProgressSelect value={defaultProgress} onChange={setDefaultProgress} />
         </div>
       </div>
+
+      <SpawnLimitsSection />
     </>
   )
 }

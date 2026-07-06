@@ -1,14 +1,11 @@
 import { useState } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { useCodeContextSettings } from '../Settings/hooks/useCodeContextSettings'
-import type { CodeContextReindex } from '../Settings/hooks/useCodeContextSettings'
 import { useAutoCommitSetting } from '../HQ/FlowControlBar/hooks/useAutoCommitSetting'
 import sc from './CodeIntelControl.module.css'
 
-const REINDEX_OPTS: CodeContextReindex[] = ['off', 'stage', 'auto']
-
 export function CodeIntelControl(): JSX.Element {
-  const { backend, reindex, setBackend, setReindex } = useCodeContextSettings()
+  const { backend, reindex, setBackend } = useCodeContextSettings()
   const { enabled: autoCommit, toggle: toggleAutoCommit } = useAutoCommitSetting()
   const [open, setOpen] = useState(false)
   const backendOn = backend !== 'off'
@@ -61,20 +58,7 @@ export function CodeIntelControl(): JSX.Element {
           </div>
           <div className={sc.rowSecondary}>
             <span className={sc.fieldLabel}>Re-index</span>
-            <div className={sc.segmented}>
-              {REINDEX_OPTS.map((opt) => (
-                <button
-                  key={opt}
-                  type="button"
-                  aria-label={`Set re-index to ${opt}`}
-                  aria-pressed={reindex === opt ? 'true' : 'false'}
-                  className={`${sc.segBtn} ${reindex === opt ? sc.segBtnActive : ''}`}
-                  onClick={() => setReindex(opt)}
-                >
-                  {opt}
-                </button>
-              ))}
-            </div>
+            <span className={sc.statusChip} title="Change this in Settings → Intelligence">{reindex}</span>
           </div>
         </>
       )}

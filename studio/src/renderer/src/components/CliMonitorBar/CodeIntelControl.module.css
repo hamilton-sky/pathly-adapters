@@ -106,33 +106,16 @@
   background: var(--accent-fg, #fff);
 }
 
-/* ── Re-index segmented buttons ── */
-.segmented {
-  display: flex;
-  gap: 2px;
-  min-width: 0;
-}
-
-.segBtn {
-  font-size: 10px;
-  padding: 1px 5px;
+/* ── Re-index status chip (read-only; configured in Settings → Intelligence) ── */
+.statusChip {
+  display: inline-flex;
+  align-items: center;
   height: 16px;
+  padding: 1px 6px;
   border-radius: 3px;
   border: 1px solid var(--border);
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
+  background: var(--bg-surface0);
+  color: var(--text-secondary);
+  font-size: 10px;
   flex-shrink: 0;
-  transition: var(--transition-fast);
-}
-
-.segBtn:hover {
-  border-color: var(--accent);
-  color: var(--text-primary);
-}
-
-.segBtnActive {
-  border-color: var(--accent);
-  color: var(--accent);
-  background: var(--accent-bg, rgba(99, 102, 241, 0.08));
 }
