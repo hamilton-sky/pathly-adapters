@@ -6,6 +6,7 @@ import MarkdownRenderer from '../../../../shared/MarkdownRenderer/MarkdownRender
 import { RunPill } from '../../../../shared/RunPill/RunPill'
 import { CopyTextButton } from '../../../../shared/CopyTextButton/CopyTextButton'
 import { useCommsStore } from '../../../../../store/commsStore'
+import SendPreviewModal from '../../../../shared/SendPreviewModal/SendPreviewModal'
 import s from './TaskCard.module.css'
 
 type TaskStatus = NonNullable<Message['taskStatus']>
@@ -48,10 +49,16 @@ export function TaskCard({ task: t, siblings }: Props): JSX.Element {
   const ready = deps.every((d) => byId.get(d)?.taskStatus === 'done')
   const runnable = (status === 'pending' || status === 'failed') && ready
   const [justRan, setJustRan] = useState(false)
+  const [confirmOpen, setConfirmOpen] = useState(false)
   useEffect(() => { if (status !== 'pending') setJustRan(false) }, [status])
-  const handleRun = (): void => { setJustRan(true); runTask(t.id) }
+  // Preview-gated like the goal Run / Evaluate controls: the pill opens a confirm modal and
+  // confirming dispatches. The backend builds from the STORED task text (by id), so the preview
+  // is read-only — editing here wouldn't change what runs.
+  const handleRun = (): void => { setConfirmOpen(true) }
+  const doRun = (): void => { setConfirmOpen(false); setJustRan(true); runTask(t.id) }
 
   return (
+    <>
     <div className={s.task} data-type="task" {...(expanded ? { 'data-expanded': 'true' } : {})}>
       <span
         className={s.dot}
@@ -108,5 +115,22 @@ export function TaskCard({ task: t, siblings }: Props): JSX.Element {
         )}
       </div>
     </div>
+    {confirmOpen && (
+      <SendPreviewModal
+        title="Run task"
+        engineLabel="Claude"
+        fileName={firstLine(t.text)}
+        prompt={t.text}
+        readOnly
+        meta={[
+          { label: 'Action', value: 'Build just this task' },
+          { label: 'Skill', value: 'development/build' },
+        ]}
+        submitLabel="Run"
+        onSubmit={doRun}
+        onCancel={() => setConfirmOpen(false)}
+      />
+    )}
+    </>
   )
 }
