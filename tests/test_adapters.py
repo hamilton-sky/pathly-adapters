@@ -36,6 +36,24 @@ def test_adapters_yaml_required_keys():
         assert not missing, f"{name} missing keys: {missing}"
 
 
+def test_resolve_command_omits_model_flag_when_empty():
+    """Empty model → the --model flag is DROPPED so the engine uses its own default.
+
+    codex/antigravity CLIs fail on an empty --model value ("a value is required for '--model'"),
+    and claude's own default tier may be inaccessible. So an empty model must leave --model out.
+    """
+    from pathly_orchestrator.adapters import resolve_command
+
+    for adapter in ("claude", "codex", "antigravity"):
+        argv = resolve_command(adapter, "build it", "")["argv"]
+        assert "--model" not in argv, f"{adapter}: empty model should drop --model, got {argv}"
+    # A real model is still spliced in with its value.
+    argv = resolve_command("codex", "build it", "gpt-5")["argv"]
+    assert argv[argv.index("--model") + 1] == "gpt-5"
+    argv = resolve_command("claude", "build it", "claude-sonnet-4-6")["argv"]
+    assert argv[argv.index("--model") + 1] == "claude-sonnet-4-6"
+
+
 def test_copilot_has_null_headless_and_resume():
     from importlib.resources import files
 

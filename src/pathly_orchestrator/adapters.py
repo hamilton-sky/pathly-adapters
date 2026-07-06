@@ -121,12 +121,21 @@ def resolve_command(
     terminal_kind = cfg.get("terminal_kind", adapter)
 
     prompt = _dash_safe_prompt(prompt)
+    model = (model or "").strip()
+    tokens = [str(t) for t in headless]
     argv: list[str] = []
-    for token in headless:
-        token_str = str(token)
-        token_str = token_str.replace("{prompt}", prompt)
-        token_str = token_str.replace("{model}", model)
-        argv.append(token_str)
+    i = 0
+    while i < len(tokens):
+        tok = tokens[i]
+        # No model set → DROP the "--model {model}" pair so the engine uses its OWN default.
+        # An empty model is valid (validate_adapter_model: empty == engine default), but leaving an
+        # empty --model VALUE in the argv makes codex/antigravity fail loudly ("a value is required
+        # for '--model'"). Mirrors cliEngine.ts buildHeadlessArgv, which already guards `if (model)`.
+        if not model and tok == "--model" and i + 1 < len(tokens) and "{model}" in tokens[i + 1]:
+            i += 2
+            continue
+        argv.append(tok.replace("{prompt}", prompt).replace("{model}", model))
+        i += 1
 
     if autonomy and cfg.get("autonomy_flag"):
         argv.append(cfg["autonomy_flag"])
