@@ -3,21 +3,6 @@ import { readFile, listDir } from '../services/pathlyApi'
 
 import { apiFetch } from '../lib/config'
 
-// ── Relative-time helper ─────────────────────────────────────────────
-
-export function relativeTime(isoTs: string): string {
-  const ms = Date.now() - new Date(isoTs).getTime()
-  if (ms < 60_000) return 'now'
-  const mins = Math.floor(ms / 60_000)
-  if (mins < 60) return `${mins}m`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs}h`
-  const days = Math.floor(hrs / 24)
-  if (days < 7) return `${days}d`
-  const wks = Math.floor(days / 7)
-  return `${wks}w`
-}
-
 // ── Backend row shape ────────────────────────────────────────────────
 
 export interface CommsRow {
@@ -100,7 +85,6 @@ export function rowToMessage(row: CommsRow): Message {
     from: toAgentId(row.from_agent),
     text: row.text,
     stage: (row.stage as Stage) ?? null,
-    time: relativeTime(row.ts),
     ts: row.ts,
     pinned: row.type === 'decision',
     ack: ackedBy.length > 0,

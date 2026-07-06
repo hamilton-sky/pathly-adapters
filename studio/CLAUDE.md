@@ -231,3 +231,20 @@ Use `aria-expanded`, `aria-label`, and other ARIA attributes on interactive elem
 
 ### External links
 Any `<a target="_blank">` must include `rel="noopener noreferrer"`.
+
+### Timestamps — one shared util, never hand-rolled
+Every rendered timestamp goes through `src/renderer/src/utils/timestamp.ts` or the
+`<Timestamp>` component (`components/Timestamp/`). Do **not** write a new
+`Date.now()`-diff "ago" formatter or a bare `toLocaleTimeString()`/`toTimeString()` —
+that ad-hoc fragmentation (six divergent formatters) is exactly what this replaced.
+
+- Pure functions: `formatRelative` (owns its ` ago` suffix; one ladder —
+  `just now` → `Nm ago` → `Nh ago` → `Nd ago` → flips to an absolute date at **7 days**),
+  `formatAbsolute` (full datetime for tooltips/audit), `formatClock` (`HH:MM:SS` for dense
+  log rows), `formatDateShort` (`Jul 6`). All accept `string | number | Date | null`,
+  are locale-aware via `Intl` with explicit options, and return a sentinel — **never throw**.
+- Prefer `<Timestamp value={…} mode="relative|absolute|clock" />` in JSX — it renders a
+  semantic `<time dateTime>` with the absolute time in a hover `title` for free. Use the
+  pure functions only where JSX isn't possible (composing a log line, a window title).
+- Never append `" ago"` in JSX and never pre-format a timestamp into a string field on a
+  store model — pass the raw `ts` through and let the util format at the render edge.

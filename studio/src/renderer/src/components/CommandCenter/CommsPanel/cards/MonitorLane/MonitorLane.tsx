@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Activity, ChevronRight } from 'lucide-react'
 import type { Message } from '../../../types'
 import { PhaseRow } from '../PhaseRow/PhaseRow'
+import { Timestamp } from '../../../../Timestamp/Timestamp'
 import s from './MonitorLane.module.css'
 
 export interface MonitorLaneProps {
@@ -35,7 +36,7 @@ export function MonitorLane({ messages }: MonitorLaneProps): JSX.Element {
         <span className={s.title}>Monitor</span>
         <span className={s.count}>{count} event{count !== 1 ? 's' : ''}</span>
         {latest && (
-          <span className={s.last}>· {latest.text} · {latest.time} ago</span>
+          <span className={s.last}>· {latest.text} · <Timestamp value={latest.ts} /></span>
         )}
         <ChevronRight size={13} className={`${s.chev}${open ? ` ${s.chevOpen}` : ''}`} />
       </button>

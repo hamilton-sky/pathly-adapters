@@ -6,6 +6,7 @@ import { MsgCard } from '../cards/MsgCard/MsgCard'
 import { MonitorLane } from '../cards/MonitorLane/MonitorLane'
 import { ConfirmModal } from '../../../shared/ConfirmModal/ConfirmModal'
 import MarkdownRenderer from '../../../../components/shared/MarkdownRenderer/MarkdownRenderer'
+import { Timestamp } from '../../../Timestamp/Timestamp'
 import s from './CommsMsgList.module.css'
 
 export interface CommsMsgListProps {
@@ -79,7 +80,7 @@ export function CommsMsgList({ scope, messages, searchResults, searchTerm, flash
               <div className={s.pinBody}>
                 <MarkdownRenderer content={m.text} className={s.pinTxt} />
                 <div className={s.pinMeta}>
-                  {agentMeta(m.from).label}{m.stage ? ` · ${m.stage}` : ''} · {m.time} ago ·{' '}
+                  {agentMeta(m.from).label}{m.stage ? ` · ${m.stage}` : ''} · <Timestamp value={m.ts} /> ·{' '}
                   <span className={s.pinScope}>{scope} scope</span>
                 </div>
               </div>

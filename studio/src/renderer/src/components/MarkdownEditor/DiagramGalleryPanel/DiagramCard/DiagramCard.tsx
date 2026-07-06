@@ -13,6 +13,7 @@ import AddToBoardButton, {
   type BoardTargetOption,
 } from '../../../shared/AddToBoardButton/AddToBoardButton'
 import styles from './DiagramCard.module.css'
+import { formatDateShort } from '../../../../utils/timestamp'
 
 interface Props {
   entry: DiagramEntry
@@ -24,12 +25,6 @@ interface Props {
   onDelete: (entry: DiagramEntry) => void
   /** Regenerate is disabled while another run for this file is in flight. */
   busy?: boolean
-}
-
-function formatDate(iso: string): string {
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
-  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
 export default function DiagramCard({
@@ -53,7 +48,7 @@ export default function DiagramCard({
         {entry.status === 'kept' && <span className={styles.status}>ok</span>}
         <span className={styles.spacer} />
         <span className={styles.meta}>
-          {formatDate(entry.createdAt)} · {entry.engine}
+          {formatDateShort(entry.createdAt)} · {entry.engine}
         </span>
       </div>
 

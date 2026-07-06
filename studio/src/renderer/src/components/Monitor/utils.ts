@@ -2,15 +2,6 @@ import { useEffect, useRef } from 'react'
 import { useStore } from '../../store'
 import type { FsmEvent } from '../../types/index'
 
-export function formatRelativeTime(ts: string): string {
-  const diffMs = Date.now() - new Date(ts).getTime()
-  const diffS = Math.floor(diffMs / 1000)
-  if (diffS < 60) return 'now'
-  const diffM = Math.floor(diffS / 60)
-  if (diffM < 60) return `${diffM}m ago`
-  return `${Math.floor(diffM / 60)}h ago`
-}
-
 export function useInjectCSS(css: string): void {
   const injectedRef = useRef(false)
   // eslint-disable-next-line react-hooks/exhaustive-deps

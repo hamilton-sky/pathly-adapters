@@ -31,9 +31,9 @@ export interface Message {
   from: string
   text: string
   stage?: Stage | null
-  time: string
-  /** Raw ISO timestamp (maps to comms_messages.ts). Kept alongside the relative
-   *  `time` label so messages can be ordered — e.g. supersede only by a newer one. */
+  /** Raw ISO timestamp (maps to comms_messages.ts). The single time source: cards
+   *  render it through the shared `<Timestamp>` util, and it orders messages —
+   *  e.g. supersede only by a newer one. */
   ts?: string
   pinned?: boolean
   ack?: boolean

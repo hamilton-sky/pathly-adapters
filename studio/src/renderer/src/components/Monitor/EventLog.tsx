@@ -4,6 +4,7 @@ import { useStore } from '../../store'
 import type { FsmEvent } from '../../types/index'
 import { Tooltip } from '../ui'
 import { useInjectCSS, useAgentTelemetry } from './utils'
+import { formatClock } from '../../utils/timestamp'
 import styles from './Monitor.module.css'
 
 const FLASH_CSS = `
@@ -51,13 +52,8 @@ function eventColorClass(ev: FsmEvent, retrograde?: boolean): string {
   }
 }
 
-function formatTime(ts?: string): string {
-  if (!ts) return '--:--:--'
-  try { return new Date(ts).toTimeString().slice(0, 8) } catch { return '--:--:--' }
-}
-
 function formatEvent(ev: FsmEvent, retrograde?: boolean): string {
-  const ts = formatTime(ev.ts ?? ev.timestamp)
+  const ts = formatClock(ev.ts ?? ev.timestamp)
   const pad = (s: string, n: number): string => s.padEnd(n)
 
   switch (ev.type) {

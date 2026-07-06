@@ -10,6 +10,7 @@ import { CopyArtifactButton } from './CopyArtifactButton/CopyArtifactButton'
 import { SupersedeMenu } from '../../SupersedeMenu/SupersedeMenu'
 import { ConfirmModal } from '../../../../shared/ConfirmModal/ConfirmModal'
 import { ArtifactModal } from '../../ArtifactModal/ArtifactModal'
+import { Timestamp } from '../../../../Timestamp/Timestamp'
 import { Tooltip } from '../../../../ui'
 import { useCommsStore } from '../../../../../store/commsStore'
 import s from './MsgCard.module.css'
@@ -115,7 +116,7 @@ export function MsgCard({ message: m, flash, onAnswer, onResolve, onDelete, onSu
           {m.stage && (
             <span className={s.msgStage} data-stage={m.stage}>{m.stage}</span>
           )}
-          <span className={s.msgTime}>{m.time} ago</span>
+          <Timestamp value={m.ts} className={s.msgTime} />
         </div>
         {confirming && (
           <ConfirmModal

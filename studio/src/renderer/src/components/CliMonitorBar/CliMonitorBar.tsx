@@ -10,14 +10,8 @@ import type { CliSession, SessionRecord } from './useCliMonitor'
 import { SpawnQueuePanel } from './SpawnQueuePanel'
 import { CodeIntelControl } from './CodeIntelControl'
 import { FlowControlBar } from '../HQ/FlowControlBar/FlowControlBar'
+import { Timestamp } from '../Timestamp/Timestamp'
 import s from './CliMonitorBar.module.css'
-
-function fmtAgo(ms: number): string {
-  const secs = Math.floor((Date.now() - ms) / 1000)
-  if (secs < 60) return `${secs}s ago`
-  if (secs < 3600) return `${Math.floor(secs / 60)}m ago`
-  return `${Math.floor(secs / 3600)}h ago`
-}
 
 function SessionRow({ session, expanded, onToggle }: { session: CliSession; expanded: boolean; onToggle: () => void }): JSX.Element {
   const { tab, elapsedS, lastLines } = session
@@ -75,7 +69,7 @@ function HistoryRow({ record, expanded, onToggle }: { record: SessionRecord; exp
         <span className={s.historyStatus} data-status={record.status}>{record.status === 'done' ? 'done' : 'fail'}</span>
         <span className={s.badge} data-adapter={adapter}>{adapterLabel(adapter)}</span>
         <span className={s.rowLabel}>{record.label}</span>
-        <span className={s.timeAgo}>{fmtAgo(record.finishedAt)}</span>
+        <Timestamp value={record.finishedAt} className={s.timeAgo} />
       </button>
       {expanded && (
         <div className={s.expanded}>

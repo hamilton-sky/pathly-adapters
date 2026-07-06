@@ -3,13 +3,8 @@ import { useRunnerStore } from '../../../store/runnerStore'
 import type { HistoricalRun } from '../../../store/runnerStore'
 import type { StageLogEntry } from '../../../store/runnerStore'
 import { RunnerLogRow } from './RunnerLogRow'
+import { formatClock } from '../../../utils/timestamp'
 import styles from './RunnerLogCard.module.css'
-
-function fmtDate(ts: number | null): string {
-  if (ts === null) return '—'
-  const d = new Date(ts)
-  return d.toTimeString().slice(0, 8)
-}
 
 interface RunnerLogCardProps {
   historicalRun?: HistoricalRun
@@ -109,7 +104,7 @@ export function RunnerLogCard({ historicalRun, docked = false, onDismiss }: Runn
           </tbody>
         </table>
         <div className={styles.footer}>
-          Started {fmtDate(runStartedAt)} · {stageLog.length} total · ${cost.toFixed(3)}
+          Started {runStartedAt != null ? formatClock(runStartedAt) : '—'} · {stageLog.length} total · ${cost.toFixed(3)}
         </div>
       </div>
     </div>

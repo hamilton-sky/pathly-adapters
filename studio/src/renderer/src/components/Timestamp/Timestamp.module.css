@@ -1,0 +1,6 @@
+/* A timestamp is an atomic value — never let it wrap mid-label. Color, size, and
+   spacing come from the caller's className; this owns only wrap + hover affordance. */
+.ts {
+  white-space: nowrap;
+  cursor: default;
+}

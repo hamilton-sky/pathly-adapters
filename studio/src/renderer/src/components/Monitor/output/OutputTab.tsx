@@ -4,6 +4,7 @@ import { useRunnerStore } from '../../../store/runnerStore'
 import type { StageLogEntry, HistoricalRun } from '../../../store/runnerStore'
 import { StageCard } from './StageCard'
 import { StageModal } from './StageModal'
+import { formatClock } from '../../../utils/timestamp'
 import styles from './OutputTab.module.css'
 
 type ViewMode = 'grid' | 'list'
@@ -76,7 +77,7 @@ export function OutputTab(): JSX.Element {
 function HistoricalRunSection({ run, index, viewMode, onSelect }: { run: HistoricalRun; index: number; viewMode: ViewMode; onSelect: (e: StageLogEntry) => void }): JSX.Element {
   const [expanded, setExpanded] = useState(false)
   const stageCount = run.stageLog.length
-  const timeStr = run.runStartedAt ? new Date(run.runStartedAt).toLocaleTimeString() : '—'
+  const timeStr = run.runStartedAt ? formatClock(run.runStartedAt) : '—'
 
   return (
     <div className={styles.historicalRun}>

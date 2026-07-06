@@ -3,7 +3,7 @@ import { useStore } from '../../store'
 import { readFile } from '../../services/pathlyApi'
 import type { ConvRow } from '../../types'
 import { parseProgressMd } from '../../hooks/usePlanConversations'
-import { formatRelativeTime } from '../Monitor/utils'
+import { formatRelative } from '../../utils/timestamp'
 import s from './PlanBoard.module.css'
 
 interface EventEntry {
@@ -78,7 +78,7 @@ function ConvCard({ conv, events, isSelected, isHovered, isNext, isFuture, onSel
 
   const statsLine = [
     hasCostData ? `${(totalTokensIn / 1000).toFixed(1)}k in · ${(totalTokensOut / 1000).toFixed(1)}k out · $${totalCost.toFixed(3)}` : null,
-    latestTs ? formatRelativeTime(latestTs) : null,
+    latestTs ? formatRelative(latestTs) : null,
   ].filter(Boolean).join(' · ')
 
   return (

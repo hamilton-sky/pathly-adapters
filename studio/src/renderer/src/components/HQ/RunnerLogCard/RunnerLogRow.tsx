@@ -1,13 +1,9 @@
 import type { StageLogEntry } from '../../../store/runnerStore'
+import { formatClock } from '../../../utils/timestamp'
 import styles from './RunnerLogCard.module.css'
 
 interface Props {
   entry: StageLogEntry
-}
-
-function fmtTime(ts: number): string {
-  const d = new Date(ts)
-  return d.toTimeString().slice(0, 8)
 }
 
 function fmtDuration(startedAt: number, endedAt: number | null): string {
@@ -31,7 +27,7 @@ export function RunnerLogRow({ entry }: Props): JSX.Element {
       <td className={isHeadless ? styles.cellAdapterHeadless : styles.cellAdapter}>
         {isHeadless ? '— headless' : (entry.adapter ?? '—')}
       </td>
-      <td className={styles.cellTime}>{fmtTime(entry.startedAt)}</td>
+      <td className={styles.cellTime}>{formatClock(entry.startedAt)}</td>
       <td className={styles.cellDuration}>{fmtDuration(entry.startedAt, entry.endedAt)}</td>
       <td className={styles.cellStatus}>
         <span className={statusClass} aria-label={isRunning ? 'running' : entry.exitCode === 0 ? 'done' : 'error'} />

@@ -1,5 +1,5 @@
 import { IconArrow } from '../icons'
-import { timeAgo } from '../utils'
+import { Timestamp } from '../../Timestamp/Timestamp'
 import styles from './CardFooter.module.css'
 
 interface CardFooterProps {
@@ -12,7 +12,7 @@ export function CardFooter({ topicCount, lastOpened, onOpen }: CardFooterProps):
   return (
     <div className={styles.footer}>
       <span className={styles.meta}>
-        {topicCount} topic{topicCount !== 1 ? 's' : ''} · {timeAgo(lastOpened)}
+        {topicCount} topic{topicCount !== 1 ? 's' : ''} · <Timestamp value={lastOpened} />
       </span>
       <button
         type="button"

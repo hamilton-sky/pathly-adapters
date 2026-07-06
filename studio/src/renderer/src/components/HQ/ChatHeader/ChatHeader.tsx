@@ -3,6 +3,7 @@ import { X, Zap, SquarePen, History, ChevronDown } from 'lucide-react'
 import type { TerminalKind } from '../../../store/chatStore'
 import { Tooltip, IconButton } from '../../ui'
 import { TERMINAL_OPTIONS } from '../../../lib/terminalOptions'
+import { Timestamp } from '../../Timestamp/Timestamp'
 import styles from './ChatHeader.module.css'
 
 export interface SessionSummary {
@@ -58,16 +59,6 @@ export function ChatHeader({ hasClaudeTab, hasCodexTab, hasShellTab, hasAntigrav
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [sessionsOpen])
-
-  function formatActivity(iso: string): string {
-    const diff = Date.now() - new Date(iso).getTime()
-    const mins = Math.floor(diff / 60000)
-    if (mins < 1) return 'just now'
-    if (mins < 60) return `${mins}m ago`
-    const hrs = Math.floor(mins / 60)
-    if (hrs < 24) return `${hrs}h ago`
-    return `${Math.floor(hrs / 24)}d ago`
-  }
 
   return (
     <div className={styles.header}>
@@ -154,7 +145,7 @@ export function ChatHeader({ hasClaudeTab, hasCodexTab, hasShellTab, hasAntigrav
                   >
                     <span className={styles.sessionTitle}>{s.title}</span>
                     <span className={styles.sessionMeta}>
-                      {s.messageCount} msg · {formatActivity(s.lastActivity)}
+                      {s.messageCount} msg · <Timestamp value={s.lastActivity} />
                     </span>
                   </button>
                 ))}

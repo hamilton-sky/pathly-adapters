@@ -5,7 +5,9 @@ import type { Message } from '../../types'
 import { ResummarizeButton } from '../cards/MsgCard/ResummarizeButton/ResummarizeButton'
 import { useFocusTrap } from '../../../../hooks/useFocusTrap'
 import { readFile } from '../../../../services/pathlyApi'
-import { fetchArtifacts, relativeTime, type ArtifactRow } from '../../../../store/commsApi'
+import { fetchArtifacts, type ArtifactRow } from '../../../../store/commsApi'
+import { Timestamp } from '../../../Timestamp/Timestamp'
+import { formatRelative } from '../../../../utils/timestamp'
 import { useUiStore } from '../../../../store/uiStore'
 import { useProjectStore } from '../../../../store/projectStore'
 import { resolveArtifactPath } from '../artifactPath'
@@ -101,7 +103,7 @@ export function ArtifactModal({ message: m, onClose }: Props): JSX.Element {
         <div className={s.body}>
           <div className={s.metaGrid}>
             <span className={s.metaLabel}>Created by</span><span className={s.metaVal}>{m.from}</span>
-            <span className={s.metaLabel}>Created</span><span className={s.metaVal}>{m.time} ago</span>
+            <span className={s.metaLabel}>Created</span><Timestamp value={m.ts} className={s.metaVal} />
             <span className={s.metaLabel}>Type</span><span className={s.metaVal}>{m.atype ?? 'md'}</span>
             {m.stage && (<><span className={s.metaLabel}>Stage</span><span className={s.metaVal}>{m.stage}</span></>)}
             <span className={s.metaLabel}>Size</span>
@@ -116,7 +118,7 @@ export function ArtifactModal({ message: m, onClose }: Props): JSX.Element {
             {meta?.last_edit_at && (
               <>
                 <span className={s.metaLabel}>Last edited</span>
-                <span className={s.metaVal}>{relativeTime(meta.last_edit_at)} ago{meta.last_edit_by ? ` · ${meta.last_edit_by}` : ''}</span>
+                <span className={s.metaVal}>{formatRelative(meta.last_edit_at)}{meta.last_edit_by ? ` · ${meta.last_edit_by}` : ''}</span>
               </>
             )}
             <span className={s.metaLabel}>Path</span><span className={s.metaPath}>{m.artifactPath ?? '—'}</span>

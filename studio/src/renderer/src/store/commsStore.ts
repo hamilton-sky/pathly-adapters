@@ -278,7 +278,7 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
       id: tempId,
       type,
       from: 'you',
-      time: 'now',
+      ts: new Date().toISOString(),
       text,
       stage: stage ?? null,
       pinned: type === 'decision',

@@ -1,6 +1,7 @@
 import { Activity } from 'lucide-react'
 import type { Message } from '../../../types'
 import { agentMeta } from '../../../constants'
+import { Timestamp } from '../../../../Timestamp/Timestamp'
 import s from './PhaseRow.module.css'
 
 export interface PhaseRowProps {
@@ -18,7 +19,7 @@ export function PhaseRow({ message: m }: PhaseRowProps): JSX.Element {
       <Activity size={11} className={s.icon} />
       <span className={s.label}>{m.text}</span>
       {author && <span className={s.author}>{author}</span>}
-      <span className={s.time}>{m.time} ago</span>
+      <Timestamp value={m.ts} className={s.time} />
     </div>
   )
 }
