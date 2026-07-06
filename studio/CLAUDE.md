@@ -241,7 +241,8 @@ that ad-hoc fragmentation (six divergent formatters) is exactly what this replac
 - Pure functions: `formatRelative` (owns its ` ago` suffix; one ladder —
   `just now` → `Nm ago` → `Nh ago` → `Nd ago` → flips to an absolute date at **7 days**),
   `formatAbsolute` (full datetime for tooltips/audit), `formatClock` (`HH:MM:SS` for dense
-  log rows), `formatDateShort` (`Jul 6`). All accept `string | number | Date | null`,
+  log rows), `formatDateShort` (`Jul 6`), `dayKey` (YYYY-MM-DD for log day-dividers).
+  All accept `string | number | Date | null`,
   are locale-aware via `Intl` with explicit options, and return a sentinel — **never throw**.
 - Prefer `<Timestamp value={…} mode="relative|absolute|clock" />` in JSX — it renders a
   semantic `<time dateTime>` with the absolute time in a hover `title` for free. Use the

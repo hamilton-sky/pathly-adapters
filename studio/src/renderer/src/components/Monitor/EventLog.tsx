@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
 import { useStore } from '../../store'
 import type { FsmEvent } from '../../types/index'
 import { Tooltip } from '../ui'
 import { useInjectCSS, useAgentTelemetry } from './utils'
-import { formatClock } from '../../utils/timestamp'
+import { dayKey, formatAbsolute, formatClock, formatDateShort } from '../../utils/timestamp'
 import styles from './Monitor.module.css'
 
 const FLASH_CSS = `
@@ -185,11 +185,22 @@ function getActorChipClass(actor: string): string {
   return styles.evActorChipDefault
 }
 
+// Date header inserted whenever the calendar day changes between rows — makes the
+// log audit-complete (which day is this row?) without repeating the date per line.
+// The row itself keeps HH:MM:SS; hovering any row reveals the full absolute datetime.
+function DayDivider({ ev }: { ev: FsmEvent }): JSX.Element {
+  return (
+    <div className={styles.evDayDivider} role="separator">
+      <span className={styles.evDayLabel}>{formatDateShort(ev.ts ?? ev.timestamp)}</span>
+    </div>
+  )
+}
+
 function RawEventLine({ ev, isNew, retrograde }: { ev: FsmEvent; isNew: boolean; retrograde?: boolean }): JSX.Element {
   const actor = getEventActor(ev)
   const cost  = getEventCost(ev)
   return (
-    <div className={`${styles.evLineRow} ${isNew ? 'pathly-new-row' : ''}`}>
+    <div className={`${styles.evLineRow} ${isNew ? 'pathly-new-row' : ''}`} title={formatAbsolute(ev.ts ?? ev.timestamp)}>
       {actor && <span className={`${styles.evActorChip} ${getActorChipClass(actor)}`}>{actor}</span>}
       <span className={`${styles.evLineText} ${eventColorClass(ev, retrograde)}`}>
         {formatEvent(ev, retrograde)}
@@ -302,14 +313,17 @@ export function EventLog(): JSX.Element {
           {visibleEvents.length === 0 ? (
             <div className={styles.evEmpty}>No events yet</div>
           ) : (
-            visibleEvents.map((ev, i) => (
-              <RawEventLine
-                key={`${ev.ts ?? ''}-${ev.type}-${i}`}
-                ev={ev}
-                isNew={i >= flashStart}
-                retrograde={retrogradeFlags[i]}
-              />
-            ))
+            visibleEvents.map((ev, i) => {
+              const prev = i > 0 ? visibleEvents[i - 1] : null
+              const evDay = dayKey(ev.ts ?? ev.timestamp)
+              const prevDay = prev ? dayKey(prev.ts ?? prev.timestamp) : null
+              return (
+                <Fragment key={`${ev.ts ?? ''}-${ev.type}-${i}`}>
+                  {evDay != null && evDay !== prevDay && <DayDivider ev={ev} />}
+                  <RawEventLine ev={ev} isNew={i >= flashStart} retrograde={retrogradeFlags[i]} />
+                </Fragment>
+              )
+            })
           )}
         </div>
         {newCount > 0 && (

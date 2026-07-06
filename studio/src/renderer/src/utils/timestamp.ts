@@ -67,6 +67,19 @@ export function formatDateShort(input: TimeInput): string {
 }
 
 /**
+ * Local calendar-day key (YYYY-MM-DD) for day-boundary detection — e.g. inserting
+ * a date divider in a log when the day changes. null for missing/invalid input.
+ */
+export function dayKey(input: TimeInput): string | null {
+  const ms = toMs(input)
+  if (ms == null) return null
+  const d = new Date(ms)
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${month}-${day}`
+}
+
+/**
  * Relative label with the " ago" suffix owned here. The one canonical ladder:
  * `just now` → `Nm ago` → `Nh ago` → `Nd ago` → flips to an absolute date at 7d.
  */

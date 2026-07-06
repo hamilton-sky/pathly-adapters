@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   CLOCK_SENTINEL,
   TIME_SENTINEL,
+  dayKey,
   formatAbsolute,
   formatClock,
   formatDateShort,
@@ -88,5 +89,12 @@ describe('formatClock / formatAbsolute / formatDateShort / toISO', () => {
     expect(toISO(NOW)).toBe(new Date(NOW).toISOString())
     expect(toISO(null)).toBe('')
     expect(toISO('bad')).toBe('')
+  })
+  it('dayKey gives a stable YYYY-MM-DD, distinct across day boundaries, null for missing', () => {
+    expect(dayKey(NOW)).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    expect(dayKey(NOW)).toBe(dayKey(NOW + HR)) // same day
+    expect(dayKey(NOW)).not.toBe(dayKey(NOW - 2 * DAY)) // different day
+    expect(dayKey(null)).toBeNull()
+    expect(dayKey('bad')).toBeNull()
   })
 })
