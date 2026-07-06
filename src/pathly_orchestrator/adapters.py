@@ -34,6 +34,55 @@ def _load_adapters() -> dict:
     return yaml.safe_load(text)
 
 
+# Which model families each engine can run. A model outside its engine's family fails
+# at the provider with a cryptic 400 ("The 'claude-sonnet-4-6' model is not supported when
+# using Codex with a ChatGPT account") and silently produces no output — validate_adapter_model
+# rejects it LOUDLY at dispatch instead. copilot proxies multiple providers (unconstrained);
+# an empty model means the engine's own default.
+_ADAPTER_MODEL_PREFIXES: dict[str, tuple[str, ...]] = {
+    "claude": ("claude-",),                                   # Anthropic: opus / sonnet / haiku / fable
+    "codex": ("gpt-", "o1-", "o3-", "o4-", "o5-", "codex-"),  # OpenAI GPT / o-series
+    "antigravity": ("gemini-",),                              # Google Gemini (agy)
+    "copilot": (),                                            # multi-provider proxy — unconstrained
+}
+
+
+def _engine_for_model(model: str) -> str:
+    """The engine whose model-family ``model`` belongs to, or '' if unrecognized."""
+    m = (model or "").strip().lower()
+    for adapter, prefixes in _ADAPTER_MODEL_PREFIXES.items():
+        if prefixes and any(m.startswith(p) for p in prefixes):
+            return adapter
+    return ""
+
+
+def validate_adapter_model(adapter: str, model: str | None) -> str | None:
+    """Return a human error reason if ``model`` cannot run on ``adapter``, else None.
+
+    An empty model (engine default) always passes. An unknown adapter or copilot (a
+    multi-provider proxy) is unconstrained. Only a KNOWN, constrained adapter with a model
+    outside its family is rejected — with a hint at the engine that model DOES run on.
+    """
+    a = (adapter or "").strip().lower()
+    m = (model or "").strip().lower()
+    if not m:
+        return None
+    prefixes = _ADAPTER_MODEL_PREFIXES.get(a)
+    if not prefixes:  # unknown adapter or unconstrained proxy (copilot)
+        return None
+    if any(m.startswith(p) for p in prefixes):
+        return None
+    # Only reject when the model CLEARLY belongs to another known engine. An
+    # unrecognized model (a custom or newly-released name) is allowed — don't guess.
+    right = _engine_for_model(m)
+    if not right:
+        return None
+    return (
+        f"model {model!r} can't run on the {adapter!r} engine "
+        f"(it runs {'/'.join(prefixes)} models) — use the {right!r} engine for that model"
+    )
+
+
 def resolve_command(
     adapter: str,
     prompt: str,
@@ -52,6 +101,13 @@ def resolve_command(
         raise ValueError(f"Unknown adapter {adapter!r}. Known adapters: {known}")
 
     cfg = config[adapter]
+
+    # Reject a model that can't run on this engine LOUDLY here, instead of letting the
+    # CLI 400 mid-run and silently produce nothing (the failure mode that made a Codex
+    # run with a claude model seed no DAG).
+    _mismatch = validate_adapter_model(adapter, model)
+    if _mismatch:
+        raise ValueError(f"adapter_model_mismatch: {_mismatch}")
 
     headless = cfg.get("headless")
     if headless is None:
