@@ -34,22 +34,52 @@ def upsert_flow_definition(
     flow_yaml: str,
     file_path: str = "",
 ) -> int:
-    """Upsert a flow definition. Returns the row id."""
+    """Upsert a flow definition. Returns the row id.
+
+    TRUE replace, stable id: ``flow_definitions`` has no ``UNIQUE(name, project_root)``
+    constraint, so a plain ``INSERT OR REPLACE`` has no conflict target and degrades to a plain
+    INSERT — it APPENDS a shadow row instead of replacing. Combined with ``read_flow_definitions``
+    (which ``_load_flow`` scans first-match-wins), that pinned the OLDEST seed forever: edits to a
+    ``*.flow.yaml`` never took effect at runtime even though ``_refresh_flows`` re-ran on every
+    start. We fix it by UPDATING the existing row for this (name, project_root) in place — keeping
+    its id stable — and collapsing any pre-existing duplicate rows (and their decomposed graph),
+    so exactly one row survives. ``replace_flow_graph`` below then rewrites that id's nodes/edges.
+    """
+    now = datetime.now(timezone.utc).isoformat()
     with _get_write_lock(conn):
-        cur = conn.execute(
-            "INSERT OR REPLACE INTO flow_definitions "
-            "(project_root, name, version, flow_yaml, file_path, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            (
-                project_root,
-                name,
-                version,
-                flow_yaml,
-                file_path,
-                datetime.now(timezone.utc).isoformat(),
-            ),
-        )
-        flow_def_id = cur.lastrowid or 0
+        if project_root is None:
+            existing = conn.execute(
+                "SELECT id FROM flow_definitions WHERE name=? AND project_root IS NULL "
+                "ORDER BY id ASC",
+                (name,),
+            ).fetchall()
+        else:
+            existing = conn.execute(
+                "SELECT id FROM flow_definitions WHERE name=? AND project_root=? "
+                "ORDER BY id ASC",
+                (name, project_root),
+            ).fetchall()
+        if existing:
+            flow_def_id = existing[0][0]
+            # Collapse any shadow duplicates from before this fix — keep the earliest id.
+            for r in existing[1:]:
+                sid = r[0]
+                conn.execute("DELETE FROM flow_nodes WHERE flow_def_id=?", (sid,))
+                conn.execute("DELETE FROM flow_edges WHERE flow_def_id=?", (sid,))
+                conn.execute("DELETE FROM flow_definitions WHERE id=?", (sid,))
+            conn.execute(
+                "UPDATE flow_definitions "
+                "SET version=?, flow_yaml=?, file_path=?, updated_at=? WHERE id=?",
+                (version, flow_yaml, file_path, now, flow_def_id),
+            )
+        else:
+            cur = conn.execute(
+                "INSERT INTO flow_definitions "
+                "(project_root, name, version, flow_yaml, file_path, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (project_root, name, version, flow_yaml, file_path, now),
+            )
+            flow_def_id = cur.lastrowid or 0
         conn.commit()
 
     try:
@@ -69,14 +99,22 @@ def upsert_flow_definition(
 
 
 def read_flow_definitions(conn: sqlite3.Connection, project_root=None) -> list[dict]:
-    """Return flow definitions. If project_root given, filter by it; else global (NULL) only."""
+    """Return flow definitions. If project_root given, filter by it; else global (NULL) only.
+
+    Newest-first: ``_load_flow`` returns the FIRST row matching a name, so ordering by
+    ``updated_at DESC`` guarantees a freshly-seeded definition wins over any older shadow row
+    that predates the true-replace fix in ``upsert_flow_definition`` (defense-in-depth).
+    """
     if project_root is not None:
         rows = conn.execute(
-            "SELECT * FROM flow_definitions WHERE project_root=?", (project_root,)
+            "SELECT * FROM flow_definitions WHERE project_root=? "
+            "ORDER BY updated_at DESC, id DESC",
+            (project_root,),
         ).fetchall()
     else:
         rows = conn.execute(
-            "SELECT * FROM flow_definitions WHERE project_root IS NULL"
+            "SELECT * FROM flow_definitions WHERE project_root IS NULL "
+            "ORDER BY updated_at DESC, id DESC"
         ).fetchall()
     return [dict(r) for r in rows]
 
@@ -87,17 +125,20 @@ def read_flow_by_name(
     """Return a single flow definition by name, or None if not found."""
     if project_root is not None:
         row = conn.execute(
-            "SELECT * FROM flow_definitions WHERE name=? AND project_root=?",
+            "SELECT * FROM flow_definitions WHERE name=? AND project_root=? "
+            "ORDER BY updated_at DESC, id DESC LIMIT 1",
             (name, project_root),
         ).fetchone()
     else:
         row = conn.execute(
-            "SELECT * FROM flow_definitions WHERE name=? AND project_root IS NULL",
+            "SELECT * FROM flow_definitions WHERE name=? AND project_root IS NULL "
+            "ORDER BY updated_at DESC, id DESC LIMIT 1",
             (name,),
         ).fetchone()
         if row is None:
             row = conn.execute(
-                "SELECT * FROM flow_definitions WHERE name=? ORDER BY project_root IS NULL DESC LIMIT 1",
+                "SELECT * FROM flow_definitions WHERE name=? "
+                "ORDER BY project_root IS NULL DESC, updated_at DESC, id DESC LIMIT 1",
                 (name,),
             ).fetchone()
     return dict(row) if row else None
