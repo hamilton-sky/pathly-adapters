@@ -5,6 +5,7 @@ import { RunPill } from '../../../shared/RunPill/RunPill'
 import SendPreviewModal from '../../../shared/SendPreviewModal/SendPreviewModal'
 import { GoalSelect } from './GoalSelect/GoalSelect'
 import { useGoalRunPreview } from './useGoalRunPreview'
+import { executorInfo } from './executorInfo'
 import {
   type EditorCli,
   loadEditorCli,
@@ -68,6 +69,7 @@ export function GoalRunButton({ goalId, defaultExecutor = 'single', goalText = '
 
   const taskLine = `${total} task${total !== 1 ? 's' : ''} · ${ready} ready`
   const executorLabel = EXECUTOR_OPTIONS.find((o) => o.value === executor)?.label ?? executor
+  const info = executorInfo(executor)
   const previewPrompt = useGoalRunPreview(confirmOpen, executor, goalText, taskLine)
 
   function handleAdapterChange(v: string): void {
@@ -117,6 +119,15 @@ export function GoalRunButton({ goalId, defaultExecutor = 'single', goalText = '
         />
       </div>
 
+      {/* Show which agent + skill the selected executor dispatches, live as it changes. */}
+      <div className={s.hint} title="Agent and skill this executor sends">
+        <span className={s.hintKey}>agent</span>
+        <span className={s.hintValue}>{info.agent}</span>
+        <span className={s.hintSep}>·</span>
+        <span className={s.hintKey}>skill</span>
+        <span className={s.hintValue}>{info.skill}</span>
+      </div>
+
       {confirmOpen && (
         <SendPreviewModal
           title="Run goal"
@@ -126,6 +137,8 @@ export function GoalRunButton({ goalId, defaultExecutor = 'single', goalText = '
           readOnly
           meta={[
             { label: 'Executor', value: executorLabel },
+            { label: 'Agent', value: info.agent },
+            { label: 'Skill', value: info.skill },
             { label: 'Tasks', value: taskLine },
           ]}
           submitLabel="Run"

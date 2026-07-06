@@ -2,14 +2,7 @@ import { useMemo } from 'react'
 import { useStore } from '../../../../store'
 import { usePromptContent } from '../../../shared/PromptPreview/PromptPreview'
 import { useSkillCatalog } from '../../../Monitor/ConfigurePhaseModal/hooks/usePhaseModalCatalog'
-
-// Executor → the skill the spawned agent actually runs (mirrors supervisor/goal_executor.py):
-// `single` drains the whole DAG in one agent (drain-dag); `loop` runs one task per spawn
-// (execute-task); `team` runs a multi-stage FSM flow, so there is no single skill body to show.
-const EXECUTOR_SKILL: Record<string, string> = {
-  single: 'development/drain-dag',
-  loop: 'development/execute-task',
-}
+import { executorInfo } from './executorInfo'
 
 // Reconstruct the prompt a goal run sends, as faithfully as the renderer can — mirrors
 // supervisor/goal_executor.py: the goal, then the executor's skill body, then a note that the
@@ -23,7 +16,7 @@ export function useGoalRunPreview(
 ): string {
   const projectPath = useStore((st) => st.projectPath)
   const skillCatalog = useSkillCatalog(projectPath)
-  const skillRel = EXECUTOR_SKILL[executor] ?? ''
+  const skillRel = executorInfo(executor).skillRel
   const skillBody = usePromptContent(
     enabled && skillRel ? skillRel : '',
     'src/pathly_data/core/skills', skillCatalog,
@@ -41,8 +34,9 @@ export function useGoalRunPreview(
       )
     } else {
       parts.push(
-        '# Team executor\n\nRuns the multi-stage `team-build` FSM flow — each stage spawns its ' +
-          'own agent with a per-stage prompt, so no single prompt is sent up front.',
+        '# Team executor\n\nRuns the multi-stage `team-build` FSM flow: BUILDING (builder) → ' +
+          'REVIEWING (reviewer) → TESTING (tester) → RETRO. Each stage spawns its own agent with ' +
+          'a per-stage skill, so no single prompt is sent up front.',
       )
     }
     parts.push(

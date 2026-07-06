@@ -13,3 +13,32 @@
   min-width: 0;
   flex-wrap: wrap;
 }
+
+/* Live "what runs" caption under the controls — updates as the executor changes. */
+.hint {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 3px 5px;
+  min-width: 0;
+  font-size: 10.5px;
+  line-height: 1.3;
+  color: var(--text-secondary);
+}
+
+.hintKey {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.hintValue {
+  min-width: 0;
+  word-break: break-word;
+}
+
+.hintSep {
+  color: var(--text-muted);
+}
