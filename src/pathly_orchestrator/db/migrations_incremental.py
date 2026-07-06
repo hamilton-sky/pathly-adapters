@@ -57,6 +57,12 @@ def _add_additive_migrations(conn: sqlite3.Connection) -> None:
         # separate counter row — project/global totals are GROUP BYs over this.
         ("agent_invocations", "scope_tier", "TEXT DEFAULT 'feature'"),
         ("otel_spans", "scope_tier", "TEXT DEFAULT 'feature'"),
+        # telemetry-reconciliation: the fsm_events.seq of the AGENT_DONE this
+        # invocation projects from. NULL = a row NOT derived from the event stream
+        # (editor/chat one-shots posted via /db/invocation, which have no event).
+        # The projector keys rows by (project_root, feature, source_seq) so the
+        # backfill + live hook stay idempotent and never double-count.
+        ("agent_invocations", "source_seq", "INTEGER"),
         # flow-nodes-edges-migration: normalized storage for flow graph
         ("flow_nodes", "agent", "TEXT"),
         ("flow_nodes", "role", "TEXT"),
@@ -125,6 +131,18 @@ def _add_additive_migrations(conn: sqlite3.Connection) -> None:
         conn.execute(
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_comms_messages_slug "
             "ON comms_messages(slug) WHERE slug IS NOT NULL"
+        )
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass
+    # telemetry-reconciliation: one invocation row per projected AGENT_DONE.
+    # Partial unique index (source_seq NOT NULL) — event-less editor/chat rows keep
+    # NULL source_seq and are unconstrained; projected rows upsert by this key.
+    try:
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_invocations_source "
+            "ON agent_invocations(project_root, feature, source_seq) "
+            "WHERE source_seq IS NOT NULL"
         )
         conn.commit()
     except sqlite3.OperationalError:

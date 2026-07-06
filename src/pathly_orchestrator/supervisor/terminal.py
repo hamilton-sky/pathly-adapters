@@ -276,12 +276,16 @@ def _run_stage_via_terminal(
     run = create_run(run_id)
 
     def _emit_executor_telemetry(ad: Optional[dict], wall: float) -> None:
-        """Project this spawn's result into otel_spans + agent_invocations — but
-        ONLY for executor-owned runs (board/single/loop), which register no topic
-        RunnerState. FSM/team leave executor_owned_telemetry False and are covered
-        by api_lifecycle._write_stage_telemetry, so this never double-writes.
+        """Project this spawn's result into otel_spans — but ONLY for executor-owned
+        runs (board/single/loop), which register no topic RunnerState. FSM/team leave
+        executor_owned_telemetry False and are covered by api_lifecycle's span writer.
         Each task gets a fresh span under the goal's trace (goal=trace, task=span).
-        Best-effort."""
+
+        The agent_invocation row is NOT written here: executor runs emit an AGENT_DONE
+        event, and the universal projector (``invocation_projection`` via
+        ``append_event``) derives the invocation from that event stream (folding the
+        superseding BILLING_UPDATE). Writing one here too would double-count — hence
+        ``write_invocation=False``. Best-effort."""
         if not getattr(state, "executor_owned_telemetry", False):
             return
         try:
@@ -298,6 +302,7 @@ def _run_stage_via_terminal(
                 trace_id=getattr(state, "goal_trace_id", ""),
                 parent_span_id=getattr(state, "goal_span_id", ""),
                 wall_seconds=wall,
+                write_invocation=False,
             )
         except Exception:
             logger.debug("_emit_executor_telemetry skipped", exc_info=True)

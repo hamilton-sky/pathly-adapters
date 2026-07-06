@@ -11,11 +11,13 @@ from ._runner_bp import _topic_from_body, bp
 
 
 def _write_stage_telemetry(runner_state, parsed: dict, agent_done, wall_seconds) -> None:
-    """Best-effort: persist ONE OTEL span + ONE agent_invocation per completed stage.
+    """Best-effort: persist ONE OTEL span per completed FSM stage (for the Traces tab).
 
-    These two tables were previously defined-but-empty (`write_otel_span`/`write_agent_invocation`
-    had no callers), so there was no span tree and no per-agent rollup even though the run's
-    `trace_id`/`span_id` were already generated. This is the missing writer. It never raises —
+    The agent_invocation row is NO LONGER written here — every FSM stage emits an
+    AGENT_DONE event, and the universal projector (``invocation_projection`` via
+    ``append_event``) derives the invocation row from that event stream, folding in
+    the superseding BILLING_UPDATE. Writing an invocation here too would double-count.
+    This still writes the span so the trace tree is intact. It never raises —
     telemetry must not break the terminal-result callback.
     """
     try:
@@ -23,7 +25,6 @@ def _write_stage_telemetry(runner_state, parsed: dict, agent_done, wall_seconds)
         from datetime import datetime, timedelta, timezone
 
         from pathly_orchestrator.db.connection import get_db as _get_db
-        from pathly_orchestrator.db.queries.invocations import write_agent_invocation
         from pathly_orchestrator.db.queries.otel_spans import write_otel_span
 
         ad = agent_done or {}
@@ -32,8 +33,6 @@ def _write_stage_telemetry(runner_state, parsed: dict, agent_done, wall_seconds)
         cost = parsed.get("cost_usd") or ad.get("cost_usd") or 0.0
         tin = parsed.get("tokens_in") or ad.get("tokens_in") or 0
         tout = parsed.get("tokens_out") or ad.get("tokens_out") or 0
-        summary = parsed.get("result") or ad.get("summary") or ""
-        session_id = parsed.get("session_id") or ad.get("session_id")
         end_dt = datetime.now(timezone.utc)
         start_dt = end_dt - timedelta(seconds=float(wall_seconds or 0))
 
@@ -57,23 +56,6 @@ def _write_stage_telemetry(runner_state, parsed: dict, agent_done, wall_seconds)
                     "tokens_out": tout,
                 }
             ),
-        )
-        write_agent_invocation(
-            conn,
-            runner_state.project_root,
-            runner_state.topic,
-            {
-                "run_id": runner_state.run_id,
-                "stage": stage,
-                "agent_role": agent_role,
-                "started_at": start_dt.isoformat(),
-                "finished_at": end_dt.isoformat(),
-                "tokens_in": tin,
-                "tokens_out": tout,
-                "cost_usd": cost,
-                "session_id": session_id,
-                "summary": (summary or "")[:2000],
-            },
         )
     except Exception:
         logging.getLogger("pathly.http").debug(

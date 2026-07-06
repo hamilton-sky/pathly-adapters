@@ -220,3 +220,20 @@ It reads the session usage payload (tokens, cost) from stdin, finds the most rec
 active feature in the central SQLite DB (`~/.pathly/pathly.db`), and appends a
 `BILLING_UPDATE` event (patching the last `AGENT_DONE` with real cost) so Studio can
 display API-accurate costs. It always exits 0 — telemetry failure never blocks the user.
+
+**`agent_invocations` is a projection of the `AGENT_DONE` event stream** (telemetry-reconciliation).
+The DB-explorer roll-up (`/db/rollup`), header strip (`/db/stats`) and cost chart
+(`/telemetry/trends`) all read `agent_invocations` — but the authoritative per-agent
+cost/tokens live in `fsm_events` (each agent writes `AGENT_DONE`; the stop hook /
+reconciliation window appends a `BILLING_UPDATE` that **supersedes** it). So the
+projector (`db/queries/invocation_projection.py`) writes exactly one invocation row
+per `AGENT_DONE`, keyed by its `fsm_events.seq` (`source_seq`), with the superseding
+`BILLING_UPDATE` folded in (billing wins when priced — never summed, so no
+double-count). It runs two ways: a **live hook** in `append_event` (every
+`AGENT_DONE`/`BILLING_UPDATE` write projects immediately) and an **idempotent startup
+backfill** (`_run_migrations` → `backfill_invocations_from_events`). Editor/chat
+one-shots posted via `/db/invocation` (feature `"(project)"`, no event) keep
+`source_seq IS NULL` and are a disjoint, untouched population. Because of this, the
+writers in `runner/telemetry.py` (`project_agent_done`, called with
+`write_invocation=False`) and `api_lifecycle._write_stage_telemetry` now write only the
+OTel **span** (for the Traces tab) — the invocation comes from the event projection.

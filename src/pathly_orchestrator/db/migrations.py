@@ -358,3 +358,15 @@ END;
         pass
     _add_additive_migrations(conn)
     _backfill_comms_artifacts(conn)
+    # telemetry-reconciliation: rebuild the event-backed slice of agent_invocations
+    # from the fsm_events AGENT_DONE/BILLING_UPDATE stream. Idempotent; skips the
+    # event-less editor/chat rows. Best-effort — a telemetry backfill must never
+    # block DB startup.
+    try:
+        from pathly_orchestrator.db.queries.invocation_projection import (
+            backfill_invocations_from_events,
+        )
+
+        backfill_invocations_from_events(conn)
+    except Exception:
+        pass

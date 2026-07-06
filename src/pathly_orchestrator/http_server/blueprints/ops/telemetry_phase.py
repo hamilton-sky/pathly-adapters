@@ -22,21 +22,32 @@ from ._telemetry_bp import (
 
 @bp.route("/telemetry/trends", methods=["GET"])
 def trends_endpoint():
-    """Return daily aggregate trend data for a feature."""
+    """Return daily aggregate trend data.
+
+    A named ``feature`` scopes the buckets to that feature. A blank/omitted feature
+    aggregates across ALL features (optionally one ``project_root``) — this backs the
+    DB-explorer OVERVIEW cost chart, which has no single feature to pin to. Previously
+    a blank feature short-circuited to ``[]``, so the overview chart was always empty.
+    """
     feature = request.args.get("feature")
     if feature is None:
         return jsonify({"error": "Missing required query param: feature"}), 400
-    if not feature.strip():
-        return jsonify({"trends": []}), 200
 
     days = request.args.get("days", 126, type=int)
     days = max(1, min(days, 365))
+    project_root = (request.args.get("project_root") or "").strip() or None
 
     try:
-        from pathly_orchestrator.db.queries.trends import get_daily_trends
+        from pathly_orchestrator.db.queries.trends import (
+            get_daily_trends,
+            get_daily_trends_all,
+        )
 
         conn = _get_db()
-        buckets = get_daily_trends(conn, feature, days)
+        if feature.strip():
+            buckets = get_daily_trends(conn, feature, days)
+        else:
+            buckets = get_daily_trends_all(conn, days, project_root)
         return jsonify({"trends": buckets}), 200
     except Exception:
         logger.exception("trends_endpoint error")

@@ -264,17 +264,29 @@ def test_runner_terminal_result_normal_exit_does_not_abort(client):
 
 
 def test_runner_terminal_result_fills_otel_and_invocation_tables(client):
-    """Each completed stage now persists ONE otel_spans row + ONE agent_invocations row —
-    the two trace tables were previously defined-but-empty (no writers)."""
+    """A completed FSM stage persists ONE otel_spans row (via terminal/result) + ONE
+    agent_invocations row (via the AGENT_DONE-event projection).
+
+    Under telemetry-reconciliation the invocation is NO LONGER synthesized by the
+    terminal/result handler — every stage's agent writes an AGENT_DONE event, and the
+    universal projector derives the invocation from it (folding any BILLING_UPDATE).
+    terminal/result only writes the span. This test seeds the AGENT_DONE the agent
+    would have written, then posts terminal/result, and asserts both tables fill."""
     c, tmp_path = client
     from pathly_orchestrator.supervisor import _lock, _registry, RunnerState
     from pathly_orchestrator.supervisor.registry import create_run, drop_run
     from pathly_orchestrator.db.connection import get_db
+    from pathly_orchestrator.db.queries.fsm_events import append_event
     from pathly_orchestrator.db.queries.otel_spans import read_otel_spans
-    from pathly_orchestrator.db.queries.invocations import read_agent_invocations
 
     topic = "tele-feature"
     pr = str(tmp_path)
+    conn = get_db()
+    # The agent's completion event — this is what the projector turns into an invocation.
+    append_event(conn, pr, topic, {
+        "type": "AGENT_DONE", "agent": "builder", "conversation": 1,
+        "cost_usd": 0.07, "total_tokens": 1000, "ts": "2026-07-06T12:00:00Z",
+    })
     with _lock:
         st = RunnerState(
             topic=topic, flow="team", project_root=pr, model="m", timeout=60,
@@ -291,14 +303,19 @@ def test_runner_terminal_result_fills_otel_and_invocation_tables(client):
                   "stdout_tail": "", "wall_seconds": 4},
         )
         assert r.status_code == 200
-        conn = get_db()
         spans = read_otel_spans(conn, pr, topic)
-        invs = read_agent_invocations(conn, pr, topic)
         assert len(spans) == 1, spans
         assert spans[0]["trace_id"] == "trace-abc" and spans[0]["span_id"] == "span-xyz"
         assert spans[0]["name"] == "BUILDING"
+        # The invocation was projected from the AGENT_DONE event (query by feature —
+        # events normalize project_root slashes, so filter on the unique topic).
+        invs = conn.execute(
+            "SELECT cost_usd, source_seq, agent_role FROM agent_invocations WHERE feature=?",
+            (topic,),
+        ).fetchall()
         assert len(invs) == 1, invs
-        assert invs[0]["stage"] == "BUILDING" and invs[0]["run_id"] == "run-tele-1"
+        assert abs(invs[0]["cost_usd"] - 0.07) < 1e-9
+        assert invs[0]["source_seq"] is not None
     finally:
         drop_run("run-tele-1")
 

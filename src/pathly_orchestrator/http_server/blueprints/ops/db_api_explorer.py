@@ -100,12 +100,13 @@ def db_stats():
         invocations = conn.execute(
             "SELECT COUNT(*) FROM fsm_events WHERE event_type='AGENT_DONE'"
         ).fetchone()[0]
+        # Cost + tokens read from agent_invocations — the SAME fact table the /db/rollup
+        # scope-tier panels sum, so the header strip and the roll-up always agree. (The
+        # old fsm_events sum double-counted every run that had both an AGENT_DONE and a
+        # superseding BILLING_UPDATE; agent_invocations folds those into one row.)
         row = conn.execute(
-            "SELECT "
-            "  COALESCE(SUM(CASE WHEN event_type='AGENT_DONE' "
-            "    THEN CAST(json_extract(payload,'$.total_tokens') AS INT) ELSE 0 END),0), "
-            "  COALESCE(SUM(CAST(json_extract(payload,'$.cost_usd') AS REAL)),0) "
-            "FROM fsm_events WHERE event_type IN ('AGENT_DONE','BILLING_UPDATE')"
+            "SELECT COALESCE(SUM(tokens_in + tokens_out),0), "
+            "       COALESCE(SUM(cost_usd),0) FROM agent_invocations"
         ).fetchone()
         total_tokens = int(row[0])
         total_cost = float(row[1])
@@ -342,12 +343,15 @@ def db_stats_trends():
         pr = _project_root_param()
         days = min(int(request.args.get("days", 30)), 365)
 
+        # Span attributes are written FLAT by the telemetry writers (attributes.cost_usd,
+        # attributes.tokens_in/out) — not under a '$.pathly'/'$.gen_ai' namespace. The
+        # old paths matched nothing, so this endpoint always reported zero cost/tokens.
         query = """
             SELECT
               date(start_time) AS day,
-              COALESCE(ROUND(SUM(CAST(json_extract(attributes,'$.pathly.cost_usd') AS REAL)),6),0)       AS cost_usd,
-              COALESCE(SUM(CAST(json_extract(attributes,'$.gen_ai.usage.input_tokens')  AS INTEGER)),0)  AS tokens_in,
-              COALESCE(SUM(CAST(json_extract(attributes,'$.gen_ai.usage.output_tokens') AS INTEGER)),0)  AS tokens_out,
+              COALESCE(ROUND(SUM(CAST(json_extract(attributes,'$.cost_usd')   AS REAL)),6),0)  AS cost_usd,
+              COALESCE(SUM(CAST(json_extract(attributes,'$.tokens_in')  AS INTEGER)),0)         AS tokens_in,
+              COALESCE(SUM(CAST(json_extract(attributes,'$.tokens_out') AS INTEGER)),0)         AS tokens_out,
               COUNT(*) AS span_count
             FROM otel_spans
             WHERE start_time IS NOT NULL

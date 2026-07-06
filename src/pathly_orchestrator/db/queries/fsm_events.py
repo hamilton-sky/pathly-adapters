@@ -30,14 +30,28 @@ def append_event(
     event_type = event_dict.get("type", event_dict.get("event_type", ""))
     ts = event_dict.get("ts", "")
     payload = json.dumps(event_dict)
+    norm_pr = _norm(project_root)
     with _get_write_lock(conn):
         cur = conn.execute(
             "INSERT INTO fsm_events (project_root, feature, ts, event_type, payload) "
             "VALUES (?, ?, ?, ?, ?)",
-            (_norm(project_root), feature, ts, event_type, payload),
+            (norm_pr, feature, ts, event_type, payload),
         )
         conn.commit()
-        return cur.lastrowid or 0
+        seq = cur.lastrowid or 0
+
+    # telemetry-reconciliation: project the completion/billing event into
+    # agent_invocations so the DB-explorer roll-up + cost chart reflect real cost for
+    # EVERY run (not just supervised ones). Outside the write lock, best-effort — a
+    # telemetry projection must never break event append.
+    if event_type in ("AGENT_DONE", "BILLING_UPDATE") and seq:
+        try:
+            from .invocation_projection import on_event_appended
+
+            on_event_appended(conn, seq, norm_pr, feature, event_dict)
+        except Exception:
+            pass
+    return seq
 
 
 def read_events(

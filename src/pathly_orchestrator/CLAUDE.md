@@ -144,6 +144,12 @@ pathly_orchestrator/
       runner_state.py      # write_runner_state, read_runner_state, mark_stale_runners
       flow_defs.py / skill_defs.py / agent_defs.py / invocations.py / overrides.py / feedback_items.py
       otel_spans.py / run_history.py / stage_configs.py / catalog_items.py / trends.py / app_settings.py
+      invocation_projection.py # agent_invocations = projection of the AGENT_DONE event stream:
+                           #   one row per AGENT_DONE (keyed by fsm_events.seq = source_seq), the
+                           #   superseding BILLING_UPDATE folded in (billing wins, never summed).
+                           #   backfill_invocations_from_events() (idempotent startup rebuild) +
+                           #   on_event_appended() (live hook fired from fsm_events.append_event).
+                           #   Editor/chat rows (/db/invocation, source_seq NULL) are left untouched.
       comms.py             # re-export shim — splits into comms_messages, comms_artifacts, comms_tasks, comms_embeddings (import from domain modules for new code)
       comms_messages.py    # board message CRUD; goal_id/executor columns back the Goals->Task-DAG model
       comms_artifacts.py   # artifact metadata CRUD (attach, list, section index, update_summary)

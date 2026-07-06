@@ -101,16 +101,23 @@ def project_agent_done(
     span_id: str = "",
     parent_span_id: str = "",
     wall_seconds: float = 0.0,
+    write_invocation: bool = True,
 ) -> None:
-    """Write ONE agent_invocation + ONE otel_span from an AGENT_DONE payload.
+    """Write ONE otel_span (+ optionally ONE agent_invocation) from an AGENT_DONE payload.
 
     `agent_done` is the dict read from the central DB's last AGENT_DONE (or the
     parsed PTY result) — cost_usd / tokens_in / tokens_out / summary / session_id.
     Never raises.
+
+    ``write_invocation`` — set False when the caller's run ALSO emits an AGENT_DONE
+    event to fsm_events (supervised / board / loop executors). For those, the
+    universal projector (``invocation_projection`` via ``append_event``) owns the
+    invocation row, so writing one here too would double-count. The span is always
+    written (the Traces tab needs it). Callers with no event backing (editor/chat
+    one-shots via ``/db/invocation``) keep the default True.
     """
     try:
         from pathly_orchestrator.db.connection import get_db
-        from pathly_orchestrator.db.queries.invocations import write_agent_invocation
         from pathly_orchestrator.db.queries.otel_spans import write_otel_span
 
         ad = agent_done or {}
@@ -154,25 +161,30 @@ def project_agent_done(
                 }
             ),
         )
-        write_agent_invocation(
-            conn,
-            project_root,
-            feature,
-            {
-                "run_id": run_id,
-                "stage": stage,
-                "agent_role": role,
-                "started_at": start_dt.isoformat(),
-                "finished_at": end_dt.isoformat(),
-                "tokens_in": tin,
-                "tokens_out": tout,
-                "cost_usd": cost,
-                "session_id": session_id,
-                "summary": (summary or "")[:2000],
-                "scope_tier": tier,
-                "provider": (adapter or None),
-                "cost_source": cost_source,
-            },
-        )
+        if write_invocation:
+            from pathly_orchestrator.db.queries.invocations import (
+                write_agent_invocation,
+            )
+
+            write_agent_invocation(
+                conn,
+                project_root,
+                feature,
+                {
+                    "run_id": run_id,
+                    "stage": stage,
+                    "agent_role": role,
+                    "started_at": start_dt.isoformat(),
+                    "finished_at": end_dt.isoformat(),
+                    "tokens_in": tin,
+                    "tokens_out": tout,
+                    "cost_usd": cost,
+                    "session_id": session_id,
+                    "summary": (summary or "")[:2000],
+                    "scope_tier": tier,
+                    "provider": (adapter or None),
+                    "cost_source": cost_source,
+                },
+            )
     except Exception:
         _log.debug("project_agent_done skipped", exc_info=True)
