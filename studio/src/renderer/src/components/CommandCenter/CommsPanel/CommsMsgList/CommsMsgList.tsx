@@ -3,7 +3,7 @@ import { Star, MessageSquare, Trash2 } from 'lucide-react'
 import type { BoardScope, Message, MessageType } from '../../types'
 import { agentMeta } from '../../constants'
 import { MsgCard } from '../cards/MsgCard/MsgCard'
-import { PhaseRow } from '../cards/PhaseRow/PhaseRow'
+import { MonitorLane } from '../cards/MonitorLane/MonitorLane'
 import { ConfirmModal } from '../../../shared/ConfirmModal/ConfirmModal'
 import MarkdownRenderer from '../../../../components/shared/MarkdownRenderer/MarkdownRenderer'
 import s from './CommsMsgList.module.css'
@@ -59,6 +59,16 @@ export function CommsMsgList({ scope, messages, searchResults, searchTerm, flash
     (m) => !m.pinned && m.type !== 'goal' && m.type !== 'task' && (!typeSet || typeSet.has(m.type)),
   )
 
+  // Execution-trace noise — FSM phase boundaries + supervisor/system lifecycle status
+  // (Started:/Done:, goal-run started/finished) — lives in the collapsible Monitor lane,
+  // not inline, so the thread reads as the semantic story (decisions, artifacts, warnings).
+  // Everything else is signal.
+  const isMonitor = (m: Message): boolean =>
+    m.type === 'phase' ||
+    (m.type === 'status' && (m.from === 'supervisor' || m.from === 'system'))
+  const monitor = thread.filter(isMonitor)
+  const signal = thread.filter((m) => !isMonitor(m))
+
   return (
     <div className={s.thread}>
       {pins.length > 0 && (
@@ -89,29 +99,27 @@ export function CommsMsgList({ scope, messages, searchResults, searchTerm, flash
         </div>
       )}
 
-      {thread.length > 0
-        ? thread.map((m) => (
-          m.type === 'phase' ? (
-            <PhaseRow key={m.id} message={m} />
-          ) : (
-            <MsgCard
-              key={m.id}
-              message={m}
-              flash={flashId === m.id}
-              onAnswer={onAnswer}
-              onResolve={onResolve}
-              onDelete={onDelete}
-              onSupersede={onSupersede}
-              siblings={messages}
-            />
-          )
+      {signal.length > 0 ? (
+        signal.map((m) => (
+          <MsgCard
+            key={m.id}
+            message={m}
+            flash={flashId === m.id}
+            onAnswer={onAnswer}
+            onResolve={onResolve}
+            onDelete={onDelete}
+            onSupersede={onSupersede}
+            siblings={messages}
+          />
         ))
-        : (
-          <div className={s.empty}>
-            <MessageSquare size={22} />
-            <p>{typeSet ? 'No messages match the current filter.' : 'No messages on this board yet.'}</p>
-          </div>
-        )}
+      ) : monitor.length === 0 ? (
+        <div className={s.empty}>
+          <MessageSquare size={22} />
+          <p>{typeSet ? 'No messages match the current filter.' : 'No messages on this board yet.'}</p>
+        </div>
+      ) : null}
+
+      {monitor.length > 0 && <MonitorLane messages={monitor} />}
 
       {confirmPinId && (
         <ConfirmModal
