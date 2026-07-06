@@ -7,6 +7,7 @@ import type { DecomposeMode } from '../../../../store/commsApi'
 import type { GoalStub } from './EvaluateBoardButton'
 import { BoardEvalConfig } from './BoardEvalConfig/BoardEvalConfig'
 import { GoalTargetConfig } from './GoalTargetConfig/GoalTargetConfig'
+import { FeatureDecomposeConfig, type FeatureRigor } from './FeatureDecomposeConfig/FeatureDecomposeConfig'
 import s from './EvalConfigPopover.module.css'
 
 // Max chars shown for a goal title in the Target dropdown.
@@ -24,6 +25,10 @@ interface Props {
   /** '' = whole board; otherwise = a goal id. */
   targetGoalId: string
   rigorMode: DecomposeMode
+  /** Whole-board "Decompose into goals" rigor (light/full/consultation). */
+  featureRigor: FeatureRigor
+  onFeatureRigorChange: (r: FeatureRigor) => void
+  onFeatureDecompose: () => void
   onSelectLens: (name: string) => void
   onLensTextChange: (v: string) => void
   onExtraPromptChange: (v: string) => void
@@ -55,6 +60,7 @@ function buildTargetOptions(goals: GoalStub[]): { value: string; label: string; 
 export function EvalConfigPopover({
   anchorEl, selectedLens, lensText, extraPrompt, selectedCli,
   running, goals, targetGoalId, rigorMode,
+  featureRigor, onFeatureRigorChange, onFeatureDecompose,
   onSelectLens, onLensTextChange, onExtraPromptChange, onCliChange,
   onTargetChange, onRigorChange, onReset, onRun, onClose,
 }: Props): JSX.Element | null {
@@ -117,20 +123,28 @@ export function EvalConfigPopover({
           onRun={onRun}
         />
       ) : (
-        <BoardEvalConfig
-          selectedLens={selectedLens}
-          lensText={lensText}
-          extraPrompt={extraPrompt}
-          selectedCli={selectedCli}
-          running={running}
-          onSelectLens={onSelectLens}
-          onLensTextChange={onLensTextChange}
-          onExtraPromptChange={onExtraPromptChange}
-          onCliChange={onCliChange}
-          onReset={onReset}
-          onRun={onRun}
-          onClose={onClose}
-        />
+        <>
+          <BoardEvalConfig
+            selectedLens={selectedLens}
+            lensText={lensText}
+            extraPrompt={extraPrompt}
+            selectedCli={selectedCli}
+            running={running}
+            onSelectLens={onSelectLens}
+            onLensTextChange={onLensTextChange}
+            onExtraPromptChange={onExtraPromptChange}
+            onCliChange={onCliChange}
+            onReset={onReset}
+            onRun={onRun}
+            onClose={onClose}
+          />
+          <FeatureDecomposeConfig
+            rigor={featureRigor}
+            running={running}
+            onRigorChange={onFeatureRigorChange}
+            onRun={onFeatureDecompose}
+          />
+        </>
       )}
     </div>,
     document.body,

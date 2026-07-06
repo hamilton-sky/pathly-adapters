@@ -26,6 +26,7 @@ import {
   apiStopTask,
   apiStopGoal,
   apiDecomposeGoal,
+  apiDecomposeFeature,
   type RunGoalOpts,
   type DecomposeMode,
 } from './commsApi'
@@ -84,6 +85,8 @@ export interface CommsState {
    *  `systemPrompt` carries the optional evaluation lens; `instructions` carries
    *  the optional extra-instructions box. */
   runEvaluator: (key: string, opts?: { adapter?: string; systemPrompt?: string; instructions?: string; progress?: string }) => void
+  /** Decompose a whole FEATURE board into sibling goals (light/full/consultation rigor). */
+  decomposeFeature: (key: string, rigor: 'light' | 'full' | 'consultation', opts?: { adapter?: string }) => void
   /** Update a board's run state from a board_run SSE phase (running/done/stopped). */
   markBoardRunPhase: (key: string, phase: string) => void
   stopBoard: (key: string) => void
@@ -536,6 +539,24 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
       .catch(() => {
         set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' } }))
       })
+  },
+
+  decomposeFeature: (key, rigor, opts = {}) => {
+    // Whole-feature decompose → sibling goals. Reuses the board-run pill state keyed by the board:
+    // the run appears on the board and the pill clears via the same board_run SSE / completion watch
+    // as Evaluate. Feature boards only (the /comms/features/decompose route is feature-scoped).
+    const now = Date.now()
+    set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'running' }, boardRunStart: { ...s.boardRunStart, [key]: now } }))
+    if (key !== 'project' && key !== 'global') useProjectStore.getState().setActiveTopic(key)
+    const projectRoot = useProjectStore.getState().projectPath.replace(/\\/g, '/').replace(/\/$/, '')
+    apiDecomposeFeature(key, rigor, { projectRoot, adapter: opts.adapter })
+      .then((res) => {
+        if (res === null) { set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' } })); return }
+        if (!res.ok && res.reason === 'board_busy') { set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'busy' } })); return }
+        if (res.ok) _startRunWatch(key, res.run_id)
+        else set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' } }))
+      })
+      .catch(() => { set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' } })) })
   },
 
   markBoardRunPhase: (key, phase) => {

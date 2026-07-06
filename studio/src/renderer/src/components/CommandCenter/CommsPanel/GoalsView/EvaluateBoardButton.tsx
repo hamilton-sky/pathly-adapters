@@ -64,6 +64,9 @@ export function EvaluateBoardButton({ boardKey, goals = [] }: Props): JSX.Elemen
           onCliChange={e.handleCliChange}
           onTargetChange={e.setTargetGoalId}
           onRigorChange={e.setRigorMode}
+          featureRigor={e.featureRigor}
+          onFeatureRigorChange={e.setFeatureRigor}
+          onFeatureDecompose={e.dispatchFeatureDecompose}
           onReset={e.handleReset}
           onRun={e.onConfigRun}
           onClose={() => e.setConfigOpen(false)}

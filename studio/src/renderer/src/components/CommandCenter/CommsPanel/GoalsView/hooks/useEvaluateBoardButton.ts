@@ -6,6 +6,7 @@ import type { DecomposeMode } from '../../../../../store/commsApi'
 import { type EditorCli, loadEditorCli, saveEditorCli } from '../../../../MarkdownEditor/EditorHeader/editorCli'
 import { useEvaluatePreview } from '../useEvaluatePreview'
 import { EVAL_LENSES } from '../../SingleAgentButton/agentFormData'
+import type { FeatureRigor } from '../FeatureDecomposeConfig/FeatureDecomposeConfig'
 
 // Persistent localStorage key for the evaluate button's engine choice.
 const CLI_KEY_EVAL = 'pathly.comms.cli.eval'
@@ -24,6 +25,7 @@ export function useEvaluateBoardButton(boardKey: string) {
   const goalRunState = useCommsStore((st) => st.goalRunState)
   const goalRunStart = useCommsStore((st) => st.goalRunStart)
   const decomposeGoal = useCommsStore((st) => st.decomposeGoal)
+  const decomposeFeature = useCommsStore((st) => st.decomposeFeature)
   const stopGoal = useCommsStore((st) => st.stopGoal)
 
   const [selectedLens, setSelectedLens] = useState('')
@@ -37,6 +39,9 @@ export function useEvaluateBoardButton(boardKey: string) {
   // '' = whole board; otherwise = a goal id.
   const [targetGoalId, setTargetGoalId] = useState('')
   const [rigorMode, setRigorMode] = useState<DecomposeMode>('plan')
+  // Whole-board "Decompose into goals" rigor (light/full/consultation) — distinct from the
+  // per-goal rigorMode above.
+  const [featureRigor, setFeatureRigor] = useState<FeatureRigor>('light')
   // Per-run board-updates verbosity override; '' = inherit the Settings default.
   const [verbosity, setVerbosity] = useState('')
   const gearRef = useRef<HTMLButtonElement>(null)
@@ -84,6 +89,14 @@ export function useEvaluateBoardButton(boardKey: string) {
     }
   }
 
+  // Whole-board "Decompose into goals" (feature-decompose) — the alternative whole-board action
+  // to Evaluate. Dispatches directly; the run + its rigor were chosen explicitly in the popover.
+  function dispatchFeatureDecompose(): void {
+    setConfigOpen(false)
+    const adapter = selectedCli !== 'claude' ? selectedCli : undefined
+    decomposeFeature(boardKey, featureRigor, { adapter })
+  }
+
   // Goal decompose is gated only for the heavy consultation tier (full team run); quick/full
   // dispatch immediately. Returns having either dispatched or opened the confirm gate.
   function requestGoalRun(): void {
@@ -120,6 +133,7 @@ export function useEvaluateBoardButton(boardKey: string) {
   return {
     // config values
     selectedLens, lensText, extraPrompt, selectedCli, targetGoalId, rigorMode, verbosity,
+    featureRigor, setFeatureRigor, dispatchFeatureDecompose,
     // pill
     runState, running, progress, activeLabel, lensLabel,
     // popover / modal open state
