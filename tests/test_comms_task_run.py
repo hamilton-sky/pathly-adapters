@@ -73,6 +73,47 @@ def test_run_task_claims_and_spawns(client, monkeypatch):
     assert "Build the widget" in seen["instructions"]
 
 
+def test_run_task_failed_result_reverts_not_completes(client, monkeypatch):
+    """A CLI that 404s (clean exit, is_error set) must NOT mark the task done — silent-failure guard."""
+    import pathly_orchestrator.supervisor.board_run as _br
+    from pathly_orchestrator.db.connection import get_db
+
+    def _fake(board, scope, mode, **kw):
+        on_done = kw.get("on_done")
+        if on_done:  # simulate the 404: is_error set, but exit 0 / subtype "success"
+            on_done("r1", {"is_error": True, "api_error_status": 404, "subtype": "success", "exit_code": 0})
+        return {"ok": True, "run_id": "r1"}
+
+    monkeypatch.setattr(_br, "start_board_run", _fake)
+    conn = get_db()
+    gid = _goal(conn, "taskrun-fail")
+    tid = _task(conn, "taskrun-fail", gid)
+    r = client.post("/comms/tasks/run", json={"message_id": tid})
+    assert r.status_code == 200  # dispatch accepted...
+    st = conn.execute("SELECT task_status FROM comms_messages WHERE id=?", (tid,)).fetchone()["task_status"]
+    assert st == "pending"  # ...but the FAILED run reverted it, did NOT mark it done
+
+
+def test_run_task_success_result_completes(client, monkeypatch):
+    import pathly_orchestrator.supervisor.board_run as _br
+    from pathly_orchestrator.db.connection import get_db
+
+    def _fake(board, scope, mode, **kw):
+        on_done = kw.get("on_done")
+        if on_done:
+            on_done("r1", {"exit_code": 0, "is_error": False, "result": "built"})
+        return {"ok": True, "run_id": "r1"}
+
+    monkeypatch.setattr(_br, "start_board_run", _fake)
+    conn = get_db()
+    gid = _goal(conn, "taskrun-succeed")
+    tid = _task(conn, "taskrun-succeed", gid)
+    r = client.post("/comms/tasks/run", json={"message_id": tid})
+    assert r.status_code == 200
+    st = conn.execute("SELECT task_status FROM comms_messages WHERE id=?", (tid,)).fetchone()["task_status"]
+    assert st == "done"
+
+
 def test_run_task_rejects_done(client, monkeypatch):
     import pathly_orchestrator.supervisor.board_run as _br
     from pathly_orchestrator.db.connection import get_db

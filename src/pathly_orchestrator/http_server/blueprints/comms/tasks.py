@@ -210,7 +210,10 @@ def comms_tasks_run():
             return jsonify({"error": "Field 'message_id' must be a non-empty string"}), 400
 
         adapter = data.get("adapter", "") or "claude"
-        model = data.get("model", "") or ""
+        # NEVER pass an empty model: it empties the CLI's --model flag, which then swallows
+        # --output-format as its value and 404s ("issue with the selected model (--output-format)").
+        # A single-task build runs the builder → default to sonnet when the caller sends no model.
+        model = data.get("model") or "claude-sonnet-4-6"
         project_root = data.get("project_root", "") or ""
         progress = data.get("progress", "") or ""
 
@@ -253,7 +256,19 @@ def comms_tasks_run():
 
         def _on_done(_rid: str, res) -> None:
             c = _get_db()
-            if isinstance(res, dict) and res.get("error"):
+            # A clean process exit does NOT mean the task succeeded: a CLI that 404s / rejects the
+            # model exits with is_error/api_error_status set (subtype may even say "success"), which
+            # a bare `error` check misses. Reuse the supervisor's failure guard AND the CLI's own
+            # is_error flag so a failed run reverts to pending instead of being marked done.
+            from pathly_orchestrator.supervisor.scheduler import _outcome_is_failure
+
+            failed = isinstance(res, dict) and (
+                res.get("error")
+                or res.get("is_error")
+                or res.get("api_error_status")
+                or _outcome_is_failure(res)
+            )
+            if failed:
                 _release_claim(c, message_id)  # let it be retried; don't cascade-fail dependents
                 post_task_status(c, message_id, "Run failed")
                 _emit("error")

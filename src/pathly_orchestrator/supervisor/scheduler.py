@@ -29,13 +29,14 @@ _ABORT_SENTINEL = object()
 
 def _outcome_is_failure(outcome) -> bool:
     """A worker's spawn returned normally, but its OUTCOME reports the task did not succeed — an
-    explicit ``error``, a non-zero ``exit_code``, or an ``outcome``/``status`` flag of failed/error.
-    Treated as a failure so a clean process exit over broken work is NOT marked done (silent-failure
-    guard #2). Missing/empty signals default to success (back-compat with spawns that only return
-    cost/session id)."""
+    explicit ``error``, the CLI's own ``is_error``/``api_error_status`` (e.g. a 404 that still exits
+    0 with subtype "success"), a non-zero ``exit_code``, or an ``outcome``/``status`` flag of
+    failed/error. Treated as a failure so a clean process exit over broken work is NOT marked done
+    (silent-failure guard #2). Missing/empty signals default to success (back-compat with spawns
+    that only return cost/session id)."""
     if not isinstance(outcome, dict):
         return False
-    if outcome.get("error"):
+    if outcome.get("error") or outcome.get("is_error") or outcome.get("api_error_status"):
         return True
     exit_code = outcome.get("exit_code")
     if isinstance(exit_code, int) and exit_code != 0:
