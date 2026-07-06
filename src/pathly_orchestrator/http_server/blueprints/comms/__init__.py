@@ -8,6 +8,7 @@ from .runs import bp as runs_bp
 from .goals import bp as goals_bp
 from .settings import bp as settings_bp
 from .context import bp as context_bp
+from .features import bp as features_bp
 
 # Back-compat re-exports: these internal symbols moved into _helpers when this
 # blueprint was decomposed into a subpackage. Re-export them at the package level
@@ -29,4 +30,5 @@ all_blueprints = [
     goals_bp,
     settings_bp,
     context_bp,
+    features_bp,
 ]
