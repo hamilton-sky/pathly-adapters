@@ -1,0 +1,50 @@
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 160px;
+  flex-shrink: 0;
+  padding: 12px 8px;
+  background-color: var(--theme-bg-mantle);
+  border-right: 1px solid var(--theme-bg-surface0);
+  overflow-y: auto;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  border-left: 2px solid transparent;
+  border-radius: 0 6px 6px 0;
+  color: var(--theme-text-secondary);
+  cursor: pointer;
+  font-size: 13px;
+  text-align: left;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+.item:hover {
+  background-color: var(--theme-bg-surface0);
+  color: var(--theme-text-primary);
+}
+.item[data-active] {
+  background-color: var(--theme-bg-surface0);
+  border-left-color: var(--theme-accent);
+  color: var(--theme-text-primary);
+  font-weight: 600;
+}
+.item:focus-visible {
+  outline: 2px solid var(--theme-accent);
+  outline-offset: -2px;
+}
+
+.label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
