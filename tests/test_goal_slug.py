@@ -32,9 +32,10 @@ def test_slugify_normal():
     assert _slugify("My Feature Plan!") == "my-feature-plan"
 
 
-def test_slugify_caps_at_48():
+def test_slugify_caps_length():
+    # Readable slugs cap at ~32 chars (first few meaningful words), even for one long word.
     long_text = "a" * 60
-    assert len(_slugify(long_text)) <= 48
+    assert len(_slugify(long_text)) <= 32
 
 
 def test_slugify_empty_returns_goal():
@@ -46,7 +47,8 @@ def test_ensure_goal_slug_format(conn):
     goal_id = "abc12345-1234-5678-90ab-cdef01234567"
     _insert_goal(conn, goal_id, "Build the login page")
     slug = ensure_goal_slug(conn, goal_id)
-    assert slug.startswith("build-the-login-page-")
+    # "the" is a dropped stopword in the readable slug -> "build-login-page-<id>"
+    assert slug.startswith("build-login-page-")
     assert slug.endswith(goal_id[:8])
 
 

@@ -31,7 +31,9 @@ def _slugify(text: str) -> str:
         if out and len("-".join(out)) + 1 + len(w) > 32:
             break
         out.append(w)
-    return "-".join(out) or "goal"
+    # Backstop the 32-char cap even for a single over-long word (the loop always
+    # takes the first word); rstrip a hyphen left by truncation.
+    return ("-".join(out)[:32].rstrip("-")) or "goal"
 
 
 def ensure_goal_slug(conn, goal_id: str) -> str:
