@@ -120,6 +120,10 @@ def project_agent_done(
         tout = int(ad.get("tokens_out") or 0)
         summary = ad.get("summary") or ad.get("result") or ""
         session_id = ad.get("session_id")
+        # The CLI's reported dollar cost is provider_reported; 0 stays unpriced (the
+        # reconciliation window upgrades it once the PTY billing arrives for early-
+        # advance executors). provider is the adapter so the rollup isn't all-NULL.
+        cost_source = "provider_reported" if cost > 0 else "unpriced"
         role = agent_role or ad.get("agent") or stage or "agent"
         sid = span_id or new_span_id()
         end_dt = datetime.now(timezone.utc)
@@ -166,6 +170,8 @@ def project_agent_done(
                 "session_id": session_id,
                 "summary": (summary or "")[:2000],
                 "scope_tier": tier,
+                "provider": (adapter or None),
+                "cost_source": cost_source,
             },
         )
     except Exception:

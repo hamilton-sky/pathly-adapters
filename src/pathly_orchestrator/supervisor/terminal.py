@@ -183,6 +183,28 @@ def _reconciliation_window(
                 logger.warning(
                     "_reconciliation_window: _patch_last_agent_done failed: %s", exc
                 )
+            # Reconcile the executor invocation written provisionally at AGENT_DONE
+            # (cost=0 / tokens=0 — the CLI billing wasn't known yet) with the real
+            # figures now that the PTY billing has arrived. Without this the rollups
+            # show cost/tokens=0 for every early-advance (loop/single/board) agent.
+            try:
+                from pathly_orchestrator.db.connection import get_db
+                from pathly_orchestrator.db.queries.invocations import (
+                    update_invocation_billing,
+                )
+
+                update_invocation_billing(
+                    get_db(),
+                    run.run_id,
+                    cost_usd=cost_usd,
+                    tokens_in=tokens_in,
+                    tokens_out=tokens_out,
+                    cost_source=("provider_reported" if cost_usd > 0 else "unpriced"),
+                )
+            except Exception as exc:
+                logger.debug(
+                    "_reconciliation_window: invocation billing update skipped: %s", exc
+                )
         else:
             try:
                 _eventlog.append_event(
