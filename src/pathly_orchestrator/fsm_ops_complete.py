@@ -108,7 +108,7 @@ def complete_stage(args: dict) -> dict:
         return {"done": True}
 
     eval_result: str | dict = evaluate_transition_rules(
-        flow_config, state_info["current_state"], storage_path, goal_id=goal_id
+        flow_config, state_info["current_state"], storage_path, goal_id=goal_id, feature_scope=scope
     )
 
     if isinstance(eval_result, dict) and eval_result.get("decide") is True:
@@ -199,6 +199,10 @@ def complete_stage(args: dict) -> dict:
         storage_path,
         topic,
         state_info["conv"],
+        # Pass the REAL repo root — never re-derive it by walking storage_path up by template
+        # depth, which lands on the feature dir for multi-segment board-scoped topics and nests
+        # pathly/pipeline-walkthrough/ inside the feature folder.
+        project_root=project_root or None,
     )
 
     from pathly_orchestrator import eventlog as _elog_ws

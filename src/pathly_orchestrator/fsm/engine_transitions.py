@@ -20,7 +20,12 @@ _COMPARE_OPS = {
 
 
 def evaluate_transition_rules(
-    flow: dict, current_state: str, storage_path: Path, *, goal_id: str | None = None
+    flow: dict,
+    current_state: str,
+    storage_path: Path,
+    *,
+    goal_id: str | None = None,
+    feature_scope: str | None = None,
 ) -> str | dict:
     """Evaluate routing rules for current_state in strict level order.
 
@@ -28,6 +33,7 @@ def evaluate_transition_rules(
     Level 2 — on_content: substring/regex match in a file → return next_state.
     Level 2.5 — on_state_counter: numeric DB field comparison.
     Level 2.6 — on_board_count: goal-scoped board task-count gate (Fix B).
+    Level 2.7 — on_feature_goal_count: feature-scoped goal-count gate.
     Level 3 — decide: return sentinel dict (no LLM call).
     Fallback — default or first transition.
     """
@@ -123,6 +129,27 @@ def evaluate_transition_rules(
                     "incomplete": count_incomplete_tasks_for_goal,
                 }.get(metric, count_tasks_for_goal)
                 count = _counter(get_db(), goal_id)
+                if op_fn(count, int(compare_to)):
+                    return next_s
+            except Exception:
+                pass  # DB error → fail-closed: do NOT advance
+
+    # Level 2.7 — on_feature_goal_count (feature-scoped goal-count gate)
+    on_feature_goal_count = rule.get("on_feature_goal_count")
+    if on_feature_goal_count is not None and feature_scope is not None:
+        op = on_feature_goal_count.get("op")
+        compare_to = on_feature_goal_count.get("compare_to")
+        next_s = on_feature_goal_count.get("next")
+        op_fn = _COMPARE_OPS.get(op)
+        # compare_to read as a raw int; `is not None` so compare_to=0 is honored
+        if op_fn is not None and compare_to is not None and next_s:
+            try:
+                from pathly_orchestrator.db.connection import get_db
+                from pathly_orchestrator.db.queries.comms_messages import (
+                    count_goals_for_feature,
+                )
+
+                count = count_goals_for_feature(get_db(), feature_scope)
                 if op_fn(count, int(compare_to)):
                     return next_s
             except Exception:

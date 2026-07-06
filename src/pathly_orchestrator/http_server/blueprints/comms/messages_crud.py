@@ -39,6 +39,10 @@ def comms_get():
             type=msg_type,
             status=status,
             limit=limit,
+            # Board feed: never let run churn evict the (bounded) goals/tasks out of the
+            # newest-`limit` window — the Goals & Tasks view needs them all, and the Messages
+            # thread filters them out anyway. Only applies when not filtering by an explicit type.
+            include_structural=(msg_type is None),
         )
         return jsonify(messages), 200
     except Exception as exc:

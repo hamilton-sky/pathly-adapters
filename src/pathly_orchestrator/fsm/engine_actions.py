@@ -71,15 +71,27 @@ def run_transition_actions(
     storage_path: Path,
     topic: str,
     conv: int,
+    project_root: Path | str | None = None,
 ) -> None:
-    """Execute transition_actions for prev_state->next_state (and ->next_state wildcard)."""
+    """Execute transition_actions for prev_state->next_state (and ->next_state wildcard).
+
+    project_root: the repo root — the base for archive-artifacts' pipeline-walkthrough dir and the
+    auto-commit cwd. Pass it explicitly; callers know it. When omitted we FALL BACK to deriving it
+    by walking ``storage_path`` up by the number of segments in the flow's ``storage_path`` template.
+    That derivation is WRONG when ``{topic}`` expands to a multi-segment board-scoped path (e.g.
+    ``features/<f>/goals/<slug>``): it undershoots and lands on the feature dir instead of the repo
+    root, which nests ``pathly/pipeline-walkthrough/...`` INSIDE the feature folder.
+    """
     transition_actions = flow.get("transition_actions") or {}
 
-    storage_template = flow.get("storage_path", "")
-    depth = len([p for p in storage_template.rstrip("/").split("/") if p])
-    project_root = storage_path
-    for _ in range(depth):
-        project_root = project_root.parent
+    if project_root is not None:
+        project_root = Path(project_root)
+    else:
+        storage_template = flow.get("storage_path", "")
+        depth = len([p for p in storage_template.rstrip("/").split("/") if p])
+        project_root = storage_path
+        for _ in range(depth):
+            project_root = project_root.parent
 
     exact_key = f"{prev_state}->{next_state}"
     wildcard_key = f"->{next_state}"

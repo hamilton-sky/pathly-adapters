@@ -1,0 +1,87 @@
+version: 1
+flow: feature-consultation
+storage_path: pathly/{topic}/
+# Feature-consultation flow — heavy decomposer for seeding GOALS onto a feature board.
+# PO → architect → researcher → designer → planner fills the board with the feature's
+# knowledge artifacts AND the goal DAG (the planner is the terminal stage; its
+# feature-decompose Step runs type=goal messages). A human review gate follows.
+states:
+  - PO_DISCUSSING
+  - ARCHITECTING
+  - RESEARCHING
+  - DESIGNING
+  - PLANNING
+  # NO_GOALS_SEEDED: the planner ran but posted fewer than 2 goals (or no feature scope).
+  # A LOUD terminal failure instead of silently re-looping PLANNING (or falsely
+  # completing) — the goal-seed depends on the planner AGENT posting goals, and if it
+  # skips that, the decompose has failed its core deliverable and must stop visibly.
+  - NO_GOALS_SEEDED
+  - DONE
+transitions:
+  PO_DISCUSSING:
+    - ARCHITECTING
+  ARCHITECTING:
+    - RESEARCHING
+  RESEARCHING:
+    - DESIGNING
+  DESIGNING:
+    - PLANNING
+  PLANNING:
+    - DONE
+    - NO_GOALS_SEEDED
+  NO_GOALS_SEEDED: []
+  DONE: []
+agent_map:
+  PO_DISCUSSING: planning/po
+  ARCHITECTING: team/architect
+  RESEARCHING: team/research
+  DESIGNING: team/design
+  PLANNING: planning/feature-decompose
+role_map:
+  PO_DISCUSSING: po
+  ARCHITECTING: architect
+  RESEARCHING: web-researcher
+  DESIGNING: designer
+  PLANNING: planner
+feedback_routing:
+  HUMAN_QUESTIONS: human
+  BLOCKED_ON_HUMAN: human
+  ARCH_QUESTION: architect
+  PO_QUESTIONS: po
+  DESIGN_QUESTIONS: designer
+  IMPL_QUESTIONS: planner
+# Each stage advances on its default edge once its artifact is written; the stage
+# skill calls `pathly-fsm-call complete-stage` to move on. Optional content gates
+# below keep a stage from advancing until its primary artifact exists.
+transition_rules:
+  PO_DISCUSSING:
+    on_content:
+      - file: PO_NOTES.md
+        contains: '#'
+        next: ARCHITECTING
+    default: PO_DISCUSSING
+  ARCHITECTING:
+    default: RESEARCHING
+  RESEARCHING:
+    default: DESIGNING
+  DESIGNING:
+    on_content:
+      - file: DESIGN.md
+        contains: '## Design System Output'
+        next: PLANNING
+    default: DESIGNING
+  PLANNING:
+    on_feature_goal_count:
+      op: gte
+      compare_to: 2
+      next: DONE
+    # Planner completed but seeded fewer than 2 goals -> route to the loud
+    # NO_GOALS_SEEDED terminal instead of silently re-running PLANNING forever.
+    default: NO_GOALS_SEEDED
+transition_actions:
+  PLANNING->DONE:
+    - skill: archive-artifacts
+scope_gate:
+  exempt_prefixes: []
+gates: {}
+_comments: []

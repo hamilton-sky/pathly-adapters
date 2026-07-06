@@ -136,22 +136,44 @@ def get_messages(
     type: str | None = None,
     status: str | None = None,
     limit: int = 50,
+    include_structural: bool = False,
 ) -> list[dict]:
-    """Return messages for the given board/scope, newest first."""
-    sql = (
-        "SELECT * FROM comms_messages WHERE board=? AND scope=? AND deleted_at IS NULL"
-    )
+    """Return messages for the given board/scope, newest first.
+
+    ``include_structural``: when True (and no explicit ``type`` filter), goal + task rows are
+    ALWAYS returned in full — they anchor the "Goals & Tasks" view and are bounded (a board has a
+    handful of goals / a DAG of tasks), so ``limit`` applies only to the volatile chat/status
+    stream. Without this, run churn (status/phase posts) evicts the OLDEST rows — the goals — out
+    of the newest-``limit`` window, and every task then renders under "Ungrouped tasks". The
+    Messages view already filters goal/task out of the thread, so full inclusion is invisible there.
+    """
+    where = "board=? AND scope=? AND deleted_at IS NULL"
     params: list[Any] = [board, scope]
     if type is not None:
-        sql += " AND type=?"
+        where += " AND type=?"
         params.append(type)
     if status is not None:
-        sql += " AND status=?"
+        where += " AND status=?"
         params.append(status)
-    sql += " ORDER BY ts DESC LIMIT ?"
-    params.append(limit)
-    rows = conn.execute(sql, params).fetchall()
-    return [dict(r) for r in rows]
+
+    if not include_structural or type is not None:
+        sql = f"SELECT * FROM comms_messages WHERE {where} ORDER BY ts DESC LIMIT ?"  # nosec B608
+        return [dict(r) for r in conn.execute(sql, params + [limit]).fetchall()]
+
+    # Structural-inclusive board feed: every goal/task + the newest `limit` of everything else.
+    structural = conn.execute(
+        f"SELECT * FROM comms_messages WHERE {where} AND type IN ('goal','task') "  # nosec B608
+        "ORDER BY ts DESC",
+        params,
+    ).fetchall()
+    others = conn.execute(
+        f"SELECT * FROM comms_messages WHERE {where} AND type NOT IN ('goal','task') "  # nosec B608
+        "ORDER BY ts DESC LIMIT ?",
+        params + [limit],
+    ).fetchall()
+    merged = [dict(r) for r in structural] + [dict(r) for r in others]
+    merged.sort(key=lambda r: r.get("ts") or "", reverse=True)
+    return merged
 
 
 def get_pending_decisions(
@@ -355,3 +377,13 @@ def update_message_text(conn: sqlite3.Connection, message_id: str, text: str) ->
         )
         conn.commit()
     return "updated"
+
+
+def count_goals_for_feature(conn: sqlite3.Connection, feature_scope: str) -> int:
+    """Count non-deleted goal rows belonging to a feature scope (any status)."""
+    row = conn.execute(
+        "SELECT COUNT(*) AS n FROM comms_messages "
+        "WHERE scope=? AND type='goal' AND deleted_at IS NULL",
+        (feature_scope,),
+    ).fetchone()
+    return int(row["n"]) if row else 0
