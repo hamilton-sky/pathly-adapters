@@ -25,6 +25,7 @@ export const CLI_KEY_SPLIT   = 'pathly.notebook.cli.split'
 export const CLI_KEY_ANALYZE = 'pathly.notebook.cli.analyze'
 export const CLI_KEY_EVAL    = 'pathly.comms.cli.eval'
 export const CLI_KEY_GOAL    = 'pathly.comms.cli.goal'
+export const CLI_KEY_TASK    = 'pathly.comms.cli.task'
 
 export const CLI_KEY_COMMENT = 'pathly.editor.cli.comment'
 

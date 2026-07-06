@@ -94,7 +94,7 @@ export interface CommsState {
   goalRunStart: Record<string, number>
   runGoal: (goal_id: string, executor?: string, opts?: RunGoalOpts) => void
   /** Run ONE task headlessly (claim → build → complete); its task_status drives the UI. */
-  runTask: (taskId: string) => void
+  runTask: (taskId: string, opts?: { adapter?: string }) => void
   /** Stop a running single-task run (reverts it to pending). */
   stopTask: (taskId: string) => void
   /** Epoch ms when a per-task run started — drives the task pill's elapsed timer. */
@@ -647,12 +647,12 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
 
   taskRunStart: {},
 
-  runTask: (taskId) => {
+  runTask: (taskId, opts = {}) => {
     // The backend claims the task (task_status → in_progress) and completes it on success, so the
     // task's own status drives the card's pill/dot; taskRunStart just feeds the pill's elapsed timer.
     set((s) => ({ taskRunStart: { ...s.taskRunStart, [taskId]: Date.now() } }))
     const projectRoot = useProjectStore.getState().projectPath.replace(/\\/g, '/').replace(/\/$/, '')
-    apiRunTask(taskId, { projectRoot })
+    apiRunTask(taskId, { projectRoot, adapter: opts.adapter })
       .then((res) => {
         if (res && !res.ok) {
           const busy = res.reason === 'busy' || res.reason === 'board_busy' || res.reason === 'already_running'

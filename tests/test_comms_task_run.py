@@ -114,6 +114,28 @@ def test_run_task_success_result_completes(client, monkeypatch):
     assert st == "done"
 
 
+def test_run_task_model_is_engine_aware(client, monkeypatch):
+    """claude gets an explicit model (empty --model 404s); non-claude engines use their own default."""
+    import pathly_orchestrator.supervisor.board_run as _br
+    from pathly_orchestrator.db.connection import get_db
+
+    seen: dict = {}
+
+    def _fake(board, scope, mode, **kw):
+        seen[kw.get("adapter")] = kw.get("model")
+        return {"ok": True, "run_id": "r"}
+
+    monkeypatch.setattr(_br, "start_board_run", _fake)
+    conn = get_db()
+    g = _goal(conn, "taskrun-eng")
+    t_claude = _task(conn, "taskrun-eng", g)
+    t_codex = _task(conn, "taskrun-eng", g)
+    client.post("/comms/tasks/run", json={"message_id": t_claude})  # default engine = claude
+    client.post("/comms/tasks/run", json={"message_id": t_codex, "adapter": "codex"})
+    assert seen["claude"] == "claude-sonnet-4-6"
+    assert seen["codex"] == ""  # engine's own default, NOT a forced claude model
+
+
 def test_run_task_rejects_done(client, monkeypatch):
     import pathly_orchestrator.supervisor.board_run as _br
     from pathly_orchestrator.db.connection import get_db

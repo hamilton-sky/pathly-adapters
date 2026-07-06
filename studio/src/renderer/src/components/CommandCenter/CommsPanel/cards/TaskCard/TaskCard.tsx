@@ -8,7 +8,23 @@ import { useElapsedProgress } from '../../../../shared/RunPill/progress'
 import { CopyTextButton } from '../../../../shared/CopyTextButton/CopyTextButton'
 import { useCommsStore } from '../../../../../store/commsStore'
 import SendPreviewModal from '../../../../shared/SendPreviewModal/SendPreviewModal'
+import { GoalSelect } from '../../GoalRunButton/GoalSelect/GoalSelect'
+import {
+  type EditorCli,
+  loadEditorCli,
+  saveEditorCli,
+  cliLabel,
+  CLI_KEY_TASK,
+  EDITOR_CLIS,
+} from '../../../../MarkdownEditor/EditorHeader/editorCli'
 import s from './TaskCard.module.css'
+
+const ADAPTER_OPTIONS = EDITOR_CLIS.map((c) => ({
+  value: c.id,
+  label: c.label,
+  hint: c.unavailable ?? c.hint,
+  disabled: !!c.unavailable,
+}))
 
 type TaskStatus = NonNullable<Message['taskStatus']>
 
@@ -58,8 +74,10 @@ export function TaskCard({ task: t, siblings }: Props): JSX.Element {
   // Preview-gated like the goal Run / Evaluate controls: the pill opens a confirm modal and
   // confirming dispatches. The backend builds from the STORED task text (by id), so the preview
   // is read-only — editing here wouldn't change what runs.
+  const [adapter, setAdapter] = useState<EditorCli>(() => loadEditorCli(CLI_KEY_TASK))
+  const handleAdapter = (v: string): void => { setAdapter(v as EditorCli); saveEditorCli(CLI_KEY_TASK, v as EditorCli) }
   const handleRun = (): void => { setConfirmOpen(true) }
-  const doRun = (): void => { setConfirmOpen(false); setJustRan(true); runTask(t.id) }
+  const doRun = (): void => { setConfirmOpen(false); setJustRan(true); runTask(t.id, { adapter }) }
 
   return (
     <>
@@ -122,7 +140,7 @@ export function TaskCard({ task: t, siblings }: Props): JSX.Element {
     {confirmOpen && (
       <SendPreviewModal
         title="Run task"
-        engineLabel="Claude"
+        engineLabel={cliLabel(adapter)}
         fileName={firstLine(t.text)}
         prompt={t.text}
         readOnly
@@ -131,6 +149,15 @@ export function TaskCard({ task: t, siblings }: Props): JSX.Element {
           { label: 'Skill', value: 'development/build' },
         ]}
         submitLabel="Run"
+        footerSlot={
+          <GoalSelect
+            value={adapter}
+            options={ADAPTER_OPTIONS}
+            onChange={handleAdapter}
+            ariaLabel="CLI engine"
+            minWidth={110}
+          />
+        }
         onSubmit={doRun}
         onCancel={() => setConfirmOpen(false)}
       />

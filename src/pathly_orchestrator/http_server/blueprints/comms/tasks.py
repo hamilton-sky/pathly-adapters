@@ -210,10 +210,11 @@ def comms_tasks_run():
             return jsonify({"error": "Field 'message_id' must be a non-empty string"}), 400
 
         adapter = data.get("adapter", "") or "claude"
-        # NEVER pass an empty model: it empties the CLI's --model flag, which then swallows
-        # --output-format as its value and 404s ("issue with the selected model (--output-format)").
-        # A single-task build runs the builder → default to sonnet when the caller sends no model.
-        model = data.get("model") or "claude-sonnet-4-6"
+        # Model per engine: claude needs an EXPLICIT model — an empty --model mangles the argv and
+        # the CLI's own default tier may be inaccessible → the 404 we saw. Non-claude engines take
+        # an empty model as "use the engine's own default" (adapters.validate_adapter_model), so we
+        # only force a claude model when the engine IS claude.
+        model = data.get("model") or ("claude-sonnet-4-6" if adapter == "claude" else "")
         project_root = data.get("project_root", "") or ""
         progress = data.get("progress", "") or ""
 
