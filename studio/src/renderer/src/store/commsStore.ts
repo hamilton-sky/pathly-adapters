@@ -23,6 +23,7 @@ import {
   apiBoardRunStatus,
   apiRunGoal,
   apiRunTask,
+  apiStopTask,
   apiStopGoal,
   apiDecomposeGoal,
   type RunGoalOpts,
@@ -94,6 +95,10 @@ export interface CommsState {
   runGoal: (goal_id: string, executor?: string, opts?: RunGoalOpts) => void
   /** Run ONE task headlessly (claim → build → complete); its task_status drives the UI. */
   runTask: (taskId: string) => void
+  /** Stop a running single-task run (reverts it to pending). */
+  stopTask: (taskId: string) => void
+  /** Epoch ms when a per-task run started — drives the task pill's elapsed timer. */
+  taskRunStart: Record<string, number>
   /** Decompose a goal into a task DAG (planner = fast, consultation = deep). */
   decomposeGoal: (goal_id: string, mode: DecomposeMode, opts?: { adapter?: string; model?: string; progress?: string }) => void
   /** Update a goal's run state from a goal_run/goal_decompose SSE phase. */
@@ -640,9 +645,12 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
     apiStopGoal(goal_id).catch(() => undefined)
   },
 
+  taskRunStart: {},
+
   runTask: (taskId) => {
-    // The backend claims the task (task_status → in_progress) and completes it on success, so
-    // the task's own status drives the card's pill/dot — no separate per-task run state to track.
+    // The backend claims the task (task_status → in_progress) and completes it on success, so the
+    // task's own status drives the card's pill/dot; taskRunStart just feeds the pill's elapsed timer.
+    set((s) => ({ taskRunStart: { ...s.taskRunStart, [taskId]: Date.now() } }))
     const projectRoot = useProjectStore.getState().projectPath.replace(/\\/g, '/').replace(/\/$/, '')
     apiRunTask(taskId, { projectRoot })
       .then((res) => {
@@ -656,6 +664,15 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
         }
       })
       .catch(() => useToastStore.getState().push('Task run failed — server unreachable', 'error', { category: 'runner_state' }))
+  },
+
+  stopTask: (taskId) => {
+    set((s) => {
+      const next = { ...s.taskRunStart }
+      delete next[taskId]
+      return { taskRunStart: next }
+    })
+    apiStopTask(taskId).catch(() => undefined)
   },
 
   markSummaryStatus: (messageId, status, error) => {

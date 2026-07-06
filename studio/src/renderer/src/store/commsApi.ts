@@ -840,6 +840,20 @@ export async function apiRunTask(
   }
 }
 
+// Stop a single-task run (kills its board run, reverts the task to pending).
+export async function apiStopTask(taskId: string): Promise<boolean> {
+  try {
+    const r = await apiFetch('/comms/tasks/stop', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message_id: taskId }),
+    })
+    return r.ok
+  } catch {
+    return false
+  }
+}
+
 // ── Feature list + per-feature enrichment from STATE.json ─────────────
 
 interface FeatureState {

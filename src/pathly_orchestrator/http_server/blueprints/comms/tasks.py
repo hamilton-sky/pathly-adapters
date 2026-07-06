@@ -294,3 +294,58 @@ def comms_tasks_run():
     except Exception as exc:
         logging.exception("comms_tasks_run error")
         return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
+@bp.route("/comms/tasks/stop", methods=["POST"])
+def comms_tasks_stop():
+    """Stop a single-task run: kill its board run (if any) and revert the task to pending."""
+    try:
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.supervisor import board_lock, get_run
+
+        data = request.get_json() or {}
+        message_id = data.get("message_id", "")
+        if not isinstance(message_id, str) or not message_id.strip():
+            return jsonify({"error": "Field 'message_id' must be a non-empty string"}), 400
+
+        conn = _get_db()
+        row = conn.execute(
+            "SELECT board, scope FROM comms_messages WHERE id=? AND deleted_at IS NULL",
+            (message_id,),
+        ).fetchone()
+        if row is None:
+            return jsonify({"ok": False, "reason": "not_found"}), 404
+        board = row["board"] or "feature"
+        scope = row["scope"] or ""
+
+        run_id = board_lock.holder(board, scope)
+        if run_id:
+            tab_id = f"runner-{run_id[-10:]}"
+            try:
+                _broadcast_runner(scope, {"type": "TERMINAL_KILL", "tab_id": tab_id, "run_id": run_id})
+            except Exception:
+                pass
+            try:
+                run = get_run(run_id)
+                if run is not None:
+                    run.mark_pty_result({"exit_code": 130, "result": {"result": "stopped by user"}})
+            except Exception:
+                pass
+            board_lock.release(board, scope, run_id)
+
+        _release_claim(conn, message_id)  # in_progress → pending (idempotent; on_done also does this)
+        _broadcast_comms(
+            scope,
+            {
+                "type": "COMMS_UPDATE",
+                "event": "task_run",
+                "message_id": message_id,
+                "board": board,
+                "scope": scope,
+                "phase": "stopped",
+            },
+        )
+        return jsonify({"ok": True, "stopped": bool(run_id)}), 200
+    except Exception as exc:
+        logging.exception("comms_tasks_stop error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500

@@ -4,6 +4,7 @@ import type { Message } from '../../../types'
 import { Tooltip } from '../../../../ui'
 import MarkdownRenderer from '../../../../shared/MarkdownRenderer/MarkdownRenderer'
 import { RunPill } from '../../../../shared/RunPill/RunPill'
+import { useElapsedProgress } from '../../../../shared/RunPill/progress'
 import { CopyTextButton } from '../../../../shared/CopyTextButton/CopyTextButton'
 import { useCommsStore } from '../../../../../store/commsStore'
 import SendPreviewModal from '../../../../shared/SendPreviewModal/SendPreviewModal'
@@ -46,6 +47,9 @@ export function TaskCard({ task: t, siblings }: Props): JSX.Element {
   // claims the task (→ in_progress) and completes it, so the task's own status drives the pill;
   // `justRan` is a brief optimistic flag until that status catches up (and prevents double-fire).
   const runTask = useCommsStore((st) => st.runTask)
+  const stopTask = useCommsStore((st) => st.stopTask)
+  const taskStart = useCommsStore((st) => st.taskRunStart[t.id])
+  const progress = useElapsedProgress(taskStart || undefined)
   const ready = deps.every((d) => byId.get(d)?.taskStatus === 'done')
   const runnable = (status === 'pending' || status === 'failed') && ready
   const [justRan, setJustRan] = useState(false)
@@ -82,7 +86,7 @@ export function TaskCard({ task: t, siblings }: Props): JSX.Element {
             </button>
           </Tooltip>
           {status === 'in_progress' || justRan ? (
-            <RunPill size="sm" state="running" idleLabel="In progress" disabled />
+            <RunPill size="sm" state="running" idleLabel="In progress" progress={progress} onStop={() => stopTask(t.id)} />
           ) : runnable ? (
             <Tooltip label="Build just this task" placement="top">
               <RunPill size="sm" state="idle" idleLabel="Run" onRun={handleRun} />

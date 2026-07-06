@@ -42,7 +42,7 @@ export function RunPill({ idleLabel, state, progress, icon, onRun, onStop, disab
   // Tooltip shows the latest PTY output line while running; otherwise the label.
   const tipLabel = isRunning && progress?.detail ? progress.detail : label
 
-  const hasStop = !!onStop && size !== 'sm'
+  const hasStop = !!onStop
 
   return (
     <div className={s.pill} data-size={size !== 'md' ? size : undefined} {...(hasStop ? { 'data-has-stop': '' } : {})}>
@@ -60,7 +60,7 @@ export function RunPill({ idleLabel, state, progress, icon, onRun, onStop, disab
           {timer && <span className={s.timer}>{timer}</span>}
         </button>
       </Tooltip>
-      {onStop && size !== 'sm' && (
+      {onStop && (
         <Tooltip label="Stop" placement="top">
           <button
             type="button"

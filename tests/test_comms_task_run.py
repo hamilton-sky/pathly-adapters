@@ -105,6 +105,18 @@ def test_run_task_rejects_goal_id(client):
     assert r.get_json()["reason"] == "not_task"
 
 
+def test_stop_task_reverts_to_pending(client):
+    from pathly_orchestrator.db.connection import get_db
+
+    conn = get_db()
+    gid = _goal(conn, "taskstop")
+    tid = _task(conn, "taskstop", gid, status="in_progress")  # simulate a running task
+    r = client.post("/comms/tasks/stop", json={"message_id": tid})
+    assert r.status_code == 200 and r.get_json()["ok"] is True
+    st = conn.execute("SELECT task_status FROM comms_messages WHERE id=?", (tid,)).fetchone()["task_status"]
+    assert st == "pending"
+
+
 def test_run_task_releases_claim_on_spawn_refusal(client, monkeypatch):
     import pathly_orchestrator.supervisor.board_run as _br
     from pathly_orchestrator.db.connection import get_db
