@@ -22,6 +22,7 @@ import {
   apiStopBoard,
   apiBoardRunStatus,
   apiRunGoal,
+  apiRunTask,
   apiStopGoal,
   apiDecomposeGoal,
   type RunGoalOpts,
@@ -91,6 +92,8 @@ export interface CommsState {
   /** Epoch ms when the goal run started — drives the elapsed clock in RunPill. */
   goalRunStart: Record<string, number>
   runGoal: (goal_id: string, executor?: string, opts?: RunGoalOpts) => void
+  /** Run ONE task headlessly (claim → build → complete); its task_status drives the UI. */
+  runTask: (taskId: string) => void
   /** Decompose a goal into a task DAG (planner = fast, consultation = deep). */
   decomposeGoal: (goal_id: string, mode: DecomposeMode, opts?: { adapter?: string; model?: string; progress?: string }) => void
   /** Update a goal's run state from a goal_run/goal_decompose SSE phase. */
@@ -635,6 +638,24 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
     _stopGoalWatch(goal_id)
     set((s) => ({ goalRunState: { ...s.goalRunState, [goal_id]: 'idle' } }))
     apiStopGoal(goal_id).catch(() => undefined)
+  },
+
+  runTask: (taskId) => {
+    // The backend claims the task (task_status → in_progress) and completes it on success, so
+    // the task's own status drives the card's pill/dot — no separate per-task run state to track.
+    const projectRoot = useProjectStore.getState().projectPath.replace(/\\/g, '/').replace(/\/$/, '')
+    apiRunTask(taskId, { projectRoot })
+      .then((res) => {
+        if (res && !res.ok) {
+          const busy = res.reason === 'busy' || res.reason === 'board_busy' || res.reason === 'already_running'
+          useToastStore.getState().push(
+            busy ? 'That task is already running, or the board is busy' : "Couldn't start the task",
+            busy ? 'info' : 'error',
+            { category: 'runner_state' },
+          )
+        }
+      })
+      .catch(() => useToastStore.getState().push('Task run failed — server unreachable', 'error', { category: 'runner_state' }))
   },
 
   markSummaryStatus: (messageId, status, error) => {

@@ -819,6 +819,27 @@ export async function apiRunGoal(
   }
 }
 
+// Run ONE task headlessly (claim → build → complete). The task's status flips to
+// in_progress/done via the board feed, so callers don't track a separate run state.
+export async function apiRunTask(
+  taskId: string,
+  opts: { projectRoot?: string; adapter?: string } = {},
+): Promise<{ ok: boolean; reason?: string; run_id?: string } | null> {
+  try {
+    const body: Record<string, unknown> = { message_id: taskId }
+    if (opts.projectRoot) body.project_root = opts.projectRoot
+    if (opts.adapter) body.adapter = opts.adapter
+    const r = await apiFetch('/comms/tasks/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    return await r.json() as { ok: boolean; reason?: string; run_id?: string }
+  } catch {
+    return null
+  }
+}
+
 // ── Feature list + per-feature enrichment from STATE.json ─────────────
 
 interface FeatureState {

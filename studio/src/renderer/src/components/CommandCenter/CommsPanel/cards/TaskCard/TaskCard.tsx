@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { FileText, ChevronRight, ChevronDown } from 'lucide-react'
 import type { Message } from '../../../types'
 import { Tooltip } from '../../../../ui'
 import MarkdownRenderer from '../../../../shared/MarkdownRenderer/MarkdownRenderer'
 import { RunPill } from '../../../../shared/RunPill/RunPill'
 import { CopyTextButton } from '../../../../shared/CopyTextButton/CopyTextButton'
+import { useCommsStore } from '../../../../../store/commsStore'
 import s from './TaskCard.module.css'
 
 type TaskStatus = NonNullable<Message['taskStatus']>
@@ -40,6 +41,16 @@ export function TaskCard({ task: t, siblings }: Props): JSX.Element {
   const byId = new Map(siblings.map((m) => [m.id, m]))
   const deps = t.dependsOn ?? []
 
+  // Per-task run: only runnable when pending/failed AND every dependency is done. The backend
+  // claims the task (→ in_progress) and completes it, so the task's own status drives the pill;
+  // `justRan` is a brief optimistic flag until that status catches up (and prevents double-fire).
+  const runTask = useCommsStore((st) => st.runTask)
+  const ready = deps.every((d) => byId.get(d)?.taskStatus === 'done')
+  const runnable = (status === 'pending' || status === 'failed') && ready
+  const [justRan, setJustRan] = useState(false)
+  useEffect(() => { if (status !== 'pending') setJustRan(false) }, [status])
+  const handleRun = (): void => { setJustRan(true); runTask(t.id) }
+
   return (
     <div className={s.task} data-type="task" {...(expanded ? { 'data-expanded': 'true' } : {})}>
       <span
@@ -63,9 +74,13 @@ export function TaskCard({ task: t, siblings }: Props): JSX.Element {
               <span className={s.bannerText}>{firstLine(t.text)}</span>
             </button>
           </Tooltip>
-          {status === 'in_progress' && (
+          {status === 'in_progress' || justRan ? (
             <RunPill size="sm" state="running" idleLabel="In progress" disabled />
-          )}
+          ) : runnable ? (
+            <Tooltip label="Build just this task" placement="top">
+              <RunPill size="sm" state="idle" idleLabel="Run" onRun={handleRun} />
+            </Tooltip>
+          ) : null}
           <CopyTextButton text={t.text} label="task" />
         </div>
         {expanded && (
