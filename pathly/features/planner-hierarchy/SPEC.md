@@ -19,6 +19,7 @@ PROJECT board   ← drop a big spec (BMAD / PRD / free text)
    ▼   [features on the project board are aware of each other]
 FEATURE board   ← each feature's spec
    │  feature-planner: split into GOALS (e.g. backend / frontend / db)
+   │    └ consultation tier: team runs FIRST → feature artifacts, THEN emits the goals
    ▼   [goals on the feature board are aware of each other — the "goal card" point]
 GOAL card
    │  goal-planner: split into TASKS (the DAG)  ← EXISTS TODAY
@@ -53,14 +54,46 @@ The upper levels are worthless if the bottom one silently drops its DAG. Land fi
 - Exit gates that require the *deliverable*, not just "something on the board".
 
 ### G1 — Feature-planner (`feature → goals`)  *(build second — immediate need)*
-A planner that reads a feature's starting spec + the feature board, and posts **2–5 goal
-cards** (e.g. `backend-api`, `frontend-dashboard`, `db-schema`), each with:
-- a scope statement + acceptance boundary,
-- `depends_on` between goals where real (frontend depends on backend contract),
-- awareness of siblings (each goal's prompt is injected with the other goals on the board).
-- Output = goal cards on the feature board (readable slugs — already shipped).
-- New skill `planning/feature-decompose` + a `/comms/features/decompose` route (mirrors
-  `/comms/goals/decompose`), reusing `task-dag-post`-style posting for `type=goal`.
+A decomposer that reads a feature's starting spec + the feature board and posts **2–5 goal
+cards** (e.g. `backend-api`, `frontend-dashboard`, `db-schema`), each with a scope statement +
+acceptance boundary, `depends_on` where real (frontend depends on the backend contract), and
+sibling-awareness (each goal's prompt is injected with the other goals on the board). Output =
+goal cards on the feature board (readable slugs — already shipped).
+
+**Rigor ladder — the goal-decompose tiers, one level up.** Goal→tasks already ships three tiers
+(`planner` / `plan` / `consultation`); feature→goals gets the same ladder:
+
+| Tier | What runs | Produces |
+|---|---|---|
+| **light** | one planner (mirrors `planning/dag-sketch`) | bare sibling-goal cards straight from the spec |
+| **full** | one planner (`planning/plan`-style) | goals + scope/acceptance + `depends_on` |
+| **consultation** | the **team** — PO→architect→researcher→designer→`feature-decompose` | **feature-level artifacts first**, then the sibling goals |
+
+**The consultation tier is the consultation flow lifted one level.** It reuses
+`consultation.flow.yaml`'s stages verbatim (PO→architect→researcher→designer); the *only* change
+is the terminal stage — `planning/feature-decompose` emits `type=goal` siblings where
+`planning/plan` emits a `type=task` DAG. Those upstream stages write the feature's cross-goal
+architecture / research / design to the feature root (`features/<f>/`) — the very "cross-goal
+design" the storage constraint below already assumes exists. That artifact pass is what makes the
+split coherent: `backend-api` and `frontend` agree on a contract because both fell out of one
+architecture pass.
+
+**Produce-once, inherit-many.** Each emitted goal carries `context_refs` pointing at the feature
+artifacts, so when a goal is later split into its own task DAG the team *consumes* the feature
+architecture/design instead of re-deriving it. Cross-goal design is paid for once at the feature
+level; every goal inherits it.
+
+**Gate + human checkpoint.** The terminal gate counts **goals**, not tasks:
+`count(type=goal, scope=feature) ≥ 2 → DONE`, else a loud `NO_GOALS_SEEDED` (the goal-level
+`NO_DAG_SEEDED` pattern, different unit). After emitting siblings the flow **stops for human
+review** — it does not auto-cascade into per-goal DAGs. Emit goals → human edits the goal set →
+*then* decompose each goal (light or consultation, chosen per goal).
+
+**Build surface.** New skill `planning/feature-decompose` (terminal emitter, `type=goal`) + a
+`feature-consultation` flow (= `consultation.flow.yaml` with the `feature-decompose` terminal +
+a goal-counting gate) + a `/comms/features/decompose` route (mirrors `/comms/goals/decompose`,
+takes a rigor param `light|full|consultation`). UI home: **Evaluate → Whole board**, with the
+rigor selector shown alongside the evaluator — the per-goal RIGOR ladder, one altitude up.
 
 ### G2 — Project-planner (`spec → features`)  *(build third — top of funnel)*
 A planner that reads a big spec dropped on the **project board** and posts **N feature
@@ -83,9 +116,11 @@ model: a BMAD file → features (G2) → goals (G1) → tasks. BMAD maps almost 
   design. Slugs are now short (`goals/backend-api-<id>/`). Do **not** flatten.
 - **Board is the awareness substrate at every level** — the decompose prompt at each level
   injects the sibling items (via the existing board-context retrieval).
-- **Reuse, don't reinvent.** Each new level is `decompose(parent) → post child items with
-  depends_on` — the same primitive as goal→tasks. New code = a skill + a thin route, not a
-  new engine.
+- **Reuse, don't reinvent — only the terminal emit changes per level.** Each new level is
+  `decompose(parent) → post child items with depends_on` — the same primitive as goal→tasks, and
+  the **same team pipeline** (PO→…→planner). What differs by altitude is the **terminal emit
+  type**: feature→`type=goal`, goal→`type=task`. New code = a terminal skill + a thin route,
+  never a new flow engine.
 
 ## Sequencing
 `G0 (reliability) → G1 (feature→goals) → G2 (spec→features) → G3 (BMAD into the new model)`.
