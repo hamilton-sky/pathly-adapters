@@ -311,6 +311,7 @@ def run_gates(
     storage_path: Path,
     topic: str,
     conv: int,
+    goal_id: str | None = None,
 ) -> dict | None:
     gates = flow.get("gates", {})
     applicable = gates.get(f"{prev_state}->{next_state}", []) + gates.get(
@@ -347,6 +348,32 @@ def run_gates(
                     {"type": "GATE_FAILED", "gate": gtype, "transition": f"{prev_state}->{next_state}"},
                 )
                 return {"gate_failed": gtype, "feedback_file": gate["on_fail"]}
+        elif gtype == "require_tasks_done":
+            # Goal-DAG completeness: a goal must not finish (reach RETRO) while any of its tasks
+            # are unfinished or failed. Skipped for non-goal runs (goal_id is None) — a plain
+            # feature pipeline has no task DAG to check.
+            if goal_id:
+                try:
+                    from pathly_orchestrator.db.connection import get_db
+                    from pathly_orchestrator.db.queries.comms_tasks import (
+                        count_incomplete_tasks_for_goal,
+                    )
+
+                    incomplete = count_incomplete_tasks_for_goal(get_db(), goal_id)
+                except Exception:
+                    incomplete = 0  # DB read error → fail-open (never wedge on a read hiccup)
+                if incomplete > 0:
+                    reason = (
+                        f"{incomplete} task(s) on this goal are not done — a goal cannot finish "
+                        f"while tasks remain unfinished or failed. Build/repair the remaining "
+                        f"tasks (they are on the board's DAG), then the flow can advance to retro."
+                    )
+                    _write_gate_feedback(storage_path, gate["on_fail"], reason)
+                    append_event(
+                        storage_path,
+                        {"type": "GATE_FAILED", "gate": gtype, "transition": f"{prev_state}->{next_state}"},
+                    )
+                    return {"gate_failed": gtype, "feedback_file": gate["on_fail"]}
         elif gtype == "scope_gate":
             scope_file = gate["scope_file"]
             build_baseline: dict | None = None

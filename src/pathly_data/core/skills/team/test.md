@@ -34,13 +34,25 @@ Run: `python -c "import time; print(int(time.time()))"` and note the integer as 
 
 ## Pre-gate
 
-Read `<feature_path>/PROGRESS.md`. Check every conversation row in the Conversation Breakdown table.
-If any row status is not DONE: stop and report:
+**Board task DAG (preferred).** Check whether this goal/feature has a board DAG:
+```
+curl -s "http://127.0.0.1:8765/comms/tasks?feature=[feature]&scope=[feature]"
+```
+If the response is a non-empty list, the DAG is the authoritative work list — you test the whole
+goal ONCE, after every task is built and reviewed. Every task must be `task_status: done`. The
+FSM's `require_tasks_done` gate already enforces this on entry to TESTING, so a stray incomplete
+task means something bypassed the gate — stop and report:
+```
+Not all tasks are complete. Route to team <feature> build first. Incomplete: <task titles>
+```
+
+**Fallback (no board DAG — older conversation plans).** Read `<feature_path>/PROGRESS.md`. Check
+every conversation row in the Conversation Breakdown table. If any row status is not DONE: stop and report:
 ```
 Not all conversations are complete. Route to team <feature> build first. Incomplete: Conv N
 ```
 
-When all DONE: log to central DB via `python3 -c "from pathly_orchestrator.eventlog import append_event; append_event('<feature_path>', {'type':'IMPLEMENT_COMPLETE','ts':'<iso-timestamp>'})"`. Confirm state is TESTING in STATE.json.
+When all work is DONE: log to central DB via `python3 -c "from pathly_orchestrator.eventlog import append_event; append_event('<feature_path>', {'type':'IMPLEMENT_COMPLETE','ts':'<iso-timestamp>'})"`. Confirm state is TESTING in STATE.json.
 
 ## Subagents (TESTING stage)
 

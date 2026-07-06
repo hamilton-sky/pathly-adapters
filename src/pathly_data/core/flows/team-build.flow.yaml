@@ -49,6 +49,7 @@ feedback_routing:
   IMPL_QUESTIONS: planner
   REFLECT_CRITIQUE: builder
   REVIEW_INCOMPLETE: reviewer   # REVIEWING->TESTING gate: REVIEW.md missing/not-PASS -> reviewer re-reviews & writes it
+  INCOMPLETE_TASKS: builder     # REVIEWING->TESTING gate: goal has unfinished/failed tasks -> builder drains the remaining DAG
   REVIEW_FAILURES: builder
   SCOPE_VIOLATION: builder
   TEST_FAILURES: builder
@@ -66,6 +67,16 @@ transition_rules:
   REVIEWING:
     on_artifact:
       REVIEW_FAILURES.md: BUILDING
+    # Per-task loop (goal runs): after a task is built + reviewed clean, if the goal still has
+    # BUILDABLE tasks (pending with all deps done) loop back to BUILDING for the next one. Only
+    # when the DAG is drained (ready == 0) fall through to TESTING — so EVERY task gets its own
+    # build→review before the goal is integration-tested once. Ignored for non-goal feature runs
+    # (no goal_id), which keep the single build→review→test pass.
+    on_board_count:
+      metric: ready
+      op: gt
+      compare_to: 0
+      next: BUILDING
     default: TESTING
   TESTING:
     on_artifact:
@@ -89,4 +100,11 @@ gates:
       artifact: REVIEW.md
       pass_marker: 'RESULT: PASS'
       on_fail: REVIEW_INCOMPLETE.md
+    # Goal-DAG completeness: with the per-task loop above, REVIEWING only defaults to TESTING once
+    # ready == 0. This gate additionally refuses to enter TESTING while any task is unfinished or
+    # FAILED (ready == 0 but incomplete > 0 — e.g. a task blocked on a failed dependency), so a
+    # goal is never integration-tested / retro'd half-built. On fail → INCOMPLETE_TASKS.md → builder
+    # (bounded by feedback rounds). No-op for non-goal feature runs (no goal_id → no DAG to check).
+    - type: require_tasks_done
+      on_fail: INCOMPLETE_TASKS.md
 _comments: []

@@ -48,9 +48,13 @@ Before reading PROGRESS.md, check whether this feature has a board task DAG:
 curl -s "http://127.0.0.1:8765/comms/tasks?ready=true&feature=[feature]&scope=[feature]"
 ```
 **If the response is a non-empty list of ready tasks, BUILD FROM THE BOARD** — the DAG is
-the authoritative work list (it supersedes PROGRESS.md / CONVERSATION_PROMPTS.md). Drain it:
+the authoritative work list (it supersedes PROGRESS.md / CONVERSATION_PROMPTS.md). Build
+**exactly ONE task this stage**, then hand off to review. The FSM runs one build→review cycle
+**per task**: after the reviewer passes it loops back to BUILDING for the next ready task, and
+only once the whole DAG is drained does it advance to a single TESTING pass. Do **not** drain
+the rest of the DAG here.
 
-1. Pick a ready task. Claim it: `POST /comms/tasks/claim {"message_id":"<id>","run_id":"build"}`.
+1. Pick ONE ready task. Claim it: `POST /comms/tasks/claim {"message_id":"<id>","run_id":"build"}`.
    If `claimed` is false, another worker took it — re-fetch and pick another.
 2. **Spawn** `builder` with `phase: implement`, passing the task's `text` as the
    instructions (it is a self-contained builder prompt — what to build · Files · Done when)
@@ -59,9 +63,11 @@ the authoritative work list (it supersedes PROGRESS.md / CONVERSATION_PROMPTS.md
    - Technical blocker → write `feedback/DESIGN_QUESTIONS.md` (routed to architect).
 3. On success: `POST /comms/tasks/complete {"message_id":"<id>","feature":"[feature]"}`.
    On unrecoverable failure: `POST /comms/tasks/fail {"message_id":"<id>","reason":"<short>"}`.
-4. Re-fetch ready tasks (step 0). Repeat until the ready list is empty.
+4. If `feedback/INCOMPLETE_TASKS.md` exists (the completeness gate sent you back to finish the
+   DAG), `rm` it after completing this task — the gate re-checks the DAG on the next transition
+   and re-raises it if work still remains.
 
-When the DAG is drained, skip the conversation flow below — go straight to **Phase 3.5
+After that ONE task: skip the conversation flow below — go straight to **Phase 3.5
 (Write VERIFY.md)** and transition to review.
 
 **If the response is empty OR the server is unreachable (connection refused), FALL BACK**

@@ -159,6 +159,7 @@ def complete_stage(args: dict) -> dict:
         storage_path,
         topic,
         state_info["conv"],
+        goal_id=goal_id,
     )
     if gate_failure is not None:
         feedback = route_feedback(flow_config, storage_path)

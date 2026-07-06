@@ -217,6 +217,49 @@ def count_tasks_for_goal(conn: sqlite3.Connection, goal_id: str) -> int:
     return int(row["n"]) if row else 0
 
 
+def count_ready_tasks_for_goal(conn: sqlite3.Connection, goal_id: str) -> int:
+    """Count a goal's BUILDABLE tasks: task_status='pending' with every dependency done.
+
+    Drives the team-build per-task loop — REVIEWING routes back to BUILDING while this is > 0
+    (one more task to build+review) and falls through to TESTING once it reaches 0 (DAG drained).
+    Goal-scoped mirror of ``get_ready_tasks``' readiness rule.
+    """
+    pending = conn.execute(
+        "SELECT id, depends_on FROM comms_messages "
+        "WHERE goal_id=? AND type='task' AND task_status='pending' AND deleted_at IS NULL",
+        (goal_id,),
+    ).fetchall()
+    done_ids = {
+        r["id"]
+        for r in conn.execute(
+            "SELECT id FROM comms_messages "
+            "WHERE goal_id=? AND type='task' AND task_status='done' AND deleted_at IS NULL",
+            (goal_id,),
+        ).fetchall()
+    }
+    n = 0
+    for r in pending:
+        deps = json.loads(r["depends_on"] or "[]")
+        if all(dep in done_ids for dep in deps):
+            n += 1
+    return n
+
+
+def count_incomplete_tasks_for_goal(conn: sqlite3.Connection, goal_id: str) -> int:
+    """Count a goal's tasks that are NOT done (pending / in_progress / failed / blocked / NULL).
+
+    Drives the ``require_tasks_done`` gate on TESTING->RETRO: a goal must not finish (reach RETRO)
+    while any of its tasks are unfinished or failed. ``IS NOT 'done'`` so NULL task_status counts
+    as incomplete.
+    """
+    row = conn.execute(
+        "SELECT COUNT(*) AS n FROM comms_messages "
+        "WHERE goal_id=? AND type='task' AND task_status IS NOT 'done' AND deleted_at IS NULL",
+        (goal_id,),
+    ).fetchone()
+    return int(row["n"]) if row else 0
+
+
 def goal_refs_coverage(conn: sqlite3.Connection, goal_id: str) -> dict:
     """Per-goal context_refs coverage: how many of a goal's tasks carry ≥1 ref (T3c).
 

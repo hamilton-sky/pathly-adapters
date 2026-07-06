@@ -97,18 +97,32 @@ def evaluate_transition_rules(
                 pass
 
     # Level 2.6 — on_board_count (goal-scoped board task-count gate; Fix B)
+    # `metric` selects WHICH count to compare (default 'total' = original Fix B behavior):
+    #   total      — all of the goal's tasks (assert the DAG was seeded)
+    #   ready      — buildable tasks (pending w/ deps done) → drives the per-task build↔review loop
+    #   incomplete — tasks not yet done
     on_board_count = rule.get("on_board_count")
     if on_board_count is not None and goal_id is not None:
         op = on_board_count.get("op")
         compare_to = on_board_count.get("compare_to")
         next_s = on_board_count.get("next")
+        metric = on_board_count.get("metric", "total")
         op_fn = _COMPARE_OPS.get(op)
         # compare_to read as a raw int; `is not None` so compare_to=0 is honored
         if op_fn is not None and compare_to is not None and next_s:
             try:
                 from pathly_orchestrator.db.connection import get_db
-                from pathly_orchestrator.db.queries.comms_tasks import count_tasks_for_goal
-                count = count_tasks_for_goal(get_db(), goal_id)
+                from pathly_orchestrator.db.queries.comms_tasks import (
+                    count_incomplete_tasks_for_goal,
+                    count_ready_tasks_for_goal,
+                    count_tasks_for_goal,
+                )
+
+                _counter = {
+                    "ready": count_ready_tasks_for_goal,
+                    "incomplete": count_incomplete_tasks_for_goal,
+                }.get(metric, count_tasks_for_goal)
+                count = _counter(get_db(), goal_id)
                 if op_fn(count, int(compare_to)):
                     return next_s
             except Exception:
