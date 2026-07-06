@@ -19,11 +19,18 @@ import {
 } from '../../../../MarkdownEditor/EditorHeader/editorCli'
 import s from './TaskCard.module.css'
 
+// A per-task build sends a large composed prompt (skill body + board context + task). Antigravity
+// (agy) has no stdin / --prompt-file input, so that prompt overflows Windows' ~32KB command-line
+// limit ("command line too long"). It's fine for the small editor actions (Split/Analyze/comments),
+// so we disable it HERE only — not globally.
+const TASK_UNAVAILABLE: Partial<Record<string, string>> = {
+  antigravity: 'No headless large-prompt input (agy takes the prompt on the command line)',
+}
 const ADAPTER_OPTIONS = EDITOR_CLIS.map((c) => ({
   value: c.id,
   label: c.label,
-  hint: c.unavailable ?? c.hint,
-  disabled: !!c.unavailable,
+  hint: TASK_UNAVAILABLE[c.id] ?? c.unavailable ?? c.hint,
+  disabled: !!c.unavailable || !!TASK_UNAVAILABLE[c.id],
 }))
 
 type TaskStatus = NonNullable<Message['taskStatus']>
@@ -74,7 +81,10 @@ export function TaskCard({ task: t, siblings }: Props): JSX.Element {
   // Preview-gated like the goal Run / Evaluate controls: the pill opens a confirm modal and
   // confirming dispatches. The backend builds from the STORED task text (by id), so the preview
   // is read-only — editing here wouldn't change what runs.
-  const [adapter, setAdapter] = useState<EditorCli>(() => loadEditorCli(CLI_KEY_TASK))
+  const [adapter, setAdapter] = useState<EditorCli>(() => {
+    const a = loadEditorCli(CLI_KEY_TASK)
+    return TASK_UNAVAILABLE[a] ? 'claude' : a
+  })
   const handleAdapter = (v: string): void => { setAdapter(v as EditorCli); saveEditorCli(CLI_KEY_TASK, v as EditorCli) }
   const handleRun = (): void => { setConfirmOpen(true) }
   const doRun = (): void => { setConfirmOpen(false); setJustRan(true); runTask(t.id, { adapter }) }
