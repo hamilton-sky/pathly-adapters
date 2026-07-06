@@ -4,22 +4,27 @@
  * Python-side shapes live in src/pathly_data/core/adapters.yaml — keep them in sync.
  */
 
-export type CliAdapter = 'claude' | 'codex' | 'antigravity' | 'copilot'
+import { ADAPTERS, type CliAdapter } from '../lib/adapters.gen'
+
+export type { CliAdapter }
 
 export interface AdapterMeta {
   id: CliAdapter
   label: string
   hint: string
-  /** Set when the adapter has no headless one-shot mode. */
+  /** Set when the adapter has no headless one-shot mode — the greyed reason. */
   noHeadless?: string
 }
 
-export const ADAPTER_META: AdapterMeta[] = [
-  { id: 'claude',      label: 'Claude',  hint: 'Claude Code' },
-  { id: 'codex',       label: 'Codex',   hint: 'OpenAI Codex' },
-  { id: 'antigravity', label: 'Gemini',  hint: 'Antigravity CLI', noHeadless: 'No one-shot mode configured yet' },
-  { id: 'copilot',     label: 'Copilot', hint: 'GitHub Copilot',  noHeadless: 'No headless mode' },
-]
+// DERIVED from the ONE source: core/adapters.yaml -> adapters.gen.ts. A non-headless
+// engine is listed but greyed with this reason. Add or enable an engine by editing
+// adapters.yaml + `python scripts/gen_adapters_ts.py` — never by hand-editing a list here.
+export const ADAPTER_META: AdapterMeta[] = Object.entries(ADAPTERS).map(([id, m]) => ({
+  id: id as CliAdapter,
+  label: m.label,
+  hint: m.hint,
+  noHeadless: m.headless ? undefined : 'No headless one-shot mode',
+}))
 
 export interface SpawnOpts {
   model?: string

@@ -1,26 +1,41 @@
+# Canonical CLI-engine registry — the ONE source of truth for adapters.
+# label/hint feed the Studio selectors (generated into adapters.gen.ts); headless/
+# autonomy/resume/parse drive the runner. Regenerate the TS after any edit:
+#   python scripts/gen_adapters_ts.py
 claude:
+  label: Claude
+  hint: Claude Code
   terminal_kind: claude
   headless: [claude, "-p", "{prompt}", "--model", "{model}", "--output-format", json]
   autonomy_flag: "--dangerously-skip-permissions"
   resume: {mode: flag, flag: "--resume", arg: "{session_id}"}
   parse: claude_json
 codex:
+  label: Codex
+  hint: OpenAI Codex
   terminal_kind: codex
   headless: [codex, exec, "--sandbox", "workspace-write", "--model", "{model}", "--", "{prompt}"]
   autonomy_flag: null
   resume: {mode: flag, flag: "--continue"}
   parse: codex_json
 copilot:
+  label: Copilot
+  hint: GitHub Copilot
   terminal_kind: shell
   headless: null
   autonomy_flag: null
   resume: null
   parse: null
 antigravity:
-  terminal_kind: shell
-  # agy (Antigravity / Gemini CLI) has no verified one-shot/exec mode — leave headless
-  # null until a real template is confirmed. The selector shows it as "(no headless)".
-  headless: null
-  autonomy_flag: null
+  label: Gemini
+  hint: Antigravity CLI
+  terminal_kind: antigravity
+  # agy (Antigravity / Gemini CLI) headless one-shot — confirmed shape:
+  #   agy -p "<prompt>" --output-format json
+  # NB: verify the exact unattended-approval flag (--yolo vs --headless --approve <policy>)
+  # and whether a --model flag is accepted, against `agy --help` on a real box. `--yolo` is
+  # the placeholder auto-approve; auth via GEMINI_API_KEY / ANTIGRAVITY_API_KEY.
+  headless: [agy, "-p", "{prompt}", "--output-format", json]
+  autonomy_flag: "--yolo"
   resume: null
-  parse: null
+  parse: claude_json

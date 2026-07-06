@@ -117,15 +117,15 @@ def test_headless_capable_true_for_claude_codex():
 
 def test_headless_capable_false_for_null_and_unknown():
     assert headless_capable("copilot") is False  # headless: null
-    assert headless_capable("antigravity") is False  # headless: null
     assert headless_capable("turbo-ai") is False  # unknown adapter
+    assert headless_capable("antigravity") is True  # agy -p one-shot template wired
 
 
 def test_unsupported_headless_adapters_filters_sorts_and_dedups():
     bad = unsupported_headless_adapters(
         ["claude", "codex", "copilot", "antigravity", "copilot", "claude"]
     )
-    assert bad == ["antigravity", "copilot"]
+    assert bad == ["copilot"]  # antigravity now has a headless template; only copilot lacks one
 
 
 def test_unsupported_headless_adapters_empty_when_all_supported():

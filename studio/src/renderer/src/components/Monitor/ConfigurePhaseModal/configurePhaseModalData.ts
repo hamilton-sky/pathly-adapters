@@ -1,16 +1,17 @@
-export const CLI_HOSTS = ['Claude Code', 'Codex', 'Copilot', 'Antigravity'] as const
+import { ADAPTER_META } from '../../../services/cliEngine'
+
+// DERIVED from the ONE source (cliEngine.ADAPTER_META <- adapters.gen.ts <- adapters.yaml).
+// Display name = the adapter's `hint`; add/enable engines by editing adapters.yaml.
+export const CLI_HOSTS = ADAPTER_META.map((m) => m.hint)
 export const AGENTS = ['planner', 'builder', 'reviewer', 'tester', 'retro'] as const
 export const SKILLS = ['plan/storm', 'plan/scope', 'fix/build', 'team/build', 'review/quality', 'test/verify', 'retro/archive'] as const
 
-export const HOST_TO_ADAPTER: Record<string, string> = {
-  'Claude Code': 'claude',
-  'Codex': 'codex',
-  'Copilot': 'copilot',
-  'Antigravity': 'antigravity',
-}
+export const HOST_TO_ADAPTER: Record<string, string> = Object.fromEntries(
+  ADAPTER_META.map((m) => [m.hint, m.id]),
+)
 
 export const ADAPTER_TO_HOST: Record<string, string> = Object.fromEntries(
-  Object.entries(HOST_TO_ADAPTER).map(([h, a]) => [a, h])
+  ADAPTER_META.map((m) => [m.id, m.hint]),
 )
 
 export const AGENT_FILE_PATHS: Record<string, string> = {
