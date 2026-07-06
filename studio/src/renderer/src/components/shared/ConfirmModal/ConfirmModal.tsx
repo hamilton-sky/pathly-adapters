@@ -10,6 +10,8 @@ interface Props {
   message?: ReactNode
   /** Label on the confirm button. */
   confirmLabel?: string
+  /** Optional controls rendered above the action buttons (e.g. a per-run progress selector). */
+  footerSlot?: ReactNode
   onCancel: () => void
   onConfirm: () => void
 }
@@ -23,6 +25,7 @@ export function ConfirmModal({
   title,
   message = 'This cannot be undone.',
   confirmLabel = 'Delete',
+  footerSlot,
   onCancel,
   onConfirm,
 }: Props): JSX.Element {
@@ -49,6 +52,7 @@ export function ConfirmModal({
       >
         <p id="confirm-modal-title" className={s.title}>{title}</p>
         {message && <p className={s.sub}>{message}</p>}
+        {footerSlot && <div className={s.footerSlot}>{footerSlot}</div>}
         <div className={s.actions}>
           <button type="button" className={s.cancel} onClick={onCancel}>Cancel</button>
           <button type="button" className={s.confirm} onClick={onConfirm}>{confirmLabel}</button>

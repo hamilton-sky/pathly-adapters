@@ -399,6 +399,32 @@ export async function apiGetDefaultStyle(): Promise<SummaryStyle | null> {
   }
 }
 
+/** Fetch the app-default board-updates verbosity ('quiet'|'normal'|'verbose'), or null. */
+export async function apiGetDefaultProgress(): Promise<string | null> {
+  try {
+    const r = await apiFetch('/comms/default-progress')
+    if (!r.ok) return null
+    const json = (await r.json()) as { progress?: string | null }
+    return json.progress ?? null
+  } catch {
+    return null
+  }
+}
+
+/** Persist the app-default board-updates verbosity. Returns true on 2xx. */
+export async function apiSetDefaultProgress(progress: string): Promise<boolean> {
+  try {
+    const r = await apiFetch('/comms/default-progress', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ progress }),
+    })
+    return r.ok
+  } catch {
+    return false
+  }
+}
+
 /** Persist the app-default summary depth style. Returns true on 2xx. */
 export async function apiSetDefaultStyle(style: SummaryStyle): Promise<boolean> {
   try {
@@ -744,6 +770,8 @@ export interface RunGoalOpts {
   model?: string
   flow?: string
   projectRoot?: string
+  /** Per-run board-updates verbosity override; '' / undefined = inherit the Settings default. */
+  progress?: string
 }
 
 export type DecomposeMode = 'planner' | 'plan' | 'consultation'
@@ -756,13 +784,14 @@ export type DecomposeMode = 'planner' | 'plan' | 'consultation'
 export async function apiDecomposeGoal(
   goal_id: string,
   mode: DecomposeMode,
-  opts: { adapter?: string; projectRoot?: string; model?: string } = {},
+  opts: { adapter?: string; projectRoot?: string; model?: string; progress?: string } = {},
 ): Promise<{ ok: boolean; reason?: string } | null> {
   try {
     const body: Record<string, unknown> = { goal_id, mode }
     if (opts.adapter) body.adapter = opts.adapter
     if (opts.projectRoot) body.project_root = opts.projectRoot
     if (opts.model) body.model = opts.model
+    if (opts.progress) body.progress = opts.progress
     const r = await apiFetch('/comms/goals/decompose', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -788,6 +817,7 @@ export async function apiRunGoal(
     if (opts.model) body.model = opts.model
     if (opts.flow) body.flow = opts.flow
     if (opts.projectRoot) body.project_root = opts.projectRoot
+    if (opts.progress) body.progress = opts.progress
     const r = await apiFetch('/comms/goals/run', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

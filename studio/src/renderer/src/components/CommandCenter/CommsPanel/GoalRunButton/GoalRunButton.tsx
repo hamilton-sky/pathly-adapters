@@ -3,6 +3,7 @@ import { useCommsStore } from '../../../../store/commsStore'
 import { useElapsedProgress } from '../../../shared/RunPill/progress'
 import { RunPill } from '../../../shared/RunPill/RunPill'
 import SendPreviewModal from '../../../shared/SendPreviewModal/SendPreviewModal'
+import { ProgressSelect } from '../../../shared/ProgressSelect/ProgressSelect'
 import { GoalSelect } from './GoalSelect/GoalSelect'
 import { useGoalRunPreview } from './useGoalRunPreview'
 import { executorInfo } from './executorInfo'
@@ -48,6 +49,8 @@ export function GoalRunButton({ goalId, defaultExecutor = 'single', goalText = '
   const [executor, setExecutor] = useState(defaultExecutor)
   const [adapter, setAdapter] = useState<EditorCli>(() => loadEditorCli(CLI_KEY_GOAL))
   const [confirmOpen, setConfirmOpen] = useState(false)
+  // Per-run board-updates verbosity override; '' = inherit the Settings default.
+  const [verbosity, setVerbosity] = useState('')
 
   const goalRunState = useCommsStore((st) => st.goalRunState)
   const goalRunStart = useCommsStore((st) => st.goalRunStart)
@@ -86,6 +89,7 @@ export function GoalRunButton({ goalId, defaultExecutor = 'single', goalText = '
     setConfirmOpen(false)
     runGoal(goalId, executor, {
       adapter: adapterApplies && adapter !== 'claude' ? adapter : undefined,
+      progress: verbosity || undefined,
     })
   }
 
@@ -142,6 +146,16 @@ export function GoalRunButton({ goalId, defaultExecutor = 'single', goalText = '
             { label: 'Tasks', value: taskLine },
           ]}
           submitLabel="Run"
+          footerSlot={
+            <ProgressSelect
+              value={verbosity}
+              onChange={setVerbosity}
+              allowInherit
+              disabled={isActive}
+              label="Board updates"
+              id="goalrun-progress"
+            />
+          }
           onSubmit={doRun}
           onCancel={() => setConfirmOpen(false)}
         />

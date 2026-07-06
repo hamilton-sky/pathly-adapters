@@ -61,7 +61,7 @@ def start_goal_decompose(
     project_root: str = "",
     adapter: str = "claude",
     model: str = "",
-    progress: str = "normal",
+    progress: str = "",
     broadcast_fn: Optional[Callable] = None,
     on_start: Optional[Callable] = None,
     on_done: Optional[Callable] = None,

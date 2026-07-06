@@ -31,9 +31,11 @@ def comms_run():
         system_prompt = data.get("system_prompt", "") or ""
         interactive = bool(data.get("interactive", False))
 
-        progress = (data.get("progress", "") or "normal").strip().lower()
+        # "" (unset) is passed through so start_board_run resolves the app-wide default
+        # from Settings; an explicit quiet/normal/verbose overrides it for this run.
+        progress = (data.get("progress", "") or "").strip().lower()
         if progress not in ("quiet", "normal", "verbose"):
-            progress = "normal"
+            progress = ""
 
         _DEFAULT_MODEL = {"claude": "claude-sonnet-4-6", "codex": "gpt-5.4"}
         adapter = (data.get("adapter", "") or "claude").strip().lower()

@@ -81,7 +81,7 @@ export interface CommsState {
   /** Run the evaluator on a board: classify its content and propose concrete tasks.
    *  `systemPrompt` carries the optional evaluation lens; `instructions` carries
    *  the optional extra-instructions box. */
-  runEvaluator: (key: string, opts?: { adapter?: string; systemPrompt?: string; instructions?: string }) => void
+  runEvaluator: (key: string, opts?: { adapter?: string; systemPrompt?: string; instructions?: string; progress?: string }) => void
   /** Update a board's run state from a board_run SSE phase (running/done/stopped). */
   markBoardRunPhase: (key: string, phase: string) => void
   stopBoard: (key: string) => void
@@ -92,7 +92,7 @@ export interface CommsState {
   goalRunStart: Record<string, number>
   runGoal: (goal_id: string, executor?: string, opts?: RunGoalOpts) => void
   /** Decompose a goal into a task DAG (planner = fast, consultation = deep). */
-  decomposeGoal: (goal_id: string, mode: DecomposeMode, opts?: { adapter?: string; model?: string }) => void
+  decomposeGoal: (goal_id: string, mode: DecomposeMode, opts?: { adapter?: string; model?: string; progress?: string }) => void
   /** Update a goal's run state from a goal_run/goal_decompose SSE phase. */
   markGoalRunPhase: (goal_id: string, phase: string) => void
   stopGoal: (goal_id: string) => void

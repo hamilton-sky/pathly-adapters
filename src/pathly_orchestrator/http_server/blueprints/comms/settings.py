@@ -190,6 +190,47 @@ def comms_set_default_style():
         return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
 
 
+@bp.route("/comms/default-progress", methods=["GET"])
+def comms_get_default_progress():
+    """Return the app-default board-updates verbosity ('quiet'|'normal'|'verbose') or null.
+
+    The single source of truth for how chatty a headless agent is on the board. The client
+    seeds the Settings control from this; null ⇒ the renderer falls back to 'normal'."""
+    try:
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.queries.app_settings import (
+            get_default_progress,
+        )
+
+        return jsonify({"progress": get_default_progress(_get_db())}), 200
+    except Exception as exc:
+        logging.exception("comms_get_default_progress error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
+@bp.route("/comms/default-progress", methods=["POST"])
+def comms_set_default_progress():
+    """Persist the app-default board-updates verbosity. Body: {progress: 'quiet'|'normal'|'verbose'}."""
+    try:
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.queries.app_settings import (
+            set_default_progress,
+        )
+
+        data = request.get_json(silent=True) or {}
+        progress = data.get("progress")
+        if not isinstance(progress, str):
+            return jsonify({"error": "Field 'progress' must be a string"}), 400
+        try:
+            set_default_progress(_get_db(), progress)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        return jsonify({"ok": True, "progress": progress}), 200
+    except Exception as exc:
+        logging.exception("comms_set_default_progress error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
 @bp.route("/comms/agent-context", methods=["POST"])
 def comms_agent_context():
     """Return board context in BOARD-INFO mode."""

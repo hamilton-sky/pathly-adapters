@@ -182,3 +182,25 @@ def set_default_summary_style(conn: sqlite3.Connection, style: str) -> None:
     if style not in _VALID_SUMMARY_STYLES:
         raise ValueError("style must be one of 'gist', 'topic-map', 'detailed'")
     set_setting(conn, _DEFAULT_SUMMARY_STYLE_KEY, style)
+
+
+_DEFAULT_PROGRESS_KEY = "board:default_progress"
+_VALID_PROGRESS = ("quiet", "normal", "verbose")
+
+
+def get_default_progress(conn: sqlite3.Connection) -> str | None:
+    """Return the app-default board-updates verbosity ('quiet'|'normal'|'verbose'), or None.
+
+    This is the single source of truth for how chatty a headless agent is on the board.
+    Every board-narrating run (single-agent, evaluator, decompose, single-executor) resolves
+    its cadence from here when the caller doesn't pass an explicit override. A missing or
+    unrecognised value degrades to None so the consumer falls back to its built-in 'normal'."""
+    raw = get_setting(conn, _DEFAULT_PROGRESS_KEY)
+    return raw if raw in _VALID_PROGRESS else None
+
+
+def set_default_progress(conn: sqlite3.Connection, progress: str) -> None:
+    """Persist the app-default board-updates verbosity. Raises ValueError if invalid."""
+    if progress not in _VALID_PROGRESS:
+        raise ValueError("progress must be one of 'quiet', 'normal', 'verbose'")
+    set_setting(conn, _DEFAULT_PROGRESS_KEY, progress)

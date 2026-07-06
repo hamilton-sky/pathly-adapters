@@ -151,6 +151,25 @@ _PROGRESS_CADENCE = {
 }
 
 
+def _resolve_progress(progress: str) -> str:
+    """Resolve the board-updates cadence: explicit override → app-setting default → 'normal'.
+
+    An empty/unknown ``progress`` means the caller did NOT override (Evaluate, decompose, and
+    the single executor all funnel through here without one), so fall back to the app-wide
+    default set in Settings, then to ``"normal"``. This makes the Settings value the single
+    source of truth for every board-narrating run, with per-run overrides still honored."""
+    p = (progress or "").strip().lower()
+    if p in _PROGRESS_CADENCE:
+        return p
+    try:
+        from pathly_orchestrator.db.connection import get_db
+        from pathly_orchestrator.db.queries.app_settings import get_default_progress
+
+        return get_default_progress(get_db()) or "normal"
+    except Exception:
+        return "normal"
+
+
 def start_board_run(
     board: str,
     scope: str,
@@ -164,7 +183,7 @@ def start_board_run(
     skill: str = "",
     system_prompt: str = "",
     interactive: bool = False,
-    progress: str = "normal",
+    progress: str = "",
     storage_path: str = "",
     caps: dict | None = None,
     broadcast_fn=None,
@@ -194,7 +213,9 @@ def start_board_run(
     progress:
         How chatty the headless agent is on the board — "quiet" (start + result
         only), "normal" (start + key steps + result), or "verbose" (a line per
-        step). Unknown values fall back to "normal".
+        step). "" (unset — the common case for Evaluate/decompose/single-executor)
+        resolves the app-wide default from Settings, then "normal"; see
+        _resolve_progress.
     broadcast_fn:
         Optional SSE broadcast callable; forwarded to spawn_fn.
     spawn_fn:
@@ -247,7 +268,9 @@ def start_board_run(
     # its progress to the board or the human is blind. These POSTs are how the human
     # follows along; they are not a user-facing skill.
     _from = agent or "agent"
-    cadence = _PROGRESS_CADENCE.get(progress, _PROGRESS_CADENCE["normal"])
+    # Resolve the cadence: explicit override → Settings default → "normal". _resolve_progress
+    # always returns a valid key, so direct indexing is safe.
+    cadence = _PROGRESS_CADENCE[_resolve_progress(progress)]
     # Where the agent should write files: prefer the resolved storage_path when supplied
     # (goal-tier runs pass this); fall back to the feature inline-resolve for feature boards.
     if storage_path:

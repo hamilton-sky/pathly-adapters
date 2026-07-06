@@ -29,6 +29,9 @@
   font-size: var(--font-size-sm);
   margin: 0 0 18px;
 }
+.footerSlot {
+  margin: 0 0 16px;
+}
 .actions {
   display: flex;
   justify-content: flex-end;

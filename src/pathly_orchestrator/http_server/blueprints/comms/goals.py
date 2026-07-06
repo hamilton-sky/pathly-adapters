@@ -37,6 +37,8 @@ def comms_goals_run():
         adapter = data.get("adapter", "") or "claude"
         model = data.get("model", "") or ""
         project_root = data.get("project_root", "") or ""
+        # "" (unset) lets start_board_run resolve the app-wide default from Settings.
+        progress = data.get("progress", "") or ""
 
         conn = _get_db()
         goal = conn.execute(
@@ -108,6 +110,7 @@ def comms_goals_run():
             project_root=project_root,
             adapter=adapter,
             model=model,
+            progress=progress,
             broadcast_fn=_broadcast_runner,
             event_broadcast_fn=_broadcast_comms,
             on_start=_on_start,
@@ -273,6 +276,8 @@ def comms_goals_decompose():
         adapter = data.get("adapter", "") or "claude"
         model = data.get("model", "") or ""
         project_root = data.get("project_root", "") or ""
+        # "" (unset) lets start_board_run resolve the app-wide default from Settings.
+        progress = data.get("progress", "") or ""
 
         conn = _get_db()
         goal = conn.execute(
@@ -339,6 +344,7 @@ def comms_goals_decompose():
             project_root=project_root,
             adapter=adapter,
             model=model,
+            progress=progress,
             broadcast_fn=_broadcast_runner,
             on_start=_on_start,
             on_done=_on_done,

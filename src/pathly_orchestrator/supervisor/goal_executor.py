@@ -89,7 +89,7 @@ def start_goal_run(
     project_root: str = "",
     adapter: str = "claude",
     model: str = "",
-    progress: str = "normal",
+    progress: str = "",
     broadcast_fn: Optional[Callable] = None,
     event_broadcast_fn: Optional[Callable] = None,
     on_start: Optional[Callable] = None,

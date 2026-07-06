@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { SendHorizonal, X, Check } from 'lucide-react'
 import { PromptBanner } from '../PromptPreview/PromptPreview'
 import styles from './SendPreviewModal.module.css'
@@ -37,6 +37,8 @@ interface Props {
   /** Render the prompt as a read-only preview (no edit toggle). Use when the final prompt
    *  is assembled elsewhere (e.g. server-side) and the modal is a confirm-and-preview gate. */
   readOnly?: boolean
+  /** Optional controls rendered in the footer, left of the buttons (e.g. a per-run progress selector). */
+  footerSlot?: ReactNode
   /** Receives the (possibly edited) prompt — that exact text is what gets sent. */
   onSubmit: (prompt: string) => void
   onCancel: () => void
@@ -45,7 +47,7 @@ interface Props {
 // Confirm-before-send: a compact gate showing the target engine + summary, an optional
 // per-item selection list (comments), and the prompt in a collapsible banner (eye = preview ·
 // pencil = edit). Whatever the banner holds on submit is the exact text dispatched.
-export default function SendPreviewModal({ title, engineLabel, fileName, prompt, meta = [], items, itemsLabel = 'Include', onToggleItem, submitLabel = 'Send', readOnly = false, onSubmit, onCancel }: Props) {
+export default function SendPreviewModal({ title, engineLabel, fileName, prompt, meta = [], items, itemsLabel = 'Include', onToggleItem, submitLabel = 'Send', readOnly = false, footerSlot, onSubmit, onCancel }: Props) {
   const submitRef = useRef<HTMLButtonElement>(null)
   const [text, setText] = useState(prompt)
 
@@ -131,6 +133,8 @@ export default function SendPreviewModal({ title, engineLabel, fileName, prompt,
             ? <PromptBanner content={text} />
             : <PromptBanner editable editValue={text} onEditChange={setText} />}
         </div>
+
+        {footerSlot && <div className={styles.footerSlot}>{footerSlot}</div>}
 
         <div className={styles.footer}>
           <button type="button" className={styles.cancelBtn} onClick={onCancel}>Cancel</button>

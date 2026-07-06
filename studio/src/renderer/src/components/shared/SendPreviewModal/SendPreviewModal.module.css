@@ -198,6 +198,13 @@
   flex-shrink: 0;
 }
 
+/* Optional controls (e.g. a per-run progress selector) sit on their own row above the
+   buttons — a labeled field, so they don't compete with the button row for height. */
+.footerSlot {
+  padding: 10px 14px 0;
+  min-width: 0;
+}
+
 .cancelBtn {
   padding: 6px 14px;
   background: var(--bg-surface0);

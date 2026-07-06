@@ -37,6 +37,8 @@ export function useEvaluateBoardButton(boardKey: string) {
   // '' = whole board; otherwise = a goal id.
   const [targetGoalId, setTargetGoalId] = useState('')
   const [rigorMode, setRigorMode] = useState<DecomposeMode>('plan')
+  // Per-run board-updates verbosity override; '' = inherit the Settings default.
+  const [verbosity, setVerbosity] = useState('')
   const gearRef = useRef<HTMLButtonElement>(null)
 
   // Pill state: when a specific goal is targeted, reflect its decompose state instead.
@@ -71,12 +73,13 @@ export function useEvaluateBoardButton(boardKey: string) {
   function dispatch(): void {
     const adapter = selectedCli !== 'claude' ? selectedCli : undefined
     if (targetGoalId) {
-      decomposeGoal(targetGoalId, rigorMode, { adapter })
+      decomposeGoal(targetGoalId, rigorMode, { adapter, progress: verbosity || undefined })
     } else {
       runEvaluator(boardKey, {
         adapter,
         systemPrompt: lensText || undefined,
         instructions: extraPrompt || undefined,
+        progress: verbosity || undefined,
       })
     }
   }
@@ -94,12 +97,13 @@ export function useEvaluateBoardButton(boardKey: string) {
     else setConfirmOpen(true)
   }
 
-  // Gear popover primary: the config surface already stands in for a preview, so whole-board
-  // dispatches directly here; the goal path still gates consultation.
+  // Gear popover primary: "Run now" opens the same guard modal as the pill (setConfirmOpen) so
+  // the board-updates override + prompt preview are shown before the CLI engine spawns; the goal
+  // path still gates consultation (light/full goal tiers dispatch directly, inheriting the default).
   function onConfigRun(): void {
     setConfigOpen(false)
     if (targetGoalId) requestGoalRun()
-    else dispatch()
+    else setConfirmOpen(true)
   }
 
   function handleStop(): void {
@@ -115,7 +119,7 @@ export function useEvaluateBoardButton(boardKey: string) {
 
   return {
     // config values
-    selectedLens, lensText, extraPrompt, selectedCli, targetGoalId, rigorMode,
+    selectedLens, lensText, extraPrompt, selectedCli, targetGoalId, rigorMode, verbosity,
     // pill
     runState, running, progress, activeLabel, lensLabel,
     // popover / modal open state
@@ -123,7 +127,7 @@ export function useEvaluateBoardButton(boardKey: string) {
     // preview
     previewPrompt,
     // handlers
-    handleCliChange, pickLens, setLensText, setExtraPrompt, setTargetGoalId, setRigorMode,
+    handleCliChange, pickLens, setLensText, setExtraPrompt, setTargetGoalId, setRigorMode, setVerbosity,
     handleReset, handleStop, onPillRun, onConfigRun, dispatch,
     confirmWholeBoard: () => { setConfirmOpen(false); dispatch() },
     cancelWholeBoard: () => setConfirmOpen(false),

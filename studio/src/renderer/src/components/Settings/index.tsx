@@ -9,7 +9,9 @@ import { NotificationSettings } from './NotificationSettings'
 import { ExportSettings } from './ExportSettings'
 import { CodeIntelligenceSettings } from './CodeIntelligenceSettings'
 import { AiTargetSelector } from '../shared/AiTargetSelector/AiTargetSelector'
+import { ProgressSelect } from '../shared/ProgressSelect/ProgressSelect'
 import { useDefaultSummaryTarget } from './hooks/useDefaultSummaryTarget'
+import { useDefaultProgress } from './hooks/useDefaultProgress'
 import s from './Settings.module.css'
 
 const DARK_PALETTES: ThemeName[] = ['dark', 'nord', 'mocha', 'solarized', 'dracula', 'rose-pine']
@@ -18,10 +20,7 @@ const LIGHT_PALETTES: ThemeName[] = ['light', 'solarized-light', 'latte', 'paper
 export function Settings(): JSX.Element {
   const {
     preferredDark, preferredLight, setPreferredDark, setPreferredLight,
-    routingEngine, setRoutingEngine,
-    fsmCommand, setFsmCommand,
   } = useStore()
-  const [fsmInput, setFsmInput] = useState(fsmCommand)
 
   const runnerMode = useRunnerStore((s) => s.runnerMode)
   const maxCostUsd = useRunnerStore((s) => s.maxCostUsd)
@@ -33,6 +32,7 @@ export function Settings(): JSX.Element {
   const [iterInput, setIterInput] = useState(String(maxIterations))
 
   const { selection: summarySelection, setSelection: setSummarySelection } = useDefaultSummaryTarget()
+  const { progress: defaultProgress, setProgress: setDefaultProgress } = useDefaultProgress()
 
   function saveRunConfig(): void {
     const cost = parseFloat(costInput)
@@ -66,43 +66,6 @@ export function Settings(): JSX.Element {
             {LIGHT_PALETTES.map((name) => (
               <PaletteSwatch key={name} data-testid={`settings-palette-${name.replace(/\s+/g, '-').toLowerCase()}`} name={name} active={preferredLight === name} onClick={() => setPreferredLight(name)} />
             ))}
-          </div>
-        </div>
-
-        <div className={s.section}>
-          <div className={s.sectionTitle}>Routing Engine</div>
-          <div className={s.radioGroup}>
-            <RadioCard
-              data-testid="settings-routing-llm"
-              active={routingEngine === 'llm'}
-              label="LLM driven"
-              description="Orchestrator agent reads YAML and routes"
-              onClick={() => setRoutingEngine('llm')}
-            />
-            <RadioCard
-              data-testid="settings-routing-python"
-              active={routingEngine === 'python-fsm'}
-              label="Python FSM"
-              description="Deterministic FSM over HTTP"
-              onClick={() => setRoutingEngine('python-fsm')}
-            />
-          </div>
-        </div>
-
-        <div className={s.section}>
-          <div className={s.sectionTitle}>FSM Server Command</div>
-          <div className={s.inputRow}>
-            <input
-              data-testid="settings-fsm-command-input"
-              aria-label="FSM server command"
-              className={s.textInput}
-              type="text"
-              value={fsmInput}
-              onChange={(e) => setFsmInput(e.target.value)}
-            />
-            <button data-testid="settings-save-btn" type="button" className={s.saveBtn} onClick={() => setFsmCommand(fsmInput)}>
-              Save
-            </button>
           </div>
         </div>
 
@@ -178,6 +141,17 @@ export function Settings(): JSX.Element {
               onChange={setSummarySelection}
               allowOff
             />
+          </div>
+        </div>
+
+        <div className={s.section}>
+          <div className={s.sectionTitle}>Board updates</div>
+          <div className={s.hint}>
+            How chatty a headless agent is on the board — the default for every board run
+            (single agent, Evaluate, decompose). Each run can still override it.
+          </div>
+          <div className={s.summaryTarget}>
+            <ProgressSelect value={defaultProgress} onChange={setDefaultProgress} />
           </div>
         </div>
 
