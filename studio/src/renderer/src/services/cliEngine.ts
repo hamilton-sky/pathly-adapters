@@ -86,14 +86,23 @@ export function buildHeadlessArgv(adapter: CliAdapter, promptRaw: string, opts: 
     return argv
   }
 
-  // antigravity + copilot have no headless one-shot mode. Fail loud instead of silently
-  // building the claude argv (the old behavior mis-attributed the run to the wrong engine).
-  // The UI already filters these out via ADAPTER_META.noHeadless; this is the honest backstop.
+  if (adapter === 'antigravity') {
+    // agy (Antigravity / Gemini CLI) headless one-shot — mirrors core/adapters.yaml.
+    // No JSON/stream mode (prints plain text); auto-approve = --dangerously-skip-permissions.
+    const argv = ['agy', '-p', prompt]
+    if (model) argv.push('--model', model)
+    if (autonomy) argv.push('--dangerously-skip-permissions')
+    return argv
+  }
+
+  // copilot has no headless one-shot mode. Fail loud instead of silently building the claude
+  // argv (the old behavior mis-attributed the run to the wrong engine). The UI already filters
+  // it out via ADAPTER_META.noHeadless; this is the honest backstop.
   const meta = ADAPTER_META.find((m) => m.id === adapter)
   throw new Error(
     `Adapter '${adapter}' has no headless mode` +
       (meta?.noHeadless ? ` (${meta.noHeadless})` : '') +
-      '. Use claude or codex for headless runs.'
+      '. Use claude, codex, or antigravity for headless runs.'
   )
 }
 

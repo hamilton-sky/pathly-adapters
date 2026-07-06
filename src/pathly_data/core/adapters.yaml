@@ -30,12 +30,15 @@ antigravity:
   label: Gemini
   hint: Antigravity CLI
   terminal_kind: antigravity
-  # agy (Antigravity / Gemini CLI) headless one-shot — confirmed shape:
-  #   agy -p "<prompt>" --output-format json
-  # NB: verify the exact unattended-approval flag (--yolo vs --headless --approve <policy>)
-  # and whether a --model flag is accepted, against `agy --help` on a real box. `--yolo` is
-  # the placeholder auto-approve; auth via GEMINI_API_KEY / ANTIGRAVITY_API_KEY.
-  headless: [agy, "-p", "{prompt}", "--output-format", json]
-  autonomy_flag: "--yolo"
+  # agy (Antigravity / Gemini CLI) headless one-shot — VERIFIED against agy v1.0.10:
+  #   agy -p "<prompt>" --model <gemini-slug> --dangerously-skip-permissions
+  # agy has NO --output-format / JSON mode (it prints plain text) and NO --yolo; the
+  # unattended auto-approve flag is --dangerously-skip-permissions. --model accepts gemini-*
+  # slugs (mapped internally to its display models). Auth is a logged-in `agy` session — no
+  # GEMINI_API_KEY needed. Because there is no JSON output, cost/session telemetry is
+  # unavailable; the semantic result comes from AGENT_DONE.summary. (`agy --continue`/-c
+  # exists if per-session resume is wired later.)
+  headless: [agy, "-p", "{prompt}", "--model", "{model}"]
+  autonomy_flag: "--dangerously-skip-permissions"
   resume: null
   parse: claude_json
