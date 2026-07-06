@@ -26,7 +26,7 @@ export function MonitorLane({ messages }: MonitorLaneProps): JSX.Element {
     <div className={s.lane}>
       <button
         type="button"
-        className={s.head}
+        className={`${s.head}${open ? ` ${s.headOpen}` : ''}`}
         onClick={() => setOpen((v) => !v)}
         {...(open ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
         aria-label={open ? 'Collapse monitor' : 'Expand monitor'}
