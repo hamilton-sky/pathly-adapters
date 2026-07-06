@@ -89,6 +89,36 @@ def comms_run():
             _board_post(
                 f"{label} finished via {adapter} — {summary[:280]}", phase="done"
             )
+            # Backstop for evaluate.md Step 3: an evaluator run MUST post a BOARD_EVAL analysis
+            # artifact. If it finished cleanly WITHOUT one (agent answered as free-form text /
+            # discovery instead), warn the human so a text-only reply isn't mistaken for a real
+            # evaluation. Windowed to this run so a stale prior artifact doesn't mask a miss.
+            if mode == "evaluator" and not (isinstance(res, dict) and res.get("error")):
+                try:
+                    from datetime import datetime, timedelta, timezone
+
+                    c = _get_db()
+                    cutoff = (datetime.now(timezone.utc) - timedelta(minutes=15)).isoformat()
+                    has_eval = c.execute(
+                        "SELECT 1 FROM comms_messages WHERE scope=? AND type='artifact' "
+                        "AND deleted_at IS NULL AND ts >= ? "
+                        "AND (artifact_path LIKE '%BOARD_EVAL%' OR text LIKE '%BOARD_EVAL%') LIMIT 1",
+                        (scope, cutoff),
+                    ).fetchone()
+                    if not has_eval:
+                        mid = _post_message(
+                            c, board=board, scope=scope, from_agent="system", type="warning",
+                            text=("Evaluate finished but posted no BOARD_EVAL analysis artifact — "
+                                  "the run returned only a text reply. Re-run Evaluate; if the board "
+                                  "already has a goal/task DAG, the evaluator must still post the "
+                                  "analysis artifact (it may skip only the goal/task proposals)."),
+                        )
+                        _broadcast_comms(scope, {
+                            "type": "COMMS_UPDATE", "event": "board_run",
+                            "message_id": mid, "board": board, "scope": scope, "phase": "warning",
+                        })
+                except Exception:
+                    logging.debug("evaluator BOARD_EVAL backstop failed", exc_info=True)
 
         result = start_board_run(
             board,

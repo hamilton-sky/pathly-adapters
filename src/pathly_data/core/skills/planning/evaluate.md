@@ -44,7 +44,13 @@ When in doubt between `RESEARCH` and `BOTH`, choose `BOTH`.
 
 ---
 
-## Step 3 — Write and post the analysis artifact
+## Step 3 — Write and post the analysis artifact (MANDATORY — your primary deliverable)
+
+**Every evaluate run MUST post this artifact — it is the ONE output that always has to exist.**
+NEVER skip it, and do it BEFORE any other posting. It is required even when the board already has a
+goal/task DAG (that only lets you skip Step 4 below — never this step). Do NOT substitute a
+free-form `discovery`/`question` post or a text-only reply for it: if the board raises a question,
+your classification + recommendation goes INSIDE `BOARD_EVAL.md` and is posted as an `artifact`.
 
 Write the analysis to `pathly/features/<feature>/artifacts/BOARD_EVAL.md`:
 
@@ -77,7 +83,7 @@ Post a `type=goal` message first, then one or more `type=task` messages stamped 
 `goal_id`. Tasks must be actionable and specific. The user runs them with the standard board
 controls — no intermediate "options" layer.
 
-**Idempotency guard — skip if a DAG already exists for this scope.** Before posting, check:
+**Idempotency guard — skip THIS STEP ONLY (never Step 3) if a DAG already exists for this scope.** Before posting, check:
 
 ```bash
 curl -s "http://127.0.0.1:8765/comms?feature=$FEATURE&scope=$FEATURE&type=goal"
