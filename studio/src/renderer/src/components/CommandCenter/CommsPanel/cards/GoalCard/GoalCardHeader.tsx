@@ -78,7 +78,7 @@ export function GoalCardHeader({ goal, tasks, open, onToggle, onEditGoal, onDele
         </span>
         <div className={s.controls}>
           {tasks.length > 0
-            ? <GoalRunButton goalId={goal.id} defaultExecutor={goal.executor ?? 'single'} />
+            ? <GoalRunButton goalId={goal.id} defaultExecutor={goal.executor ?? 'single'} goalText={goal.text} total={r.total} ready={r.ready} />
             : <GoalPlanStatus state={isPlanning ? 'planning' : 'idle'} />}
         </div>
       </div>

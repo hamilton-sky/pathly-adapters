@@ -2,11 +2,14 @@ import { useState } from 'react'
 import { useCommsStore } from '../../../../store/commsStore'
 import { useElapsedProgress } from '../../../shared/RunPill/progress'
 import { RunPill } from '../../../shared/RunPill/RunPill'
+import SendPreviewModal from '../../../shared/SendPreviewModal/SendPreviewModal'
 import { GoalSelect } from './GoalSelect/GoalSelect'
+import { useGoalRunPreview } from './useGoalRunPreview'
 import {
   type EditorCli,
   loadEditorCli,
   saveEditorCli,
+  cliLabel,
   CLI_KEY_GOAL,
   EDITOR_CLIS,
 } from '../../../MarkdownEditor/EditorHeader/editorCli'
@@ -30,14 +33,20 @@ const ADAPTER_OPTIONS = EDITOR_CLIS.map((c) => ({
 interface Props {
   goalId: string
   defaultExecutor?: string
+  /** Goal title + task rollup — shown in the send preview so the run is confirmed in context. */
+  goalText?: string
+  total?: number
+  ready?: number
 }
 
 // Run a goal's task-DAG. The user picks the executor (single|loop|team) AND the CLI
 // engine (adapter) the run uses — one selector, two fields (ROADMAP multi-adapter rider).
 // The adapter rides with the run to /comms/goals/run → start_goal_run → the spawn.
-export function GoalRunButton({ goalId, defaultExecutor = 'single' }: Props): JSX.Element {
+// Run is preview-gated (SendPreviewModal), mirroring the board's Evaluate control.
+export function GoalRunButton({ goalId, defaultExecutor = 'single', goalText = '', total = 0, ready = 0 }: Props): JSX.Element {
   const [executor, setExecutor] = useState(defaultExecutor)
   const [adapter, setAdapter] = useState<EditorCli>(() => loadEditorCli(CLI_KEY_GOAL))
+  const [confirmOpen, setConfirmOpen] = useState(false)
 
   const goalRunState = useCommsStore((st) => st.goalRunState)
   const goalRunStart = useCommsStore((st) => st.goalRunStart)
@@ -57,12 +66,22 @@ export function GoalRunButton({ goalId, defaultExecutor = 'single' }: Props): JS
     : runState === 'done' ? 'done'
     : 'idle'
 
+  const taskLine = `${total} task${total !== 1 ? 's' : ''} · ${ready} ready`
+  const executorLabel = EXECUTOR_OPTIONS.find((o) => o.value === executor)?.label ?? executor
+  const previewPrompt = useGoalRunPreview(confirmOpen, executor, goalText, taskLine)
+
   function handleAdapterChange(v: string): void {
     setAdapter(v as EditorCli)
     saveEditorCli(CLI_KEY_GOAL, v as EditorCli)
   }
 
+  // Run is preview-gated: the pill opens the modal; confirming dispatches the run.
   function handleRun(): void {
+    setConfirmOpen(true)
+  }
+
+  function doRun(): void {
+    setConfirmOpen(false)
     runGoal(goalId, executor, {
       adapter: adapterApplies && adapter !== 'claude' ? adapter : undefined,
     })
@@ -97,6 +116,23 @@ export function GoalRunButton({ goalId, defaultExecutor = 'single' }: Props): JS
           onStop={() => stopGoal(goalId)}
         />
       </div>
+
+      {confirmOpen && (
+        <SendPreviewModal
+          title="Run goal"
+          engineLabel={adapterApplies ? cliLabel(adapter) : 'per-stage (team)'}
+          fileName={goalText || goalId}
+          prompt={previewPrompt}
+          readOnly
+          meta={[
+            { label: 'Executor', value: executorLabel },
+            { label: 'Tasks', value: taskLine },
+          ]}
+          submitLabel="Run"
+          onSubmit={doRun}
+          onCancel={() => setConfirmOpen(false)}
+        />
+      )}
     </div>
   )
 }
