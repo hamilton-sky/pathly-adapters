@@ -11,11 +11,27 @@ import uuid
 from pathly_orchestrator.db.queries.comms_messages import read_message_slug, set_message_slug
 
 
+# Trivial words dropped from a slug so the readable part is the meaningful head of the
+# title (e.g. "The Frontend of the App" -> "frontend-app", not "the-frontend-of-the-app").
+_STOPWORDS = frozenset(
+    {"a", "an", "the", "of", "to", "and", "for", "in", "on", "with", "from", "is", "it"}
+)
+
+
 def _slugify(text: str) -> str:
-    """Lowercase text, replace runs of non-[a-z0-9] with '-', strip leading/trailing '-',
-    cap at 48 chars. Returns 'goal' for empty/symbol-only text."""
-    s = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
-    return (s or "goal")[:48]
+    """Short, HUMAN-READABLE slug base: the first few meaningful (non-stopword) words of
+    ``text``, lowercased and '-'-joined, kept under ~32 chars without truncating mid-word.
+    Returns 'goal' for empty/symbol-only text. The goal_id tail (added by
+    ``ensure_goal_slug``) keeps the full slug unique, so the base only needs to be
+    recognizable at a glance — 'backend-api', not the whole title + hash.
+    """
+    words = [w for w in re.findall(r"[a-z0-9]+", text.lower()) if w not in _STOPWORDS]
+    out: list[str] = []
+    for w in words[:4]:
+        if out and len("-".join(out)) + 1 + len(w) > 32:
+            break
+        out.append(w)
+    return "-".join(out) or "goal"
 
 
 def ensure_goal_slug(conn, goal_id: str) -> str:
@@ -37,7 +53,7 @@ def ensure_goal_slug(conn, goal_id: str) -> str:
         if existing:
             return existing
 
-        base = _slugify(row.get("text") or "")[:48]
+        base = _slugify(row.get("text") or "")
         candidate = f"{base}-{goal_id[:8]}"
         # Truncate the whole slug to 64 chars maximum
         candidate = candidate[:64]
