@@ -12,6 +12,11 @@ states:
   - RESEARCHING
   - DESIGNING
   - PLANNING
+  # NO_DAG_SEEDED: the planner ran but posted no task DAG (or no goal_id reached it).
+  # A LOUD terminal failure instead of silently re-looping PLANNING (or falsely
+  # completing) — the DAG-seed depends on the planner AGENT posting tasks, and if it
+  # skips that, the decompose has failed its core deliverable and must stop visibly.
+  - NO_DAG_SEEDED
   - DONE
 transitions:
   PO_DISCUSSING:
@@ -24,6 +29,8 @@ transitions:
     - PLANNING
   PLANNING:
     - DONE
+    - NO_DAG_SEEDED
+  NO_DAG_SEEDED: []
   DONE: []
 agent_map:
   PO_DISCUSSING: planning/po
@@ -69,7 +76,9 @@ transition_rules:
       op: gt
       compare_to: 0
       next: DONE
-    default: PLANNING
+    # Planner completed but seeded 0 tasks (or no goal_id) -> route to the loud
+    # NO_DAG_SEEDED terminal instead of silently re-running PLANNING forever.
+    default: NO_DAG_SEEDED
 transition_actions:
   PLANNING->DONE:
     - skill: archive-artifacts
