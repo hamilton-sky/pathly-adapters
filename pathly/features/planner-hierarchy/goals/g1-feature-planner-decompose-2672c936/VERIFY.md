@@ -1,2 +1,2 @@
 RESULT: PASS
-Verified: conversation 1 complete — planning/feature-decompose.md created and registered in composition.yaml; compose_skill() assembles it successfully (17602 chars with comms-post + completion-report fragments, no_defaults).
+Verified: T3 (feature-decompose route) complete — POST /comms/features/decompose registered (light/full/consultation rigor), all 1129 tests pass, lazy imports correct, 314-line file under 400-line limit.

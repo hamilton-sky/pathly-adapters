@@ -575,3 +575,23 @@ MUST NOT use `BEGIN IMMEDIATE` / `BEGIN EXCLUSIVE` inside functions called by pa
 
 ### Source
 Feature: fsm-sqlite | Stage: review (conv 1) | Date: 2026-06-04
+
+---
+
+## [planner-hierarchy] Bundle doc-sync with skill registration in builder prompts
+
+### Pattern
+When builder registers a new skill in `composition.yaml`, the builder prompt must explicitly list every CLAUDE.md location that needs updating: directory listing, count fields (e.g. `no_defaults` count), board-native exception list, and manifest converted list. Without this, doc-sync violations surface in review and require a re-run.
+
+### Source
+planner-hierarchy retro (g1-feature-planner-decompose), 2026-07-06
+
+---
+
+## [planner-hierarchy] Include doc-sync checks as acceptance criteria, not just review items
+
+### Pattern
+Doc-sync violations for skill registration are predictable and mechanical. Moving them into acceptance criteria (and the test suite) catches them before review runs — saving one full review cycle and the associated time gap.
+
+### Source
+planner-hierarchy retro (g1-feature-planner-decompose), 2026-07-06
