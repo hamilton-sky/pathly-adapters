@@ -139,12 +139,19 @@ def retrieve_board_context(
         fetch_k = k + over_fetch_margin
         try:
             rows = search_by_hybrid(
-                conn, task_description, task_embedding, [board_type], [scope_val], fetch_k,
+                conn,
+                task_description,
+                task_embedding,
+                [board_type],
+                [scope_val],
+                fetch_k,
             )
             if not rows and task_embedding is None:
                 from pathly_orchestrator.db.queries.comms import get_messages
 
-                rows = get_messages(conn, board=board_type, scope=scope_val, limit=fetch_k)
+                rows = get_messages(
+                    conn, board=board_type, scope=scope_val, limit=fetch_k
+                )
         except Exception:
             rows = []
 

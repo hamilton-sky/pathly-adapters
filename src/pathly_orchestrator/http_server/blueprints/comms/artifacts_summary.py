@@ -194,7 +194,8 @@ def comms_artifact_set_style(artifact_id: str):
     """Persist the per-artifact summary DEPTH style.
 
     Body: {style: 'gist'|'topic-map'|'detailed'}. Selects which development/summarize*
-    skill the client composes on the next re-summarize. Stored next to summary_selection."""
+    skill the client composes on the next re-summarize. Stored next to summary_selection.
+    """
     try:
         from pathly_orchestrator.db.connection import get_db as _get_db
         from pathly_orchestrator.db.queries.comms_summary import (

@@ -37,7 +37,9 @@ def safe_plan_path(scope: str, artifact: str, project_root: str | None) -> str |
     return None
 
 
-def safe_artifact_path(scope: str, artifact: str, project_root: str | None) -> str | None:
+def safe_artifact_path(
+    scope: str, artifact: str, project_root: str | None
+) -> str | None:
     """Resolve a board artifact ref to an absolute path under *project_root*, or None.
 
     Supersedes ``safe_plan_path`` for hydration. context_refs store artifact paths in

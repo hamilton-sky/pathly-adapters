@@ -854,7 +854,8 @@ def test_early_advance_surfaces_agent_reported_failure(tmp_path, monkeypatch):
 
     This closes the loop end-to-end: the completion-report fragment now SETS an explicit outcome
     on the AGENT_DONE, and the spawn path must RELAY it back to scheduler_loop for the guard to
-    read. Without the relay the dict carries only cost/session/summary and the failure is lost."""
+    read. Without the relay the dict carries only cost/session/summary and the failure is lost.
+    """
     import pathly_orchestrator.supervisor as _sup
     from pathly_orchestrator import db as _db
     from pathly_orchestrator.supervisor.scheduler import _outcome_is_failure
@@ -865,7 +866,9 @@ def test_early_advance_surfaces_agent_reported_failure(tmp_path, monkeypatch):
     topic = "ea-agent-failure"
     run_id = f"{topic}-001"
     state = _make_state(tmp_path, topic=topic)
-    state.interactive = False  # non-interactive reconciliation path (mirrors the loop executor)
+    state.interactive = (
+        False  # non-interactive reconciliation path (mirrors the loop executor)
+    )
 
     plan_dir = tmp_path / "pathly" / "plans" / topic
     plan_dir.mkdir(parents=True, exist_ok=True)

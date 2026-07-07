@@ -103,9 +103,7 @@ def test_fail_posts_failed_status_with_reason(client):
     mid = _post_task(client, "task gamma", scope="st_fail")
     _make_task_pending(mid)
 
-    r = client.post(
-        "/comms/tasks/fail", json={"message_id": mid, "reason": "boom"}
-    )
+    r = client.post("/comms/tasks/fail", json={"message_id": mid, "reason": "boom"})
     assert json.loads(r.data)["ok"] is True
 
     failed = [t for t in _status_texts("st_fail") if t.startswith("Failed:")]

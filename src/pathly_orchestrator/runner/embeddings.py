@@ -76,7 +76,8 @@ def embed_async(message_id: str, text: str) -> None:
 def chunk_summary(summary: str) -> list[str]:
     """Split a summary into retrievable CHILD chunks by its natural structure:
     detailed → one chunk per ``###`` section; topic-map → one chunk per bullet; gist → none.
-    Returns [] when there are no meaningful sub-units (the parent vector already covers it)."""
+    Returns [] when there are no meaningful sub-units (the parent vector already covers it).
+    """
     if not summary or not summary.strip():
         return []
     lines = summary.splitlines()
@@ -104,7 +105,8 @@ def chunk_summary(summary: str) -> list[str]:
 def embed_artifact_async(message_id: str, parent_text: str, summary: str) -> None:
     """Embed an artifact in a daemon thread: a PARENT vector (whole message text + summary) for
     thematic recall, plus one CHILD vector per summary chunk (per-bullet / per-section) for
-    subtopic recall. Empty pieces are skipped; never raises (retrieval falls back gracefully)."""
+    subtopic recall. Empty pieces are skipped; never raises (retrieval falls back gracefully).
+    """
 
     def _worker():
         try:

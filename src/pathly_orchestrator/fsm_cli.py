@@ -93,7 +93,9 @@ def _main_record_activity(args: argparse.Namespace) -> int:
             "wall_seconds": args.wall_seconds,
         }
     )
-    raw = _request_raw("POST", _RECORD_ACTIVITY_PATH, payload, host=args.host, port=args.port)
+    raw = _request_raw(
+        "POST", _RECORD_ACTIVITY_PATH, payload, host=args.host, port=args.port
+    )
     print(raw)
     return 0
 
@@ -111,7 +113,9 @@ def _main_record_phase(args: argparse.Namespace) -> int:
             "project_root": getattr(args, "project_root", None),
         }
     )
-    raw = _request_raw("POST", _RECORD_PHASE_PATH, payload, host=args.host, port=args.port)
+    raw = _request_raw(
+        "POST", _RECORD_PHASE_PATH, payload, host=args.host, port=args.port
+    )
     print(raw)
     return 0
 
@@ -131,7 +135,12 @@ def _main_code_query(args: argparse.Namespace) -> int:
         # the 10s default so a legitimately-slow backend completes rather than
         # the client timing out mid-query.
         raw = _request_raw(
-            "POST", _CODE_QUERY_PATH, payload, host=args.host, port=args.port, timeout=30.0
+            "POST",
+            _CODE_QUERY_PATH,
+            payload,
+            host=args.host,
+            port=args.port,
+            timeout=30.0,
         )
     except _ServerUnreachable:
         # Degrade to a safe-null envelope so the calling agent falls back to Grep
@@ -158,26 +167,35 @@ def main() -> None:
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    next_action_parser = subparsers.add_parser("next-action", help="Call POST /next_action.")
+    next_action_parser = subparsers.add_parser(
+        "next-action", help="Call POST /next_action."
+    )
     next_action_parser.add_argument("--flow", required=True)
     next_action_parser.add_argument("--topic", required=True)
     next_action_parser.add_argument("--project-root", required=True)
     _add_common_net_args(next_action_parser)
     next_action_parser.set_defaults(func=_main_next_action)
 
-    complete_stage_parser = subparsers.add_parser("complete-stage", help="Call POST /complete_stage.")
+    complete_stage_parser = subparsers.add_parser(
+        "complete-stage", help="Call POST /complete_stage."
+    )
     complete_stage_parser.add_argument("--flow", required=True)
     complete_stage_parser.add_argument("--topic", required=True)
     complete_stage_parser.add_argument("--project-root", required=True)
     complete_stage_parser.add_argument("--decision")
     complete_stage_parser.add_argument(
-        "--resolved-file", action="append", dest="resolved_file", default=[],
+        "--resolved-file",
+        action="append",
+        dest="resolved_file",
+        default=[],
         help="Feedback file to resolve; repeat for multiple files.",
     )
     _add_common_net_args(complete_stage_parser)
     complete_stage_parser.set_defaults(func=_main_complete_stage)
 
-    record_activity_parser = subparsers.add_parser("record-activity", help="Call POST /record_activity.")
+    record_activity_parser = subparsers.add_parser(
+        "record-activity", help="Call POST /record_activity."
+    )
     record_activity_parser.add_argument("--agent", required=True)
     record_activity_parser.add_argument("--feature", required=True)
     record_activity_parser.add_argument("--summary", required=True)
@@ -194,18 +212,23 @@ def main() -> None:
     record_activity_parser.set_defaults(func=_main_record_activity)
 
     record_phase_parser = subparsers.add_parser(
-        "record-phase", help="Call POST /record_phase (PHASE_START or PHASE_DONE event)."
+        "record-phase",
+        help="Call POST /record_phase (PHASE_START or PHASE_DONE event).",
     )
     record_phase_parser.add_argument("--feature", required=True)
     record_phase_parser.add_argument("--agent", required=True)
     record_phase_parser.add_argument("--phase", required=True)
     record_phase_parser.add_argument(
-        "--event-type", required=True, dest="event_type",
+        "--event-type",
+        required=True,
+        dest="event_type",
         choices=["PHASE_START", "PHASE_DONE"],
     )
     record_phase_parser.add_argument("--conv", type=int, default=None)
     record_phase_parser.add_argument("--summary", default=None)
-    record_phase_parser.add_argument("--project-root", default=None, dest="project_root")
+    record_phase_parser.add_argument(
+        "--project-root", default=None, dest="project_root"
+    )
     _add_common_net_args(record_phase_parser)
     record_phase_parser.set_defaults(func=_main_record_phase)
 
@@ -219,10 +242,14 @@ def main() -> None:
         "--target", required=True, help="File path or symbol the query is about."
     )
     code_query_parser.add_argument(
-        "--role", default=None, help="Calling agent role (gates per-role tiering; Phase 8)."
+        "--role",
+        default=None,
+        help="Calling agent role (gates per-role tiering; Phase 8).",
     )
     code_query_parser.add_argument(
-        "--scope", default=None, help="Feature/goal scope key for caching and board logging."
+        "--scope",
+        default=None,
+        help="Feature/goal scope key for caching and board logging.",
     )
     _add_common_net_args(code_query_parser)
     code_query_parser.set_defaults(func=_main_code_query)

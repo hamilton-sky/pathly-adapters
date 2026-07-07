@@ -19,12 +19,14 @@ import pytest
 # "absolute path" assertions below must use the right shape for the host OS (CI is Linux).
 _ABS = "D:/work/myrepo" if os.name == "nt" else "/work/myrepo"
 
-_FAKE_PROJECTS = json.dumps({
-    "projects": [
-        {"name": "myrepo", "root_path": _ABS},
-        {"name": "myrepo-src", "root_path": _ABS + "/src"},
-    ]
-})
+_FAKE_PROJECTS = json.dumps(
+    {
+        "projects": [
+            {"name": "myrepo", "root_path": _ABS},
+            {"name": "myrepo-src", "root_path": _ABS + "/src"},
+        ]
+    }
+)
 
 
 @pytest.fixture()
@@ -53,7 +55,9 @@ def test_windows_backslash_path_normalized(provider):
     assert provider._project("exe", "D:\\work\\myrepo\\a.py") == "myrepo"
 
 
-def test_relative_without_root_from_unrelated_cwd_misses(provider, tmp_path, monkeypatch):
+def test_relative_without_root_from_unrelated_cwd_misses(
+    provider, tmp_path, monkeypatch
+):
     # The bug it fixes: a relative path with NO project_root resolves against the
     # process CWD; from an unrelated dir that matches no indexed project → "".
     monkeypatch.chdir(tmp_path)
@@ -68,6 +72,8 @@ def test_build_block_passes_project_root(monkeypatch):
     seen = {}
 
     monkeypatch.setattr("shutil.which", lambda _t: "exe")
-    monkeypatch.setattr(p, "_project", lambda exe, f, pr="": seen.setdefault("project_root", pr) or "")
+    monkeypatch.setattr(
+        p, "_project", lambda exe, f, pr="": seen.setdefault("project_root", pr) or ""
+    )
     p.build_block("scope", ["src/x.py"], "builder", 1500, project_root=_ABS)
     assert seen["project_root"] == _ABS

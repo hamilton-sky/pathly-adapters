@@ -1,4 +1,5 @@
 """Tests for supervisor/slug.py — _slugify and ensure_goal_slug."""
+
 from __future__ import annotations
 
 import sqlite3

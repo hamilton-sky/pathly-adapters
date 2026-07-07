@@ -20,7 +20,7 @@ def _first_line(path: Path) -> str:
         if text.startswith("---"):
             end = text.find("\n---", 3)
             if end != -1:
-                text = text[end + 4:]
+                text = text[end + 4 :]
         for line in text.splitlines():
             line = line.strip()
             if not line or line.startswith("#"):

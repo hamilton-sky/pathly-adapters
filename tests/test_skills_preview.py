@@ -54,7 +54,9 @@ def test_preview_injects_prompt_vars(client):
     )
     assert r.status_code == 200, r.data
     blob = json.dumps(json.loads(r.data))
-    assert "<feature>" not in blob, "placeholder must be substituted by _inject_prompt_vars"
+    assert (
+        "<feature>" not in blob
+    ), "placeholder must be substituted by _inject_prompt_vars"
     assert "my-feature" in blob
 
 

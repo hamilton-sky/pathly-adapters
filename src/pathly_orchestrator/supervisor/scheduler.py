@@ -36,7 +36,11 @@ def _outcome_is_failure(outcome) -> bool:
     that only return cost/session id)."""
     if not isinstance(outcome, dict):
         return False
-    if outcome.get("error") or outcome.get("is_error") or outcome.get("api_error_status"):
+    if (
+        outcome.get("error")
+        or outcome.get("is_error")
+        or outcome.get("api_error_status")
+    ):
         return True
     exit_code = outcome.get("exit_code")
     if isinstance(exit_code, int) and exit_code != 0:
@@ -56,7 +60,12 @@ def _post_task_status(conn, board: str, scope: str, text: str) -> None:
         from pathly_orchestrator.db.queries.comms import post_message
 
         post_message(
-            conn, board=board, scope=scope, from_agent="supervisor", type="status", text=text
+            conn,
+            board=board,
+            scope=scope,
+            from_agent="supervisor",
+            type="status",
+            text=text,
         )
     except Exception:
         logger.debug("scheduler: _post_task_status failed", exc_info=True)
@@ -313,7 +322,9 @@ def scheduler_loop(
                 reason = str(exc)[:500]
             else:
                 reason = str(
-                    outcome.get("error") or outcome.get("outcome") or "task reported failure"
+                    outcome.get("error")
+                    or outcome.get("outcome")
+                    or "task reported failure"
                 )[:500]
             logger.warning("scheduler: task %s failed: %s", task_id, reason)
             blocked_ids = fail_task(conn, task_id, reason=reason)
@@ -332,7 +343,9 @@ def scheduler_loop(
                 },
             )
             _post_task_status(
-                conn, board, scope,
+                conn,
+                board,
+                scope,
                 f"Failed: {(task_texts.pop(task_id, '') or task_id)[:80]} — {reason[:80]}",
             )
         else:
@@ -345,7 +358,10 @@ def scheduler_loop(
                 {"task_id": task_id, "lane": lane, "text": task_texts.get(task_id, "")},
             )
             _post_task_status(
-                conn, board, scope, f"Done: {(task_texts.pop(task_id, '') or task_id)[:110]}"
+                conn,
+                board,
+                scope,
+                f"Done: {(task_texts.pop(task_id, '') or task_id)[:110]}",
             )
 
         # Release the SAME workspace lease we acquired for this task.
@@ -363,11 +379,16 @@ def scheduler_loop(
     # each blocked with a reason, report it, and warn.
     result_deadlocked: list[str] = []
     if not aborted:
-        for row in get_tasks(conn, board, scope, task_status="pending", goal_id=goal_id):
+        for row in get_tasks(
+            conn, board, scope, task_status="pending", goal_id=goal_id
+        ):
             tid = row["id"]
             conn.execute(
                 "UPDATE comms_messages SET task_status='blocked', fail_reason=? WHERE id=?",
-                ("deadlocked: unsatisfiable dependency (cycle or missing depends_on)", tid),
+                (
+                    "deadlocked: unsatisfiable dependency (cycle or missing depends_on)",
+                    tid,
+                ),
             )
             result_deadlocked.append(tid)
             result_blocked.append(tid)
@@ -375,10 +396,15 @@ def scheduler_loop(
             conn.commit()
             logger.warning(
                 "scheduler: %d task(s) DEADLOCKED in %s/%s (unsatisfiable deps): %s",
-                len(result_deadlocked), board, scope, result_deadlocked,
+                len(result_deadlocked),
+                board,
+                scope,
+                result_deadlocked,
             )
             _broadcast(
-                event_broadcast_fn, scope, "task_deadlocked",
+                event_broadcast_fn,
+                scope,
+                "task_deadlocked",
                 {"tasks": result_deadlocked, "board": board},
             )
 

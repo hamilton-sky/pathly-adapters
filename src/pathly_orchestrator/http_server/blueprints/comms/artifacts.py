@@ -111,9 +111,9 @@ def comms_attach():
                         conn,
                         artifact_id=art_id,
                         artifact_path=artifact_path,
-                        artifact_type=artifact_type
-                        if isinstance(artifact_type, str)
-                        else None,
+                        artifact_type=(
+                            artifact_type if isinstance(artifact_type, str) else None
+                        ),
                         scope=_ascope,
                         summary_backend=None,
                         broadcast_fn=lambda _p: _broadcast_comms(_ascope, _p),

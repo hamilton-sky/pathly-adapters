@@ -19,15 +19,27 @@ def test_update_invocation_billing_reconciles_latest_for_run():
     conn = get_db()
     pr, feat, run = "C:/x", "billing-recon-1", "run-recon-1"
     write_agent_invocation(
-        conn, pr, feat,
+        conn,
+        pr,
+        feat,
         {
-            "run_id": run, "stage": "task", "agent_role": "builder",
-            "tokens_in": 0, "tokens_out": 0, "cost_usd": 0.0,
-            "scope_tier": "feature", "provider": "claude", "cost_source": "unpriced",
+            "run_id": run,
+            "stage": "task",
+            "agent_role": "builder",
+            "tokens_in": 0,
+            "tokens_out": 0,
+            "cost_usd": 0.0,
+            "scope_tier": "feature",
+            "provider": "claude",
+            "cost_source": "unpriced",
         },
     )
     n = update_invocation_billing(
-        conn, run, cost_usd=1.5, tokens_in=1200, tokens_out=340,
+        conn,
+        run,
+        cost_usd=1.5,
+        tokens_in=1200,
+        tokens_out=340,
         cost_source="provider_reported",
     )
     assert n == 1
@@ -42,11 +54,18 @@ def test_write_persists_provider_and_cost_source():
     conn = get_db()
     pr, feat, run = "C:/x", "billing-recon-2", "run-recon-2"
     write_agent_invocation(
-        conn, pr, feat,
+        conn,
+        pr,
+        feat,
         {
-            "run_id": run, "agent_role": "builder", "cost_usd": 0.42,
-            "tokens_in": 10, "tokens_out": 5,
-            "provider": "codex", "cost_source": "provider_reported", "scope_tier": "project",
+            "run_id": run,
+            "agent_role": "builder",
+            "cost_usd": 0.42,
+            "tokens_in": 10,
+            "tokens_out": 5,
+            "provider": "codex",
+            "cost_source": "provider_reported",
+            "scope_tier": "project",
         },
     )
     r = [x for x in read_agent_invocations(conn, pr, feat) if x["run_id"] == run][0]
@@ -56,5 +75,14 @@ def test_write_persists_provider_and_cost_source():
 
 def test_update_no_run_id_is_noop():
     conn = get_db()
-    assert update_invocation_billing(conn, "", cost_usd=1.0, tokens_in=1, tokens_out=1,
-                                     cost_source="provider_reported") == 0
+    assert (
+        update_invocation_billing(
+            conn,
+            "",
+            cost_usd=1.0,
+            tokens_in=1,
+            tokens_out=1,
+            cost_source="provider_reported",
+        )
+        == 0
+    )

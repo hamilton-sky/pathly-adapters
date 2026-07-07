@@ -366,7 +366,9 @@ def get_active_file_claims(
         if not s or s == exclude_scope:
             continue
         try:
-            fs = [str(f).strip() for f in json.loads(r["files"] or "[]") if str(f).strip()]
+            fs = [
+                str(f).strip() for f in json.loads(r["files"] or "[]") if str(f).strip()
+            ]
         except (json.JSONDecodeError, TypeError):
             fs = []
         if fs:

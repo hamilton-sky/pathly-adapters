@@ -583,62 +583,80 @@ def _flow_with_board_count(op="gt", compare_to=0):
         "agent_map": {"A": "planner"},
         "storage_path": "pathly/plans/{topic}/",
         "transition_rules": {
-            "A": {"on_board_count": {"op": op, "compare_to": compare_to, "next": "DONE"},
-                  "default": "A"},
+            "A": {
+                "on_board_count": {"op": op, "compare_to": compare_to, "next": "DONE"},
+                "default": "A",
+            },
         },
     }
 
 
 def test_on_board_count_advances_when_seeded(tmp_path, monkeypatch):
     from pathly_orchestrator.fsm import engine_transitions as et
+
     monkeypatch.setattr(
         "pathly_orchestrator.db.queries.comms_tasks.count_tasks_for_goal",
         lambda conn, gid: 3,
     )
     storage = _storage(tmp_path)
-    out = et.evaluate_transition_rules(_flow_with_board_count(), "A", storage, goal_id="g1")
+    out = et.evaluate_transition_rules(
+        _flow_with_board_count(), "A", storage, goal_id="g1"
+    )
     assert out == "DONE"
 
 
 def test_on_board_count_stays_when_empty(tmp_path, monkeypatch):
     from pathly_orchestrator.fsm import engine_transitions as et
-    monkeypatch.setattr(
-        "pathly_orchestrator.db.queries.comms_tasks.count_tasks_for_goal",
-        lambda conn, gid: 0,
-    )
-    storage = _storage(tmp_path)
-    out = et.evaluate_transition_rules(_flow_with_board_count(), "A", storage, goal_id="g1")
-    assert out == "A"  # default — DAG not seeded yet
 
-
-def test_on_board_count_skipped_without_goal_id(tmp_path):
-    from pathly_orchestrator.fsm import engine_transitions as et
-    storage = _storage(tmp_path)
-    out = et.evaluate_transition_rules(_flow_with_board_count(), "A", storage)  # goal_id=None
-    assert out == "A"  # gate skipped → default
-
-
-def test_on_board_count_honors_zero_threshold(tmp_path, monkeypatch):
-    """compare_to=0 with op=gte must be honored (not treated as falsy)."""
-    from pathly_orchestrator.fsm import engine_transitions as et
     monkeypatch.setattr(
         "pathly_orchestrator.db.queries.comms_tasks.count_tasks_for_goal",
         lambda conn, gid: 0,
     )
     storage = _storage(tmp_path)
     out = et.evaluate_transition_rules(
-        _flow_with_board_count(op="gte", compare_to=0), "A", storage, goal_id="g1")
+        _flow_with_board_count(), "A", storage, goal_id="g1"
+    )
+    assert out == "A"  # default — DAG not seeded yet
+
+
+def test_on_board_count_skipped_without_goal_id(tmp_path):
+    from pathly_orchestrator.fsm import engine_transitions as et
+
+    storage = _storage(tmp_path)
+    out = et.evaluate_transition_rules(
+        _flow_with_board_count(), "A", storage
+    )  # goal_id=None
+    assert out == "A"  # gate skipped → default
+
+
+def test_on_board_count_honors_zero_threshold(tmp_path, monkeypatch):
+    """compare_to=0 with op=gte must be honored (not treated as falsy)."""
+    from pathly_orchestrator.fsm import engine_transitions as et
+
+    monkeypatch.setattr(
+        "pathly_orchestrator.db.queries.comms_tasks.count_tasks_for_goal",
+        lambda conn, gid: 0,
+    )
+    storage = _storage(tmp_path)
+    out = et.evaluate_transition_rules(
+        _flow_with_board_count(op="gte", compare_to=0), "A", storage, goal_id="g1"
+    )
     assert out == "DONE"  # 0 >= 0 → advance; proves compare_to=0 is honored
 
 
 def test_on_board_count_fails_closed_on_db_error(tmp_path, monkeypatch):
     from pathly_orchestrator.fsm import engine_transitions as et
+
     def _boom(conn, gid):
         raise RuntimeError("db down")
+
     monkeypatch.setattr(
-        "pathly_orchestrator.db.queries.comms_tasks.count_tasks_for_goal", _boom)
+        "pathly_orchestrator.db.queries.comms_tasks.count_tasks_for_goal", _boom
+    )
     storage = _storage(tmp_path)
-    out = et.evaluate_transition_rules(_flow_with_board_count(), "A", storage, goal_id="g1")
+    out = et.evaluate_transition_rules(
+        _flow_with_board_count(), "A", storage, goal_id="g1"
+    )
     assert out == "A"  # DB error → fail closed, no advance
 
 
@@ -648,10 +666,19 @@ def test_count_tasks_for_goal_counts():
     from pathly_orchestrator.db.migrations_incremental import _add_additive_migrations
     from pathly_orchestrator.db.queries.comms_messages import post_message
     from pathly_orchestrator.db.queries.comms_tasks import count_tasks_for_goal
-    conn = sqlite3.connect(":memory:"); conn.row_factory = sqlite3.Row
-    _run_migrations(conn); _add_additive_migrations(conn)
+
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    _run_migrations(conn)
+    _add_additive_migrations(conn)
     assert count_tasks_for_goal(conn, "g1") == 0
-    post_message(conn, "feature", "feat", "planner", type="task", text="t1", goal_id="g1")
-    post_message(conn, "feature", "feat", "planner", type="task", text="t2", goal_id="g1")
-    post_message(conn, "feature", "feat", "planner", type="task", text="other", goal_id="g2")
+    post_message(
+        conn, "feature", "feat", "planner", type="task", text="t1", goal_id="g1"
+    )
+    post_message(
+        conn, "feature", "feat", "planner", type="task", text="t2", goal_id="g1"
+    )
+    post_message(
+        conn, "feature", "feat", "planner", type="task", text="other", goal_id="g2"
+    )
     assert count_tasks_for_goal(conn, "g1") == 2

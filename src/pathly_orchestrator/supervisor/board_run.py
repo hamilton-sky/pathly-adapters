@@ -157,7 +157,8 @@ def _resolve_progress(progress: str) -> str:
     An empty/unknown ``progress`` means the caller did NOT override (Evaluate, decompose, and
     the single executor all funnel through here without one), so fall back to the app-wide
     default set in Settings, then to ``"normal"``. This makes the Settings value the single
-    source of truth for every board-narrating run, with per-run overrides still honored."""
+    source of truth for every board-narrating run, with per-run overrides still honored.
+    """
     p = (progress or "").strip().lower()
     if p in _PROGRESS_CADENCE:
         return p

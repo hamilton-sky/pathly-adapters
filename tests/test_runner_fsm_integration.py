@@ -56,12 +56,16 @@ def _patch_load_flow(monkeypatch) -> None:
 
 
 def _patch_build_prompt(monkeypatch) -> None:
-    monkeypatch.setattr(fsm_ops, "build_prompt", lambda *args: f"instructions for {args[1]}")
+    monkeypatch.setattr(
+        fsm_ops, "build_prompt", lambda *args: f"instructions for {args[1]}"
+    )
 
 
 def _seed(tmp_path) -> Path:
     storage = _storage_path(tmp_path)
-    (storage / "STATE.json").write_text(json.dumps({"current": "ALPHA"}), encoding="utf-8")
+    (storage / "STATE.json").write_text(
+        json.dumps({"current": "ALPHA"}), encoding="utf-8"
+    )
     (storage / "A.md").write_text("## go\nready", encoding="utf-8")
     (storage / "B.md").write_text("## go\nready", encoding="utf-8")
     return storage
@@ -103,7 +107,9 @@ def test_next_action_does_not_carry_next_state(tmp_path, monkeypatch):
     _patch_build_prompt(monkeypatch)
     _seed(tmp_path)
 
-    result = next_action({"flow": "test", "topic": "test-topic", "project_root": str(tmp_path)})
+    result = next_action(
+        {"flow": "test", "topic": "test-topic", "project_root": str(tmp_path)}
+    )
     assert result["current_state"] == "ALPHA"
     assert "next_state" not in result
 
@@ -177,8 +183,18 @@ def test_supervisor_loop_advances_through_real_fsm_to_done(tmp_path, monkeypatch
         _registry.pop(topic, None)
 
     na_calls = [
-        {"current_state": "ALPHA", "agent": "team/a", "instructions": "do", "preferred_adapter": "claude"},
-        {"current_state": "BETA", "agent": "team/b", "instructions": "do", "preferred_adapter": "claude"},
+        {
+            "current_state": "ALPHA",
+            "agent": "team/a",
+            "instructions": "do",
+            "preferred_adapter": "claude",
+        },
+        {
+            "current_state": "BETA",
+            "agent": "team/b",
+            "instructions": "do",
+            "preferred_adapter": "claude",
+        },
     ]
 
     # The supervisor's complete_stage is the HTTP client; point it at the REAL in-process

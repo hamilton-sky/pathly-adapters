@@ -48,15 +48,22 @@ def reconcile_artifacts(
                 continue
             try:
                 ensure_attached(
-                    conn, scope, path,
-                    board=board, goal_id=goal_id,
-                    role=rec.get("role"), title=rec.get("title"),
-                    summary=rec.get("summary"), type=rec.get("type", "md"),
+                    conn,
+                    scope,
+                    path,
+                    board=board,
+                    goal_id=goal_id,
+                    role=rec.get("role"),
+                    title=rec.get("title"),
+                    summary=rec.get("summary"),
+                    type=rec.get("type", "md"),
                     broadcast_fn=broadcast_fn,
                 )
                 n += 1
             except Exception as exc:
-                logger.warning("reconcile_artifacts: attach failed for %s: %s", path, exc)
+                logger.warning(
+                    "reconcile_artifacts: attach failed for %s: %s", path, exc
+                )
     except Exception as exc:
         logger.warning("reconcile_artifacts: failed: %s", exc)
     return n

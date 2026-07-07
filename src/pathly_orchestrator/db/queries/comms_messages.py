@@ -90,9 +90,7 @@ def set_message_slug(conn: sqlite3.Connection, message_id: str, slug: str) -> No
         conn.commit()
 
 
-def read_message_slug(
-    conn: sqlite3.Connection, message_id: str
-) -> dict | None:
+def read_message_slug(conn: sqlite3.Connection, message_id: str) -> dict | None:
     """Read slug + text for a goal message. Returns None if not found."""
     row = conn.execute(
         "SELECT slug, text FROM comms_messages WHERE id=? AND type='goal'",

@@ -207,14 +207,19 @@ def comms_tasks_run():
             return jsonify({"error": "Missing JSON body"}), 400
         message_id = data.get("message_id", "")
         if not isinstance(message_id, str) or not message_id.strip():
-            return jsonify({"error": "Field 'message_id' must be a non-empty string"}), 400
+            return (
+                jsonify({"error": "Field 'message_id' must be a non-empty string"}),
+                400,
+            )
 
         adapter = data.get("adapter", "") or "claude"
         # Model per engine: claude needs an EXPLICIT model — an empty --model mangles the argv and
         # the CLI's own default tier may be inaccessible → the 404 we saw. Non-claude engines take
         # an empty model as "use the engine's own default" (adapters.validate_adapter_model), so we
         # only force a claude model when the engine IS claude.
-        model = data.get("model") or ("claude-sonnet-4-6" if adapter == "claude" else "")
+        model = data.get("model") or (
+            "claude-sonnet-4-6" if adapter == "claude" else ""
+        )
         project_root = data.get("project_root", "") or ""
         progress = data.get("progress", "") or ""
 
@@ -270,7 +275,9 @@ def comms_tasks_run():
                 or _outcome_is_failure(res)
             )
             if failed:
-                _release_claim(c, message_id)  # let it be retried; don't cascade-fail dependents
+                _release_claim(
+                    c, message_id
+                )  # let it be retried; don't cascade-fail dependents
                 post_task_status(c, message_id, "Run failed")
                 _emit("error")
                 return
@@ -279,13 +286,19 @@ def comms_tasks_run():
             for nrid in newly_ready:
                 _broadcast_comms(
                     scope,
-                    {"type": "COMMS_UPDATE", "message_id": nrid, "event": "task_unblocked", "feature": scope},
+                    {
+                        "type": "COMMS_UPDATE",
+                        "message_id": nrid,
+                        "event": "task_unblocked",
+                        "feature": scope,
+                    },
                 )
             _emit("done")
 
         instructions = (
             "Build EXACTLY this one task and nothing else — it is a self-contained builder prompt "
-            "(what to build · Files · Done when). Do not start other tasks.\n\n" + task_text
+            "(what to build · Files · Done when). Do not start other tasks.\n\n"
+            + task_text
         )
         result = start_board_run(
             board,
@@ -302,11 +315,24 @@ def comms_tasks_run():
         )
         if isinstance(result, dict) and result.get("ok"):
             _emit("running")
-            return jsonify({"ok": True, "run_id": result.get("run_id"), "message_id": message_id}), 200
+            return (
+                jsonify(
+                    {
+                        "ok": True,
+                        "run_id": result.get("run_id"),
+                        "message_id": message_id,
+                    }
+                ),
+                200,
+            )
 
-        _release_claim(conn, message_id)  # spawn refused (board busy, etc.) → free the claim
+        _release_claim(
+            conn, message_id
+        )  # spawn refused (board busy, etc.) → free the claim
         reason = (result or {}).get("reason") or "spawn_failed"
-        return jsonify(result or {"ok": False, "reason": reason}), (409 if reason == "board_busy" else 400)
+        return jsonify(result or {"ok": False, "reason": reason}), (
+            409 if reason == "board_busy" else 400
+        )
     except Exception as exc:
         logging.exception("comms_tasks_run error")
         return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
@@ -322,7 +348,10 @@ def comms_tasks_stop():
         data = request.get_json() or {}
         message_id = data.get("message_id", "")
         if not isinstance(message_id, str) or not message_id.strip():
-            return jsonify({"error": "Field 'message_id' must be a non-empty string"}), 400
+            return (
+                jsonify({"error": "Field 'message_id' must be a non-empty string"}),
+                400,
+            )
 
         conn = _get_db()
         row = conn.execute(
@@ -338,18 +367,24 @@ def comms_tasks_stop():
         if run_id:
             tab_id = f"runner-{run_id[-10:]}"
             try:
-                _broadcast_runner(scope, {"type": "TERMINAL_KILL", "tab_id": tab_id, "run_id": run_id})
+                _broadcast_runner(
+                    scope, {"type": "TERMINAL_KILL", "tab_id": tab_id, "run_id": run_id}
+                )
             except Exception:
                 pass
             try:
                 run = get_run(run_id)
                 if run is not None:
-                    run.mark_pty_result({"exit_code": 130, "result": {"result": "stopped by user"}})
+                    run.mark_pty_result(
+                        {"exit_code": 130, "result": {"result": "stopped by user"}}
+                    )
             except Exception:
                 pass
             board_lock.release(board, scope, run_id)
 
-        _release_claim(conn, message_id)  # in_progress → pending (idempotent; on_done also does this)
+        _release_claim(
+            conn, message_id
+        )  # in_progress → pending (idempotent; on_done also does this)
         _broadcast_comms(
             scope,
             {

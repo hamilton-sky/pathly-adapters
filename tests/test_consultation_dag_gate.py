@@ -33,7 +33,12 @@ def _seed_goal(scope: str) -> str:
 
     conn = get_db()
     return post_message(
-        conn, board="feature", scope=scope, from_agent="architect", type="goal", text="g"
+        conn,
+        board="feature",
+        scope=scope,
+        from_agent="architect",
+        type="goal",
+        text="g",
     )
 
 
@@ -48,7 +53,10 @@ def test_planning_routes_to_no_dag_seeded_when_zero_tasks(tmp_path):
     gid = _seed_goal("dag-loud-1")
     flow = _consultation_flow()
     # planner ran but seeded 0 tasks -> loud terminal, NOT PLANNING (loop) / DONE (false success)
-    assert evaluate_transition_rules(flow, "PLANNING", tmp_path, goal_id=gid) == "NO_DAG_SEEDED"
+    assert (
+        evaluate_transition_rules(flow, "PLANNING", tmp_path, goal_id=gid)
+        == "NO_DAG_SEEDED"
+    )
 
 
 def test_planning_completes_when_tasks_seeded(tmp_path):
@@ -58,8 +66,13 @@ def test_planning_completes_when_tasks_seeded(tmp_path):
 
     conn = get_db()
     tid = post_message(
-        conn, board="feature", scope="dag-loud-2", from_agent="planner",
-        type="task", text="t", goal_id=gid,
+        conn,
+        board="feature",
+        scope="dag-loud-2",
+        from_agent="planner",
+        type="task",
+        text="t",
+        goal_id=gid,
     )
     conn.execute("UPDATE comms_messages SET task_status='pending' WHERE id=?", (tid,))
     conn.commit()

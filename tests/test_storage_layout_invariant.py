@@ -21,7 +21,6 @@ from pathlib import Path
 
 import pytest
 
-
 FEATURE = "layout-inv-feature"
 
 
@@ -32,7 +31,8 @@ def _make_feature(root: Path, name: str = FEATURE) -> Path:
     """Stand up a feature the CANONICAL way: pathly/features/<name>/ with the files the
     live team pipeline reads/writes (STATE.json via the real writer → DB row + file mirror,
     EVENTS.jsonl, PROGRESS.md, feedback/). Returns the feature dir. Deliberately creates NO
-    pathly/plans/<name> — a subsystem that only finds the feature under plans/ must fail."""
+    pathly/plans/<name> — a subsystem that only finds the feature under plans/ must fail.
+    """
     from pathly_orchestrator import eventlog
 
     feature_dir = root / "pathly" / "features" / name
@@ -95,10 +95,13 @@ def test_discovery_finds_flat_feature(tmp_path):
 
 def test_goal_storage_dir_is_nested_not_flat(tmp_path):
     """Regression guard for T6's canonical answer: a feature-tier goal nests under its
-    feature; the flat pathly/goals/<slug> home is gone. The goal-executor loop MUST match."""
+    feature; the flat pathly/goals/<slug> home is gone. The goal-executor loop MUST match.
+    """
     from pathly_orchestrator.supervisor.goal_decomposer import _goal_storage_dir
 
-    d = _goal_storage_dir(str(tmp_path), "feature", FEATURE, "goal-slug").replace("\\", "/")
+    d = _goal_storage_dir(str(tmp_path), "feature", FEATURE, "goal-slug").replace(
+        "\\", "/"
+    )
     assert d.endswith(f"pathly/features/{FEATURE}/goals/goal-slug")
     assert "pathly/goals/" not in d
 
@@ -199,7 +202,8 @@ def test_runner_event_creates_no_decoy_for_absent_feature(client):
     topic that has no features/ home (a debug/fix/goal run whose storage lives elsewhere).
     A stray empty pathly/features/<topic> would win _resolve_storage_path's existence probe
     and hijack that topic's real storage on the next resolve — the class of bug the flat
-    _write_mirror mkdir caused. The event is DB-keyed, so it persists with no dir at all."""
+    _write_mirror mkdir caused. The event is DB-keyed, so it persists with no dir at all.
+    """
     c, root = client
     topic = "debug-topic-no-home"  # deliberately created nowhere on disk
 
@@ -236,7 +240,9 @@ def test_eventlog_keys_nested_run_by_true_project_root(tmp_path):
     conn = eventlog._db.get_db()
 
     proj_run = tmp_path / "pathly" / "project" / "explorations" / "nested-proj-run"
-    feat_run = tmp_path / "pathly" / "features" / "some-feat" / "debugs" / "nested-feat-run"
+    feat_run = (
+        tmp_path / "pathly" / "features" / "some-feat" / "debugs" / "nested-feat-run"
+    )
     for run_dir in (proj_run, feat_run):
         run_dir.mkdir(parents=True)
         eventlog.write_state(str(run_dir), {"current": "DONE", "feature": run_dir.name})
@@ -267,7 +273,10 @@ def test_discovery_finds_board_nested_runs(tmp_path):
     proj_run.mkdir(parents=True)
     eventlog.write_state(str(proj_run), {"current": "DONE", "feature": "bug-1"})
 
-    found = {(sf.parent.resolve(), flow, topic) for sf, flow, topic in iter_state_files(tmp_path)}
+    found = {
+        (sf.parent.resolve(), flow, topic)
+        for sf, flow, topic in iter_state_files(tmp_path)
+    }
     assert (feat_run.resolve(), "explore", "trace-1") in found
     assert (proj_run.resolve(), "debug", "bug-1") in found
     # named lookup resolves the project run to its nested home

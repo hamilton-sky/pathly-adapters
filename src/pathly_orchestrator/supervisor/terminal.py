@@ -451,15 +451,26 @@ def _run_stage_via_terminal(
                     drop_run(run_id)
                 else:
                     try:
-                        from pathly_orchestrator.supervisor.artifact_reconcile import reconcile_artifacts
-                        _bfn = (lambda payload: broadcast_fn(state.topic, payload)) if broadcast_fn else None
+                        from pathly_orchestrator.supervisor.artifact_reconcile import (
+                            reconcile_artifacts,
+                        )
+
+                        _bfn = (
+                            (lambda payload: broadcast_fn(state.topic, payload))
+                            if broadcast_fn
+                            else None
+                        )
                         reconcile_artifacts(
-                            storage_path, state.topic,
+                            storage_path,
+                            state.topic,
                             goal_id=(state.goal_id or None),
                             broadcast_fn=_bfn,
                         )
                     except Exception as exc:
-                        logger.warning("_run_stage_via_terminal: artifact reconcile failed: %s", exc)
+                        logger.warning(
+                            "_run_stage_via_terminal: artifact reconcile failed: %s",
+                            exc,
+                        )
                     events_path_for_recon = str(feature_dir / "EVENTS.jsonl")
                     recon_t = threading.Thread(
                         target=_reconciliation_window,

@@ -83,7 +83,11 @@ def start_goal_decompose(
         (goal_id,),
     ).fetchone()
     if row is None:
-        return {"ok": False, "reason": "not_found", "error": f"goal {goal_id!r} not found"}
+        return {
+            "ok": False,
+            "reason": "not_found",
+            "error": f"goal {goal_id!r} not found",
+        }
     if (row["type"] or "") != "goal":
         return {
             "ok": False,
@@ -110,23 +114,46 @@ def start_goal_decompose(
     mode = (mode or "planner").strip().lower()
     if mode == "planner":
         return _decompose_planner(
-            goal_id, board, scope, goal_text,
-            project_root=project_root, adapter=adapter, model=model,
-            progress=progress, broadcast_fn=broadcast_fn,
-            on_start=on_start, on_done=on_done, spawn_fn=spawn_fn, block=block,
+            goal_id,
+            board,
+            scope,
+            goal_text,
+            project_root=project_root,
+            adapter=adapter,
+            model=model,
+            progress=progress,
+            broadcast_fn=broadcast_fn,
+            on_start=on_start,
+            on_done=on_done,
+            spawn_fn=spawn_fn,
+            block=block,
         )
     if mode == "plan":
         return _decompose_plan(
-            goal_id, board, scope, goal_text,
-            project_root=project_root, adapter=adapter, model=model,
-            progress=progress, broadcast_fn=broadcast_fn,
-            on_start=on_start, on_done=on_done, spawn_fn=spawn_fn, block=block,
+            goal_id,
+            board,
+            scope,
+            goal_text,
+            project_root=project_root,
+            adapter=adapter,
+            model=model,
+            progress=progress,
+            broadcast_fn=broadcast_fn,
+            on_start=on_start,
+            on_done=on_done,
+            spawn_fn=spawn_fn,
+            block=block,
         )
     if mode == "consultation":
         return _decompose_consultation(
-            goal_id, board, scope,
-            project_root=project_root, model=model,
-            broadcast_fn=broadcast_fn, on_start=on_start, on_done=on_done,
+            goal_id,
+            board,
+            scope,
+            project_root=project_root,
+            model=model,
+            broadcast_fn=broadcast_fn,
+            on_start=on_start,
+            on_done=on_done,
             start_fn=start_fn,
         )
     return {
@@ -169,6 +196,7 @@ def _decompose_planner(
             from pathly_orchestrator.db.connection import get_db
             from pathly_orchestrator.supervisor.slug import ensure_goal_slug
             import os
+
             _slug = ensure_goal_slug(get_db(project_root or None), goal_id)
             _goal_dir = _goal_storage_dir(project_root, board, scope, _slug)
             os.makedirs(_goal_dir, exist_ok=True)
@@ -180,12 +208,15 @@ def _decompose_planner(
     if goal_id and (adapter or "claude"):
         try:
             from pathly_orchestrator.skills.compose import build_adapter_caps
+
             _caps = build_adapter_caps(adapter or "claude", goal_id=goal_id, kind="dag")
         except Exception:
             pass
 
     result = start_board_run(
-        board, scope, "single-agent",
+        board,
+        scope,
+        "single-agent",
         instructions=instructions,
         project_root=project_root,
         model=model or _DEFAULT_MODEL,
@@ -243,6 +274,7 @@ def _decompose_plan(
             from pathly_orchestrator.db.connection import get_db
             from pathly_orchestrator.supervisor.slug import ensure_goal_slug
             import os
+
             _slug = ensure_goal_slug(get_db(project_root or None), goal_id)
             _goal_dir = _goal_storage_dir(project_root, board, scope, _slug)
             os.makedirs(_goal_dir, exist_ok=True)
@@ -254,12 +286,15 @@ def _decompose_plan(
     if goal_id and (adapter or "claude"):
         try:
             from pathly_orchestrator.skills.compose import build_adapter_caps
+
             _caps = build_adapter_caps(adapter or "claude", goal_id=goal_id, kind="dag")
         except Exception:
             pass
 
     result = start_board_run(
-        board, scope, "single-agent",
+        board,
+        scope,
+        "single-agent",
         instructions=instructions,
         project_root=project_root,
         model=model or _DEFAULT_MODEL,
@@ -299,9 +334,17 @@ def _decompose_consultation(
     from pathly_orchestrator.supervisor.registry import get_state
 
     if board_lock.holder(board, scope) is not None:
-        return {"ok": False, "reason": "board_busy", "error": "board is busy (a run holds the lock)"}
+        return {
+            "ok": False,
+            "reason": "board_busy",
+            "error": "board is busy (a run holds the lock)",
+        }
     existing = get_state(scope)
-    if existing is not None and existing.status in ("running", "paused", "awaiting_decision"):
+    if existing is not None and existing.status in (
+        "running",
+        "paused",
+        "awaiting_decision",
+    ):
         return {
             "ok": False,
             "reason": "board_busy",
@@ -322,13 +365,16 @@ def _decompose_consultation(
         slug = scope  # fallback
     topic = _goal_topic(board, scope, slug)
     try:
-        os.makedirs(os.path.join(project_root, "pathly", *topic.split("/")), exist_ok=True)
+        os.makedirs(
+            os.path.join(project_root, "pathly", *topic.split("/")), exist_ok=True
+        )
     except Exception:
         pass
 
     _start = start_fn
     if _start is None:
         from pathly_orchestrator.supervisor.api import start_run as _start
+
         # Re-seed a stale DONE/foreign FSM state so a re-decompose actually spawns the PO
         # stage instead of short-circuiting to {done:True}. Only when driving the real FSM.
         from pathly_orchestrator.supervisor.goal_executor import (

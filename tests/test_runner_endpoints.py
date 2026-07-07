@@ -210,8 +210,12 @@ def test_runner_terminal_result_user_initiated_aborts_active_run(client):
     topic = "ep-kill-active"
     with _lock:
         st = RunnerState(
-            topic=topic, flow="consultation", project_root=str(tmp_path),
-            model="m", timeout=60, run_id="run-kill-1",
+            topic=topic,
+            flow="consultation",
+            project_root=str(tmp_path),
+            model="m",
+            timeout=60,
+            run_id="run-kill-1",
         )
         st.status = "running"
         _registry[topic] = st
@@ -220,8 +224,11 @@ def test_runner_terminal_result_user_initiated_aborts_active_run(client):
         r = c.post(
             "/runner/terminal/result",
             json={
-                "topic": topic, "run_id": "run-kill-1", "exit_code": 130,
-                "stdout_tail": "", "user_initiated": True,
+                "topic": topic,
+                "run_id": "run-kill-1",
+                "exit_code": 130,
+                "stdout_tail": "",
+                "user_initiated": True,
             },
         )
         assert r.status_code == 200
@@ -243,8 +250,12 @@ def test_runner_terminal_result_normal_exit_does_not_abort(client):
     topic = "ep-normal-exit"
     with _lock:
         st = RunnerState(
-            topic=topic, flow="consultation", project_root=str(tmp_path),
-            model="m", timeout=60, run_id="run-norm-1",
+            topic=topic,
+            flow="consultation",
+            project_root=str(tmp_path),
+            model="m",
+            timeout=60,
+            run_id="run-norm-1",
         )
         st.status = "running"
         _registry[topic] = st
@@ -253,8 +264,11 @@ def test_runner_terminal_result_normal_exit_does_not_abort(client):
         r = c.post(
             "/runner/terminal/result",
             json={
-                "topic": topic, "run_id": "run-norm-1", "exit_code": 0,
-                "stdout_tail": "", "user_initiated": False,
+                "topic": topic,
+                "run_id": "run-norm-1",
+                "exit_code": 0,
+                "stdout_tail": "",
+                "user_initiated": False,
             },
         )
         assert r.status_code == 200
@@ -283,15 +297,31 @@ def test_runner_terminal_result_fills_otel_and_invocation_tables(client):
     pr = str(tmp_path)
     conn = get_db()
     # The agent's completion event — this is what the projector turns into an invocation.
-    append_event(conn, pr, topic, {
-        "type": "AGENT_DONE", "agent": "builder", "conversation": 1,
-        "cost_usd": 0.07, "total_tokens": 1000, "ts": "2026-07-06T12:00:00Z",
-    })
+    append_event(
+        conn,
+        pr,
+        topic,
+        {
+            "type": "AGENT_DONE",
+            "agent": "builder",
+            "conversation": 1,
+            "cost_usd": 0.07,
+            "total_tokens": 1000,
+            "ts": "2026-07-06T12:00:00Z",
+        },
+    )
     with _lock:
         st = RunnerState(
-            topic=topic, flow="team", project_root=pr, model="m", timeout=60,
-            run_id="run-tele-1", current_state="BUILDING", current_adapter="claude",
-            trace_id="trace-abc", span_id="span-xyz",
+            topic=topic,
+            flow="team",
+            project_root=pr,
+            model="m",
+            timeout=60,
+            run_id="run-tele-1",
+            current_state="BUILDING",
+            current_adapter="claude",
+            trace_id="trace-abc",
+            span_id="span-xyz",
         )
         st.status = "running"
         _registry[topic] = st
@@ -299,8 +329,13 @@ def test_runner_terminal_result_fills_otel_and_invocation_tables(client):
     try:
         r = c.post(
             "/runner/terminal/result",
-            json={"topic": topic, "run_id": "run-tele-1", "exit_code": 0,
-                  "stdout_tail": "", "wall_seconds": 4},
+            json={
+                "topic": topic,
+                "run_id": "run-tele-1",
+                "exit_code": 0,
+                "stdout_tail": "",
+                "wall_seconds": 4,
+            },
         )
         assert r.status_code == 200
         spans = read_otel_spans(conn, pr, topic)

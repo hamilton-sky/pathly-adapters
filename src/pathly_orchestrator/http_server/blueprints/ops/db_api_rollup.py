@@ -26,7 +26,10 @@ def _by_tier(conn, where_sql: str, params: list) -> dict:
         f"FROM agent_invocations {where_sql} GROUP BY COALESCE(scope_tier,'feature')",
         params,
     ).fetchall()
-    out = {t: {"invocations": 0, "cost_usd": 0.0, "tokens_in": 0, "tokens_out": 0} for t in _TIERS}
+    out = {
+        t: {"invocations": 0, "cost_usd": 0.0, "tokens_in": 0, "tokens_out": 0}
+        for t in _TIERS
+    }
     for r in rows:
         tier = r["tier"] if r["tier"] in _TIERS else "feature"
         out[tier] = {
@@ -95,7 +98,11 @@ def db_rollup():
         }
 
         # project — sums every feature/topic under this project_root
-        p_by_tier = _by_tier(conn, "WHERE project_root=?", [pr]) if pr else _by_tier(conn, "WHERE 1=0", [])
+        p_by_tier = (
+            _by_tier(conn, "WHERE project_root=?", [pr])
+            if pr
+            else _by_tier(conn, "WHERE 1=0", [])
+        )
         project_block = {"root": pr, "by_tier": p_by_tier, "totals": _totals(p_by_tier)}
 
         result = {"project": project_block, "global": global_block}

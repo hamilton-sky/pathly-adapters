@@ -43,7 +43,12 @@ def client():
 
 
 def _flow() -> dict:
-    p = Path(pathly_data.__file__).parent / "core" / "flows" / "feature-consultation.flow.yaml"
+    p = (
+        Path(pathly_data.__file__).parent
+        / "core"
+        / "flows"
+        / "feature-consultation.flow.yaml"
+    )
     return yaml.safe_load(p.read_text(encoding="utf-8"))
 
 
@@ -52,7 +57,9 @@ def _seed_goal(scope: str, deps=None, refs=None) -> str:
     from pathly_orchestrator.db.queries.comms import post_message
 
     conn = get_db()
-    gid = post_message(conn, board="feature", scope=scope, from_agent="planner", type="goal", text="G")
+    gid = post_message(
+        conn, board="feature", scope=scope, from_agent="planner", type="goal", text="G"
+    )
     if deps or refs:
         conn.execute(
             "UPDATE comms_messages SET depends_on=?, context_refs=? WHERE id=?",
@@ -73,7 +80,9 @@ def test_light_dispatch_uses_feature_decompose_skill(client, monkeypatch):
         return {"ok": True, "run_id": "r1"}
 
     monkeypatch.setattr(_br, "start_board_run", _fake)
-    r = client.post("/comms/features/decompose", json={"feature": "featdec-light", "rigor": "light"})
+    r = client.post(
+        "/comms/features/decompose", json={"feature": "featdec-light", "rigor": "light"}
+    )
     assert r.status_code == 200 and r.get_json()["ok"] is True
     assert seen["skill"] == "planning/feature-decompose"
 
@@ -88,7 +97,9 @@ def test_full_dispatch_uses_plan_skill(client, monkeypatch):
         return {"ok": True, "run_id": "r1"}
 
     monkeypatch.setattr(_br, "start_board_run", _fake)
-    r = client.post("/comms/features/decompose", json={"feature": "featdec-full", "rigor": "full"})
+    r = client.post(
+        "/comms/features/decompose", json={"feature": "featdec-full", "rigor": "full"}
+    )
     assert r.status_code == 200
     assert seen["skill"] == "planning/plan"
 
@@ -108,7 +119,8 @@ def test_consultation_dispatch_starts_feature_consultation_flow(client, monkeypa
 
     monkeypatch.setattr(_api, "start_run", _fake_start)
     r = client.post(
-        "/comms/features/decompose", json={"feature": "featdec-consult", "rigor": "consultation"}
+        "/comms/features/decompose",
+        json={"feature": "featdec-consult", "rigor": "consultation"},
     )
     assert r.status_code == 200 and r.get_json()["rigor"] == "consultation"
     assert seen["flow"] == "feature-consultation"
@@ -116,7 +128,9 @@ def test_consultation_dispatch_starts_feature_consultation_flow(client, monkeypa
 
 
 def test_invalid_rigor_rejected(client):
-    r = client.post("/comms/features/decompose", json={"feature": "x", "rigor": "bogus"})
+    r = client.post(
+        "/comms/features/decompose", json={"feature": "x", "rigor": "bogus"}
+    )
     assert r.status_code == 400 and r.get_json()["reason"] == "invalid_rigor"
 
 
@@ -136,7 +150,9 @@ def test_count_goals_for_feature_and_stored_deps_refs():
     conn = get_db()
     assert count_goals_for_feature(conn, scope) == 2
     # (b) depends_on + context_refs round-trip on a posted goal.
-    row = conn.execute("SELECT depends_on, context_refs FROM comms_messages WHERE id=?", (g2,)).fetchone()
+    row = conn.execute(
+        "SELECT depends_on, context_refs FROM comms_messages WHERE id=?", (g2,)
+    ).fetchone()
     assert json.loads(row["depends_on"]) == ["dep-x"]
     assert json.loads(row["context_refs"]) == [{"artifact": "ARCHITECTURE.md"}]
 
@@ -148,13 +164,17 @@ def test_goal_count_gate_routes_by_count(tmp_path):
     flow = _flow()
     _seed_goal("featdec-gate-lo")  # only 1 goal
     assert (
-        evaluate_transition_rules(flow, "PLANNING", tmp_path, feature_scope="featdec-gate-lo")
+        evaluate_transition_rules(
+            flow, "PLANNING", tmp_path, feature_scope="featdec-gate-lo"
+        )
         == "NO_GOALS_SEEDED"
     )
     _seed_goal("featdec-gate-hi")
     _seed_goal("featdec-gate-hi")  # 2 goals
     assert (
-        evaluate_transition_rules(flow, "PLANNING", tmp_path, feature_scope="featdec-gate-hi")
+        evaluate_transition_rules(
+            flow, "PLANNING", tmp_path, feature_scope="featdec-gate-hi"
+        )
         == "DONE"
     )
 
@@ -164,7 +184,10 @@ def test_feature_consultation_flow_shape():
     flow = _flow()
     assert flow["flow"] == "feature-consultation"
     assert "PLANNING" in flow["states"]
-    assert "NO_GOALS_SEEDED" in flow["states"] and flow["transitions"]["NO_GOALS_SEEDED"] == []
+    assert (
+        "NO_GOALS_SEEDED" in flow["states"]
+        and flow["transitions"]["NO_GOALS_SEEDED"] == []
+    )
     # terminal stage emits GOALS (planning/feature-decompose), not planning/plan.
     assert flow["agent_map"]["PLANNING"] == "planning/feature-decompose"
 

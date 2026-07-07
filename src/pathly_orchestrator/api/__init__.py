@@ -137,7 +137,11 @@ def project_open():
         if not base_dir.exists():
             continue
         for entry in sorted(base_dir.iterdir()):
-            if entry.is_dir() and not entry.name.startswith(".") and entry.name not in seen:
+            if (
+                entry.is_dir()
+                and not entry.name.startswith(".")
+                and entry.name not in seen
+            ):
                 seen.add(entry.name)
                 features.append(entry.name)
     return jsonify({"features": features}), 200

@@ -194,7 +194,8 @@ def get_default_progress(conn: sqlite3.Connection) -> str | None:
     This is the single source of truth for how chatty a headless agent is on the board.
     Every board-narrating run (single-agent, evaluator, decompose, single-executor) resolves
     its cadence from here when the caller doesn't pass an explicit override. A missing or
-    unrecognised value degrades to None so the consumer falls back to its built-in 'normal'."""
+    unrecognised value degrades to None so the consumer falls back to its built-in 'normal'.
+    """
     raw = get_setting(conn, _DEFAULT_PROGRESS_KEY)
     return raw if raw in _VALID_PROGRESS else None
 

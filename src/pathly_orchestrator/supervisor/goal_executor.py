@@ -114,7 +114,11 @@ def start_goal_run(
         (goal_id,),
     ).fetchone()
     if row is None:
-        return {"ok": False, "reason": "not_found", "error": f"goal {goal_id!r} not found"}
+        return {
+            "ok": False,
+            "reason": "not_found",
+            "error": f"goal {goal_id!r} not found",
+        }
     if (row["type"] or "") != "goal":
         return {
             "ok": False,
@@ -151,11 +155,8 @@ def start_goal_run(
     from pathly_orchestrator.supervisor import file_claims
 
     _serialize = (
-        (get_setting(conn, "serialize_feature_builds", "true") or "true")
-        .strip()
-        .lower()
-        not in ("false", "0", "off", "no")
-    )
+        get_setting(conn, "serialize_feature_builds", "true") or "true"
+    ).strip().lower() not in ("false", "0", "off", "no")
     _claimed_scope = scope or (project_root or "project")
     if _serialize:
         _my_files = feature_task_files(conn, scope, goal_id) if scope else set()
@@ -184,24 +185,47 @@ def start_goal_run(
     try:
         if executor == "single":
             result = _run_single(
-                goal_id, board, scope, goal_text,
-                project_root=project_root, adapter=adapter, model=model, progress=progress,
-                broadcast_fn=broadcast_fn, on_start=on_start, on_done=_on_done_release,
-                spawn_fn=spawn_fn, block=block,
+                goal_id,
+                board,
+                scope,
+                goal_text,
+                project_root=project_root,
+                adapter=adapter,
+                model=model,
+                progress=progress,
+                broadcast_fn=broadcast_fn,
+                on_start=on_start,
+                on_done=_on_done_release,
+                spawn_fn=spawn_fn,
+                block=block,
             )
         elif executor == "loop":
             result = _run_loop(
-                goal_id, board, scope,
-                project_root=project_root, adapter=adapter, model=model,
-                broadcast_fn=broadcast_fn, event_broadcast_fn=event_broadcast_fn,
-                on_start=on_start, on_done=_on_done_release, spawn_fn=spawn_fn, block=block,
+                goal_id,
+                board,
+                scope,
+                project_root=project_root,
+                adapter=adapter,
+                model=model,
+                broadcast_fn=broadcast_fn,
+                event_broadcast_fn=event_broadcast_fn,
+                on_start=on_start,
+                on_done=_on_done_release,
+                spawn_fn=spawn_fn,
+                block=block,
             )
         else:  # team
             result = _run_team(
-                goal_id, board, scope,
+                goal_id,
+                board,
+                scope,
                 flow=(flow_override or _TEAM_FLOW),
-                project_root=project_root, adapter=adapter, model=model,
-                broadcast_fn=broadcast_fn, on_start=on_start, on_done=_on_done_release,
+                project_root=project_root,
+                adapter=adapter,
+                model=model,
+                broadcast_fn=broadcast_fn,
+                on_start=on_start,
+                on_done=_on_done_release,
                 start_fn=start_fn,
             )
     except Exception:
@@ -243,7 +267,9 @@ def _run_single(
         + (f"\n\nGoal: {goal_text}" if goal_text else "")
     )
     result = start_board_run(
-        board, scope, "single-agent",
+        board,
+        scope,
+        "single-agent",
         instructions=instructions,
         project_root=project_root,
         model=model or _DEFAULT_MODEL,
@@ -299,6 +325,7 @@ def _run_loop(
             from pathly_orchestrator.supervisor.goal_decomposer import _goal_storage_dir
             from pathly_orchestrator.supervisor.slug import ensure_goal_slug
             import os
+
             slug = ensure_goal_slug(get_db(project_root or None), goal_id)
             # Board-scoped goal home (storage-restructure): feature-tier nests under the feature
             # (pathly/features/<feature>/goals/<slug>), project/global under pathly/project/goals/
@@ -408,9 +435,17 @@ def _run_team(
     from pathly_orchestrator.supervisor.registry import get_state
 
     if board_lock.holder(board, scope) is not None:
-        return {"ok": False, "reason": "board_busy", "error": "board is busy (a run holds the lock)"}
+        return {
+            "ok": False,
+            "reason": "board_busy",
+            "error": "board is busy (a run holds the lock)",
+        }
     existing = get_state(scope)
-    if existing is not None and existing.status in ("running", "paused", "awaiting_decision"):
+    if existing is not None and existing.status in (
+        "running",
+        "paused",
+        "awaiting_decision",
+    ):
         return {
             "ok": False,
             "reason": "board_busy",
@@ -439,13 +474,16 @@ def _run_team(
         try:
             import os
 
-            os.makedirs(os.path.join(project_root, "pathly", *topic.split("/")), exist_ok=True)
+            os.makedirs(
+                os.path.join(project_root, "pathly", *topic.split("/")), exist_ok=True
+            )
         except Exception:
             pass
 
     if start_fn is None:
         try:
             from pathly_orchestrator.fsm_ops import _load_flow
+
             _load_flow(flow, project_root or None)
         except Exception:
             return {
@@ -457,6 +495,7 @@ def _run_team(
     _start = start_fn
     if _start is None:
         from pathly_orchestrator.supervisor.api import start_run as _start
+
         # Only re-seed when driving the REAL FSM — a test start_fn owns its own state.
         _reset_fsm_state_for_flow(flow, topic, project_root)
 

@@ -61,7 +61,10 @@ def db_invocation():
         summary = body.get("summary") or ""
         wall_seconds = float(body.get("wall_seconds") or 0)
 
-        from pathly_orchestrator.runner.telemetry import new_trace_id, project_agent_done
+        from pathly_orchestrator.runner.telemetry import (
+            new_trace_id,
+            project_agent_done,
+        )
 
         trace_id = new_trace_id()
         project_agent_done(

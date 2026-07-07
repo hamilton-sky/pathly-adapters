@@ -37,8 +37,13 @@ def test_project_agent_done_writes_tagged_invocation_and_span(tmp_path):
     project_agent_done(
         project_root=pr,
         feature=feat,
-        agent_done={"cost_usd": 0.25, "tokens_in": 80, "tokens_out": 40,
-                    "summary": "did the thing", "agent": "builder"},
+        agent_done={
+            "cost_usd": 0.25,
+            "tokens_in": 80,
+            "tokens_out": 40,
+            "summary": "did the thing",
+            "agent": "builder",
+        },
         run_id="sched-x",
         stage="task",
         scope_tier="project",
@@ -78,12 +83,25 @@ def test_goal_root_and_task_span_share_trace(tmp_path):
 
     pr, feat = str(tmp_path), "telem-trace"
     tid = new_trace_id()
-    write_goal_root_span(project_root=pr, feature=feat, goal_id="G1",
-                         trace_id=tid, span_id="goalspan", scope_tier="feature",
-                         executor="loop")
-    project_agent_done(project_root=pr, feature=feat, agent_done={"cost_usd": 0.1},
-                       run_id="sched-t1", stage="task", scope_tier="feature",
-                       trace_id=tid, parent_span_id="goalspan")
+    write_goal_root_span(
+        project_root=pr,
+        feature=feat,
+        goal_id="G1",
+        trace_id=tid,
+        span_id="goalspan",
+        scope_tier="feature",
+        executor="loop",
+    )
+    project_agent_done(
+        project_root=pr,
+        feature=feat,
+        agent_done={"cost_usd": 0.1},
+        run_id="sched-t1",
+        stage="task",
+        scope_tier="feature",
+        trace_id=tid,
+        parent_span_id="goalspan",
+    )
     spans = read_otel_spans(get_db(), pr, feat)
     assert len(spans) == 2
     by_name = {s["name"]: s for s in spans}
@@ -105,9 +123,20 @@ def test_db_rollup_aggregates_without_double_count(client):
     pr_b = str(tmp_path / "proj-b").replace("\\", "/")
 
     def inv(pr, feat, tier, cost):
-        write_agent_invocation(conn, pr, feat, {
-            "run_id": "r", "stage": "task", "agent_role": "builder",
-            "tokens_in": 10, "tokens_out": 5, "cost_usd": cost, "scope_tier": tier})
+        write_agent_invocation(
+            conn,
+            pr,
+            feat,
+            {
+                "run_id": "r",
+                "stage": "task",
+                "agent_role": "builder",
+                "tokens_in": 10,
+                "tokens_out": 5,
+                "cost_usd": cost,
+                "scope_tier": tier,
+            },
+        )
 
     # 3 facts under proj-a (2 feature + 1 project), 1 under proj-b (global)
     inv(pr_a, "f1", "feature", 0.10)

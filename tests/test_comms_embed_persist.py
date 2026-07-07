@@ -37,7 +37,9 @@ def test_store_embedding_persists_when_vec_available():
     mid = "regress-embed-persist-1"
     conn.execute("DELETE FROM comms_embeddings WHERE message_id=?", (mid,))
     conn.commit()
-    store_embedding(conn, mid, [0.05] * 384, chunk_index=0, chunk_text="regression probe")
+    store_embedding(
+        conn, mid, [0.05] * 384, chunk_index=0, chunk_text="regression probe"
+    )
     n = conn.execute(
         "SELECT COUNT(*) FROM comms_embeddings WHERE message_id=?", (mid,)
     ).fetchone()[0]

@@ -203,7 +203,9 @@ def test_comms_write_perm_builder_global_403_allowed_roles_are_global_writers(cl
 def test_comms_write_perm_builder_project_returns_200(client):
     """builder posting to 'project' board is allowed — returns 200 (d5159971)."""
     r = _post_msg(client, "builder", "project", scope="myproject")
-    assert r.status_code == 200, f"builder→project should be 200, got {r.status_code}: {r.data}"
+    assert (
+        r.status_code == 200
+    ), f"builder→project should be 200, got {r.status_code}: {r.data}"
 
 
 def test_comms_write_perm_project_403_allowed_roles_are_project_writers(client):

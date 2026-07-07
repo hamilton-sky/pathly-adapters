@@ -40,10 +40,10 @@ def _load_adapters() -> dict:
 # rejects it LOUDLY at dispatch instead. copilot proxies multiple providers (unconstrained);
 # an empty model means the engine's own default.
 _ADAPTER_MODEL_PREFIXES: dict[str, tuple[str, ...]] = {
-    "claude": ("claude-",),                                   # Anthropic: opus / sonnet / haiku / fable
+    "claude": ("claude-",),  # Anthropic: opus / sonnet / haiku / fable
     "codex": ("gpt-", "o1-", "o3-", "o4-", "o5-", "codex-"),  # OpenAI GPT / o-series
-    "antigravity": ("gemini-",),                              # Google Gemini (agy)
-    "copilot": (),                                            # multi-provider proxy — unconstrained
+    "antigravity": ("gemini-",),  # Google Gemini (agy)
+    "copilot": (),  # multi-provider proxy — unconstrained
 }
 
 
@@ -131,7 +131,12 @@ def resolve_command(
         # An empty model is valid (validate_adapter_model: empty == engine default), but leaving an
         # empty --model VALUE in the argv makes codex/antigravity fail loudly ("a value is required
         # for '--model'"). Mirrors cliEngine.ts buildHeadlessArgv, which already guards `if (model)`.
-        if not model and tok == "--model" and i + 1 < len(tokens) and "{model}" in tokens[i + 1]:
+        if (
+            not model
+            and tok == "--model"
+            and i + 1 < len(tokens)
+            and "{model}" in tokens[i + 1]
+        ):
             i += 2
             continue
         argv.append(tok.replace("{prompt}", prompt).replace("{model}", model))

@@ -57,7 +57,7 @@ def skills_parse():
         marker = "core/skills/"
         idx = normalized.find(marker)
         if idx != -1:
-            rel = normalized[idx + len(marker):]
+            rel = normalized[idx + len(marker) :]
         else:
             rel = normalized.split("/")[-1]
         composition_key = rel.removesuffix(".md")
@@ -199,6 +199,7 @@ def skills_preview():
             assembled = "\n\n".join(p for p in raw_parts if p) + "\n"
         else:
             from pathly_orchestrator.skills.compose import build_adapter_caps
+
             assembled = compose_skill(skill, build_adapter_caps("claude"))
 
         feature = Path(feature_path).name if feature_path else ""
@@ -260,6 +261,7 @@ def skills_compose():
         composed = skill in (manifest.get("skills") or {})
         try:
             from pathly_orchestrator.skills.compose import build_adapter_caps
+
             _caps = build_adapter_caps(adapter, goal_id=goal_id)
             prompt = compose_skill(skill, _caps, manifest=manifest)
         except Exception:

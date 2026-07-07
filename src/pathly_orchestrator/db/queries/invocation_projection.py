@@ -258,7 +258,11 @@ def on_event_appended(
         if etype == "AGENT_DONE":
             rec = _agent_done_rec(event_dict)
             _upsert_projected(
-                conn, project_root, feature, seq, rec,
+                conn,
+                project_root,
+                feature,
+                seq,
+                rec,
                 _tier_for(conn, project_root, feature),
             )
         elif etype == "BILLING_UPDATE":
@@ -283,7 +287,11 @@ def on_event_appended(
                 # billing's seq so the cost is captured, matching the backfill.
                 rec = _agent_done_rec(event_dict)
                 _upsert_projected(
-                    conn, project_root, feature, seq, rec,
+                    conn,
+                    project_root,
+                    feature,
+                    seq,
+                    rec,
                     _tier_for(conn, project_root, feature),
                 )
                 return

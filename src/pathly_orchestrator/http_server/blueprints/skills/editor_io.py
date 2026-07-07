@@ -45,7 +45,7 @@ def skills_save():
         marker = "core/skills/"
         idx = normalized.find(marker)
         skill_key = (
-            normalized[idx + len(marker):].removesuffix(".md")
+            normalized[idx + len(marker) :].removesuffix(".md")
             if idx != -1
             else Path(skill_path).stem
         )

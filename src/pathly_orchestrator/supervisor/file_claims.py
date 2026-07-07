@@ -22,7 +22,11 @@ WILDCARD = "*"
 
 def _norm(files) -> set[str]:
     """Normalize a file list to a token set; empty → {WILDCARD}."""
-    out = {str(f).strip().replace("\\", "/").rstrip("/") for f in (files or []) if str(f).strip()}
+    out = {
+        str(f).strip().replace("\\", "/").rstrip("/")
+        for f in (files or [])
+        if str(f).strip()
+    }
     return out or {WILDCARD}
 
 
@@ -66,6 +70,4 @@ def release(scope: str) -> None:
 def active(exclude_scope: str | None = None) -> dict[str, list[str]]:
     """Snapshot of current claims as {scope: [files]}, optionally excluding one scope."""
     with _lock:
-        return {
-            s: sorted(fs) for s, fs in _claims.items() if s != exclude_scope
-        }
+        return {s: sorted(fs) for s, fs in _claims.items() if s != exclude_scope}

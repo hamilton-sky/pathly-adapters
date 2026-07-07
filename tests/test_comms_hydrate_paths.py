@@ -54,7 +54,14 @@ def test_hydrate_whole_file_for_features_ref(tmp_path):
     from pathly_orchestrator.db.connection import get_db
     from pathly_orchestrator.runner.hydrate import hydrate_section
 
-    _mk(tmp_path, "pathly", "features", "feat", "SPEC.md", text="# Spec\n\nauthoritative body\n")
+    _mk(
+        tmp_path,
+        "pathly",
+        "features",
+        "feat",
+        "SPEC.md",
+        text="# Spec\n\nauthoritative body\n",
+    )
     res = hydrate_section(
         get_db(),
         scope="feat",
@@ -82,19 +89,33 @@ def test_find_or_create_canonicalizes_absolute_to_existing_relative(tmp_path):
     passes the resolved absolute path, and the old exact-string match never found the relative
     row so it created a new sentinel on every board_context_for call."""
     from pathly_orchestrator.db.connection import get_db
-    from pathly_orchestrator.db.queries.comms import find_or_create_artifact_by_path, post_message
+    from pathly_orchestrator.db.queries.comms import (
+        find_or_create_artifact_by_path,
+        post_message,
+    )
     from pathly_orchestrator.db.queries.comms_artifacts import insert_artifact
 
     conn = get_db()
     p = _mk(tmp_path, "pathly", "features", "feat", "SPEC.md")
     rel = "pathly/features/feat/SPEC.md"
-    mid = post_message(conn, board="feature", scope="feat", from_agent="architect",
-                       type="artifact", text="spec", artifact_path=rel)
+    mid = post_message(
+        conn,
+        board="feature",
+        scope="feat",
+        from_agent="architect",
+        type="artifact",
+        text="spec",
+        artifact_path=rel,
+    )
     insert_artifact(conn, mid, path=rel, type="spec", title="SPEC.md")
 
-    row = find_or_create_artifact_by_path(conn, "feat", str(p))  # absolute path (as hydrate passes)
+    row = find_or_create_artifact_by_path(
+        conn, "feat", str(p)
+    )  # absolute path (as hydrate passes)
     assert row is not None
-    assert row["path"] == rel, f"expected the existing relative row, got {row['path']!r}"
+    assert (
+        row["path"] == rel
+    ), f"expected the existing relative row, got {row['path']!r}"
     n = conn.execute(
         "SELECT COUNT(*) FROM comms_artifacts a JOIN comms_messages m ON m.id=a.message_id "
         "WHERE m.scope='feat'"
@@ -114,11 +135,20 @@ def test_catalog_channel_dedups_same_file(tmp_path):
     conn = get_db()
     rel = "pathly/features/feat/SPEC.md"
     for i in range(2):
-        mid = post_message(conn, board="feature", scope="feat", from_agent="architect",
-                           type="artifact", text=f"a{i}", artifact_path=rel)
+        mid = post_message(
+            conn,
+            board="feature",
+            scope="feat",
+            from_agent="architect",
+            type="artifact",
+            text=f"a{i}",
+            artifact_path=rel,
+        )
         insert_artifact(conn, mid, path=rel, type="spec", title="SPEC.md")
 
     lines, count = build_catalog_channel(conn, "feature", "feat")
     entries = [ln for ln in lines if "•" in ln and "SPEC.md" in ln]
-    assert len(entries) == 1, f"expected 1 catalog entry for SPEC.md, got {len(entries)}: {entries}"
+    assert (
+        len(entries) == 1
+    ), f"expected 1 catalog entry for SPEC.md, got {len(entries)}: {entries}"
     assert count == 1, f"expected catalog count 1, got {count}"

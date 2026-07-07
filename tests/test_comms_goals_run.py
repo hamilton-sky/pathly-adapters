@@ -153,8 +153,12 @@ def test_dispatch_loop_creates_nested_goal_dir(tmp_path):
     assert result["ok"] is True
 
     nested = tmp_path / "pathly" / "features" / scope / "goals"
-    assert nested.is_dir(), "loop goal dir must nest under pathly/features/<feature>/goals/"
-    assert list(nested.iterdir()), "the goal-slug dir must exist under features/<f>/goals/"
+    assert (
+        nested.is_dir()
+    ), "loop goal dir must nest under pathly/features/<feature>/goals/"
+    assert list(
+        nested.iterdir()
+    ), "the goal-slug dir must exist under features/<f>/goals/"
     assert not (
         tmp_path / "pathly" / "goals"
     ).exists(), "the flat pathly/goals/ home must not be created"
@@ -239,8 +243,12 @@ def test_dispatch_team_routes_to_team_build_flow():
     # topic is the scope-nested goal path (features/<scope>/goals/<slug>), so the team-build run's
     # storage nests under the feature the goal lives on — not the raw scope, not a flat slug.
     topic = captured["topic"]
-    assert topic.startswith("features/gr_team/goals/"), "team-build storage nests under the feature"
-    assert goal[:8] in topic, "the slug (with the goal id prefix) is the trailing segment"
+    assert topic.startswith(
+        "features/gr_team/goals/"
+    ), "team-build storage nests under the feature"
+    assert (
+        goal[:8] in topic
+    ), "the slug (with the goal id prefix) is the trailing segment"
     assert topic != "gr_team" and " " not in topic  # filesystem-safe scope-nested path
 
 
@@ -284,7 +292,11 @@ def test_dispatch_debug_flow_nests_under_debugs(tmp_path):
         return types.SimpleNamespace(run_id="dbg-1")
 
     result = start_goal_run(
-        goal, flow_override="debug", project_root=str(tmp_path), start_fn=fake_start, block=True
+        goal,
+        flow_override="debug",
+        project_root=str(tmp_path),
+        start_fn=fake_start,
+        block=True,
     )
     assert result["ok"] is True and result["flow"] == "debug"
     topic = captured["topic"]
@@ -296,7 +308,8 @@ def test_dispatch_debug_flow_nests_under_debugs(tmp_path):
 
 def test_dispatch_custom_flow_nests_under_flow_name(tmp_path):
     """A custom/user-created flow gets its OWN name as the board folder kind:
-    features/<f>/<flow>/<slug>. New flows are self-describing on disk — no code change to add one."""
+    features/<f>/<flow>/<slug>. New flows are self-describing on disk — no code change to add one.
+    """
     import types
     from pathly_orchestrator.db.connection import get_db
     from pathly_orchestrator.supervisor.goal_run import start_goal_run
@@ -310,7 +323,11 @@ def test_dispatch_custom_flow_nests_under_flow_name(tmp_path):
         return types.SimpleNamespace(run_id="c-1")
 
     result = start_goal_run(
-        goal, flow_override="audit", project_root=str(tmp_path), start_fn=fake_start, block=True
+        goal,
+        flow_override="audit",
+        project_root=str(tmp_path),
+        start_fn=fake_start,
+        block=True,
     )
     assert result["ok"] is True
     assert captured["topic"].startswith("features/gr_custom/audit/"), captured["topic"]
@@ -344,7 +361,9 @@ def test_dispatch_gate_serializes_on_file_overlap():
     conn = get_db()
     goal = _make_goal(conn, "gr_overlap", executor="single")
     _make_task(conn, "gr_overlap", "edit x", goal)  # no files declared -> wildcard
-    file_claims.try_claim("feature-A", {"src/x.ts"})  # a sibling is already editing src/x.ts
+    file_claims.try_claim(
+        "feature-A", {"src/x.ts"}
+    )  # a sibling is already editing src/x.ts
     result = start_goal_run(goal, project_root="", spawn_fn=lambda **k: {}, block=True)
     assert result["ok"] is False
     assert result["reason"] == "project_busy"
@@ -361,10 +380,18 @@ def test_dispatch_gate_allows_disjoint_files_in_parallel():
     conn = get_db()
     goal = _make_goal(conn, "gr_frontend", executor="single")
     post_message(
-        conn, board="feature", scope="gr_frontend", from_agent="planner",
-        type="task", text="edit UI", goal_id=goal, files=["studio/src/app.tsx"],
+        conn,
+        board="feature",
+        scope="gr_frontend",
+        from_agent="planner",
+        type="task",
+        text="edit UI",
+        goal_id=goal,
+        files=["studio/src/app.tsx"],
     )
-    file_claims.try_claim("feature-backend", {"src/pathly_orchestrator/x.py"})  # disjoint
+    file_claims.try_claim(
+        "feature-backend", {"src/pathly_orchestrator/x.py"}
+    )  # disjoint
     result = start_goal_run(goal, project_root="", spawn_fn=lambda **k: {}, block=True)
     assert result["ok"] is True  # disjoint -> runs in parallel, not refused
     assert result["executor"] == "single"
@@ -382,8 +409,12 @@ def test_dispatch_gate_off_allows_overlap(monkeypatch):
     try:
         goal = _make_goal(conn, "gr_toggle", executor="single")
         _make_task(conn, "gr_toggle", "edit x", goal)
-        file_claims.try_claim("feature-A", {"src/x.ts"})  # would overlap, but gate is OFF
-        result = start_goal_run(goal, project_root="", spawn_fn=lambda **k: {}, block=True)
+        file_claims.try_claim(
+            "feature-A", {"src/x.ts"}
+        )  # would overlap, but gate is OFF
+        result = start_goal_run(
+            goal, project_root="", spawn_fn=lambda **k: {}, block=True
+        )
         assert result["ok"] is True  # gate off -> runs despite overlap
     finally:
         set_setting(conn, "serialize_feature_builds", "true")
@@ -613,7 +644,9 @@ def test_start_run_fires_on_done_on_terminal_status(tmp_path, monkeypatch):
         goal_id="g-xyz",
         on_done=_on_done,
     )
-    assert fired.wait(timeout=5), "on_done must fire when the run reaches terminal status"
+    assert fired.wait(
+        timeout=5
+    ), "on_done must fire when the run reaches terminal status"
     assert seen["run_id"] == state.run_id
     assert seen["res"]["status"] == "done"
     assert state.goal_id == "g-xyz"  # goal_id threaded onto the run

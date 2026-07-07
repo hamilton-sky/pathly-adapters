@@ -147,8 +147,11 @@ def _collect_hydrate_channel(
                         continue
                     hydrate_count += 1
                     result = _hydrate(
-                        conn, scope=task_scope, artifact=art,
-                        anchor=anc, project_root=project_root,
+                        conn,
+                        scope=task_scope,
+                        artifact=art,
+                        anchor=anc,
+                        project_root=project_root,
                     )
                     if result.get("status") == 200:
                         body = result["body"]
@@ -167,11 +170,15 @@ def _collect_hydrate_channel(
                         err = (result.get("body") or {}).get("error", "unavailable")
                         hydrate_lines.append(f"- {art}{anchor_label} — {err}")
                 except Exception:
-                    _logger.debug("hydrate_section failed for ref %r", ref, exc_info=True)
+                    _logger.debug(
+                        "hydrate_section failed for ref %r", ref, exc_info=True
+                    )
                     art = ref.get("artifact", "?")
                     anc = ref.get("anchor")
                     anchor_label = f" §{anc}" if anc else ""
-                    hydrate_lines.append(f"- {art}{anchor_label} — hydration error (skipped)")
+                    hydrate_lines.append(
+                        f"- {art}{anchor_label} — hydration error (skipped)"
+                    )
     except Exception:
         _logger.debug("comms_context: task_id hydration failed", exc_info=True)
     return hydrate_lines, hydrate_count

@@ -97,9 +97,8 @@ class CliProvider:
                 sections.append(section)
         if not sections:
             return ""
-        block = (
-            "## Code structure (advisory — verify before acting)\n"
-            + "\n\n".join(sections)
+        block = "## Code structure (advisory — verify before acting)\n" + "\n\n".join(
+            sections
         )
         return block[: max(0, int(budget))]
 

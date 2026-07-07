@@ -12,6 +12,7 @@ REAL SerialIsolation. Only the CLI spawn (`spawn_fn`) is stubbed, so every task 
 `pending -> in_progress -> done` transitions and real dependency/fail-cascade decisions. `block=True`
 runs the drain synchronously in the test thread — no thread-join races.
 """
+
 from __future__ import annotations
 
 import json
@@ -32,8 +33,12 @@ def _seed_goal(conn, scope: str) -> str:
     from pathly_orchestrator.db.queries.comms import post_message
 
     return post_message(
-        conn, board="feature", scope=scope, from_agent="architect",
-        type="goal", text=f"Goal: {scope}",
+        conn,
+        board="feature",
+        scope=scope,
+        from_agent="architect",
+        type="goal",
+        text=f"Goal: {scope}",
     )
 
 
@@ -41,8 +46,14 @@ def _seed_task(conn, scope: str, goal_id: str, text: str, depends_on=None) -> st
     from pathly_orchestrator.db.queries.comms import post_message
 
     mid = post_message(
-        conn, board="feature", scope=scope, from_agent="planner",
-        type="task", text=text, goal_id=goal_id, depends_on=depends_on,
+        conn,
+        board="feature",
+        scope=scope,
+        from_agent="planner",
+        type="task",
+        text=text,
+        goal_id=goal_id,
+        depends_on=depends_on,
     )
     conn.execute("UPDATE comms_messages SET task_status='pending' WHERE id=?", (mid,))
     conn.commit()
@@ -50,7 +61,9 @@ def _seed_task(conn, scope: str, goal_id: str, text: str, depends_on=None) -> st
 
 
 def _status(conn, mid: str) -> str | None:
-    r = conn.execute("SELECT task_status FROM comms_messages WHERE id=?", (mid,)).fetchone()
+    r = conn.execute(
+        "SELECT task_status FROM comms_messages WHERE id=?", (mid,)
+    ).fetchone()
     return r["task_status"] if r else None
 
 
@@ -77,12 +90,17 @@ def test_goal_loop_drains_dag_to_done(tmp_path):
         return {"cost_usd": 0.0, "session_id": f"sess-{len(spawn_order)}"}
 
     result = start_goal_run(
-        gid, executor_override="loop", project_root=str(tmp_path),
-        spawn_fn=fake_spawn, block=True,
+        gid,
+        executor_override="loop",
+        project_root=str(tmp_path),
+        spawn_fn=fake_spawn,
+        block=True,
     )
 
     assert result["ok"] is True, result
-    inner = result["result"]  # _work() dict: completed/failed/blocked + executor/goal_id/run_id
+    inner = result[
+        "result"
+    ]  # _work() dict: completed/failed/blocked + executor/goal_id/run_id
     assert set(inner["completed"]) == {a, b, c}, inner
     assert inner["failed"] == []
     assert inner["blocked"] == []
@@ -96,13 +114,16 @@ def test_goal_loop_drains_dag_to_done(tmp_path):
     assert len(spawn_order) == 3
     idx_alpha = next(i for i, ins in enumerate(spawn_order) if "task ALPHA" in ins)
     idx_beta = next(i for i, ins in enumerate(spawn_order) if "task BETA" in ins)
-    assert idx_alpha < idx_beta, "BETA (depends on ALPHA) must not be dispatched before ALPHA"
+    assert (
+        idx_alpha < idx_beta
+    ), "BETA (depends on ALPHA) must not be dispatched before ALPHA"
 
 
 def test_goal_loop_cascades_block_on_failure(tmp_path):
     """FAIL PATH through the REAL executor: a task whose spawn RAISES fails, and its dependent
     cascades to 'blocked'; an independent task still completes. Exercises fail_task via the real
-    loop, not just the DB query — so a broken agent halts its branch, loudly, not silently."""
+    loop, not just the DB query — so a broken agent halts its branch, loudly, not silently.
+    """
     from pathly_orchestrator.db.connection import get_db
     from pathly_orchestrator.supervisor.goal_executor import start_goal_run
 
@@ -119,8 +140,11 @@ def test_goal_loop_cascades_block_on_failure(tmp_path):
         return {"cost_usd": 0.0, "session_id": "sess"}
 
     result = start_goal_run(
-        gid, executor_override="loop", project_root=str(tmp_path),
-        spawn_fn=failing_spawn, block=True,
+        gid,
+        executor_override="loop",
+        project_root=str(tmp_path),
+        spawn_fn=failing_spawn,
+        block=True,
     )
 
     assert result["ok"] is True, result
@@ -129,14 +153,15 @@ def test_goal_loop_cascades_block_on_failure(tmp_path):
     assert b in inner["blocked"]
 
     assert _status(conn, a) == "failed"
-    assert _status(conn, b) == "blocked"   # cascade from its failed dependency
-    assert _status(conn, c) == "done"      # independent branch still drains
+    assert _status(conn, b) == "blocked"  # cascade from its failed dependency
+    assert _status(conn, c) == "done"  # independent branch still drains
 
 
 def test_goal_loop_fails_task_on_failure_outcome(tmp_path):
     """SILENT-FAILURE GUARD #2: a spawn that returns NORMALLY but whose outcome signals failure
     (explicit error / non-zero exit / outcome='failed') must mark the task FAILED — not 'done' just
-    because the process didn't raise. A clean process exit over broken work is the exact hole."""
+    because the process didn't raise. A clean process exit over broken work is the exact hole.
+    """
     from pathly_orchestrator.db.connection import get_db
     from pathly_orchestrator.supervisor.goal_executor import start_goal_run
 
@@ -153,41 +178,52 @@ def test_goal_loop_fails_task_on_failure_outcome(tmp_path):
         return {"cost_usd": 0.0}
 
     result = start_goal_run(
-        gid, executor_override="loop", project_root=str(tmp_path),
-        spawn_fn=outcome_fail_spawn, block=True,
+        gid,
+        executor_override="loop",
+        project_root=str(tmp_path),
+        spawn_fn=outcome_fail_spawn,
+        block=True,
     )
 
     assert result["ok"] is True, result
     assert a in result["result"]["failed"]
-    assert _status(conn, a) == "failed"     # failed via the OUTCOME, not a raised exception
-    assert _status(conn, b) == "blocked"    # cascade from the failed dependency
-    assert _status(conn, c) == "done"       # independent branch still drains
+    assert (
+        _status(conn, a) == "failed"
+    )  # failed via the OUTCOME, not a raised exception
+    assert _status(conn, b) == "blocked"  # cascade from the failed dependency
+    assert _status(conn, c) == "done"  # independent branch still drains
 
 
 def test_goal_loop_surfaces_deadlocked_dag(tmp_path):
     """SILENT-FAILURE GUARD: a task with an unsatisfiable dependency — a dangling ref or a cycle —
     never becomes ready, so the frontier drains leaving it pending forever. The executor must
-    SURFACE that as deadlocked/blocked, not return a clean-looking result that hides stuck work."""
+    SURFACE that as deadlocked/blocked, not return a clean-looking result that hides stuck work.
+    """
     from pathly_orchestrator.db.connection import get_db
     from pathly_orchestrator.supervisor.goal_executor import start_goal_run
 
     conn = get_db()
     scope = "golden-path-deadlock"
     gid = _seed_goal(conn, scope)
-    ok = _seed_task(conn, scope, gid, "task OK")                       # no deps -> completes
+    ok = _seed_task(conn, scope, gid, "task OK")  # no deps -> completes
     dangle = _seed_task(conn, scope, gid, "task DANGLE", depends_on=["nonexistent-id"])
-    cyc = _seed_task(conn, scope, gid, "task CYCLE")                   # made self-cyclic below
-    conn.execute("UPDATE comms_messages SET depends_on=? WHERE id=?", (json.dumps([cyc]), cyc))
+    cyc = _seed_task(conn, scope, gid, "task CYCLE")  # made self-cyclic below
+    conn.execute(
+        "UPDATE comms_messages SET depends_on=? WHERE id=?", (json.dumps([cyc]), cyc)
+    )
     conn.commit()
 
     result = start_goal_run(
-        gid, executor_override="loop", project_root=str(tmp_path),
-        spawn_fn=lambda *_a: {}, block=True,
+        gid,
+        executor_override="loop",
+        project_root=str(tmp_path),
+        spawn_fn=lambda *_a: {},
+        block=True,
     )
 
     assert result["ok"] is True, result
     inner = result["result"]
-    assert _status(conn, ok) == "done"            # the healthy task still drains
+    assert _status(conn, ok) == "done"  # the healthy task still drains
     # The two unsatisfiable tasks are surfaced, not silently left pending.
     assert set(inner.get("deadlocked", [])) == {dangle, cyc}, inner
     assert _status(conn, dangle) == "blocked"
@@ -218,8 +254,11 @@ def test_goal_loop_spawns_headless_not_interactive(tmp_path):
         return {"cost_usd": 0.0}
 
     result = start_goal_run(
-        gid, executor_override="loop", project_root=str(tmp_path),
-        spawn_fn=capture_spawn, block=True,
+        gid,
+        executor_override="loop",
+        project_root=str(tmp_path),
+        spawn_fn=capture_spawn,
+        block=True,
     )
 
     assert result["ok"] is True, result
@@ -235,7 +274,8 @@ def test_goal_loop_posts_supervisor_progress(tmp_path):
     Per-task progress is guaranteed SERVER-SIDE, never left to the agent: the supervisor owns
     claim/complete for the loop, so it is the reliable source of mid-run progress; without this a
     headless loop run shows no board progress at all (only the final card-drain), which is exactly
-    what a live run exposed. (The single executor gets the equivalent via the /comms/tasks handlers.)"""
+    what a live run exposed. (The single executor gets the equivalent via the /comms/tasks handlers.)
+    """
     from pathly_orchestrator.db.connection import get_db
     from pathly_orchestrator.supervisor.goal_executor import start_goal_run
 
@@ -246,8 +286,11 @@ def test_goal_loop_posts_supervisor_progress(tmp_path):
     _seed_task(conn, scope, gid, "task BETA", depends_on=[a])
 
     result = start_goal_run(
-        gid, executor_override="loop", project_root=str(tmp_path),
-        spawn_fn=lambda *_a: {"cost_usd": 0.0}, block=True,
+        gid,
+        executor_override="loop",
+        project_root=str(tmp_path),
+        spawn_fn=lambda *_a: {"cost_usd": 0.0},
+        block=True,
     )
     assert result["ok"] is True, result
 
@@ -260,12 +303,15 @@ def test_goal_loop_posts_supervisor_progress(tmp_path):
     assert "Started:" in texts and "task ALPHA" in texts, texts
     assert "Done:" in texts, texts
     # one start + one done for each of the 2 tasks → at least 4 supervisor status posts
-    assert len(rows) >= 4, f"expected >=4 supervisor progress posts, got {len(rows)}: {texts}"
+    assert (
+        len(rows) >= 4
+    ), f"expected >=4 supervisor progress posts, got {len(rows)}: {texts}"
 
 
 def test_goal_loop_broadcast_task_done_carries_text(tmp_path):
     """The loop's task_done/task_failed SSE events must carry the task TEXT, so Studio can toast a
-    meaningful label instead of a bare id. The renderer's task-completion toast reads `data.text`."""
+    meaningful label instead of a bare id. The renderer's task-completion toast reads `data.text`.
+    """
     from pathly_orchestrator.db.connection import get_db
     from pathly_orchestrator.supervisor.goal_executor import start_goal_run
 
@@ -280,8 +326,12 @@ def test_goal_loop_broadcast_task_done_carries_text(tmp_path):
         events.append(payload)
 
     result = start_goal_run(
-        gid, executor_override="loop", project_root=str(tmp_path),
-        spawn_fn=lambda *_a: {"cost_usd": 0.0}, event_broadcast_fn=rec, block=True,
+        gid,
+        executor_override="loop",
+        project_root=str(tmp_path),
+        spawn_fn=lambda *_a: {"cost_usd": 0.0},
+        event_broadcast_fn=rec,
+        block=True,
     )
     assert result["ok"] is True, result
     done = [e for e in events if e.get("event") == "task_done"]

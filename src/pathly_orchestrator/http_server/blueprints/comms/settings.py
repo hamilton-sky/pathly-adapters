@@ -311,7 +311,9 @@ def comms_consolidate():
             from pathly_orchestrator.runner.embeddings import embed as _embed_fn
         except Exception:
             _embed_fn = None
-        pairs = _dedupe(conn, board, scope, max_distance=float(max_distance), embed_fn=_embed_fn)
+        pairs = _dedupe(
+            conn, board, scope, max_distance=float(max_distance), embed_fn=_embed_fn
+        )
 
         if pairs:
             try:

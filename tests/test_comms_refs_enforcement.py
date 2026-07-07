@@ -33,7 +33,9 @@ def _post(client, **fields):
 
 # ── T3a ────────────────────────────────────────────────────────────────────
 def test_t3a_ref_warning_on_refless_task(client):
-    refless = _post(client, **{"from": "planner", "type": "task", "text": "no refs task"})
+    refless = _post(
+        client, **{"from": "planner", "type": "task", "text": "no refs task"}
+    )
     assert "ref_warning" in refless
 
     with_refs = _post(
@@ -78,7 +80,9 @@ def test_t3c_goal_refs_coverage(client):
                 "context_refs": [{"artifact": f"pathly/features/demo/{name}.md"}],
             },
         )
-    _post(client, **{"from": "planner", "type": "task", "text": "task C", "goal_id": goal})
+    _post(
+        client, **{"from": "planner", "type": "task", "text": "task C", "goal_id": goal}
+    )
 
     r = client.get(f"/comms/goals/refs-coverage?goal_id={goal}")
     assert r.status_code == 200
@@ -117,7 +121,9 @@ def _stub_semantic(monkeypatch):
 
 
 def test_t3b_unverified_header_when_task_has_no_refs(client, monkeypatch):
-    tid = _post(client, **{"from": "planner", "type": "task", "text": "do X"})["message_id"]
+    tid = _post(client, **{"from": "planner", "type": "task", "text": "do X"})[
+        "message_id"
+    ]
     _stub_semantic(monkeypatch)
     import pathly_orchestrator.runner.comms_context as cc
 

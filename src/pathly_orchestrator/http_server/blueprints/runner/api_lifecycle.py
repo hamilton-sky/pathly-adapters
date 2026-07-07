@@ -10,7 +10,9 @@ from ...sse import _broadcast_runner
 from ._runner_bp import _topic_from_body, bp
 
 
-def _write_stage_telemetry(runner_state, parsed: dict, agent_done, wall_seconds) -> None:
+def _write_stage_telemetry(
+    runner_state, parsed: dict, agent_done, wall_seconds
+) -> None:
     """Best-effort: persist ONE OTEL span per completed FSM stage (for the Traces tab).
 
     The agent_invocation row is NO LONGER written here — every FSM stage emits an

@@ -21,13 +21,19 @@ def _parse_json_file(path: Path) -> dict:
 
 # Direct children of pathly/ that are containers, not features.
 _RESERVED_PATHLY_SUBDIRS = {
-    "plans", "debugs", "explorations", "goals", ".archive", "pipeline-walkthrough"
+    "plans",
+    "debugs",
+    "explorations",
+    "goals",
+    ".archive",
+    "pipeline-walkthrough",
 }
 
 
 def _scan_filesystem_features(project_root: str) -> list[dict]:
     """Scan for features not yet in the DB — the legacy ``pathly/plans/<feature>/`` root
-    AND the new top-level ``pathly/<feature>/`` root (reserved container dirs skipped)."""
+    AND the new top-level ``pathly/<feature>/`` root (reserved container dirs skipped).
+    """
     results: list[dict] = []
     pathly_dir = Path(project_root) / "pathly"
     if not pathly_dir.is_dir():

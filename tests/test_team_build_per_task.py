@@ -34,7 +34,12 @@ def _seed_goal(scope: str) -> str:
     from pathly_orchestrator.db.queries.comms import post_message
 
     return post_message(
-        get_db(), board="feature", scope=scope, from_agent="architect", type="goal", text="g"
+        get_db(),
+        board="feature",
+        scope=scope,
+        from_agent="architect",
+        type="goal",
+        text="g",
     )
 
 
@@ -44,7 +49,13 @@ def _seed_task(scope: str, gid: str, status: str, deps=None) -> str:
 
     conn = get_db()
     tid = post_message(
-        conn, board="feature", scope=scope, from_agent="planner", type="task", text="t", goal_id=gid
+        conn,
+        board="feature",
+        scope=scope,
+        from_agent="planner",
+        type="task",
+        text="t",
+        goal_id=gid,
     )
     conn.execute(
         "UPDATE comms_messages SET task_status=?, depends_on=? WHERE id=?",
@@ -64,7 +75,7 @@ def test_counts_ready_and_incomplete():
 
     gid = _seed_goal("ptl-counts")
     t1 = _seed_task("ptl-counts", gid, "done")
-    _seed_task("ptl-counts", gid, "pending", deps=[t1])         # ready — dep is done
+    _seed_task("ptl-counts", gid, "pending", deps=[t1])  # ready — dep is done
     _seed_task("ptl-counts", gid, "pending", deps=["missing"])  # blocked — dep not done
     conn = get_db()
     assert count_ready_tasks_for_goal(conn, gid) == 1
@@ -77,7 +88,9 @@ def test_reviewing_loops_to_building_while_ready(tmp_path):
     t1 = _seed_task("ptl-loop", gid, "done")
     _seed_task("ptl-loop", gid, "pending", deps=[t1])  # one buildable task remains
     assert (
-        evaluate_transition_rules(_team_build_flow(), "REVIEWING", tmp_path, goal_id=gid)
+        evaluate_transition_rules(
+            _team_build_flow(), "REVIEWING", tmp_path, goal_id=gid
+        )
         == "BUILDING"
     )
 
@@ -87,7 +100,9 @@ def test_reviewing_advances_to_testing_when_dag_drained(tmp_path):
     _seed_task("ptl-drained", gid, "done")
     _seed_task("ptl-drained", gid, "done")
     assert (
-        evaluate_transition_rules(_team_build_flow(), "REVIEWING", tmp_path, goal_id=gid)
+        evaluate_transition_rules(
+            _team_build_flow(), "REVIEWING", tmp_path, goal_id=gid
+        )
         == "TESTING"
     )
 
@@ -99,7 +114,9 @@ def test_review_failures_wins_over_loop(tmp_path):
     _seed_task("ptl-revfail", gid, "pending", deps=[t1])
     (tmp_path / "REVIEW_FAILURES.md").write_text("x", encoding="utf-8")
     assert (
-        evaluate_transition_rules(_team_build_flow(), "REVIEWING", tmp_path, goal_id=gid)
+        evaluate_transition_rules(
+            _team_build_flow(), "REVIEWING", tmp_path, goal_id=gid
+        )
         == "BUILDING"
     )
 
@@ -107,14 +124,20 @@ def test_review_failures_wins_over_loop(tmp_path):
 def test_non_goal_run_keeps_single_pass(tmp_path):
     """No goal_id → on_board_count is skipped → REVIEWING defaults to TESTING (legacy behavior)."""
     assert (
-        evaluate_transition_rules(_team_build_flow(), "REVIEWING", tmp_path, goal_id=None)
+        evaluate_transition_rules(
+            _team_build_flow(), "REVIEWING", tmp_path, goal_id=None
+        )
         == "TESTING"
     )
 
 
 # ── completeness gate (require_tasks_done) ────────────────────────────────────
 _GATE_FLOW = {
-    "gates": {"REVIEWING->TESTING": [{"type": "require_tasks_done", "on_fail": "INCOMPLETE_TASKS.md"}]}
+    "gates": {
+        "REVIEWING->TESTING": [
+            {"type": "require_tasks_done", "on_fail": "INCOMPLETE_TASKS.md"}
+        ]
+    }
 }
 
 
@@ -131,19 +154,30 @@ def test_require_tasks_done_passes_when_all_done(tmp_path):
     gid = _seed_goal("ptl-gate-pass")
     _seed_task("ptl-gate-pass", gid, "done")
     _seed_task("ptl-gate-pass", gid, "done")
-    assert run_gates(_GATE_FLOW, "REVIEWING", "TESTING", tmp_path, "t", 0, goal_id=gid) is None
+    assert (
+        run_gates(_GATE_FLOW, "REVIEWING", "TESTING", tmp_path, "t", 0, goal_id=gid)
+        is None
+    )
 
 
 def test_require_tasks_done_noop_without_goal(tmp_path):
     """Non-goal feature runs (goal_id None) have no DAG — the gate is a no-op."""
-    assert run_gates(_GATE_FLOW, "REVIEWING", "TESTING", tmp_path, "t", 0, goal_id=None) is None
+    assert (
+        run_gates(_GATE_FLOW, "REVIEWING", "TESTING", tmp_path, "t", 0, goal_id=None)
+        is None
+    )
 
 
 # ── structural (shipped flow) ─────────────────────────────────────────────────
 def test_shipped_flow_wires_loop_and_gate():
     flow = _team_build_flow()
     rev = flow["transition_rules"]["REVIEWING"]
-    assert rev["on_board_count"] == {"metric": "ready", "op": "gt", "compare_to": 0, "next": "BUILDING"}
+    assert rev["on_board_count"] == {
+        "metric": "ready",
+        "op": "gt",
+        "compare_to": 0,
+        "next": "BUILDING",
+    }
     assert rev["default"] == "TESTING"
     gate_types = [g["type"] for g in flow["gates"]["REVIEWING->TESTING"]]
     assert "require_tasks_done" in gate_types

@@ -54,17 +54,22 @@ def comms_project_decompose():
         # (T3 contract: best-effort, never 500 on a malformed/absent request).
         data = request.get_json(silent=True)
         if not data:
-            return jsonify({"error": "Missing JSON body", "reason": "missing_body"}), 400
+            return (
+                jsonify({"error": "Missing JSON body", "reason": "missing_body"}),
+                400,
+            )
 
         rigor = (data.get("rigor") or "light").strip().lower()
         if rigor not in _VALID_RIGORS:
             return (
-                jsonify({
-                    "error": (
-                        f"Field 'rigor' must be one of: {', '.join(sorted(_VALID_RIGORS))}"
-                    ),
-                    "reason": "invalid_rigor",
-                }),
+                jsonify(
+                    {
+                        "error": (
+                            f"Field 'rigor' must be one of: {', '.join(sorted(_VALID_RIGORS))}"
+                        ),
+                        "reason": "invalid_rigor",
+                    }
+                ),
                 400,
             )
 
@@ -144,6 +149,7 @@ def _dispatch_board_run(
     if project_root:
         try:
             import os
+
             _storage_path_str = os.path.join(project_root, "pathly", "project")
             os.makedirs(_storage_path_str, exist_ok=True)
         except Exception:
@@ -152,6 +158,7 @@ def _dispatch_board_run(
     _caps = None
     try:
         from pathly_orchestrator.skills.compose import build_adapter_caps
+
         _caps = build_adapter_caps(adapter or "claude", kind="dag")
     except Exception:
         pass
@@ -203,7 +210,9 @@ def _dispatch_board_run(
         _board_post("project decomposition finished", phase="done")
 
     result = start_board_run(
-        board, scope, "single-agent",
+        board,
+        scope,
+        "single-agent",
         instructions=instructions,
         project_root=project_root,
         model=model or _DEFAULT_MODEL,
@@ -246,24 +255,32 @@ def _dispatch_consultation(
 
     if board_lock.holder(board, scope) is not None:
         return (
-            jsonify({
-                "ok": False,
-                "reason": "board_busy",
-                "error": "board is busy (a run holds the lock)",
-            }),
+            jsonify(
+                {
+                    "ok": False,
+                    "reason": "board_busy",
+                    "error": "board is busy (a run holds the lock)",
+                }
+            ),
             409,
         )
     existing = get_state(scope)
-    if existing is not None and existing.status in ("running", "paused", "awaiting_decision"):
+    if existing is not None and existing.status in (
+        "running",
+        "paused",
+        "awaiting_decision",
+    ):
         return (
-            jsonify({
-                "ok": False,
-                "reason": "board_busy",
-                "error": (
-                    f"a pipeline run is already active for {scope!r} "
-                    f"(status={existing.status})"
-                ),
-            }),
+            jsonify(
+                {
+                    "ok": False,
+                    "reason": "board_busy",
+                    "error": (
+                        f"a pipeline run is already active for {scope!r} "
+                        f"(status={existing.status})"
+                    ),
+                }
+            ),
             409,
         )
 
@@ -275,6 +292,7 @@ def _dispatch_consultation(
     if project_root:
         try:
             import os
+
             os.makedirs(
                 os.path.join(project_root, "pathly", "project"),
                 exist_ok=True,
@@ -349,12 +367,14 @@ def _dispatch_consultation(
     run_id = getattr(state, "run_id", "") or ""
     _safe_call(_board_post, "project consultation started…", "running")
     return (
-        jsonify({
-            "ok": True,
-            "run_id": run_id,
-            "rigor": "consultation",
-            "project": project,
-            "status": "started",
-        }),
+        jsonify(
+            {
+                "ok": True,
+                "run_id": run_id,
+                "rigor": "consultation",
+                "project": project,
+                "status": "started",
+            }
+        ),
         200,
     )

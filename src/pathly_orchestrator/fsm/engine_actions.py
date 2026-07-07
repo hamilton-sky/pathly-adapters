@@ -119,15 +119,22 @@ def run_transition_actions(
             _paths = action.get("paths")
             if isinstance(_paths, list) and _paths:
                 add_cmd = [
-                    "git", "add", "--", str(storage_path), *[str(p) for p in _paths]
+                    "git",
+                    "add",
+                    "--",
+                    str(storage_path),
+                    *[str(p) for p in _paths],
                 ]
             else:
                 add_cmd = ["git", "add", "-A"]
             try:
                 try:
                     add_result = subprocess.run(
-                        add_cmd, cwd=str(project_root), capture_output=True,
-                        text=True, timeout=30,
+                        add_cmd,
+                        cwd=str(project_root),
+                        capture_output=True,
+                        text=True,
+                        timeout=30,
                     )
                 except subprocess.TimeoutExpired:
                     raise RuntimeError("git add timed out after 30 seconds")
@@ -135,8 +142,11 @@ def run_transition_actions(
                     raise RuntimeError(f"git add failed: {add_result.stderr}")
                 try:
                     commit_result = subprocess.run(
-                        ["git", "commit", "-m", message], cwd=str(project_root),
-                        capture_output=True, text=True, timeout=30,
+                        ["git", "commit", "-m", message],
+                        cwd=str(project_root),
+                        capture_output=True,
+                        text=True,
+                        timeout=30,
                     )
                 except subprocess.TimeoutExpired:
                     raise RuntimeError("git commit timed out after 30 seconds")
@@ -249,7 +259,11 @@ def _scope_clean(
     if not declared:
         append_event(
             storage_path,
-            {"type": "GATE_SKIPPED", "gate": "scope_gate", "reason": "no_declared_scope"},
+            {
+                "type": "GATE_SKIPPED",
+                "gate": "scope_gate",
+                "reason": "no_declared_scope",
+            },
         )
         return True
 
@@ -258,7 +272,10 @@ def _scope_clean(
     try:
         diff_result = subprocess.run(
             ["git", "diff", "--name-only", "HEAD"],
-            cwd=str(project_root), capture_output=True, text=True, timeout=30,
+            cwd=str(project_root),
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
     except Exception:
         append_event(
@@ -277,7 +294,10 @@ def _scope_clean(
     try:
         status_result = subprocess.run(
             ["git", "status", "--porcelain=v1"],
-            cwd=str(project_root), capture_output=True, text=True, timeout=30,
+            cwd=str(project_root),
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
         untracked = (
             {
@@ -339,7 +359,11 @@ def run_gates(
                 _write_gate_feedback(storage_path, gate["on_fail"], reason)
                 append_event(
                     storage_path,
-                    {"type": "GATE_FAILED", "gate": gtype, "transition": f"{prev_state}->{next_state}"},
+                    {
+                        "type": "GATE_FAILED",
+                        "gate": gtype,
+                        "transition": f"{prev_state}->{next_state}",
+                    },
                 )
                 return {"gate_failed": gtype, "feedback_file": gate["on_fail"]}
         elif gtype == "verify_gate":
@@ -357,7 +381,11 @@ def run_gates(
                 _write_gate_feedback(storage_path, gate["on_fail"], reason)
                 append_event(
                     storage_path,
-                    {"type": "GATE_FAILED", "gate": gtype, "transition": f"{prev_state}->{next_state}"},
+                    {
+                        "type": "GATE_FAILED",
+                        "gate": gtype,
+                        "transition": f"{prev_state}->{next_state}",
+                    },
                 )
                 return {"gate_failed": gtype, "feedback_file": gate["on_fail"]}
         elif gtype == "require_tasks_done":
@@ -373,7 +401,9 @@ def run_gates(
 
                     incomplete = count_incomplete_tasks_for_goal(get_db(), goal_id)
                 except Exception:
-                    incomplete = 0  # DB read error → fail-open (never wedge on a read hiccup)
+                    incomplete = (
+                        0  # DB read error → fail-open (never wedge on a read hiccup)
+                    )
                 if incomplete > 0:
                     reason = (
                         f"{incomplete} task(s) on this goal are not done — a goal cannot finish "
@@ -383,7 +413,11 @@ def run_gates(
                     _write_gate_feedback(storage_path, gate["on_fail"], reason)
                     append_event(
                         storage_path,
-                        {"type": "GATE_FAILED", "gate": gtype, "transition": f"{prev_state}->{next_state}"},
+                        {
+                            "type": "GATE_FAILED",
+                            "gate": gtype,
+                            "transition": f"{prev_state}->{next_state}",
+                        },
                     )
                     return {"gate_failed": gtype, "feedback_file": gate["on_fail"]}
         elif gtype == "scope_gate":
@@ -408,7 +442,11 @@ def run_gates(
             if build_baseline is None:
                 append_event(
                     storage_path,
-                    {"type": "GATE_SKIPPED", "gate": "scope_gate", "reason": "no_build_baseline"},
+                    {
+                        "type": "GATE_SKIPPED",
+                        "gate": "scope_gate",
+                        "reason": "no_build_baseline",
+                    },
                 )
                 continue
             if (
@@ -417,16 +455,26 @@ def run_gates(
             ):
                 append_event(
                     storage_path,
-                    {"type": "GATE_DEGRADED", "gate": "scope_gate", "reason": "preexisting_dirty_truncated"},
+                    {
+                        "type": "GATE_DEGRADED",
+                        "gate": "scope_gate",
+                        "reason": "preexisting_dirty_truncated",
+                    },
                 )
                 continue
             preexisting = set(build_baseline.get("preexisting_dirty", []))
             if not _scope_clean(storage_path, scope_file, preexisting, flow=flow):
-                reason = f"Scope gate failed: changes outside declared scope in {scope_file}"
+                reason = (
+                    f"Scope gate failed: changes outside declared scope in {scope_file}"
+                )
                 _write_gate_feedback(storage_path, gate["on_fail"], reason)
                 append_event(
                     storage_path,
-                    {"type": "GATE_FAILED", "gate": gtype, "transition": f"{prev_state}->{next_state}"},
+                    {
+                        "type": "GATE_FAILED",
+                        "gate": gtype,
+                        "transition": f"{prev_state}->{next_state}",
+                    },
                 )
                 return {"gate_failed": gtype, "feedback_file": gate["on_fail"]}
         else:

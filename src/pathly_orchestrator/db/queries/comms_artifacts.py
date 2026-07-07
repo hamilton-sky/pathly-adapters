@@ -163,7 +163,7 @@ def canonical_artifact_path(path: str) -> str:
     (catalog dedup) to normalize paths before comparison."""
     p = (path or "").replace("\\", "/")
     idx = p.rfind("/pathly/")
-    return p[idx + 1:] if idx != -1 else p
+    return p[idx + 1 :] if idx != -1 else p
 
 
 def find_or_create_artifact_by_path(
@@ -298,12 +298,20 @@ def ensure_attached(
     )
     if broadcast_fn is not None:
         try:
-            broadcast_fn({"type": "artifact_attached", "scope": scope,
-                          "path": artifact_path, "artifact_id": artifact_id,
-                          "goal_id": goal_id})
+            broadcast_fn(
+                {
+                    "type": "artifact_attached",
+                    "scope": scope,
+                    "path": artifact_path,
+                    "artifact_id": artifact_id,
+                    "goal_id": goal_id,
+                }
+            )
         except Exception:
             pass
-    row = conn.execute("SELECT * FROM comms_artifacts WHERE id=?", (artifact_id,)).fetchone()
+    row = conn.execute(
+        "SELECT * FROM comms_artifacts WHERE id=?", (artifact_id,)
+    ).fetchone()
     return dict(row) if row is not None else {"id": artifact_id, "path": artifact_path}
 
 

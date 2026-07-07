@@ -1,4 +1,5 @@
 """Tests for _resolve_storage_path with the 3-tier probe order (P1)."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -7,13 +8,13 @@ import pytest
 
 import pathly_orchestrator.fsm_ops as fsm_ops
 
-
 FLOW = {"storage_path": "pathly/plans/{topic}/"}
 
 
 def test_flat_pathly_goals_no_longer_resolves(tmp_path):
     """The flat pathly/goals/<slug> candidate is DROPPED — goals nest by board scope now. A bare
-    slug with a stray pathly/goals/<slug> dir falls through to the flow template default."""
+    slug with a stray pathly/goals/<slug> dir falls through to the flow template default.
+    """
     slug = "my-goal-slug"
     goal_dir = tmp_path / "pathly" / "goals" / slug
     goal_dir.mkdir(parents=True)
@@ -27,7 +28,9 @@ def test_scope_nested_feature_goal_topic_resolves(tmp_path):
     via the pathly/<topic> candidate."""
     nested = tmp_path / "pathly" / "features" / "my-feature" / "goals" / "g-slug"
     nested.mkdir(parents=True)
-    result = fsm_ops._resolve_storage_path(FLOW, str(tmp_path), "features/my-feature/goals/g-slug")
+    result = fsm_ops._resolve_storage_path(
+        FLOW, str(tmp_path), "features/my-feature/goals/g-slug"
+    )
     assert result == nested
 
 

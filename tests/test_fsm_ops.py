@@ -635,7 +635,8 @@ def test_build_prompt_includes_pipeline_history(tmp_path):
     }
 
     with patch(
-        "pathly_orchestrator.fsm_compose._load_agent_text", return_value="base agent text"
+        "pathly_orchestrator.fsm_compose._load_agent_text",
+        return_value="base agent text",
     ):
         result = build_prompt(flow_config, "BUILDING", storage_path)
 
@@ -690,8 +691,12 @@ def test_build_prompt_uses_parent_board_scope_for_goal(tmp_path):
 
     # The goal lives on the parent FEATURE board.
     goal_id = post_message(
-        get_db(), board="feature", scope=parent, from_agent="human",
-        type="goal", text="Studio CliMonitorBar review",
+        get_db(),
+        board="feature",
+        scope=parent,
+        from_agent="human",
+        type="goal",
+        text="Studio CliMonitorBar review",
     )
 
     # On-disk storage nests under the parent feature; the run's dir name is the slug (isolation).
@@ -700,7 +705,8 @@ def test_build_prompt_uses_parent_board_scope_for_goal(tmp_path):
     flow_config = {"agent_map": {"ARCHITECTING": "quick"}, "composition": {}}
 
     with patch(
-        "pathly_orchestrator.fsm_compose._load_agent_text", return_value="base agent text"
+        "pathly_orchestrator.fsm_compose._load_agent_text",
+        return_value="base agent text",
     ):
         with_goal = build_prompt(flow_config, "ARCHITECTING", slug_dir, goal_id)
         without_goal = build_prompt(flow_config, "ARCHITECTING", slug_dir, "")

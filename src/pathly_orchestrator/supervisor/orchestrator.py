@@ -136,7 +136,9 @@ def _loop(state: RunnerState, broadcast_fn: Optional[Callable]) -> None:
             current_fsm_state = response.get("current_state", "")
             instructions = response.get("instructions", "")
             # Goal decompose/executor: tell the DAG-seeder stage which existing goal to fill.
-            instructions += _decompose_directive(response.get("agent", ""), state.goal_id)
+            instructions += _decompose_directive(
+                response.get("agent", ""), state.goal_id
+            )
             preferred_adapter = response.get("preferred_adapter", "") or "claude"
 
             # Apply reroute override if set

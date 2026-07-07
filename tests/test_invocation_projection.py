@@ -28,16 +28,25 @@ def _invocations(conn, feature):
 
 def _ad(agent, conv, cost, total_tokens=0, ts="2026-07-06T12:00:00Z"):
     return {
-        "type": "AGENT_DONE", "agent": agent, "conversation": conv,
-        "cost_usd": cost, "total_tokens": total_tokens, "ts": ts,
+        "type": "AGENT_DONE",
+        "agent": agent,
+        "conversation": conv,
+        "cost_usd": cost,
+        "total_tokens": total_tokens,
+        "ts": ts,
     }
 
 
 def _billing(agent, conv, cost, tin=0, tout=0, ts="2026-07-06T12:01:00Z"):
     return {
-        "type": "BILLING_UPDATE", "agent": agent, "conversation": conv,
-        "cost_usd": cost, "tokens_in": tin, "tokens_out": tout,
-        "total_tokens": tin + tout, "ts": ts,
+        "type": "BILLING_UPDATE",
+        "agent": agent,
+        "conversation": conv,
+        "cost_usd": cost,
+        "tokens_in": tin,
+        "tokens_out": tout,
+        "total_tokens": tin + tout,
+        "ts": ts,
     }
 
 
@@ -105,9 +114,13 @@ def test_backfill_idempotent():
     append_event(conn, PR, "f5", _ad("builder", 1, 0.05, 8000))
     append_event(conn, PR, "f5", _ad("reviewer", 1, 0.03, 4000))
     s1 = backfill_invocations_from_events(conn)
-    n1 = conn.execute("SELECT COUNT(*), COALESCE(SUM(cost_usd),0) FROM agent_invocations").fetchone()
+    n1 = conn.execute(
+        "SELECT COUNT(*), COALESCE(SUM(cost_usd),0) FROM agent_invocations"
+    ).fetchone()
     s2 = backfill_invocations_from_events(conn)
-    n2 = conn.execute("SELECT COUNT(*), COALESCE(SUM(cost_usd),0) FROM agent_invocations").fetchone()
+    n2 = conn.execute(
+        "SELECT COUNT(*), COALESCE(SUM(cost_usd),0) FROM agent_invocations"
+    ).fetchone()
     assert n1[0] == n2[0]
     assert abs(n1[1] - n2[1]) < 1e-9
     assert s1["rows"] == s2["rows"]
@@ -117,10 +130,18 @@ def test_backfill_preserves_event_less_editor_chat_rows():
     conn = get_db()
     # An editor/chat one-shot: written directly, NO AGENT_DONE event, source_seq NULL.
     write_agent_invocation(
-        conn, PR, "(project)",
-        {"run_id": "editor-1", "agent_role": "editor", "cost_usd": 0.42,
-         "tokens_in": 100, "tokens_out": 50, "scope_tier": "project",
-         "cost_source": "provider_reported"},
+        conn,
+        PR,
+        "(project)",
+        {
+            "run_id": "editor-1",
+            "agent_role": "editor",
+            "cost_usd": 0.42,
+            "tokens_in": 100,
+            "tokens_out": 50,
+            "scope_tier": "project",
+            "cost_source": "provider_reported",
+        },
     )
     # A real feature with events, in the same DB.
     append_event(conn, PR, "realfeat", _ad("builder", 1, 0.05, 8000))
@@ -139,7 +160,9 @@ def test_backfill_rebuilds_after_corruption():
     conn.execute("UPDATE agent_invocations SET cost_usd=999 WHERE feature='f6'")
     conn.commit()
     backfill_invocations_from_events(conn)
-    row = conn.execute("SELECT cost_usd FROM agent_invocations WHERE feature='f6'").fetchone()
+    row = conn.execute(
+        "SELECT cost_usd FROM agent_invocations WHERE feature='f6'"
+    ).fetchone()
     assert abs(row["cost_usd"] - 0.05) < 1e-9
 
 

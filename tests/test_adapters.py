@@ -46,7 +46,9 @@ def test_resolve_command_omits_model_flag_when_empty():
 
     for adapter in ("claude", "codex", "antigravity"):
         argv = resolve_command(adapter, "build it", "")["argv"]
-        assert "--model" not in argv, f"{adapter}: empty model should drop --model, got {argv}"
+        assert (
+            "--model" not in argv
+        ), f"{adapter}: empty model should drop --model, got {argv}"
     # A real model is still spliced in with its value.
     argv = resolve_command("codex", "build it", "gpt-5")["argv"]
     assert argv[argv.index("--model") + 1] == "gpt-5"
@@ -143,7 +145,9 @@ def test_unsupported_headless_adapters_filters_sorts_and_dedups():
     bad = unsupported_headless_adapters(
         ["claude", "codex", "copilot", "antigravity", "copilot", "claude"]
     )
-    assert bad == ["copilot"]  # antigravity now has a headless template; only copilot lacks one
+    assert bad == [
+        "copilot"
+    ]  # antigravity now has a headless template; only copilot lacks one
 
 
 def test_unsupported_headless_adapters_empty_when_all_supported():

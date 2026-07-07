@@ -2,14 +2,17 @@
 
 Supervisor-layer helper: may import db; MUST NOT import http_server.
 """
+
 from __future__ import annotations
 
 import re
 import sqlite3
 import uuid
 
-from pathly_orchestrator.db.queries.comms_messages import read_message_slug, set_message_slug
-
+from pathly_orchestrator.db.queries.comms_messages import (
+    read_message_slug,
+    set_message_slug,
+)
 
 # Trivial words dropped from a slug so the readable part is the meaningful head of the
 # title (e.g. "The Frontend of the App" -> "frontend-app", not "the-frontend-of-the-app").

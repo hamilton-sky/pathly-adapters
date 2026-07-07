@@ -108,7 +108,11 @@ def complete_stage(args: dict) -> dict:
         return {"done": True}
 
     eval_result: str | dict = evaluate_transition_rules(
-        flow_config, state_info["current_state"], storage_path, goal_id=goal_id, feature_scope=scope
+        flow_config,
+        state_info["current_state"],
+        storage_path,
+        goal_id=goal_id,
+        feature_scope=scope,
     )
 
     if isinstance(eval_result, dict) and eval_result.get("decide") is True:
@@ -227,7 +231,9 @@ def complete_stage(args: dict) -> dict:
     if next_state == "DONE":
         return {"done": True}
 
-    instructions = _fops.build_prompt(flow_config, next_state, storage_path, goal_id or "")
+    instructions = _fops.build_prompt(
+        flow_config, next_state, storage_path, goal_id or ""
+    )
     agent = flow_config["agent_map"][next_state]
     menu = _fops.build_menu_payload(flow_config, next_state, storage_path)
     result = _fops._response_envelope(
@@ -243,7 +249,10 @@ def complete_stage(args: dict) -> dict:
     result["limits"] = state_info["limits"]
     result["next_state"] = next_state
     try:
-        from pathly_orchestrator.supervisor.artifact_reconcile import reconcile_artifacts
+        from pathly_orchestrator.supervisor.artifact_reconcile import (
+            reconcile_artifacts,
+        )
+
         reconcile_artifacts(storage_path, scope, goal_id=goal_id, board=board)
     except Exception:
         pass  # best-effort; the ledger + files remain authoritative

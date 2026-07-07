@@ -35,7 +35,9 @@ def cc(monkeypatch):
 
 def _capture(cc, monkeypatch):
     calls: list[list[str]] = []
-    monkeypatch.setattr(cc.subprocess, "run", lambda argv, **k: calls.append(list(argv)))
+    monkeypatch.setattr(
+        cc.subprocess, "run", lambda argv, **k: calls.append(list(argv))
+    )
     return calls
 
 
@@ -44,8 +46,8 @@ def test_auto_runs_incremental_index_and_sets_flag(cc, monkeypatch):
     calls = _capture(cc, monkeypatch)
     cc.maybe_reindex("D:/work/myrepo")
     joined = [" ".join(a) for a in calls]
-    assert any("index_repository" in c for c in joined), joined   # actually re-indexes
-    assert any("auto_index" in c for c in joined), joined          # + flag once
+    assert any("index_repository" in c for c in joined), joined  # actually re-indexes
+    assert any("auto_index" in c for c in joined), joined  # + flag once
 
 
 def test_stage_runs_incremental_index(cc, monkeypatch):

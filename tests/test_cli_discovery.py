@@ -22,11 +22,13 @@ def _mk(root: Path, rel: str, state: str = "BUILDING") -> Path:
 
 
 def test_iter_finds_all_three_layouts(tmp_path):
-    _mk(tmp_path, "pathly/features/new-feat/plans")   # feature-centric (topic = grandparent)
-    _mk(tmp_path, "pathly/plans/legacy-feat")         # legacy type-nested
-    _mk(tmp_path, "pathly/flat-feat")                 # legacy flat
-    _mk(tmp_path, "pathly/.archive/old-feat")         # archived → excluded
-    _mk(tmp_path, "pathly/goals/some-goal")           # reserved container child → excluded
+    _mk(
+        tmp_path, "pathly/features/new-feat/plans"
+    )  # feature-centric (topic = grandparent)
+    _mk(tmp_path, "pathly/plans/legacy-feat")  # legacy type-nested
+    _mk(tmp_path, "pathly/flat-feat")  # legacy flat
+    _mk(tmp_path, "pathly/.archive/old-feat")  # archived → excluded
+    _mk(tmp_path, "pathly/goals/some-goal")  # reserved container child → excluded
     found = {topic for _sf, _flow, topic in iter_state_files(tmp_path)}
     assert found == {"new-feat", "legacy-feat", "flat-feat"}
 

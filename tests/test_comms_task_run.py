@@ -30,13 +30,30 @@ def client():
 def _goal(conn, scope):
     from pathly_orchestrator.db.queries.comms import post_message
 
-    return post_message(conn, board="feature", scope=scope, from_agent="planner", type="goal", text="G")
+    return post_message(
+        conn, board="feature", scope=scope, from_agent="planner", type="goal", text="G"
+    )
 
 
-def _task(conn, scope, gid, text="Build X. Files: a. Done when: b.", status="pending", deps=None):
+def _task(
+    conn,
+    scope,
+    gid,
+    text="Build X. Files: a. Done when: b.",
+    status="pending",
+    deps=None,
+):
     from pathly_orchestrator.db.queries.comms import post_message
 
-    tid = post_message(conn, board="feature", scope=scope, from_agent="planner", type="task", text=text, goal_id=gid)
+    tid = post_message(
+        conn,
+        board="feature",
+        scope=scope,
+        from_agent="planner",
+        type="task",
+        text=text,
+        goal_id=gid,
+    )
     conn.execute(
         "UPDATE comms_messages SET task_status=?, depends_on=? WHERE id=?",
         (status, json.dumps(deps or []), tid),
@@ -52,21 +69,36 @@ def test_run_task_claims_and_spawns(client, monkeypatch):
     seen: dict = {}
 
     def _fake(board, scope, mode, **kw):
-        seen.update(board=board, scope=scope, mode=mode, instructions=kw.get("instructions"), skill=kw.get("skill"))
+        seen.update(
+            board=board,
+            scope=scope,
+            mode=mode,
+            instructions=kw.get("instructions"),
+            skill=kw.get("skill"),
+        )
         return {"ok": True, "run_id": "r1"}
 
     monkeypatch.setattr(_br, "start_board_run", _fake)
     conn = get_db()
     gid = _goal(conn, "taskrun-ok")
-    tid = _task(conn, "taskrun-ok", gid, text="Build the widget. Files: w.py. Done when: tests pass.")
+    tid = _task(
+        conn,
+        "taskrun-ok",
+        gid,
+        text="Build the widget. Files: w.py. Done when: tests pass.",
+    )
 
-    r = client.post("/comms/tasks/run", json={"message_id": tid, "project_root": "/tmp/p"})
+    r = client.post(
+        "/comms/tasks/run", json={"message_id": tid, "project_root": "/tmp/p"}
+    )
     assert r.status_code == 200
     body = r.get_json()
     assert body["ok"] is True and body["run_id"] == "r1"
 
     # Claimed → in_progress, and the builder got the task's own prompt via a single-agent build.
-    st = conn.execute("SELECT task_status FROM comms_messages WHERE id=?", (tid,)).fetchone()["task_status"]
+    st = conn.execute(
+        "SELECT task_status FROM comms_messages WHERE id=?", (tid,)
+    ).fetchone()["task_status"]
     assert st == "in_progress"
     assert seen["mode"] == "single-agent"
     assert seen["skill"] == "development/build"
@@ -81,7 +113,15 @@ def test_run_task_failed_result_reverts_not_completes(client, monkeypatch):
     def _fake(board, scope, mode, **kw):
         on_done = kw.get("on_done")
         if on_done:  # simulate the 404: is_error set, but exit 0 / subtype "success"
-            on_done("r1", {"is_error": True, "api_error_status": 404, "subtype": "success", "exit_code": 0})
+            on_done(
+                "r1",
+                {
+                    "is_error": True,
+                    "api_error_status": 404,
+                    "subtype": "success",
+                    "exit_code": 0,
+                },
+            )
         return {"ok": True, "run_id": "r1"}
 
     monkeypatch.setattr(_br, "start_board_run", _fake)
@@ -90,7 +130,9 @@ def test_run_task_failed_result_reverts_not_completes(client, monkeypatch):
     tid = _task(conn, "taskrun-fail", gid)
     r = client.post("/comms/tasks/run", json={"message_id": tid})
     assert r.status_code == 200  # dispatch accepted...
-    st = conn.execute("SELECT task_status FROM comms_messages WHERE id=?", (tid,)).fetchone()["task_status"]
+    st = conn.execute(
+        "SELECT task_status FROM comms_messages WHERE id=?", (tid,)
+    ).fetchone()["task_status"]
     assert st == "pending"  # ...but the FAILED run reverted it, did NOT mark it done
 
 
@@ -110,7 +152,9 @@ def test_run_task_success_result_completes(client, monkeypatch):
     tid = _task(conn, "taskrun-succeed", gid)
     r = client.post("/comms/tasks/run", json={"message_id": tid})
     assert r.status_code == 200
-    st = conn.execute("SELECT task_status FROM comms_messages WHERE id=?", (tid,)).fetchone()["task_status"]
+    st = conn.execute(
+        "SELECT task_status FROM comms_messages WHERE id=?", (tid,)
+    ).fetchone()["task_status"]
     assert st == "done"
 
 
@@ -130,7 +174,9 @@ def test_run_task_model_is_engine_aware(client, monkeypatch):
     g = _goal(conn, "taskrun-eng")
     t_claude = _task(conn, "taskrun-eng", g)
     t_codex = _task(conn, "taskrun-eng", g)
-    client.post("/comms/tasks/run", json={"message_id": t_claude})  # default engine = claude
+    client.post(
+        "/comms/tasks/run", json={"message_id": t_claude}
+    )  # default engine = claude
     client.post("/comms/tasks/run", json={"message_id": t_codex, "adapter": "codex"})
     assert seen["claude"] == "claude-sonnet-4-6"
     assert seen["codex"] == ""  # engine's own default, NOT a forced claude model
@@ -176,7 +222,9 @@ def test_stop_task_reverts_to_pending(client):
     tid = _task(conn, "taskstop", gid, status="in_progress")  # simulate a running task
     r = client.post("/comms/tasks/stop", json={"message_id": tid})
     assert r.status_code == 200 and r.get_json()["ok"] is True
-    st = conn.execute("SELECT task_status FROM comms_messages WHERE id=?", (tid,)).fetchone()["task_status"]
+    st = conn.execute(
+        "SELECT task_status FROM comms_messages WHERE id=?", (tid,)
+    ).fetchone()["task_status"]
     assert st == "pending"
 
 
@@ -184,7 +232,9 @@ def test_run_task_releases_claim_on_spawn_refusal(client, monkeypatch):
     import pathly_orchestrator.supervisor.board_run as _br
     from pathly_orchestrator.db.connection import get_db
 
-    monkeypatch.setattr(_br, "start_board_run", lambda *a, **k: {"ok": False, "reason": "board_busy"})
+    monkeypatch.setattr(
+        _br, "start_board_run", lambda *a, **k: {"ok": False, "reason": "board_busy"}
+    )
     conn = get_db()
     gid = _goal(conn, "taskrun-busy")
     tid = _task(conn, "taskrun-busy", gid)
@@ -192,5 +242,7 @@ def test_run_task_releases_claim_on_spawn_refusal(client, monkeypatch):
     r = client.post("/comms/tasks/run", json={"message_id": tid})
     assert r.status_code == 409
     # The claim must be released so the task can be retried.
-    st = conn.execute("SELECT task_status FROM comms_messages WHERE id=?", (tid,)).fetchone()["task_status"]
+    st = conn.execute(
+        "SELECT task_status FROM comms_messages WHERE id=?", (tid,)
+    ).fetchone()["task_status"]
     assert st == "pending"

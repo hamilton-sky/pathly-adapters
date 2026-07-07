@@ -24,14 +24,33 @@ def test_get_messages_structural_survives_limit():
 
     conn = get_db()
     scope = "structfeed-1"
-    gid = post_message(conn, board="feature", scope=scope, from_agent="a", type="goal", text="G")
-    post_message(conn, board="feature", scope=scope, from_agent="a", type="task", text="T", goal_id=gid)
+    gid = post_message(
+        conn, board="feature", scope=scope, from_agent="a", type="goal", text="G"
+    )
+    post_message(
+        conn,
+        board="feature",
+        scope=scope,
+        from_agent="a",
+        type="task",
+        text="T",
+        goal_id=gid,
+    )
     # Bury them under more chat messages than the limit.
     for i in range(60):
-        post_message(conn, board="feature", scope=scope, from_agent="a", type="status", text=f"s{i}")
+        post_message(
+            conn,
+            board="feature",
+            scope=scope,
+            from_agent="a",
+            type="status",
+            text=f"s{i}",
+        )
 
     default = get_messages(conn, board="feature", scope=scope, limit=50)
-    structural = get_messages(conn, board="feature", scope=scope, limit=50, include_structural=True)
+    structural = get_messages(
+        conn, board="feature", scope=scope, limit=50, include_structural=True
+    )
 
     # The limited feed is bounded; the structural feed ALWAYS carries the goal + task.
     assert len(default) <= 50
@@ -39,7 +58,12 @@ def test_get_messages_structural_survives_limit():
     assert sum(1 for m in structural if m["type"] == "task") == 1
     # An explicit type filter opts out of structural inclusion (still bounded).
     only_status = get_messages(
-        conn, board="feature", scope=scope, type="status", limit=50, include_structural=True
+        conn,
+        board="feature",
+        scope=scope,
+        type="status",
+        limit=50,
+        include_structural=True,
     )
     assert all(m["type"] == "status" for m in only_status)
 
@@ -56,11 +80,24 @@ def test_archive_artifacts_uses_repo_root_not_feature_dir(tmp_path):
         "transition_actions": {"RETRO->DONE": [{"skill": "archive-artifacts"}]},
     }
 
-    run_transition_actions(flow, "RETRO", "DONE", storage, topic, 1, project_root=str(tmp_path))
+    run_transition_actions(
+        flow, "RETRO", "DONE", storage, topic, 1, project_root=str(tmp_path)
+    )
 
-    correct = tmp_path / "pathly" / "pipeline-walkthrough" / "features" / "f" / "goals" / "g-slug" / "artifacts"
+    correct = (
+        tmp_path
+        / "pathly"
+        / "pipeline-walkthrough"
+        / "features"
+        / "f"
+        / "goals"
+        / "g-slug"
+        / "artifacts"
+    )
     assert correct.exists()  # written at the repo root
-    assert not (storage / "pathly").exists()  # NOT nested inside the feature/goal storage dir
+    assert not (
+        storage / "pathly"
+    ).exists()  # NOT nested inside the feature/goal storage dir
 
 
 def test_run_transition_actions_fallback_without_project_root(tmp_path):
@@ -74,5 +111,9 @@ def test_run_transition_actions_fallback_without_project_root(tmp_path):
         "storage_path": "pathly/{topic}/",
         "transition_actions": {"RETRO->DONE": [{"skill": "archive-artifacts"}]},
     }
-    run_transition_actions(flow, "RETRO", "DONE", storage, "solo-feature", 1)  # no project_root
-    assert (tmp_path / "pathly" / "pipeline-walkthrough" / "solo-feature" / "artifacts").exists()
+    run_transition_actions(
+        flow, "RETRO", "DONE", storage, "solo-feature", 1
+    )  # no project_root
+    assert (
+        tmp_path / "pathly" / "pipeline-walkthrough" / "solo-feature" / "artifacts"
+    ).exists()

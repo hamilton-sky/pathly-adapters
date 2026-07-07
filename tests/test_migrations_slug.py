@@ -53,7 +53,9 @@ def test_two_null_slugs_both_succeed(conn):
         "VALUES ('b2', 'feature', 'test', 'agent', 'progress', 'second', '2026-01-01T00:00:00Z')"
     )
     conn.commit()
-    count = conn.execute("SELECT COUNT(*) FROM comms_messages WHERE id IN ('b1','b2')").fetchone()[0]
+    count = conn.execute(
+        "SELECT COUNT(*) FROM comms_messages WHERE id IN ('b1','b2')"
+    ).fetchone()[0]
     assert count == 2
 
 

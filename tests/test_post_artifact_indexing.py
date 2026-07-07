@@ -61,6 +61,8 @@ def test_post_artifact_calls_indexer_with_valid_kwargs(client, tmp_path, monkeyp
     )
     assert r.status_code == 200, r.data
     assert calls, "post path never called index_artifact_async"
-    assert not bind_errors, f"stale kwargs passed to index_artifact_async: {bind_errors}"
+    assert (
+        not bind_errors
+    ), f"stale kwargs passed to index_artifact_async: {bind_errors}"
     # Conv 5 removed `summarize`; guard against it (or any caller) coming back.
     assert "summarize" not in real_sig.parameters

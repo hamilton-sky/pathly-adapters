@@ -50,7 +50,11 @@ def _normalize_model_usage(raw: Any) -> dict[str, dict[str, Any]]:
         t_in = int(
             (u.get("inputTokens") or u.get("input_tokens") or 0)
             + (u.get("cacheReadInputTokens") or u.get("cache_read_input_tokens") or 0)
-            + (u.get("cacheCreationInputTokens") or u.get("cache_creation_input_tokens") or 0)
+            + (
+                u.get("cacheCreationInputTokens")
+                or u.get("cache_creation_input_tokens")
+                or 0
+            )
         )
         t_out = int(u.get("outputTokens", 0) or u.get("output_tokens", 0))
         try:

@@ -84,7 +84,9 @@ def test_comms_tasks_list_reports_true_task_status(client):
     rc = client.post("/comms/tasks/complete", json={"message_id": a, "feature": "dagf"})
     assert rc.status_code == 200
 
-    rows = {t["id"]: t for t in json.loads(client.get("/comms/tasks?feature=dagf").data)}
+    rows = {
+        t["id"]: t for t in json.loads(client.get("/comms/tasks?feature=dagf").data)
+    }
     assert set(rows) == {a, b}, "both tasks should still be listed"
     assert rows[a]["task_status"] == "done", rows[a]
     assert rows[b]["task_status"] == "pending", rows[b]

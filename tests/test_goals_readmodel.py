@@ -31,8 +31,13 @@ def _post_goal(scope: str) -> str:
     from pathly_orchestrator.db.queries.comms import post_message
 
     return post_message(
-        get_db(), board="feature", scope=scope, from_agent="planner", type="goal",
-        text="Goal", executor="loop",
+        get_db(),
+        board="feature",
+        scope=scope,
+        from_agent="planner",
+        type="goal",
+        text="Goal",
+        executor="loop",
     )
 
 
@@ -42,11 +47,19 @@ def _post_task(scope: str, goal_id: str, status: str = "pending", deps=None) -> 
 
     conn = get_db()
     tid = post_message(
-        conn, board="feature", scope=scope, from_agent="planner", type="task",
-        text="T", goal_id=goal_id, depends_on=deps or [],
+        conn,
+        board="feature",
+        scope=scope,
+        from_agent="planner",
+        type="task",
+        text="T",
+        goal_id=goal_id,
+        depends_on=deps or [],
     )
     if status != "pending":
-        conn.execute("UPDATE comms_messages SET task_status=? WHERE id=?", (status, tid))
+        conn.execute(
+            "UPDATE comms_messages SET task_status=? WHERE id=?", (status, tid)
+        )
         conn.commit()
     return tid
 
@@ -57,8 +70,8 @@ def test_goals_rollup_counts_by_status(client):
     _post_task(scope, g, "done")
     _post_task(scope, g, "done")
     ip = _post_task(scope, g, "in_progress")
-    _post_task(scope, g, "pending")                 # no deps → ready
-    _post_task(scope, g, "pending", deps=[ip])      # dep in_progress → NOT ready
+    _post_task(scope, g, "pending")  # no deps → ready
+    _post_task(scope, g, "pending", deps=[ip])  # dep in_progress → NOT ready
     _post_task(scope, g, "failed")
 
     r = client.get(f"/comms/goals?feature={scope}")
@@ -69,8 +82,13 @@ def test_goals_rollup_counts_by_status(client):
     assert row["id"] == g
     assert row["executor"] == "loop"
     assert row["tasks"] == {
-        "total": 6, "done": 2, "in_progress": 1, "pending": 2,
-        "blocked": 0, "failed": 1, "ready": 1,
+        "total": 6,
+        "done": 2,
+        "in_progress": 1,
+        "pending": 2,
+        "blocked": 0,
+        "failed": 1,
+        "ready": 1,
     }
 
 
@@ -80,16 +98,25 @@ def test_ready_updates_as_deps_complete(client):
 
     scope = "grm-ready"
     g = _post_goal(scope)
-    up = _post_task(scope, g, "pending")            # ready now
-    _post_task(scope, g, "pending", deps=[up])      # blocked behind `up`
-    assert client.get(f"/comms/goals?feature={scope}").get_json()[0]["tasks"]["ready"] == 1
+    up = _post_task(scope, g, "pending")  # ready now
+    _post_task(scope, g, "pending", deps=[up])  # blocked behind `up`
+    assert (
+        client.get(f"/comms/goals?feature={scope}").get_json()[0]["tasks"]["ready"] == 1
+    )
 
     get_db().execute("UPDATE comms_messages SET task_status='done' WHERE id=?", (up,))
     get_db().commit()
     # `up` done → the downstream task's dep is satisfied → both ready count flips to 1
     t = client.get(f"/comms/goals?feature={scope}").get_json()[0]["tasks"]
-    assert t == {"total": 2, "done": 1, "in_progress": 0, "pending": 1,
-                 "blocked": 0, "failed": 0, "ready": 1}
+    assert t == {
+        "total": 2,
+        "done": 1,
+        "in_progress": 0,
+        "pending": 1,
+        "blocked": 0,
+        "failed": 0,
+        "ready": 1,
+    }
 
 
 def test_multiple_goals_isolated(client):
@@ -98,7 +125,10 @@ def test_multiple_goals_isolated(client):
     g2 = _post_goal(scope)
     _post_task(scope, g1, "done")
     _post_task(scope, g2, "pending")
-    data = {row["id"]: row["tasks"] for row in client.get(f"/comms/goals?feature={scope}").get_json()}
+    data = {
+        row["id"]: row["tasks"]
+        for row in client.get(f"/comms/goals?feature={scope}").get_json()
+    }
     assert data[g1]["done"] == 1 and data[g1]["total"] == 1
     assert data[g2]["ready"] == 1 and data[g2]["total"] == 1
 

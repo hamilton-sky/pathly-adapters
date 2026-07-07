@@ -80,7 +80,8 @@ def test_keyword_hit_without_distance_is_kept(monkeypatch):
 
 def test_keyword_hit_dropped_on_cross_tier(monkeypatch):
     """CT4: a keyword/recency hit (no _distance) is kept on the feature board but dropped
-    on cross-tier project/global boards — closing the per-tier-gate bypass (ISSUE-1b)."""
+    on cross-tier project/global boards — closing the per-tier-gate bypass (ISSUE-1b).
+    """
     cq = _stub_common(monkeypatch)
     import pathly_orchestrator.runner.comms_context as cc
 
@@ -109,7 +110,8 @@ def test_keyword_hit_dropped_on_cross_tier(monkeypatch):
 
 def test_per_tier_gate_drops_midrange_cross_tier(monkeypatch):
     """CT1: a 0.60 match is kept on the feature board (cutoff 0.75) but dropped on the
-    project (0.55) and global (0.50) boards — cross-tier requires a stricter distance."""
+    project (0.55) and global (0.50) boards — cross-tier requires a stricter distance.
+    """
     cq = _stub_common(monkeypatch)
     import pathly_orchestrator.runner.comms_context as cc
 

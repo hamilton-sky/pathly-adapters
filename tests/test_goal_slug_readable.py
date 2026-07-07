@@ -10,8 +10,10 @@ from pathly_orchestrator.supervisor.slug import _slugify
 
 
 def test_readable_base_is_first_meaningful_words():
-    assert _slugify("Studio CliMonitorBar panel - A UI/UX design review") == \
-        "studio-climonitorbar-panel-ui"
+    assert (
+        _slugify("Studio CliMonitorBar panel - A UI/UX design review")
+        == "studio-climonitorbar-panel-ui"
+    )
     assert _slugify("Backend API layer") == "backend-api-layer"
 
 
@@ -27,5 +29,5 @@ def test_empty_or_symbol_is_goal():
 def test_capped_without_midword_truncation():
     s = _slugify("comprehensive authentication authorization subsystem redesign")
     assert len(s) <= 32
-    assert not s.endswith("-")            # no dangling hyphen
+    assert not s.endswith("-")  # no dangling hyphen
     assert all(part for part in s.split("-"))  # no empty (truncated) segments

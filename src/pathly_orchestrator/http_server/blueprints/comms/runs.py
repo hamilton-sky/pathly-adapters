@@ -98,7 +98,9 @@ def comms_run():
                     from datetime import datetime, timedelta, timezone
 
                     c = _get_db()
-                    cutoff = (datetime.now(timezone.utc) - timedelta(minutes=15)).isoformat()
+                    cutoff = (
+                        datetime.now(timezone.utc) - timedelta(minutes=15)
+                    ).isoformat()
                     has_eval = c.execute(
                         "SELECT 1 FROM comms_messages WHERE scope=? AND type='artifact' "
                         "AND deleted_at IS NULL AND ts >= ? "
@@ -107,16 +109,29 @@ def comms_run():
                     ).fetchone()
                     if not has_eval:
                         mid = _post_message(
-                            c, board=board, scope=scope, from_agent="system", type="warning",
-                            text=("Evaluate finished but posted no BOARD_EVAL analysis artifact — "
-                                  "the run returned only a text reply. Re-run Evaluate; if the board "
-                                  "already has a goal/task DAG, the evaluator must still post the "
-                                  "analysis artifact (it may skip only the goal/task proposals)."),
+                            c,
+                            board=board,
+                            scope=scope,
+                            from_agent="system",
+                            type="warning",
+                            text=(
+                                "Evaluate finished but posted no BOARD_EVAL analysis artifact — "
+                                "the run returned only a text reply. Re-run Evaluate; if the board "
+                                "already has a goal/task DAG, the evaluator must still post the "
+                                "analysis artifact (it may skip only the goal/task proposals)."
+                            ),
                         )
-                        _broadcast_comms(scope, {
-                            "type": "COMMS_UPDATE", "event": "board_run",
-                            "message_id": mid, "board": board, "scope": scope, "phase": "warning",
-                        })
+                        _broadcast_comms(
+                            scope,
+                            {
+                                "type": "COMMS_UPDATE",
+                                "event": "board_run",
+                                "message_id": mid,
+                                "board": board,
+                                "scope": scope,
+                                "phase": "warning",
+                            },
+                        )
                 except Exception:
                     logging.debug("evaluator BOARD_EVAL backstop failed", exc_info=True)
 

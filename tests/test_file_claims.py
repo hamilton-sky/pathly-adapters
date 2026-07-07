@@ -26,7 +26,9 @@ def test_same_file_conflicts():
 
 def test_directory_containment_overlaps():
     assert file_claims.try_claim("A", ["src/api"]) is None
-    assert file_claims.try_claim("B", ["src/api/routes.py"]) == "A"  # dir covers the file
+    assert (
+        file_claims.try_claim("B", ["src/api/routes.py"]) == "A"
+    )  # dir covers the file
 
 
 def test_undeclared_is_wildcard():
@@ -42,5 +44,7 @@ def test_release_frees_the_claim():
 
 def test_reclaim_same_scope_refreshes():
     assert file_claims.try_claim("A", ["src/a.py"]) is None
-    assert file_claims.try_claim("A", ["src/b.py"]) is None  # same scope -> refresh, no self-conflict
+    assert (
+        file_claims.try_claim("A", ["src/b.py"]) is None
+    )  # same scope -> refresh, no self-conflict
     assert file_claims.active()["A"] == ["src/b.py"]

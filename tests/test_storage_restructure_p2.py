@@ -26,13 +26,19 @@ def _n(p: str) -> str:
 
 # ── _goal_topic + _goal_storage_dir (board-scoped; no flat pathly/goals) ──────
 
+
 def test_goal_topic_feature_tier():
-    assert _goal_topic("feature", "my-feature", "goal-slug") == "features/my-feature/goals/goal-slug"
+    assert (
+        _goal_topic("feature", "my-feature", "goal-slug")
+        == "features/my-feature/goals/goal-slug"
+    )
 
 
 def test_goal_topic_project_tier():
     # Project-tier scope is the project root path; the topic uses the singular 'project' home.
-    assert _goal_topic("project", "/some/root", "goal-slug") == "project/goals/goal-slug"
+    assert (
+        _goal_topic("project", "/some/root", "goal-slug") == "project/goals/goal-slug"
+    )
 
 
 def test_goal_topic_global_tier():
@@ -60,16 +66,26 @@ def test_project_tier_nests_under_project():
 
 def test_board_run_topic_nests_every_kind_under_the_board():
     for kind in ("goals", "explorations", "debugs", "fixes"):
-        assert board_run_topic("feature", "my-feature", kind, "slug") == f"features/my-feature/{kind}/slug"
+        assert (
+            board_run_topic("feature", "my-feature", kind, "slug")
+            == f"features/my-feature/{kind}/slug"
+        )
         # project + global + empty-scope all collapse to the project home
-        assert board_run_topic("project", "/some/root", kind, "slug") == f"project/{kind}/slug"
-        assert board_run_topic("global", "global", kind, "slug") == f"project/{kind}/slug"
+        assert (
+            board_run_topic("project", "/some/root", kind, "slug")
+            == f"project/{kind}/slug"
+        )
+        assert (
+            board_run_topic("global", "global", kind, "slug") == f"project/{kind}/slug"
+        )
         assert board_run_topic("feature", "", kind, "slug") == f"project/{kind}/slug"
 
 
 def test_goal_helpers_are_board_run_goals_wrappers():
     # _goal_topic / _goal_storage_dir must stay byte-identical to the 'goals' kind.
-    assert _goal_topic("feature", "f", "s") == board_run_topic("feature", "f", "goals", "s")
+    assert _goal_topic("feature", "f", "s") == board_run_topic(
+        "feature", "f", "goals", "s"
+    )
     assert _goal_topic("project", "/r", "s") == "project/goals/s"
     assert _n(_goal_storage_dir(ROOT, "feature", "f", "s")) == _n(
         board_run_storage_dir(ROOT, "feature", "f", "goals", "s")
@@ -82,6 +98,7 @@ def test_board_run_storage_dir_absolute_nested():
 
 
 # ── _project_root_from_storage ───────────────────────────────────────
+
 
 def test_legacy_plans_identical_to_old_behavior():
     # The dominant production layout: <root>/pathly/plans/<topic> (3 levels). Here the new

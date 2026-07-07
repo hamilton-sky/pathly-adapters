@@ -41,8 +41,17 @@ _KIND_FLOW = (
 
 # Direct children of pathly/ that are containers, not features.
 _RESERVED = {
-    "features", "project", "plans", "debugs", "explorations", "fixes",
-    "goals", "lessons", "board-artifacts", "pipeline-walkthrough", ".archive",
+    "features",
+    "project",
+    "plans",
+    "debugs",
+    "explorations",
+    "fixes",
+    "goals",
+    "lessons",
+    "board-artifacts",
+    "pipeline-walkthrough",
+    ".archive",
 }
 
 

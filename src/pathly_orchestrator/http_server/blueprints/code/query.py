@@ -51,16 +51,25 @@ _TIER_OPS: dict[str, frozenset[str]] = {
     "lookup": frozenset({"symbol", "context"}),
 }
 _ROLE_TIER: dict[str, str] = {
-    "architect": "full", "builder": "full", "reviewer": "full", "explorer": "full",
+    "architect": "full",
+    "builder": "full",
+    "reviewer": "full",
+    "explorer": "full",
     # "worker"/"explorer" are the FSM/loop host-neutral roles (agent_hint.role); a
     # worker does implementation → full, like builder. Without this, a loop task agent
     # that passes its host-neutral role was silently gated and code-query never fired.
     "worker": "full",
-    "scout": "chain", "tester": "chain",
-    "quick": "lookup", "director": "lookup", "planner": "lookup",
-    "designer": "lookup", "po": "lookup",
-    "web-researcher": "excluded", "orchestrator": "excluded",
-    "evaluator": "excluded", "human": "excluded",
+    "scout": "chain",
+    "tester": "chain",
+    "quick": "lookup",
+    "director": "lookup",
+    "planner": "lookup",
+    "designer": "lookup",
+    "po": "lookup",
+    "web-researcher": "excluded",
+    "orchestrator": "excluded",
+    "evaluator": "excluded",
+    "human": "excluded",
 }
 
 # Fallback tier for an unrecognized / empty role. A Pathly agent that didn't name its

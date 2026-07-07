@@ -133,9 +133,7 @@ def post_task_status(conn, message_id: str, verb: str, reason: str = "") -> None
     except Exception:
         import logging
 
-        logging.getLogger("pathly.http").debug(
-            "post_task_status failed", exc_info=True
-        )
+        logging.getLogger("pathly.http").debug("post_task_status failed", exc_info=True)
 
 
 def task_duration_seconds(task: dict) -> float | None:

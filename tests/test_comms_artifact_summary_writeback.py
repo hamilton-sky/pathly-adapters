@@ -91,8 +91,7 @@ def test_summary_selection_column_exists(client, tmp_path):
     from pathly_orchestrator.db.connection import get_db
 
     cols = {
-        r[1]
-        for r in get_db().execute("PRAGMA table_info(comms_artifacts)").fetchall()
+        r[1] for r in get_db().execute("PRAGMA table_info(comms_artifacts)").fetchall()
     }
     assert "summary_selection" in cols
 

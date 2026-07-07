@@ -110,6 +110,7 @@ def _inject_prompt_vars(
         text = text.replace("<feature_path>", feature_path)
         if skill is not None:
             from pathly_orchestrator.compose import manifest_role_file
+
             entry = manifest_role_file(agent_role, skill)
             if entry is not None:
                 out_path = f"{feature_path}/{entry[0]}"
@@ -242,7 +243,11 @@ def build_prompt(
         agent_text = _load_agent_text(agent)
 
     agent_text = _inject_prompt_vars(
-        agent_text, board_scope, project_root, agent_role, storage_path=storage_path,
+        agent_text,
+        board_scope,
+        project_root,
+        agent_role,
+        storage_path=storage_path,
         skill=(agent if "/" in agent else None),
     )
 

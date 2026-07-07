@@ -608,7 +608,9 @@ def test_backward_compat_task_id_set_but_no_context_refs(client):
         board_scope={"feature": True, "project": False, "global": False},
         task_id=task_id,
     )
-    assert "### Referenced context" not in block, "no referenced channel when context_refs is NULL"
+    assert (
+        "### Referenced context" not in block
+    ), "no referenced channel when context_refs is NULL"
 
 
 def test_backward_compat_task_id_none_identical_to_before(client):

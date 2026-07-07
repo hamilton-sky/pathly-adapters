@@ -308,9 +308,9 @@ def comms_post():
                     conn,
                     artifact_id=art_id,
                     artifact_path=artifact_path,
-                    artifact_type=artifact_type
-                    if isinstance(artifact_type, str)
-                    else None,
+                    artifact_type=(
+                        artifact_type if isinstance(artifact_type, str) else None
+                    ),
                     scope=scope,
                     summary_backend="minilm" if artifact_summary else summary_backend,
                     broadcast_fn=lambda _p: _broadcast_comms(scope, _p),
@@ -321,7 +321,9 @@ def comms_post():
         if msg_type in _EMBED_TYPES:
             if msg_type == "artifact" and artifact_summary:
                 _embed_artifact_async(
-                    message_id, f"{text}\n\n{artifact_summary}".strip(), artifact_summary
+                    message_id,
+                    f"{text}\n\n{artifact_summary}".strip(),
+                    artifact_summary,
                 )
             else:
                 _embed_async(message_id, text)

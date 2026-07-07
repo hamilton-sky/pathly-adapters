@@ -1,4 +1,5 @@
 """Tests for T6: goal-slug routing at goal call sites."""
+
 from __future__ import annotations
 
 import os
@@ -14,11 +15,14 @@ def _make_test_db(tmp_path: Path) -> sqlite3.Connection:
     conn = sqlite3.connect(str(tmp_path / "pathly.db"))
     conn.row_factory = sqlite3.Row
     from pathly_orchestrator.db.migrations import _run_migrations
+
     _run_migrations(conn)
     return conn
 
 
-def _insert_goal(conn: sqlite3.Connection, goal_id: str, scope: str, board: str = "project") -> None:
+def _insert_goal(
+    conn: sqlite3.Connection, goal_id: str, scope: str, board: str = "project"
+) -> None:
     now = "2026-06-30T00:00:00Z"
     conn.execute(
         "INSERT INTO comms_messages (id, board, scope, from_agent, type, text, ts) "
@@ -35,6 +39,7 @@ def test_ensure_goal_slug_formats_correctly(tmp_path):
     _insert_goal(conn, goal_id, "my-project", board="project")
 
     from pathly_orchestrator.supervisor.slug import ensure_goal_slug
+
     slug = ensure_goal_slug(conn, goal_id)
 
     # Slug should contain the goal_id prefix and be filesystem-safe
@@ -51,6 +56,7 @@ def test_ensure_goal_slug_is_idempotent(tmp_path):
     _insert_goal(conn, goal_id, str(tmp_path), board="project")
 
     from pathly_orchestrator.supervisor.slug import ensure_goal_slug
+
     slug1 = ensure_goal_slug(conn, goal_id)
     slug2 = ensure_goal_slug(conn, goal_id)
 
@@ -65,8 +71,11 @@ def test_project_goal_nests_under_project(tmp_path):
 
     from pathly_orchestrator.supervisor.slug import ensure_goal_slug
     from pathly_orchestrator.supervisor.goal_decomposer import _goal_storage_dir
+
     slug = ensure_goal_slug(conn, goal_id)
-    goal_dir = _goal_storage_dir(str(tmp_path), "project", str(tmp_path), slug).replace("\\", "/")
+    goal_dir = _goal_storage_dir(str(tmp_path), "project", str(tmp_path), slug).replace(
+        "\\", "/"
+    )
 
     expected = str(tmp_path / "pathly" / "project" / "goals" / slug).replace("\\", "/")
     assert goal_dir == expected
@@ -79,6 +88,7 @@ def test_resolve_nested_project_goal_topic(tmp_path):
     nested.mkdir(parents=True)
 
     from pathly_orchestrator.fsm_ops import _resolve_storage_path
+
     flow = {"storage_path": "pathly/{topic}/"}
     result = _resolve_storage_path(flow, str(tmp_path), "project/goals/g-slug")
     assert result == nested
@@ -91,6 +101,7 @@ def test_feature_slug_still_resolves_plans(tmp_path):
     plans_dir.mkdir(parents=True)
 
     from pathly_orchestrator.fsm_ops import _resolve_storage_path
+
     flow = {"storage_path": "pathly/plans/{topic}/"}
     result = _resolve_storage_path(flow, str(tmp_path), slug)
     assert result == plans_dir
@@ -99,6 +110,7 @@ def test_feature_slug_still_resolves_plans(tmp_path):
 def test_absolute_scope_never_reaches_fsm_ops(tmp_path):
     """_safe_topic raises on absolute scope so project-path scopes are caught early."""
     from pathly_orchestrator.storage_paths import _safe_topic
+
     absolute = str(tmp_path / "some" / "absolute")
     with pytest.raises(ValueError, match="unsafe topic"):
         _safe_topic(absolute)

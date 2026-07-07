@@ -189,7 +189,14 @@ def test_load_manifest_shape():
 
 # ── Converted team/* family: golden snapshots + exactly-once guarantee ───────
 
-_CONVERTED_TEAM_SKILLS = ["team/build", "team/review", "team/test", "team/design", "team/retro", "planning/plan"]
+_CONVERTED_TEAM_SKILLS = [
+    "team/build",
+    "team/review",
+    "team/test",
+    "team/design",
+    "team/retro",
+    "planning/plan",
+]
 
 
 @pytest.mark.parametrize("skill", _CONVERTED_TEAM_SKILLS)
@@ -262,9 +269,12 @@ def test_task_executors_do_not_compose_task_progress(skill):
     """Task executors must NOT compose an agent-side progress fragment. Per-task progress is
     guaranteed SERVER-SIDE — the loop via scheduler._post_task_status, the single via the
     /comms/tasks/{claim,complete,fail} handlers (blueprints/comms/_helpers.post_task_status) — so an
-    agent-side fragment would only duplicate it. This guards against re-introducing that dup."""
+    agent-side fragment would only duplicate it. This guards against re-introducing that dup.
+    """
     out = compose_skill(skill, "claude")
-    assert "Task progress (board status)" not in out, f"{skill} should not compose task-progress"
+    assert (
+        "Task progress (board status)" not in out
+    ), f"{skill} should not compose task-progress"
     # It still composes code-query + completion-report (the latter stays last).
     assert "Completion report (AGENT_DONE)" in out, f"{skill} missing completion-report"
 
@@ -274,11 +284,20 @@ def test_task_executors_do_not_compose_task_progress(skill):
 # structure before Grep — safe-nulling back to Grep when the backend is off. Design /
 # research / planning / summarize skills are intentionally excluded (no code structure).
 _CODE_TOUCHING_SKILLS = [
-    "team/build", "team/review", "team/test", "team/architect",
-    "development/build", "development/review", "development/test",
-    "development/explore", "development/debug",
-    "development/execute-task", "development/drain-dag",
-    "debug/build", "debug/verify", "fix/build",
+    "team/build",
+    "team/review",
+    "team/test",
+    "team/architect",
+    "development/build",
+    "development/review",
+    "development/test",
+    "development/explore",
+    "development/debug",
+    "development/execute-task",
+    "development/drain-dag",
+    "debug/build",
+    "debug/verify",
+    "fix/build",
 ]
 
 
@@ -288,13 +307,15 @@ def test_code_touching_skills_include_code_query_fragment(skill):
     code graph (POST /code/query) for structure before Grep — safe-nulling back to Grep when the
     backend is off. Without this, that agent never uses Pathly's code-intelligence."""
     out = compose_skill(skill, "claude")
-    assert "Code intelligence (ask Pathly's code graph before Grep)" in out, f"{skill} missing code-query"
+    assert (
+        "Code intelligence (ask Pathly's code graph before Grep)" in out
+    ), f"{skill} missing code-query"
     assert "/code/query" in out, f"{skill} missing the /code/query endpoint"
     # completion-report, where present, owns the "final act" slot — code-query composes before it.
     if "Completion report (AGENT_DONE)" in out:
-        assert out.index("/code/query") < out.index("Completion report (AGENT_DONE)"), (
-            f"{skill}: code-query must compose before completion-report"
-        )
+        assert out.index("/code/query") < out.index(
+            "Completion report (AGENT_DONE)"
+        ), f"{skill}: code-query must compose before completion-report"
 
 
 def test_dev_build_includes_completion_scout_and_spawn():
@@ -379,7 +400,8 @@ def test_block_duplicate_fragment_raises():
 
 def test_task_dag_post_block_retired():
     """The task-dag-post stopgap is gone — `planning/plan` is the real decomposer now
-    (it derives context_refs + depends_on). The consultation-plan block must not exist."""
+    (it derives context_refs + depends_on). The consultation-plan block must not exist.
+    """
     with pytest.raises(KeyError):
         resolve_block("consultation-plan", "claude")
     # planning/plan still composes cleanly (it stays the terminal planner for all decompose tiers).
@@ -416,6 +438,7 @@ def test_user_block_overrides_core_block():
 
 def test_build_adapter_caps_merges_goal_context():
     from pathly_orchestrator.skills.compose import build_adapter_caps
+
     caps = build_adapter_caps("claude", goal_id="g1", executor="loop", kind="dag")
     assert caps["goal_id"] == "g1"
     assert caps["executor"] == "loop"
@@ -430,6 +453,7 @@ def test_goal_id_gate_known_capability():
         _KNOWN_CAPABILITIES,
         build_adapter_caps,
     )
+
     assert "goal_id" in _KNOWN_CAPABILITIES
 
     # With goal_id — a gated fragment would be kept
@@ -445,7 +469,9 @@ def test_dag_sketch_composes_task_post_and_completion():
     from pathly_orchestrator.skills.compose import compose_skill, build_adapter_caps
 
     # With goal_id — both gated fragments included
-    out = compose_skill("planning/dag-sketch", build_adapter_caps("claude", goal_id="g1"))
+    out = compose_skill(
+        "planning/dag-sketch", build_adapter_caps("claude", goal_id="g1")
+    )
     assert "## Posting the task DAG to the Comms Board" in out
     assert "## Reading the board before you decompose" in out
     assert "## Completion report" in out
@@ -466,7 +492,9 @@ def test_plan_composes_task_dag_post_before_completion():
     assert "## Posting the task DAG to the Comms Board" in out
     task_idx = out.index("## Posting the task DAG to the Comms Board")
     completion_idx = out.index("## Completion report")
-    assert task_idx < completion_idx, "task-dag-post must appear before completion-report"
+    assert (
+        task_idx < completion_idx
+    ), "task-dag-post must appear before completion-report"
 
 
 # ── artifact-manifest + artifact-register tests ───────────────────────────────
@@ -474,6 +502,7 @@ def test_plan_composes_task_dag_post_before_completion():
 
 def test_artifact_manifest_loads():
     from pathly_orchestrator.skills.compose import load_artifact_manifest
+
     m = load_artifact_manifest()
     assert m["version"] == 1
     assert "planner" in m["roles"]
@@ -482,7 +511,11 @@ def test_artifact_manifest_loads():
 
 def test_manifest_role_file_override():
     from pathly_orchestrator.skills.compose import manifest_role_file
-    assert manifest_role_file("planner", "planning/dag-sketch") == ("DAG_PLAN.md", "## Tasks")
+
+    assert manifest_role_file("planner", "planning/dag-sketch") == (
+        "DAG_PLAN.md",
+        "## Tasks",
+    )
     assert manifest_role_file("planner") == ("IMPLEMENTATION_PLAN.md", "## Phase")
     assert manifest_role_file("designer") == ("DESIGN.md", "## Design System Output")
     assert manifest_role_file("nonexistent-role") is None
@@ -500,12 +533,21 @@ def test_artifact_register_not_in_po():
 
 def test_artifact_register_never_last():
     """No ordering-invariant skill may end on artifact-register."""
-    for skill in ("team/build", "team/review", "team/test", "team/design",
-                  "team/retro", "planning/plan"):
+    for skill in (
+        "team/build",
+        "team/review",
+        "team/test",
+        "team/design",
+        "team/retro",
+        "planning/plan",
+    ):
         out = compose_skill(skill, "claude").rstrip()
         # the artifact-register section must not be the final section
         reg = "## Registering your output artifact"
         assert reg in out
-        tail = out[out.index(reg) + len(reg):]
-        assert tail.lstrip().count("## ") >= 1 or "comms-post" in tail.lower() or "Completion" in tail, \
-            f"{skill}: artifact-register appears to be the last section"
+        tail = out[out.index(reg) + len(reg) :]
+        assert (
+            tail.lstrip().count("## ") >= 1
+            or "comms-post" in tail.lower()
+            or "Completion" in tail
+        ), f"{skill}: artifact-register appears to be the last section"
