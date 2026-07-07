@@ -310,7 +310,7 @@ def build_prompt(
             _code_files = _changed_files(project_root)
             if _code_files:
                 code_block = _code_build_block(
-                    board_scope, _code_files, agent_role, 1200
+                    board_scope, _code_files, agent_role, 1200, project_root
                 )
     except Exception:
         pass

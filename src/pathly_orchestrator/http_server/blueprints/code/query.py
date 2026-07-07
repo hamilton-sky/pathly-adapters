@@ -205,9 +205,9 @@ def code_query():
                 200,
             )
 
-        # Backend name for the response envelope. `_resolve_backend` is
-        # module-internal today (always "none"); Phase 4 wires it to ~/.pathly
-        # config, and this route then reflects the real backend automatically.
+        # Backend name for the response envelope. `_resolve_backend` reads the
+        # `code_context.backend` setting from ~/.pathly (off→none | cli), so this
+        # reflects the live backend; flipping the setting takes effect without a restart.
         backend = _cc.get_provider(_cc._resolve_backend()).name
 
         # Content-hash cache: serve an unchanged (op, target) from cache without
@@ -220,7 +220,9 @@ def code_query():
         else:
             # build_block never raises and returns "" when the backend is off;
             # map an empty block to JSON null so the agent gets a safe-null.
-            block = _cc.build_block(scope, [target], role, budget)
+            block = _cc.build_block(
+                scope, [target], role, budget, str(data.get("project_root") or "")
+            )
             result = block or None
             _QUERY_CACHE[key] = result
             # Log fresh queries to the board (shared context) with a hit/miss marker

@@ -77,6 +77,7 @@ class CliProvider:
         files: Sequence[str],
         role: str,
         budget: int,
+        project_root: str = "",
     ) -> str:
         # scope/role steer caching + per-role tiering at the gateway, not the
         # raw query — the cli backend only needs the files.
@@ -86,7 +87,7 @@ class CliProvider:
         exe = shutil.which(self.tool)
         if not exe:
             return ""  # binary not installed -> safe no-op
-        project = self._project(exe, list(files)[0])
+        project = self._project(exe, list(files)[0], project_root)
         if not project:
             return ""  # repo not indexed yet -> no block (caller degrades to Grep)
         sections: list[str] = []
@@ -102,15 +103,27 @@ class CliProvider:
         )
         return block[: max(0, int(budget))]
 
-    def _project(self, exe: str, sample_file: str) -> str:
+    def _project(self, exe: str, sample_file: str, project_root: str = "") -> str:
         """Indexed project whose root contains ``sample_file`` (longest-prefix
-        match), or ``""`` when the repo is not indexed."""
+        match), or ``""`` when the repo is not indexed.
+
+        A relative ``sample_file`` (agents pass the repo-relative changed-set) is
+        anchored to ``project_root``, NOT the server process CWD — the FSM server
+        rarely runs from the repo root, so ``os.path.abspath`` would mislocate every
+        relative file and silently drop the whole block.
+        """
         out = self._run(exe, ["cli", "list_projects", "{}"])
         try:
             projects = json.loads(out).get("projects", []) if out else []
         except Exception:
             return ""
-        target = os.path.abspath(sample_file).replace("\\", "/")
+        if os.path.isabs(sample_file):
+            target = sample_file.replace("\\", "/")
+        elif project_root:
+            target = os.path.join(project_root, sample_file).replace("\\", "/")
+        else:
+            target = os.path.abspath(sample_file).replace("\\", "/")
+        target = target.rstrip("/")
         best_name, best_len = "", -1
         for proj in projects:
             root = str(proj.get("root_path") or "").replace("\\", "/").rstrip("/")

@@ -54,6 +54,7 @@ class CodeContextProvider(Protocol):
         files: Sequence[str],
         role: str,
         budget: int,
+        project_root: str = "",
     ) -> str:
         """Return an advisory block for ``files``, or ``""`` when empty."""
         ...
@@ -76,9 +77,10 @@ class NoneProvider:
         files: Sequence[str],
         role: str,
         budget: int,
+        project_root: str = "",
     ) -> str:
         # Intentionally ignores every argument — the safe-off backend.
-        del scope, files, role, budget
+        del scope, files, role, budget, project_root
         return ""
 
 
@@ -202,11 +204,16 @@ def build_block(
     files: Sequence[str],
     role: str,
     budget: int = _DEFAULT_BUDGET,
+    project_root: str = "",
 ) -> str:
     """Return an advisory ``## Code structure`` block for ``files``, or ``""``.
 
     **Never raises.** Any failure returns ``""`` (the "never break the prompt"
     idiom); the default backend is ``none`` (safe-off).
+
+    ``project_root`` anchors relative ``files`` (agents pass the repo-relative
+    changed-set) — without it the ``cli`` backend resolves paths against the
+    server's process CWD and silently finds nothing.
     """
     try:
         provider = get_provider(_resolve_backend())
@@ -215,6 +222,7 @@ def build_block(
             list(files or []),
             role or "",
             int(budget),
+            project_root or "",
         )
     except Exception:
         logger.debug(
