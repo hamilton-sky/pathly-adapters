@@ -24,8 +24,8 @@ core/
                                 project-decompose, goalize
                   team/         team, discover, plan, design, architect, research,
                                 build, review, test, retro
-                  utilities/    archive, log, log-agent-done, lessons, meet,
-                                verify-state, fsm-call, scout-path, reflect,
+                  utilities/    archive, archive-artifacts, log, log-phase, log-agent-done,
+                                lessons, meet, verify-state, fsm-call, scout-path, reflect,
                                 dispatch, help
                   fix/          fix (blocked-feedback quick fix)
                   custom/       user-defined custom skills
@@ -35,8 +35,10 @@ core/
   templates/    plan file templates:
                   plan/   USER_STORIES, IMPLEMENTATION_PLAN, CONVERSATION_PROMPTS,
                           FEATURE_INDEX, PROGRESS, EDGE_CASES, FLOW_DIAGRAM,
-                          HAPPY_FLOW, ARCHITECTURE_PROPOSAL, MERMAID_DIAGRAM
-                  pipeline-walkthrough/   01-PIPELINE-FLOW, 02-TOKEN-USAGE, 03-ARTIFACT-MAP
+                          HAPPY_FLOW, ARCHITECTURE_PROPOSAL, MERMAID_DIAGRAM, VERIFY
+                          (VERIFY is the BUILDING→REVIEWING gate contract: line 1 must be
+                          `RESULT: PASS` for team/build to advance)
+                  pipeline-walkthrough/   README (folder index), 01-PIPELINE-FLOW, 02-TOKEN-USAGE, 03-ARTIFACT-MAP
                   summary/   gist.md, topic-map.md, detailed.md — depth-format contracts
                              injected as <summary_format> by POST /skills/compose;
                              also served raw by GET /skills/summary-format/<style>
@@ -45,6 +47,8 @@ core/
                   team.flow.yaml         full pipeline (STORMING→PLANNING→DESIGNING→BUILDING→REVIEWING→TESTING→RETRO→DONE)
                   team-build.flow.yaml   trimmed team flow used by the goal `team` executor
                   consultation.flow.yaml PO→architect→researcher→designer→planner goal decompose
+                  feature-consultation.flow.yaml PO→architect→researcher→designer→planner seeds GOALS onto a feature board (POST /comms/features/decompose)
+                  project-consultation.flow.yaml same stages, one altitude up: seeds FEATURES onto the project board + scaffolds pathly/features/<slug>/ (POST /comms/project/decompose)
                   debug.flow.yaml        debug flow
                   explore.flow.yaml      exploration flow
                   test.flow.yaml         test-only flow

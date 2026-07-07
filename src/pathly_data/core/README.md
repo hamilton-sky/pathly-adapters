@@ -18,9 +18,10 @@ src/pathly_data/
   core/
     agents/       agent role contracts (building/, planning/, quality/, research/, support/, director.md)
     skills/       skill markdown (controls/, development/, planning/, team/, utilities/,
-                                  fix/, fix-hutk/, custom/, debug/, hello/, planning-hello/, fragments/)
-    templates/    plan file templates (plan/, pipeline-walkthrough/)
-    flows/        flow YAML files (team, team-build, debug, explore, test, quick-fix, consultation)
+                                  fix/, custom/, debug/, fragments/)
+    templates/    plan file templates (plan/, pipeline-walkthrough/, summary/)
+    flows/        flow YAML files (team, team-build, debug, explore, test, quick-fix,
+                                  consultation, feature-consultation, project-consultation)
     design/       UI/UX design subsystem (data/CSVs, scripts/, cli.py)
   adapters/
     claude/       _meta/ YAMLs + .claude-plugin/

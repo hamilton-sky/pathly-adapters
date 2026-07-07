@@ -153,17 +153,18 @@ max_threads = 6          # max concurrent workers
 ### Agent TOML files
 
 `pathly-setup codex --apply` installs a TOML file for each Pathly role to
-`~/.codex/agents/`. These files define the role contract, model, and sandbox
-mode that Codex uses when an orchestrator calls `spawn_agent(agent_type=<name>)`.
+`~/.codex/agents/`. These files define the role contract and model that Codex
+uses when an orchestrator calls `spawn_agent(agent_type=<name>)`.
 
 Roles installed:
 
-| Role | Model | Sandbox |
-|---|---|---|
-| director, architect, orchestrator | o3 | full / restricted |
-| builder, reviewer, tester, designer, planner, po | codex-1 | full |
-| explorer | codex-1 | restricted |
-| scout, quick | codex-1-mini | restricted |
+| Role | Model |
+|---|---|
+| director, architect, orchestrator | gpt-5.5 |
+| builder, reviewer, tester, designer, planner, po, explorer | gpt-5.4 |
+| scout | gpt-5.4-mini |
+| quick | gpt-4.1-nano |
+| web-researcher | gpt-4o |
 
 ### Verify installation
 

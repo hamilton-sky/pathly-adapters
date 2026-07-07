@@ -2,7 +2,7 @@
 
 > **New here? Read [WHAT_IS_PATHLY.md](WHAT_IS_PATHLY.md) first** — it states Pathly's primary goal (board-driven *headless* multi-agent orchestration) and the board concept, with diagrams. This document covers only the **install/adapter surface**, which is one layer of the product, not its purpose.
 >
-> Scope: runtime adapter surfaces and install pipeline. For package layout and install/publish details see `PATHLY_ARCHITECTURE.md`. Version: **2.16.2**.
+> Scope: runtime adapter surfaces and install pipeline. For package layout and install/publish details see `PATHLY_ARCHITECTURE.md`. Version: **2.19.0**.
 
 pathly-adapters installs Pathly agent and skill files into AI host tools (Claude
 Code, Codex, Copilot, Antigravity). It owns the stitch pipeline, host detection,
@@ -23,33 +23,29 @@ pathly-adapters/                 ← pip package: pathly-adapters (CLI: pathly-s
 │   │   └── __main__.py
 │   └── pathly_data/
 │       ├── core/                ← SINGLE SOURCE OF TRUTH (tool-agnostic)
-│       │   ├── agents/          ← Agent behavior contracts (.md — no spawning syntax)
-│       │   │   ├── architect.md
-│       │   │   ├── builder.md
-│       │   │   ├── designer.md
-│       │   │   ├── director.md
-│       │   │   ├── explorer.md
-│       │   │   ├── human.md
-│       │   │   ├── orchestrator.md
-│       │   │   ├── planner.md
-│       │   │   ├── po.md
-│       │   │   ├── quick.md
-│       │   │   ├── README_routing.md  ← routing guide (not deployed)
-│       │   │   ├── reviewer.md
-│       │   │   ├── scout.md
-│       │   │   ├── tester.md
-│       │   │   └── web-researcher.md
+│       │   ├── agents/          ← Agent behavior contracts (.md — no spawning syntax), grouped by function
+│       │   │   ├── building/    ← builder.md, designer.md
+│       │   │   ├── planning/    ← architect.md, planner.md, po.md
+│       │   │   ├── quality/     ← reviewer.md, tester.md
+│       │   │   ├── research/    ← scout.md, explorer.md, web-researcher.md, evaluator.md
+│       │   │   ├── support/     ← orchestrator.md, quick.md, human.md
+│       │   │   ├── director.md  ← top-level router (not grouped)
+│       │   │   └── README_routing.md  ← routing guide (not deployed)
 │       │   ├── skills/          ← Skill logic in natural language, grouped by category
-│       │   │   ├── controls/    ← start, go, ff, back, pause, end, status
-│       │   │   ├── development/ ← build, review, test, design, debug, explore, fix
-│       │   │   ├── planning/    ← plan, po, prd-import, storm, retro
-│       │   │   ├── team/        ← team, discover, team-build, team-review, team-test, …
-│       │   │   ├── utilities/   ← archive, log, fsm-call, scout-path, reflect, commit, …
+│       │   │   ├── controls/    ← start, go, ff, back, pause, end, status, pathly
+│       │   │   ├── development/ ← build, review, test, design, debug, explore, fix, quick-fix, …
+│       │   │   ├── planning/    ← plan, po, prd-import, storm, retro, evaluate, consolidate,
+│       │   │   │                   feature-decompose, project-decompose, goalize, …
+│       │   │   ├── team/        ← team, discover, plan, design, architect, research, build, review, test, retro
+│       │   │   ├── utilities/   ← archive, log, log-agent-done, fsm-call, scout-path, reflect, commit, …
 │       │   │   ├── fix/         ← fix variants
 │       │   │   ├── custom/      ← user-defined skills
 │       │   │   ├── debug/       ← debug-specific skills
-│       │   │   └── fragments/   ← reusable prompt fragments
-│       │   ├── flows/           ← Flow YAML definitions (team.flow.yaml, debug.flow.yaml, explore.flow.yaml)
+│       │   │   └── fragments/   ← reusable prompt fragments (board CRUD, context retrieval, completion)
+│       │   ├── flows/           ← Flow YAML definitions (team.flow.yaml, team-build.flow.yaml,
+│       │   │                       consultation/feature-consultation/project-consultation.flow.yaml,
+│       │   │                       debug.flow.yaml, explore.flow.yaml, test.flow.yaml, quick-fix.flow.yaml)
+│       │   ├── design/          ← UI/UX design subsystem (data/ CSVs, scripts/, cli.py) — powers `pathly-design`
 │       │   └── templates/       ← Plan file templates (PROGRESS, USER_STORIES, etc.)
 │       │       └── plan/
 │       └── adapters/            ← Thin tool-specific wrappers
@@ -134,7 +130,7 @@ For Copilot: stitched files use Copilot-compatible format, deployed to workspace
 | `src/pathly_studio_cli/` | `pathly-studio` launcher and local Studio install helpers |
 | `src/pathly_data/core/` | Source-of-truth agent contracts, skill logic, plan templates — never edited by install |
 | `src/pathly_data/adapters/` | Per-tool YAML metadata (`_meta/`) and plugin manifests |
-| `src/pathly_orchestrator/` | FSM engine package. `http_server.py` exposes `/next_action`, `/complete_stage`, `/record_activity`, `/events/stream` over HTTP (port 8765). Also implements `pathly-events`, `pathly-state`, and `pathly-validate-flow` CLI entry points. |
+| `src/pathly_orchestrator/` | FSM engine package. `http_server/` (blueprint package) exposes `/next_action`, `/complete_stage`, `/record_activity`, `/events/stream` over HTTP (port 8765). Also implements `pathly-events`, `pathly-state`, and `pathly-validate-flow` CLI entry points. |
 | `src/pathly_hooks/` | Hook scripts (`classify_feedback.py`, `inject_feedback_ttl.py`) deployed by install into host tool settings. |
 
 ## Host Detection
@@ -178,11 +174,11 @@ Spawn Agent(subagent_type="reviewer") for review.
 ## Installed Manifests
 
 - Claude plugin manifest: `src/pathly_data/adapters/claude/.claude-plugin/plugin.json`
+- Claude marketplace metadata: `src/pathly_data/adapters/claude/.claude-plugin/marketplace.json`
 - Codex plugin manifest: `src/pathly_data/adapters/codex/.codex-plugin/plugin.json`
-- Public Codex marketplace metadata: `.agents/plugins/marketplace.json`
 
 There is no repository-root `.codex-plugin/` directory. Repository-root
-`.agents/` is marketplace metadata only; installed Codex skills are written to
+`.agents/` is empty (reserved); installed Codex skills are written to
 the user-level `~/.agents/skills/` directory.
 
 ## pathly-setup Commands
@@ -227,7 +223,7 @@ Current major panes:
 |---|---|
 | Flow Editor | visual canvas + raw YAML tab; save via `PUT /flows/<name>`; export to `pathly-package`, `claude-code`, or `codex` targets |
 | Canvas | bundled `src/pathly_data/core/flows/*.flow.yaml` plus editable user flow files |
-| Plan | project-local `pathly/plans/**` artifacts |
+| Plan | project-local `pathly/features/**` artifacts (legacy `pathly/plans/**` still resolved) |
 | Monitor | `pathly-fsm-http` SSE stream from `/events/stream` |
 | Conductor | chat target routing for Claude, Codex, and shell terminals |
 | Terminal | Electron PTY IPC exposed through `window.pathly.terminal` |
@@ -247,18 +243,23 @@ instance rail for focusing, hiding, and killing terminal instances.
 |---|---|
 | Windows | `%LOCALAPPDATA%\Pathly\` or `%APPDATA%\Pathly\` |
 | macOS/Linux | XDG-compatible data directory |
-| Project state | Always under the active project `plans/` directory |
+| Project state | Always under the active project `pathly/` directory (feature files under `pathly/features/<name>/`; legacy `pathly/plans/<name>/` still resolved) |
 
 ## Flow YAMLs
 
-Flows are fully user-definable. `src/pathly_data/core/flows/` ships four reference flows, but users can create any number of custom flows with any stages in any order.
+Flows are fully user-definable. `src/pathly_data/core/flows/` ships nine reference flows, but users can create any number of custom flows with any stages in any order.
 
 | Flow | File | States | Used for |
 |---|---|---|---|
-| `team` | `team.flow.yaml` | IDLE → STORMING → PLANNING → BUILDING → REVIEWING → TESTING → RETRO → DONE | Full feature pipeline |
+| `team` | `team.flow.yaml` | STORMING → PLANNING → DESIGNING → BUILDING → REVIEWING → TESTING → RETRO → DONE | Full feature pipeline |
+| `team-build` | `team-build.flow.yaml` | BUILDING → REVIEWING → TESTING → RETRO → DONE | Trimmed team flow used by the goal `team` executor |
 | `debug` | `debug.flow.yaml` | INVESTIGATING → REPRODUCING → ROOT_CAUSE_FOUND → FIXING → VERIFYING → DONE | Bug investigation |
 | `explore` | `explore.flow.yaml` | FRAMING → ANALYZING → TRACING → CONCLUDING → DONE | Codebase exploration |
 | `test` | `test.flow.yaml` | STORMING → PLANNING → BUILDING → REVIEWING → TESTING → DONE | Lightweight build+test pipeline (no retro/archive) |
+| `quick-fix` | `quick-fix.flow.yaml` | SCOPING → FIXING → VERIFYING → DONE | nano/lite fast path |
+| `consultation` | `consultation.flow.yaml` | PO_DISCUSSING → ARCHITECTING → RESEARCHING → DESIGNING → PLANNING → NO_DAG_SEEDED → DONE | Goal decompose (PO→architect→researcher→designer→planner) |
+| `feature-consultation` | `feature-consultation.flow.yaml` | PO_DISCUSSING → ARCHITECTING → RESEARCHING → DESIGNING → PLANNING → NO_GOALS_SEEDED → DONE | Feature→goals decomposer |
+| `project-consultation` | `project-consultation.flow.yaml` | PO_DISCUSSING → ARCHITECTING → RESEARCHING → DESIGNING → PLANNING → NO_FEATURES_SEEDED → DONE | Project spec→features decomposer |
 
 Each flow YAML specifies: `states`, `transitions`, `agent_map`, `role_map`, `feedback_routing`, `transition_rules`, `transition_actions`, and an optional `adapter_map` for routing stages to different CLI adapters.
 
@@ -282,14 +283,16 @@ The FSM server persists state in SQLite at `~/.pathly/pathly.db`.
 
 The runtime orchestration layer now extends beyond `transition_actions` auto-spawning. The comms board (`comms_messages` + `comms_artifacts` tables, `/comms/*` routes) acts as the live orchestration substrate:
 
-- **Goals** are top-level intent records; each goal owns a Task-DAG (`goal_id` column on tasks).
-- **Executors** (`single` / `loop` / `team`) are pluggable per goal and drive how tasks are dispatched (`supervisor/goal_run.py`).
+- **Goals** are top-level intent records; each goal owns a Task-DAG (`goal_id` column on tasks). `GET /comms/goals` is the read-model — goals plus their per-goal task-DAG rollup.
+- **Executors** (`single` / `loop` / `team`) are pluggable per goal and drive how tasks are dispatched (`supervisor/goal_executor.py`; `supervisor/goal_run.py` is a thin re-export shim over `goal_executor.py` + `goal_decomposer.py`).
+- **Decomposers** turn intent into a Task-DAG or sub-goals: `planning/feature-decompose` (feature → goals) and `planning/project-decompose` (project spec → sibling features), dispatched via the `feature-consultation` / `project-consultation` FSM flows.
 - **Per-goal adapter selection** routes each goal's execution to a specific CLI adapter (Claude, Codex, Antigravity, etc.).
 - **Context-retrieval** (`context_refs` + `/comms/artifacts/<id>/section` hydration, Board Catalog, opt-in summarizer) injects relevant board context into every agent prompt.
+- **Code intelligence** (`POST /code/query`) proxies codebase-structure questions to `codebase-memory-mcp` (the sole code-intel backend; the earlier `gitnexus` tool has been removed).
 - **Memory consolidation** (`/comms/consolidate`) deduplicates and merges near-duplicate notes.
 - **Goal-stop** (`POST /comms/goals/stop`) terminates an in-progress goal run.
 
-All of these are shipped as of v2.16.2. `transition_actions` auto-spawning remains the baseline for flow-driven pipelines; the Board executor model is the layer above it for board-driven (headless-supervised) and multi-goal orchestration.
+`transition_actions` auto-spawning remains the baseline for flow-driven pipelines; the Board executor model is the layer above it for board-driven (headless-supervised) and multi-goal orchestration.
 
 ## Source of Truth
 

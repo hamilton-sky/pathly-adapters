@@ -66,6 +66,8 @@ POST /comms/acknowledge     ← mark a message acknowledged
 POST /comms/answer          ← answer a posted question
 GET  /comms/tasks           ← list DAG tasks
 POST /comms/tasks/complete  ← mark a task complete
+POST /comms/tasks/run       ← run ONE task headlessly: claim it, spawn a builder on its prompt, complete on success
+POST /comms/tasks/stop      ← stop a single-task run: kill its board run and revert the task to pending
 POST /comms/attach          ← attach an artifact to a message
 GET  /comms/artifacts       ← list artifacts linked to a message (comms_artifacts table)
 GET  /comms/trash           ← list trashed messages
@@ -86,6 +88,9 @@ GET  /comms/goals           ← list goals + per-goal task-DAG rollup (read-mode
 POST /comms/goals/run       ← dispatch a goal's task-DAG to its executor (single|loop|team)
 POST /comms/goals/stop      ← stop a running goal (releases lock / aborts FSM run)
 POST /comms/goals/decompose ← decompose a goal into a task-DAG (planner|consultation)
+GET  /comms/goals/refs-coverage ← per-goal context_refs coverage stats
+POST /comms/features/decompose ← decompose a feature board into a goal task-DAG (feature-consultation flow)
+POST /comms/project/decompose  ← decompose a project spec into a feature set + scaffold pathly/features/<slug>/ (project-consultation flow)
 POST /comms/consolidate     ← memory consolidation: near-dup dedup; mode=full adds the reflection pass
 GET  /events/comms          ← SSE stream of comms board updates (streams blueprint)
 ```
@@ -151,11 +156,15 @@ pathly_orchestrator/
                            #   backfill_invocations_from_events() (idempotent startup rebuild) +
                            #   on_event_appended() (live hook fired from fsm_events.append_event).
                            #   Editor/chat rows (/db/invocation, source_seq NULL) are left untouched.
-      comms.py             # re-export shim — splits into comms_messages, comms_artifacts, comms_tasks, comms_embeddings (import from domain modules for new code)
+      comms.py             # re-export shim — splits into comms_messages, comms_artifacts, comms_tasks, comms_embeddings, comms_counts, comms_goals_read (import from domain modules for new code)
       comms_messages.py    # board message CRUD; goal_id/executor columns back the Goals->Task-DAG model
       comms_artifacts.py   # artifact metadata CRUD (attach, list, section index, update_summary)
-      comms_tasks.py       # task DAG operations (get_ready, complete, claim, fail, reclaim)
+      comms_tasks.py       # task DAG operations (get_ready, complete, claim, fail, reclaim, goal_refs_coverage)
       comms_embeddings.py  # embedding storage + hybrid/semantic search; search_by_embedding() merges parent+child vectors, deduplicates by message_id, returns _matched_chunk for subtopic surfacing; store_chunk_embeddings() writes to comms_chunk_embeddings
+      comms_counts.py      # count_goals_for_feature / count_features_for_project — gate the consultation flows' seed thresholds
+      comms_goals_read.py  # get_goals_with_rollup() — backs GET /comms/goals
+      comms_summary.py     # per-artifact AI-summary selection/style/note setters+getters (unified-ai-routing)
+      skill_composition.py # per-project skill-composition overrides (composition editor)
   runner/                  # CLI runner, agent invocation, argv, output parsing
     argv.py                # resolve_argv, resolve_interactive_argv, _storage_path
     output.py              # parse_result, _extract_json_payload
@@ -166,6 +175,8 @@ pathly_orchestrator/
     comms_context.py       # assembles board context (governance + referenced + semantic, relevance-gated); _matched_chunk surfaced as "matched topic: …" via comms_formatters.py
     sections.py            # parse_sections/slugify_heading/structure_key — markdown section index (anchors)
     hydrate.py             # hydrate_section/ensure_indexed — /section payload + staleness; index_artifact_async (eager, section-index only)
+    code_context.py        # CodeContextProvider protocol + get_provider()/build_block() — codebase-intelligence context injection
+    code_context_cli.py    # CliProvider — shells out to codebase-memory-mcp for code_context.py
     cli.py                 # run_flow, main, resolve_stage, handle_blocked, handle_decide
   supervisor/              # Visible runner: PTY spawning, SSE broadcast, registry
     state.py               # RunnerState, OpenSession dataclasses
@@ -204,7 +215,7 @@ pathly_orchestrator/
       flows/               # defs.py (flow CRUD); stage_configs.py (per-stage agent/model overrides)
       catalog/             # items.py (file-tree catalog)
       skills/              # editor.py re-export shim; editor_render.py (/skills/catalog|parse|preview|compose|summary-format/<style>); editor_io.py (/skills/save|export)
-      comms/               # board + goals/DAG, split by domain: messages*.py, tasks.py, artifacts*.py, runs.py, goals.py, goals_read.py (GET /comms/goals rollup), settings.py, context.py (+ _helpers.py); see "Comms board endpoints" above
+      comms/               # board + goals/DAG, split by domain: messages*.py, tasks.py, artifacts*.py, runs.py, goals.py, goals_read.py (GET /comms/goals rollup), settings.py, context.py, features.py (/comms/features/decompose), project.py (/comms/project/decompose) (+ _helpers.py); see "Comms board endpoints" above
       ops/                 # telemetry*.py (/record_activity, /record_phase*, /telemetry/*); menu.py (/menu, /metrics); db_api*.py (/db/* read API); chat.py (/chat); export.py
       code/                # query.py (POST /code/query — codebase-intelligence)
 ```

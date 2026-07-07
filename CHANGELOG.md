@@ -1,5 +1,41 @@
 # Changelog
 
+## Unreleased (2026-07-07)
+
+### Board — project-planner (G2): spec → sibling features
+
+- New skill `planning/project-decompose` — splits a big spec dropped on the PROJECT
+  board into 2-5 sibling `type=feature` cards, each scaffolded under
+  `pathly/features/<slug>/SPEC.md`.
+- New `project-consultation` flow (PO→…→project-decompose) plus a feature-count exit
+  gate (`count_features_for_project`, mirrored by `count_goals_for_feature` for the
+  feature-consultation gate) — both counters live in `db/queries/comms_counts.py`.
+- `POST /comms/project/decompose` and `POST /comms/features/decompose` — light/full
+  (single-agent board run) or consultation (FSM flow) rigor tiers.
+- Project-board scope is the normalized `project_root` path (not a fixed literal),
+  matching how Studio and `comms_context` injection already key the project board.
+
+### Board — goals read-model + `/pathly goalize`
+
+- `GET /comms/goals` — goals enriched with a task-DAG rollup
+  (`{total, done, in_progress, pending, blocked, failed, ready}`), the symmetric
+  read partner to the existing `/comms/goals/{run,stop,decompose}` write routes.
+- New interactive skill `planning/goalize` (`/pathly goalize`) — chats an idea into
+  a goal + task DAG with the human, then posts both to the board only after sign-off.
+
+### Code intelligence — `/code/query` fixes
+
+- `/code/query` now serves real data: relative file paths passed to the `cli` backend
+  are anchored to `project_root` instead of the FSM server's own process CWD, which
+  previously made every relative-path lookup resolve to nothing.
+- `code_context.reindex=auto` now actually refreshes the graph — `maybe_reindex` runs
+  the tool's incremental `index_repository` itself (debounced to once per 30s),
+  instead of only flipping the tool's own `auto_index` flag, whose change-detection
+  could silently miss genuinely-changed files.
+- The `code-query` skill fragment gained a direct-CLI fallback
+  (`codebase-memory-mcp cli search_code` / `query_graph`) for when the `/code/query`
+  proxy returns a null result.
+
 ## 2.19.0
 
 ### Studio — Workspace sidebar rebuilt as a real file tree

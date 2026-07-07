@@ -65,17 +65,17 @@ flowchart TD
 
 ```text
 ~/.claude/
-├── agents/                    ← 14 stitched behavioral contracts
+├── agents/                    ← 13 stitched behavioral contracts
 │   ├── builder.md
 │   ├── reviewer.md
 │   ├── architect.md
-│   └── ... (8 more)
+│   └── ... (10 more)
 ├── skills/                    ← stitched skill files (nested: each skill is a folder)
 │   ├── pathly/
 │   │   └── SKILL.md           ← main dispatcher
-│   ├── build/
+│   ├── pathly-build/
 │   │   └── SKILL.md
-│   ├── review/
+│   ├── pathly-review/
 │   │   └── SKILL.md
 │   ├── pathly-team/
 │   │   └── SKILL.md
@@ -133,6 +133,7 @@ Command                   Purpose
 /pathly build             implement next conversation (auto-detects feature)
 /pathly storm             brainstorm with architect
 /pathly plan              create/update feature plan (auto-detects feature)
+/pathly goalize           create a goal + task-DAG from chat (interactive)
 /pathly review            code review
 /pathly test              run acceptance tests (auto-detects feature)
 /pathly debug             investigate a bug

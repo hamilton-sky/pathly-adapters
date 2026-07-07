@@ -55,37 +55,31 @@ pathly-adapters/                 ← pip package: pathly-adapters
 │   ├── pathly_hooks/            ← Hook scripts deployed into host tool settings by installer
 │   └── pathly_data/             ← Package resource layout for installed data files
 │       ├── core/                ← SINGLE SOURCE OF TRUTH (tool-agnostic)
-│       │   ├── agents/          ← Agent behavior contracts (.md — no spawning syntax)
-│       │   │   ├── architect.md
-│       │   │   ├── builder.md
-│       │   │   ├── designer.md  ← UI/UX design spec generation (used by /design skill)
-│       │   │   ├── director.md
-│       │   │   ├── explorer.md  ← analyze/explore/conclude phases for /explore skill
-│       │   │   ├── human.md     ← blocks pipeline until user responds (HUMAN_QUESTIONS)
-│       │   │   ├── orchestrator.md
-│       │   │   ├── planner.md
-│       │   │   ├── po.md
-│       │   │   ├── quick.md
-│       │   │   ├── README_routing.md  ← routing guide (not deployed)
-│       │   │   ├── reviewer.md
-│       │   │   ├── scout.md
-│       │   │   ├── tester.md
-│       │   │   └── web-researcher.md
+│       │   ├── agents/          ← Agent behavior contracts (.md — no spawning syntax), grouped by function
+│       │   │   ├── building/    ← builder.md, designer.md (designer: UI/UX design spec generation, used by /design skill)
+│       │   │   ├── planning/    ← architect.md, planner.md, po.md
+│       │   │   ├── quality/     ← reviewer.md, tester.md
+│       │   │   ├── research/    ← scout.md, explorer.md (analyze/explore/conclude phases), web-researcher.md, evaluator.md
+│       │   │   ├── support/     ← orchestrator.md, quick.md, human.md (blocks pipeline until user responds — HUMAN_QUESTIONS)
+│       │   │   ├── director.md  ← top-level router (not grouped)
+│       │   │   └── README_routing.md  ← routing guide (not deployed)
 │       │   ├── skills/          ← Skill logic in natural language, grouped by category
-│       │   │   ├── controls/    ← start, go, ff, back, pause, end, status
-│       │   │   ├── development/ ← build, review, test, design, debug, explore, fix, build-debug, verify-debug
-│       │   │   ├── planning/    ← plan, po, prd-import, storm, retro
-│       │   │   ├── team/        ← team, discover, team-build, team-review, team-test, team-plan, team-design, team-retro
-│       │   │   ├── utilities/   ← archive, log, log-agent-done, lessons, meet, verify-state, fsm-call,
-│       │   │   │                   scout-path, reflect, commit, dispatch, help, pathly
-│       │   │   ├── fix/         ← fix variants
-│       │   │   ├── fix-hutk/    ← hook-triggered fix variants
+│       │   │   ├── controls/    ← start, go, ff, back, pause, end, status, pathly
+│       │   │   ├── development/ ← build, review, test, design, debug, explore, fix, quick-fix,
+│       │   │   │                   execute-task, drain-dag, analyze, split, summarize (+ -gist / -detailed), commit
+│       │   │   ├── planning/    ← plan, po, prd-import, storm, retro, evaluate, consolidate,
+│       │   │   │                   create-feature, dag-sketch, feature-decompose, project-decompose, goalize
+│       │   │   ├── team/        ← team, discover, plan, design, architect, research, build, review, test, retro
+│       │   │   ├── utilities/   ← archive, archive-artifacts, log, log-agent-done, log-phase, lessons, meet,
+│       │   │   │                   verify-state, fsm-call, scout-path, reflect, dispatch, help
+│       │   │   ├── fix/         ← fix (blocked-feedback quick fix)
 │       │   │   ├── custom/      ← user-defined custom skills
-│       │   │   ├── debug/       ← debug-specific skills
-│       │   │   ├── fragments/   ← reusable prompt fragments
-│       │   │   ├── hello/       ← onboarding/welcome skills
-│       │   │   └── planning-hello/ ← planning onboarding skills
-│       │   ├── flows/           ← FSM flow definitions (team.flow.yaml, debug.flow.yaml, explore.flow.yaml, test.flow.yaml)
+│       │   │   ├── debug/       ← debug-specific skills (build, verify)
+│       │   │   └── fragments/   ← reusable prompt fragments (board CRUD, context retrieval, completion reporting)
+│       │   ├── flows/           ← FSM flow definitions: team.flow.yaml, team-build.flow.yaml,
+│       │   │                       consultation.flow.yaml, feature-consultation.flow.yaml, project-consultation.flow.yaml,
+│       │   │                       debug.flow.yaml, explore.flow.yaml, test.flow.yaml, quick-fix.flow.yaml
+│       │   ├── design/          ← UI/UX design subsystem (data/ CSVs, scripts/, cli.py) — powers `pathly-design`
 │       │   └── templates/       ← Plan file templates (PROGRESS, USER_STORIES, etc.)
 │       │       └── plan/
 │       └── adapters/            ← Thin tool-specific wrappers
@@ -139,8 +133,8 @@ CLI implementation modules (`detect.py`, `stitch.py`, `materialize.py`, `orchest
 `src/pathly_data/` is the installed package data. Resources are loaded through the
 package's internal resource API rather than repo-relative path assumptions.
 
-- `src/pathly_data/core/agents/` — `.md` files (tool-agnostic agent contracts)
-- `src/pathly_data/core/skills/` — `.md` files (tool-agnostic skill logic)
+- `src/pathly_data/core/agents/` — `.md` files (tool-agnostic agent contracts), grouped into `building/`, `planning/`, `quality/`, `research/`, `support/` subdirectories plus top-level `director.md`
+- `src/pathly_data/core/skills/` — `.md` files (tool-agnostic skill logic), grouped by category subdirectory
 - `src/pathly_data/core/templates/plan/` — `.template.md` files
 - `src/pathly_data/adapters/claude/` — `.claude-plugin/plugin.json` + `_meta/` per-agent and per-skill `.yaml` files
 - `src/pathly_data/adapters/codex/` — `.codex-plugin/plugin.json` + `_meta/`
@@ -151,14 +145,19 @@ package's internal resource API rather than repo-relative path assumptions.
 
 ## Flow YAMLs
 
-`src/pathly_data/core/flows/` contains the FSM definitions consumed by the orchestrator at runtime. There are four flows:
+`src/pathly_data/core/flows/` contains the FSM definitions consumed by the orchestrator at runtime. There are nine flows:
 
 | Flow | File | Storage path | States |
 |---|---|---|---|
-| `team` | `team.flow.yaml` | `pathly/plans/{topic}/` | IDLE → STORMING → PLANNING → BUILDING → REVIEWING → TESTING → RETRO → DONE |
+| `team` | `team.flow.yaml` | `pathly/features/{topic}/` | STORMING → PLANNING → DESIGNING → BUILDING → REVIEWING → TESTING → RETRO → DONE |
+| `team-build` | `team-build.flow.yaml` | `pathly/{topic}/` | BUILDING → REVIEWING → TESTING → RETRO → DONE |
 | `debug` | `debug.flow.yaml` | `pathly/debugs/{topic}/` | INVESTIGATING → REPRODUCING → ROOT_CAUSE_FOUND → FIXING → VERIFYING → DONE |
 | `explore` | `explore.flow.yaml` | `pathly/explorations/{topic}/` | FRAMING → ANALYZING → TRACING → CONCLUDING → DONE |
-| `test` | `test.flow.yaml` | `pathly/plans/{topic}/` | STORMING → PLANNING → BUILDING → REVIEWING → TESTING → DONE |
+| `test` | `test.flow.yaml` | `pathly/features/{topic}/` | STORMING → PLANNING → BUILDING → REVIEWING → TESTING → DONE |
+| `quick-fix` | `quick-fix.flow.yaml` | `pathly/fixes/{topic}/` | SCOPING → FIXING → VERIFYING → DONE |
+| `consultation` | `consultation.flow.yaml` | `pathly/{topic}/` | PO_DISCUSSING → ARCHITECTING → RESEARCHING → DESIGNING → PLANNING → NO_DAG_SEEDED → DONE |
+| `feature-consultation` | `feature-consultation.flow.yaml` | `pathly/{topic}/` | PO_DISCUSSING → ARCHITECTING → RESEARCHING → DESIGNING → PLANNING → NO_GOALS_SEEDED → DONE |
+| `project-consultation` | `project-consultation.flow.yaml` | `pathly/project/` | PO_DISCUSSING → ARCHITECTING → RESEARCHING → DESIGNING → PLANNING → NO_FEATURES_SEEDED → DONE |
 
 Each YAML specifies: `version`, `flow`, `storage_path`, `states`, `transitions`, `agent_map`, `feedback_routing`, `transition_rules`, and `transition_actions`.
 
@@ -261,16 +260,27 @@ src/pathly_data/adapters/copilot/
 Stitched output → VS Code agents folder
 Subagent spawning syntax: `/fleet`, `/delegate`
 
+### Antigravity
+
+```
+src/pathly_data/adapters/antigravity/
+└── _meta/
+    ├── builder.yaml        ← Gemini CLI slash-command format
+    └── ...                 ← one yaml per agent and skill (Gemini models: gemini-2.5-pro / gemini-2.5-flash)
+```
+
+Stitched output → `~/.gemini/antigravity-cli/agents/` + `~/.gemini/antigravity-cli/skills/`
+Subagent spawning syntax: role delegation (Gemini CLI layout)
+
 ---
 
 ## Installed Manifests
 
 - Claude plugin manifest: `src/pathly_data/adapters/claude/.claude-plugin/plugin.json`
+- Claude marketplace metadata: `src/pathly_data/adapters/claude/.claude-plugin/marketplace.json`
 - Codex plugin manifest: `src/pathly_data/adapters/codex/.codex-plugin/plugin.json`
-- Public Codex marketplace metadata: `.agents/plugins/marketplace.json`
 
-There is no root `.codex-plugin/` directory. Root `.agents/` is marketplace
-metadata only.
+There is no root `.codex-plugin/` directory. Root `.agents/` is empty (reserved).
 
 ---
 
@@ -283,7 +293,7 @@ pathly-tokens        = "pathly_telemetry.report:main"
 pathly-events        = "pathly_orchestrator.eventlog:_cli"
 pathly-state         = "pathly_orchestrator.eventlog:_state_cli"
 pathly-fsm-http      = "pathly_orchestrator.http_server:main"
-pathly-fsm-call      = "pathly_orchestrator.fsm.http_client:main"
+pathly-fsm-call      = "pathly_orchestrator.fsm_cli:main"
 pathly-validate-flow = "pathly_orchestrator.fsm.state:validate_flow_cli"
 pathly-run           = "pathly_orchestrator.runner:main"
 pathly-status        = "pathly_orchestrator.cli.status:main"
@@ -306,10 +316,10 @@ from an installed wheel, not just from the source checkout:
 ```python
 # correct — works from installed wheel
 from importlib.resources import files
-data = files("pathly_data").joinpath("core/agents/builder.md").read_text()  # package name, not path
+data = files("pathly_data").joinpath("core/agents/building/builder.md").read_text()  # package name, not path
 
 # wrong — breaks outside source checkout
-path = Path(__file__).parent.parent / "core" / "agents" / "builder.md"
+path = Path(__file__).parent.parent / "core" / "agents" / "building" / "builder.md"
 ```
 
 ---

@@ -3,7 +3,7 @@
 This document records the security/reliability posture for pathly-adapters and
 the remaining hardening work before a production-ready label.
 
-Current status: public beta candidate (core install path stable at 2.18.1).
+Current status: public beta candidate (core install path stable at 2.19.0).
 
 The adapter architecture has good safety properties: thin adapters, an explicit
 stitch pipeline, dry-run support, a Pathly-owned-file manifest, and atomic
@@ -59,48 +59,50 @@ The FSM server uses SQLite in WAL mode at `~/.pathly/pathly.db`.
 
 ## Hook Injection Risks
 
-Hooks are installed by pathly-adapters into host tool settings. They run local
-Python scripts after tool calls and can rewrite files.
+Feedback-file classification and TTL injection run as an in-process file
+watcher inside the FSM HTTP server (`_feedback_watcher` in
+`pathly_orchestrator/http_server/feedback.py`), gated on `PATHLY_PROJECT_ROOT`
+being set for the `pathly-fsm-http` process. This replaced the earlier design
+of installing Python scripts into host tool hook-event systems (Claude/Codex/
+Copilot) — that install-time hook deployment was removed from the installer.
 
 Risk:
 
-- Hook input comes from JSON on stdin and includes file paths.
-- `classify_feedback.py` may call the Anthropic API when `ANTHROPIC_API_KEY` is
-  present.
-- Hook failures could silently leave feedback unclassified or without TTL
+- The watcher reads file paths from the project's own `pathly/features/**`
+  and `pathly/plans/**` (legacy) directories on a polling loop and rewrites
+  matched files.
+- A path-matching bug could rewrite a file outside the intended feedback
+  directory.
+- Watcher failures could silently leave feedback unclassified or without TTL
   metadata.
-- A hook that validates paths incorrectly could write outside the intended
-  project `plans/` directory.
 
 Mitigation today:
 
-- Hooks are narrow: they only act on feedback-file names or
-  `feedback/IMPL_QUESTIONS.md`.
-- `classify_feedback.py` exits silently if no API key exists or if questions
-  are already tagged.
-- `inject_feedback_ttl.py` only acts on known feedback filenames under a
-  `feedback/` path segment.
-- Setup scripts only touch host tool settings to register/unregister hooks.
+- The watcher is narrow: it only globs `*/feedback/*.md` under each feature's
+  directory and only rewrites files it already found via that glob.
+- Classification is a deterministic regex/keyword match
+  (`_classify_content` in `feedback.py`) — no external API call, so there is
+  no network egress or key-handling risk in this path.
+- TTL injection only fires when the file lacks a `ttl_hours` frontmatter key.
 
 Remaining gap:
 
-- File path validation is string-based. A production hardening pass should
-  resolve paths and ensure writes stay under the active project's `plans/`
-  directory.
-- Hook API failures are intentionally non-blocking, but not strongly
-  observable.
-- The model name in `classify_feedback.py` is a compatibility dependency and
-  should be checked during release.
+- File path validation is string-based (glob match, not canonicalized path
+  resolution). A production hardening pass should resolve paths and ensure
+  writes stay under the active project's `pathly/features/` (or legacy
+  `pathly/plans/`) directory.
+- Watcher failures are intentionally non-blocking (caught and logged), but
+  not strongly observable outside the server's own log stream.
 
 Production recommendation:
 
-- Add path canonicalization before every hook write.
-- Add hook unit tests for ignored paths, malformed JSON, already-tagged files,
-  missing API key, existing `DESIGN_QUESTIONS.md`, and TTL frontmatter.
-- Log hook failures in a project-local diagnostic file or clearly visible hook
-  output.
-- Document that hooks are optional and the pipeline must remain correct
-  without them.
+- Add path canonicalization before every watcher write.
+- Add unit tests for ignored paths, already-tagged files, and TTL frontmatter
+  injection.
+- Log watcher failures in a project-local diagnostic file or clearly visible
+  server output.
+- Document that the watcher requires `PATHLY_PROJECT_ROOT` and the pipeline
+  must remain correct without it running.
 
 Allowed hook behavior:
 
@@ -274,15 +276,19 @@ Production recommendation:
 
 ## Hook surface coverage
 
-Status of automatic hook integration per host:
+Feedback classification and TTL injection are no longer host-tool hooks — they
+run inside the FSM HTTP server as a file watcher (`_feedback_watcher`), so
+coverage is uniform across every host that runs `pathly-fsm-http` with
+`PATHLY_PROJECT_ROOT` set, not deployed per adapter. The one per-host hook
+still installed into a tool's own settings is Claude Code's `Stop` telemetry
+hook:
 
 | Host | Status | Deployed by installer | Notes |
 |---|---|---|---|
-| **Claude Code** | Supported | ✅ (auto via `post_tool_call` hook system) | Hooks fire automatically via the Claude Code hook event system (`post_tool_call`). |
-| **Codex** | Supported | ✅ (`pathly-setup codex --apply`) | Writes `~/.codex/hooks.json` with `PostToolUse` entries under the `pathly` namespace. |
-| **Copilot VS Code** | Supported | ✅ (`pathly-setup copilot --apply`) | Writes `.github/hooks/pathly-classify.json` and `.github/hooks/pathly-ttl.json`. |
-| **Copilot CLI** | Not supported | ❌ (no hook event system) | No hook event system available in this host. |
-| **Antigravity** | Unknown | ❓ (not yet verified) | Hook event system availability in Antigravity CLI has not been confirmed. |
+| **Claude Code** | Supported | ✅ (`pathly-setup claude --apply`) | Writes a `Stop` hook entry (`python -m pathly_hooks.stop_telemetry`) into `~/.claude/settings.json`. Feedback classification/TTL is handled by the FSM server watcher, not a Claude hook. |
+| **Codex** | N/A | — | No host-tool hooks are installed for Codex. Feedback classification/TTL works the same as any other host via the FSM server watcher. |
+| **Copilot VS Code** | N/A | — | No host-tool hooks are installed for Copilot. Feedback classification/TTL works the same as any other host via the FSM server watcher. |
+| **Antigravity** | N/A | — | No host-tool hooks are installed for Antigravity. Feedback classification/TTL works the same as any other host via the FSM server watcher. |
 
 ---
 

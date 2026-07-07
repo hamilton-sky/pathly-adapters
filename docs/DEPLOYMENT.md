@@ -27,9 +27,8 @@ Copy `.env.example` to `.env` and configure:
 | `PATHLY_FSM_HTTP_PORT` | `8765` | Port for the FSM HTTP server (validated 1–65535) |
 | `PATHLY_FSM_HTTP_HOST` | `127.0.0.1` | Bind address. **Must be a loopback address** (`127.0.0.1`, `::1`, `localhost`). Any other value causes a startup error unless `PATHLY_EXPOSE_HOST=true` is also set. |
 | `PATHLY_EXPOSE_HOST` | _(unset)_ | Set to `true` to allow a non-loopback `PATHLY_FSM_HTTP_HOST`. Prints a warning about unauthenticated SSE streams. Only needed when Studio and the FSM server run on different machines. |
-| `PATHLY_PROJECT_ROOT` | _(none)_ | Absolute path to your project root — **required for hooks** |
+| `PATHLY_PROJECT_ROOT` | _(none)_ | Absolute path to your project root — **required for the feedback-file watcher** |
 | `PATHLY_API_SECRET` | _(auto)_ | Shared secret for `X-Pathly-Secret` auth. If unset, a 64-char hex token is auto-generated and saved to `~/.pathly/server_secret.txt` on first run. Set explicitly to pin the secret across restarts or share it with external callers. |
-| `ANTHROPIC_API_KEY` | _(none)_ | Enables feedback auto-classification (optional) |
 | `PATHLY_CORS_ORIGIN` | `null` | Allowed CORS origin for SSE stream (e.g. `http://localhost:3000`) |
 
 ## Running the FSM HTTP Server
@@ -117,13 +116,22 @@ curl -X POST http://127.0.0.1:8765/health -H "X-Pathly-Secret: $SECRET"
 
 ## Hook Setup
 
-Hooks require `PATHLY_PROJECT_ROOT` to be set in Claude Code's environment. Add to your shell profile or Claude Code settings:
+Feedback-file classification and TTL injection run as a file watcher inside
+the FSM HTTP server (`pathly-fsm-http`), not as a per-tool hook. The watcher
+requires `PATHLY_PROJECT_ROOT` to be set in the FSM server's own environment.
+Add to your shell profile before starting `pathly-fsm-http`:
 
 ```bash
 export PATHLY_PROJECT_ROOT=/path/to/your/project
 ```
 
-Verify hooks are working by checking `~/.pathly/hook.log` after a feedback file is written.
+Verify it's working by editing a `feedback/*.md` file under your project's
+`pathly/features/<feature>/` directory and confirming the server injects TTL
+frontmatter / `[REQ]`/`[ARCH]` tags within a couple of seconds.
+
+Claude Code additionally gets a `Stop` hook (registered by
+`pathly-setup claude --apply` into `~/.claude/settings.json`) that reports
+session telemetry — unrelated to feedback classification.
 
 ## Health Check
 
@@ -153,13 +161,10 @@ the instance.
 - Check `PATHLY_FSM_HTTP_PORT` is not already in use: `lsof -i :8765`
 - Check Python version: `python --version` (requires 3.11+)
 
-### Hooks not running
-- Ensure `PATHLY_PROJECT_ROOT` is set: `echo $PATHLY_PROJECT_ROOT`
-- Check `~/.pathly/hook.log` for skip messages
-
-### Feedback files not classified
-- Set `ANTHROPIC_API_KEY` in your environment
-- Check `~/.pathly/hook.log` for errors
+### Feedback files not classified / TTL not injected
+- Ensure `PATHLY_PROJECT_ROOT` is set in the environment the FSM server was started in: `echo $PATHLY_PROJECT_ROOT`
+- Ensure the feedback watcher feature flag is enabled (`PATHLY_FF_FEEDBACK_WATCHER`, on by default)
+- Check the `pathly-fsm-http` server's own log output for watcher errors
 
 ## Releasing a New Version
 

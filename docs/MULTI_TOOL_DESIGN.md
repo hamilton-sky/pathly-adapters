@@ -17,12 +17,14 @@ HTTP runtime; it is not a separate workflow source of truth.
 pathly-adapters/                 ← repo root (single package)
 ├── src/
 │   ├── install_cli/             ← Python CLI: detect, stitch, setup_command
-│   ├── pathly_orchestrator/     ← FSM event-log module (internal, src-layout package)
+│   ├── pathly_orchestrator/     ← FSM engine package (HTTP server, supervisor, comms board)
 │   ├── pathly_hooks/            ← Hook scripts deployed by installer into host tool settings
 │   └── pathly_data/             ← installed package data
 │       ├── core/                ← single source of truth (tool-agnostic)
-│       │   ├── agents/
-│       │   ├── skills/
+│       │   ├── agents/          ← grouped: building/, planning/, quality/, research/, support/
+│       │   ├── skills/          ← grouped: controls/, development/, planning/, team/, utilities/, …
+│       │   ├── flows/           ← nine .flow.yaml definitions
+│       │   ├── design/          ← UI/UX design subsystem
 │       │   └── templates/plan/
 │       └── adapters/            ← thin tool-specific wrappers
 │           ├── claude/
@@ -60,7 +62,7 @@ Each adapter exposes a host-native **interactive** invocation (below). In the **
 Studio uses the same core runtime rather than defining another adapter:
 
 - Canvas reads bundled `src/pathly_data/core/flows/*.flow.yaml`.
-- Plan reads and writes project-local `pathly/plans/**` files.
+- Plan reads and writes project-local `pathly/features/**` files (legacy `pathly/plans/**` still resolved).
 - Monitor consumes `pathly-fsm-http` events.
 - Conductor routes chat work to Claude, Codex, or shell targets.
 - Terminal uses `window.pathly.terminal` and a shared `xtermRegistry` so the
@@ -72,11 +74,11 @@ keeps the PTY alive; the bin icon kills/disposes/removes the terminal instance.
 ## Installed Manifests
 
 - Claude plugin manifest: `src/pathly_data/adapters/claude/.claude-plugin/plugin.json`
+- Claude marketplace metadata: `src/pathly_data/adapters/claude/.claude-plugin/marketplace.json`
 - Codex plugin manifest: `src/pathly_data/adapters/codex/.codex-plugin/plugin.json`
-- Public Codex marketplace metadata: `.agents/plugins/marketplace.json`
 
 There is no root `.codex-plugin/` directory in the current repository. Root
-`.agents/` is marketplace metadata only; there is no `.agents/skills/` directory.
+`.agents/` is empty (reserved); there is no `.agents/skills/` directory.
 
 ## Future Adapter Work
 

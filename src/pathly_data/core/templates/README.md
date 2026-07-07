@@ -10,6 +10,7 @@ Current template sets:
 
 - `plan/`: Pathly plan files used by planning and import workflows.
 - `pipeline-walkthrough/`: Per-run metrics templates (pipeline flow, token usage, artifact map).
+- `summary/`: depth-format contracts (`gist.md`, `topic-map.md`, `detailed.md`) injected as `<summary_format>` by `POST /skills/compose`, and served raw by `GET /skills/summary-format/<style>`.
 
 Repo-root `templates/` is intentionally absent; do not add a duplicate install
 surface there.
