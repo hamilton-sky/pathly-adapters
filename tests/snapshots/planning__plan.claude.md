@@ -11,8 +11,8 @@ for rendering those routes in their host-native form.
 ## Skill Contract
 
 **Consumes (optional):** `pathly/features/STORM_SEED.md` - pre-filled answers for the interview
-**Produces:** `pathly/features/$FEATURE/` - FEATURE_INDEX.md + 4 files in lite, FEATURE_INDEX.md + 8 files in standard/strict
-**Consumed by:** `build` skill reads `pathly/features/$FEATURE/FEATURE_INDEX.md` first, then `CONVERSATION_PROMPTS.md` and `PROGRESS.md`
+**Produces:** `$PLAN_DIR/` - FEATURE_INDEX.md + 4 files in lite, FEATURE_INDEX.md + 8 files in standard/strict (Step 0.5 resolves `PLAN_DIR`: the feature folder in feature mode, the **goal folder** in goal-decompose mode)
+**Consumed by:** the board task DAG seeded in Step 6 (authoritative for board-native executors); the legacy `build` skill path reads `$PLAN_DIR/FEATURE_INDEX.md` first, then `CONVERSATION_PROMPTS.md` and `PROGRESS.md`
 
 ## Step 0: Parse Arguments
 
@@ -25,7 +25,27 @@ Parse `$ARGUMENTS`:
 
 Use `FEATURE` for the folder name, not the full `$ARGUMENTS` string.
 
-If `pathly/features/$FEATURE/` already exists, treat this as a rigor change or plan completion task:
+## Step 0.5: Resolve PLAN_DIR — where every plan file goes
+
+Storage path provided by the launch context (substituted at compose time):
+
+```
+<feature_path>
+```
+
+- **Flow / decompose mode:** if the line above shows a real path, set `PLAN_DIR` to it
+  exactly. For a goal decompose (e.g. the consultation flow's terminal planner stage) this
+  is the **goal folder** — `pathly/features/<name>/goals/<goal-slug>` — NOT the feature
+  root. The plan and its task DAG belong to the goal; knowledge artifacts live on the
+  feature board ("two owners, two homes"). Writing plan files to the feature root in this
+  mode silently clobbers sibling goals' plans — never do it.
+- **Interactive mode:** if the line above still literally reads `<feature_path>` (angle
+  brackets — nothing was substituted), there is no flow context. Set
+  `PLAN_DIR = pathly/features/$FEATURE`.
+
+All Step 4 file writes, Step 5 checks, and Step 6 `artifact_path` values use `$PLAN_DIR/`.
+
+If `$PLAN_DIR/FEATURE_INDEX.md` already exists, treat this as a rigor change or plan completion task:
 - `lite -> standard`: keep existing files and add missing standard files.
 - `standard -> strict`: keep existing files and add strict risk, rollback, approval, and verification mapping.
 - `strict -> standard` or `standard -> lite`: do not delete files; report that downgrades change future gates only.
@@ -101,7 +121,7 @@ All template reads below use `$TEMPLATE_BASE/<FILE>.template.md`.
 
 ## Step 4: Create The Plans Folder
 
-Create `pathly/features/$FEATURE/` if it does not exist. If it exists, add or update only the files/sections needed for the selected rigor.
+Create `$PLAN_DIR/` (from Step 0.5) if it does not exist. If it exists, add or update only the files/sections needed for the selected rigor.
 
 ### Rigor File Sets
 
@@ -185,9 +205,9 @@ Read `{{TEMPLATES_DIR}}/plan/PROGRESS.template.md` for the exact file structure.
 Verbatim prompts for each builder conversation. Max 4 conversations per folder.
 Read `{{TEMPLATES_DIR}}/plan/CONVERSATION_PROMPTS.template.md` for the exact file structure.
 
-Each prompt must be self-contained. Start every prompt with:
+Each prompt must be self-contained. Start every prompt with (write the resolved `$PLAN_DIR` value, not the variable):
 ```
-Read pathly/features/$FEATURE/FEATURE_INDEX.md first to orient yourself and verify codebase paths.
+Read $PLAN_DIR/FEATURE_INDEX.md first to orient yourself and verify codebase paths.
 ```
 Do not re-list all codebase files in the prompt — they live in FEATURE_INDEX.md.
 
@@ -206,6 +226,11 @@ For standard and strict, read `{{TEMPLATES_DIR}}/plan/EDGE_CASES.template.md` fo
 ### 4h. ARCHITECTURE_PROPOSAL.md
 
 Skip in `lite`; put short architecture notes directly in `IMPLEMENTATION_PLAN.md`.
+
+**Collision guard (decompose mode):** if `$PLAN_DIR/ARCHITECTURE_PROPOSAL.md` already exists
+(a consultation's architect stage wrote it), do NOT overwrite it — it is the authoritative
+proposal. Keep it, and only append a `## Phase Mapping` section at the end if the phase-anchor
+mapping is missing.
 
 For standard and strict, read `{{TEMPLATES_DIR}}/plan/ARCHITECTURE_PROPOSAL.template.md` for the exact file structure.
 
@@ -260,9 +285,9 @@ Keep decomposition small enough for builder reliability:
 
 ## Step 5: Verify Structure
 
-- `FEATURE_INDEX.md` exists in `pathly/features/$FEATURE/` for all rigor levels.
-- If `rigor = lite`, all 5 required files exist in `pathly/features/$FEATURE/`.
-- If `rigor = standard` or `strict`, all 9 files exist in `pathly/features/$FEATURE/`.
+- `FEATURE_INDEX.md` exists in `$PLAN_DIR/` for all rigor levels.
+- If `rigor = lite`, all 5 required files exist in `$PLAN_DIR/`.
+- If `rigor = standard` or `strict`, all 9 files exist in `$PLAN_DIR/`.
 - `CONVERSATION_PROMPTS.md` has no more than 4 conversations.
 - Conversation prompts reference correct phase numbers.
 - `PROGRESS.md` conversation table matches `CONVERSATION_PROMPTS.md`.
@@ -343,7 +368,7 @@ curl -s -X POST http://127.0.0.1:8765/comms/post \
     "text": "Advisory artifact: edge cases for $FEATURE",
     "board": "feature",
     "scope": "$FEATURE",
-    "artifact_path": "pathly/features/$FEATURE/EDGE_CASES.md",
+    "artifact_path": "$PLAN_DIR/EDGE_CASES.md",
     "artifact_type": "plan_artifact"
   }'
 
@@ -357,7 +382,7 @@ curl -s -X POST http://127.0.0.1:8765/comms/post \
     "text": "Advisory artifact: happy flow for $FEATURE",
     "board": "feature",
     "scope": "$FEATURE",
-    "artifact_path": "pathly/features/$FEATURE/HAPPY_FLOW.md",
+    "artifact_path": "$PLAN_DIR/HAPPY_FLOW.md",
     "artifact_type": "plan_artifact"
   }'
 
@@ -371,7 +396,7 @@ curl -s -X POST http://127.0.0.1:8765/comms/post \
     "text": "Advisory artifact: architecture proposal for $FEATURE",
     "board": "feature",
     "scope": "$FEATURE",
-    "artifact_path": "pathly/features/$FEATURE/ARCHITECTURE_PROPOSAL.md",
+    "artifact_path": "$PLAN_DIR/ARCHITECTURE_PROPOSAL.md",
     "artifact_type": "plan_artifact"
   }'
 ```
@@ -397,7 +422,7 @@ The `context_refs` and `depends_on` derivation rules are unchanged:
 ## Step 7: Report
 
 ```text
-## Plans folder created: pathly/features/$FEATURE/
+## Plans folder created: $PLAN_DIR/
 
 Rigor: [lite / standard / strict]
 
