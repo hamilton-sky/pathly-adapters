@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (2026-07-07)
+## 2.20.0
 
 ### Board — project-planner (G2): spec → sibling features
 
