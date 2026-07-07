@@ -116,7 +116,7 @@ export function MsgCard({ message: m, flash, onAnswer, onResolve, onDelete, onSu
           {m.stage && (
             <span className={s.msgStage} data-stage={m.stage}>{m.stage}</span>
           )}
-          <Timestamp value={m.ts} className={s.msgTime} />
+          <Timestamp value={m.ts} mode="absolute" className={s.msgTime} />
         </div>
         {confirming && (
           <ConfirmModal

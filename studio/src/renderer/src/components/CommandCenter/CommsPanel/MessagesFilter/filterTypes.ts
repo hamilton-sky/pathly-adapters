@@ -6,11 +6,11 @@ export interface FilterGroup {
 }
 
 // Thread-eligible message types, grouped by role for a scannable filter popover.
-// goal/task are excluded — they live in the "Goals & Tasks" view, never the thread
-// (see CommsMsgList, which filters them out).
+// goal/task/artifact are excluded — they live in their own board views (Goals &
+// Tasks, Artifacts), never the message thread (see CommsMsgList, which filters them out).
 export const FILTER_GROUPS: FilterGroup[] = [
   { label: 'Conversation', types: ['nudge', 'decision', 'question', 'answer'] },
-  { label: 'Knowledge', types: ['discovery', 'note', 'artifact'] },
+  { label: 'Knowledge', types: ['discovery', 'note'] },
   { label: 'Status', types: ['status', 'phase'] },
   { label: 'Signals', types: ['warning', 'escalation'] },
 ]

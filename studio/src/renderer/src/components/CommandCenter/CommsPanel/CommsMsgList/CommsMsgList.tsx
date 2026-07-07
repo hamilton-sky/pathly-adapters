@@ -4,6 +4,7 @@ import type { BoardScope, Message, MessageType } from '../../types'
 import { agentMeta } from '../../constants'
 import { MsgCard } from '../cards/MsgCard/MsgCard'
 import { MonitorLane } from '../cards/MonitorLane/MonitorLane'
+import { isMonitorMessage } from '../monitorClass'
 import { ConfirmModal } from '../../../shared/ConfirmModal/ConfirmModal'
 import MarkdownRenderer from '../../../../components/shared/MarkdownRenderer/MarkdownRenderer'
 import { Timestamp } from '../../../Timestamp/Timestamp'
@@ -52,26 +53,33 @@ export function CommsMsgList({ scope, messages, searchResults, searchTerm, flash
   }
 
   const pins = messages.filter((m) => m.pinned)
-  // Goals and tasks live in the dedicated "Goals & Tasks" board view, not the
-  // message thread — filter them out here so the Messages view stays a clean log.
-  // An optional type filter (empty = all) narrows the thread further; pins are exempt.
+  // Goals, tasks and artifacts live in their dedicated board views (Goals & Tasks,
+  // Artifacts), not the message thread — filter them out here so the Messages view
+  // stays a clean log. An optional type filter (empty = all) narrows the thread
+  // further; pins are exempt.
   const typeSet = typeFilter && typeFilter.length > 0 ? new Set(typeFilter) : null
   const thread = messages.filter(
-    (m) => !m.pinned && m.type !== 'goal' && m.type !== 'task' && (!typeSet || typeSet.has(m.type)),
+    (m) =>
+      !m.pinned &&
+      m.type !== 'goal' &&
+      m.type !== 'task' &&
+      m.type !== 'artifact' &&
+      (!typeSet || typeSet.has(m.type)),
   )
 
   // Execution-trace noise — FSM phase boundaries + supervisor/system lifecycle status
   // (Started:/Done:, goal-run started/finished) — lives in the collapsible Monitor lane,
   // not inline, so the thread reads as the semantic story (decisions, artifacts, warnings).
   // Everything else is signal.
-  const isMonitor = (m: Message): boolean =>
-    m.type === 'phase' ||
-    (m.type === 'status' && (m.from === 'supervisor' || m.from === 'system'))
-  const monitor = thread.filter(isMonitor)
-  const signal = thread.filter((m) => !isMonitor(m))
+  const monitor = thread.filter(isMonitorMessage)
+  const signal = thread.filter((m) => !isMonitorMessage(m))
 
   return (
     <div className={s.thread}>
+      {/* Execution trace always sits at the very top (collapsed) — above pins —
+          mirroring the All grid so the Monitor lane is in one consistent place. */}
+      {monitor.length > 0 && <MonitorLane messages={monitor} />}
+
       {pins.length > 0 && (
         <div className={s.pins}>
           {pins.map((m) => (
@@ -119,8 +127,6 @@ export function CommsMsgList({ scope, messages, searchResults, searchTerm, flash
           <p>{typeSet ? 'No messages match the current filter.' : 'No messages on this board yet.'}</p>
         </div>
       ) : null}
-
-      {monitor.length > 0 && <MonitorLane messages={monitor} />}
 
       {confirmPinId && (
         <ConfirmModal

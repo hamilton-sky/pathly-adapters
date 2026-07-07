@@ -1,0 +1,56 @@
+.view {
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.band {
+  min-width: 0;
+}
+
+/* Responsive without a viewport media query: auto-fill reflows against the
+   band's own width, so it degrades to fewer columns in a narrow docked panel.
+   (Swap to a `container-type: inline-size` + @container rule if you prefer
+   fixed 3/2/1 breakpoints — both satisfy the spec.) `minmax(0, …)` lets columns
+   shrink below tile content so long titles never blow out the track. */
+.grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(min(var(--tile-min, 220px), 100%), 1fr));
+}
+
+/* Compact, squarer tiles — the full text lives in the hover card, so a tile only
+   needs to be big enough to scan/recognise, not to hold everything. */
+.grid[data-kind='goals']     { --tile-min: 180px; }
+.grid[data-kind='tasks']     { --tile-min: 150px; }
+.grid[data-kind='messages']  { --tile-min: 160px; }
+.grid[data-kind='artifacts'] { --tile-min: 230px; }
+
+.placeholder {
+  height: 100%;
+  min-height: 160px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+  padding: 32px 20px;
+}
+
+.phTitle {
+  margin: 0;
+  font: 600 13px/1.3 var(--font-family-base);
+  color: var(--text-primary);
+}
+
+.phText {
+  margin: 0;
+  max-width: 260px;
+  font: 12px/1.5 var(--font-family-base);
+  color: var(--text-muted);
+}

@@ -33,9 +33,11 @@ const RELATIVE_MAX_MS = 7 * DAY
 
 const dateFmt = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' })
 const dateFmtYear = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+// Numeric on purpose — "7/6/2026, 9:46 PM", not "Mon, Jul 6…". Read as an exact
+// instant on card faces + tooltips; seconds live in formatClock for dense log rows.
 const absoluteFmt = new Intl.DateTimeFormat(undefined, {
-  year: 'numeric', month: 'short', day: 'numeric',
-  hour: 'numeric', minute: '2-digit', second: '2-digit',
+  year: 'numeric', month: 'numeric', day: 'numeric',
+  hour: 'numeric', minute: '2-digit',
 })
 const clockFmt = new Intl.DateTimeFormat(undefined, {
   hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
@@ -99,7 +101,7 @@ export function formatRelative(input: TimeInput): string {
   return formatDateShort(ms)
 }
 
-/** Full absolute datetime for tooltips and audit surfaces — "Jul 6, 2026, 2:03:22 PM". */
+/** Full absolute datetime, numeric — "7/6/2026, 9:46 PM". Card faces, tooltips, audit. */
 export function formatAbsolute(input: TimeInput): string {
   const ms = toMs(input)
   if (ms == null) return TIME_SENTINEL

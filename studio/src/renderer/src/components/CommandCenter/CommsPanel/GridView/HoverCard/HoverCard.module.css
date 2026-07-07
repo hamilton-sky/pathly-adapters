@@ -1,0 +1,47 @@
+/* The wrapper is the grid cell; the tile inside is width:100%. */
+.wrap {
+  display: block;
+  min-width: 0;
+}
+
+/* Portaled preview — position:fixed at the trigger rect, opens upward. */
+.card {
+  position: fixed;
+  transform: translateY(-100%);
+  z-index: 9000;
+  max-width: 320px;
+  padding: 10px 12px;
+  background: var(--bg-mantle);
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  /* Long unbreakable tokens (e.g. file paths — slashes aren't break points) must
+     wrap inside the card, not spill past its right edge. Inherited by all children. */
+  overflow-wrap: anywhere;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .card { animation: hcIn 120ms ease-out; }
+  @keyframes hcIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+}
+
+/* Shared preview content classes — imported by the tile modules so every kind's
+   hover card reads consistently. */
+.pvHead { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.pvKind {
+  font: 700 9px/1 var(--font-family-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+.pvTime { margin-left: auto; font: 10px/1 var(--font-family-mono); color: var(--text-muted); flex-shrink: 0; }
+.pvTitle { font: 600 12.5px/1.4 var(--font-family-base); color: var(--text-primary); }
+.pvMeta { font: 500 11px/1.4 var(--font-family-mono); color: var(--text-muted); }
+.pvText { font: 400 11.5px/1.5 var(--font-family-base); color: var(--text-secondary); }

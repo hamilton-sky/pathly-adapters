@@ -7,6 +7,7 @@ import { SearchBar } from '../SearchBar/SearchBar'
 import { SingleAgentButton } from '../SingleAgentButton/SingleAgentButton'
 import { BoardViewToggle, type BoardView } from '../BoardViewToggle/BoardViewToggle'
 import { GoalsView } from '../GoalsView/GoalsView'
+import { GridView } from '../GridView/GridView'
 import { NewGoalButton } from '../GoalsView/NewGoalButton'
 import { EvaluateBoardButton } from '../GoalsView/EvaluateBoardButton'
 import { ArtifactsView } from '../ArtifactsView/ArtifactsView'
@@ -220,9 +221,9 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
               note={summaryNote}
               onNoteChange={setSummaryNote}
             />
-          ) : (
+          ) : boardView === 'messages' ? (
             <MessagesFilter value={typeFilter} onChange={setTypeFilter} />
-          )
+          ) : null /* grid — no per-view action */
         }
       />
 
@@ -257,6 +258,9 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
           onDropFiles={handleDropFiles}
           onDropPaths={handleDropPaths}
         />
+      )}
+      {boardView === 'grid' && (
+        <GridView messages={messages} boardKey={boardKey} boardScope={scope} onDelete={del} />
       )}
 
       <div className={s.foot}>

@@ -1,0 +1,60 @@
+.tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  min-height: 54px;
+  padding: 8px 10px;
+  text-align: left;
+  cursor: pointer;
+  background: var(--bg-surface0);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  color: var(--text-primary);
+  font-family: var(--font-family-base);
+  transition: border-color 120ms ease-out, transform 120ms ease-out;
+}
+.tile:hover { border-color: var(--accent-border); }
+.tile:active { transform: scale(0.985); }
+.tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.tile:hover [data-tile-del],
+.tile:focus-within [data-tile-del] { opacity: 1; pointer-events: auto; }
+
+/* Alerts keep the same full-tint treatment as the thread cards (no side bar). */
+.tile[data-type='warning']    { background: var(--orange-bg); border-color: var(--orange-border); }
+.tile[data-type='escalation'] { background: var(--red-bg); border-color: var(--red-border); }
+
+.top { display: flex; align-items: center; gap: 8px; min-width: 0; }
+
+.time {
+  margin-left: auto;
+  flex-shrink: 0;
+  font: 10px/1 var(--font-family-mono);
+  color: var(--text-muted);
+  cursor: help;
+}
+
+.text {
+  font: 500 12px/1.4 var(--font-family-base);
+  color: var(--text-primary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-width: 0;
+  /* Long unbreakable tokens (file paths, test names) must wrap and clamp, not
+     spill past the tile's right edge. */
+  overflow-wrap: anywhere;
+}
+
+.author {
+  font: 500 10px/1 var(--font-family-mono);
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
