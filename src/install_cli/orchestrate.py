@@ -192,6 +192,7 @@ _SKILL_GROUPS = {
     "quick-fix": "development",
     "fsm-call": "utilities",
     "go": "controls",
+    "goalize": "planning",
     "help": "utilities",
     "lessons": "utilities",
     "log-agent-done": "utilities",

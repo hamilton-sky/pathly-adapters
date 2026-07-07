@@ -29,6 +29,9 @@ from .comms_counts import (  # noqa: F401
     count_goals_for_feature,
     count_features_for_project,
 )
+from .comms_goals_read import (  # noqa: F401
+    get_goals_with_rollup,
+)
 from .comms_artifacts import (  # noqa: F401
     attach_artifact_to_message,
     insert_artifact,

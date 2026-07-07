@@ -6,6 +6,7 @@ from .artifacts import bp as artifacts_bp
 from .artifacts_summary import bp as artifacts_summary_bp
 from .runs import bp as runs_bp
 from .goals import bp as goals_bp
+from .goals_read import bp as goals_read_bp
 from .settings import bp as settings_bp
 from .context import bp as context_bp
 from .features import bp as features_bp
@@ -29,6 +30,7 @@ all_blueprints = [
     artifacts_summary_bp,
     runs_bp,
     goals_bp,
+    goals_read_bp,
     settings_bp,
     context_bp,
     features_bp,

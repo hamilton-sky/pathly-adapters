@@ -176,6 +176,16 @@ skills:
       - comms-post
       - completion-report
 
+  # Interactive front-door to Board→Goals→Tasks: chat an idea into a goal + its task DAG, then post
+  # BOTH on human sign-off. Goal create is in-body (like planning/plan's find-or-create); task
+  # posting is the task-dag-post fragment, UNGATED — $GOAL_ID is set at runtime by the goal this
+  # skill just created (an interactive run has no goal_id spawn context to gate on). no_defaults:
+  # an interactive create action with no pipeline phases.
+  planning/goalize:
+    no_defaults: true
+    fragments:
+      - task-dag-post
+
   team/plan:
     fragments:
       - completion-report

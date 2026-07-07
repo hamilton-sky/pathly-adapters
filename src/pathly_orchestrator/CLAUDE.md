@@ -82,6 +82,7 @@ GET  /comms/artifacts/<id>/section ← hydrate a named section of a .md artifact
 POST /comms/run             ← single-agent / evaluator board run
 POST /comms/run/stop        ← stop a board run
 POST /comms/agent-context   ← board context block for prompt injection
+GET  /comms/goals           ← list goals + per-goal task-DAG rollup (read-model; symmetric partner to the goals write routes)
 POST /comms/goals/run       ← dispatch a goal's task-DAG to its executor (single|loop|team)
 POST /comms/goals/stop      ← stop a running goal (releases lock / aborts FSM run)
 POST /comms/goals/decompose ← decompose a goal into a task-DAG (planner|consultation)
@@ -203,7 +204,7 @@ pathly_orchestrator/
       flows/               # defs.py (flow CRUD); stage_configs.py (per-stage agent/model overrides)
       catalog/             # items.py (file-tree catalog)
       skills/              # editor.py re-export shim; editor_render.py (/skills/catalog|parse|preview|compose|summary-format/<style>); editor_io.py (/skills/save|export)
-      comms/               # board + goals/DAG, split by domain: messages*.py, tasks.py, artifacts*.py, runs.py, goals.py, settings.py, context.py (+ _helpers.py); see "Comms board endpoints" above
+      comms/               # board + goals/DAG, split by domain: messages*.py, tasks.py, artifacts*.py, runs.py, goals.py, goals_read.py (GET /comms/goals rollup), settings.py, context.py (+ _helpers.py); see "Comms board endpoints" above
       ops/                 # telemetry*.py (/record_activity, /record_phase*, /telemetry/*); menu.py (/menu, /metrics); db_api*.py (/db/* read API); chat.py (/chat); export.py
       code/                # query.py (POST /code/query — codebase-intelligence)
 ```
