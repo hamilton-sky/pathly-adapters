@@ -215,6 +215,15 @@ function resolveRunnerShell(argv: string[]): { shell: string; args: string[]; te
   const isClaude = engineBase.startsWith('claude')
   const isCodex = engineBase.startsWith('codex')
 
+  // A cmd.exe batch shim (.cmd/.bat) SHREDS any argument containing a newline: cmd's batch
+  // parser truncates the value at the first CR/LF, and the escaped remainder makes cmd print
+  // "The system cannot find the path specified" — yet the whole chain still exits 0. So a
+  // multi-line prompt handed to a batch shim silently produces NO real run (empirically
+  // confirmed with agy.cmd). Two mitigations below key off this flag: claude/codex move the
+  // prompt onto stdin regardless of length (there's a channel); an engine with no stdin path
+  // (agy) is failed loudly rather than recording a false success.
+  const isBatchShim = /\.(cmd|bat)$/i.test(argv[0])
+
   // Windows caps a process command line (~32 KB). A big composed prompt (e.g. the planner
   // skill) passed as `claude -p <prompt>` blows it → claude.exe "filename or extension is too
   // long". claude's print mode reads the prompt from STDIN, so for an over-long prompt we pipe
@@ -228,7 +237,26 @@ function resolveRunnerShell(argv: string[]): { shell: string; args: string[]; te
   let pipeIdx = -1
   if (isClaude || isCodex) {
     for (let i = 1; i < argv.length; i++) {
-      if (!argv[i].startsWith('-') && argv[i].length > STDIN_PROMPT_MAX) { pipeIdx = i; break }
+      const a = argv[i]
+      if (a.startsWith('-')) continue
+      // Pipe when the prompt is over-long OR — through a batch shim — carries a newline that
+      // the shim would otherwise shred. Either way it moves off the command line onto stdin.
+      if (a.length > STDIN_PROMPT_MAX || (isBatchShim && /[\r\n]/.test(a))) { pipeIdx = i; break }
+    }
+  }
+
+  // Batch shim + a still-on-command-line newline arg = guaranteed silent shred (the engine has
+  // no stdin fallback, or the multi-line arg is a non-prompt one we don't pipe). Fail loudly so
+  // the run surfaces as an error instead of a false success. This is the agy-diagram failure mode.
+  if (isBatchShim && pipeIdx === -1) {
+    const shredIdx = argv.findIndex((a, i) => i > 0 && /[\r\n]/.test(a))
+    if (shredIdx !== -1) {
+      throw new Error(
+        `Cannot run a multi-line prompt through a batch shim (${path.basename(argv[0])}). ` +
+        'A .cmd/.bat wrapper truncates the argument at the first newline and the run would ' +
+        "silently do nothing. Install the engine's native launcher (.exe / .ps1), or use " +
+        'claude/codex, which move the prompt onto stdin.',
+      )
     }
   }
 

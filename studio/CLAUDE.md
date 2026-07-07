@@ -120,6 +120,8 @@ Queue management IPC: `terminal:queue-control` accepts `pause | resume | cancel 
 
 **Codex headless shape:** `codex exec --skip-git-repo-check --sandbox workspace-write -- <prompt>`. On Windows, `terminal.ts` pipes `$null` to stdin to prevent `codex exec` from stalling while waiting for additional stdin input.
 
+**Batch-shim guard (`resolveRunnerShell`):** a resolved launcher ending in `.cmd`/`.bat` is a cmd.exe batch shim, and cmd's batch parser **shreds any argument containing a newline** — it truncates at the first CR/LF and the escaped remainder makes cmd print "The system cannot find the path specified", yet the chain still exits 0 (a silent false success — this was the `agy.cmd` diagram-run failure). Mitigation: for claude/codex a multi-line prompt through a batch shim is moved onto **stdin** regardless of length (there is a channel); for an engine with **no** stdin path (agy), a still-on-command-line newline arg **throws** so the run surfaces as an error instead of a false success. `agy` resolves to `%LOCALAPPDATA%\agy\bin\agy.exe` first — the `.cmd` fallback only bites during an agy self-update rename window.
+
 ## Markdown Editor (formerly Notebook)
 
 The component formerly called "Notebook" is now fully renamed:
