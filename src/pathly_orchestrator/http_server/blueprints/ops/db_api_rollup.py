@@ -18,7 +18,7 @@ _TIERS = ("feature", "project", "global")
 def _by_tier(conn, where_sql: str, params: list) -> dict:
     """Return {tier: {invocations, cost_usd, tokens_in, tokens_out}} for a WHERE clause."""
     rows = conn.execute(
-        "SELECT COALESCE(scope_tier,'feature') AS tier, "
+        "SELECT COALESCE(scope_tier,'feature') AS tier, "  # nosec B608 - where_sql is internally built; values are bound
         "  COUNT(*) AS invocations, "
         "  COALESCE(SUM(cost_usd),0) AS cost_usd, "
         "  COALESCE(SUM(tokens_in),0) AS tokens_in, "

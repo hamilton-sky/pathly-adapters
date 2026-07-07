@@ -38,7 +38,7 @@ def _file_hash(path: str) -> str:
     """SHA1 of the file's bytes, or ``""`` when it can't be read."""
     try:
         with open(path, "rb") as fh:
-            return hashlib.sha1(fh.read()).hexdigest()
+            return hashlib.sha1(fh.read(), usedforsecurity=False).hexdigest()
     except OSError:
         return ""
 

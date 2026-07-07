@@ -119,7 +119,7 @@ def _content_hash(target: str, project_root: str) -> str:
             else os.path.join(project_root or "", target)
         )
         with open(path, "rb") as fh:
-            return hashlib.sha1(fh.read()).hexdigest()
+            return hashlib.sha1(fh.read(), usedforsecurity=False).hexdigest()
     except Exception:
         return ""
 

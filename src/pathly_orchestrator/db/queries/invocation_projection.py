@@ -56,7 +56,7 @@ def _tier_for(conn: sqlite3.Connection, project_root: str, feature: str) -> str:
     for table in ("agent_invocations", "otel_spans"):
         try:
             row = conn.execute(
-                f"SELECT scope_tier FROM {table} "
+                f"SELECT scope_tier FROM {table} "  # nosec B608 - {table} is a hardcoded literal tuple; params are bound
                 "WHERE project_root=? AND feature=? AND scope_tier IS NOT NULL "
                 "AND scope_tier!='feature' LIMIT 1",
                 (project_root, feature),
@@ -174,7 +174,7 @@ def backfill_invocations_from_events(
         params = [project_root]
 
     rows = conn.execute(
-        "SELECT seq, project_root, feature, event_type, payload FROM fsm_events "
+        "SELECT seq, project_root, feature, event_type, payload FROM fsm_events "  # nosec B608 - WHERE is an internal constant; project_root is bound
         f"{where}{' AND' if where else 'WHERE'} event_type IN ('AGENT_DONE','BILLING_UPDATE') "
         "ORDER BY seq ASC",
         params,
