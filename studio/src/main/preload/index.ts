@@ -139,6 +139,10 @@ contextBridge.exposeInMainWorld('pathly', {
     setTitleBarOverlay: (color: string, symbolColor: string): Promise<void> =>
       ipcRenderer.invoke('window:setTitleBarOverlay', { color, symbolColor }),
   },
+  board: {
+    popout: (opts: { scope: string; feature: string; project: string; name: string }): Promise<void> =>
+      ipcRenderer.invoke('board:popout', opts),
+  },
   fs: {
     read: (path: string): Promise<string | null> => ipcRenderer.invoke('fs:read', path),
     write: (path: string, content: string): Promise<void> =>

@@ -7,6 +7,7 @@ import { registerWatcherHandlers } from './ipc/watcher'
 import { registerFsmHandlers } from './ipc/fsm'
 import { registerShellHandlers } from './ipc/shell'
 import { registerTerminalHandlers, killAllPtys } from './ipc/terminal'
+import { registerBoardHandlers } from './ipc/board'
 import { initApiConfig, getApiSecret, getApiBase } from '@main/apiConfig'
 import { spawn, ChildProcess, execSync } from 'child_process'
 import net from 'net'
@@ -289,6 +290,7 @@ function registerIpcHandlers(win: BrowserWindow): void {
   registerFsmHandlers()
   registerShellHandlers(win)
   registerTerminalHandlers(win)
+  registerBoardHandlers()
   registerSetupHandlers()
   registerAutomationHandlers(win)
   registerLlmHandlers()

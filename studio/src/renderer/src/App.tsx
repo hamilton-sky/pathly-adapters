@@ -21,6 +21,8 @@ import { PopoutTerminal } from './components/Terminal/PopoutTerminal'
 import { SetupScreen } from './components/SetupScreen'
 import { HQ } from './components/HQ'
 import { CommandCenter } from './components/CommandCenter/CommandCenter'
+import { PopoutBoard } from './components/CommandCenter/PopoutBoard/PopoutBoard'
+import type { BoardScope } from './components/CommandCenter/types'
 import { TerminalSpawnListener } from './components/TerminalSpawnListener'
 import { CliMonitorBar } from './components/CliMonitorBar/CliMonitorBar'
 import { Toaster } from './components/Toaster'
@@ -74,6 +76,21 @@ export default function App(): JSX.Element | null {
 
   if (popoutTabId) {
     return <PopoutTerminal tabId={popoutTabId} label={popoutLabel} />
+  }
+
+  const popoutBoard = params.get('board')
+  if (popoutBoard) {
+    return (
+      <>
+        <PopoutBoard
+          scope={popoutBoard as BoardScope}
+          feature={params.get('feature') ?? ''}
+          project={params.get('project') ?? ''}
+          name={params.get('name') ?? 'Board'}
+        />
+        <Toaster />
+      </>
+    )
   }
 
   return (

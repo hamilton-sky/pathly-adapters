@@ -1,8 +1,9 @@
 import React from 'react'
-import { GitBranch, Folder, Globe, X } from 'lucide-react'
+import { GitBranch, Folder, Globe, X, ExternalLink } from 'lucide-react'
 import type { BoardScope, Preset, Direction, SectionDef } from '../types'
 import { SCOPES } from '../constants'
 import { CommsPanel } from '../CommsPanel/CommsPanel/CommsPanel'
+import { useProjectStore } from '../../../store/projectStore'
 import { Tooltip } from '../../ui'
 import s from './BoardSection.module.css'
 
@@ -37,9 +38,27 @@ function getBoardName(section: SectionDef): string {
 
 export function BoardSection(props: BoardSectionProps) {
   const { section, mainFeature, onClose } = props
+  const projectPath = useProjectStore((st) => st.projectPath)
   const sc = SCOPES[section.scope]
   const flexValue = getSectionFlex(props)
   const panelFeature = section.scope === 'feature' ? section.featureId : mainFeature
+  const boardName = getBoardName(section)
+
+  // Tear this board off into its own window: open the pop-out (it reconnects to
+  // the same local Pathly server independently, so it stays live), then hide the
+  // section here so the board lives in exactly one place — moved, not duplicated.
+  // If the pop-out fails, keep the section visible.
+  const handlePopout = (): void => {
+    void window.pathly.board
+      .popout({
+        scope: section.scope,
+        feature: panelFeature,
+        project: projectPath,
+        name: `${sc.title} · ${boardName}`,
+      })
+      .then(() => onClose())
+      .catch(() => { /* pop-out failed — leave the section in place */ })
+  }
 
   return (
     <div
@@ -51,10 +70,19 @@ export function BoardSection(props: BoardSectionProps) {
         <span className={s.bsIcon}>{SCOPE_ICONS[section.scope]}</span>
         <span className={s.bsScope}>{sc.title}</span>
         <span className={s.bsSep}>:</span>
-        <Tooltip label={getBoardName(section)} placement="bottom">
-          <span className={s.bsName}>{getBoardName(section)}</span>
+        <Tooltip label={boardName} placement="bottom">
+          <span className={s.bsName}>{boardName}</span>
         </Tooltip>
         <div className={s.bsHeadActs}>
+          <button
+            type="button"
+            className={s.bsIconbtn}
+            title="Open board in a new window"
+            aria-label="Open board in a new window"
+            onClick={handlePopout}
+          >
+            <ExternalLink size={14} />
+          </button>
           <button
             type="button"
             className={`${s.bsIconbtn} ${s.close}`}
