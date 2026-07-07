@@ -53,8 +53,13 @@ def test_consultation_flow_valid():
         assert _skill_exists(
             skill
         ), f"agent_map[{state}]={skill!r} has no core skill file"
-    # po → architect → researcher → designer → planner, in order
-    assert list(flow["role_map"].values()) == [
+    # po → architect → researcher → designer → planner, in order.
+    # Derive the sequence from `states` (not role_map dict-order): the FSM keys role_map
+    # by state, so its dict-order is not meaningful, and the Studio flow editor serializes
+    # keys alphabetically on save — asserting raw .values() order would break on a
+    # round-trip through the editor while the actual flow is unchanged.
+    role_seq = [flow["role_map"][s] for s in flow["states"] if s in flow["role_map"]]
+    assert role_seq == [
         "po",
         "architect",
         "web-researcher",

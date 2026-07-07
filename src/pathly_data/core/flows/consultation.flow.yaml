@@ -44,6 +44,12 @@ role_map:
   RESEARCHING: web-researcher
   DESIGNING: designer
   PLANNING: planner
+# Per-stage CLI routing (multi-adapter). `default` is REQUIRED by the FSM validator
+# (fsm/state.py). PO discussion + design run on codex; the rest fall through to claude.
+adapter_map:
+  default: claude
+  PO_DISCUSSING: codex
+  DESIGNING: codex
 feedback_routing:
   HUMAN_QUESTIONS: human
   BLOCKED_ON_HUMAN: human
