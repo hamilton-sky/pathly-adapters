@@ -210,6 +210,12 @@ def code_query():
         # reflects the live backend; flipping the setting takes effect without a restart.
         backend = _cc.get_provider(_cc._resolve_backend()).name
 
+        # On-demand freshness: fire a debounced background re-index so the graph keeps
+        # up with edits between pipeline stages. No-op when the backend is off or inside
+        # the debounce window; never blocks. (The tool's own auto_index silently misses
+        # edits, so we drive the incremental index ourselves.)
+        _cc.maybe_reindex(str(data.get("project_root") or ""))
+
         # Content-hash cache: serve an unchanged (op, target) from cache without
         # re-querying the backend; an edit changes the hash and forces a refresh.
         chash = _content_hash(target, str(data.get("project_root") or ""))

@@ -23,6 +23,7 @@ import logging
 import os
 import shutil
 import subprocess
+import time
 from typing import Protocol, Sequence, runtime_checkable
 
 from .code_context_cli import CliProvider
@@ -157,18 +158,31 @@ def _resolve_reindex() -> str:
 
 
 _auto_index_done = False
+_last_reindex_monotonic = 0.0
+# Re-index at most this often. The incremental index is cheap (hash-based — only
+# changed files reparse), but we still debounce so frequent /code/query calls (which
+# now trigger this) never spawn a subprocess per request.
+_REINDEX_DEBOUNCE_S = 30.0
 
 
 def maybe_reindex(project_root: str) -> None:
-    """Freshness bridge — fire-and-forget re-index per ``code_context.reindex``.
+    """Freshness bridge — fire-and-forget incremental re-index per ``code_context.reindex``.
 
-    Called once per stage from runner prompt assembly. Only acts for the
-    cli/codebase-memory-mcp backend; **never raises, never blocks** (runs in a
-    daemon thread). ``stage`` → ``index_repository`` (incremental: persisted
-    hashes mean only changed files are re-processed); ``auto`` → set the tool's
-    own ``auto_index`` once; ``off`` → nothing.
+    Called per stage from runner prompt assembly AND on-demand from the /code/query
+    route. Only acts for the cli/codebase-memory-mcp backend; **never raises, never
+    blocks** (runs in a daemon thread); debounced to at most once per
+    ``_REINDEX_DEBOUNCE_S``.
+
+    Both ``stage`` and ``auto`` run ``index_repository`` (incremental: persisted hashes
+    mean only changed files reparse); ``auto`` additionally sets the tool's own
+    ``auto_index`` once. ``off`` → nothing.
+
+    NB ``auto`` USED to only flip the tool's ``auto_index`` flag and defer freshness to
+    the tool — but the tool's change-detection silently misses edits (``detect_changes``
+    can report 0 changed for genuinely-changed files), so the graph drifted stale.
+    ``auto`` now re-indexes itself.
     """
-    global _auto_index_done
+    global _auto_index_done, _last_reindex_monotonic
     try:
         if _resolve_backend() != "cli" or _resolve_reindex() == "off":
             return
@@ -177,20 +191,24 @@ def maybe_reindex(project_root: str) -> None:
         exe = shutil.which("codebase-memory-mcp")
         if not exe:
             return
-        if _resolve_reindex() == "auto":
-            if _auto_index_done:
-                return
+        now = time.monotonic()
+        if now - _last_reindex_monotonic < _REINDEX_DEBOUNCE_S:
+            return
+        _last_reindex_monotonic = now
+
+        root = os.path.abspath(project_root or os.getcwd()).replace("\\", "/")
+        argvs: list[list[str]] = []
+        if _resolve_reindex() == "auto" and not _auto_index_done:
             _auto_index_done = True
-            argv = [exe, "config", "set", "auto_index", "true"]
-        else:  # stage
-            root = os.path.abspath(project_root or os.getcwd()).replace("\\", "/")
-            argv = [exe, "cli", "index_repository", json.dumps({"repo_path": root})]
+            argvs.append([exe, "config", "set", "auto_index", "true"])
+        argvs.append([exe, "cli", "index_repository", json.dumps({"repo_path": root})])
 
         def _bg() -> None:
-            try:
-                subprocess.run(argv, capture_output=True, text=True, timeout=180)
-            except Exception:
-                pass
+            for a in argvs:
+                try:
+                    subprocess.run(a, capture_output=True, text=True, timeout=180)
+                except Exception:
+                    pass
 
         import threading
 
