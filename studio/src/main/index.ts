@@ -140,6 +140,12 @@ function createWindow(projectPath?: string): BrowserWindow {
       sandbox: false,
       experimentalFeatures: true,
       webSecurity: false,
+      // Keep the renderer's timers running at full rate while the window is occluded
+      // (screen saver, minimized, covered). With the default (throttled), Chromium starves
+      // the Vite HMR heartbeat and the runner's /events/spawn EventSource during a screen
+      // saver; the dropped socket then triggers a full page reload on resume, which orphans
+      // any in-flight headless run. Disabling throttling keeps those sockets alive.
+      backgroundThrottling: false,
     }
   })
   Menu.setApplicationMenu(null)
