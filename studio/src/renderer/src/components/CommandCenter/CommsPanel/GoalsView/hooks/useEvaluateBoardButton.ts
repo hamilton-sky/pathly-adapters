@@ -6,16 +6,17 @@ import type { DecomposeMode } from '../../../../../store/commsApi'
 import { type EditorCli, loadEditorCli, saveEditorCli } from '../../../../MarkdownEditor/EditorHeader/editorCli'
 import { useEvaluatePreview } from '../useEvaluatePreview'
 import { EVAL_LENSES } from '../../SingleAgentButton/agentFormData'
-import type { FeatureRigor } from '../FeatureDecomposeConfig/FeatureDecomposeConfig'
+import { DECOMPOSE_TARGET, type FeatureRigor } from '../FeatureDecomposeConfig/FeatureDecomposeConfig'
 
 // Persistent localStorage key for the evaluate button's engine choice.
 const CLI_KEY_EVAL = 'pathly.comms.cli.eval'
 
 /**
  * All state + derived values + handlers for EvaluateBoardButton. The component is left
- * as pure JSX. Handles two dispatch altitudes off one control: whole-board evaluate
- * (preview-gated) and per-goal decompose (consultation-gated), plus the pill/timer and
- * the target-lock that keeps a live run from desyncing when the popover is reopened.
+ * as pure JSX. Handles three explicit actions off one control: whole-board evaluate
+ * (preview-gated), whole-board decompose into goals (consultation-gated), and per-goal
+ * decompose into tasks (consultation-gated) — plus the pill/timer and the target-lock
+ * that keeps a live run from desyncing when the popover is reopened.
  */
 export function useEvaluateBoardButton(boardKey: string) {
   const runEvaluator = useCommsStore((st) => st.runEvaluator)
@@ -33,10 +34,12 @@ export function useEvaluateBoardButton(boardKey: string) {
   const [extraPrompt, setExtraPrompt] = useState('')
   const [selectedCli, setSelectedCli] = useState<EditorCli>(() => loadEditorCli(CLI_KEY_EVAL))
   const [configOpen, setConfigOpen] = useState(false)
-  // Whole-board preview gate (SendPreviewModal) vs goal consultation gate (ConfirmModal).
+  // Whole-board preview gate (SendPreviewModal) vs goal/feature consultation gates (ConfirmModal).
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [confirmGoalOpen, setConfirmGoalOpen] = useState(false)
-  // '' = whole board; otherwise = a goal id.
+  const [confirmFeatureOpen, setConfirmFeatureOpen] = useState(false)
+  // '' = whole-board evaluate; DECOMPOSE_TARGET = whole-board decompose into goals;
+  // otherwise = a goal id (decompose into tasks).
   const [targetGoalId, setTargetGoalId] = useState('')
   const [rigorMode, setRigorMode] = useState<DecomposeMode>('plan')
   // Whole-board "Decompose into goals" rigor (light/full/consultation) — distinct from the
@@ -46,8 +49,12 @@ export function useEvaluateBoardButton(boardKey: string) {
   const [verbosity, setVerbosity] = useState('')
   const gearRef = useRef<HTMLButtonElement>(null)
 
-  // Pill state: when a specific goal is targeted, reflect its decompose state instead.
-  const runState: PillState = targetGoalId
+  // Three targets, two run-state homes: a real goal tracks its own decompose state;
+  // whole-board evaluate AND whole-board decompose both track the board run state
+  // (decomposeFeature marks boardRunState/boardRunStart, same as runEvaluator).
+  const isDecomposeTarget = targetGoalId === DECOMPOSE_TARGET
+  const isGoalTarget = Boolean(targetGoalId) && !isDecomposeTarget
+  const runState: PillState = isGoalTarget
     ? ((goalRunState[targetGoalId] ?? 'idle') as PillState)
     : ((boardRunState[boardKey] ?? 'idle') as PillState)
   const running = runState === 'running'
@@ -55,12 +62,12 @@ export function useEvaluateBoardButton(boardKey: string) {
   // Elapsed clock: board start for whole-board runs, the goal's own start for goal runs.
   const boardProgress = useElapsedProgress(boardRunStart[boardKey] || undefined)
   const goalProgress = useElapsedProgress(
-    targetGoalId ? goalRunStart[targetGoalId] || undefined : undefined,
+    isGoalTarget ? goalRunStart[targetGoalId] || undefined : undefined,
   )
-  const progress = targetGoalId ? goalProgress : boardProgress
+  const progress = isGoalTarget ? goalProgress : boardProgress
 
   const lensLabel = EVAL_LENSES.find((l) => l.name === selectedLens && l.name)?.label
-  const activeLabel = lensLabel ?? 'Evaluate'
+  const activeLabel = isDecomposeTarget ? 'Decompose' : (lensLabel ?? 'Evaluate')
 
   const previewPrompt = useEvaluatePreview(confirmOpen && !targetGoalId, lensText, extraPrompt)
 
@@ -77,7 +84,7 @@ export function useEvaluateBoardButton(boardKey: string) {
   // The actual dispatch — no gating. Goal target → decompose; else → whole-board evaluate.
   function dispatch(): void {
     const adapter = selectedCli !== 'claude' ? selectedCli : undefined
-    if (targetGoalId) {
+    if (isGoalTarget) {
       decomposeGoal(targetGoalId, rigorMode, { adapter, progress: verbosity || undefined })
     } else {
       runEvaluator(boardKey, {
@@ -89,12 +96,19 @@ export function useEvaluateBoardButton(boardKey: string) {
     }
   }
 
-  // Whole-board "Decompose into goals" (feature-decompose) — the alternative whole-board action
-  // to Evaluate. Dispatches directly; the run + its rigor were chosen explicitly in the popover.
+  // Whole-board "Decompose into goals" (feature-decompose) — ungated dispatch, called after
+  // any consultation gate has been passed.
   function dispatchFeatureDecompose(): void {
-    setConfigOpen(false)
     const adapter = selectedCli !== 'claude' ? selectedCli : undefined
     decomposeFeature(boardKey, featureRigor, { adapter })
+  }
+
+  // Feature decompose is gated for the heavy consultation tier (full team run), mirroring
+  // the goal path; light/full dispatch immediately.
+  function requestFeatureDecompose(): void {
+    setConfigOpen(false)
+    if (featureRigor === 'consultation') setConfirmFeatureOpen(true)
+    else dispatchFeatureDecompose()
   }
 
   // Goal decompose is gated only for the heavy consultation tier (full team run); quick/full
@@ -104,9 +118,11 @@ export function useEvaluateBoardButton(boardKey: string) {
     else dispatch()
   }
 
-  // Main pill: whole board → preview modal; goal → consultation gate or direct dispatch.
+  // Main pill: board evaluate → preview modal; board decompose → consultation gate or direct
+  // dispatch; goal → consultation gate or direct dispatch.
   function onPillRun(): void {
-    if (targetGoalId) requestGoalRun()
+    if (isDecomposeTarget) requestFeatureDecompose()
+    else if (isGoalTarget) requestGoalRun()
     else setConfirmOpen(true)
   }
 
@@ -115,12 +131,12 @@ export function useEvaluateBoardButton(boardKey: string) {
   // path still gates consultation (light/full goal tiers dispatch directly, inheriting the default).
   function onConfigRun(): void {
     setConfigOpen(false)
-    if (targetGoalId) requestGoalRun()
+    if (isGoalTarget) requestGoalRun()
     else setConfirmOpen(true)
   }
 
   function handleStop(): void {
-    if (targetGoalId) stopGoal(targetGoalId)
+    if (isGoalTarget) stopGoal(targetGoalId)
     else stopBoard(boardKey)
   }
 
@@ -133,11 +149,13 @@ export function useEvaluateBoardButton(boardKey: string) {
   return {
     // config values
     selectedLens, lensText, extraPrompt, selectedCli, targetGoalId, rigorMode, verbosity,
-    featureRigor, setFeatureRigor, dispatchFeatureDecompose,
+    featureRigor, setFeatureRigor, requestFeatureDecompose,
+    // derived target kind
+    isDecomposeTarget, isGoalTarget,
     // pill
     runState, running, progress, activeLabel, lensLabel,
     // popover / modal open state
-    configOpen, setConfigOpen, confirmOpen, confirmGoalOpen, gearRef,
+    configOpen, setConfigOpen, confirmOpen, confirmGoalOpen, confirmFeatureOpen, gearRef,
     // preview
     previewPrompt,
     // handlers
@@ -147,5 +165,7 @@ export function useEvaluateBoardButton(boardKey: string) {
     cancelWholeBoard: () => setConfirmOpen(false),
     confirmGoal: () => { setConfirmGoalOpen(false); dispatch() },
     cancelGoal: () => setConfirmGoalOpen(false),
+    confirmFeature: () => { setConfirmFeatureOpen(false); dispatchFeatureDecompose() },
+    cancelFeature: () => setConfirmFeatureOpen(false),
   }
 }

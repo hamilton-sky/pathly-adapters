@@ -7,7 +7,7 @@ import type { DecomposeMode } from '../../../../store/commsApi'
 import type { GoalStub } from './EvaluateBoardButton'
 import { BoardEvalConfig } from './BoardEvalConfig/BoardEvalConfig'
 import { GoalTargetConfig } from './GoalTargetConfig/GoalTargetConfig'
-import { FeatureDecomposeConfig, type FeatureRigor } from './FeatureDecomposeConfig/FeatureDecomposeConfig'
+import { DECOMPOSE_TARGET, FeatureDecomposeConfig, type FeatureRigor } from './FeatureDecomposeConfig/FeatureDecomposeConfig'
 import s from './EvalConfigPopover.module.css'
 
 // Max chars shown for a goal title in the Target dropdown.
@@ -42,10 +42,16 @@ interface Props {
 
 const POPOVER_WIDTH = 290
 
-// Target options: "Whole board" first, then each goal (text truncated).
+// Target options — the three explicit actions, then each goal (text truncated):
+// board evaluate, board decompose-into-goals, per-goal decompose-into-tasks.
 function buildTargetOptions(goals: GoalStub[]): { value: string; label: string; hint?: string }[] {
   return [
-    { value: '', label: 'Whole board', hint: 'Evaluate everything and propose tasks' },
+    { value: '', label: 'Whole board — Evaluate', hint: 'Analyze the board and propose tasks' },
+    {
+      value: DECOMPOSE_TARGET,
+      label: 'Whole board — Decompose into goals',
+      hint: 'Split the feature into sibling goals',
+    },
     ...goals.map((g) => ({
       value: g.id,
       label: g.text.length > GOAL_LABEL_MAX ? `${g.text.slice(0, GOAL_LABEL_MAX)}…` : g.text,
@@ -55,8 +61,10 @@ function buildTargetOptions(goals: GoalStub[]): { value: string; label: string; 
 }
 
 // Portal shell + positioning for the evaluator config popover. Always shows the Target
-// selector, then branches: whole board → BoardEvalConfig (lens/engine/preview); a specific
-// goal → GoalTargetConfig (rigor/engine/Plan-now).
+// selector, then branches on the chosen action: whole-board evaluate → BoardEvalConfig
+// (lens/engine/preview); whole-board decompose → FeatureDecomposeConfig (rigor/engine);
+// a specific goal → GoalTargetConfig (rigor/engine/Plan-now). One action per state —
+// exactly one primary button is ever visible.
 export function EvalConfigPopover({
   anchorEl, selectedLens, lensText, extraPrompt, selectedCli,
   running, goals, targetGoalId, rigorMode,
@@ -65,7 +73,8 @@ export function EvalConfigPopover({
   onTargetChange, onRigorChange, onReset, onRun, onClose,
 }: Props): JSX.Element | null {
   const ref = useRef<HTMLDivElement>(null)
-  const isGoalTarget = Boolean(targetGoalId)
+  const isDecomposeTarget = targetGoalId === DECOMPOSE_TARGET
+  const isGoalTarget = Boolean(targetGoalId) && !isDecomposeTarget
 
   useLayoutEffect(() => {
     if (!anchorEl || !ref.current) return
@@ -122,29 +131,30 @@ export function EvalConfigPopover({
           onCliChange={onCliChange}
           onRun={onRun}
         />
+      ) : isDecomposeTarget ? (
+        <FeatureDecomposeConfig
+          rigor={featureRigor}
+          selectedCli={selectedCli}
+          running={running}
+          onRigorChange={onFeatureRigorChange}
+          onCliChange={onCliChange}
+          onRun={onFeatureDecompose}
+        />
       ) : (
-        <>
-          <BoardEvalConfig
-            selectedLens={selectedLens}
-            lensText={lensText}
-            extraPrompt={extraPrompt}
-            selectedCli={selectedCli}
-            running={running}
-            onSelectLens={onSelectLens}
-            onLensTextChange={onLensTextChange}
-            onExtraPromptChange={onExtraPromptChange}
-            onCliChange={onCliChange}
-            onReset={onReset}
-            onRun={onRun}
-            onClose={onClose}
-          />
-          <FeatureDecomposeConfig
-            rigor={featureRigor}
-            running={running}
-            onRigorChange={onFeatureRigorChange}
-            onRun={onFeatureDecompose}
-          />
-        </>
+        <BoardEvalConfig
+          selectedLens={selectedLens}
+          lensText={lensText}
+          extraPrompt={extraPrompt}
+          selectedCli={selectedCli}
+          running={running}
+          onSelectLens={onSelectLens}
+          onLensTextChange={onLensTextChange}
+          onExtraPromptChange={onExtraPromptChange}
+          onCliChange={onCliChange}
+          onReset={onReset}
+          onRun={onRun}
+          onClose={onClose}
+        />
       )}
     </div>,
     document.body,
