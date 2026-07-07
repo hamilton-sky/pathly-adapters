@@ -118,9 +118,12 @@ pathly/features/<name>/            FEATURE scope — team pipeline files live DI
   IMPLEMENTATION_PLAN.md
   feedback/                        REVIEW_FAILURES.md, TEST_FAILURES.md
   goals/<slug>/                    per-goal decompose (planner/plan)
-  debugs/<slug>/  explorations/<slug>/  fixes/<slug>/
 pathly/features/.archive/<name>/   completed features (mirrors the shape above)
-pathly/project/                    PROJECT scope (cross-feature): goals/, board-artifacts/, lessons/
+pathly/project/                    PROJECT scope: artifacts/, SEQUENCING.md
+pathly/board-artifacts/            cross-feature board artifacts (e.g. BOARD_EVAL.md)
+pathly/lessons/                    promoted lessons (cross-feature)
+pathly/debugs/<slug>/  pathly/explorations/<slug>/   standalone (non-feature) investigations
+pathly/pipeline-walkthrough/<slug>/  point-in-time pipeline records (never sync these)
 ~/.pathly/                         GLOBAL scope (cross-project): pathly.db, lessons/
 
 # Legacy, still resolved for back-compat: pathly/plans/<name>/
