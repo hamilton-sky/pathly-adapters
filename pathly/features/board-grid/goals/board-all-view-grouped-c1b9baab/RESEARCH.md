@@ -1,0 +1,1 @@
+No external research required — all patterns (CSS container queries, CSS Modules, React portals, ResizeObserver, `data-*` attribute tinting) are already established in this codebase and fully specified in ARCHITECTURE_PROPOSAL.md.

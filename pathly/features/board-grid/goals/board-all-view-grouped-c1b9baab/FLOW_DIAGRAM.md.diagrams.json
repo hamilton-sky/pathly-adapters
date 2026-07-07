@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "source": "C:/Users/Yafit/pathly-adapters/pathly/features/board-grid/FLOW_DIAGRAM.md",
+  "diagrams": [
+    {
+      "id": "dg_x7k4p",
+      "title": "board-grid component structure",
+      "style": "plantuml",
+      "content": "@startuml\nskinparam classAttributeIconSize 0\nskinparam shadowing false\nhide circle\n\nclass CommsPanel {\n  +messages : Message[]\n  +boardView : 'grid' | ...\n  --\n  renders GridView when boardView='grid'\n}\n\nclass GridView {\n  +messages : Message[]\n  +boardKey : string\n  +boardScope : string\n  --\n  -openGoalId : string | null\n  -openArtifact : Message | null\n  -openMessage : Message | null\n  -narrow : boolean  (ResizeObserver, w<=220)\n  --\n  +open(m : Message) : void\n}\n\nclass gridBands <<pure function>> {\n  +(messages) : { goals[]; tasks[]; msgs[]; artifacts[] }\n}\n\nclass Tile <<presentational>> {\n  +message : Message\n  +onOpen(m) : void\n  --\n  badge + title + meta\n}\n\nclass PlaceholderBanner <<presentational>>\n\nclass MessageDetailModal <<portal>> {\n  +message : Message\n  --\n  wraps MsgCard (read-only)\n}\nclass MsgCard <<read-only>>\nclass GoalDetailModal <<portal>>\nclass ArtifactModal <<portal>>\n\nCommsPanel *-- GridView\nGridView ..> gridBands : uses\nGridView *-- Tile : renders per band\nGridView *-- PlaceholderBanner : when narrow\nGridView ..> GoalDetailModal : openGoalId\nGridView ..> ArtifactModal : openArtifact\nGridView ..> MessageDetailModal : openMessage\nMessageDetailModal *-- MsgCard\nTile ..> GridView : onOpen -> open()\n@enduml",
+      "status": "kept",
+      "engine": "plantuml",
+      "model": null,
+      "createdAt": "2026-07-06T00:00:00Z"
+    }
+  ]
+}

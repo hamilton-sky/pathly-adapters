@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "source": "C:/Users/Yafit/pathly-adapters/pathly/features/board-grid/goals/board-all-view-grouped-c1b9baab/DESIGN.md",
+  "diagrams": [
+    {
+      "id": "dg_k7P4q",
+      "title": "Board Grid Layered Flow",
+      "style": "mermaid",
+      "content": "flowchart TD\n  subgraph s1[\"Presentation Layer\"]\n    n_root[\"GridView.tsx root scroll container\"]\n    n_bands[\"Band sections ordered Goals -> Tasks -> Messages -> Artifacts\"]\n    n_grid[\"Per-band responsive tile grid\"]\n    n_tile[\"Kind-banded tile button\"]\n    n_placeholder[\"Placeholder banner when the panel is too narrow\"]\n  end\n\n  subgraph s2[\"State and Interaction Layer\"]\n    n_split[\"gridBands.ts split logic\"]\n    n_query[\"Container query breakpoints\"]\n    n_resize[\"ResizeObserver narrow-panel check\"]\n    n_focus[\"Keyboard focus and press handling\"]\n    n_modal_state[\"Modal state for goal, artifact, and message detail\"]\n  end\n\n  subgraph s3[\"Domain Data Layer\"]\n    n_messages[\"Hydrated messages prop\"]\n    n_grouped[\"Grouped board items by kind\"]\n    n_badge[\"MessageTypeBadge semantic color and label\"]\n  end\n\n  subgraph s4[\"Modal Boundary\"]\n    n_goal_modal[\"GoalDetailModal\"]\n    n_artifact_modal[\"ArtifactModal\"]\n    n_message_modal[\"MessageDetailModal with focus trap\"]\n  end\n\n  n_messages --> n_split\n  n_split --> n_grouped\n  n_grouped --> n_bands\n  n_bands --> n_grid\n  n_query --> n_grid\n  n_resize --> n_placeholder\n  n_grid --> n_tile\n  n_badge --> n_tile\n  n_focus --> n_tile\n  n_tile --> n_modal_state\n  n_modal_state --> n_goal_modal\n  n_modal_state --> n_artifact_modal\n  n_modal_state --> n_message_modal\n  n_root --> n_query\n  n_root --> n_resize\n  n_root --> n_focus",
+      "status": "kept",
+      "engine": "mermaid",
+      "model": null,
+      "createdAt": "2026-07-06T00:00:00.000Z"
+    }
+  ]
+}
