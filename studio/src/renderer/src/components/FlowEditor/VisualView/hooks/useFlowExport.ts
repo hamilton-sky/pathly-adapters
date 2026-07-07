@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import * as jsYaml from 'js-yaml'
 import type { FlowYaml, FlowExportTarget, FlowExportRecord } from '../../../../types'
 import { resolveExportPath } from '../../utils/exportPaths'
+import { serializeFlow } from '../../utils/serializeFlow'
 import { writeFile } from '../../../../services/pathlyApi'
 import { useStore } from '../../../../store'
 
@@ -21,7 +21,7 @@ export function useFlowExport(data: FlowYaml) {
     if (!projectPath) return
     const flowName = getFlowName()
     const targetPath = resolveExportPath(exportTarget, { projectPath, flowName })
-    const content = jsYaml.dump(data, { lineWidth: 120 })
+    const content = serializeFlow(data)
     try {
       await writeFile(targetPath, content)
       const record: FlowExportRecord = { target: exportTarget, path: targetPath, at: new Date() }

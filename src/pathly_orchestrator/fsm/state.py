@@ -92,18 +92,15 @@ def flow_transitions(flow: dict) -> dict[str, frozenset[str]]:
     return {k: frozenset(v) for k, v in flow.get("transitions", {}).items()}
 
 
-def validate_flow_cli() -> None:
-    if len(sys.argv) < 2:
-        print("Usage: pathly-validate-flow <path>")
-        sys.exit(1)
-    path = sys.argv[1]
-    try:
-        flow = load_flow(path)
-    except Exception as e:
-        print(f"Error loading {path}: {e}")
-        sys.exit(1)
+def validate_flow_dict(flow: dict) -> tuple[list[str], list[str]]:
+    """Validate a parsed flow dict. Returns ``(errors, warnings)``.
 
+    Pure — no argv, no I/O, no ``sys.exit`` — so callers and tests can reuse it.
+    ``validate_flow_cli`` is the thin wrapper that loads the file, prints both
+    lists, and exits non-zero when ``errors`` is non-empty.
+    """
     errors: list[str] = []
+    warnings: list[str] = []
 
     missing = _REQUIRED_FLOW_KEYS - set(flow.keys())
     if missing:
@@ -111,8 +108,8 @@ def validate_flow_cli() -> None:
             errors.append(f"Missing required field: {key}")
 
     if "transition_actions" not in flow:
-        print(
-            f"Warning: transition_actions key absent — flow has no declared side effects"
+        warnings.append(
+            "Warning: transition_actions key absent — flow has no declared side effects"
         )
     else:
         ta = flow["transition_actions"] or {}
@@ -202,17 +199,34 @@ def validate_flow_cli() -> None:
         try:
             agent_path.read_bytes()
         except (FileNotFoundError, TypeError, Exception):
-            print(f"Warning: Missing agent contract: core/agents/{agent}.md")
+            warnings.append(f"Warning: Missing agent contract: core/agents/{agent}.md")
 
     # Addition 2 — Decide-block option count
     for state, rule in (flow.get("transition_rules") or {}).items():
         if isinstance(rule, dict) and "decide" in rule:
             decide = rule["decide"]
             if isinstance(decide, dict) and len(decide.get("options", {})) < 2:
-                print(
+                warnings.append(
                     f"Warning: decide block in state '{state}' has fewer than 2 options."
                 )
 
+    return errors, warnings
+
+
+def validate_flow_cli() -> None:
+    if len(sys.argv) < 2:
+        print("Usage: pathly-validate-flow <path>")
+        sys.exit(1)
+    path = sys.argv[1]
+    try:
+        flow = load_flow(path)
+    except Exception as e:
+        print(f"Error loading {path}: {e}")
+        sys.exit(1)
+
+    errors, warnings = validate_flow_dict(flow)
+    for warning in warnings:
+        print(warning)
     if errors:
         for err in errors:
             print(err)

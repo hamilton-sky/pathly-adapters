@@ -82,6 +82,7 @@ def update_flow_graph(name: str):
     try:
         from pathly_orchestrator.db import get_db
         from pathly_orchestrator.db.queries.flow_defs import (
+            ensure_adapter_map_default,
             read_flow_by_name,
             upsert_flow_definition,
         )
@@ -93,6 +94,9 @@ def update_flow_graph(name: str):
         if not graph or not isinstance(graph, dict):
             return jsonify({"error": "Missing or invalid 'graph' key"}), 400
 
+        # A non-empty adapter_map must carry a 'default' or the FSM validator rejects
+        # the file — guarantee it before we serialize the graph the editor posted.
+        ensure_adapter_map_default(graph)
         flow_yaml = yaml.dump(graph, allow_unicode=True, sort_keys=False)
 
         conn = get_db()

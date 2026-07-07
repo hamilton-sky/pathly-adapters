@@ -54,4 +54,23 @@ describe('validateFlow', () => {
     const errors = issues.filter((i) => i.level === 'error' && i.id === 'start->nowhere')
     expect(errors.length).toBeGreaterThan(0)
   })
+
+  it('warns (not errors) when a non-empty adapter_map has no default', () => {
+    const flow: FlowYaml = { ...base, adapter_map: { start: 'codex' } }
+    const issues = validateFlow(flow)
+    expect(issues.some((i) => i.level === 'warning' && i.id === 'adapter_map')).toBe(true)
+    expect(issues.some((i) => i.level === 'error')).toBe(false)
+  })
+
+  it('errors on an unknown adapter value', () => {
+    const flow: FlowYaml = { ...base, adapter_map: { default: 'claude', start: 'bogus' } }
+    const errors = validateFlow(flow).filter((i) => i.level === 'error')
+    expect(errors.some((i) => i.message.includes('unknown adapter'))).toBe(true)
+  })
+
+  it('errors when an adapter_map key is not a declared state', () => {
+    const flow: FlowYaml = { ...base, adapter_map: { default: 'claude', NOPE: 'codex' } }
+    const errors = validateFlow(flow).filter((i) => i.level === 'error')
+    expect(errors.some((i) => i.id === 'NOPE')).toBe(true)
+  })
 })

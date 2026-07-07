@@ -12,6 +12,11 @@ import sqlite3
 
 from ..connection import _get_write_lock
 
+# Adapter used to satisfy the FSM validator's "adapter_map: 'default' key is
+# required" rule when a flow declares per-state adapters but no default. Kept in
+# sync with fsm/state.py `_KNOWN_ADAPTERS` and the studio serializer's DEFAULT_ADAPTER.
+_DEFAULT_ADAPTER = "claude"
+
 # Top-level flow keys that are decomposed into node/edge rows — everything ELSE is
 # carried verbatim as flow-level config so new/custom keys round-trip losslessly.
 _STRUCTURAL_FLOW_KEYS = frozenset(
@@ -42,6 +47,29 @@ _ASSEMBLED_FLOW_KEYS = frozenset(
         "adapter_default",
     }
 )
+
+
+def ensure_adapter_map_default(flow_dict: dict) -> dict:
+    """Normalize ``flow_dict['adapter_map']`` so a serialized flow always passes the
+    FSM validator (``fsm/state.py``): a *non-empty* adapter_map MUST carry a
+    ``default`` key. Mutates and returns ``flow_dict`` in place.
+
+    - absent / non-dict adapter_map → left untouched (adapter_map is optional)
+    - empty ``{}`` → dropped (an empty map has no default and is invalid)
+    - per-state entries but no ``default`` → inject ``default='claude'`` FIRST
+      (readable, canonical ordering — matches the on-disk shape)
+
+    Mirrors ``normalizeAdapterMap`` in
+    ``studio/src/renderer/src/components/FlowEditor/utils/serializeFlow.ts``.
+    """
+    am = flow_dict.get("adapter_map")
+    if not isinstance(am, dict):
+        return flow_dict
+    if not am:
+        flow_dict.pop("adapter_map", None)
+    elif "default" not in am:
+        flow_dict["adapter_map"] = {"default": _DEFAULT_ADAPTER, **am}
+    return flow_dict
 
 
 def _decompose_flow_dict(flow_dict: dict) -> tuple[dict, list[dict], list[dict]]:
@@ -183,12 +211,12 @@ def _assemble_from_parts(
     }
     adapter_default = flow_level_config.get("adapter_default")
     if per_state_adapters or adapter_default is not None:
-        adapter_map: dict = {}
-        adapter_map.update(per_state_adapters)
-        if adapter_default is not None:
-            adapter_map["default"] = adapter_default
-        if adapter_map:
-            result["adapter_map"] = adapter_map
+        # The FSM validator requires a 'default' whenever adapter_map is present, so
+        # synthesize one when per-state adapters exist without it — otherwise a graph
+        # round-trip could emit an invalid flow. `default` goes first for readability.
+        if adapter_default is None:
+            adapter_default = _DEFAULT_ADAPTER
+        result["adapter_map"] = {"default": adapter_default, **per_state_adapters}
 
     feedback_routing = flow_level_config.get("feedback_routing")
     if feedback_routing is not None:

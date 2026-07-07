@@ -2,6 +2,9 @@ import type { FlowYaml } from '../../../types'
 
 export type FlowValidationScope = 'flow' | 'node' | 'edge' | 'export'
 
+/** Adapters the FSM validator accepts (src/pathly_orchestrator/fsm/state.py `_KNOWN_ADAPTERS`). */
+const KNOWN_ADAPTERS = new Set(['claude', 'codex', 'copilot', 'antigravity'])
+
 export interface FlowValidationIssue {
   target: FlowValidationScope
   /** State id for node issues; "SOURCE->TARGET" for edge issues */
@@ -130,6 +133,34 @@ export function validateFlow(data: FlowYaml, knownBehaviors: string[] = []): Flo
     for (const [state, behavior] of Object.entries(data.agent_map ?? {})) {
       if (behavior && !behaviorSet.has(behavior)) {
         issues.push({ target: 'node', id: state, message: `Behavior ${behavior} not in library`, level: 'warning' })
+      }
+    }
+  }
+
+  // Validate adapter_map — mirrors the FSM validator (src/pathly_orchestrator/fsm/state.py).
+  // A non-empty adapter_map must map to known adapters and declared states. A missing
+  // `default` is only a warning: serializeFlow injects 'claude' when the flow is saved.
+  const adapterMap = data.adapter_map
+  if (adapterMap && Object.keys(adapterMap).length > 0) {
+    if (!('default' in adapterMap)) {
+      issues.push({
+        target: 'flow',
+        id: 'adapter_map',
+        message: "adapter_map has no 'default' — 'claude' will be used when the flow is saved",
+        level: 'warning',
+      })
+    }
+    for (const [key, value] of Object.entries(adapterMap)) {
+      if (!KNOWN_ADAPTERS.has(value)) {
+        issues.push({
+          target: key === 'default' ? 'flow' : 'node',
+          id: key === 'default' ? 'adapter_map' : key,
+          message: `adapter_map[${key}]: unknown adapter "${value}"`,
+          level: 'error',
+        })
+      }
+      if (key !== 'default' && !stateSet.has(key)) {
+        issues.push({ target: 'node', id: key, message: `adapter_map key ${key} is not a declared state`, level: 'error' })
       }
     }
   }

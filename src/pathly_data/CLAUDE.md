@@ -132,7 +132,7 @@ adapter_map:
 3. `adapter_map["default"]`
 4. `""` — no `adapter_map`; fully backward-compatible
 
-**Known adapter set:** `claude`, `codex`, `copilot`, `antigravity`. The FSM validator (`state.py`) enforces this set and requires `default`. Studio serializer (`utils.ts`) must conform to this exact shape — a round-trip test enforces it.
+**Known adapter set:** `claude`, `codex`, `copilot`, `antigravity`. The FSM validator (`fsm/state.py`) enforces this set and requires `default` whenever `adapter_map` is present. Both serialization layers guarantee this so a flow-editor round-trip can never emit an invalid file: the backend graph round-trip (`db/queries/flow_graph_ops.py` — `ensure_adapter_map_default` + `_assemble_from_parts`) and the Studio serializer (`studio/src/renderer/src/components/FlowEditor/utils/serializeFlow.ts`, the canonical `FlowYaml`→YAML serializer used by every save/export path) both inject `default: claude` (first, for readable output) when a flow declares per-stage adapters but no default, and drop an empty `adapter_map`. Round-trip tests (`tests/test_flow_decompose.py`, `serializeFlow.test.ts`) assert a per-stage-adapter flow passes the validator.
 
 ---
 

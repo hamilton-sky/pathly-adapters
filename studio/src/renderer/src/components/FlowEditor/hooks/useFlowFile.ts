@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import * as jsYaml from 'js-yaml'
 import { fetchFlowGraph, saveFlow, saveFlowGraph } from '../../../services/pathlyApi'
+import { normalizeFlow, serializeFlow } from '../utils/serializeFlow'
 import type { FlowYaml } from '../../../types'
 
 type TabMode = 'visual' | 'yaml'
@@ -75,7 +76,7 @@ export function useFlowFile(
           const parsed = result.graph
           setFlowData(parsed)
           lastValidFlowDataRef.current = parsed
-          setRawYaml(jsYaml.dump(parsed, { lineWidth: 120 }))
+          setRawYaml(serializeFlow(parsed))
         } else {
           setFlowData(null)
           setRawYaml('')
@@ -94,7 +95,7 @@ export function useFlowFile(
     const currentFlowData = flowDataRef.current
     const currentRawYaml = rawYamlRef.current
     if (next === 'yaml' && currentFlowData) {
-      const serialized = jsYaml.dump(currentFlowData, { lineWidth: 120 })
+      const serialized = serializeFlow(currentFlowData)
       setRawYaml(serialized)
       setYamlSyncContent(serialized)
     } else if (next === 'visual' && currentRawYaml) {
@@ -144,7 +145,7 @@ export function useFlowFile(
     if (!name) return
     setSaveError(null)
     try {
-      await saveFlowGraph(name, flowDataRef.current)
+      await saveFlowGraph(name, normalizeFlow(flowDataRef.current))
       clearDirty(selectedItem.path)
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : String(err))

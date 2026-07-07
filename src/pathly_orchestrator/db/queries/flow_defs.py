@@ -18,6 +18,7 @@ from .flow_graph_ops import (  # noqa: F401
     _assemble_flow_dict,
     _assemble_from_parts,
     _decompose_flow_dict,
+    ensure_adapter_map_default,
     read_flow_edges,
     read_flow_nodes,
     replace_flow_graph,

@@ -12,10 +12,12 @@ from importlib.resources import files
 from pathly_orchestrator.db.queries.flow_defs import (
     _assemble_from_parts,
     _decompose_flow_dict,
+    ensure_adapter_map_default,
     read_flow_edges,
     read_flow_nodes,
     upsert_flow_definition,
 )
+from pathly_orchestrator.fsm.state import validate_flow_dict
 
 # ---------------------------------------------------------------------------
 # Fixture dicts for branches not covered by bundled flows (T1.5)
@@ -217,3 +219,82 @@ def test_upsert_idempotency():
     assert len(nodes_1) == len(nodes_2)
     assert len(edges_1) == len(edges_2)
     assert [r["node_id"] for r in nodes_1] == [r["node_id"] for r in nodes_2]
+
+
+# ---------------------------------------------------------------------------
+# adapter_map default guarantee — a studio flow-editor round-trip must never emit
+# an adapter_map missing the FSM-required 'default' key (the invalid-file bug).
+# ---------------------------------------------------------------------------
+
+# Per-stage routing but NO `default` — the exact invalid shape the flow editor wrote.
+FIXTURE_PER_STAGE_ADAPTERS_NO_DEFAULT = {
+    "version": 1,
+    "flow": "adapter-test",
+    "storage_path": "pathly/{topic}/",
+    "states": ["PO_DISCUSSING", "ARCHITECTING", "PLANNING"],
+    "transitions": {
+        "PO_DISCUSSING": ["ARCHITECTING"],
+        "ARCHITECTING": ["PLANNING"],
+        "PLANNING": [],
+    },
+    "agent_map": {
+        "PO_DISCUSSING": "planning/po",
+        "ARCHITECTING": "team/architect",
+        "PLANNING": "planning/plan",
+    },
+    "feedback_routing": {},
+    "adapter_map": {"PO_DISCUSSING": "codex", "ARCHITECTING": "claude"},
+}
+
+
+def test_fixture_without_default_is_rejected_by_validator():
+    """Regression anchor: the raw fixture really is the invalid shape."""
+    errors, _ = validate_flow_dict(FIXTURE_PER_STAGE_ADAPTERS_NO_DEFAULT)
+    assert "adapter_map: 'default' key is required" in errors
+
+
+def test_assemble_injects_adapter_default_first_when_missing():
+    flow_cfg, nodes, edges = _decompose_flow_dict(FIXTURE_PER_STAGE_ADAPTERS_NO_DEFAULT)
+    reconstructed = _assemble_from_parts(flow_cfg, nodes, edges)
+    adapter_map = reconstructed["adapter_map"]
+    assert adapter_map["default"] == "claude"
+    assert list(adapter_map)[0] == "default"  # default first, for readable output
+    assert adapter_map["PO_DISCUSSING"] == "codex"  # per-stage overrides preserved
+    assert adapter_map["ARCHITECTING"] == "claude"
+
+
+def test_serialized_flow_with_per_stage_adapters_passes_fsm_validator():
+    """The decompose→assemble→serialize round-trip the editor performs must yield a
+    flow the FSM validator accepts (adapter_map carries 'default')."""
+    flow_cfg, nodes, edges = _decompose_flow_dict(FIXTURE_PER_STAGE_ADAPTERS_NO_DEFAULT)
+    reconstructed = _assemble_from_parts(flow_cfg, nodes, edges)
+    # Serialize + re-parse exactly as update_flow_graph writes it to disk.
+    text = yaml.dump(reconstructed, allow_unicode=True, sort_keys=False)
+    reparsed = yaml.safe_load(text)
+    errors, _ = validate_flow_dict(reparsed)
+    assert errors == [], f"validator rejected serialized flow: {errors}"
+    assert "default" in reparsed["adapter_map"]
+
+
+def test_ensure_adapter_map_default_injects_when_missing():
+    graph = {"adapter_map": {"BUILDING": "codex"}}
+    ensure_adapter_map_default(graph)
+    assert graph["adapter_map"] == {"default": "claude", "BUILDING": "codex"}
+
+
+def test_ensure_adapter_map_default_preserves_existing_default():
+    graph = {"adapter_map": {"default": "codex", "BUILDING": "claude"}}
+    ensure_adapter_map_default(graph)
+    assert graph["adapter_map"]["default"] == "codex"
+
+
+def test_ensure_adapter_map_default_drops_empty_map():
+    graph = {"flow": "x", "adapter_map": {}}
+    ensure_adapter_map_default(graph)
+    assert "adapter_map" not in graph
+
+
+def test_ensure_adapter_map_default_ignores_absent_map():
+    graph = {"flow": "x"}
+    ensure_adapter_map_default(graph)
+    assert "adapter_map" not in graph

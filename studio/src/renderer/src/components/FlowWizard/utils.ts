@@ -39,14 +39,14 @@ export function generateYaml(
     }
   }
 
-  // adapter_map — omit when trivially default (only { default: 'claude' }, no state overrides)
+  // adapter_map — omit when trivially default (only { default: 'claude' }, no state overrides).
+  // When any override is present we MUST emit `default` (the FSM validator requires it),
+  // defaulting to 'claude' when the wizard has none. Mirrors serializeFlow.ts / flow_graph_ops.py.
   const adapterKeys = Object.keys(adapterMap)
   if (adapterKeys.length > 0 && !(adapterKeys.length === 1 && adapterMap['default'] === 'claude')) {
     lines.push(``)
     lines.push(`adapter_map:`)
-    if ('default' in adapterMap) {
-      lines.push(`  default: ${adapterMap['default']}`)
-    }
+    lines.push(`  default: ${adapterMap['default'] ?? 'claude'}`)
     for (const s of states) {
       if (adapterMap[s]) {
         lines.push(`  ${s}: ${adapterMap[s]}`)
