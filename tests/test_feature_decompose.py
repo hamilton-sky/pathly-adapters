@@ -128,7 +128,7 @@ def test_missing_feature_is_400_not_500(client):
 # ── (a)/(b) goal seeding + count contract ─────────────────────────────────────
 def test_count_goals_for_feature_and_stored_deps_refs():
     from pathly_orchestrator.db.connection import get_db
-    from pathly_orchestrator.db.queries.comms_messages import count_goals_for_feature
+    from pathly_orchestrator.db.queries.comms_counts import count_goals_for_feature
 
     scope = "featdec-count"
     _seed_goal(scope)

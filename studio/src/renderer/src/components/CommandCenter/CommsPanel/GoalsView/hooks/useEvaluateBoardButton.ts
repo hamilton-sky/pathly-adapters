@@ -3,6 +3,7 @@ import { useCommsStore } from '../../../../../store/commsStore'
 import { useElapsedProgress } from '../../../../shared/RunPill/progress'
 import type { PillState } from '../../../../shared/RunPill/RunPill'
 import type { DecomposeMode } from '../../../../../store/commsApi'
+import type { BoardScope } from '../../../types'
 import { type EditorCli, loadEditorCli, saveEditorCli } from '../../../../MarkdownEditor/EditorHeader/editorCli'
 import { useEvaluatePreview } from '../useEvaluatePreview'
 import { EVAL_LENSES } from '../../SingleAgentButton/agentFormData'
@@ -18,7 +19,7 @@ const CLI_KEY_EVAL = 'pathly.comms.cli.eval'
  * decompose into tasks (consultation-gated) — plus the pill/timer and the target-lock
  * that keeps a live run from desyncing when the popover is reopened.
  */
-export function useEvaluateBoardButton(boardKey: string) {
+export function useEvaluateBoardButton(boardKey: string, boardScope?: BoardScope) {
   const runEvaluator = useCommsStore((st) => st.runEvaluator)
   const stopBoard = useCommsStore((st) => st.stopBoard)
   const boardRunState = useCommsStore((st) => st.boardRunState)
@@ -27,7 +28,9 @@ export function useEvaluateBoardButton(boardKey: string) {
   const goalRunStart = useCommsStore((st) => st.goalRunStart)
   const decomposeGoal = useCommsStore((st) => st.decomposeGoal)
   const decomposeFeature = useCommsStore((st) => st.decomposeFeature)
+  const decomposeProject = useCommsStore((st) => st.decomposeProject)
   const stopGoal = useCommsStore((st) => st.stopGoal)
+  const isProjectBoard = boardScope === 'project'
 
   const [selectedLens, setSelectedLens] = useState('')
   const [lensText, setLensText] = useState('')
@@ -96,11 +99,13 @@ export function useEvaluateBoardButton(boardKey: string) {
     }
   }
 
-  // Whole-board "Decompose into goals" (feature-decompose) — ungated dispatch, called after
-  // any consultation gate has been passed.
+  // Whole-board "Decompose into goals/features" — ungated dispatch, called after any
+  // consultation gate has been passed. The project board decomposes into sibling
+  // FEATURES one altitude up; every other board decomposes into sibling goals.
   function dispatchFeatureDecompose(): void {
     const adapter = selectedCli !== 'claude' ? selectedCli : undefined
-    decomposeFeature(boardKey, featureRigor, { adapter })
+    if (isProjectBoard) decomposeProject(boardKey, featureRigor, { adapter })
+    else decomposeFeature(boardKey, featureRigor, { adapter })
   }
 
   // Feature decompose is gated for the heavy consultation tier (full team run), mirroring
@@ -151,7 +156,7 @@ export function useEvaluateBoardButton(boardKey: string) {
     selectedLens, lensText, extraPrompt, selectedCli, targetGoalId, rigorMode, verbosity,
     featureRigor, setFeatureRigor, requestFeatureDecompose,
     // derived target kind
-    isDecomposeTarget, isGoalTarget,
+    isDecomposeTarget, isGoalTarget, isProjectBoard,
     // pill
     runState, running, progress, activeLabel, lensLabel,
     // popover / modal open state

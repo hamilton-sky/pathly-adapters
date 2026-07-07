@@ -377,13 +377,3 @@ def update_message_text(conn: sqlite3.Connection, message_id: str, text: str) ->
         )
         conn.commit()
     return "updated"
-
-
-def count_goals_for_feature(conn: sqlite3.Connection, feature_scope: str) -> int:
-    """Count non-deleted goal rows belonging to a feature scope (any status)."""
-    row = conn.execute(
-        "SELECT COUNT(*) AS n FROM comms_messages "
-        "WHERE scope=? AND type='goal' AND deleted_at IS NULL",
-        (feature_scope,),
-    ).fetchone()
-    return int(row["n"]) if row else 0
