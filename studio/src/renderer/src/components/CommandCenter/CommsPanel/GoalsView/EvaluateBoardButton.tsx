@@ -4,6 +4,7 @@ import SendPreviewModal from '../../../shared/SendPreviewModal/SendPreviewModal'
 import { ConfirmModal } from '../../../shared/ConfirmModal/ConfirmModal'
 import { ProgressSelect } from '../../../shared/ProgressSelect/ProgressSelect'
 import { cliLabel } from '../.././../MarkdownEditor/EditorHeader/editorCli'
+import type { BoardScope } from '../../types'
 import { EvalConfigPopover } from './EvalConfigPopover'
 import { useEvaluateBoardButton } from './hooks/useEvaluateBoardButton'
 
@@ -16,6 +17,9 @@ interface Props {
   boardKey: string
   /** Goals on this board — used to populate the Target selector in the popover. */
   goals?: GoalStub[]
+  /** This board's scope — 'project' routes whole-board decompose into sibling
+   *  FEATURES instead of sibling goals. */
+  boardScope?: BoardScope
 }
 
 // Evaluate the board → propose tasks. Also dispatches per-goal decompose when the
@@ -23,8 +27,8 @@ interface Props {
 // run+gear+stop control as the editor's AI Split/Analyze. The gear opens
 // EvalConfigPopover (rigor, target, lens, engine). All state + handlers live in
 // useEvaluateBoardButton; this component is the JSX shell.
-export function EvaluateBoardButton({ boardKey, goals = [] }: Props): JSX.Element {
-  const e = useEvaluateBoardButton(boardKey)
+export function EvaluateBoardButton({ boardKey, goals = [], boardScope }: Props): JSX.Element {
+  const e = useEvaluateBoardButton(boardKey, boardScope)
 
   return (
     <>
@@ -57,6 +61,7 @@ export function EvaluateBoardButton({ boardKey, goals = [] }: Props): JSX.Elemen
           running={e.running}
           goals={goals}
           targetGoalId={e.targetGoalId}
+          isProjectBoard={e.isProjectBoard}
           rigorMode={e.rigorMode}
           onSelectLens={e.pickLens}
           onLensTextChange={e.setLensText}
@@ -102,7 +107,9 @@ export function EvaluateBoardButton({ boardKey, goals = [] }: Props): JSX.Elemen
       {e.confirmFeatureOpen && e.isDecomposeTarget && (
         <ConfirmModal
           title="Run a full consultation?"
-          message="Consultation decomposes this whole board into sibling goals with the full team (PO → architect → research → design → planner). It spawns several agents and can take a while before the goals appear."
+          message={e.isProjectBoard
+            ? 'Consultation decomposes this whole board into sibling features with the full team (PO → architect → research → design → planner). It spawns several agents and can take a while before the features appear.'
+            : 'Consultation decomposes this whole board into sibling goals with the full team (PO → architect → research → design → planner). It spawns several agents and can take a while before the goals appear.'}
           confirmLabel="Run consultation"
           onConfirm={e.confirmFeature}
           onCancel={e.cancelFeature}

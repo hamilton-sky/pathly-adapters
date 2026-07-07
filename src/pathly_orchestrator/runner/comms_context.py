@@ -72,6 +72,13 @@ def retrieve_board_context(
     if not enabled_boards:
         return ""
 
+    # The agent's OWN board is the highest-priority enabled one — feature for a feature
+    # run, but PROJECT for a project-level decompose (feature disabled). The own board
+    # gets the lenient cutoff + keeps keyword-only hits; the strict per-tier cutoffs
+    # exist to keep tangential CROSS-tier items out, so they must not fire on the own
+    # board (else a project-decompose agent can't see its own sibling feature cards).
+    own_board_type = enabled_boards[0][0]
+
     try:
         from pathly_orchestrator.db.connection import get_db
         from pathly_orchestrator.db.queries.comms import (
@@ -153,15 +160,21 @@ def retrieve_board_context(
                 # CT4: a row with no cosine score. When semantic search is ACTIVE
                 # (task_embedding present), an unscored cross-tier row is a BM25-only
                 # keyword match that bypassed the distance gate — the ISSUE-1 leak — so
-                # drop it on cross-tier boards (keep on the agent's OWN feature board for
-                # lexical recall). When semantic search is INACTIVE (no embedding — the
-                # whole board is in recency fallback), keep the row so cross-tier context
-                # isn't starved in degraded mode.
-                if task_embedding is not None and board_type != "feature":
+                # drop it on cross-tier boards (keep on the agent's OWN board — feature,
+                # or project for a project-level decompose — for lexical recall). When
+                # semantic search is INACTIVE (no embedding — the whole board is in
+                # recency fallback), keep the row so cross-tier context isn't starved.
+                if task_embedding is not None and board_type != own_board_type:
                     continue
             else:
-                cutoff = _SEMANTIC_MAX_DISTANCE.get(
-                    board_type, _SEMANTIC_MAX_DISTANCE_DEFAULT
+                # Own board → lenient DEFAULT cutoff; cross-tier boards keep their strict
+                # per-tier cutoff so tangential project/global items don't leak in.
+                cutoff = (
+                    _SEMANTIC_MAX_DISTANCE_DEFAULT
+                    if board_type == own_board_type
+                    else _SEMANTIC_MAX_DISTANCE.get(
+                        board_type, _SEMANTIC_MAX_DISTANCE_DEFAULT
+                    )
                 )
                 if dist > cutoff:
                     continue

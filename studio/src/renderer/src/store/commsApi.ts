@@ -862,6 +862,28 @@ export async function apiDecomposeFeature(
   }
 }
 
+// Decompose a whole PROJECT into sibling features (POST /comms/project/decompose).
+// rigor: light → planning/project-decompose skill · full → planner · consultation → FSM flow.
+export async function apiDecomposeProject(
+  project: string,
+  rigor: 'light' | 'full' | 'consultation',
+  opts: { projectRoot?: string; adapter?: string } = {},
+): Promise<{ ok: boolean; reason?: string; run_id?: string } | null> {
+  try {
+    const body: Record<string, unknown> = { project, rigor }
+    if (opts.projectRoot) body.project_root = opts.projectRoot
+    if (opts.adapter) body.adapter = opts.adapter
+    const r = await apiFetch('/comms/project/decompose', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    return await r.json() as { ok: boolean; reason?: string; run_id?: string }
+  } catch {
+    return null
+  }
+}
+
 // Stop a single-task run (kills its board run, reverts the task to pending).
 export async function apiStopTask(taskId: string): Promise<boolean> {
   try {

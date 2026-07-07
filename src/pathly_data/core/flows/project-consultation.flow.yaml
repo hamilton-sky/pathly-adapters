@@ -1,0 +1,93 @@
+version: 1
+flow: project-consultation
+# Fixed (NOT pathly/{topic}/): the project-board scope — and thus this flow's topic —
+# is the normalized project_root PATH, which can't be a path segment. Storage is pinned
+# to pathly/project/ so the path-like topic keys the board scope + feature-count gate
+# while artifacts still land in the one project home.
+storage_path: pathly/project/
+# Project-consultation flow — heavy decomposer for seeding FEATURES onto a project board.
+# PO → architect → researcher → designer → planner fills the board with the project's
+# knowledge artifacts AND the feature set (the planner is the terminal stage; its
+# project-decompose Step posts type=feature messages AND scaffolds pathly/features/<slug>/).
+# A human review gate follows. This is feature-consultation.flow.yaml lifted one altitude up:
+# same stages, the terminal emit is type=feature (not type=goal).
+states:
+  - PO_DISCUSSING
+  - ARCHITECTING
+  - RESEARCHING
+  - DESIGNING
+  - PLANNING
+  # NO_FEATURES_SEEDED: the planner ran but posted fewer than 2 features (or no project scope).
+  # A LOUD terminal failure instead of silently re-looping PLANNING (or falsely
+  # completing) — the feature-seed depends on the planner AGENT posting features, and if
+  # it skips that, the decompose has failed its core deliverable and must stop visibly.
+  - NO_FEATURES_SEEDED
+  - DONE
+transitions:
+  PO_DISCUSSING:
+    - ARCHITECTING
+  ARCHITECTING:
+    - RESEARCHING
+  RESEARCHING:
+    - DESIGNING
+  DESIGNING:
+    - PLANNING
+  PLANNING:
+    - DONE
+    - NO_FEATURES_SEEDED
+  NO_FEATURES_SEEDED: []
+  DONE: []
+agent_map:
+  PO_DISCUSSING: planning/po
+  ARCHITECTING: team/architect
+  RESEARCHING: team/research
+  DESIGNING: team/design
+  PLANNING: planning/project-decompose
+role_map:
+  PO_DISCUSSING: po
+  ARCHITECTING: architect
+  RESEARCHING: web-researcher
+  DESIGNING: designer
+  PLANNING: planner
+feedback_routing:
+  HUMAN_QUESTIONS: human
+  BLOCKED_ON_HUMAN: human
+  ARCH_QUESTION: architect
+  PO_QUESTIONS: po
+  DESIGN_QUESTIONS: designer
+  IMPL_QUESTIONS: planner
+# Each stage advances on its default edge once its artifact is written; the stage
+# skill calls `pathly-fsm-call complete-stage` to move on. Optional content gates
+# below keep a stage from advancing until its primary artifact exists.
+transition_rules:
+  PO_DISCUSSING:
+    on_content:
+      - file: PO_NOTES.md
+        contains: '#'
+        next: ARCHITECTING
+    default: PO_DISCUSSING
+  ARCHITECTING:
+    default: RESEARCHING
+  RESEARCHING:
+    default: DESIGNING
+  DESIGNING:
+    on_content:
+      - file: DESIGN.md
+        contains: '## Design System Output'
+        next: PLANNING
+    default: DESIGNING
+  PLANNING:
+    on_project_feature_count:
+      op: gte
+      compare_to: 2
+      next: DONE
+    # Planner completed but seeded fewer than 2 features -> route to the loud
+    # NO_FEATURES_SEEDED terminal instead of silently re-running PLANNING forever.
+    default: NO_FEATURES_SEEDED
+transition_actions:
+  PLANNING->DONE:
+    - skill: archive-artifacts
+scope_gate:
+  exempt_prefixes: []
+gates: {}
+_comments: []

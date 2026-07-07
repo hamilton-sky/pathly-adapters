@@ -201,6 +201,7 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
         </div>
         <EvaluateBoardButton
           boardKey={boardKey}
+          boardScope={scope}
           goals={messages
             .filter((m) => m.type === 'goal')
             .map((g) => ({ id: g.id, text: g.text }))}

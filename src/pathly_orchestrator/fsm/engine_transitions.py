@@ -34,6 +34,7 @@ def evaluate_transition_rules(
     Level 2.5 — on_state_counter: numeric DB field comparison.
     Level 2.6 — on_board_count: goal-scoped board task-count gate (Fix B).
     Level 2.7 — on_feature_goal_count: feature-scoped goal-count gate.
+    Level 2.8 — on_project_feature_count: project-scoped feature-count gate.
     Level 3 — decide: return sentinel dict (no LLM call).
     Fallback — default or first transition.
     """
@@ -145,11 +146,36 @@ def evaluate_transition_rules(
         if op_fn is not None and compare_to is not None and next_s:
             try:
                 from pathly_orchestrator.db.connection import get_db
-                from pathly_orchestrator.db.queries.comms_messages import (
+                from pathly_orchestrator.db.queries.comms_counts import (
                     count_goals_for_feature,
                 )
 
                 count = count_goals_for_feature(get_db(), feature_scope)
+                if op_fn(count, int(compare_to)):
+                    return next_s
+            except Exception:
+                pass  # DB error → fail-closed: do NOT advance
+
+    # Level 2.8 — on_project_feature_count (project-scoped feature-count gate)
+    # Mirror of 2.7 one altitude up: the project-consultation PLANNING stage routes
+    # to DONE once >= 2 type=feature cards sit on the project board, else to
+    # NO_FEATURES_SEEDED. `feature_scope` is the generic flow scope passed by
+    # fsm_ops_complete (scope = the flow topic), so for a project flow it carries the
+    # PROJECT scope — no separate param threading is needed.
+    on_project_feature_count = rule.get("on_project_feature_count")
+    if on_project_feature_count is not None and feature_scope is not None:
+        op = on_project_feature_count.get("op")
+        compare_to = on_project_feature_count.get("compare_to")
+        next_s = on_project_feature_count.get("next")
+        op_fn = _COMPARE_OPS.get(op)
+        if op_fn is not None and compare_to is not None and next_s:
+            try:
+                from pathly_orchestrator.db.connection import get_db
+                from pathly_orchestrator.db.queries.comms_counts import (
+                    count_features_for_project,
+                )
+
+                count = count_features_for_project(get_db(), feature_scope)
                 if op_fn(count, int(compare_to)):
                     return next_s
             except Exception:

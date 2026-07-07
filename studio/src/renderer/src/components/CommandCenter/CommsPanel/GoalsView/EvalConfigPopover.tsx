@@ -8,6 +8,7 @@ import type { GoalStub } from './EvaluateBoardButton'
 import { BoardEvalConfig } from './BoardEvalConfig/BoardEvalConfig'
 import { GoalTargetConfig } from './GoalTargetConfig/GoalTargetConfig'
 import { DECOMPOSE_TARGET, FeatureDecomposeConfig, type FeatureRigor } from './FeatureDecomposeConfig/FeatureDecomposeConfig'
+import { ProjectDecomposeConfig } from './ProjectDecomposeConfig/ProjectDecomposeConfig'
 import s from './EvalConfigPopover.module.css'
 
 // Max chars shown for a goal title in the Target dropdown.
@@ -24,6 +25,9 @@ interface Props {
   goals: GoalStub[]
   /** '' = whole board; otherwise = a goal id. */
   targetGoalId: string
+  /** True when this popover is anchored on the PROJECT board — decompose targets features
+   *  instead of goals. */
+  isProjectBoard: boolean
   rigorMode: DecomposeMode
   /** Whole-board "Decompose into goals" rigor (light/full/consultation). */
   featureRigor: FeatureRigor
@@ -43,15 +47,25 @@ interface Props {
 const POPOVER_WIDTH = 290
 
 // Target options — the three explicit actions, then each goal (text truncated):
-// board evaluate, board decompose-into-goals, per-goal decompose-into-tasks.
-function buildTargetOptions(goals: GoalStub[]): { value: string; label: string; hint?: string }[] {
+// board evaluate, board decompose-into-goals/features, per-goal decompose-into-tasks.
+// On the PROJECT board the decompose target splits into sibling FEATURES instead of goals.
+function buildTargetOptions(
+  goals: GoalStub[],
+  isProjectBoard: boolean,
+): { value: string; label: string; hint?: string }[] {
   return [
     { value: '', label: 'Whole board — Evaluate', hint: 'Analyze the board and propose tasks' },
-    {
-      value: DECOMPOSE_TARGET,
-      label: 'Whole board — Decompose into goals',
-      hint: 'Split the feature into sibling goals',
-    },
+    isProjectBoard
+      ? {
+        value: DECOMPOSE_TARGET,
+        label: 'Whole board — Decompose into features',
+        hint: 'Split the project into sibling features',
+      }
+      : {
+        value: DECOMPOSE_TARGET,
+        label: 'Whole board — Decompose into goals',
+        hint: 'Split the feature into sibling goals',
+      },
     ...goals.map((g) => ({
       value: g.id,
       label: g.text.length > GOAL_LABEL_MAX ? `${g.text.slice(0, GOAL_LABEL_MAX)}…` : g.text,
@@ -67,7 +81,7 @@ function buildTargetOptions(goals: GoalStub[]): { value: string; label: string; 
 // exactly one primary button is ever visible.
 export function EvalConfigPopover({
   anchorEl, selectedLens, lensText, extraPrompt, selectedCli,
-  running, goals, targetGoalId, rigorMode,
+  running, goals, targetGoalId, isProjectBoard, rigorMode,
   featureRigor, onFeatureRigorChange, onFeatureDecompose,
   onSelectLens, onLensTextChange, onExtraPromptChange, onCliChange,
   onTargetChange, onRigorChange, onReset, onRun, onClose,
@@ -115,7 +129,7 @@ export function EvalConfigPopover({
           id="eval-target"
           ariaLabel="Evaluate target"
           value={targetGoalId}
-          options={buildTargetOptions(goals)}
+          options={buildTargetOptions(goals, isProjectBoard)}
           onChange={(v) => onTargetChange(v)}
           leadingIcon={<Target size={13} />}
           disabled={running}
@@ -132,14 +146,25 @@ export function EvalConfigPopover({
           onRun={onRun}
         />
       ) : isDecomposeTarget ? (
-        <FeatureDecomposeConfig
-          rigor={featureRigor}
-          selectedCli={selectedCli}
-          running={running}
-          onRigorChange={onFeatureRigorChange}
-          onCliChange={onCliChange}
-          onRun={onFeatureDecompose}
-        />
+        isProjectBoard ? (
+          <ProjectDecomposeConfig
+            rigor={featureRigor}
+            selectedCli={selectedCli}
+            running={running}
+            onRigorChange={onFeatureRigorChange}
+            onCliChange={onCliChange}
+            onRun={onFeatureDecompose}
+          />
+        ) : (
+          <FeatureDecomposeConfig
+            rigor={featureRigor}
+            selectedCli={selectedCli}
+            running={running}
+            onRigorChange={onFeatureRigorChange}
+            onCliChange={onCliChange}
+            onRun={onFeatureDecompose}
+          />
+        )
       ) : (
         <BoardEvalConfig
           selectedLens={selectedLens}
