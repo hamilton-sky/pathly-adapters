@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "source": "SPEC.md",
+  "diagrams": [
+    {
+      "id": "dg_h9k2m",
+      "title": "Planner Hierarchy: recursive decomposition",
+      "style": "mermaid",
+      "content": "flowchart TD\n  project[\"PROJECT board (spec / PRD / BMAD)\"]\n  projDecompose[\"planning/project-decompose (type=feature)\"]\n  feature[\"FEATURE board (SPEC.md)\"]\n  featDecompose[\"planning/feature-decompose (type=goal)\"]\n  goal[\"GOAL card\"]\n  goalPlan[\"planning/plan or dag-sketch (type=task)\"]\n  tasks[\"TASKS DAG\"]\n  executors[\"executors: single / loop / team\"]\n  dependsOn[\"depends_on via message_id (sibling scope)\"]\n  checkpoint[\"human checkpoint between levels\"]\n  gates[\"child-count gates: NO_FEATURES/GOALS/DAG_SEEDED\"]\n  prdImport[\"planning/prd-import G3 (not built)\"]\n\n  project -->|\"project-decompose\"| projDecompose\n  projDecompose --> feature\n  feature -->|\"feature-decompose\"| featDecompose\n  featDecompose --> goal\n  goal -->|\"goal planner\"| goalPlan\n  goalPlan --> tasks\n  tasks --> executors\n  projDecompose -.-> checkpoint\n  featDecompose -.-> checkpoint\n  dependsOn -.-> feature\n  dependsOn -.-> goal\n  dependsOn -.-> tasks\n  gates -.-> projDecompose\n  gates -.-> featDecompose\n  gates -.-> goalPlan\n  prdImport -.->|\"posts type=feature + type=goal\"| project",
+      "status": "kept",
+      "engine": "mermaid",
+      "model": null,
+      "createdAt": "2026-07-08T00:00:00Z"
+    }
+  ]
+}

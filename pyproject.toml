@@ -39,7 +39,10 @@ target-version = ["py311"]
 testpaths = ["tests"]
 pythonpath = ["src"]
 addopts = ["-p", "no:cacheprovider"]
-markers = ["slow: marks tests as slow (E2E installs)"]
+markers = [
+    "slow: marks tests as slow (E2E installs)",
+    "no_pathly_autouse: skip Pathly DB/server autouse fixtures for pure contract tests",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]

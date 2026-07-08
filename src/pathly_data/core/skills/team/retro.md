@@ -35,7 +35,7 @@ Parse the `<usage>` block from quick's response:
 
 Then invoke the `log-agent-done` skill with:
 ```json
-{"agent":"quick","feature":"<FEATURE>","conversation":0,"result":"DONE","total_tokens":<total_tokens>,"tool_uses":<tool_uses>,"duration_ms":<duration_ms>}
+{"agent":"quick","feature":"<fsm_feature>","conversation":0,"result":"DONE","total_tokens":<total_tokens>,"tool_uses":<tool_uses>,"duration_ms":<duration_ms>}
 ```
 
 **Generate pipeline-walkthrough files:**

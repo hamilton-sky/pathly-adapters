@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "source": "BOARD_EVAL.md",
+  "diagrams": [
+    {
+      "id": "dg_h7k2q",
+      "title": "planner-hierarchy board — recursive decomposition and 3-goal status",
+      "style": "mermaid",
+      "content": "flowchart TD\n  spec[\"spec\"] -->|\"G2 project-planner (ready)\"| features[\"features\"]\n  features -->|\"G1 feature-planner (complete)\"| goals[\"goals\"]\n  goals --> tasks[\"tasks\"]\n  g1[\"G1 feature-planner: feature to goals\"] --> features\n  g2[\"G2 project-planner: spec to features\"] --> route[\"/comms/project/decompose route\"]\n  route --> features\n  g2 --> t2[\"G2-T2 count_features_for_project\"]\n  t2 -->|\"needs pre-split\"| comms[\"comms_messages.py 389 of 400 lines\"]\n  g3[\"G3 prd-import: BMAD/PRD to goal-DAG\"] -->|\"Gap 1: no task DAG\"| dag[\"G3 task DAG (missing)\"]\n  g3 --> import[\"planning/prd-import.md\"]\n  import -->|\"posts to /comms/post\"| goals\n  route -.->|\"blocks full integration\"| g3",
+      "engine": "mermaid",
+      "model": null,
+      "createdAt": "2026-07-07T00:00:00Z"
+    }
+  ]
+}

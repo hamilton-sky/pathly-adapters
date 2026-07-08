@@ -15,6 +15,31 @@ interface Props {
   onDropPaths?: (items: { path: string; name: string }[]) => void
 }
 
+const WORKSPACE_TREE_DRAG_MIME = 'application/x-pathly-ws-move'
+
+function droppedPathFromPathlyPayload(raw: string): { path: string; name: string } | null {
+  try {
+    const p = JSON.parse(raw) as {
+      dragType?: string
+      type?: string
+      sourcePath?: string
+      src?: string
+      isFolder?: boolean
+      name?: string
+      path?: string[]
+    }
+    if (p.isFolder || p.type === 'folder') return null
+    const path =
+      p.sourcePath ??
+      p.src ??
+      (p.dragType === 'canvas' && p.path?.length ? p.path[0] : undefined)
+    if (!path) return null
+    return { path, name: p.name ?? path.split(/[/\\]/).pop() ?? 'file' }
+  } catch {
+    return null
+  }
+}
+
 // The "Artifacts" board view: type='artifact' messages as a filtered card list,
 // reusing the existing artifact card. Dropping content posts it as an artifact
 // card — board content the evaluator can then read. Two drag sources:
@@ -33,16 +58,16 @@ export function ArtifactsView({
     if (!canDrop) return
     e.preventDefault()
     setDragOver(false)
-    // Internal drag from the workspace tree carries a path, not a File object.
-    const internal = e.dataTransfer.getData(PATHLY_DRAG_MIME)
+    // Internal drags carry a path, not a File object. The current sidebar has
+    // two sources: LibraryCatalog uses PATHLY_DRAG_MIME, while WorkspaceTree
+    // uses its move MIME for tree reordering.
+    const internal = e.dataTransfer.getData(PATHLY_DRAG_MIME) || e.dataTransfer.getData(WORKSPACE_TREE_DRAG_MIME)
     if (internal && onDropPaths) {
-      try {
-        const p = JSON.parse(internal) as { type?: string; sourcePath?: string; name?: string }
-        if (p.type === 'file' && p.sourcePath) {
-          onDropPaths([{ path: p.sourcePath, name: p.name ?? p.sourcePath.split(/[/\\]/).pop() ?? 'file' }])
-          return
-        }
-      } catch { /* not our payload — fall through to OS files */ }
+      const item = droppedPathFromPathlyPayload(internal)
+      if (item) {
+        onDropPaths([item])
+        return
+      }
     }
     const files = Array.from(e.dataTransfer.files)
     if (files.length && onDropFiles) onDropFiles(files)

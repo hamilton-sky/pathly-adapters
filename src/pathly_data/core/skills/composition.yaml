@@ -176,6 +176,17 @@ skills:
       - comms-post
       - completion-report
 
+  # Terminal emitter for PRD/BMAD import into the board-native hierarchy. Posts
+  # type=feature cards on the project board, type=goal cards on feature boards,
+  # scaffolds feature SPEC.md files, and preserves depends_on by returned message_id.
+  # no_defaults: no legacy progress phases or conversation-file workflow.
+  planning/prd-import:
+    no_defaults: true
+    fragments:
+      - code-query
+      - comms-post
+      - completion-report
+
   # Interactive front-door to Board→Goals→Tasks: chat an idea into a goal + its task DAG, then post
   # BOTH on human sign-off. Goal create is in-body (like planning/plan's find-or-create); task
   # posting is the task-dag-post fragment, UNGATED — $GOAL_ID is set at runtime by the goal this

@@ -1,199 +1,247 @@
----
-
----
 # prd-import
 
-This is the canonical, tool-agnostic Pathly behavior for the prd-import workflow.
-This skill handles all PRD formats — generic hand-written PRDs, AI-generated PRDs,
-and BMAD-structured PRDs. The `bmad-import` route is an alias; both resolve here.
-Adapter skills should load and follow this prompt instead of duplicating workflow logic.
+Terminal emitter for importing a PRD or BMAD PRD into the board-native hierarchy:
+project -> features -> goals -> task DAGs. `bmad-import` is an alias; both routes
+resolve here.
 
-## Workflow Surface
+This skill does **not** create legacy conversation plan files. It posts feature
+and goal cards to the Comms Board and scaffolds starting feature specs. Task DAGs
+are created later by decomposing each goal with the normal goal-level planner.
 
-This core prompt uses host-neutral Pathly route names. Adapters are responsible
-for rendering those routes in their host-native form.
+## Step 0 - Parse arguments
 
-## Skill Contract
+`$ARGUMENTS` is:
 
-**Consumes:** Any PRD file — generic, AI-generated, or BMAD-structured (path provided as second argument)
-**Produces:** `pathly/features/$FEATURE/` — 4 files in lite, all 8 plan files in standard/strict, pre-populated from the PRD
-**Consumed by:** `build` skill reads `CONVERSATION_PROMPTS.md` and `PROGRESS.md`
-
----
-
-## Step 0: Parse Arguments
-
-Split `$ARGUMENTS` on the first space:
-- `FEATURE` = first token (the feature name, e.g., `hotel-search`)
-- `PRD_PATH` = remaining tokens (the file path, e.g., `docs/hotel-search-prd.md`)
-- If the final token is `lite`, `standard`, or `strict`, remove it from `PRD_PATH` and set `rigor` accordingly.
-- Default: `rigor = standard`
-
-If `FEATURE` is missing, ask interactively:
+```text
+<path/to/PRD.md> [project_scope_or_root]
 ```
-Feature name? (e.g. hotel-search):
-```
-Wait for the user's reply and use it as `FEATURE`.
 
-If `PRD_PATH` is missing, stop and tell the user:
-```
-Route: `prd-import <feature-name> <path/to/PRD.md>`
-Example route: `prd-import hotel-search docs/hotel-search-prd.md`
+- `PRD_PATH` is the first token.
+- `PROJECT` is the remaining text, if present.
+- If `PROJECT` is omitted, derive a readable project key from the PRD title.
+
+Do not use the old `<feature-name> <path/to/PRD.md>` contract. A PRD maps to a
+project/import scope; epics map to features, and stories map to goals.
+
+If `PRD_PATH` is missing, stop and report:
+
+```text
+Route: prd-import <path/to/PRD.md> [project_scope_or_root]
+Example: prd-import docs/payments-prd.md C:/Users/Yafit/my-app
 ```
 
 Check that `PRD_PATH` exists. If not, stop and report the missing file.
-Check that `pathly/features/$FEATURE/` does NOT already exist. If it does, stop and ask the user whether to overwrite.
 
----
+## Step 1 - Read and classify the PRD
 
-## Step 1: Read the PRD
+Read the full PRD file.
 
-Read the full PRD file at `PRD_PATH`.
+Classify it as BMAD-structured when it has clear epic/story structure, for example:
 
-Extract these sections (they may use different headings — use best-match):
-- **Feature name / title**
-- **User Stories** — each story with: title, persona, goal, benefit
-- **Acceptance Criteria** — per story (list items, checkboxes, or numbered)
-- **Edge Cases** — per story or global
-- **Out of Scope** — explicit exclusions
-- **Tech stack / constraints** — any mentioned technologies, URLs, environments
-- **Overview / context** — problem statement or background
+- `## Epic ...`, `### Epic ...`, or numbered `Epic N` sections;
+- story sections under epics;
+- explicit epic/story IDs;
+- explicit dependency fields such as `Depends on`, `Dependencies`, `After`, or
+  `Blocked by`.
 
-If the PRD uses different section names (e.g., "Non-functional requirements", "Constraints"), map them to the closest category above.
+Otherwise treat it as a generic PRD.
 
----
+Extract:
 
-## Step 2: Read Project Conventions
+- project title and overview;
+- epics with title, scope, acceptance boundary, and dependency names;
+- stories under each epic with title, scope, acceptance boundary, and dependency names;
+- global constraints, out-of-scope notes, risks, and tech constraints.
 
-1. Read the project's guidance files — layer structure, run commands, project architecture
-2. Read project rule files if present — architectural contracts, dependency rules, naming conventions
-3. Identify the project's layer structure from the available guidance (e.g., what layers exist, what belongs where)
-4. Find similar existing components in the codebase — use as reference patterns for naming and structure
+## Step 2 - Read project context
 
----
+Read project guidance and board context before proposing cards:
 
-## Step 3: Plan the Conversation Split
+1. Project guidance files and rule files, if present.
+2. Existing project-board features:
+   ```bash
+   curl -s "http://127.0.0.1:8765/comms?board=project&scope=$PROJECT&type=feature"
+   ```
+3. Existing artifacts on the project board:
+   ```bash
+   curl -s "http://127.0.0.1:8765/comms/artifacts?board=project&scope=$PROJECT"
+   ```
+4. Board context:
+   ```bash
+   curl -s -X POST http://127.0.0.1:8765/comms/agent-context \
+     -H "Content-Type: application/json" \
+     -d '{"scope": "$PROJECT"}'
+   ```
 
-Determine how many conversations are needed (max 4 per folder):
+Skip missing files or unreachable optional context sources, but do not skip the
+PRD itself.
 
-**Rules for splitting:**
-- **Conversation 1** always covers: the foundation layer — data models, base classes, core interfaces
-- **Conversation 2** covers: service/integration layer — logic that uses the foundation
-- **Conversation 3** (if needed): additional stories that depend on Conv 1 foundation
-- **Conversation 4** (if needed): integration tests, entry point wiring, or end-to-end flows
+## Step 3 - Map PRD content to hierarchy
 
-If complexity is LOW (1-2 stories, ≤4 ACs): 2 conversations
-If complexity is MEDIUM (3-4 stories, 5-8 ACs): 3 conversations
-If complexity is HIGH (5+ stories or 9+ ACs): consider splitting into two plan folders: `pathly/features/$FEATURE-part-1/` and `pathly/features/$FEATURE-part-2/`
+### BMAD PRD
 
----
+- PRD title / explicit project scope -> `PROJECT`
+- Epics -> project-board `type=feature` cards
+- Stories -> feature-board `type=goal` cards
+- Epic dependencies -> feature-card `depends_on`
+- Story dependencies -> goal-card `depends_on`
 
-## Step 4: Translate ACs to Verify Commands
+### Generic PRD
 
-This is the core translation step. For each acceptance criterion, determine which layer it tests and generate the appropriate verify command:
+Propose 2-5 project-board features from the PRD. Use natural product slices, not
+implementation phases. Each feature must be independently reviewable and should
+later decompose into 2-5 goals.
 
-**General approach — use the project's own test/run conventions from project guidance:**
+## Step 4 - Dependency rules
 
-| AC type | Verify method |
-|---|---|
-| Structure exists (class, file, interface) | `grep` or file existence check |
-| Logic executes correctly | unit test or integration test command from project guidance |
-| End-to-end behavior | full run command from project guidance |
-| Error/edge state handled | targeted test for the edge case |
+Dependencies are preserved at every hierarchy level, but only task dependencies
+are executable scheduler DAG edges today.
 
-**Verify command format:**
-```
-Verify:
-  <command>
-  # expected: <what success looks like>
-```
+- Feature dependencies are planning/review ordering metadata between sibling
+  `type=feature` cards on the project board.
+- Goal dependencies are planning/review ordering metadata between sibling
+  `type=goal` cards on one feature board.
+- Task dependencies remain the executable DAG under one goal.
 
-Always include at least one verify command per conversation that proves the deliverable is runnable, not just syntactically correct.
+`depends_on` must always store returned board `message_id` values, never slugs,
+titles, filenames, or human labels.
 
----
+Post upstream cards first. Record each POST response's `"message_id"` and resolve
+later dependency names to those ids.
 
-## Step 5: Map Edge Cases to Conversations
+## Step 5 - Seed project-board feature cards
 
-Each edge case from the PRD becomes either:
+### 5a. Idempotency guard
 
-1. **A test scenario** — if it requires exercising a failure path or boundary condition
-   → Add to the conversation that implements the relevant component
+Before posting features:
 
-2. **A Do NOT item** — if it's a scope boundary ("do not implement payment flow")
-   → Add to every conversation's `Do NOT` list
-
-3. **A model/method** — if it's a state the component must handle (e.g., "returns empty list when no results")
-   → Add to the foundation conversation scope
-
----
-
-## Step 6: Generate Plan Files
-
-Create `pathly/features/$FEATURE/`.
-
-If `rigor = lite`, write only:
-- USER_STORIES.md
-- IMPLEMENTATION_PLAN.md
-- PROGRESS.md
-- CONVERSATION_PROMPTS.md
-
-Merge happy flow, edge cases, architecture notes, and flow notes into those four files.
-
-If `rigor = standard` or `strict`, write all 8 files.
-
-If `rigor = strict`, add explicit risk, rollback, verification mapping, and approval notes.
-
-### FILE 1: USER_STORIES.md
-Read `{{TEMPLATES_DIR}}/plan/USER_STORIES.template.md` for structure.
-
-### FILE 2: IMPLEMENTATION_PLAN.md
-Read `{{TEMPLATES_DIR}}/plan/IMPLEMENTATION_PLAN.template.md` for structure.
-
-### FILE 3: PROGRESS.md
-Read `{{TEMPLATES_DIR}}/plan/PROGRESS.template.md` for structure.
-
-### FILE 4: CONVERSATION_PROMPTS.md
-Read `{{TEMPLATES_DIR}}/plan/CONVERSATION_PROMPTS.template.md` for structure.
-
-Each conversation prompt must be self-contained, scoped to specific files and layers, include the relevant architectural boundary rules from project guidance, Do NOT list, verify command, and end with:
-`After done, update pathly/features/$FEATURE/PROGRESS.md phase X to DONE.`
-
-### FILE 5: HAPPY_FLOW.md
-Standard/strict only. Skip in lite.
-Read `{{TEMPLATES_DIR}}/plan/HAPPY_FLOW.template.md` for structure.
-
-### FILE 6: EDGE_CASES.md
-Standard/strict only. Skip in lite.
-Read `{{TEMPLATES_DIR}}/plan/EDGE_CASES.template.md` for structure.
-
-### FILE 7: ARCHITECTURE_PROPOSAL.md
-Standard/strict only. Skip in lite; merge short architecture notes into IMPLEMENTATION_PLAN.md.
-Read `{{TEMPLATES_DIR}}/plan/ARCHITECTURE_PROPOSAL.template.md` for structure.
-
-### FILE 8: FLOW_DIAGRAM.md
-Standard/strict only. Skip in lite unless the flow is unclear without a diagram.
-Read `{{TEMPLATES_DIR}}/plan/FLOW_DIAGRAM.template.md` for structure.
-ASCII only. Max ~70 chars wide.
-
----
-
-## Step 7: Verify Output
-
-After writing files, confirm the selected rigor's required files exist in `pathly/features/$FEATURE/`.
-
-Then report:
-```
-PRD import complete. Created pathly/features/$FEATURE/.
-
-Rigor: [lite / standard / strict]
-
-Stories imported: [count] ([story IDs])
-Conversations planned: [count]
-Edge case workflows: [count]
-
-Next step: Review the plan, then run:
-  continue $FEATURE        <- implement Conversation 1
-  team $FEATURE       <- run the full pipeline
+```bash
+curl -s "http://127.0.0.1:8765/comms?board=project&scope=$PROJECT&type=feature"
 ```
 
-If a section was missing from the PRD, note it and leave the relevant section minimal rather than inventing content.
+If the project already has 2 or more `type=feature` cards, do not duplicate the
+feature set. Reuse existing feature ids when wiring downstream story goals.
+
+### 5b. Scaffold each feature
+
+For each emitted feature, create `pathly/features/<feature-slug>/` if absent and
+write a starting `SPEC.md` with:
+
+- title and problem statement;
+- scope and out-of-scope;
+- PRD source path;
+- relevant epic/story source references;
+- acceptance boundary;
+- known constraints and risks.
+
+### 5c. Materialize each feature board/root goal
+
+Ensure the feature has its own feature board/root goal, matching
+`planning/project-decompose` behavior. If a `type=goal` already exists at
+`scope=<feature-slug>`, reuse it. Otherwise post:
+
+```bash
+curl -s -X POST http://127.0.0.1:8765/comms/post \
+  -H "Content-Type: application/json" \
+  -d '{
+    "feature": "<feature-slug>",
+    "from": "planner",
+    "type": "goal",
+    "board": "feature",
+    "scope": "<feature-slug>",
+    "executor": "single",
+    "text": "Goal: <feature title>"
+  }'
+```
+
+### 5d. Post each feature card
+
+Post features in dependency order:
+
+```bash
+curl -s -X POST http://127.0.0.1:8765/comms/post \
+  -H "Content-Type: application/json" \
+  -d '{
+    "feature": "$PROJECT",
+    "from": "planner",
+    "type": "feature",
+    "board": "project",
+    "scope": "$PROJECT",
+    "slug": "<feature-slug>",
+    "text": "<feature-slug>: <title>\n\nScope: <scope paragraph>\n\nDone when:\n- <boundary 1>\n- <boundary 2>",
+    "depends_on": ["<message_id_of_feature_dependency>"],
+    "context_refs": [
+      {"artifact": "<artifact_path>", "anchor": ""}
+    ]
+  }'
+```
+
+Use `[]` or omit `depends_on` when there is no dependency. Record every returned
+`message_id`.
+
+## Step 6 - Seed feature-board goal cards
+
+This step applies to BMAD stories. For generic PRDs, stop after feature cards
+unless the PRD has clear story-level structure.
+
+### 6a. Idempotency guard
+
+For each feature:
+
+```bash
+curl -s "http://127.0.0.1:8765/comms?feature=$FEATURE&scope=$FEATURE&type=goal"
+```
+
+If the feature already has 2 or more `type=goal` cards, do not duplicate that
+goal set.
+
+### 6b. Post story goals
+
+Post goals in dependency order:
+
+```bash
+curl -s -X POST http://127.0.0.1:8765/comms/post \
+  -H "Content-Type: application/json" \
+  -d '{
+    "feature": "$FEATURE",
+    "from": "planner",
+    "type": "goal",
+    "board": "feature",
+    "scope": "$FEATURE",
+    "slug": "<goal-slug>",
+    "executor": "team",
+    "text": "<goal-slug>: <title>\n\nScope: <scope paragraph>\n\nDone when:\n- <boundary 1>\n- <boundary 2>",
+    "depends_on": ["<message_id_of_goal_dependency>"],
+    "context_refs": [
+      {"artifact": "pathly/features/<feature-slug>/SPEC.md", "anchor": ""}
+    ]
+  }'
+```
+
+Use `[]` or omit `depends_on` when there is no dependency. Record every returned
+`message_id`.
+
+## Step 7 - Skip-if-down fallback
+
+If the comms server is unreachable:
+
+- still scaffold local `pathly/features/<feature-slug>/SPEC.md` files where possible;
+- write `pathly/project/PRD_IMPORT_PLAN.md` with the same feature/goal/dependency
+  plan that would have been posted;
+- record in the completion report that board seeding did not complete.
+
+Do not retry in a loop. Do not claim success for board seeding when the board was
+unreachable.
+
+## Step 8 - Completion report
+
+Supply to the `completion-report` fragment:
+
+- `agent: planner`
+- `result: DONE` when board seeding succeeded, otherwise `BLOCKED`
+- `conversation: 0`
+- `summary: "prd-import seeded N features and M goals for $PROJECT from $PRD_PATH"`
+- `outcome: success` or `failed`
+
+The `completion-report` fragment writes AGENT_DONE as your final action.
+Nothing may run after it.

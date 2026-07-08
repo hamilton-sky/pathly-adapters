@@ -282,3 +282,26 @@ It is never subject to the PTY's 500-chunk rolling output buffer.
 If `summary` is absent (e.g. legacy agent), stdout `result` is used as a fallback.
 
 The runner→FSM result dict `_run_stage_via_terminal` returns also relays the agent's self-reported `outcome` (`success`/`failed`) + `error` from `AGENT_DONE`, so the loop executor's `_outcome_is_failure` (`supervisor/scheduler.py`) fails a task that exited cleanly but reported failure (silent-failure guard #2); a `_pty_return()` helper merges the CLI `exit_code` into the same returned dict for that check.
+
+## Telemetry feature key — `<fsm_feature>` vs `<feature>` (goal runs)
+
+Every `fsm_events` row is keyed by a `feature` string. There are **two** distinct identities in a
+prompt, and telemetry must use the right one or the goal panel shows `$0`:
+
+| Placeholder | Resolves to | Substituted in | Used for |
+|---|---|---|---|
+| `<feature>` | **board scope** — the parent feature/project the goal lives on (e.g. `planner-hierarchy`) | `fsm_compose._inject_prompt_vars` (= `board_scope`) | board writes (`/comms/*`), record-activity — so artifacts don't orphan onto a throwaway slug board |
+| `<fsm_feature>` | **run slug** — the storage-dir basename (e.g. `g3-…`) | `fsm_compose._inject_prompt_vars` (= `storage_path.name`) | telemetry: the `AGENT_DONE` POST in the `completion-report` fragment |
+
+The slug is the canonical event-log key: `fsm_state`, `STATE_TRANSITION`, every
+`eventlog.append_event(<path>)` (keys by `feature_dir.name`, `eventlog.py`), the supervisor
+billing reconciliation (`_patch_last_agent_done(events_path.parent, …)`), the early-advance
+watcher (`terminal.py` keys by `feature_dir.name`), and the DB-explorer goal panel
+(`/db/features/<feature>/{events,agents}`) all use it. For a **plain feature run** the board
+scope and the slug are identical, so `<feature> == <fsm_feature>` and nothing changes. For a
+**goal team run** they differ — so `completion-report` posts `AGENT_DONE` under `<fsm_feature>`
+(not `<feature>`); otherwise the cost lands on the feature/board scope and the goal detail shows
+`$0` / "No AGENT_DONE events yet". `team/retro` records its stage via `log-agent-done`, which is
+also passed `<fsm_feature>` so the retro slice keys by the slug like every other stage.
+(Residual: `PHASE_SUMMARY`/`run_history`/OTel spans still key by the full `state.topic` path — a
+non-cost display nuance, not yet unified.)

@@ -91,7 +91,7 @@ try:
     import urllib.request, urllib.error
     body = json.dumps({
         'type': event['type'],
-        'feature': '<feature>',
+        'feature': '<fsm_feature>',
         'project_root': str(pathlib.Path.cwd()),
         'payload': event,
     }).encode('utf-8')

@@ -23,30 +23,38 @@ def tmp_path():
 
 
 @pytest.fixture(autouse=True)
-def _no_async_embed(monkeypatch):
+def _no_async_embed(monkeypatch, request):
     """Disable the background embedding thread for all tests.
 
     embed_async() spawns a daemon thread that opens its own connection and
     writes embeddings concurrently — it races the per-test DB and causes
     intermittent 'database is locked' failures in the concurrency tests.
     """
+    if request.node.get_closest_marker("no_pathly_autouse"):
+        yield
+        return
     try:
         import pathly_orchestrator.runner.embeddings as _emb_mod
 
         monkeypatch.setattr(_emb_mod, "embed_async", lambda *a, **k: None)
     except Exception:
         pass
+    yield
 
 
 @pytest.fixture(autouse=True)
-def _isolate_db(tmp_path, monkeypatch):
+def _isolate_db(monkeypatch, request):
     """Redirect ~/.pathly/pathly.db to a per-test temp dir for isolation.
 
     Patches Path.home() so get_db() writes to tmp_path/.pathly/pathly.db.
     Clears the db connection cache before and after each test.
     """
+    if request.node.get_closest_marker("no_pathly_autouse"):
+        yield
+        return
     import pathly_orchestrator.db.connection as _conn_mod
 
+    tmp_path = request.getfixturevalue("tmp_path")
     fake_home = tmp_path
     (fake_home / ".pathly").mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr(Path, "home", staticmethod(lambda: fake_home))
@@ -73,7 +81,7 @@ def _isolate_db(tmp_path, monkeypatch):
 
 
 @pytest.fixture(autouse=True)
-def _reset_rate_limiter():
+def _reset_rate_limiter(request):
     """Clear the module-level per-IP rate-limit counters around each test.
 
     `middleware._rate_counters` is a global deque keyed by client IP and is NOT
@@ -84,6 +92,10 @@ def _reset_rate_limiter():
     Clearing per test fixes that; the dedicated rate-limit tests in test_http_server
     still trip the limit because they make their own 120+ requests after this reset.
     """
+
+    if request.node.get_closest_marker("no_pathly_autouse"):
+        yield
+        return
 
     def _clear():
         try:

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { DragEvent, MouseEvent } from 'react'
 import { useStore } from '../../../store'
 import { useCommandCenterStore } from '../../../store/commandCenterStore'
+import { PATHLY_DRAG_MIME } from '../../../types'
 import type { WsListing, WsMenu, WsRow, WorkspaceTreeController } from './types'
 import { buildRows, IGNORE } from './buildRows'
 import { createEntry, deleteEntry, loadListing, moveEntry, renameEntry } from './treeOps'
@@ -191,6 +192,16 @@ export function useWorkspaceTree(): { controller: WorkspaceTreeController } {
     if (row.isRoot) return
     e.stopPropagation(); e.dataTransfer.effectAllowed = 'move'
     try { e.dataTransfer.setData(DRAG_MIME, JSON.stringify({ src: row.fsPath, isFolder: row.isFolder })) } catch { /* noop */ }
+    if (!row.isFolder) {
+      try {
+        e.dataTransfer.setData(PATHLY_DRAG_MIME, JSON.stringify({
+          dragType: 'reorg',
+          name: row.name,
+          type: 'file',
+          sourcePath: row.fsPath,
+        }))
+      } catch { /* noop */ }
+    }
     setMenu(null)
   }, [])
   const onDragOver = useCallback((e: DragEvent): void => {

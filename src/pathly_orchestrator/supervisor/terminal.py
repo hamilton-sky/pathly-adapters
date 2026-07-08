@@ -347,7 +347,12 @@ def _run_stage_via_terminal(
                 if state.storage_path
                 else _resolve_storage_path(None, state.project_root, state.topic)
             )
-            feature = state.topic
+            # Watch/patch under the FSM/event-log key = the storage dir basename (the run slug),
+            # NOT state.topic. For a plain feature run these are identical; for a GOAL run
+            # state.topic is the nested path (features/<f>/goals/<slug>) while the AGENT_DONE the
+            # watcher looks for is keyed by the slug (eventlog.append_event derives feature from the
+            # dir basename). Keying by state.topic here made early-advance never fire for goal runs.
+            feature = feature_dir.name
 
             last_seq = 0
             try:

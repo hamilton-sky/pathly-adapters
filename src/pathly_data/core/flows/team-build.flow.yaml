@@ -1,110 +1,89 @@
-version: 1
-flow: team-build
-storage_path: pathly/{topic}/
-# Trimmed team flow — the `team` executor (GOALS-DAG-EXECUTORS §3, §6). Runs
-# build → review → test → retro on a goal whose decomposition (plan + task DAG)
-# already exists (from the consultation flow or a single planner run). The upfront
-# STORM/PLAN/DESIGN stages live in consultation.flow.yaml, not here.
-states:
-  - BUILDING
-  - REVIEWING
-  - TESTING
-  - RETRO
-  - DONE
-transitions:
-  BUILDING:
-    - REVIEWING
-  REVIEWING:
-    - BUILDING
-    - TESTING
-  TESTING:
-    - BUILDING
-    - RETRO
-  RETRO:
-    - DONE
-  DONE: []
+_comments: []
 agent_map:
   BUILDING: team/build
+  RETRO: team/retro
   REVIEWING: team/review
   TESTING: team/test
-  RETRO: team/retro
-role_map:
-  BUILDING: builder
-  REVIEWING: reviewer
-  TESTING: tester
-  RETRO: retro
-# Feedback files route BACK to the specialist who owns them, even though those
-# roles are not stages in this flow — the builder can escalate an architecture
-# question, a requirements gap, or a design question to the right consultation
-# role mid-build; the reviewer/tester send failures back to the builder.
+escalation_routing:
+  REVIEW_FAILURES: planner
+  SCOPE_VIOLATION: planner
+  TEST_FAILURES: po
 feedback_routing:
-  HUMAN_QUESTIONS: human
-  BLOCKED_ON_HUMAN: human
-  ARCH_QUESTION: architect
+  ACCEPTANCE_QUESTION: po
   ARCH_FEEDBACK: architect
+  ARCH_QUESTION: architect
+  BLOCKED_ON_HUMAN: human
   DESIGN_QUESTIONS: designer
-  PO_QUESTIONS: po
-  REQUIREMENT_GAP: po
-  ACCEPTANCE_QUESTION: po      # tester asks the PO whether the criteria themselves are right
+  HUMAN_QUESTIONS: human
   IMPL_QUESTIONS: planner
+  INCOMPLETE_TASKS: builder
+  PO_QUESTIONS: po
   REFLECT_CRITIQUE: builder
-  REVIEW_INCOMPLETE: reviewer   # REVIEWING->TESTING gate: REVIEW.md missing/not-PASS -> reviewer re-reviews & writes it
-  INCOMPLETE_TASKS: builder     # REVIEWING->TESTING gate: goal has unfinished/failed tasks -> builder drains the remaining DAG
+  REQUIREMENT_GAP: po
   REVIEW_FAILURES: builder
+  REVIEW_INCOMPLETE: reviewer
   SCOPE_VIOLATION: builder
   TEST_FAILURES: builder
-# 3-tier escalation (fsm.engine.route_feedback): when a FAILURE file keeps failing,
-# its target climbs from the builder (rounds 1-2) → the upstream owner (round 3) →
-# the human (round 4+). The repeated failure usually means the plan/design/criteria
-# are wrong, not the build. Files absent here never tier (clarifications, human files).
-escalation_routing:
-  REVIEW_FAILURES: planner    # round 3: the plan/scope likely doesn't match reality
-  SCOPE_VIOLATION: planner    # round 3: the conversation scope is wrong
-  TEST_FAILURES: po           # round 3: the acceptance criteria may be wrong
+flow: team-build
+gates:
+  REVIEWING->TESTING:
+  - artifact: REVIEW.md
+    on_fail: REVIEW_INCOMPLETE.md
+    pass_marker: 'RESULT: PASS'
+    type: verify_gate
+  - on_fail: INCOMPLETE_TASKS.md
+    type: require_tasks_done
+role_map:
+  BUILDING: builder
+  RETRO: retro
+  REVIEWING: reviewer
+  TESTING: tester
+scope_gate:
+  exempt_prefixes: []
+states:
+- BUILDING
+- REVIEWING
+- TESTING
+- RETRO
+- DONE
+storage_path: pathly/{topic}/
+transition_actions:
+  BUILDING->REVIEWING:
+  - message: 'feat: complete building stage'
+    skill: commit
+  RETRO->DONE:
+  - skill: archive-artifacts
 transition_rules:
   BUILDING:
     default: REVIEWING
   REVIEWING:
+    default: TESTING
     on_artifact:
       REVIEW_FAILURES.md: BUILDING
-    # Per-task loop (goal runs): after a task is built + reviewed clean, if the goal still has
-    # BUILDABLE tasks (pending with all deps done) loop back to BUILDING for the next one. Only
-    # when the DAG is drained (ready == 0) fall through to TESTING — so EVERY task gets its own
-    # build→review before the goal is integration-tested once. Ignored for non-goal feature runs
-    # (no goal_id), which keep the single build→review→test pass.
     on_board_count:
-      metric: ready
-      op: gt
       compare_to: 0
+      metric: ready
       next: BUILDING
-    default: TESTING
+      op: gt
   TESTING:
+    default: RETRO
     on_artifact:
       TEST_FAILURES.md: BUILDING
-    default: RETRO
-transition_actions:
-  BUILDING->REVIEWING:
-    - skill: commit
-      message: 'feat: complete building stage'
-  RETRO->DONE:
-    - skill: archive-artifacts
-scope_gate:
-  exempt_prefixes: []
-gates:
-  REVIEWING->TESTING:
-    # The reviewer writes REVIEW.md (RESULT: PASS) ONLY on a clean pass; a failing review leaves
-    # REVIEW_FAILURES.md instead (and deletes any stale REVIEW.md). If REVIEW.md is missing/not-PASS
-    # the gate routes to REVIEW_INCOMPLETE.md -> reviewer (NOT human), so a builder-fixed review is
-    # RE-REVIEWED before advancing instead of dead-ending the headless run at a human checkpoint.
-    - type: verify_gate
-      artifact: REVIEW.md
-      pass_marker: 'RESULT: PASS'
-      on_fail: REVIEW_INCOMPLETE.md
-    # Goal-DAG completeness: with the per-task loop above, REVIEWING only defaults to TESTING once
-    # ready == 0. This gate additionally refuses to enter TESTING while any task is unfinished or
-    # FAILED (ready == 0 but incomplete > 0 — e.g. a task blocked on a failed dependency), so a
-    # goal is never integration-tested / retro'd half-built. On fail → INCOMPLETE_TASKS.md → builder
-    # (bounded by feedback rounds). No-op for non-goal feature runs (no goal_id → no DAG to check).
-    - type: require_tasks_done
-      on_fail: INCOMPLETE_TASKS.md
-_comments: []
+transitions:
+  BUILDING:
+  - REVIEWING
+  DONE: []
+  RETRO:
+  - DONE
+  REVIEWING:
+  - BUILDING
+  - TESTING
+  TESTING:
+  - BUILDING
+  - RETRO
+version: 1
+adapter_map:
+  default: claude
+  BUILDING: claude
+  REVIEWING: codex
+  TESTING: claude

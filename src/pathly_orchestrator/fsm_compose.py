@@ -105,6 +105,15 @@ def _inject_prompt_vars(
     text = text.replace("<feature>", feature)
     text = text.replace("<project_root>", project_root)
     text = text.replace("<agent>", agent_role)
+    # <fsm_feature> = the run's FSM/event-log key = the storage dir basename (the run slug).
+    # This is what fsm_state, STATE_TRANSITION, every eventlog.append_event(<path>) write, and
+    # the DB-explorer goal panel all key by. For a plain feature run it equals <feature>; for a
+    # GOAL run <feature> is the parent BOARD scope (so board posts don't orphan onto a throwaway
+    # slug board) while <fsm_feature> is the goal slug. Telemetry (AGENT_DONE) MUST key by
+    # <fsm_feature> so it lands where the panel + billing reconciliation look — else the goal
+    # shows $0 while the cost hides under the feature/board scope.
+    fsm_feature = storage_path.name if storage_path is not None else feature
+    text = text.replace("<fsm_feature>", fsm_feature)
     if storage_path is not None:
         feature_path = storage_path.as_posix().rstrip("/")
         text = text.replace("<feature_path>", feature_path)
