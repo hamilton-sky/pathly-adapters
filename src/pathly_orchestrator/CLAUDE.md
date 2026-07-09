@@ -61,7 +61,7 @@ humans post messages, ask/answer questions, decompose DAG tasks, and supersede s
 ```
 POST /comms/post            ← post a message (embedding computed for hybrid search)
 GET  /comms                 ← list board messages (scoped)
-POST /comms/search          ← hybrid (semantic + keyword) search
+POST /comms/search          ← hybrid (semantic + keyword) search; semantic arm floored at SEMANTIC_DISTANCE_CEILING, keyword hits bypass; no match → [] (never padded with recent messages)
 POST /comms/acknowledge     ← mark a message acknowledged
 POST /comms/answer          ← answer a posted question
 GET  /comms/tasks           ← list DAG tasks
@@ -160,7 +160,7 @@ pathly_orchestrator/
       comms_messages.py    # board message CRUD; goal_id/executor columns back the Goals->Task-DAG model
       comms_artifacts.py   # artifact metadata CRUD (attach, list, section index, update_summary)
       comms_tasks.py       # task DAG operations (get_ready, complete, claim, fail, reclaim, goal_refs_coverage)
-      comms_embeddings.py  # embedding storage + hybrid/semantic search; search_by_embedding() merges parent+child vectors, deduplicates by message_id, returns _matched_chunk for subtopic surfacing; store_chunk_embeddings() writes to comms_chunk_embeddings
+      comms_embeddings.py  # embedding storage + hybrid/semantic search; search_by_embedding() merges parent+child vectors, deduplicates by message_id, returns _matched_chunk for subtopic surfacing; store_chunk_embeddings() writes to comms_chunk_embeddings; SEMANTIC_DISTANCE_CEILING (0.72) + opt-in max_distance= floor scored hits for /comms/search (BM25 hits bypass; comms_context.py keeps its own per-tier gates)
       comms_counts.py      # count_goals_for_feature / count_features_for_project — gate the consultation flows' seed thresholds
       comms_goals_read.py  # get_goals_with_rollup() — backs GET /comms/goals
       comms_summary.py     # per-artifact AI-summary selection/style/note setters+getters (unified-ai-routing)

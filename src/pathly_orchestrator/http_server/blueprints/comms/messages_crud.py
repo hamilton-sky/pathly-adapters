@@ -52,7 +52,12 @@ def comms_get():
 
 @bp.route("/comms/search", methods=["POST"])
 def comms_search():
-    """Semantic search across boards."""
+    """Hybrid (BM25 + semantic) search across boards.
+
+    Semantic hits are floored at SEMANTIC_DISTANCE_CEILING; keyword hits bypass the
+    floor. A query matching nothing returns [] — results are never padded with
+    recent messages (that padding made every query "match" the newest rows).
+    """
     try:
         from pathly_orchestrator.db.connection import get_db as _get_db
         from pathly_orchestrator.db.queries.comms import search_by_embedding as _search
@@ -61,6 +66,9 @@ def comms_search():
         )
         from pathly_orchestrator.db.queries.comms import (
             search_by_keyword as _search_keyword,
+        )
+        from pathly_orchestrator.db.queries.comms_embeddings import (
+            SEMANTIC_DISTANCE_CEILING as _CEILING,
         )
         from pathly_orchestrator.runner.embeddings import embed as _embed
 
@@ -95,22 +103,21 @@ def comms_search():
         elif mode == "semantic":
             if embedding is not None:
                 results = _search(
-                    conn, embedding=embedding, boards=[board], scopes=[scope], k=k
+                    conn,
+                    embedding=embedding,
+                    boards=[board],
+                    scopes=[scope],
+                    k=k,
+                    max_distance=_CEILING,
                 )
             else:
-                from pathly_orchestrator.db.queries.comms import (
-                    get_messages as _get_messages,
-                )
-
-                results = _get_messages(conn, board=board, scope=scope, limit=k)
+                # No embedding model → degrade to keyword matching, which is still
+                # honest; recency rows are not matches.
+                results = _search_keyword(conn, query, [board], [scope], k)
         else:
-            results = _search_hybrid(conn, query, embedding, [board], [scope], k)
-            if not results:
-                from pathly_orchestrator.db.queries.comms import (
-                    get_messages as _get_messages,
-                )
-
-                results = _get_messages(conn, board=board, scope=scope, limit=k)
+            results = _search_hybrid(
+                conn, query, embedding, [board], [scope], k, max_distance=_CEILING
+            )
 
         return jsonify(results), 200
     except Exception as exc:

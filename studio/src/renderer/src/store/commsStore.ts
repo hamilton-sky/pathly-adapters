@@ -52,6 +52,8 @@ export interface GlobalSearchHit {
   boardKey: string
   boardScope: BoardScope
   boardLabel: string
+  /** Position in the board's relevance-ranked results (0 = best RRF/semantic hit). */
+  rank: number
   message: Message
 }
 
@@ -497,8 +499,8 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
     const batches = await Promise.all(
       targets.map((t) =>
         apiSearch(q, t.feature, t.board, t.apiScope)
-          .then((rows) => rows.map((m): GlobalSearchHit => ({
-            boardKey: t.boardKey, boardScope: t.scope, boardLabel: t.label, message: m,
+          .then((rows) => rows.map((m, i): GlobalSearchHit => ({
+            boardKey: t.boardKey, boardScope: t.scope, boardLabel: t.label, rank: i, message: m,
           })))
           .catch(() => [] as GlobalSearchHit[]),
       ),
@@ -506,7 +508,13 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
 
     // Drop a stale run: a newer query started while this fan-out was in flight.
     if (get().globalQuery !== q) return
-    const hits = batches.flat().sort((a, b) => (b.message.ts ?? '').localeCompare(a.message.ts ?? ''))
+    // Each board's rows arrive relevance-ranked (RRF/cosine). Merge boards by
+    // interleaving rank — every board's best hit first, then the #2s… — with
+    // newest-first as the tiebreak. Not a plain ts sort: that buried relevance
+    // and displayed the same order for every query.
+    const hits = batches.flat().sort(
+      (a, b) => a.rank - b.rank || (b.message.ts ?? '').localeCompare(a.message.ts ?? ''),
+    )
     set({ globalHits: hits.slice(0, 40), globalSearching: false })
   },
 

@@ -3,8 +3,11 @@
 POST /comms/search must:
   - Default to 'hybrid' mode when mode param is absent.
   - Return keyword-ranked results for mode='keyword'.
-  - Return identical results to the pre-Phase-12 code path for mode='semantic'.
   - Reject invalid modes gracefully (fall back to hybrid).
+  - Degrade mode='semantic' to keyword matching when no embedding model is available.
+  - Return [] when nothing matches — results are never padded with recent messages.
+    (Semantic hits are additionally floored at SEMANTIC_DISTANCE_CEILING; BM25
+    keyword hits bypass the floor.)
 
 retrieve_board_context() must now call search_by_hybrid internally.
 """
@@ -94,11 +97,17 @@ def test_comms_search_mode_semantic_returns_200(client, monkeypatch):
     assert isinstance(results, list)
 
 
-def test_comms_search_mode_semantic_with_none_embedding_falls_back_to_recency(
+def test_comms_search_mode_semantic_with_none_embedding_falls_back_to_keyword(
     client, monkeypatch
 ):
-    """mode='semantic' with embed()=None falls back to recency (get_messages)."""
+    """mode='semantic' with embed()=None degrades to keyword search — an honest
+    literal match, never recency padding (which made every query "match")."""
+    import pathly_orchestrator.db.connection as _conn_mod
     import pathly_orchestrator.runner.embeddings as _emb_mod
+
+    _conn_mod.get_db()  # ensure init has run so _FTS_AVAILABLE is set
+    if not _conn_mod._FTS_AVAILABLE:
+        pytest.skip("FTS5 not available — keyword fallback not testable")
 
     monkeypatch.setattr(_emb_mod, "embed", lambda text: None)
 
@@ -106,7 +115,7 @@ def test_comms_search_mode_semantic_with_none_embedding_falls_back_to_recency(
     results = _search(client, "Auth", mode="semantic")
     assert any(
         r["id"] == mid for r in results
-    ), "semantic+None embedding should fall back to recency and include the message"
+    ), "semantic+None embedding should degrade to keyword search and find the literal match"
 
 
 def test_comms_search_mode_semantic_regression_same_as_default_path(
@@ -249,6 +258,43 @@ def test_comms_search_mode_invalid_falls_back_to_hybrid(client, monkeypatch):
     )
     assert r.status_code == 200
     assert len(hybrid_calls) == 1, "Invalid mode should fall back to hybrid"
+
+
+# ---------------------------------------------------------------------------
+# Honest empties + distance floor
+# ---------------------------------------------------------------------------
+
+
+def test_comms_search_hybrid_no_results_returns_empty(client, monkeypatch):
+    """A query matching nothing returns [] — a search result must be a match,
+    not merely the newest row on the board (the old recency-padding fallback)."""
+    import pathly_orchestrator.db.queries.comms as _comms_mod
+    import pathly_orchestrator.runner.embeddings as _emb_mod
+
+    monkeypatch.setattr(_emb_mod, "embed", lambda text: None)
+    monkeypatch.setattr(_comms_mod, "search_by_hybrid", lambda *a, **k: [])
+
+    _post(client, "some unrelated board message")
+    results = _search(client, "zzznonsense123")
+    assert results == []
+
+
+def test_comms_search_hybrid_keyword_hits_bypass_distance_floor(client, monkeypatch):
+    """BM25 keyword hits survive even when the semantic arm floors everything —
+    a literal token match is valid regardless of embedding distance."""
+    import pathly_orchestrator.db.queries.comms_embeddings as _emb_q
+    import pathly_orchestrator.runner.embeddings as _emb_mod
+
+    monkeypatch.setattr(_emb_mod, "embed", lambda text: [0.0] * 384)
+    monkeypatch.setattr(
+        _emb_q,
+        "search_by_keyword",
+        lambda *a, **k: [{"id": "kw1", "text": "literal hit"}],
+    )
+    monkeypatch.setattr(_emb_q, "search_by_embedding", lambda *a, **k: [])
+
+    results = _search(client, "literal")
+    assert [r["id"] for r in results] == ["kw1"]
 
 
 # ---------------------------------------------------------------------------

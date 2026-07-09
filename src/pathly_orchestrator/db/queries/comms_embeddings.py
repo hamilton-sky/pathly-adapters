@@ -32,17 +32,30 @@ def _dist_of(row: dict) -> float:
     return d if d is not None else 9e9
 
 
+# Cosine-distance ceiling for human-facing search (/comms/search). Calibrated twice,
+# independently, on live board data: comms_context.py (2026-07-02) measured genuine
+# same-board matches at ~0.48-0.67 with tangential items from ~0.68; a 2026-07-09 probe
+# of /comms/search saw real hits <=0.66 and unrelated rows >=0.80. 0.72 sits in the gap.
+# Opt-in via max_distance= — agent context (comms_context.py) and the consolidation
+# dedup keep their own gates. BM25 keyword hits are never distance-gated.
+SEMANTIC_DISTANCE_CEILING = 0.72
+
+
 def search_by_embedding(
     conn: sqlite3.Connection,
     embedding: list[float],
     boards: list[str],
     scopes: list[str],
     k: int = 6,
+    max_distance: float | None = None,
 ) -> list[dict]:
     """Return up to k messages ordered by semantic similarity (or recency when vec unavailable).
 
     Merges parent vector (whole summary) and child chunk vectors so a query matching
-    one subtopic of a multi-topic artifact still retrieves it.
+    one subtopic of a multi-topic artifact still retrieves it. When *max_distance* is
+    given, scored rows farther than it are dropped — plain k-nearest would return the
+    k least-unrelated rows of ANY corpus, i.e. junk "matches" on a sparse board. The
+    no-vec recency fallback rows carry no score and are returned regardless.
     """
     if not boards or not scopes:
         return []
@@ -77,7 +90,10 @@ def search_by_embedding(
                     best[d["id"]] = d
         except sqlite3.OperationalError:
             pass  # chunk table absent (older DB) → parents only
-        return sorted(best.values(), key=_dist_of)[:k]
+        ranked = sorted(best.values(), key=_dist_of)
+        if max_distance is not None:
+            ranked = [r for r in ranked if _dist_of(r) <= max_distance]
+        return ranked[:k]
 
     board_ph = ",".join("?" * len(boards))
     scope_ph = ",".join("?" * len(scopes))
@@ -126,13 +142,20 @@ def search_by_hybrid(
     boards: list[str],
     scopes: list[str],
     k: int = 6,
+    max_distance: float | None = None,
 ) -> list[dict]:
-    """BM25 + cosine merged via Reciprocal Rank Fusion. Falls back gracefully."""
+    """BM25 + cosine merged via Reciprocal Rank Fusion. Falls back gracefully.
+
+    *max_distance* floors only the semantic arm — a literal BM25 keyword match is a
+    valid hit regardless of its embedding distance.
+    """
     bm25_rows = (
         search_by_keyword(conn, query_text, boards, scopes, k * 2) if query_text else []
     )
     sem_rows = (
-        search_by_embedding(conn, query_embedding, boards, scopes, k * 2)
+        search_by_embedding(
+            conn, query_embedding, boards, scopes, k * 2, max_distance=max_distance
+        )
         if query_embedding is not None
         else []
     )
