@@ -21,8 +21,6 @@ function dbFeatureToFeatureData(f: DbFeature): FeatureData {
     tokens: f.total_tokens.toLocaleString(),
     cost: `$${f.cost_usd.toFixed(2)}`,
     ts: f.updated_at ? f.updated_at.slice(11, 19) : '',
-    done: f.convs_done ?? 0,
-    total: f.convs_total ?? 0,
     pcol: `var(--state-${state.toLowerCase()})`,
     dots: [{ state }],
   }

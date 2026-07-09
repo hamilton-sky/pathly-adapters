@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import datetime
-import re
 import subprocess
 from importlib.resources import files
 from pathlib import Path
@@ -11,7 +10,6 @@ from pathlib import Path
 import yaml
 
 from pathly_orchestrator.fsm import (
-    append_event,
     evaluate_transition_rules,
     recover_state,
     route_feedback,
@@ -89,28 +87,6 @@ def _resolve_storage_path(
     # (pathly/features/{topic}/) so a not-yet-created feature never resolves to legacy pathly/plans.
     template = (flow_config or {}).get("storage_path") or "pathly/features/{topic}/"
     return root / template.format(topic=topic)
-
-
-def _count_planned_convs(storage_path: Path) -> int:
-    """Return convs_total from DB state, falling back to PROGRESS.md on first run."""
-    from pathly_orchestrator import eventlog as _el
-
-    state = _el.read_state(str(storage_path))
-    if state and state.get("convs_total") is not None:
-        return int(state["convs_total"])
-    progress_file = storage_path / "PROGRESS.md"
-    if not progress_file.exists():
-        return 0
-    try:
-        text = progress_file.read_text(encoding="utf-8")
-    except OSError:
-        return 0
-    numbers: set[str] = set()
-    for line in text.splitlines():
-        m = re.match(r"^\s*\|\s*(\d+)\s*\|", line)
-        if m:
-            numbers.add(m.group(1))
-    return len(numbers)
 
 
 def _get_head_sha(project_root: str) -> str:
@@ -222,24 +198,6 @@ def next_action(args: dict) -> dict:
             baseline["truncated"] = True
         stamped_state["build_baseline"] = baseline
         needs_write = True
-
-    if stamped_state.get("convs_total") is None:
-        total = _count_planned_convs(storage_path)
-        stamped_state["convs_total"] = total
-        stamped_state["convs_done"] = 0
-        needs_write = True
-    else:
-        current_total = _count_planned_convs(storage_path)
-        if current_total != stamped_state.get("convs_total"):
-            append_event(
-                storage_path,
-                {
-                    "type": "WARNING",
-                    "reason": "convs_total_mismatch",
-                    "persisted": stamped_state.get("convs_total"),
-                    "current": current_total,
-                },
-            )
 
     if needs_write:
         from pathly_orchestrator import eventlog as _elog_ws

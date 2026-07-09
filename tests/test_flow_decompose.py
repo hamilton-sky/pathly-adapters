@@ -76,7 +76,7 @@ FIXTURE_ON_CONTENT = {
     "transition_actions": {},
 }
 
-FIXTURE_ON_STATE_COUNTER = {
+FIXTURE_ON_BOARD_COUNT = {
     "version": 1,
     "flow": "counter-test",
     "storage_path": "pathly/plans/{topic}/",
@@ -94,10 +94,10 @@ FIXTURE_ON_STATE_COUNTER = {
     "feedback_routing": {},
     "transition_rules": {
         "REVIEWING": {
-            "on_state_counter": {
-                "field": "convs_done",
-                "op": "lt",
-                "compare_to": "convs_total",
+            "on_board_count": {
+                "op": "gt",
+                "compare_to": 0,
+                "metric": "ready",
                 "next": "BUILDING",
             },
             "default": "DONE",
@@ -108,12 +108,12 @@ FIXTURE_ON_STATE_COUNTER = {
 
 
 # ---------------------------------------------------------------------------
-# T1.5 — Branch coverage tests for decide / on_content / on_state_counter
+# T1.5 — Branch coverage tests for decide / on_content / on_board_count
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
-    "fixture", [FIXTURE_DECIDE, FIXTURE_ON_CONTENT, FIXTURE_ON_STATE_COUNTER]
+    "fixture", [FIXTURE_DECIDE, FIXTURE_ON_CONTENT, FIXTURE_ON_BOARD_COUNT]
 )
 def test_decompose_does_not_raise(fixture):
     _decompose_flow_dict(fixture)
@@ -145,19 +145,19 @@ def test_on_content_array_preserved_in_order():
     assert on_content[1]["contains"] == "## Summary"
 
 
-def test_on_state_counter_in_node_config():
-    _, nodes, _ = _decompose_flow_dict(FIXTURE_ON_STATE_COUNTER)
+def test_on_board_count_in_node_config():
+    _, nodes, _ = _decompose_flow_dict(FIXTURE_ON_BOARD_COUNT)
     reviewing = next(n for n in nodes if n["node_id"] == "REVIEWING")
     cfg = json.loads(reviewing["config_json"])
-    assert "on_state_counter" in cfg["transition_rule"]
-    assert cfg["transition_rule"]["on_state_counter"]["field"] == "convs_done"
+    assert "on_board_count" in cfg["transition_rule"]
+    assert cfg["transition_rule"]["on_board_count"]["metric"] == "ready"
 
 
-def test_on_state_counter_not_in_any_edge():
-    _, _, edges = _decompose_flow_dict(FIXTURE_ON_STATE_COUNTER)
+def test_on_board_count_not_in_any_edge():
+    _, _, edges = _decompose_flow_dict(FIXTURE_ON_BOARD_COUNT)
     for edge in edges:
         cfg = json.loads(edge["config_json"] or "{}")
-        assert "on_state_counter" not in cfg
+        assert "on_board_count" not in cfg
 
 
 def test_no_db_in_fixture_tests():

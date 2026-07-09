@@ -43,7 +43,7 @@ export function FeatureCard({ feature: f, open, isMain, pending, boardOpen, atCa
         <div className={s.featBody}>
           <div className={s.featStage}>
             <span className={s.stg} data-stage={f.stage}>{f.stage}</span>
-            <span className={s.featConv}>conv {f.conv} · {f.status}</span>
+            <span className={s.featConv}>{f.status}</span>
           </div>
           <div className={s.featLast}>{f.last}</div>
           <div className={s.featActs}>

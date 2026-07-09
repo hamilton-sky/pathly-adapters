@@ -40,8 +40,6 @@ declare global {
     total_tokens: number
     cost_usd: number
     updated_at: string
-    convs_done?: number
-    convs_total?: number
     source?: string
   }
 

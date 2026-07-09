@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -184,34 +183,6 @@ def run_transition_actions(
                         f"archive-artifacts failed copying {md_file.name}: {e}"
                     )
 
-        elif skill == "update_progress":
-            progress_file = storage_path / "PROGRESS.md"
-            if not progress_file.exists():
-                continue
-            mark = action.get("mark", "")
-            try:
-                content = progress_file.read_text(encoding="utf-8")
-                if mark == "conv_done":
-                    content = content.replace(f"| {conv} |", f"| {conv} | DONE |", 1)
-                    try:
-                        from pathly_orchestrator import eventlog as _eventlog
-                        from pathly_orchestrator.eventlog import VALID_STATES
-
-                        state_doc = _eventlog.read_state(str(storage_path)) or {}
-                        state_doc["convs_done"] = (
-                            int(state_doc.get("convs_done", 0)) + 1
-                        )
-                        if state_doc.get("current") not in VALID_STATES:
-                            state_doc["current"] = prev_state
-                        _eventlog.write_state(str(storage_path), state_doc)
-                    except (ValueError, OSError):
-                        pass
-                elif mark == "all_phases_done":
-                    content = re.sub(r"\|\s*\[ \]\s*\|", "| [x] |", content)
-                progress_file.write_text(content, encoding="utf-8")
-            except OSError as e:
-                raise RuntimeError(f"update_progress failed: {e}")
-
         else:
             raise RuntimeError(f"Unknown action skill: {skill!r}")
 
@@ -344,6 +315,8 @@ def run_gates(
     topic: str,
     conv: int,
     goal_id: str | None = None,
+    feature_scope: str | None = None,
+    board: str = "feature",
 ) -> dict | None:
     gates = flow.get("gates", {})
     applicable = gates.get(f"{prev_state}->{next_state}", []) + gates.get(
@@ -389,37 +362,45 @@ def run_gates(
                 )
                 return {"gate_failed": gtype, "feedback_file": gate["on_fail"]}
         elif gtype == "require_tasks_done":
-            # Goal-DAG completeness: a goal must not finish (reach RETRO) while any of its tasks
-            # are unfinished or failed. Skipped for non-goal runs (goal_id is None) — a plain
-            # feature pipeline has no task DAG to check.
-            if goal_id:
-                try:
-                    from pathly_orchestrator.db.connection import get_db
+            # Completeness gate: don't advance while tasks remain unfinished. Goal-scoped when a
+            # goal_id is present (goal executor); else feature-scoped across the whole (board,
+            # scope) — the linear team pipeline has no single goal_id. Skipped when neither is set.
+            incomplete = 0
+            try:
+                from pathly_orchestrator.db.connection import get_db
+
+                if goal_id:
                     from pathly_orchestrator.db.queries.comms_tasks import (
                         count_incomplete_tasks_for_goal,
                     )
 
                     incomplete = count_incomplete_tasks_for_goal(get_db(), goal_id)
-                except Exception:
-                    incomplete = (
-                        0  # DB read error → fail-open (never wedge on a read hiccup)
+                elif feature_scope:
+                    from pathly_orchestrator.db.queries.comms_tasks import (
+                        count_incomplete_tasks_for_scope,
                     )
-                if incomplete > 0:
-                    reason = (
-                        f"{incomplete} task(s) on this goal are not done — a goal cannot finish "
-                        f"while tasks remain unfinished or failed. Build/repair the remaining "
-                        f"tasks (they are on the board's DAG), then the flow can advance to retro."
+
+                    incomplete = count_incomplete_tasks_for_scope(
+                        get_db(), board or "feature", feature_scope
                     )
-                    _write_gate_feedback(storage_path, gate["on_fail"], reason)
-                    append_event(
-                        storage_path,
-                        {
-                            "type": "GATE_FAILED",
-                            "gate": gtype,
-                            "transition": f"{prev_state}->{next_state}",
-                        },
-                    )
-                    return {"gate_failed": gtype, "feedback_file": gate["on_fail"]}
+            except Exception:
+                incomplete = 0  # DB read error → fail-open (never wedge on a read hiccup)
+            if incomplete > 0:
+                reason = (
+                    f"{incomplete} task(s) are not done — the flow cannot advance while tasks "
+                    f"remain unfinished or failed. Build/repair the remaining tasks (they are on "
+                    f"the board's DAG), then the flow can advance."
+                )
+                _write_gate_feedback(storage_path, gate["on_fail"], reason)
+                append_event(
+                    storage_path,
+                    {
+                        "type": "GATE_FAILED",
+                        "gate": gtype,
+                        "transition": f"{prev_state}->{next_state}",
+                    },
+                )
+                return {"gate_failed": gtype, "feedback_file": gate["on_fail"]}
         elif gtype == "scope_gate":
             scope_file = gate["scope_file"]
             build_baseline: dict | None = None

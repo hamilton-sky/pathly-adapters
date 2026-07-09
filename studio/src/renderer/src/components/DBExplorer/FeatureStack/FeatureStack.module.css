@@ -6,7 +6,7 @@
 
 .header {
   display: grid;
-  grid-template-columns: 160px 1fr 72px 96px 96px 72px 110px 120px;
+  grid-template-columns: 160px 1fr 72px 96px 96px 72px 120px;
   gap: 12px;
   padding: 0 14px 8px;
   border-bottom: var(--border);
@@ -15,7 +15,6 @@
 .hName,
 .hDots,
 .hNum,
-.hProgress,
 .hState {
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
@@ -24,14 +23,13 @@
   color: var(--text-muted);
 }
 
-.hNum,
-.hProgress {
+.hNum {
   text-align: right;
 }
 
 .row {
   display: grid;
-  grid-template-columns: 160px 1fr 72px 96px 96px 72px 110px 120px;
+  grid-template-columns: 160px 1fr 72px 96px 96px 72px 120px;
   gap: 12px;
   align-items: center;
   padding: 10px 14px;
@@ -77,45 +75,6 @@
 
 .cost {
   color: var(--green);
-}
-
-.progress {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-.progressEl {
-  width: 56px;
-  height: 5px;
-  appearance: none;
-  border: none;
-  border-radius: var(--radius-full);
-  background: var(--bg-surface1);
-  overflow: hidden;
-}
-
-.progressEl::-webkit-progress-bar {
-  background: var(--bg-surface1);
-  border-radius: var(--radius-full);
-}
-
-.progressEl::-webkit-progress-value {
-  background: var(--accent);
-  border-radius: var(--radius-full);
-}
-
-.progressEl::-moz-progress-bar {
-  background: var(--accent);
-  border-radius: var(--radius-full);
-}
-
-.frac {
-  font-family: var(--font-family-mono);
-  font-size: var(--font-size-sm);
-  color: var(--text-muted);
-  white-space: nowrap;
 }
 
 .state {

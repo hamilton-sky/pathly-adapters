@@ -902,8 +902,6 @@ export async function apiStopTask(taskId: string): Promise<boolean> {
 
 interface FeatureState {
   current?: string
-  convs_done?: number
-  convs_total?: number
 }
 
 // FSM state name → kit Stage (the card's 6-stage colour vocabulary).
@@ -1028,7 +1026,6 @@ export function buildFeature(
   return {
     id,
     stage,
-    conv: state?.convs_done ?? 0,
     status,
     agent: STAGE_AGENT[stage],
     last,

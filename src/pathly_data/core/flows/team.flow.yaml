@@ -77,7 +77,7 @@ transition_rules:
     on_artifact:
       REVIEW_FAILURES.md: BUILDING
       MORE_CONVS_NEEDED.md: BUILDING
-    on_board_count:
+    on_scope_count:
       metric: ready
       op: gt
       compare_to: 0
@@ -110,8 +110,9 @@ gates:
       artifact: REVIEW.md
       pass_marker: 'RESULT: PASS'
       on_fail: REVIEW_INCOMPLETE.md
-    # Board-DAG completeness: don't advance to TESTING while any of the goal's tasks are
-    # unfinished. Skipped for a goal-less / offline run (goal_id resolves to None).
+    # Board-DAG completeness: don't advance to TESTING while any of the FEATURE's tasks
+    # (across all its goals) are unfinished — this linear pipeline has no single goal_id,
+    # so the gate is feature-scoped (board+scope), matching team/build's ready-task fetch.
     - type: require_tasks_done
       on_fail: INCOMPLETE_TASKS.md
 _comments: []

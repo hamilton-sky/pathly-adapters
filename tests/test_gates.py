@@ -684,37 +684,138 @@ def test_count_tasks_for_goal_counts():
     assert count_tasks_for_goal(conn, "g1") == 2
 
 
-# ── feature->goal resolution (board-native team.flow.yaml loop) ────────────────
+# ── on_scope_count gate tests (feature-scoped mirror of on_board_count) ────────
 
 
-def test_get_latest_goal_id_resolves_feature_goal():
-    """get_latest_goal_id backs the FSM's feature->goal resolution: it returns the feature
-    board's goal (or None), so a team run that passes NO goal_id can still drive the goal-scoped
-    on_board_count / require_tasks_done gates."""
+def _flow_with_scope_count(op="gt", compare_to=0, metric="ready"):
+    return {
+        "states": ["REVIEWING", "BUILDING", "TESTING"],
+        "initial": "REVIEWING",
+        "agent_map": {"REVIEWING": "reviewer"},
+        "storage_path": "pathly/plans/{topic}/",
+        "transition_rules": {
+            "REVIEWING": {
+                "on_scope_count": {
+                    "op": op,
+                    "compare_to": compare_to,
+                    "metric": metric,
+                    "next": "BUILDING",
+                },
+                "default": "TESTING",
+            },
+        },
+    }
+
+
+def test_on_scope_count_advances_when_ready(tmp_path, monkeypatch):
+    from pathly_orchestrator.fsm import engine_transitions as et
+
+    monkeypatch.setattr(
+        "pathly_orchestrator.db.queries.comms_tasks.count_ready_tasks_for_scope",
+        lambda conn, board, scope: 2,
+    )
+    storage = _storage(tmp_path)
+    out = et.evaluate_transition_rules(
+        _flow_with_scope_count(), "REVIEWING", storage, feature_scope="feat-x"
+    )
+    assert out == "BUILDING"
+
+
+def test_on_scope_count_falls_through_when_drained(tmp_path, monkeypatch):
+    from pathly_orchestrator.fsm import engine_transitions as et
+
+    monkeypatch.setattr(
+        "pathly_orchestrator.db.queries.comms_tasks.count_ready_tasks_for_scope",
+        lambda conn, board, scope: 0,
+    )
+    storage = _storage(tmp_path)
+    out = et.evaluate_transition_rules(
+        _flow_with_scope_count(), "REVIEWING", storage, feature_scope="feat-x"
+    )
+    assert out == "TESTING"  # default — whole feature's DAG drained
+
+
+def test_on_scope_count_skipped_without_feature_scope(tmp_path):
+    from pathly_orchestrator.fsm import engine_transitions as et
+
+    storage = _storage(tmp_path)
+    out = et.evaluate_transition_rules(
+        _flow_with_scope_count(), "REVIEWING", storage
+    )  # feature_scope=None
+    assert out == "TESTING"  # gate skipped → default
+
+
+def test_on_scope_count_fails_closed_on_db_error(tmp_path, monkeypatch):
+    from pathly_orchestrator.fsm import engine_transitions as et
+
+    def _boom(conn, board, scope):
+        raise RuntimeError("db down")
+
+    monkeypatch.setattr(
+        "pathly_orchestrator.db.queries.comms_tasks.count_ready_tasks_for_scope", _boom
+    )
+    storage = _storage(tmp_path)
+    out = et.evaluate_transition_rules(
+        _flow_with_scope_count(), "REVIEWING", storage, feature_scope="feat-x"
+    )
+    assert out == "TESTING"  # DB error → fail closed, default retained
+
+
+def test_count_ready_and_incomplete_tasks_for_scope_span_goals():
+    """count_ready_tasks_for_scope / count_incomplete_tasks_for_scope must count across ALL
+    goals sharing a (board, scope) — the whole feature's task frontier, not one goal's."""
     import sqlite3
     from pathly_orchestrator.db.migrations import _run_migrations
     from pathly_orchestrator.db.migrations_incremental import _add_additive_migrations
     from pathly_orchestrator.db.queries.comms_messages import post_message
-    from pathly_orchestrator.db.queries.comms_goals_read import get_latest_goal_id
+    from pathly_orchestrator.db.queries.comms_tasks import (
+        count_incomplete_tasks_for_scope,
+        count_ready_tasks_for_scope,
+    )
 
     conn = sqlite3.connect(":memory:")
     conn.row_factory = sqlite3.Row
     _run_migrations(conn)
     _add_additive_migrations(conn)
 
-    assert get_latest_goal_id(conn, "feature", "feat-x") is None  # no goal yet
-    gid = post_message(conn, "feature", "feat-x", "planner", type="goal", text="Goal")
-    assert get_latest_goal_id(conn, "feature", "feat-x") == gid  # resolves it
-    assert get_latest_goal_id(conn, "feature", "other-feat") is None  # scoped by feature
+    assert count_ready_tasks_for_scope(conn, "feature", "feat-x") == 0
+    assert count_incomplete_tasks_for_scope(conn, "feature", "feat-x") == 0
+
+    gid1 = post_message(
+        conn, "feature", "feat-x", "planner", type="goal", text="Goal 1"
+    )
+    gid2 = post_message(
+        conn, "feature", "feat-x", "planner", type="goal", text="Goal 2"
+    )
+    t1 = post_message(
+        conn, "feature", "feat-x", "planner", type="task", text="t1", goal_id=gid1
+    )
+    post_message(
+        conn, "feature", "feat-x", "planner", type="task", text="t2", goal_id=gid2
+    )
+
+    # Two pending, dep-free tasks spread across TWO different goals — both ready/incomplete.
+    assert count_ready_tasks_for_scope(conn, "feature", "feat-x") == 2
+    assert count_incomplete_tasks_for_scope(conn, "feature", "feat-x") == 2
+
+    with conn:
+        conn.execute("UPDATE comms_messages SET task_status='done' WHERE id=?", (t1,))
+
+    assert count_ready_tasks_for_scope(conn, "feature", "feat-x") == 1
+    assert count_incomplete_tasks_for_scope(conn, "feature", "feat-x") == 1
 
 
-def test_complete_stage_resolves_goal_for_board_loop(tmp_path, monkeypatch):
-    """The core of the conversation-model retirement: team.flow.yaml's REVIEWING loop is now
-    board-DAG-driven (on_board_count) and its REVIEWING->TESTING gate is require_tasks_done — both
-    goal-scoped. A Studio-Start / interactive team run passes NO goal_id, so complete_stage must
-    resolve the feature's goal, or the loop would degrade to build-one-then-TESTING (the exact
-    regression removing PROGRESS.md/convs_total could have caused). With a ready task, REVIEWING
-    loops back to BUILDING; once every task is done it advances to TESTING."""
+# ── feature-scoped board loop (linear team.flow.yaml has no single goal_id) ────
+
+
+def test_complete_stage_feature_scoped_board_loop(tmp_path, monkeypatch):
+    """The core of the multi-goal correctness fix: team.flow.yaml's REVIEWING loop is
+    feature-scoped (on_scope_count) and its REVIEWING->TESTING gate is require_tasks_done
+    with no goal_id — both driven by feature_scope=scope, which complete_stage always passes.
+    team/build fetches ready work by feature+scope (across ALL goals), so counting a single
+    goal would disagree with the frontier the builder actually sees. A Studio-Start /
+    interactive team run passes NO goal_id; with a ready task, REVIEWING loops back to
+    BUILDING; once every task is done it advances to TESTING."""
     import pathly_orchestrator.fsm_ops as fsm_ops
     from pathly_orchestrator import eventlog
     from pathly_orchestrator.db import get_db
@@ -744,7 +845,7 @@ def test_complete_stage_resolves_goal_for_board_loop(tmp_path, monkeypatch):
         },
         "transition_rules": {
             "REVIEWING": {
-                "on_board_count": {
+                "on_scope_count": {
                     "metric": "ready",
                     "op": "gt",
                     "compare_to": 0,
@@ -778,11 +879,11 @@ def test_complete_stage_resolves_goal_for_board_loop(tmp_path, monkeypatch):
         conn, "feature", FEATURE, "planner", type="task", text="task-1", goal_id=gid
     )
 
-    # No goal_id in args — complete_stage must resolve the feature's goal and see the ready task.
+    # No goal_id in args — feature_scope=scope (always passed) must see the ready task.
     r1 = complete_stage(
         {"flow": "test", "topic": FEATURE, "project_root": str(tmp_path)}
     )
-    assert r1.get("current_state") == "BUILDING", r1  # on_board_count(ready>0) looped back
+    assert r1.get("current_state") == "BUILDING", r1  # on_scope_count(ready>0) looped back
 
     # Drain the DAG: mark the only task done → no ready tasks, none incomplete.
     with conn:

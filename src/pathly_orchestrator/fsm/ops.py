@@ -18,6 +18,5 @@ from pathly_orchestrator.fsm_ops import (  # noqa: F401
     _resolve_adapter,
     _response_envelope,
     _blocked_response,
-    _count_planned_convs,
     _get_head_sha,
 )

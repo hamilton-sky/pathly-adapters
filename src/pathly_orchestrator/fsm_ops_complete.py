@@ -16,28 +16,6 @@ from pathly_orchestrator.fsm import (
 )
 
 
-def _resolve_feature_goal_id(board: str, scope: str) -> str | None:
-    """Resolve the goal a feature-scoped team run is building, so the board-DAG gates fire.
-
-    Studio-Start and interactive ``/pathly team`` runs don't pass a ``goal_id``, but
-    ``team.flow.yaml``'s REVIEWING loop (``on_board_count``) and REVIEWING->TESTING gate
-    (``require_tasks_done``) are goal-scoped — without a goal_id they skip and the build loop
-    degrades to build-one-then-TESTING. The team pipeline seeds exactly one goal per feature
-    (plan.md Step 6), so resolve the newest active goal on the feature board. Returns None (gates
-    skip, unchanged) when the feature has no goal; a goal-executor run passes its goal_id
-    explicitly, so this only fills the gap for feature-scoped runs.
-    """
-    if not scope:
-        return None
-    try:
-        from pathly_orchestrator.db.connection import get_db
-        from pathly_orchestrator.db.queries.comms_goals_read import get_latest_goal_id
-
-        return get_latest_goal_id(get_db(), board or "feature", scope)
-    except Exception:
-        return None
-
-
 def complete_stage(args: dict) -> dict:
     flow_name = args["flow"]
     topic = args["topic"]
@@ -51,11 +29,6 @@ def complete_stage(args: dict) -> dict:
     board = args.get("board", "feature")
     scope = args.get("scope") or topic
     goal_id = args.get("goal_id")
-    # Feature-scoped team runs (Studio-Start / interactive `/pathly team`) don't pass a goal_id,
-    # but team.flow.yaml's board-DAG gates (on_board_count / require_tasks_done) need one. Resolve
-    # the feature's goal for gate evaluation only; leave `goal_id` (build_prompt / artifact
-    # reconcile) exactly as the caller sent it.
-    eval_goal_id = goal_id or _resolve_feature_goal_id(board, scope)
 
     if resolved_files:
         feedback_dir = storage_path / "feedback"
@@ -138,7 +111,7 @@ def complete_stage(args: dict) -> dict:
         flow_config,
         state_info["current_state"],
         storage_path,
-        goal_id=eval_goal_id,
+        goal_id=goal_id,
         feature_scope=scope,
     )
 
@@ -190,7 +163,9 @@ def complete_stage(args: dict) -> dict:
         storage_path,
         topic,
         state_info["conv"],
-        goal_id=eval_goal_id,
+        goal_id=goal_id,
+        feature_scope=scope,
+        board=board,
     )
     if gate_failure is not None:
         feedback = route_feedback(flow_config, storage_path)

@@ -17,25 +17,6 @@ import sqlite3
 from .comms_tasks import count_ready_tasks_for_goal
 
 
-def get_latest_goal_id(conn: sqlite3.Connection, board: str, scope: str) -> str | None:
-    """Return the id of the most-recent active goal on ``(board, scope)``, or None.
-
-    The FSM uses this to resolve a feature-scoped team run's goal for the board-count and
-    task-completeness gates (``on_board_count`` / ``require_tasks_done``) when the caller did not
-    pass a ``goal_id`` explicitly (Studio-Start and interactive ``/pathly team``). The team
-    pipeline seeds exactly one goal per feature (plan.md Step 6); if several exist, the newest is
-    this run's. Returns None when the feature has no goal (offline / non-team flows) — the gates
-    then skip, unchanged.
-    """
-    row = conn.execute(
-        "SELECT id FROM comms_messages "
-        "WHERE board=? AND scope=? AND type='goal' AND deleted_at IS NULL "
-        "ORDER BY ts DESC LIMIT 1",
-        (board, scope),
-    ).fetchone()
-    return row["id"] if row else None
-
-
 def get_goals_with_rollup(
     conn: sqlite3.Connection, board: str, scope: str
 ) -> list[dict]:

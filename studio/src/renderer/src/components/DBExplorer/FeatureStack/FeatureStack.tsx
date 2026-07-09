@@ -18,7 +18,6 @@ export function FeatureStack({ features, onRowClick }: FeatureStackProps): JSX.E
         <span className={styles.hNum}>Invocations</span>
         <span className={styles.hNum}>Tokens</span>
         <span className={styles.hNum}>Cost</span>
-        <span className={styles.hProgress}>Progress</span>
         <span className={styles.hState}>State</span>
       </div>
       {features.map((f) => (
@@ -35,10 +34,6 @@ export function FeatureStack({ features, onRowClick }: FeatureStackProps): JSX.E
           <span className={styles.num}>{f.inv}</span>
           <span className={styles.num}>{f.tokens}</span>
           <span className={`${styles.num} ${styles.cost}`}>{f.cost}</span>
-          <span className={styles.progress}>
-            <progress className={styles.progressEl} value={f.done} max={f.total} />
-            <span className={styles.frac}>{f.done}/{f.total}</span>
-          </span>
           <span className={styles.state}><StatePill state={f.state} /></span>
         </button>
       ))}

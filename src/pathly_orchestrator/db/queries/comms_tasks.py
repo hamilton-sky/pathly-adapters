@@ -260,6 +260,44 @@ def count_incomplete_tasks_for_goal(conn: sqlite3.Connection, goal_id: str) -> i
     return int(row["n"]) if row else 0
 
 
+def count_ready_tasks_for_scope(conn: sqlite3.Connection, board: str, scope: str) -> int:
+    """Feature-scoped mirror of ``count_ready_tasks_for_goal``: BUILDABLE tasks (pending with
+    every dependency done) across ALL goals in a ``(board, scope)``. This is the frontier
+    ``team/build`` fetches by feature+scope, so the linear team pipeline's REVIEWING loop counts
+    the whole feature rather than a single goal."""
+    pending = conn.execute(
+        "SELECT id, depends_on FROM comms_messages "
+        "WHERE board=? AND scope=? AND type='task' AND task_status='pending' AND deleted_at IS NULL",
+        (board, scope),
+    ).fetchall()
+    done_ids = {
+        r["id"]
+        for r in conn.execute(
+            "SELECT id FROM comms_messages "
+            "WHERE board=? AND scope=? AND type='task' AND task_status='done' AND deleted_at IS NULL",
+            (board, scope),
+        ).fetchall()
+    }
+    n = 0
+    for r in pending:
+        deps = json.loads(r["depends_on"] or "[]")
+        if all(dep in done_ids for dep in deps):
+            n += 1
+    return n
+
+
+def count_incomplete_tasks_for_scope(conn: sqlite3.Connection, board: str, scope: str) -> int:
+    """Feature-scoped mirror of ``count_incomplete_tasks_for_goal``: tasks NOT done across ALL
+    goals in a ``(board, scope)``. Drives the linear team pipeline's REVIEWING->TESTING
+    completeness gate."""
+    row = conn.execute(
+        "SELECT COUNT(*) AS n FROM comms_messages "
+        "WHERE board=? AND scope=? AND type='task' AND task_status IS NOT 'done' AND deleted_at IS NULL",
+        (board, scope),
+    ).fetchone()
+    return int(row["n"]) if row else 0
+
+
 def goal_refs_coverage(conn: sqlite3.Connection, goal_id: str) -> dict:
     """Per-goal context_refs coverage: how many of a goal's tasks carry ≥1 ref (T3c).
 

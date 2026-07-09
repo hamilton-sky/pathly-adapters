@@ -65,7 +65,6 @@ export interface Message {
 export interface Feature {
   id: string
   stage: Stage
-  conv: number
   status: FeatureStatus
   agent: AgentId
   last: string

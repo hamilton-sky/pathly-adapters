@@ -60,8 +60,6 @@ def _scan_filesystem_features(project_root: str) -> list[dict]:
 
         current = state.get("current", "UNKNOWN").upper()
         updated_at = state.get("updated_at", "")
-        convs_done = int(state.get("convs_done", 0))
-        convs_total = int(state.get("convs_total", 0))
 
         cost_usd = 0.0
         runner_file = state_file.parent / "RUNNER_STATE.json"
@@ -82,8 +80,6 @@ def _scan_filesystem_features(project_root: str) -> list[dict]:
                 "total_tokens": 0,
                 "cost_usd": cost_usd,
                 "updated_at": updated_at,
-                "convs_done": convs_done,
-                "convs_total": convs_total,
                 "source": "filesystem",
             }
         )
@@ -213,8 +209,6 @@ def db_features():
                     "total_tokens": int(inv.get("total_tokens", 0)),
                     "cost_usd": round(float(inv.get("total_cost", 0.0)), 4),
                     "updated_at": state_obj.get("updated_at", ""),
-                    "convs_done": state_obj.get("convs_done", 0),
-                    "convs_total": state_obj.get("convs_total", 0),
                     "source": "db",
                 }
             )

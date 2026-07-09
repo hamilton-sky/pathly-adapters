@@ -141,8 +141,7 @@ function ModalHeader({ feature, onClose }: { feature: FeatureData; onClose: () =
       <span className={styles.mName}>{feature.name}</span>
       <StatePill state={feature.state} />
       <span className={styles.mMeta}>
-        convs {feature.done}/{feature.total}
-        {' · '}events {feature.events}
+        events {feature.events}
         {' · '}cost <b>{feature.cost}</b>
       </span>
       <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Close modal">

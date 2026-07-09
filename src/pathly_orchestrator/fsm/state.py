@@ -69,7 +69,6 @@ _KNOWN_OPTIONAL_FLOW_KEYS = {
 _ACTION_VOCAB = {
     "git_commit",
     "commit",
-    "update_progress",
     "archive_artifacts",
     "archive-artifacts",
 }

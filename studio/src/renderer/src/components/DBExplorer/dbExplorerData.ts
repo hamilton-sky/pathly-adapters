@@ -19,8 +19,6 @@ export interface FeatureData {
   tokens: string
   cost: string
   ts: string
-  done: number
-  total: number
   pcol: string
   dots: DotSegment[]
 }
@@ -54,8 +52,6 @@ export const FEATURES: FeatureData[] = [
     tokens: '290,749',
     cost: '$3.64',
     ts: '10:06:05',
-    done: 3,
-    total: 3,
     pcol: 'var(--state-done)',
     dots: [
       { state: 'BUILDING' },
@@ -77,8 +73,6 @@ export const FEATURES: FeatureData[] = [
     tokens: '142,300',
     cost: '$1.97',
     ts: '11:14:02',
-    done: 1,
-    total: 3,
     pcol: 'var(--state-building)',
     dots: [
       { state: 'PLANNING' },
@@ -95,8 +89,6 @@ export const FEATURES: FeatureData[] = [
     tokens: '188,400',
     cost: '$2.41',
     ts: '09:31:50',
-    done: 2,
-    total: 3,
     pcol: 'var(--state-reviewing)',
     dots: [
       { state: 'BUILDING' },
@@ -114,8 +106,6 @@ export const FEATURES: FeatureData[] = [
     tokens: '96,800',
     cost: '$1.12',
     ts: '13:20:11',
-    done: 2,
-    total: 4,
     pcol: 'var(--state-testing)',
     dots: [
       { state: 'BUILDING' },
@@ -131,8 +121,6 @@ export const FEATURES: FeatureData[] = [
     tokens: '214,600',
     cost: '$3.02',
     ts: '08:48:33',
-    done: 4,
-    total: 4,
     pcol: 'var(--state-done)',
     dots: [
       { state: 'BUILDING' },
@@ -152,8 +140,6 @@ export const FEATURES: FeatureData[] = [
     tokens: '18,900',
     cost: '$0.31',
     ts: '14:02:19',
-    done: 0,
-    total: 3,
     pcol: 'var(--state-planning)',
     dots: [{ state: 'PLANNING', flex: 2 }],
   },

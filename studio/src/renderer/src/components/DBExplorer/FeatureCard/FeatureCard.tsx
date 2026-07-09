@@ -38,12 +38,6 @@ export function FeatureCard({ feature, onClick }: FeatureCardProps): JSX.Element
 
       <div className={styles.foot}>
         <span className={styles.ts}>{feature.ts}</span>
-        <div className={styles.prog}>
-          <div className={styles.track}>
-            <progress className={styles.progressEl} value={feature.done} max={feature.total} />
-          </div>
-          <span className={styles.frac}>{feature.done}/{feature.total}</span>
-        </div>
         <StatePill state={feature.state} />
       </div>
     </button>

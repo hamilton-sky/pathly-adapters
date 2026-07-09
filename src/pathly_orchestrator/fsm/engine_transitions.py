@@ -31,8 +31,8 @@ def evaluate_transition_rules(
 
     Level 1 — on_artifact: if storage_path/filename exists → return next_state.
     Level 2 — on_content: substring/regex match in a file → return next_state.
-    Level 2.5 — on_state_counter: numeric DB field comparison.
     Level 2.6 — on_board_count: goal-scoped board task-count gate (Fix B).
+    Level 2.65 — on_scope_count: feature-scoped board task-count gate (whole feature, all goals).
     Level 2.7 — on_feature_goal_count: feature-scoped goal-count gate.
     Level 2.8 — on_project_feature_count: project-scoped feature-count gate.
     Level 3 — decide: return sentinel dict (no LLM call).
@@ -83,26 +83,6 @@ def evaluate_transition_rules(
                 if entry["contains"] in contents:
                     return entry["next"]
 
-    # Level 2.5 — on_state_counter
-    on_state_counter = rule.get("on_state_counter")
-    if on_state_counter is not None:
-        field = on_state_counter.get("field")
-        op = on_state_counter.get("op")
-        compare_to = on_state_counter.get("compare_to")
-        next_s = on_state_counter.get("next")
-        op_fn = _COMPARE_OPS.get(op)
-        if op_fn is not None and field and compare_to and next_s:
-            try:
-                from pathly_orchestrator import eventlog as _eventlog
-
-                state_doc = _eventlog.read_state(str(storage_path)) or {}
-                field_val = int(state_doc[field])
-                compare_val = int(state_doc[compare_to])
-                if op_fn(field_val, compare_val):
-                    return next_s
-            except (KeyError, ValueError, TypeError):
-                pass
-
     # Level 2.6 — on_board_count (goal-scoped board task-count gate; Fix B)
     # `metric` selects WHICH count to compare (default 'total' = original Fix B behavior):
     #   total      — all of the goal's tasks (assert the DAG was seeded)
@@ -130,6 +110,35 @@ def evaluate_transition_rules(
                     "incomplete": count_incomplete_tasks_for_goal,
                 }.get(metric, count_tasks_for_goal)
                 count = _counter(get_db(), goal_id)
+                if op_fn(count, int(compare_to)):
+                    return next_s
+            except Exception:
+                pass  # DB error → fail-closed: do NOT advance
+
+    # Level 2.65 — on_scope_count (feature-scoped board task-count: the WHOLE feature's task
+    # frontier across all its goals). The linear team pipeline (team.flow.yaml) has no single
+    # goal_id — team/build fetches ready work by feature+scope — so its REVIEWING loop counts the
+    # feature scope, not one goal. `metric`: 'ready' (buildable, default) | 'incomplete' (not done).
+    on_scope_count = rule.get("on_scope_count")
+    if on_scope_count is not None and feature_scope:
+        op = on_scope_count.get("op")
+        compare_to = on_scope_count.get("compare_to")
+        next_s = on_scope_count.get("next")
+        metric = on_scope_count.get("metric", "ready")
+        board = on_scope_count.get("board", "feature")
+        op_fn = _COMPARE_OPS.get(op)
+        if op_fn is not None and compare_to is not None and next_s:
+            try:
+                from pathly_orchestrator.db.connection import get_db
+                from pathly_orchestrator.db.queries.comms_tasks import (
+                    count_incomplete_tasks_for_scope,
+                    count_ready_tasks_for_scope,
+                )
+
+                _counter = {
+                    "incomplete": count_incomplete_tasks_for_scope,
+                }.get(metric, count_ready_tasks_for_scope)
+                count = _counter(get_db(), board, feature_scope)
                 if op_fn(count, int(compare_to)):
                     return next_s
             except Exception:
