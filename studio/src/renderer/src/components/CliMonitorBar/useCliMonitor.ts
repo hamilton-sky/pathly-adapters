@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTerminalStore } from '../../store/terminalStore'
 import type { SessionRecord } from '../../store/terminalStore'
-import type { TerminalTab } from '../../types/terminal'
 import { lastNLines } from './ansiUtils'
 import { loadCaps } from './SpawnQueuePanel'
 
@@ -40,9 +39,14 @@ function snapPos(x: number, y: number): { x: number; y: number } {
 }
 
 export interface CliSession {
-  tab: TerminalTab
+  tabId: string
+  adapter: string
+  label: string
   elapsedS: number
   lastLines: string[]
+  prompt?: string
+  /** True when a terminalStore tab still backs this engine (enables "open terminal"). */
+  hasTab: boolean
 }
 
 export type { SessionRecord }
@@ -52,8 +56,12 @@ export function useCliMonitor() {
   const scrollbackByTabId = useTerminalStore((s) => s.scrollbackByTabId)
   const sessionHistory = useTerminalStore((s) => s.sessionHistory)
   const spawnQueue = useTerminalStore((s) => s.spawnQueue)
-  const runningTabs = tabs.filter((t) => t.status === 'running')
-  const hasRunning = runningTabs.length > 0
+  // ACTIVE engines come from the main-process spawn gate (authoritative process liveness),
+  // NOT from renderer tab status — so board/runner runs, editor one-shots, and manual REPLs all
+  // appear identically, the header count and this list share one source, and the list survives a
+  // renderer reload (engines live in the main process, this store does not).
+  const engines = spawnQueue.engines
+  const hasRunning = engines.length > 0
 
   // Live spawn-scheduler state from the main process (running / queued / paused / caps).
   useEffect(() => {
@@ -87,38 +95,15 @@ export function useCliMonitor() {
     posRef.current = p
   }, [])
 
-  // Elapsed seconds per tab — keyed by tabId
-  const startedAtRef = useRef<Record<string, number>>({})
-  const [elapsed, setElapsed] = useState<Record<string, number>>({})
-
-  // Sync startedAt map when the set of running tabs changes
+  // One shared per-second clock advances every elapsed timer. Each engine carries its own
+  // startedAt from the gate, so no per-tab bookkeeping is needed.
+  const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
-    const ids = new Set(runningTabs.map((t) => t.id))
-    for (const tab of runningTabs) {
-      if (!startedAtRef.current[tab.id]) {
-        startedAtRef.current[tab.id] = tab.startedAt ?? Date.now()
-      }
-    }
-    for (const id of Object.keys(startedAtRef.current)) {
-      if (!ids.has(id)) delete startedAtRef.current[id]
-    }
-  }, [runningTabs.length]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Tick every second while any engine is running
-  useEffect(() => {
-    if (runningTabs.length === 0) return
-    const tick = () => {
-      const now = Date.now()
-      const next: Record<string, number> = {}
-      for (const [id, start] of Object.entries(startedAtRef.current)) {
-        next[id] = Math.floor((now - start) / 1000)
-      }
-      setElapsed(next)
-    }
-    tick()
-    const id = window.setInterval(tick, 1000)
+    if (engines.length === 0) return
+    setNow(Date.now())
+    const id = window.setInterval(() => setNow(Date.now()), 1000)
     return () => window.clearInterval(id)
-  }, [runningTabs.length])
+  }, [engines.length])
 
   // Drag-to-move with edge snapping
   const dragRef = useRef<{ startX: number; startY: number; initX: number; initY: number } | null>(null)
@@ -153,11 +138,18 @@ export function useCliMonitor() {
     window.addEventListener('mouseup', onUp)
   }, [savePos])
 
-  const sessions: CliSession[] = runningTabs.map((tab) => ({
-    tab,
-    elapsedS: elapsed[tab.id] ?? 0,
-    lastLines: lastNLines(scrollbackByTabId[tab.id] ?? [], 8),
-  }))
+  const sessions: CliSession[] = engines.map((e) => {
+    const tab = tabs.find((t) => t.id === e.tabId)
+    return {
+      tabId: e.tabId,
+      adapter: e.adapter,
+      label: e.label,
+      elapsedS: Math.max(0, Math.floor((now - e.startedAt) / 1000)),
+      lastLines: lastNLines(scrollbackByTabId[e.tabId] ?? [], 8),
+      prompt: tab?.prompt,
+      hasTab: !!tab,
+    }
+  })
 
   return { sessions, history: sessionHistory, hasRunning, spawnQueue, pos, onDragStart, expandedIds, toggleExpand }
 }

@@ -108,6 +108,8 @@ interactive: 5   // max interactive CLI sessions open simultaneously
 Queue management IPC: `terminal:queue-control` accepts `pause | resume | cancel | reorder | set-caps`.
 `spawn:state` IPC event is broadcast to the renderer after every state change — `terminalStore.spawnQueue` holds the latest snapshot.
 
+**The gate is the single source of truth for engine liveness.** Its `spawn:state` payload carries `engines: RunningEngine[]` — every identified live engine (`{ tabId, adapter, label, startedAt }`), added right after `pty.spawn` and removed in `releaseEngineSlot` (the one place exit/kill/cancel converge). `CliMonitorBar`'s ACTIVE list and the topbar CLI-engine dot both project THIS list, **not** per-tab `terminalStore` status — so board/runner runs, editor one-shots, and manual REPLs all appear identically, the header count and the ACTIVE list share one source, and the list survives a renderer reload (engines live in the main process; the renderer store does not). `terminalStore` is joined in only to enrich a row with scrollback/prompt and to enable "open terminal".
+
 **Rate-limit backoff:** when a headless run exits non-zero and its output matches the `RATE_LIMIT_RE` pattern (429, "rate limit", "overloaded", etc.), a 15-second cooldown (`RATE_LIMIT_COOLDOWN_MS`) is armed. Subsequent queued headless runs wait out the cooldown before starting.
 
 **`SPAWN_DEBUG` logging:** when `SPAWN_DEBUG = true` (default), every spawn lifecycle event is logged to the main-process console with a `[spawn]` prefix.

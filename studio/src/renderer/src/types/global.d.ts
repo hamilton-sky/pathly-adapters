@@ -2,10 +2,15 @@ export {}
 
 declare global {
   interface SpawnCaps { global: number; headless: number; interactive: number }
+  /** One identified live CLI engine (PTY spawned, not yet exited). Carries enough to render a
+   *  monitor row without the renderer's terminalStore, which a window reload would wipe. */
+  interface RunningEngine { tabId: string; adapter: string; label: string; startedAt: number }
   interface SpawnState {
     running: number
     interactive: number
     total: number
+    /** Live engines (headless + interactive) — the CLI monitor's authoritative ACTIVE list. */
+    engines: RunningEngine[]
     queued: string[]
     paused: boolean
     rateLimitedUntil: number

@@ -28,7 +28,10 @@ export function TopBar(): JSX.Element {
   } = useStore()
 
   const { chatOpen, toggleChat, cliMonitorOpen, toggleCliMonitor } = useUiStore()
-  const hasRunningEngine = useTerminalStore((s) => s.tabs.some((t) => t.status === 'running'))
+  // Read the authoritative spawn-gate state (same source as the CLI monitor's ACTIVE list), NOT
+  // per-tab status — so the dot lights for EVERY engine (board/runner, editor, manual) and any
+  // queued run, instead of missing backend spawns whose tab never reaches status:'running'.
+  const hasRunningEngine = useTerminalStore((s) => s.spawnQueue.total > 0 || s.spawnQueue.queued.length > 0)
   const [showLog, setShowLog] = useState(false)
   const compact = useWindowWidth() < TOPBAR_COMPACT_BREAKPOINT
 

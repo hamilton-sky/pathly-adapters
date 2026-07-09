@@ -324,6 +324,7 @@ function killPtyTree(p: import('node-pty').IPty): void {
 export function killAllPtys(): void {
   activePtys.forEach((p) => { try { p.kill() } catch { /* ignore */ } })
   runnerScripts.forEach((scriptPath) => { try { fs.unlinkSync(scriptPath) } catch { /* ignore */ } })
+  activeEngines.clear()
   activePtys.clear()
   ptyWindows.clear()
   ptyOwners.clear()
@@ -358,6 +359,25 @@ const gatedRunning = new Set<string>()        // headless one-shots currently ru
 const interactiveRunning = new Set<string>()  // interactive engine sessions currently running
 interface QueueItem { tabId: string; priority: number; resolve: () => void; reject: (e: Error) => void }
 const engineQueue: QueueItem[] = []           // ordered — front runs next
+
+// Identified live engines (PTY spawned, not yet exited) — the CLI monitor's SINGLE source of
+// truth. Keyed by tabId; carries enough to render a monitor row WITHOUT the renderer's
+// terminalStore (which a window reload would wipe while these PTYs keep running here). Populated
+// right after pty.spawn; removed in releaseEngineSlot (the one place exit/kill/cancel converge).
+interface RunningEngine { tabId: string; adapter: string; label: string; startedAt: number }
+const activeEngines = new Map<string, RunningEngine>()
+
+/** Normalize a launcher (bare 'claude' or a resolved '…\claude.ps1') to a CliAdapter id so the
+ *  monitor badges it consistently regardless of how it was spawned. */
+function adapterIdFromLauncher(launcher: string): string {
+  const base = path.basename(launcher).toLowerCase().replace(/\.(ps1|cmd|exe)$/, '')
+  if (base.startsWith('claude')) return 'claude'
+  if (base.startsWith('codex')) return 'codex'
+  if (base.startsWith('agy') || base.startsWith('antigravity')) return 'antigravity'
+  if (base.startsWith('copilot')) return 'copilot'
+  return base || 'claude'
+}
+
 let queuePaused = false
 let rateLimitedUntil = 0
 let spawnStateWin: BrowserWindow | null = null
@@ -384,6 +404,7 @@ function broadcastSpawnState(): void {
       running: gatedRunning.size,
       interactive: interactiveRunning.size,
       total: totalRunning(),
+      engines: Array.from(activeEngines.values()),
       queued: engineQueue.map((w) => w.tabId),
       paused: queuePaused,
       rateLimitedUntil,
@@ -418,6 +439,7 @@ function promoteQueue(): void {
 }
 
 function releaseEngineSlot(tabId: string): void {
+  const wasEngine = activeEngines.delete(tabId)   // live engine gone (exit/kill) — drop from the monitor registry
   const qi = engineQueue.findIndex((w) => w.tabId === tabId)
   if (qi !== -1) {
     const [w] = engineQueue.splice(qi, 1) // cancelled while queued — reject so the spawn() call unblocks
@@ -426,7 +448,11 @@ function releaseEngineSlot(tabId: string): void {
     broadcastSpawnState()
     return
   }
-  if (!gatedRunning.delete(tabId) && !interactiveRunning.delete(tabId)) { slog('release: not tracked', tabId); return }
+  if (!gatedRunning.delete(tabId) && !interactiveRunning.delete(tabId)) {
+    if (wasEngine) broadcastSpawnState()   // slot untracked but an engine was removed — keep the monitor honest
+    slog('release: not tracked', tabId)
+    return
+  }
   slog('release', tabId, '|', spawnCounts())
   promoteQueue()
   broadcastSpawnState()
@@ -549,6 +575,20 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
       throw e
     }
     const ptyStartedAt = Date.now()
+
+    // Register this live engine with the authoritative gate so the CLI monitor renders EVERY
+    // running engine — board/runner, editor one-shot, and manual REPL — from ONE source of truth,
+    // not the renderer's per-tab status (which races the spawn round-trip and misses backend runs).
+    if (headlessEngine || interactiveEngine) {
+      const adapterId = adapterIdFromLauncher(runnerArgv?.[0] ?? command ?? '')
+      activeEngines.set(tabId, {
+        tabId,
+        adapter: adapterId,
+        label: runnerTabMeta.get(tabId)?.label ?? spawnMeta?.telemetry?.label ?? adapterId,
+        startedAt: ptyStartedAt,
+      })
+      broadcastSpawnState()
+    }
 
     // Default target window is the main window
     ptyWindows.set(tabId, win)

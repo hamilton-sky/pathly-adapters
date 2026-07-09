@@ -63,7 +63,7 @@ export const useTerminalStore = create<TerminalState>()((set) => ({
   scrollbackByTabId: {},
   tabCounter: 0,
   sessionHistory: [],
-  spawnQueue: { running: 0, interactive: 0, total: 0, queued: [], paused: false, rateLimitedUntil: 0, caps: { global: 8, headless: 5, interactive: 5 } },
+  spawnQueue: { running: 0, interactive: 0, total: 0, engines: [], queued: [], paused: false, rateLimitedUntil: 0, caps: { global: 8, headless: 5, interactive: 5 } },
 
   toggle: () => set((s) => ({ open: !s.open })),
 

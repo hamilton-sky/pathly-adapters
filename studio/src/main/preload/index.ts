@@ -2,10 +2,12 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron'
 
 // Mirrored in studio/src/renderer/src/types/global.d.ts — keep in sync
 interface SpawnCaps { global: number; headless: number; interactive: number }
+interface RunningEngine { tabId: string; adapter: string; label: string; startedAt: number }
 interface SpawnState {
   running: number
   interactive: number
   total: number
+  engines: RunningEngine[]
   queued: string[]
   paused: boolean
   rateLimitedUntil: number

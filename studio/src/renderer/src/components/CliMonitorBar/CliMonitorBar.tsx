@@ -14,24 +14,23 @@ import { Timestamp } from '../Timestamp/Timestamp'
 import s from './CliMonitorBar.module.css'
 
 function SessionRow({ session, expanded, onToggle }: { session: CliSession; expanded: boolean; onToggle: () => void }): JSX.Element {
-  const { tab, elapsedS, lastLines } = session
-  const adapter = (tab.kind ?? 'claude') as CliAdapter
+  const { tabId, adapter, label, elapsedS, lastLines, prompt, hasTab } = session
   // Mirror the MD-editor pill's stopRun: close the tab synchronously rather than wait for onExit —
-  // a force-killed PTY (taskkill /T /F) may never deliver a clean exit event, so without this the
-  // tab stays status:'running' and the row (plus its timer and the editor pill) spins forever.
+  // a force-killed PTY (taskkill /T /F) may never deliver a clean exit event. kill() also releases
+  // the gate slot, which drops this engine from the monitor's authoritative ACTIVE list.
   // updateTabStatus('done') must precede closeTab so the run is snapshotted into RECENT.
   const handleStop = () => {
-    void window.pathly.terminal.kill(tab.id)
-    useTerminalStore.getState().updateTabStatus(tab.id, 'done')
-    useTerminalStore.getState().closeTab(tab.id)
+    void window.pathly.terminal.kill(tabId)
+    useTerminalStore.getState().updateTabStatus(tabId, 'done')
+    useTerminalStore.getState().closeTab(tabId)
   }
-  const handleOpen = () => { useTerminalStore.getState().openTab(tab.id) }
+  const handleOpen = () => { useTerminalStore.getState().openTab(tabId) }
 
   return (
     <div className={s.rowGroup}>
       <button type="button" className={s.row} onClick={onToggle} aria-expanded={expanded ? 'true' : 'false'}>
-        <span className={s.badge} data-adapter={adapter}>{adapterLabel(adapter)}</span>
-        <span className={s.rowLabel}>{tab.label}</span>
+        <span className={s.badge} data-adapter={adapter}>{adapterLabel(adapter as CliAdapter)}</span>
+        <span className={s.rowLabel}>{label}</span>
         <span className={s.elapsed}>{fmtElapsed(elapsedS)}</span>
         <span
           role="button"
@@ -51,10 +50,10 @@ function SessionRow({ session, expanded, onToggle }: { session: CliSession; expa
               {lastLines.map((l, i) => <div key={i}>{l}</div>)}
             </div>
           )}
-          {tab.prompt && (
-            <div className={s.promptSnippet}>{tab.prompt.slice(0, 120)}{tab.prompt.length > 120 ? '…' : ''}</div>
+          {prompt && (
+            <div className={s.promptSnippet}>{prompt.slice(0, 120)}{prompt.length > 120 ? '…' : ''}</div>
           )}
-          <button type="button" className={s.openTermBtn} onClick={handleOpen}>&#8599; open terminal</button>
+          {hasTab && <button type="button" className={s.openTermBtn} onClick={handleOpen}>&#8599; open terminal</button>}
         </div>
       )}
     </div>
@@ -132,7 +131,7 @@ export function CliMonitorBar(): JSX.Element | null {
           <>
             <div className={s.sectionLabel}>ACTIVE</div>
             {sessions.map((session) => (
-              <SessionRow key={session.tab.id} session={session} expanded={expandedIds.has(session.tab.id)} onToggle={() => toggleExpand(session.tab.id)} />
+              <SessionRow key={session.tabId} session={session} expanded={expandedIds.has(session.tabId)} onToggle={() => toggleExpand(session.tabId)} />
             ))}
           </>
         )}
