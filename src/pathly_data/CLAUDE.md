@@ -33,9 +33,9 @@ core/
                   fragments/    reusable prompt fragments
 
   templates/    plan file templates:
-                  plan/   USER_STORIES, IMPLEMENTATION_PLAN, CONVERSATION_PROMPTS,
-                          FEATURE_INDEX, PROGRESS, EDGE_CASES, FLOW_DIAGRAM,
-                          HAPPY_FLOW, ARCHITECTURE_PROPOSAL, MERMAID_DIAGRAM, VERIFY
+                  plan/   USER_STORIES, IMPLEMENTATION_PLAN, FEATURE_INDEX,
+                          EDGE_CASES, FLOW_DIAGRAM, HAPPY_FLOW,
+                          ARCHITECTURE_PROPOSAL, MERMAID_DIAGRAM, VERIFY
                           (VERIFY is the BUILDING→REVIEWING gate contract: line 1 must be
                           `RESULT: PASS` for team/build to advance)
                   pipeline-walkthrough/   README (folder index), 01-PIPELINE-FLOW, 02-TOKEN-USAGE, 03-ARTIFACT-MAP

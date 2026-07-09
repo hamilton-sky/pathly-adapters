@@ -22,8 +22,7 @@ User intent: "{{USER_INTENT}}"
 │   Produces:
 │     pathly/features/{{FEATURE}}/USER_STORIES.md
 │     pathly/features/{{FEATURE}}/IMPLEMENTATION_PLAN.md
-│     pathly/features/{{FEATURE}}/CONVERSATION_PROMPTS.md
-│     pathly/features/{{FEATURE}}/PROGRESS.md
+│     board task DAG (goal + one task per phase)
 │
 {{ARCHITECT_CONSULT_TRACE}}
 │  [Stage 2–3 — Build + Review]

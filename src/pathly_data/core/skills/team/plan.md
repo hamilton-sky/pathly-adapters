@@ -214,7 +214,7 @@ If not autoFlow — pause:
 ```
 [Stage 2 — Plan complete]
 <feature_path>/ created with the selected rigor's required files.
-Review USER_STORIES.md and CONVERSATION_PROMPTS.md.
+Review USER_STORIES.md and IMPLEMENTATION_PLAN.md.
 Reply 'go' to start implementation, or 'stop' to pause here.
 ```
 - Proceed: log human response with reply value. Advance.
@@ -234,14 +234,14 @@ Route back to `team [FEATURE] [rigor] [autoFlow]`.
 
 Runs after planning completes, before routing back to the orchestrator.
 
-The pipeline **always starts with the 5 core lite files** — no exceptions:
+The pipeline **always starts with the 3 core lite files** — no exceptions:
 ```
 FEATURE_INDEX.md
 USER_STORIES.md
 IMPLEMENTATION_PLAN.md
-PROGRESS.md
-CONVERSATION_PROMPTS.md
 ```
+`IMPLEMENTATION_PLAN.md` is the phase source: each phase becomes one board task in plan.md
+Step 6, and the build loop drains that board DAG — there are no per-conversation plan files.
 
 Check these signals after planning. Each additional file has one trigger:
 
@@ -249,7 +249,7 @@ Check these signals after planning. Each additional file has one trigger:
 |---|---|---|
 | `ARCHITECTURE_PROPOSAL.md` | Cross-layer dependency | Architect or planner mentions > 1 layer, or STORM_SEED.md references multiple layers |
 | `EDGE_CASES.md` | High-risk keyword in risk context | See keyword rule below |
-| `HAPPY_FLOW.md` | > 3 conversations planned | CONVERSATION_PROMPTS.md has more than 3 conversation blocks |
+| `HAPPY_FLOW.md` | > 3 conversations planned | IMPLEMENTATION_PLAN.md has more than 3 phases |
 | `FLOW_DIAGRAM.md` | Long discovery path | STORM_SEED.md or explore output references > 3 files, or architect drew a multi-component diagram |
 
 **EDGE_CASES.md keyword rule:** Scan USER_STORIES.md and STORM_SEED.md for:
@@ -268,7 +268,7 @@ If any signal fires, write `<feature_path>/feedback/HUMAN_QUESTIONS.md`:
 ```
 [RIGOR ESCALATOR] — recommended additions for <feature>
 
-The 5 core plan files are ready. Based on what was found during planning,
+The 3 core plan files are ready. Based on what was found during planning,
 these additional files are recommended:
 
   ✦ ARCHITECTURE_PROPOSAL.md   → cross-layer dependencies detected
@@ -280,7 +280,7 @@ Add to plan:
   [1] All recommended
   [2] ARCHITECTURE_PROPOSAL.md only
   [3] EDGE_CASES.md only
-  [4] None — keep 5 core files only
+  [4] None — keep 3 core files only
 
 Reply with 1, 2, 3, or 4:
 ```
@@ -295,7 +295,7 @@ Print: `[RIGOR AUTO] Adding: <file1>, <file2> — signals detected during planni
 
 ### Rules
 
-- The 5 core files are never removed, never conditional, never skipped.
+- The 3 core files are never removed, never conditional, never skipped.
 - Extra files are additive only — never replace core files.
 - Do not add a file when its signal did not fire, even if the user asks for "standard".
-  (If the user wants all 8 files explicitly, route to `flow <feature> standard`.)
+  (If the user wants all 7 files explicitly, route to `flow <feature> standard`.)

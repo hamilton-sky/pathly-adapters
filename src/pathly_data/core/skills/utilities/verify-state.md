@@ -19,7 +19,7 @@ If `$ARGUMENTS` is given:
 - Set `FEATURES = [$ARGUMENTS]`
 
 If no argument:
-- List all subdirectories of `pathly/features/` that contain `PROGRESS.md`
+- List all subdirectories of `pathly/features/` that contain `STATE.json`
 - Set `FEATURES = that list`
 
 ---
@@ -62,23 +62,28 @@ Both orphan and expired files are **safe to delete**. Offer the action to the us
 
 ---
 
-### Check B — PROGRESS.md DONE items with no matching file coverage
+### Check B — Completed tasks with no matching file coverage
 
-Read `pathly/features/$FEATURE/PROGRESS.md` and `pathly/features/$FEATURE/IMPLEMENTATION_PLAN.md`.
+Query the feature's board task DAG and read `pathly/features/$FEATURE/IMPLEMENTATION_PLAN.md`:
+```bash
+curl -s "http://127.0.0.1:8765/comms/tasks?feature=$FEATURE&scope=$FEATURE"
+```
 
-For each conversation marked DONE in `PROGRESS.md`:
-- Extract the files that conversation was expected to touch from `IMPLEMENTATION_PLAN.md` (look for file paths listed under that conversation's phase/section)
+For each task with `task_status: done` (or, if the board is unreachable, each `## Phase N` in
+`IMPLEMENTATION_PLAN.md` whose `Done when:` reads as satisfied):
+- Extract the files that task/phase was expected to touch (the task `text` Files list, or the
+  phase's `File:` field in `IMPLEMENTATION_PLAN.md`)
 - Get the full set of files changed on this branch vs. the base branch:
   ```bash
   git diff $(git merge-base HEAD main)...HEAD --name-only -- . ":(exclude)pathly/features/" 2>/dev/null
   ```
-- **Flag if:** a conversation is marked DONE but **none** of its expected files appear in the branch diff
+- **Flag if:** a task is marked `done` but **none** of its expected files appear in the branch diff
 
-If `IMPLEMENTATION_PLAN.md` does not list expected files per conversation, fall back to:
-- Count DONE conversations vs. count files changed on branch outside `pathly/features/`
-- Flag if DONE count > 0 and changed file count is 0 (nothing was ever committed)
+If neither the board nor `IMPLEMENTATION_PLAN.md` lists expected files, fall back to:
+- Count done tasks vs. count files changed on branch outside `pathly/features/`
+- Flag if done count > 0 and changed file count is 0 (nothing was ever committed)
 
-Report as: `[PROGRESS DRIFT] $FEATURE — conversation 'N' marked DONE but none of its expected files appear in branch diff`
+Report as: `[TASK DRIFT] $FEATURE — task 'N' marked done but none of its expected files appear in branch diff`
 
 ---
 
@@ -128,7 +133,7 @@ N issue(s) found ← if problems detected
 [ORPHAN FEEDBACK]   pathly/features/.../feedback/REVIEW_FAILURES.md — event 2026-04-28T10:00:00Z not in current event log → safe to delete
 [EXPIRED FEEDBACK]  pathly/features/.../feedback/ARCH_FEEDBACK.md — TTL expired at 2026-04-29T10:00:00Z → safe to delete
 [STALE FEEDBACK]    pathly/features/.../feedback/REVIEW_FAILURES.md — open since 2026-04-28, no commits since
-[PROGRESS DRIFT]    hotel-search — 3 conversations DONE but only 1 implementation commit found
+[TASK DRIFT]        hotel-search — 3 tasks done but only 1 implementation commit found
 [DEAD REFERENCE]    nl-workflow-compiler — 'src/engine/pathly planner/nl_compiler.py' mentioned but not found
 [INVALID STATE]     hotel-search — STATE.json has unknown state: BLOCKED
 [STATE DRIFT]       hotel-search — STATE.json says BUILDING but REVIEW_FAILURES.md is open
@@ -146,4 +151,4 @@ If issues found: list each one. Do NOT auto-fix. Report only.
 - **Read-only:** Never edit files, never delete feedback files.
 - **Objective:** Do not make assumptions about correctness — report what the data shows.
 - **Robustness:** If a check cannot run (git not available, file unreadable), report that check as SKIPPED, not PASS.
-- **Context:** Dead references in `CONVERSATION_PROMPTS.md` are common and expected (future work) — only flag `IMPLEMENTATION_PLAN.md` and `ARCHITECTURE_PROPOSAL.md` when present.
+- **Context:** Only flag dead references in `IMPLEMENTATION_PLAN.md` and `ARCHITECTURE_PROPOSAL.md` when present (these are the authoritative plan files).

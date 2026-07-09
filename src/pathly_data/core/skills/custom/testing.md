@@ -33,12 +33,11 @@ Before writing any code, verify the live state of all files this feature touches
 
 3. Record any TypeScript compile errors visible in the files (do not fix them).
 
-4. Update `pathly/features/chat-stop-proxy/PROGRESS.md` — mark Conv 0 items complete
-   and note any pre-existing issues found.
+4. Mark the corresponding board task(s) done via `POST /comms/tasks/complete`.
 
 ### Done when
 All five files confirmed present; `abortLlm`, `chatStore` fields, and `ChatInput` props
-confirmed by direct read; PROGRESS.md updated.
+confirmed by direct read; board task(s) marked done.
 
 ---
 
@@ -137,7 +136,7 @@ RESULT: PASS
 Conv 1 verified: Stop button transforms Send, aborts stream, preserves partial text, no orphaned streaming state.
 ```
 
-Update `pathly/features/chat-stop-proxy/PROGRESS.md` — mark all Conv 1 items complete.
+Mark the corresponding board task(s) done via `POST /comms/tasks/complete`.
 
 ---
 
@@ -281,7 +280,7 @@ RESULT: PASS
 Conv 2 verified: mode toggle routes to PTY, output streams into bubble, CC badge present, LLM mode unaffected.
 ```
 
-Update `pathly/features/chat-stop-proxy/PROGRESS.md` — mark all Conv 2 items complete.
+Mark the corresponding board task(s) done via `POST /comms/tasks/complete`.
 
 ---
 

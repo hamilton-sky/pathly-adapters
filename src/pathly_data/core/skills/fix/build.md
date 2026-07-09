@@ -7,7 +7,7 @@ Parse `$ARGUMENTS`: `TOPIC` (the fix identifier).
 ## Role
 
 **Stage orchestrator: Quick Fix**
-Apply a single, well-scoped fix. No multi-conversation planning, no PROGRESS.md tracking.
+Apply a single, well-scoped fix. No multi-step planning, no progress-file tracking.
 Read the issue description, locate the code, apply the minimal change, verify it passes.
 
 log-phase PHASE_START analyze

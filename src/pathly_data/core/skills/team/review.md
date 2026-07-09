@@ -3,8 +3,8 @@
 Stage 3b — Review. Invoked by the `team` orchestrator when FSM state is REVIEWING.
 Runs reviewer for the current conversation, handles feedback loops, then advances.
 
-Parse `$ARGUMENTS`: `FEATURE`, `rigor`, `autoFlow`. Conv N is the most recent BUILDING conversation
-(last row in PROGRESS.md that is not yet DONE).
+Parse `$ARGUMENTS`: `FEATURE`, `rigor`, `autoFlow`. Conv N is the most recent BUILDING work item —
+the board task that was just built and claimed for review.
 
 > Shared protocols — **Scout choreography**, **Feedback protocol**, **Completion report**,
 > **Sub-agent spawning rules**, and **Live progress logging** — are composed in below from
@@ -182,7 +182,8 @@ Reply 'continue' for the next conversation, or 'stop' to pause here.
 
 If autoFlow: log human response "auto-advance".
 
-Mark Conv N as DONE in `<feature_path>/PROGRESS.md`.
+The board task's status is already managed (completed in BUILDING, re-opened on review failure) —
+there is no per-conversation progress file to mark.
 
 **Write-or-delete transition artifacts:**
 - If reviewer PASSED (no REVIEW_FAILURES.md written this run): `REVIEW.md` (RESULT: PASS) was written above — keep it,

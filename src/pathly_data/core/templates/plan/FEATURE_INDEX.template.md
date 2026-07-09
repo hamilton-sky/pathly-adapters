@@ -14,9 +14,7 @@ name: Feature Index
 |---|---|---|---|
 | `FEATURE_INDEX.md` | Planner | All agents | This file — single entry point for feature context |
 | `USER_STORIES.md` | Planner | Tester, Reviewer | Acceptance criteria — the contract |
-| `IMPLEMENTATION_PLAN.md` | Planner | Builder, Architect | Phase-by-phase design — the what and how |
-| `CONVERSATION_PROMPTS.md` | Planner | Builder | Exact builder prompts — one section per conversation |
-| `PROGRESS.md` | Builder, Orchestrator | Orchestrator, Builder | Conversation status — the checkpoint |
+| `IMPLEMENTATION_PLAN.md` | Planner | Builder, Architect | Phase-by-phase design — the what and how; each phase becomes one board task |
 
 ### Optional plan files (present if signals fired)
 

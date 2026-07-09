@@ -144,7 +144,7 @@ def test_complete_stage_after_planning(tmp_path):
     state_file = storage / "STATE.json"
     state_file.write_text(json.dumps({"current": "PLANNING"}), encoding="utf-8")
     (storage / "IMPLEMENTATION_PLAN.md").write_text(
-        "## Conversation 1\nplan content", encoding="utf-8"
+        "## Phase 1\nplan content", encoding="utf-8"
     )
 
     result = complete_stage(
@@ -369,10 +369,10 @@ def test_current_state_key_on_complete_stage(tmp_path):
     storage = _storage_path(tmp_path)
     state_file = storage / "STATE.json"
     state_file.write_text(json.dumps({"current": "PLANNING"}), encoding="utf-8")
-    # Must contain the PLANNING->DESIGNING on_content marker ('## Conversation'), otherwise the
+    # Must contain the PLANNING->DESIGNING on_content marker ('## Phase'), otherwise the
     # rule falls through to default:PLANNING and this is a no-op self-loop rather than an advance.
     (storage / "IMPLEMENTATION_PLAN.md").write_text(
-        "## Conversation 1\nplan content", encoding="utf-8"
+        "## Phase 1\nplan content", encoding="utf-8"
     )
 
     result = complete_stage(

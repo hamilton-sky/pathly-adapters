@@ -110,8 +110,8 @@ and follow its procedure from Step 0.
 
 **Step 1 — Find in-progress feature**
 
-Scan `pathly/features/` (skip `.archive/`). For each feature folder, read `PROGRESS.md`.
-Look for `status: IN PROGRESS` or `Status: IN PROGRESS`.
+Scan `pathly/features/*/STATE.json` (skip `.archive/`). Look for a feature whose `current` state
+is active (in progress) — not `IDLE`, `DONE`, or a `*_PAUSED` state.
 
 **Step 2 — If a feature is in progress**
 
@@ -119,7 +119,7 @@ Print:
 
 ```
 Feature: <feature-name>
-Conversations done / total: <X> / <Y>
+Tasks done / total: <X> / <Y>
 ```
 
 Ask:
@@ -143,8 +143,8 @@ Nothing in progress. All done.
 
 ## Behavior: pause
 
-Scan `pathly/features/` for a feature whose `PROGRESS.md` contains `status: IN PROGRESS`.
-If found, write `status: PAUSED` to that feature's `PROGRESS.md`.
+Scan `pathly/features/*/STATE.json` for a feature in an active (in-progress) state.
+If found, report the pause to the FSM (`pathly-fsm-call complete-stage --flow pause --topic <feature>`); the FSM persists the paused state.
 
 Print:
 
@@ -168,14 +168,14 @@ write a read-only consult note to `pathly/features/<feature>/feedback/CONSULT_<r
 
 1. If `args` is provided, use it as `FEATURE`. Otherwise scan `pathly/features/` for the
    most recently modified feature folder.
-2. Read `pathly/features/$FEATURE/PROGRESS.md` if it exists.
+2. Read `pathly/features/$FEATURE/STATE.json` if it exists.
 3. Check `pathly/features/$FEATURE/feedback/` for open files.
-4. Infer rigor: **lite** (4 required files only), **standard** (all 8 files),
-   **strict** (8 files + audit markers), **unknown** (no plan folder).
+4. Infer rigor: **lite** (3 required files only), **standard** (all 7 files),
+   **strict** (7 files + audit markers), **unknown** (no plan folder).
 5. Classify state:
    - **no-feature** — no pathly/features/ folder or no feature found
    - **storm-done** — `pathly/features/STORM_SEED.md` exists, no plans folder yet
-   - **plan-done** — plans folder exists, conversations TODO, no open feedback
+   - **plan-done** — plan folder exists, board tasks not yet done, no open feedback
    - **feedback-open** — feedback file(s) present
    - **build-done** — all conversations DONE, no RETRO.md yet
    - **retro-done** — RETRO.md exists

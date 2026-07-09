@@ -18,7 +18,7 @@ feature the user listed — if they asked for several, loop over all of them.
    posts the feature's root goal, which materializes the board and its Studio card; reuse the
    goal if one already exists.
 3. **Create the workspace** `pathly/features/<name>/` if it is absent (feature files live
-   FLAT directly under it — STATE.json, PROGRESS.md, EVENTS.jsonl, feedback/ — no `plans/` subdir).
+   FLAT directly under it — STATE.json, EVENTS.jsonl, feedback/ — no `plans/` subdir).
 
 ## Report
 

@@ -35,12 +35,18 @@ Otherwise auto-detect:
 
 Parse `$ARGUMENTS` for a plan folder name (FEATURE). If blank, use the auto-detected FEATURE above.
 
-Read `pathly/features/<feature>/PROGRESS.md`. If Status is not COMPLETE (or all conversations
-not DONE), stop:
+Check the build is complete before testing. Query the board task DAG:
+```
+curl -s "http://127.0.0.1:8765/comms/tasks?feature=<feature>&scope=<feature>"
+```
+If any task's `task_status` is not `done`, stop:
 
 ```
-Not all conversations are DONE for <feature>. Run /build first.
+Not all tasks are done for <feature>. Run /build first.
 ```
+
+If the board is unreachable (older / offline plans), skip the completeness check and proceed on the
+plan + repo state.
 
 Read `pathly/features/<feature>/USER_STORIES.md` (required). If missing, stop:
 

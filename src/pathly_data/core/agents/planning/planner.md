@@ -10,13 +10,13 @@ You are a product owner and feature planner. Your job is to define WHAT needs to
 
 ## Stage brief
 Stage: PLAN
-Output: USER_STORIES.md, IMPLEMENTATION_PLAN.md, CONVERSATION_PROMPTS.md written to plans/
-Done when: All nine plan files exist in pathly/features/<feature>/ and PROGRESS.md shows TODO rows
+Output: USER_STORIES.md, IMPLEMENTATION_PLAN.md written to the plan folder, plus the board task DAG seeded in plan.md Step 6 (one `type=goal` message + one `type=task` per phase; each task's `text` is a self-contained builder prompt)
+Done when: FEATURE_INDEX.md, USER_STORIES.md, and IMPLEMENTATION_PLAN.md exist in pathly/features/<feature>/ (plus the standard/strict knowledge artifacts) and the board task DAG is seeded
 
 Before returning, you MUST execute plan.md Step 6 to seed the comms-board task DAG
 (post one `type=goal` message, then one `type=task` per phase stamped with `goal_id`).
 Each task's `text` must be a **self-contained builder prompt** (what to build · Files ·
-Done when) — the board-DAG executor runs it without any CONVERSATION_PROMPTS.md file.
+Done when) — the board-DAG executor runs it directly, with no separate prompts file.
 
 ## Before planning: check active lessons
 

@@ -14,8 +14,8 @@ Pause the current session cleanly without losing state.
 
 ## Step 1 — Find in-progress feature
 
-Scan `pathly/features/` (skip `.archive/`). For each feature folder, read `PROGRESS.md` if present.
-Look for a feature whose `PROGRESS.md` contains `status: IN PROGRESS` or `Status: IN PROGRESS`.
+Scan `pathly/features/` (skip `.archive/`). For each feature folder, read `STATE.json` if present.
+Look for a feature whose `current` state is active (in progress) — not `IDLE`, `DONE`, or a `*_PAUSED` state.
 
 ## Step 2 — If a feature is in progress
 
@@ -30,9 +30,7 @@ the read-only info panel before writing PAUSED status. Do NOT call next_action.
 ─────────────────────────────────────────────────────────
 ```
 
-Write `status: PAUSED` to that feature's `PROGRESS.md`.
-
-Then report the pause to the FSM (it will persist the paused state):
+Then report the pause to the FSM (it persists the paused state — the FSM owns STATE.json):
 
 ```
 pathly-fsm-call complete-stage --flow pause --topic <feature-name> --project-root <project_root>
@@ -45,7 +43,7 @@ Print:
 ```
 Session paused.
 Feature: <feature-name>
-Conversations done / total: <X> / <Y>
+Tasks done / total: <X> / <Y>   (from the board DAG)
 
 Resume with:  /pathly go
 Consult a role: /pathly meet

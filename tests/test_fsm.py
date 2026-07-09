@@ -94,7 +94,7 @@ def test_recover_state_limits_per_state(tmp_path):
 def test_evaluate_l1_artifact_present(tmp_path):
     flow = _load_team_flow()
     (tmp_path / "IMPLEMENTATION_PLAN.md").write_text(
-        "## Conversation 1\nsome plan", encoding="utf-8"
+        "## Phase 1\nsome plan", encoding="utf-8"
     )
     result = evaluate_transition_rules(flow, "PLANNING", tmp_path)
     assert result == "DESIGNING"
