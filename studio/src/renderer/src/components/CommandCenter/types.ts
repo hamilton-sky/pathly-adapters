@@ -52,6 +52,9 @@ export interface Message {
   /** True once any agent has read this message. Maps to a non-empty read_by
    *  (SPEC §5). Your own messages can be retracted only while this is false. */
   readByAgent?: boolean
+  /** For a global-search result: the specific artifact chunk that matched the query
+   *  semantically (maps to the backend's `_matched_chunk`). Absent for keyword hits. */
+  matchedChunk?: string
   /** Goal id — set on task messages to link them to their parent goal. */
   goal_id?: string
   /** Executor type — set on goal messages (single | loop | team). */

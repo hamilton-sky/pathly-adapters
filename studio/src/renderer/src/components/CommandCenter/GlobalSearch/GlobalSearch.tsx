@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Search, X } from 'lucide-react'
 import { useCommsStore, type GlobalSearchHit } from '../../../store/commsStore'
 import { Tooltip } from '../../ui'
+import { SearchResults } from './SearchResults/SearchResults'
 import s from './GlobalSearch.module.css'
 
 interface Props {
@@ -10,13 +11,15 @@ interface Props {
 }
 
 // Collapsible cross-board search for the top bar. Collapsed = a search icon; click
-// expands an input that, on Enter, fans out /comms/search across every board and lists
-// the matches in a dropdown. Picking one jumps to its board and flashes the message.
+// expands an input. Once open, pressing Enter OR clicking the magnifier fans out
+// /comms/search across every board (hybrid keyword + semantic) and lists the matches
+// below — split into keyword and semantic groups. Picking one jumps to its board.
 export function GlobalSearch({ onOpenResult }: Props): JSX.Element {
   const [open, setOpen] = useState(false)
   const [text, setText] = useState('')
   const hits = useCommsStore((st) => st.globalHits)
   const searching = useCommsStore((st) => st.globalSearching)
+  const query = useCommsStore((st) => st.globalQuery)
   const runGlobalSearch = useCommsStore((st) => st.runGlobalSearch)
   const clearGlobalSearch = useCommsStore((st) => st.clearGlobalSearch)
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -42,26 +45,14 @@ export function GlobalSearch({ onOpenResult }: Props): JSX.Element {
   }, [open, close])
 
   const submit = (): void => { if (text.trim()) void runGlobalSearch(text) }
-  const pick = (hit: GlobalSearchHit): void => { onOpenResult(hit); close() }
+  const pick = useCallback((hit: GlobalSearchHit): void => {
+    onOpenResult(hit)
+    close()
+  }, [onOpenResult, close])
 
-  return (
-    <div className={s.wrap} ref={wrapRef}>
-      {open ? (
-        <div className={s.field}>
-          <Search size={13} className={s.fieldIco} />
-          <input
-            ref={inputRef}
-            className={s.input}
-            placeholder="Search all boards…"
-            value={text}
-            onChange={(e) => setText(e.currentTarget.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') submit(); if (e.key === 'Escape') close() }}
-          />
-          <button type="button" className={s.clear} aria-label="Close search" onClick={close}>
-            <X size={14} />
-          </button>
-        </div>
-      ) : (
+  if (!open) {
+    return (
+      <div className={s.wrap} ref={wrapRef}>
         <Tooltip label="Search all boards" description="Find a message across every board" placement="bottom">
           <button
             type="button"
@@ -73,32 +64,37 @@ export function GlobalSearch({ onOpenResult }: Props): JSX.Element {
             <Search size={15} />
           </button>
         </Tooltip>
-      )}
+      </div>
+    )
+  }
 
-      {open && (searching || hits) && (
-        <div className={s.results} role="listbox">
-          {searching && <div className={s.hint}>Searching every board…</div>}
-          {!searching && hits && hits.length === 0 && (
-            <div className={s.hint}>No matches across any board.</div>
-          )}
-          {!searching && hits && hits.map((h) => (
-            <button
-              type="button"
-              role="option"
-              aria-selected="false"
-              key={`${h.boardKey}:${h.message.id}`}
-              className={s.hit}
-              onClick={() => pick(h)}
-            >
-              <span className={s.hitTop}>
-                <span className={s.hitBoard}>{h.boardLabel}</span>
-                <span className={s.hitType} data-type={h.message.type}>{h.message.type}</span>
-              </span>
-              <span className={s.hitText}>{h.message.text}</span>
-            </button>
-          ))}
-        </div>
-      )}
+  return (
+    <div className={s.wrap} ref={wrapRef}>
+      <div className={s.field}>
+        <button
+          type="button"
+          className={s.fieldBtn}
+          aria-label="Run search"
+          onClick={() => { submit(); inputRef.current?.focus() }}
+        >
+          <Search size={13} />
+        </button>
+        <input
+          ref={inputRef}
+          className={s.input}
+          placeholder="Search all boards…"
+          value={text}
+          onChange={(e) => setText(e.currentTarget.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') submit(); if (e.key === 'Escape') close() }}
+        />
+        <button type="button" className={s.clear} aria-label="Close search" onClick={close}>
+          <X size={14} />
+        </button>
+      </div>
+
+      <div className={s.results} role="listbox">
+        <SearchResults query={query} hits={hits} searching={searching} onPick={pick} />
+      </div>
     </div>
   )
 }

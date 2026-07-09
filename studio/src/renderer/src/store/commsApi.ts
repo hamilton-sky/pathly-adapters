@@ -30,6 +30,8 @@ export interface CommsRow {
   executor?: string | null
   task_status?: string | null
   depends_on?: string | null
+  /** Semantic-search only: the child chunk that matched (search_by_embedding). */
+  _matched_chunk?: string | null
 }
 
 interface BackendOption {
@@ -106,6 +108,7 @@ export function rowToMessage(row: CommsRow): Message {
   if (row.task_status) m.taskStatus = row.task_status as Message['taskStatus']
   const deps = parseJsonArray(row.depends_on ?? null)
   if (deps.length > 0) m.dependsOn = deps
+  if (row._matched_chunk) m.matchedChunk = row._matched_chunk
 
   return m
 }

@@ -1,0 +1,44 @@
+.hint {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px;
+  color: var(--text-muted);
+  font: 500 12px/1.3 var(--font-family-base);
+}
+
+.hintIco { flex-shrink: 0; opacity: 0.8; }
+
+/* "N matches · M boards" — the scope of what was found. */
+.count {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 9px 8px;
+  margin-bottom: 2px;
+  border-bottom: var(--border);
+  color: var(--text-secondary);
+  font: 500 12px/1 var(--font-family-base);
+}
+
+.countIco { flex-shrink: 0; color: var(--text-muted); }
+.count strong { font-weight: 700; color: var(--text-primary); }
+
+/* Group divider — keyword (top) vs semantic (below). */
+.group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 9px 3px;
+  color: var(--text-muted);
+  font: 600 11px/1 var(--font-family-base);
+}
+
+.group[data-semantic='true'] {
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: var(--border);
+}
+
+.groupIco { flex-shrink: 0; }
+.approx { font-size: 13px; line-height: 1; }

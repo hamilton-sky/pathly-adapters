@@ -1,0 +1,74 @@
+.hit {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  text-align: left;
+}
+
+.hit:hover { background: var(--bg-surface1); }
+
+.top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.board {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 600 11px/1 var(--font-family-mono);
+  color: var(--accent);
+}
+
+.type {
+  flex-shrink: 0;
+  font: 600 9px/1 var(--font-family-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+  padding: 2px 5px;
+  border-radius: var(--radius-full);
+  background: var(--bg-surface2, var(--bg-surface1));
+}
+
+.text {
+  color: var(--text-secondary);
+  font: 500 12px/1.4 var(--font-family-base);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Layer 3 — the semantic chunk that actually matched (long artifacts). */
+.matched {
+  display: flex;
+  gap: 5px;
+  min-width: 0;
+  font: 500 11px/1.4 var(--font-family-base);
+  color: var(--text-muted);
+}
+
+.matchedLabel {
+  flex-shrink: 0;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.matchedText {
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
