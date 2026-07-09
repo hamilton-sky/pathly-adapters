@@ -6,9 +6,9 @@
   align-items: center;
   justify-content: center;
   padding: 0;
-  background: transparent;
+  background: var(--bg-surface0);
   border: var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   color: var(--text-secondary);
   cursor: pointer;
   flex-shrink: 0;

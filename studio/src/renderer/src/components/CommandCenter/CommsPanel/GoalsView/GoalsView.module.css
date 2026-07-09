@@ -83,8 +83,9 @@
 }
 
 /* ── New goal control (lives in the board view-toggle row, top right) ──── */
-/* Matches the header's "New feature" button (.ctl .newFeature): squared
-   corners, accent text + border. */
+/* One of the board's per-view action buttons — shares the style of the Messages
+   filter and Artifacts summary buttons: 28px tall, radius-md, neutral border at
+   rest, accent on hover. Consistent family across the Messages/Goals/Artifacts views. */
 .newGoalBtn {
   display: inline-flex;
   align-items: center;
@@ -92,10 +93,9 @@
   height: 28px;
   padding: 0 10px;
   border: var(--border);
-  border-color: var(--accent-border);
   border-radius: var(--radius-md);
   background: var(--bg-surface0);
-  color: var(--accent);
+  color: var(--text-secondary);
   font: 500 12px/1 var(--font-family-base);
   cursor: pointer;
   transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
@@ -104,6 +104,8 @@
 
 .newGoalBtn:hover {
   background: var(--accent-bg);
+  border-color: var(--accent-border);
+  color: var(--accent);
 }
 
 .newGoalLabel {

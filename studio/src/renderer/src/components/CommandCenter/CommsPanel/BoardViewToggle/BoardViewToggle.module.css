@@ -13,8 +13,9 @@
 
 .seg {
   display: flex;
-  align-items: center;
+  align-items: stretch;    /* segments fill the height so the active chip reads full-height */
   gap: 2px;
+  height: 28px;            /* match the Evaluate pill + per-view buttons — one uniform row */
   margin-left: 5px;        /* nudge the toggle off the left edge */
   padding: 2px;
   border: var(--border);

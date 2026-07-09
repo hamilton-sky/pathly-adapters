@@ -8,10 +8,10 @@ import s from './BoardViewToggle.module.css'
 export type BoardView = 'messages' | 'goals' | 'artifacts' | 'grid'
 
 const VIEWS: Array<{ id: BoardView; label: string; icon: JSX.Element }> = [
+  { id: 'grid', label: 'All', icon: <LayoutGrid size={12} /> },
   { id: 'messages', label: 'Messages', icon: <MessageSquare size={12} /> },
   { id: 'goals', label: 'Goals & Tasks', icon: <ListTree size={12} /> },
   { id: 'artifacts', label: 'Artifacts', icon: <FileText size={12} /> },
-  { id: 'grid', label: 'All', icon: <LayoutGrid size={12} /> },
 ]
 
 interface Props {

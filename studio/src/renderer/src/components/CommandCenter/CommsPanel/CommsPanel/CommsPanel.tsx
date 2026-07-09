@@ -72,7 +72,7 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
   } = useCommsPanel(scope, mainFeature)
   const [type, setType] = useState<MessageType>(scope === 'feature' ? 'nudge' : 'decision')
   const [composeText, setComposeText] = useState('')
-  const [boardView, setBoardView] = useState<BoardView>('messages')
+  const [boardView, setBoardView] = useState<BoardView>('grid')
   // Message-thread type filter (empty = show all). Persists across tab switches so
   // switching to Goals and back keeps the filter; the trigger shows a count badge.
   const [typeFilter, setTypeFilter] = useState<MessageType[]>([])

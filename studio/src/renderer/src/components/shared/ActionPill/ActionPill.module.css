@@ -6,12 +6,15 @@
 .pill[data-tone='green'] { --pill-tone: var(--green); }
 .pill[data-tone='amber'] { --pill-tone: var(--yellow); }
 
-/* Zone A — primary action button (run; label follows the selected preset). */
+/* Zone A — primary action button (run; label follows the selected preset).
+   height:28px sets the whole pill's height (the gear/chip/stop segments stretch to it),
+   matching the app-standard control height used by tabs, .ctl, and the board toggle. */
 .pill .main {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 9px;
+  height: 28px;
+  padding: 0 9px;
   background: var(--bg-surface0);
   border: var(--border);
   border-right: none;
