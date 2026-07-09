@@ -3,6 +3,8 @@ import { GitBranch, Folder, Globe, Plus, Columns2, List, LayoutGrid, ChevronDown
 import type { BoardScope, Direction, Preset, SectionDef } from '../types'
 import { SCOPES } from '../constants'
 import { Tooltip, CreatePopover, slugify } from '../../ui'
+import { GlobalSearch } from '../GlobalSearch/GlobalSearch'
+import type { GlobalSearchHit } from '../../../store/commsStore'
 import s from './CommandCenterHeader.module.css'
 
 export interface CommandCenterHeaderProps {
@@ -20,6 +22,8 @@ export interface CommandCenterHeaderProps {
   onToggleDirection: () => void
   onApplyPreset: (preset: 'board' | 'pipeline' | 'focus') => void
   onCreateFeature: (topic: string, description: string) => void
+  /** Navigate to a global-search hit's board and flash the matched message. */
+  onOpenSearchResult: (hit: GlobalSearchHit) => void
 }
 
 const SCOPE_ICONS: Record<BoardScope, React.ReactNode> = {
@@ -44,8 +48,10 @@ export function CommandCenterHeader(p: CommandCenterHeaderProps): JSX.Element {
   const checkCompact = useCallback(() => {
     const el = headRef.current
     if (!el) return
-    // Brand ~190px + headRight ~280px (with dirPill) or ~100px + gaps 30px + ~122px per tab
-    const headRightPx = p.sections.length >= 2 ? 280 : 100
+    // Brand ~190px + headRight (search icon ~34 + New feature ~120 + dirPill ~130 ≈ 315,
+    // or ~135 without the pill) + gaps 30px + ~122px per tab. headRight collapses to icons
+    // past this point (data-compact), so this is the labels-shown width we size against.
+    const headRightPx = p.sections.length >= 2 ? 315 : 135
     const needed = 220 + headRightPx + (2 + p.featureTabs.length) * 122
     setCompact(el.offsetWidth < needed)
   }, [p.featureTabs.length, p.sections.length])
@@ -172,7 +178,8 @@ export function CommandCenterHeader(p: CommandCenterHeaderProps): JSX.Element {
         )}
       </div>
 
-      <div className={s.headRight}>
+      <div className={s.headRight} {...(compact ? { 'data-compact': '' } : {})}>
+        <GlobalSearch onOpenResult={p.onOpenSearchResult} />
         <Tooltip label="New feature" description="Create a feature folder and open its board" placement="bottom">
           <button
             ref={newFeatureBtnRef}
@@ -210,7 +217,7 @@ export function CommandCenterHeader(p: CommandCenterHeaderProps): JSX.Element {
               title="Stacked layout"
               onClick={() => p.direction !== 'column' && p.onToggleDirection()}
             >
-              <List size={13} />Stacked
+              <List size={13} /><span className={s.dirLabel}>Stacked</span>
             </button>
             <button
               type="button"
@@ -220,7 +227,7 @@ export function CommandCenterHeader(p: CommandCenterHeaderProps): JSX.Element {
               title="Side by side layout"
               onClick={() => p.direction !== 'row' && p.onToggleDirection()}
             >
-              <Columns2 size={13} />Side by side
+              <Columns2 size={13} /><span className={s.dirLabel}>Side by side</span>
             </button>
           </div>
         )}
@@ -228,11 +235,12 @@ export function CommandCenterHeader(p: CommandCenterHeaderProps): JSX.Element {
           <button
             type="button"
             className={s.ctl}
+            title="Presets"
             aria-haspopup="listbox"
             {...(menu ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
             onClick={(e) => { e.stopPropagation(); setMenu((m) => !m) }}
           >
-            <LayoutGrid size={13} />Presets<ChevronDown size={12} />
+            <LayoutGrid size={13} /><span className={s.presetLabel}>Presets</span><ChevronDown size={12} className={s.presetChevron} />
           </button>
           <div className={s.menu} {...(menu ? { 'data-open': '' } : {})}>
             {PRESET_ITEMS.map((it) => (

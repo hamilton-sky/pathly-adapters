@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import type { BoardScope, Message, MessageType } from '../../types'
 import { useCommsStore } from '../../../../store/commsStore'
 import { scopeToParams } from '../../../../store/commsApi'
@@ -13,7 +13,6 @@ import { handleSummaryRequest } from '../ArtifactsView/handleSummaryRequest'
 export function useCommsPanel(scope: BoardScope, mainFeature: string) {
   const store = useCommsStore()
   const projectPath = useProjectStore((s) => s.projectPath)
-  const [flashId, setFlashId] = useState<string | null>(null)
 
   const key = scope === 'feature' ? mainFeature : scope
   const messages = store.messagesFor(scope, mainFeature)
@@ -103,15 +102,10 @@ export function useCommsPanel(scope: BoardScope, mainFeature: string) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scope, key, projectRoot])
 
-  const flash = (id: string) => {
-    setFlashId(id)
-    window.setTimeout(() => setFlashId(null), 900)
-  }
-
   const post = useCallback(
     (type: MessageType, text: string) => {
       const id = store.post(key, type, text, scope === 'feature' ? feature?.stage : null)
-      flash(id)
+      store.flashMessage(key, id)
     },
     [store, key, scope, feature],
   )
@@ -168,16 +162,13 @@ export function useCommsPanel(scope: BoardScope, mainFeature: string) {
     [store],
   )
 
-  const searchResults = store.searchResults
-  const searchTerm = store.searchTerm
-  const runSearch = useCallback((q: string) => { void store.runSearch(key, q) }, [store, key])
-  const clearSearch = useCallback(() => store.clearSearch(), [store])
+  const flashId = store.flashId[key] ?? null
 
   const reload = useCallback(() => { void store.loadBoard(scope, key, projectRoot) }, [store, scope, key, projectRoot])
 
   return {
     messages, feature, pendingCount, flashId, post, answer, resolve,
     toggleScope, del, editMessage, supersede, attach, runSingleAgent, runGoal, stopGoal,
-    searchResults, searchTerm, runSearch, clearSearch, reload,
+    reload,
   }
 }

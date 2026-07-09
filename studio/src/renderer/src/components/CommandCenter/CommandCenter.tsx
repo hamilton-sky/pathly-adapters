@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import { LayoutGrid } from 'lucide-react'
 import { MAX_SECTIONS } from './types'
-import { useCommsStore } from '../../store/commsStore'
+import { useCommsStore, type GlobalSearchHit } from '../../store/commsStore'
 import { useCommandCenterStore } from '../../store/commandCenterStore'
 import { useProjectStore } from '../../store/projectStore'
 import { useSectionResize } from './hooks/useSectionResize'
@@ -70,6 +70,18 @@ export function CommandCenter() {
     }
   }, [projectPath, store, cc])
 
+  // Jump to a global-search hit: open/focus its board, then flash the matched message.
+  // For features, openFeatureFromRail surfaces the board (tab + section + sidebar);
+  // for project/global, show the section if it isn't already open.
+  const handleOpenSearchResult = useCallback((hit: GlobalSearchHit) => {
+    if (hit.boardScope === 'feature') {
+      cc.openFeatureFromRail(hit.boardKey)
+    } else if (!cc.sections.some((sec) => sec.scope === hit.boardScope)) {
+      cc.toggleSection(hit.boardScope as 'project' | 'global')
+    }
+    store.flashMessage(hit.boardKey, hit.message.id)
+  }, [cc, store])
+
   useEffect(() => {
     if (!projectPath) return
     void store.loadFeatures(projectPath)
@@ -106,6 +118,7 @@ export function CommandCenter() {
         onToggleDirection={cc.toggleDirection}
         onApplyPreset={cc.applyPreset}
         onCreateFeature={handleCreate}
+        onOpenSearchResult={handleOpenSearchResult}
       />
 
       {archivePending && (

@@ -1,6 +1,5 @@
-/* Persistent header row: search bar (grows) + the board-global Evaluate pill.
-   Owns the bottom border so the underline spans the whole row (search + pill),
-   not just the search field. */
+/* Header row: the view toggle grows to fill, the board-global Evaluate pill keeps its
+   intrinsic width. Owns the bottom border so the underline spans the whole row. */
 .headerRow {
   display: flex;
   align-items: center;
@@ -9,12 +8,6 @@
   min-width: 0;
   border-bottom: var(--border);
   background: var(--bg-mantle);
-}
-
-/* Let the search bar grow and shrink; the pill keeps its intrinsic width. */
-.searchWrap {
-  flex: 1;
-  min-width: 0;
 }
 
 .foot {

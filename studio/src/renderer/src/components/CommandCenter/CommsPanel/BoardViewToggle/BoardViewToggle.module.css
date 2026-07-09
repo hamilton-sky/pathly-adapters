@@ -2,7 +2,9 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 0 8px;
+  /* Grows to fill the header row; the Evaluate pill sits to its right. No vertical
+     padding — the parent .headerRow owns it now that the two share one row. */
+  flex: 1;
   min-width: 0;
   /* Establish a size-query container so the controls can collapse to
      icon-only when the panel gets narrow (labels hidden below 400px). */

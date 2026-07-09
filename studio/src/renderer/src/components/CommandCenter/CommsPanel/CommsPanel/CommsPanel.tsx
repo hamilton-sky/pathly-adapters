@@ -3,7 +3,6 @@ import { Check } from 'lucide-react'
 import type { BoardScope, MessageType } from '../../types'
 import { CommsMsgList } from '../CommsMsgList/CommsMsgList'
 import { CommsInput } from '../CommsInput/CommsInput'
-import { SearchBar } from '../SearchBar/SearchBar'
 import { SingleAgentButton } from '../SingleAgentButton/SingleAgentButton'
 import { BoardViewToggle, type BoardView } from '../BoardViewToggle/BoardViewToggle'
 import { GoalsView } from '../GoalsView/GoalsView'
@@ -69,7 +68,7 @@ function notifyDrop(posted: number, failed: number, failHint?: string): void {
 export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeature: string }) {
   const {
     messages, feature, flashId, post, answer, resolve, toggleScope, del, editMessage,
-    supersede, attach, runSingleAgent, searchResults, searchTerm, runSearch, clearSearch, reload,
+    supersede, attach, runSingleAgent, reload,
   } = useCommsPanel(scope, mainFeature)
   const [type, setType] = useState<MessageType>(scope === 'feature' ? 'nudge' : 'decision')
   const [composeText, setComposeText] = useState('')
@@ -191,14 +190,31 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
 
   return (
     <>
-      {/* Persistent header: search + the board-global Evaluate pill (spawns a CLI
-          agent that reads the whole board). Evaluate stays visible on every tab —
-          it is board-scoped, not tab-scoped — while the toggle row below carries
-          each tab's own control (filter / new goal / summary settings). */}
+      {/* Header row: the per-tab view toggle (with its per-view right action) and the
+          board-global Evaluate pill share ONE row. Evaluate stays visible on every tab —
+          it reads the whole board, not the active view. Per-board search is gone; it moved
+          up to the top-bar global search (one search across every board). */}
       <div className={s.headerRow}>
-        <div className={s.searchWrap}>
-          <SearchBar value={searchTerm} onSearch={runSearch} onClear={clearSearch} />
-        </div>
+        <BoardViewToggle
+          view={boardView}
+          onChange={setBoardView}
+          rightAction={
+            boardView === 'goals' ? (
+              <NewGoalButton onCreate={(text) => post('goal', text)} />
+            ) : boardView === 'artifacts' ? (
+              <SummaryConfig
+                selection={summarySelection}
+                onSelectionChange={setSummarySelection}
+                style={summaryStyle}
+                onStyleChange={setSummaryStyle}
+                note={summaryNote}
+                onNoteChange={setSummaryNote}
+              />
+            ) : boardView === 'messages' ? (
+              <MessagesFilter value={typeFilter} onChange={setTypeFilter} />
+            ) : null /* grid — no per-view action */
+          }
+        />
         <EvaluateBoardButton
           boardKey={boardKey}
           boardScope={scope}
@@ -207,33 +223,11 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
             .map((g) => ({ id: g.id, text: g.text }))}
         />
       </div>
-      <BoardViewToggle
-        view={boardView}
-        onChange={setBoardView}
-        rightAction={
-          boardView === 'goals' ? (
-            <NewGoalButton onCreate={(text) => post('goal', text)} />
-          ) : boardView === 'artifacts' ? (
-            <SummaryConfig
-              selection={summarySelection}
-              onSelectionChange={setSummarySelection}
-              style={summaryStyle}
-              onStyleChange={setSummaryStyle}
-              note={summaryNote}
-              onNoteChange={setSummaryNote}
-            />
-          ) : boardView === 'messages' ? (
-            <MessagesFilter value={typeFilter} onChange={setTypeFilter} />
-          ) : null /* grid — no per-view action */
-        }
-      />
 
       {boardView === 'messages' && (
         <CommsMsgList
           scope={scope}
           messages={messages}
-          searchResults={searchResults}
-          searchTerm={searchTerm}
           flashId={flashId}
           typeFilter={typeFilter}
           onAnswer={answer}

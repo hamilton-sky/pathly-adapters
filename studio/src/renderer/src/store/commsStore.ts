@@ -46,6 +46,15 @@ function storageKey(scope: BoardScope, key: string): string {
   return scope === 'feature' ? key : scope
 }
 
+// One global-search result: a message plus the board it lives on, so the UI can
+// jump to that board and flash the matched message.
+export interface GlobalSearchHit {
+  boardKey: string
+  boardScope: BoardScope
+  boardLabel: string
+  message: Message
+}
+
 // ── Store shape ──────────────────────────────────────────────────────
 
 export interface CommsState {
@@ -69,11 +78,20 @@ export interface CommsState {
   /** Edit a message's text in place (e.g. rename a goal). */
   editMessage: (key: string, messageId: string, text: string) => void
 
-  // GAP 4 — management actions + transient search overlay state.
-  searchResults: Message[] | null
-  searchTerm: string
-  runSearch: (key: string, query: string) => Promise<void>
-  clearSearch: () => void
+  // Per-board one-shot flash: highlight + scroll to a single message on a board,
+  // keyed by board key (feature id / 'project' / 'global'). Set on a fresh post and
+  // on a global-search result jump; auto-clears. Drives the .flash animation.
+  flashId: Record<string, string | null>
+  flashMessage: (boardKey: string, messageId: string) => void
+
+  // Global search — fan-out across every board (all features + project + global),
+  // each hit tagged with its origin board so a click can navigate there and flash it.
+  globalQuery: string
+  globalHits: GlobalSearchHit[] | null
+  globalSearching: boolean
+  runGlobalSearch: (query: string) => Promise<void>
+  clearGlobalSearch: () => void
+
   supersede: (key: string, oldId: string, newId: string) => void
   attach: (key: string, messageId: string, path: string, atype?: Message['atype']) => void
 
@@ -438,22 +456,61 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
     apiEditMessage(messageId, text).catch(() => { /* best-effort */ })
   },
 
-  searchResults: null,
-  searchTerm: '',
+  flashId: {},
 
-  runSearch: async (key, query) => {
-    const q = query.trim()
-    if (!q) { set({ searchResults: null, searchTerm: '' }); return }
-    set({ searchTerm: q })
-    const isFeature = key !== 'project' && key !== 'global'
-    const scope: BoardScope = isFeature ? 'feature' : key as BoardScope
-    const params = scopeToParams(scope, key)
-    const feature = isFeature ? key : (scope === 'global' ? 'global' : key)
-    const results = await apiSearch(q, feature, params.board, params.scope)
-    set({ searchResults: results })
+  flashMessage: (boardKey, messageId) => {
+    set((s) => ({ flashId: { ...s.flashId, [boardKey]: messageId } }))
+    // Keep it set long enough for a freshly-opened board to mount and catch it; the
+    // CSS animation is a 900ms one-shot, so nothing lingers visually after it plays.
+    window.setTimeout(() => {
+      set((s) => (s.flashId[boardKey] === messageId
+        ? { flashId: { ...s.flashId, [boardKey]: null } }
+        : s))
+    }, 1600)
   },
 
-  clearSearch: () => set({ searchResults: null, searchTerm: '' }),
+  globalQuery: '',
+  globalHits: null,
+  globalSearching: false,
+
+  runGlobalSearch: async (query) => {
+    const q = query.trim()
+    if (!q) { set({ globalHits: null, globalQuery: '', globalSearching: false }); return }
+    set({ globalQuery: q, globalSearching: true })
+
+    // Fan out the per-board /comms/search across every board there is — all features
+    // (get().features holds them all, not just the open ones) plus project + global.
+    // Each board query is tagged with its origin so a result can navigate + flash.
+    const projectRoot = useProjectStore.getState().projectPath.replace(/\\/g, '/').replace(/\/$/, '')
+    interface Target { boardKey: string; scope: BoardScope; label: string; feature: string; board: string; apiScope: string }
+    const targets: Target[] = get().features.map((f) => {
+      const p = scopeToParams('feature', f.id)
+      return { boardKey: f.id, scope: 'feature', label: f.id, feature: f.id, board: p.board, apiScope: p.scope }
+    })
+    if (projectRoot) {
+      const p = scopeToParams('project', projectRoot)
+      targets.push({ boardKey: 'project', scope: 'project', label: 'Project', feature: 'project', board: p.board, apiScope: p.scope })
+    }
+    const gp = scopeToParams('global', 'global')
+    targets.push({ boardKey: 'global', scope: 'global', label: 'Global', feature: 'global', board: gp.board, apiScope: gp.scope })
+
+    const batches = await Promise.all(
+      targets.map((t) =>
+        apiSearch(q, t.feature, t.board, t.apiScope)
+          .then((rows) => rows.map((m): GlobalSearchHit => ({
+            boardKey: t.boardKey, boardScope: t.scope, boardLabel: t.label, message: m,
+          })))
+          .catch(() => [] as GlobalSearchHit[]),
+      ),
+    )
+
+    // Drop a stale run: a newer query started while this fan-out was in flight.
+    if (get().globalQuery !== q) return
+    const hits = batches.flat().sort((a, b) => (b.message.ts ?? '').localeCompare(a.message.ts ?? ''))
+    set({ globalHits: hits.slice(0, 40), globalSearching: false })
+  },
+
+  clearGlobalSearch: () => set({ globalHits: null, globalQuery: '', globalSearching: false }),
 
   supersede: (key, oldId, newId) => {
     set((s) => {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Star, MessageSquare, Trash2 } from 'lucide-react'
 import type { BoardScope, Message, MessageType } from '../../types'
 import { agentMeta } from '../../constants'
@@ -13,8 +13,6 @@ import s from './CommsMsgList.module.css'
 export interface CommsMsgListProps {
   scope: BoardScope
   messages: Message[]
-  searchResults?: Message[] | null
-  searchTerm?: string
   flashId?: string | null
   /** Message types to show; empty/undefined = show all. Pinned messages are exempt. */
   typeFilter?: MessageType[]
@@ -25,32 +23,18 @@ export interface CommsMsgListProps {
 }
 
 // Pinned decisions tray + the message thread.
-export function CommsMsgList({ scope, messages, searchResults, searchTerm, flashId, typeFilter, onAnswer, onResolve, onDelete, onSupersede }: CommsMsgListProps) {
+export function CommsMsgList({ scope, messages, flashId, typeFilter, onAnswer, onResolve, onDelete, onSupersede }: CommsMsgListProps) {
   // Pinned-message delete confirmation (cards manage their own confirm state).
   const [confirmPinId, setConfirmPinId] = useState<string | null>(null)
 
-  // Search overlay — replaces the normal thread when active.
-  if (searchResults) {
-    return (
-      <div className={s.thread}>
-        <div className={s.searchHead}>
-          {searchResults.length} result{searchResults.length !== 1 ? 's' : ''} for &ldquo;{searchTerm}&rdquo;
-        </div>
-        {searchResults.map((m) => (
-          <MsgCard
-            key={m.id}
-            message={m}
-            flash={false}
-            onAnswer={onAnswer}
-            onResolve={onResolve}
-            onDelete={onDelete}
-            onSupersede={onSupersede}
-            siblings={messages}
-          />
-        ))}
-      </div>
-    )
-  }
+  // Scroll the flashed message into view when a global-search result jumps to this
+  // board. Re-runs when messages arrive so a freshly-opened board still lands on it.
+  const threadRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!flashId) return
+    const el = threadRef.current?.querySelector(`[data-msg="${CSS.escape(flashId)}"]`)
+    if (el) (el as HTMLElement).scrollIntoView({ block: 'center', behavior: 'smooth' })
+  }, [flashId, messages])
 
   const pins = messages.filter((m) => m.pinned)
   // Goals, tasks and artifacts live in their dedicated board views (Goals & Tasks,
@@ -75,7 +59,7 @@ export function CommsMsgList({ scope, messages, searchResults, searchTerm, flash
   const signal = thread.filter((m) => !isMonitorMessage(m))
 
   return (
-    <div className={s.thread}>
+    <div ref={threadRef} className={s.thread}>
       {/* Execution trace always sits at the very top (collapsed) — above pins —
           mirroring the All grid so the Monitor lane is in one consistent place. */}
       {monitor.length > 0 && <MonitorLane messages={monitor} />}
@@ -83,7 +67,7 @@ export function CommsMsgList({ scope, messages, searchResults, searchTerm, flash
       {pins.length > 0 && (
         <div className={s.pins}>
           {pins.map((m) => (
-            <div key={m.id} className={`${s.pin}${flashId === m.id ? ` ${s.flash}` : ''}`}>
+            <div key={m.id} data-msg={m.id} className={`${s.pin}${flashId === m.id ? ` ${s.flash}` : ''}`}>
               <Star size={14} className={s.pinIcon} />
               <div className={s.pinBody}>
                 <MarkdownRenderer content={m.text} className={s.pinTxt} />
