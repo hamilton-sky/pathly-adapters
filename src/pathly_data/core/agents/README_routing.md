@@ -85,13 +85,12 @@ plan (planner)
   -> pathly/features/<feature>/
        USER_STORIES.md
        IMPLEMENTATION_PLAN.md
-       CONVERSATION_PROMPTS.md
-       PROGRESS.md
+       board task DAG (goal + tasks)
        optional rigor-specific extras
 
 build (builder) x N
   -> implementation changes
-  -> PROGRESS.md updates
+  -> board task marked done
 
 review (reviewer)
   -> PASS or feedback files

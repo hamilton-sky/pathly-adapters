@@ -75,11 +75,10 @@ filesystem:
 
 1. Read `<storage_path>/STATE.json` if present.
 2. Read `<storage_path>/EVENTS.jsonl` if present.
-3. Read `<storage_path>/PROGRESS.md` if present.
-4. Read `<storage_path>/feedback/*.md`.
-5. Recover the effective state from disk.
-6. Apply exactly one event.
-7. Emit exactly one next action.
+3. Read `<storage_path>/feedback/*.md`.
+4. Recover the effective state from disk.
+5. Apply exactly one event.
+6. Emit exactly one next action.
 
 On this fallback path `STATE.json` is the checkpoint and the filesystem is the source of
 truth; if they disagree, recover from disk. (The sections below — Subagent routing,
@@ -164,8 +163,8 @@ These actions are the orchestrator's job — sub-agents do NOT perform them.
 
 ### Feedback re-route
 
-When a feedback file triggers re-routing to a fixing agent: no commit and no PROGRESS.md
-update until the feedback is resolved and the state advances cleanly.
+When a feedback file triggers re-routing to a fixing agent: no commit and no board
+task-status update until the feedback is resolved and the state advances cleanly.
 
 ## What you must NOT do
 

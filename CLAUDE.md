@@ -112,10 +112,8 @@ Design + phases: [pathly/features/storage-restructure/SPEC.md](pathly/features/s
 pathly/features/<name>/            FEATURE scope — team pipeline files live DIRECTLY here
   STATE.json                       current FSM state
   EVENTS.jsonl                     append-only event log
-  PROGRESS.md                      conversation status table (TODO / DONE)
-  CONVERSATION_PROMPTS.md          per-conversation builder prompts
   USER_STORIES.md                  acceptance criteria
-  IMPLEMENTATION_PLAN.md
+  IMPLEMENTATION_PLAN.md           phase-by-phase plan; each phase → one board task (build work-list = board DAG)
   feedback/                        REVIEW_FAILURES.md, TEST_FAILURES.md
   goals/<slug>/                    per-goal decompose (planner/plan)
 pathly/features/.archive/<name>/   completed features (mirrors the shape above)

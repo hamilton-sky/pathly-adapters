@@ -682,3 +682,116 @@ def test_count_tasks_for_goal_counts():
         conn, "feature", "feat", "planner", type="task", text="other", goal_id="g2"
     )
     assert count_tasks_for_goal(conn, "g1") == 2
+
+
+# ── feature->goal resolution (board-native team.flow.yaml loop) ────────────────
+
+
+def test_get_latest_goal_id_resolves_feature_goal():
+    """get_latest_goal_id backs the FSM's feature->goal resolution: it returns the feature
+    board's goal (or None), so a team run that passes NO goal_id can still drive the goal-scoped
+    on_board_count / require_tasks_done gates."""
+    import sqlite3
+    from pathly_orchestrator.db.migrations import _run_migrations
+    from pathly_orchestrator.db.migrations_incremental import _add_additive_migrations
+    from pathly_orchestrator.db.queries.comms_messages import post_message
+    from pathly_orchestrator.db.queries.comms_goals_read import get_latest_goal_id
+
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    _run_migrations(conn)
+    _add_additive_migrations(conn)
+
+    assert get_latest_goal_id(conn, "feature", "feat-x") is None  # no goal yet
+    gid = post_message(conn, "feature", "feat-x", "planner", type="goal", text="Goal")
+    assert get_latest_goal_id(conn, "feature", "feat-x") == gid  # resolves it
+    assert get_latest_goal_id(conn, "feature", "other-feat") is None  # scoped by feature
+
+
+def test_complete_stage_resolves_goal_for_board_loop(tmp_path, monkeypatch):
+    """The core of the conversation-model retirement: team.flow.yaml's REVIEWING loop is now
+    board-DAG-driven (on_board_count) and its REVIEWING->TESTING gate is require_tasks_done — both
+    goal-scoped. A Studio-Start / interactive team run passes NO goal_id, so complete_stage must
+    resolve the feature's goal, or the loop would degrade to build-one-then-TESTING (the exact
+    regression removing PROGRESS.md/convs_total could have caused). With a ready task, REVIEWING
+    loops back to BUILDING; once every task is done it advances to TESTING."""
+    import pathly_orchestrator.fsm_ops as fsm_ops
+    from pathly_orchestrator import eventlog
+    from pathly_orchestrator.db import get_db
+    from pathly_orchestrator.db.queries.comms_messages import post_message
+
+    FEATURE = "board-loop-feat"
+    flow = {
+        "version": 1,
+        "flow": "test",
+        "storage_path": "pathly/plans/{topic}/",
+        "states": ["BUILDING", "REVIEWING", "TESTING", "DONE"],
+        "transitions": {
+            "BUILDING": ["REVIEWING"],
+            "REVIEWING": ["BUILDING", "TESTING"],
+            "TESTING": ["DONE"],
+            "DONE": [],
+        },
+        "agent_map": {
+            "BUILDING": "team/build",
+            "REVIEWING": "team/review",
+            "TESTING": "team/test",
+            "DONE": "team/retro",
+        },
+        "feedback_routing": {
+            "REVIEW_FAILURES": "builder",
+            "INCOMPLETE_TASKS": "builder",
+        },
+        "transition_rules": {
+            "REVIEWING": {
+                "on_board_count": {
+                    "metric": "ready",
+                    "op": "gt",
+                    "compare_to": 0,
+                    "next": "BUILDING",
+                },
+                "default": "TESTING",
+            },
+        },
+        "transition_actions": {},
+        "gates": {
+            "REVIEWING->TESTING": [
+                {"type": "require_tasks_done", "on_fail": "INCOMPLETE_TASKS.md"}
+            ]
+        },
+    }
+    monkeypatch.setattr(fsm_ops, "_load_flow", lambda _n, _r=None: flow)
+    monkeypatch.setattr(
+        fsm_ops,
+        "build_prompt",
+        lambda fc, state, sp, goal_id="": f"instructions for {state}",
+    )
+
+    storage = tmp_path / "pathly" / "plans" / FEATURE
+    storage.mkdir(parents=True)
+    # Authoritative DB state (read_state reads the DB first, then the STATE.json mirror).
+    eventlog.write_state(str(storage), {"current": "REVIEWING", "feature": FEATURE})
+
+    conn = get_db()
+    gid = post_message(conn, "feature", FEATURE, "planner", type="goal", text="Goal")
+    t1 = post_message(
+        conn, "feature", FEATURE, "planner", type="task", text="task-1", goal_id=gid
+    )
+
+    # No goal_id in args — complete_stage must resolve the feature's goal and see the ready task.
+    r1 = complete_stage(
+        {"flow": "test", "topic": FEATURE, "project_root": str(tmp_path)}
+    )
+    assert r1.get("current_state") == "BUILDING", r1  # on_board_count(ready>0) looped back
+
+    # Drain the DAG: mark the only task done → no ready tasks, none incomplete.
+    with conn:
+        conn.execute(
+            "UPDATE comms_messages SET task_status='done' WHERE id=?", (t1,)
+        )
+    eventlog.write_state(str(storage), {"current": "REVIEWING", "feature": FEATURE})
+
+    r2 = complete_stage(
+        {"flow": "test", "topic": FEATURE, "project_root": str(tmp_path)}
+    )
+    assert r2.get("current_state") == "TESTING", r2  # DAG drained + require_tasks_done passed

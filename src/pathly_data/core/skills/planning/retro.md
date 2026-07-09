@@ -10,7 +10,7 @@ for rendering those routes in their host-native form.
 
 ## Skill Contract
 
-**Consumes:** `pathly/features/<FEATURE>/PROGRESS.md` + `pathly/features/<FEATURE>/CONVERSATION_PROMPTS.md`
+**Consumes:** `pathly/features/<FEATURE>/IMPLEMENTATION_PLAN.md` + the feature's board task DAG and the central-DB event log
 **Produces:** `pathly/features/<FEATURE>/RETRO.md`
 **Consumed by:** `storm` skill (user pastes RETRO.md as context for next storm session)
 
@@ -29,18 +29,20 @@ Run a retrospective on the **FEATURE** plan.
 
 ## Step 1: Read the plan
 
-Read both files:
-1. `pathly/features/$ARGUMENTS/PROGRESS.md` — overall status, what was completed
-2. `pathly/features/$ARGUMENTS/CONVERSATION_PROMPTS.md` — the prompts that were used
+Read the plan and reconstruct what was executed:
+1. `pathly/features/$ARGUMENTS/IMPLEMENTATION_PLAN.md` — the phases/plan that was built.
+2. The feature's board task DAG (each task's `text` is the builder prompt that was run) and the
+   central-DB event log — what was completed, retried, and by whom.
 
 If the plan folder doesn't exist, list all `pathly/features/*/` folders and ask which one the user meant.
-If PROGRESS.md status is not COMPLETE, warn: "This plan is not marked COMPLETE — retro may be incomplete."
+If the feature's tasks are not all `done` (or `STATE.json` `current` is not `DONE`), warn:
+"This feature is not marked complete — retro may be incomplete."
 
 ## Step 2: Ask 3 questions
 
 Ask these three questions, one at a time. Wait for an answer before asking the next:
 
-**Q1:** "Looking at the conversation prompts — were any conversations too big (needed mid-conversation scope cuts) or too small (finished too fast with leftover context)?"
+**Q1:** "Looking at the phases/tasks — were any too big (needed mid-task scope cuts) or too small (finished too fast with leftover context)?"
 
 **Q2:** "Did anything break unexpectedly during implementation that the plan didn't anticipate? Any unexpected architectural violations, integration failures, or test failures that surprised you?"
 

@@ -94,24 +94,28 @@ phase: implement
 
 Find the plan folder at `pathly/features/$PLAN/`. If it doesn't exist, list all `pathly/features/*/` folders and ask which one the user meant.
 
-## Step 3: Read current state
+## Step 3: Determine the work source
 
-Read these files:
+The **board task DAG is the authoritative work list.** Query it:
+```
+GET http://127.0.0.1:8765/comms/tasks?feature=$PLAN&scope=$PLAN&ready=true
+```
 
-1. **`pathly/features/$PLAN/PROGRESS.md`** — Find the first row in the "Conversation Breakdown" table with status **TODO**. That is the next target conversation. Also check overall Status — if COMPLETE, stop and report.
-
-2. **`pathly/features/$PLAN/CONVERSATION_PROMPTS.md`** — Find the section for the target conversation number. Extract:
-   - The full prompt (everything inside the ` ``` ` block)
-   - The verify command (from the prompt or the "Expected output" line)
-   - Files touched (listed after the prompt block)
+- **Board reachable with ready tasks →** drain the DAG (Step 4.6). Each task's `text` is a
+  self-contained builder prompt (what to build · Files · Done when); its `artifact_path` points
+  at plan context.
+- **Board unreachable or no DAG (older plans / offline) →** fall back to
+  `pathly/features/$PLAN/IMPLEMENTATION_PLAN.md`. Build the next `## Phase N` whose `Done when:`
+  is not yet satisfied in the repo (use the live repo state to find the next unbuilt phase). There
+  is no per-conversation plan file — the plan's `## Phase N` sections are the work list.
 
 ## Step 4: Confirm scope
 
 Report to the user before starting:
 
 ```
-## Next: Conversation N — [title]
-- Scope: [files listed in CONVERSATION_PROMPTS.md]
+## Next: [board task <id> — title | IMPLEMENTATION_PLAN.md Phase N — title]
+- Scope: [files from the task text, or the phase `File:` fields]
 - Verify: [command]
 ```
 
@@ -122,7 +126,7 @@ Run: `python -c "import time; print(int(time.time()))"` and note the printed int
 ## Step 4.6: Board task DAG (preferred work source)
 
 If this feature has a board task DAG, it is the **authoritative** work list — drain it
-**instead of** the conversation prompt (the DAG supersedes `CONVERSATION_PROMPTS.md`):
+(each task's `text` is the builder prompt; the DAG replaces the legacy conversation model):
 
 1. `GET http://127.0.0.1:8765/comms/tasks?feature=<feature>&scope=<feature>&ready=true`
 2. **If the list is non-empty, drain it** (do NOT also run Step 5's conversation prompt):
@@ -136,24 +140,23 @@ If this feature has a board task DAG, it is the **authoritative** work list — 
       On unrecoverable failure: `POST /comms/tasks/fail` with `{"message_id":"<id>","reason":"<short>"}`.
    d. Re-fetch (step 1). Repeat until the ready list is empty, then **skip Steps 5–6 and go
       to Step 7**.
-3. **If the list is empty or the endpoint is unreachable**, fall through to Step 5 and build
-   the conversation prompt read in Step 3 — the legacy path, unchanged. Features with no board
-   DAG (older plans) work exactly as before.
+3. **If the list is empty or the endpoint is unreachable**, fall through to Step 5 and build the
+   next unbuilt `## Phase N` from `IMPLEMENTATION_PLAN.md` (the offline fallback from Step 3).
 
 ## Step 5: Implement
 
-Execute exactly what the conversation prompt specifies:
+Execute exactly what the work item specifies (the board task `text`, or the IMPLEMENTATION_PLAN.md phase in the offline fallback):
 
-0. **Verify before edit** — before touching any file, glob or read the live repo to confirm every path in the conversation prompt exists and matches reality. If any path is wrong, stale, or missing: correct it and note the discrepancy. Do not proceed with a path that cannot be found.
+0. **Verify before edit** — before touching any file, glob or read the live repo to confirm every path the work item names exists and matches reality. If any path is wrong, stale, or missing: correct it and note the discrepancy. Do not proceed with a path that cannot be found.
 1. Read each file that will be modified
-2. Make changes following the prompt's specifications exactly
+2. Make changes following the work item's specifications exactly
 3. Follow all project conventions from the project's guidance and rule files.
-4. Stay strictly within the conversation's scope — do NOT touch files outside the listed scope
-5. **No silent refactoring**: do not rename, reformat, or clean up anything outside what the prompt explicitly requires
+4. Stay strictly within the work item's scope — do NOT touch files outside the listed scope
+5. **No silent refactoring**: do not rename, reformat, or clean up anything outside what the work item explicitly requires
 
 ## Step 6: Verify
 
-Run the verify command from the conversation prompt.
+Run the verify command from the work item (the task text, or the phase's `Verify:` field).
 
 If verification fails, fix the issues before proceeding. If the fix requires out-of-scope changes, STOP and report:
 ```
@@ -170,12 +173,12 @@ log-phase PHASE_DONE implement
 After successful verification, report:
 
 ```
-## Completed: Conv N — [title]
+## Completed: [board task <id> | Phase N] — [title]
 - Files modified: [list]
 - Verification: passed
 ```
 
-Do NOT update PROGRESS.md. Do NOT commit. The orchestrator (`/pathly team`) handles both after the reviewer passes.
+Do NOT commit — the orchestrator (`/pathly team`) commits after the reviewer passes. Board task status is closed by the Step 4.6 drain loop or by the orchestrator; there is no per-conversation progress file to update.
 
 ## Emitting progress notes
 
@@ -214,6 +217,6 @@ In non-auto mode: do not invoke any other skill. The orchestrator reads the FSM 
 
 ## Edge Cases
 
-- **All conversations DONE**: Report "Plan $PLAN is already COMPLETE."
-- **No CONVERSATION_PROMPTS.md**: Fall back to reading IMPLEMENTATION_PLAN.md directly for the next TODO phase.
-- **Blocked conversation**: Report the blocker and stop.
+- **All tasks / phases done**: Report "Plan $PLAN is already COMPLETE."
+- **Board unreachable**: Fall back to reading IMPLEMENTATION_PLAN.md directly for the next unbuilt phase (Step 3).
+- **Blocked task**: Report the blocker and stop.

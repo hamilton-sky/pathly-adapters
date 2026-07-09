@@ -50,16 +50,16 @@ log-phase PHASE_START build
 
 ## Phase 0 — Select the work item
 
-Determine the ONE thing to build this stage. The **board task DAG is authoritative**; the
-conversation table is a fallback for older plans that have no DAG.
+Determine the ONE thing to build this stage. The **board task DAG is authoritative** — it is
+the sole work source (the legacy per-conversation plan files and conversation model are gone).
 
-### Board task DAG (preferred)
+### Board task DAG
 
 ```
 curl -s "http://127.0.0.1:8765/comms/tasks?ready=true&feature=[feature]&scope=[feature]"
 ```
 **If the response is a non-empty list of ready tasks, BUILD FROM THE BOARD** — the DAG is the
-authoritative work list (it supersedes PROGRESS.md / CONVERSATION_PROMPTS.md). Build **exactly
+authoritative work list. Build **exactly
 ONE task this stage**, then hand off to review. The FSM runs one build→review cycle **per task**:
 after the reviewer passes it loops back to BUILDING for the next ready task, and only once the
 whole DAG is drained does it advance to a single TESTING pass. Do **not** drain the rest of the
@@ -75,12 +75,12 @@ DAG here.
 
 Proceed to Phase 1 with this task as the work item.
 
-### Conversation fallback (no board DAG — older plans)
+### No ready task
 
-If the response is empty OR the server is unreachable (connection refused), read
-`<feature_path>/PROGRESS.md`. Find the first conversation row with status TODO. This is Conv N —
-the **work item**. Note `WORK_ITEM = "conversation N"`. Do NOT update PROGRESS.md — the
-orchestrator marks it DONE after the reviewer passes.
+If the ready list is empty but tasks remain incomplete (blocked / in-progress), report the
+blocker and stop — do not invent work. If the DAG is fully drained, the FSM advances to TESTING
+and you should not have been invoked. If the server is unreachable (connection refused), stop and
+report — the headless team pipeline requires the FSM / board to be up.
 
 ## Phase 1 — Analyze
 
@@ -124,7 +124,7 @@ phase: implement
 Implement the work item for [feature]: <WORK_ITEM>.
   - Board task: execute exactly this task; read its artifact_path for plan context.
   - Conversation N: execute conversation N only, in manual mode.
-Verify. Do NOT update PROGRESS.md — the orchestrator handles that after the reviewer passes.
+Verify. Do NOT change board task status — the orchestrator closes the task after the reviewer passes.
 
 ## Scout Findings
 [compressed summary from Phase 2]
@@ -150,7 +150,7 @@ Feedback protocol fragment. Route the highest-priority open file to the agent be
 **Spawn** `planner`:
 ```
 Read <feature_path>/feedback/IMPL_QUESTIONS.md.
-Answer each [REQ] question — clarify in USER_STORIES.md or CONVERSATION_PROMPTS.md.
+Answer each [REQ] question — clarify in USER_STORIES.md or IMPLEMENTATION_PLAN.md.
 Delete <feature_path>/feedback/IMPL_QUESTIONS.md when resolved.
 ```
 After resolved: log file deleted for IMPL_QUESTIONS.md. Re-run Phase 3. Do not log retry.

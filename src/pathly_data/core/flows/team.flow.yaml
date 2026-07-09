@@ -57,11 +57,12 @@ feedback_routing:
   REVIEW_FAILURES: builder
   SCOPE_VIOLATION: builder
   TEST_FAILURES: builder
+  INCOMPLETE_TASKS: builder     # REVIEWING->TESTING gate: require_tasks_done -> finish remaining board tasks
 transition_rules:
   PLANNING:
     on_content:
       - file: IMPLEMENTATION_PLAN.md
-        contains: '## Conversation'
+        contains: '## Phase'
         next: DESIGNING
     default: PLANNING
   DESIGNING:
@@ -76,10 +77,10 @@ transition_rules:
     on_artifact:
       REVIEW_FAILURES.md: BUILDING
       MORE_CONVS_NEEDED.md: BUILDING
-    on_state_counter:
-      field: convs_done
-      op: lt
-      compare_to: convs_total
+    on_board_count:
+      metric: ready
+      op: gt
+      compare_to: 0
       next: BUILDING
     default: TESTING
   TESTING:
@@ -88,8 +89,6 @@ transition_rules:
     default: RETRO
 transition_actions:
   BUILDING->REVIEWING:
-    - skill: update_progress
-      mark: conv_done
     - skill: commit
       message: 'feat: complete building stage'
   RETRO->DONE:
@@ -102,9 +101,6 @@ gates:
       artifact: VERIFY.md
       pass_marker: 'RESULT: PASS'
       on_fail: VERIFY_FAILURES.md
-    - type: scope_gate
-      scope_file: CONVERSATION_PROMPTS.md
-      on_fail: SCOPE_VIOLATION.md
   REVIEWING->TESTING:
     # The reviewer writes REVIEW.md (RESULT: PASS) ONLY on a clean pass; a failing review leaves
     # REVIEW_FAILURES.md instead (and deletes any stale REVIEW.md). If REVIEW.md is missing/not-PASS
@@ -114,4 +110,8 @@ gates:
       artifact: REVIEW.md
       pass_marker: 'RESULT: PASS'
       on_fail: REVIEW_INCOMPLETE.md
+    # Board-DAG completeness: don't advance to TESTING while any of the goal's tasks are
+    # unfinished. Skipped for a goal-less / offline run (goal_id resolves to None).
+    - type: require_tasks_done
+      on_fail: INCOMPLETE_TASKS.md
 _comments: []

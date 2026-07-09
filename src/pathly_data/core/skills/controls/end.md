@@ -14,8 +14,8 @@ You are wrapping up the current session.
 
 ## Step 1 — Find in-progress feature
 
-Scan `pathly/features/` (skip `.archive/`). For each feature folder, read `PROGRESS.md` if present.
-Look for a feature whose `PROGRESS.md` contains `status: IN PROGRESS` or `Status: IN PROGRESS`.
+Scan `pathly/features/` (skip `.archive/`). For each feature folder, read `STATE.json` if present.
+Look for a feature whose `current` state is active (in progress) — not `IDLE`, `DONE`, or a `*_PAUSED` state.
 
 ## Step 2 — If a feature is in progress
 

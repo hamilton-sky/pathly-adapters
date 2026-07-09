@@ -15,9 +15,7 @@ Plans (IMPLEMENTATION_PLAN.md)  →  Implementation modules  →  Interfaces / c
 [feature definition]              [business logic]            [public API / contracts]
 ```
 
-## Phases
-
-### Phase 1: [Phase Title]   ← Conversation: N
+## Phase 1: [Phase Title]
 **File:** `src/path/to/file.ext` — [CREATE / MODIFY: what changes]
 **Done when:** [one observable sentence — what is true when this phase is complete]
 **Delivers stories:** S1.1, S1.2
@@ -27,7 +25,7 @@ Plans (IMPLEMENTATION_PLAN.md)  →  Implementation modules  →  Interfaces / c
 [Specific implementation instructions — cfg list keys, method signatures, section names]
 **Verify:** `<project verify command — e.g. pytest, make test>` ← standard/strict only; omit in lite
 
-### Phase 2: [Phase Title] (estimated effort)
+## Phase 2: [Phase Title] (estimated effort)
 ...
 
 ## Prerequisites

@@ -112,7 +112,7 @@ Reads project state, classifies intent, chooses the lightest safe workflow.
       │
       ▼ (ask if empty)
   Read project state
-  pathly/features/, PROGRESS.md, git status
+  pathly/features/, STATE.json, git status
       │
       ▼
   Classify intent:
@@ -156,7 +156,7 @@ IN PROGRESS found     nothing found
       │                   │
       ▼                   ▼
 Write PAUSED          "Nothing in
-to PROGRESS.md         progress."
+via STATE.json         progress."
       │
       ▼
   "Session paused.
@@ -175,7 +175,7 @@ Ask one named role a bounded question without touching code or pipeline state.
       │
       ▼
   Read feature state
-  (PROGRESS.md, feedback/, STATE.json)
+  (STATE.json, feedback/, board DAG)
       │
       ▼
   Infer state:
@@ -407,7 +407,7 @@ plan <feature> [rigor]
 
 ## 11. build — Conversation Executor
 
-Implements one conversation from the plan, verifies it, updates PROGRESS.md.
+Implements one conversation from the plan, verifies it, marks the board task done.
 
 ```
 build <plan> [auto]
@@ -420,8 +420,7 @@ build <plan> [auto]
   (not clean → stop, ask)
       │
       ▼
-  Read PROGRESS.md → first TODO conv
-  Read CONVERSATION_PROMPTS.md
+  Read the board task DAG (ready tasks)
       │
       ▼
   Two-phase builder:
@@ -443,7 +442,7 @@ build <plan> [auto]
   (fail → fix, max 2 retries)
       │
       ▼
-  Update PROGRESS.md → DONE
+  Mark the board task done
       │
   ┌───┴───────────────┐
   ▼                   ▼
@@ -656,8 +655,8 @@ Three focused questions → RETRO.md → lessons extracted.
 retro <feature>
       │
       ▼
-  Read PROGRESS.md +
-  CONVERSATION_PROMPTS.md
+  Read IMPLEMENTATION_PLAN.md +
+  board task DAG
       │
       ▼
   Ask 3 questions (one at a time):
@@ -758,7 +757,7 @@ test <feature>
       │
       ▼
   Pre-flight:
-  all PROGRESS conversations DONE?
+  all board tasks done?
   USER_STORIES.md exists?
   (no → stop, explain)
       │
@@ -805,8 +804,8 @@ verify-state [feature | all]
   │ stale? (no commits since)    │
   └──────────────────────────────┘
       │
-  Check B: PROGRESS drift
-  (DONE convs with no git diff)
+  Check B: task drift
+  (DONE tasks with no git diff)
       │
   Check C: Dead references
   (plan mentions files not on disk)
@@ -821,7 +820,7 @@ verify-state [feature | all]
   [ORPHAN FEEDBACK]
   [EXPIRED FEEDBACK]
   [STALE FEEDBACK]
-  [PROGRESS DRIFT]
+  [TASK DRIFT]
   [DEAD REFERENCE]
   [STATE DRIFT]
   [CORRUPT STATE / EVENTS]
@@ -1108,10 +1107,10 @@ Invoked by the orchestrator on: `RETRO->DONE` (team), `VERIFYING->DONE` (debug),
   idea / intent   ──►  storm     ──►  STORM_SEED.md
   STORM_SEED.md   ──►  plan      ──►  pathly/features/<feature>/
   any PRD file    ──►  prd-import──►  pathly/features/<feature>/
-  pathly/features/<feature> ──►  build     ──►  code + PROGRESS.md
+  pathly/features/<feature> ──►  build     ──►  code + board task updates
   pathly/features/<feature> ──►  team ──►  full pipeline
   git diff        ──►  review    ──►  violations report
-  PROGRESS.md     ──►  retro     ──►  RETRO.md
+  IMPLEMENTATION_PLAN.md + board DAG ──►  retro     ──►  RETRO.md
   RETRO.md files  ──►  lessons   ──►  LESSONS.md
   LESSONS.md      ──►  plan      ──►  (injected silently)
   RETRO.md + done ──►  archive   ──►  pathly/features/.archive/
@@ -1138,7 +1137,7 @@ Invoked by the orchestrator on: `RETRO->DONE` (team), `VERIFYING->DONE` (debug),
   MACHINE CONTROLS (no output files, change only state)
   /pathly start   ──►  start     ──►  welcome menu
   /pathly go      ──►  go        ──►  routes to skill
-  /pathly pause   ──►  pause     ──►  PAUSED in PROGRESS
+  /pathly pause   ──►  pause     ──►  PAUSED via FSM (STATE.json)
   /pathly meet    ──►  meet      ──►  consult note
   /pathly end     ──►  end       ──►  → retro or close
   /pathly help    ──►  help      ──►  state-aware menu

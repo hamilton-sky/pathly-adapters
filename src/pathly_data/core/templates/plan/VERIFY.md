@@ -15,7 +15,7 @@ RESULT: PASS
 ## Checks
 - Typecheck / lint: <!-- command + result -->
 - Tests: <!-- command + result -->
-- Scope: <!-- changes stayed within CONVERSATION_PROMPTS.md scope -->
+- Scope: <!-- changes stayed within the board task / plan phase scope -->
 
 ## Manual verification
 <!-- Anything verified by hand (UI, behavior). Note what was deferred. -->

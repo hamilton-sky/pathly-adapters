@@ -41,7 +41,7 @@ curl -s -X POST http://127.0.0.1:8765/record_phase \
 
 **Find active feature:**
 1. List folders in `pathly/features/` (skip `.archive/`)
-2. Read `PROGRESS.md` in each — find `status: IN PROGRESS` or `Status: IN PROGRESS`
+2. Read `STATE.json` in each — use the most recent feature whose `current` state is not `IDLE` or `DONE`
 3. If none found and `$ARGUMENTS` names a feature, use that
 4. If still none found, ask: `Which feature are we designing for?`
 

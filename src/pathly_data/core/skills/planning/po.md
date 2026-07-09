@@ -30,7 +30,7 @@ Before anything else, determine how you are running:
 Do **not** ask the human anything and do **not** wait for replies.
 
 1. **Gather context** from the storage path and your prompt: read whichever exist —
-   `SPEC.md`, `USER_STORIES.md`, `PO_NOTES.md`, `PROGRESS.md`, `STORM_SEED.md` — plus the
+   `SPEC.md`, `USER_STORIES.md`, `PO_NOTES.md`, `STORM_SEED.md` — plus the
    goal/feature text and the Communication Board context already injected into this prompt.
 2. **Synthesise the four PO dimensions yourself** (Who / Success / Out of scope / Constraints),
    making explicit, reasonable assumptions wherever a source is silent. Never leave a section
@@ -61,7 +61,6 @@ Wait for reply. Use the answer as the working feature name.
 4. Read when present:
    - `pathly/features/$FEATURE/USER_STORIES.md`
    - `pathly/features/$FEATURE/PO_NOTES.md`
-   - `pathly/features/$FEATURE/PROGRESS.md`
 
 ---
 

@@ -6,15 +6,14 @@ Every file produced or consumed during this pipeline run.
 
 ## Plan files (FSM persistent state)
 
-These files are the pipeline's memory. An interrupted run can be resumed by reading
-PROGRESS.md and re-entering at the last incomplete conversation.
+These files are the pipeline's memory. An interrupted run can be resumed by reading the
+board task DAG and re-entering at the last incomplete task.
 
 | File | Written by | Read by | Purpose |
 |---|---|---|---|
 | USER_STORIES.md | Planner | Tester | Acceptance criteria — the contract |
 | IMPLEMENTATION_PLAN.md | Planner | Planner | Exact code changes — the design |
-| CONVERSATION_PROMPTS.md | Planner | Builder agents | Verbatim prompts — the instructions |
-| PROGRESS.md | Orchestrator | Orchestrator | Conversation status — the checkpoint |
+| board task DAG (goal + tasks) | Planner | Builder agents | Per-task builder prompts + status — the work list and the checkpoint |
 | RETRO.md | Retro agent | Humans, /lessons | What we learned — the feedback loop |
 
 ---
@@ -43,13 +42,10 @@ These files no longer exist. They were the inter-agent communication medium.
 USER_STORIES.md          ←── what to build
        │
        ▼
-IMPLEMENTATION_PLAN.md   ←── how to build it
+IMPLEMENTATION_PLAN.md   ←── how to build it (one board task per phase)
        │
        ▼
-CONVERSATION_PROMPTS.md  ←── exact builder prompts
-       │
-       ▼
-PROGRESS.md              ←── which conversations done
+board task DAG           ←── per-task builder prompts + status
        │
        ▼
 RETRO.md                 ←── what we learned

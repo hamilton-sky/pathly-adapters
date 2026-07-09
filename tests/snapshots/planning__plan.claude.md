@@ -11,8 +11,8 @@ for rendering those routes in their host-native form.
 ## Skill Contract
 
 **Consumes (optional):** `pathly/features/STORM_SEED.md` - pre-filled answers for the interview
-**Produces:** `$PLAN_DIR/` - FEATURE_INDEX.md + 4 files in lite, FEATURE_INDEX.md + 8 files in standard/strict (Step 0.5 resolves `PLAN_DIR`: the feature folder in feature mode, the **goal folder** in goal-decompose mode)
-**Consumed by:** the board task DAG seeded in Step 6 (authoritative for board-native executors); the legacy `build` skill path reads `$PLAN_DIR/FEATURE_INDEX.md` first, then `CONVERSATION_PROMPTS.md` and `PROGRESS.md`
+**Produces:** `$PLAN_DIR/` - FEATURE_INDEX.md + 2 files in lite, FEATURE_INDEX.md + 6 files in standard/strict (Step 0.5 resolves `PLAN_DIR`: the feature folder in feature mode, the **goal folder** in goal-decompose mode)
+**Consumed by:** the board task DAG seeded in Step 6 (each task's `text` is the authoritative builder prompt); if the board is unreachable, the build path falls back to `$PLAN_DIR/IMPLEMENTATION_PLAN.md` phases
 
 ## Step 0: Parse Arguments
 
@@ -127,21 +127,17 @@ Create `$PLAN_DIR/` (from Step 0.5) if it does not exist. If it exists, add or u
 
 **All rigor levels produce `FEATURE_INDEX.md` as the first file.** Write it before any other plan file.
 
-Lite produces 5 required files:
+Lite produces 3 required files:
 - `FEATURE_INDEX.md` ← always first
 - `USER_STORIES.md`
 - `IMPLEMENTATION_PLAN.md`
-- `PROGRESS.md`
-- `CONVERSATION_PROMPTS.md`
 
-Lite merges happy path, edge cases, architecture notes, and flow notes into the relevant sections of those four files. Keep the plan small: target 1-2 conversations and only include detail the builder needs.
+Lite merges happy path, edge cases, architecture notes, and flow notes into the relevant sections of those three files. Keep the plan small: target 1-2 phases and only include detail the builder needs.
 
-Standard produces 9 files:
+Standard produces 7 files:
 - `FEATURE_INDEX.md` ← always first
 - `USER_STORIES.md`
 - `IMPLEMENTATION_PLAN.md`
-- `PROGRESS.md`
-- `CONVERSATION_PROMPTS.md`
 - `HAPPY_FLOW.md`
 - `EDGE_CASES.md`
 - `ARCHITECTURE_PROPOSAL.md`
@@ -149,7 +145,7 @@ Standard produces 9 files:
 
 Standard is the current default.
 
-Strict produces the same 8 files plus stronger audit expectations:
+Strict produces the same 7 files plus stronger audit expectations:
 - Add explicit risk, rollback, verification, and approval notes to `IMPLEMENTATION_PLAN.md`.
 - Ensure every acceptance criterion maps to a verification step.
 - Keep all assumptions and unresolved questions visible.
@@ -164,7 +160,7 @@ Read `{{TEMPLATES_DIR}}/plan/FEATURE_INDEX.template.md` for the exact file struc
 Fill in:
 - **Plan files table** — list every plan file this feature will produce, with written-by/read-by/purpose.
 - **Codebase touchpoints table** — list every source file this feature will create or modify, which conversation touches it, and what changes. One row per file. These are the paths the builder must verify before editing.
-- **Conversation map** — one row per conversation matching PROGRESS.md exactly.
+- **Conversation map** — one row per phase, matching `IMPLEMENTATION_PLAN.md`.
 - **Optional plan files** — mark yes/no for each of the 4 optional files.
 
 Write this file before writing any other plan file. All codebase paths must be accurate — the builder will glob-verify each one.
@@ -179,37 +175,14 @@ In lite, include only the stories and acceptance criteria needed for the small c
 
 Read `{{TEMPLATES_DIR}}/plan/IMPLEMENTATION_PLAN.template.md` for the exact file structure.
 
-Each phase header must carry a `Conversation: N` tag matching the PROGRESS.md row it belongs to:
-```
-## Phase 2 — Fix path prefixes   ← Conversation: 1
-```
-This enforces 1:1 alignment between plan phases and PROGRESS.md rows. The builder navigates by conversation number; the tag is the bridge.
+Give every phase a `## Phase N` header (e.g. `## Phase 2 — Fix path prefixes`) and a
+self-contained scope (File, Done when, Depends on). Step 6 turns each phase into one board
+task whose `text` is the builder prompt, and the `## Phase N` heading makes each phase's
+advisory content anchor-addressable (slug `phase-N`). The builder navigates the board DAG by phase.
 
 In lite, add short sections for happy path, edge cases, and architecture notes directly in this file instead of creating separate files.
 
 In strict, add risk, rollback, approval, and verification mapping sections.
-
-### 4d. PROGRESS.md
-
-Read `{{TEMPLATES_DIR}}/plan/PROGRESS.template.md` for the exact file structure.
-
-### 4e. CONVERSATION_PROMPTS.md (legacy — superseded by board-DAG task text)
-
-> **Legacy.** In the board-DAG model the **task `text` posted in Step 6 is the builder
-> prompt** (self-contained, per task). `CONVERSATION_PROMPTS.md` is retained only for the
-> older `build` skill path that still reads it; the board-native executors
-> (`single`/`loop`) never open it. When the build path is reworked to consume board tasks,
-> this file goes away. Generate it for back-compat, but the per-task Step-6 text is
-> authoritative.
-
-Verbatim prompts for each builder conversation. Max 4 conversations per folder.
-Read `{{TEMPLATES_DIR}}/plan/CONVERSATION_PROMPTS.template.md` for the exact file structure.
-
-Each prompt must be self-contained. Start every prompt with (write the resolved `$PLAN_DIR` value, not the variable):
-```
-Read $PLAN_DIR/FEATURE_INDEX.md first to orient yourself and verify codebase paths.
-```
-Do not re-list all codebase files in the prompt — they live in FEATURE_INDEX.md.
 
 ### 4f. HAPPY_FLOW.md
 
@@ -219,7 +192,7 @@ For standard and strict, read `{{TEMPLATES_DIR}}/plan/HAPPY_FLOW.template.md` fo
 
 ### 4g. EDGE_CASES.md
 
-Skip in `lite`; merge only relevant edge cases into `USER_STORIES.md` and `CONVERSATION_PROMPTS.md`.
+Skip in `lite`; merge only relevant edge cases into `USER_STORIES.md` and `IMPLEMENTATION_PLAN.md`.
 
 For standard and strict, read `{{TEMPLATES_DIR}}/plan/EDGE_CASES.template.md` for the exact file structure.
 
@@ -286,11 +259,9 @@ Keep decomposition small enough for builder reliability:
 ## Step 5: Verify Structure
 
 - `FEATURE_INDEX.md` exists in `$PLAN_DIR/` for all rigor levels.
-- If `rigor = lite`, all 5 required files exist in `$PLAN_DIR/`.
-- If `rigor = standard` or `strict`, all 9 files exist in `$PLAN_DIR/`.
-- `CONVERSATION_PROMPTS.md` has no more than 4 conversations.
-- Conversation prompts reference correct phase numbers.
-- `PROGRESS.md` conversation table matches `CONVERSATION_PROMPTS.md`.
+- If `rigor = lite`, all 3 required files exist in `$PLAN_DIR/`.
+- If `rigor = standard` or `strict`, all 7 files exist in `$PLAN_DIR/`.
+- `IMPLEMENTATION_PLAN.md` has no more than 4 conversations' worth of phases (split the feature if more are needed).
 - Phase numbers are consistent across all created files.
 - Every phase in `IMPLEMENTATION_PLAN.md` has a `File:` field and a `Done when:` field — all rigor levels.
 - Verify commands use correct project commands (standard/strict only).
@@ -429,14 +400,13 @@ Rigor: [lite / standard / strict]
 Files:
 - FEATURE_INDEX.md - entry point: all plan files + codebase touchpoints
 - USER_STORIES.md - N stories with acceptance criteria
-- IMPLEMENTATION_PLAN.md - N phases across N conversations (each tagged Conversation: N)
-- PROGRESS.md - tracking table, all TODO
-- CONVERSATION_PROMPTS.md - N builder prompts ready to use
+- IMPLEMENTATION_PLAN.md - N phases (each becomes one board task in Step 6)
 - HAPPY_FLOW.md - ideal journey [standard/strict only]
 - EDGE_CASES.md - edge cases [standard/strict only]
 - ARCHITECTURE_PROPOSAL.md - design decisions [standard/strict only]
 - FLOW_DIAGRAM.md - ASCII flow diagram [standard/strict only]
 
+Board task DAG: [T tasks seeded under goal $GOAL_ID / not seeded — reason]
 Seed consumed: [yes / no]
 Next route: `continue $FEATURE`
 ```

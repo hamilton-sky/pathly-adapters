@@ -34,7 +34,7 @@ Run: `python -c "import time; print(int(time.time()))"` and note the integer as 
 
 ## Pre-gate
 
-**Board task DAG (preferred).** Check whether this goal/feature has a board DAG:
+**Board task DAG.** Check whether this goal/feature has a board DAG:
 ```
 curl -s "http://127.0.0.1:8765/comms/tasks?feature=[feature]&scope=[feature]"
 ```
@@ -44,12 +44,6 @@ FSM's `require_tasks_done` gate already enforces this on entry to TESTING, so a 
 task means something bypassed the gate — stop and report:
 ```
 Not all tasks are complete. Route to team <feature> build first. Incomplete: <task titles>
-```
-
-**Fallback (no board DAG — older conversation plans).** Read `<feature_path>/PROGRESS.md`. Check
-every conversation row in the Conversation Breakdown table. If any row status is not DONE: stop and report:
-```
-Not all conversations are complete. Route to team <feature> build first. Incomplete: Conv N
 ```
 
 When all work is DONE: log to central DB via `python3 -c "from pathly_orchestrator.eventlog import append_event; append_event('<feature_path>', {'type':'IMPLEMENT_COMPLETE','ts':'<iso-timestamp>'})"`. Confirm state is TESTING in STATE.json.

@@ -23,8 +23,7 @@ It documents every agent spawn, feedback loop, token cost, and artifact produced
 |---|---|---|
 | [pathly/features/{{FEATURE}}/USER_STORIES.md](../../pathly/features/{{FEATURE}}/USER_STORIES.md) | Planning | Acceptance criteria |
 | [pathly/features/{{FEATURE}}/IMPLEMENTATION_PLAN.md](../../pathly/features/{{FEATURE}}/IMPLEMENTATION_PLAN.md) | Planning | Exact code changes |
-| [pathly/features/{{FEATURE}}/CONVERSATION_PROMPTS.md](../../pathly/features/{{FEATURE}}/CONVERSATION_PROMPTS.md) | Planning | Verbatim builder prompts |
-| [pathly/features/{{FEATURE}}/PROGRESS.md](../../pathly/features/{{FEATURE}}/PROGRESS.md) | Pipeline | Conversation status |
+| board task DAG (goal + tasks) | Planning | Per-task builder prompts + status |
 | [pathly/features/{{FEATURE}}/RETRO.md](../../pathly/features/{{FEATURE}}/RETRO.md) | Retro | Human retrospective |
 | [lessons/LESSONS.md](../../lessons/LESSONS.md) | Lessons | Promoted patterns for next planner |
 

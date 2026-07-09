@@ -19,7 +19,6 @@ not update source code, and does not change workflow state on its own.
 2. If `$ARGUMENTS` does not name a feature, scan `pathly/features/` and use the most
    recently modified active feature folder.
 3. Read these files when present:
-   - `pathly/features/$FEATURE/PROGRESS.md`
    - `pathly/features/$FEATURE/feedback/`
    - `pathly/features/$FEATURE/STATE.json`
 4. Infer the current workflow state in plain language:

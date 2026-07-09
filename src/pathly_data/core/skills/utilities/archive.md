@@ -34,12 +34,17 @@ RETRO.md missing. Run route `retro $FEATURE` before archiving.
 The retro seed is needed for future storm sessions.
 ```
 
-Read `pathly/features/$FEATURE/PROGRESS.md`. Check all conversations are DONE.
-If any TODO: stop →
+Check the feature's work is complete before archiving. Query the board task DAG:
+```bash
+curl -s "http://127.0.0.1:8765/comms/tasks?feature=$FEATURE&scope=$FEATURE"
 ```
-$FEATURE has incomplete conversations. Finish building before archiving.
-Incomplete: [list the TODO conversations]
+If any task's `task_status` is not `done`: stop →
 ```
+$FEATURE has incomplete tasks. Finish building before archiving.
+Incomplete: [list the task titles that are not done]
+```
+If the board is unreachable (connection refused), fall back to `STATE.json`: if `current` is
+not `DONE` or `RETRO`, warn that the feature may be incomplete and ask the user to confirm.
 
 Check `pathly/features/$FEATURE/feedback/` — any open feedback files? If yes: stop →
 ```
