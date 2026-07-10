@@ -359,6 +359,24 @@
   background: var(--green);
 }
 
+/* ── Pinned PANELS nav (foot of sidebar, above the profile, never scrolls) ── */
+.panelsNav {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 4px 0 6px;
+  border-top: 1px solid var(--bg-surface0);
+}
+
+.panelsLabel {
+  padding: 6px 12px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
 .collapseBtn {
   background: none;
   border: none;

@@ -64,7 +64,7 @@
 .center {
   flex: 1;
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
   gap: 6px;
   min-width: 0;
@@ -479,62 +479,6 @@
 .vsCodeDropdownItem:focus-visible {
   outline: var(--focus-ring);
   outline-offset: -2px;
-}
-
-.navBtn {
-  background: transparent;
-  border: none;
-  border-radius: var(--radius-md);
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: var(--font-size-sm);
-  font-weight: 500;
-  padding: 0 10px;
-  height: 28px;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  transition: var(--transition-fast);
-  white-space: nowrap;
-}
-
-.navBtn:hover {
-  background: var(--btn-b-hover-bg);
-  color: var(--btn-b-hover-color);
-}
-.navBtn:active { transform: scale(0.94); }
-
-.navBtnActive {
-  background: var(--accent);
-  color: #fff;
-  font-weight: 600;
-}
-
-.navBtnActive:hover {
-  background: var(--accent);
-  color: #fff;
-  opacity: 0.9;
-}
-
-.navBtn:focus-visible {
-  outline: var(--focus-ring);
-  outline-offset: -2px;
-}
-
-.navBtnDisabled {
-  opacity: 0.5;
-}
-
-.panelNav {
-  display: flex;
-  gap: 4px;
-  margin-left: 12px;
-  flex-shrink: 0;
-}
-
-/* ── Compact nav button label (hidden in icon-only mode) ── */
-.navBtnLabel {
-  white-space: nowrap;
 }
 
 /* ── Compact topic selector — folder icon with invisible select overlay ── */

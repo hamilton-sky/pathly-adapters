@@ -2,7 +2,7 @@
 
 **Feature:** `i18n-rtl`
 **Scope:** Studio presentation layer only (Electron/React renderer)
-**Status:** SPEC / not started · industry research folded in 2026-07-07
+**Status:** SPEC / not started · industry research folded in 2026-07-07 · codebase-review addendum 2026-07-09 (see §11)
 **Author:** design session (2026-07-07)
 
 ---
@@ -56,7 +56,7 @@ Grounding from the current `studio/src/renderer` tree:
 | Physical-direction CSS decls | **473 across 153 files** (`margin-left`, `padding-right`, `text-align:left`, `left:`/`right:`, `border-left/right`) | The RTL axis; ~80% codemod-able |
 | Logical-property CSS decls | **0** | Nothing done yet — but nothing to undo either |
 | Theming | `tokens.css` `:root` custom properties | Font stack + direction tokens live in one place |
-| Timestamps | shared `Intl`-based util (`utils/timestamp.ts`) | Dates/times already locale-aware — near-free |
+| Timestamps | shared `Intl`-based util (`utils/timestamp.ts`) | Uses `Intl`, but formatters are **module-scope consts with `locale=undefined`** — they follow the OS locale, not the app toggle, and can't re-bind on a live switch. Needs store-binding, not free — see §11.2 |
 | Native app menu | **suppressed** — `Menu.setApplicationMenu(null)` (`main/index.ts:151`) | The worst Electron RTL gap is already moot (see §4.4) |
 | Local inference already bundled | `@xenova/transformers`, `node-llama-cpp` | Phase 5 needs no new cloud dependency |
 
@@ -190,6 +190,11 @@ already sidesteps this:**
 ## 5. Phased delivery
 
 Each phase is independently shippable and leaves the app fully working in English.
+
+> **Amended 2026-07-09.** The codebase-review pass adds scope to Phases 1–3 (direction logic
+> that lives *outside* CSS, attribute strings, date-formatter binding) plus two CI gates. The
+> deltas are consolidated in **§11** so the original phase intent stays readable — treat §11 as
+> authoritative where it overlaps the phase text below.
 
 ### Phase 0 — Foundation & harness *(small)*
 - Add `react-i18next` + `i18next` + `i18next-icu`; create `src/renderer/src/i18n/` (config,
@@ -391,3 +396,94 @@ each corroborated across ≥2 independent authoritative sources. Softer spots: e
 (changes fast — verify live), Hebrew-specific MT quality benchmarks (DeepL Hebrew too new for
 independent head-to-heads; the NLLB score cited is for the larger model) — hence the §8 bake-off
 before finalizing the Phase 5 engine.
+
+---
+
+## 11. Review addendum — codebase gaps folded in *(2026-07-09)*
+
+A verification pass re-measured the spec against `studio/src/renderer`. **Every §3 figure
+reconfirmed:** 344 `.tsx`, 262 `.module.css`, 477 physical / 0 logical CSS decls,
+`Menu.setApplicationMenu(null)` at `main/index.ts:151`, xterm / codemirror / reactflow / mermaid
+islands all present, `@xenova/transformers` + `node-llama-cpp` both bundled. The architecture and
+the §2 boundary hold — this is a green light. Six gaps surfaced; all are **added scope, not
+blockers.** This section is authoritative where it overlaps §4–§6.
+
+The spec is strong on the two axes it names (CSS direction, JSX-text strings) but under-covers
+**direction and text that live outside those two layers.** That is the theme of every gap below.
+
+### 11.1 Direction lives outside CSS too — the codemod can't reach it *(highest new risk)*
+`postcss-use-logical` only rewrites `.css`. Direction logic also lives in TSX/JS, invisible to the
+Phase-1 CSS grep and its accept criteria:
+- **~44 physical-direction sites in `.tsx`/`.ts`** — inline styles (`paddingLeft` tree-indent in
+  `sidebar/shared/InlineCreateInput.tsx`) and, worse, **JS-computed positioning** that reads
+  `getBoundingClientRect()` into `{ top, left }` inline styles (`ui/Tooltip/Tooltip.tsx`,
+  `Editor/CommentsPanel/CommentConfigButton/CommentConfigButton.tsx`). JS-pinned popovers/tooltips
+  will **not** mirror under RTL — the single highest-risk RTL item after the §4.2 islands.
+- **10 `ArrowLeft`/`ArrowRight` keyboard handlers** (`GettingStarted/SlideCarousel`,
+  `MarkdownEditor/DiagramGalleryPanel/DiagramLightbox`, `MarkdownEditor/EditorHeader`,
+  `Monitor/TabBar`, `CommandCenter/…/BoardEvalConfig`). Under RTL, ArrowLeft usually means *next*,
+  not *previous* — CSS mirroring cannot fix key semantics.
+
+**Scope add (Phase 1):** grep-inventory both sets; convert TSX inline direction props to logical
+or `dir`-aware values; for JS positioning, derive the inline offset from the active `dir` (or move
+to `inset-inline-*` and drop the JS offset); make arrow-key handlers read the active `dir`.
+**Accept add:** with `:dir(rtl)` forced, JS-positioned popovers/tooltips pin to the correct edge,
+and carousel / lightbox / tab arrow keys move in the reading direction.
+
+### 11.2 Date/number localization is *not* "near-free"
+`utils/timestamp.ts` builds `new Intl.DateTimeFormat(undefined, …)` at **module scope**:
+`undefined` = OS locale (not the app's chosen language), and module-scope consts instantiate once
+at import, so a live `changeLanguage()` cannot re-bind them. §3's "near-free" and Phase 3's
+"date/number localization via the existing Intl util" were both optimistic.
+**Scope add (Phase 3, small):** refactor the util to build formatters from the active `lang`
+(via `languageStore`) and rebuild on language change — a factory/hook, not module consts.
+**Accept add:** switching to Hebrew reformats visible dates/times **without reload**.
+
+### 11.3 Attribute strings are a large, easy-to-miss slice
+Extraction is framed around JSX chrome *text*, but **~424 human-facing strings live in
+attributes**: **277 `aria-label`, 101 `title`, 46 `placeholder`.** These are not JSX children, so a
+default `eslint-plugin-i18next` config can pass green while a11y / tooltip copy ships untranslated.
+**Scope add (Phase 2):** the CI lint gate MUST cover translatable attributes
+(`aria-label`, `title`, `placeholder`, `alt`), not only JSX text; count them in the per-panel
+extraction budget. **Accept add:** no bare literal in a translatable attribute passes CI.
+
+### 11.4 The §2 boundary needs a CI gate — "renderer = display only" is too clean
+The renderer is **not** purely presentational: it composes prompts for interactive / editor
+one-shots (`dashSafePrompt` + `buildHeadlessArgv` in `services/cliEngine.ts`). The §2 boundary
+holds **only** under the discipline that `t()` wraps chrome strings and **never** a
+prompt-composition string.
+**Scope add:** promote the §2 boundary test (Hebrew-UI headless prompt + board rows == English,
+byte-for-byte) to a **CI job**, not a manual check; add a lint/allowlist forbidding `t()` inside
+`services/cliEngine.ts` and any prompt-composition module. **Accept add:** the boundary diff runs
+in CI and blocks merge on any drift.
+
+### 11.5 No automated RTL regression across 344 components
+Acceptance leans entirely on manual "force `:dir(rtl)`, eyeball at ≤200px" — a large manual surface
+over ~150 CSS files. **Scope add (Phase 1/3):** a Playwright or screenshot-diff **smoke** pass over
+the top ~20 panels in both directions, to catch clipping / overflow / island bleed that eyeballing
+misses. Not a full matrix — a gated smoke set.
+
+### 11.6 Sequencing — migrate per panel, not two full-tree sweeps
+Phases 1 (direction) and 2 (strings) each sweep nearly every component. Run as two separate passes,
+each file is opened twice and eats merge churn on a live codebase. **Recommendation:** co-migrate
+**per panel** — strings + attributes + direction + arrow-keys together, panel by panel in the
+Phase-2 order — so each file is touched once and lands in one PR. Keep the two axes conceptually
+distinct (they are), but stop treating Phase 2 as a single "mechanical" bucket: it is the largest
+cost and the most likely to stall, so give it explicit per-panel milestones.
+
+### 11.7 Amended risk rows *(extend §7)*
+| Risk | Mitigation |
+|---|---|
+| Direction logic in TSX inline styles / JS positioning not mirrored | §11.1 inventory + `dir`-aware offsets; forced-`:dir(rtl)` popover/tooltip QA |
+| Arrow-key navigation inverted under RTL | §11.1 — handlers read the active `dir` |
+| Dates/numbers stuck on OS locale or frozen on switch | §11.2 — store-bound formatter factory |
+| Untranslated `aria-label` / `title` / `placeholder` shipping "green" | §11.3 — CI lint covers attributes |
+| `t()` accidentally wrapping a prompt-composition string | §11.4 — boundary diff as a CI gate + `cliEngine.ts` lint bar |
+| Unverified RTL clipping across 344 components | §11.5 — screenshot-diff smoke gate |
+
+### 11.8 Net effect on the plan
+No phase is removed or reordered; the architecture stands. Phase 1 gains a non-CSS direction
+workstream (§11.1), Phase 2 gains attribute coverage (§11.3), Phase 3 gains the date-formatter
+refactor (§11.2), and two CI gates (§11.4 boundary, §11.5 RTL smoke) join the §5 harness. The
+honest cost delta is **Phase 1 and Phase 2 each grow modestly**; the "near-free" and "mechanical"
+labels were the two places the original estimate ran light.

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useStore } from '../../store'
 import { useUiStore } from '../../store/uiStore'
 import type { PathlyItem } from '../../types'
-import { listDir, listDirs } from '../../services/pathlyApi'
+import { listDir, listDirs, readFile } from '../../services/pathlyApi'
 import { apiFetch } from '../../lib/config'
 import { WorkspaceTree } from './workspace-tree/WorkspaceTree'
 import LibraryCatalog from '../shared/LibraryCatalog/LibraryCatalog'
@@ -54,12 +54,14 @@ export function Sidebar(): JSX.Element | null {
     setSidebarCollapsed,
     sidebarTab,
     setSidebarTab,
+    selectedItem,
     setSelectedItem,
     setActivePanel,
     setMdEditorPath,
     mdEditorViewMode,
     setMdEditorViewMode,
     activePanel,
+    lastUsedFlowPath,
     setLastUsedFlowPath,
   } = useStore()
 
@@ -118,6 +120,22 @@ export function Sidebar(): JSX.Element | null {
 
   const isNarrow = windowWidth < POPOVER_BREAKPOINT
 
+  // Open the Canvas/Flow panel, restoring the last-used flow (mirrors the old header PanelNav).
+  const openCanvas = (): void => {
+    setActivePanel('flow')
+    if ((!selectedItem || selectedItem.type !== 'flow') && lastUsedFlowPath) {
+      readFile(lastUsedFlowPath)
+        .then(() =>
+          setSelectedItem({
+            name: lastUsedFlowPath.split('/').pop() ?? lastUsedFlowPath,
+            path: lastUsedFlowPath,
+            type: 'flow',
+          }),
+        )
+        .catch(() => setLastUsedFlowPath(null))
+    }
+  }
+
   // Collapsed (wide or narrow) → icon strip. The strip carries the expand button,
   // so there's always a way to reopen now that the topbar toggle is gone.
   if (sidebarCollapsed) {
@@ -132,10 +150,12 @@ export function Sidebar(): JSX.Element | null {
         onExpand={() => setSidebarCollapsed(false)}
         onWorkspace={() => openTab('workspace')}
         onLibrary={() => openTab('library')}
+        onCommandCenter={() => setActivePanel('command-center')}
         onMonitor={() => setActivePanel('monitor')}
         onDbExplorer={() => setActivePanel('db-explorer')}
+        onMarkdownEditor={() => setActivePanel('markdown-editor')}
+        onCanvas={openCanvas}
         onSettings={() => setActivePanel('settings')}
-        onCommandCenter={() => setActivePanel('command-center')}
       />
     )
   }
@@ -265,15 +285,17 @@ export function Sidebar(): JSX.Element | null {
         )}
 
         {!libraryOpen && projectPath && <WorkspaceTree />}
-
-        <BottomNav
-          activePanel={activePanel}
-          onMonitor={() => setActivePanel('monitor')}
-          onDbExplorer={() => setActivePanel('db-explorer')}
-          onSettings={() => setActivePanel('settings')}
-          onCommandCenter={() => setActivePanel('command-center')}
-        />
       </div>
+
+      <BottomNav
+        activePanel={activePanel}
+        onCommandCenter={() => setActivePanel('command-center')}
+        onMonitor={() => setActivePanel('monitor')}
+        onDbExplorer={() => setActivePanel('db-explorer')}
+        onMarkdownEditor={() => setActivePanel('markdown-editor')}
+        onCanvas={openCanvas}
+        onSettings={() => setActivePanel('settings')}
+      />
 
       <BrightskyProfile />
 

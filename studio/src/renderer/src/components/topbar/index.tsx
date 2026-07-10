@@ -9,7 +9,6 @@ import { PathlyLogo } from './PathlyLogo'
 import { ProjectSelector } from './ProjectSelector'
 import { EditorLauncher } from './EditorLauncher'
 import { TerminalLauncher } from './TerminalLauncher'
-import { PanelNav } from './PanelNav'
 import { PublishControl } from './PublishControl'
 import { PublishLog } from './PublishLog'
 import { useWindowWidth } from '../sidebar/shell/useWindowWidth'
@@ -45,7 +44,6 @@ export function TopBar(): JSX.Element {
         <div className={styles.center}>
           <ProjectSelector compact={compact} />
           <EditorLauncher />
-          <PanelNav compact={compact} />
         </div>
 
         <div className={styles.right}>
