@@ -55,6 +55,13 @@ export interface Message {
   /** For a global-search result: the specific artifact chunk that matched the query
    *  semantically (maps to the backend's `_matched_chunk`). Absent for keyword hits. */
   matchedChunk?: string
+  /** Global-search: which arm of the hybrid search matched this row (backend
+   *  `_match_source`). The dropdown groups keyword vs semantic by this — not by a
+   *  literal-substring guess, which misses BM25 stemming ("decomposing"→"decompose"). */
+  matchSource?: 'keyword' | 'semantic'
+  /** Global-search: cosine distance for a semantic hit (backend `_distance`, lower =
+   *  closer). Orders the semantic group best-first. Absent on keyword-only hits. */
+  distance?: number
   /** Goal id — set on task messages to link them to their parent goal. */
   goal_id?: string
   /** Executor type — set on goal messages (single | loop | team). */

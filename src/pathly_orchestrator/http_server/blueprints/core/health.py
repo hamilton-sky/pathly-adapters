@@ -45,6 +45,18 @@ def health():
         checks["retrieval"] = retrieval_status()
     except Exception:
         logger.debug("health: retrieval_status failed", exc_info=True)
+    # Query-embedder availability — makes a silently-degraded semantic search
+    # (model failed to load → hybrid quietly runs keyword-only) visible.
+    try:
+        from pathly_orchestrator.runner.embeddings import embedder_status
+
+        retrieval = checks.get("retrieval")
+        if isinstance(retrieval, dict):
+            retrieval["query_embedder"] = embedder_status()
+        else:
+            checks["query_embedder"] = embedder_status()
+    except Exception:
+        logger.debug("health: embedder_status failed", exc_info=True)
     return jsonify(checks), 200
 
 

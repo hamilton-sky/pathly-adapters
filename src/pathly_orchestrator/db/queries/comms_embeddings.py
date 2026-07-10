@@ -107,6 +107,21 @@ def search_by_embedding(
     return [dict(r) for r in conn.execute(sql, params).fetchall()]
 
 
+def _fts_query(query_text: str) -> str:
+    """Turn a raw user query into a safe FTS5 MATCH expression.
+
+    FTS5 MATCH parses operators — ``code:query`` is a column filter, ``a OR b`` a
+    boolean, ``build*`` a prefix, an unbalanced ``"`` a syntax error. Feeding raw
+    user input straight to MATCH therefore makes plausible literal searches
+    (``code:query`` -> 0 hits) behave surprisingly. We quote each whitespace token
+    (doubling any embedded quote) so every token matches literally, joined by
+    implicit AND. Tokens with no alphanumeric content are dropped so punctuation
+    (``-``, ``(``) can't form an empty phrase. Returns "" when nothing is searchable.
+    """
+    tokens = [t for t in query_text.split() if any(c.isalnum() for c in t)]
+    return " ".join('"' + t.replace('"', '""') + '"' for t in tokens)
+
+
 def search_by_keyword(
     conn: sqlite3.Connection,
     query_text: str,
@@ -116,6 +131,9 @@ def search_by_keyword(
 ) -> list[dict]:
     """BM25 full-text search via FTS5. Returns [] when FTS unavailable or inputs empty."""
     if not _connection_module._FTS_AVAILABLE or not boards or not scopes:
+        return []
+    match_expr = _fts_query(query_text)
+    if not match_expr:
         return []
     board_ph = ",".join("?" * len(boards))
     scope_ph = ",".join("?" * len(scopes))
@@ -128,7 +146,7 @@ def search_by_keyword(
     )
     try:
         rows = conn.execute(
-            sql, [query_text] + list(boards) + list(scopes) + [k]
+            sql, [match_expr] + list(boards) + list(scopes) + [k]
         ).fetchall()
     except sqlite3.OperationalError:
         return []
@@ -179,11 +197,27 @@ def search_by_hybrid(
         reverse=True,
     )
     sem_dist = {row["id"]: row.get("_distance") for row in sem_rows}
+    sem_chunk = {
+        row["id"]: row["_matched_chunk"]
+        for row in sem_rows
+        if row.get("_matched_chunk")
+    }
+    bm25_ids = {row["id"] for row in bm25_rows}
     out: list[dict] = []
     for r in ranked[:k]:
         row = dict(r["row"])
-        if row.get("id") in sem_dist:
-            row["_distance"] = sem_dist[row["id"]]
+        rid = row.get("id")
+        if rid in sem_dist:
+            row["_distance"] = sem_dist[rid]
+        # A dual (keyword + semantic-child) hit locks in the bm25 row (SELECT m.*, no
+        # chunk) — re-attach the matched chunk so the "matched on" line survives.
+        if not row.get("_matched_chunk") and rid in sem_chunk:
+            row["_matched_chunk"] = sem_chunk[rid]
+        # Which arm matched this row — the client groups keyword vs semantic by this
+        # instead of guessing from literal substrings (which misses BM25 stemming,
+        # e.g. query "decomposing" matching "decompose"). A row in both arms is a
+        # keyword hit: a literal match outranks a merely-similar one.
+        row["_match_source"] = "keyword" if rid in bm25_ids else "semantic"
         out.append(row)
     return out
 

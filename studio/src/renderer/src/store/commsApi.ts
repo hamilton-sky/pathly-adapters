@@ -32,6 +32,10 @@ export interface CommsRow {
   depends_on?: string | null
   /** Semantic-search only: the child chunk that matched (search_by_embedding). */
   _matched_chunk?: string | null
+  /** Hybrid search: which arm matched this row ('keyword' | 'semantic'). */
+  _match_source?: string | null
+  /** Semantic hit: cosine distance (lower = closer). */
+  _distance?: number | null
 }
 
 interface BackendOption {
@@ -109,6 +113,10 @@ export function rowToMessage(row: CommsRow): Message {
   const deps = parseJsonArray(row.depends_on ?? null)
   if (deps.length > 0) m.dependsOn = deps
   if (row._matched_chunk) m.matchedChunk = row._matched_chunk
+  if (row._match_source === 'keyword' || row._match_source === 'semantic') {
+    m.matchSource = row._match_source
+  }
+  if (typeof row._distance === 'number') m.distance = row._distance
 
   return m
 }

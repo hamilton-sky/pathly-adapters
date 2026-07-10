@@ -7,6 +7,7 @@ all callers fall back to recency-based retrieval.
 
 from __future__ import annotations
 
+import logging
 import threading
 from typing import TYPE_CHECKING
 
@@ -15,14 +16,31 @@ if TYPE_CHECKING:
 
 _model = None
 _model_lock = threading.Lock()
-_model_load_attempted = False
+# A load failure used to latch _model=None PERMANENTLY on the first attempt, so one
+# transient hiccup (a model-download blip) silently disabled semantic search for the
+# whole process — indistinguishable from an honest "no matches". Now a transient
+# failure is retried (up to _MAX_LOAD_ATTEMPTS); only a genuinely-absent library
+# hard-latches, and embedder_status() surfaces the state to /health.
+_model_load_attempts = 0
+_model_unavailable = False
+_MAX_LOAD_ATTEMPTS = 3
+
+# A single global search fans out one /comms/search call PER board (features +
+# project + global) — every one re-embeds the SAME query text. This bounded LRU
+# dedupes that burst: the check happens INSIDE _model_lock, so during a burst only
+# the first caller runs the model forward-pass and the rest return the cached vector.
+_embed_cache: dict[str, list[float]] = {}
+_embed_cache_order: list[str] = []
+_EMBED_CACHE_MAX = 256
 
 
 def _load_model():
-    global _model, _model_load_attempted
-    if _model_load_attempted:
+    global _model, _model_load_attempts, _model_unavailable
+    if _model is not None or _model_unavailable:
         return
-    _model_load_attempted = True
+    if _model_load_attempts >= _MAX_LOAD_ATTEMPTS:
+        return  # gave up after repeated transient failures — see embedder_status()
+    _model_load_attempts += 1
     try:
         import os
 
@@ -36,8 +54,17 @@ def _load_model():
         from sentence_transformers import SentenceTransformer
 
         _model = SentenceTransformer("all-MiniLM-L6-v2")
+    except ImportError:
+        _model_unavailable = True  # library truly absent → retrying cannot help
     except Exception:
-        _model = None
+        logging.getLogger("pathly").warning(
+            "embedding model load failed (attempt %d/%d) — semantic search degraded "
+            "until it loads",
+            _model_load_attempts,
+            _MAX_LOAD_ATTEMPTS,
+            exc_info=True,
+        )
+        _model = None  # transient (download/init) → a later embed() retries
 
 
 def embed(text: str) -> list[float] | None:
@@ -45,11 +72,28 @@ def embed(text: str) -> list[float] | None:
     if not text or not text.strip():
         return None
     with _model_lock:
+        cached = _embed_cache.get(text)
+        if cached is not None:
+            return cached
         _load_model()
         if _model is None:
             return None
-        result = _model.encode(text, convert_to_numpy=True)
-        return result.tolist()
+        result = _model.encode(text, convert_to_numpy=True).tolist()
+        _embed_cache[text] = result
+        _embed_cache_order.append(text)
+        if len(_embed_cache_order) > _EMBED_CACHE_MAX:
+            del _embed_cache[_embed_cache_order.pop(0)]
+        return result
+
+
+def embedder_status() -> dict:
+    """Current query-embedder availability, for /health. Never triggers a load —
+    it only reports state, so a health probe can't block on a model download."""
+    return {
+        "loaded": _model is not None,
+        "unavailable": _model_unavailable,
+        "load_attempts": _model_load_attempts,
+    }
 
 
 def embed_async(message_id: str, text: str) -> None:

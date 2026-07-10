@@ -22,7 +22,17 @@ export function SearchResults({ query, hits, searching, onPick }: Props): JSX.El
     if (!hits) return null
     const keyword: GlobalSearchHit[] = []
     const semantic: GlobalSearchHit[] = []
-    for (const h of hits) (isKeywordHit(h, tokens) ? keyword : semantic).push(h)
+    for (const h of hits) {
+      // Group by the backend's match arm when present (correct even when BM25
+      // matched a stemmed form the highlighter can't see); fall back to the
+      // literal-substring heuristic for older backends / keyword|semantic modes.
+      const src = h.message.matchSource
+      const isKw = src ? src === 'keyword' : isKeywordHit(h, tokens)
+      ;(isKw ? keyword : semantic).push(h)
+    }
+    // Semantic group best-first by cosine distance (closest match on top); this is
+    // comparable across boards where the per-board `rank` interleave is not.
+    semantic.sort((a, b) => (a.message.distance ?? 9) - (b.message.distance ?? 9))
     return { keyword, semantic, boards: new Set(hits.map((h) => h.boardKey)).size }
   }, [hits, tokens])
 

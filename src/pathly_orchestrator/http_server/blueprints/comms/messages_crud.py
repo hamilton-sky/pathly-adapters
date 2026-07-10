@@ -50,6 +50,12 @@ def comms_get():
         return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
 
 
+# Bounds for /comms/search hardening: a search box never needs a multi-KB query
+# (which would hog the process-wide embedding-model lock) or hundreds of results.
+_MAX_QUERY_LEN = 512
+_MAX_K = 50
+
+
 @bp.route("/comms/search", methods=["POST"])
 def comms_search():
     """Hybrid (BM25 + semantic) search across boards.
@@ -72,9 +78,11 @@ def comms_search():
         )
         from pathly_orchestrator.runner.embeddings import embed as _embed
 
-        data = request.get_json()
-        if not data:
-            return jsonify({"error": "Missing JSON body"}), 400
+        # silent=True → a malformed/empty body yields None (a clean 400), not a
+        # werkzeug BadRequest bubbling into the generic 500 that echoes exception text.
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify({"error": "Missing or malformed JSON body"}), 400
 
         query = data.get("query", "")
         feature = data.get("feature", "")
@@ -82,20 +90,27 @@ def comms_search():
             return jsonify({"error": "Field 'query' must be a non-empty string"}), 400
         if not isinstance(feature, str) or not feature.strip():
             return jsonify({"error": "Field 'feature' must be a non-empty string"}), 400
+        # Cap length before embedding: a multi-KB query is never a real search and
+        # would hold the process-wide model lock, stalling every other embed.
+        query = query[:_MAX_QUERY_LEN]
 
         board = data.get("board", "feature")
         if board not in ("feature", "project", "global"):
             board = "feature"
         scope = data.get("scope") or feature
+        # bool is an int subclass — reject it so k=true can't silently become LIMIT 1.
         k = data.get("k", 5)
-        if not isinstance(k, int) or k <= 0:
+        if not isinstance(k, int) or isinstance(k, bool) or k <= 0:
             k = 5
+        k = min(k, _MAX_K)
 
         mode = data.get("mode", "hybrid")
         if mode not in ("hybrid", "semantic", "keyword"):
             mode = "hybrid"
 
-        embedding = _embed(query)
+        # Only the semantic/hybrid arms need a query vector — keyword mode skips the
+        # model forward-pass entirely.
+        embedding = _embed(query) if mode != "keyword" else None
         conn = _get_db()
 
         if mode == "keyword":
