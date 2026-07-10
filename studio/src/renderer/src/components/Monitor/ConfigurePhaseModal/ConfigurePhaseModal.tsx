@@ -49,17 +49,27 @@ interface Props {
 }
 
 export function ConfigurePhaseModal({ stage, onClose }: Props): JSX.Element {
-  const defaults = STAGE_DEFAULTS[stage] ?? { agent: 'builder', skill: 'fix/build' }
+  const projectPath          = useStore((s) => s.projectPath)
+  const activeTopic          = useStore((s) => s.activeTopic)
+  const setActivePanel       = useStore((s) => s.setActivePanel)
+  const flowAgent            = useStore((s) => s.stageRoles[stage])
+  const flowSkill            = useStore((s) => s.stageSkills[stage])
+  const setMdEditorPath = useUiStore((s) => s.setMdEditorPath)
+
+  // Defaults come from the ACTIVE flow's role_map/agent_map, so debug, explore, and
+  // consultation stages get their real agent + skill. The static team map is only a
+  // fallback for stages the flow didn't declare (or when the flow YAML failed to load).
+  const staticDefault = STAGE_DEFAULTS[stage] ?? { agent: 'builder', skill: 'fix/build' }
+  const defaults = {
+    agent: flowAgent ?? staticDefault.agent,
+    skill: flowSkill ?? staticDefault.skill,
+  }
+
   const [host, setHost]   = useState<string>('Claude Code')
   const [agent, setAgent] = useState<string>(defaults.agent)
   const [skill, setSkill] = useState<string>(defaults.skill)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved]   = useState(false)
-
-  const projectPath          = useStore((s) => s.projectPath)
-  const activeTopic          = useStore((s) => s.activeTopic)
-  const setActivePanel       = useStore((s) => s.setActivePanel)
-  const setMdEditorPath = useUiStore((s) => s.setMdEditorPath)
 
   const agentCatalog = useAgentCatalog(projectPath)
   const skillCatalog = useSkillCatalog(projectPath)
@@ -68,8 +78,11 @@ export function ConfigurePhaseModal({ stage, onClose }: Props): JSX.Element {
     [agentCatalog],
   )
 
-  // ── Load saved stage config ──────────────────────────────────────────────
+  // ── Reset to the stage's flow defaults, then overlay any saved override ───
   useEffect(() => {
+    setHost('Claude Code')
+    setAgent(defaults.agent)
+    setSkill(defaults.skill)
     if (!projectPath || !activeTopic) return
     const params = new URLSearchParams({ project_root: projectPath, feature: activeTopic, stage })
     fetch(`${PATHLY_API_BASE}/flows/stage-config?${params}`)
@@ -81,7 +94,7 @@ export function ConfigurePhaseModal({ stage, onClose }: Props): JSX.Element {
         if (cfg.skill)   setSkill(cfg.skill)
       })
       .catch(() => undefined)
-  }, [projectPath, activeTopic, stage])
+  }, [projectPath, activeTopic, stage, defaults.agent, defaults.skill])
 
   // ── Live skill / agent markdown for the preview ──────────────────────────
   const [loadedSkillText, setLoadedSkillText] = useState<string | null>(null)

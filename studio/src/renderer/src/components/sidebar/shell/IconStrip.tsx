@@ -80,12 +80,12 @@ export function IconStrip({
         </button>
       </Tooltip>
 
-      <Tooltip label="Monitor" placement="right">
+      <Tooltip label="Pipeline" placement="right">
         <button
           type="button"
           className={`${styles.iconBtn} ${activePanel === 'monitor' ? styles.iconBtnActive : ''}`}
           onClick={onMonitor}
-          aria-label="Monitor"
+          aria-label="Pipeline"
         >
           <Activity size={16} />
         </button>

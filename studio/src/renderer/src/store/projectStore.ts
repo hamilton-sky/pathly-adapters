@@ -12,6 +12,12 @@ export interface ProjectState {
   fsmState: FsmState | null
   events: FsmEvent[]
   pipelineStates: string[]
+  // Per-stage agent/skill assignments parsed from the active flow's YAML
+  // (role_map → stageRoles, agent_map → stageSkills). These let the Monitor
+  // stepper label and the Configure-phase modal adapt to ANY flow instead of
+  // a hardcoded team roster.
+  stageRoles: Record<string, string>
+  stageSkills: Record<string, string>
   monitorSource: 'chokidar' | 'sse' | null
   publishing: boolean
   publishLog: string[]
@@ -26,6 +32,8 @@ export interface ProjectState {
   setFsmState: (s: FsmState | null) => void
   setEvents: (e: FsmEvent[]) => void
   setPipelineStates: (s: string[]) => void
+  setStageRoles: (m: Record<string, string>) => void
+  setStageSkills: (m: Record<string, string>) => void
   setMonitorSource: (s: 'chokidar' | 'sse' | null) => void
   setPublishing: (v: boolean) => void
   appendPublishLog: (line: string) => void
@@ -44,6 +52,8 @@ export const useProjectStore = create<ProjectState>()(
       fsmState: null,
       events: [],
       pipelineStates: [],
+      stageRoles: {},
+      stageSkills: {},
       monitorSource: null,
       publishing: false,
       publishLog: [],
@@ -65,6 +75,8 @@ export const useProjectStore = create<ProjectState>()(
       setFsmState: (s) => set({ fsmState: s }),
       setEvents: (e) => set({ events: e }),
       setPipelineStates: (s) => set({ pipelineStates: s }),
+      setStageRoles: (m) => set({ stageRoles: m }),
+      setStageSkills: (m) => set({ stageSkills: m }),
       setMonitorSource: (s) => set({ monitorSource: s }),
       setPublishing: (v) => set({ publishing: v }),
       appendPublishLog: (line) => set((s) => ({ publishLog: [...s.publishLog, line] })),

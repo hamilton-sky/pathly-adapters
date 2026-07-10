@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { useStore } from '../../../store'
 import { usePlanFiles } from '../../../hooks/usePlanFiles'
-import { watchStart, readFile, onWatchEvent } from '../../../services/pathlyApi'
-import { getFlowYamlName, extractTopic, mergeBillingUpdate } from '../utils'
+import { watchStart, readFile, onWatchEvent, fetchFlowGraph } from '../../../services/pathlyApi'
+import { getFlowYamlName, extractTopic, mergeBillingUpdate, parseFlowStages, parseFlowGraph } from '../utils'
 import type { FsmEvent } from '../../../types/index'
 
 export function useMonitorSession(): { effectiveTopic: string | null; showTabBar: boolean; refresh: () => void } {
@@ -15,6 +15,8 @@ export function useMonitorSession(): { effectiveTopic: string | null; showTabBar
     setFsmState,
     setEvents,
     setPipelineStates,
+    setStageRoles,
+    setStageSkills,
     activeFlowSessions,
     activeMonitorTab,
     setActiveFlowSessions,
@@ -92,6 +94,8 @@ export function useMonitorSession(): { effectiveTopic: string | null; showTabBar
   useEffect(() => {
     if (!effectiveTopic) {
       setPipelineStates([])
+      setStageRoles({})
+      setStageSkills({})
       return
     }
 
@@ -150,22 +154,31 @@ export function useMonitorSession(): { effectiveTopic: string | null; showTabBar
 
         const flowName = parsedState.flow as string | undefined
         if (!flowName) return
-        const yamlName = getFlowYamlName(flowName)
-        readFile(`${projectPath}/src/pathly_data/core/flows/${yamlName}`)
-          .then((yaml) => {
-            if (!yaml) return
-            const cleanYaml = yaml.replace(/\r/g, '')
-            const match = cleanYaml.match(/states:\s*\n((?:[ \t]+-[ \t]+\S+\n?)+)/)
-            if (match) {
-              const states = match[1]
-                .trim()
-                .split('\n')
-                .map((l) => l.replace(/^[ \t]+-[ \t]+/, '').trim().toUpperCase())
-                .filter(Boolean)
-              setPipelineStates(states)
+
+        // Flows are DB-first at runtime (the FSM runs the DB copy; core/flows/*.yaml are
+        // only a boot-time seed). Read the LIVE graph so user-created and user-edited flows
+        // resolve their real per-stage roles/skills; fall back to the seed file only when
+        // the server/DB is unavailable.
+        fetchFlowGraph(flowName)
+          .then((res) => {
+            const dbParsed = res?.graph ? parseFlowGraph(res.graph) : null
+            if (dbParsed) {
+              setPipelineStates(dbParsed.states)
+              setStageRoles(dbParsed.roles)
+              setStageSkills(dbParsed.skills)
+              return
             }
+            return readFile(`${projectPath}/src/pathly_data/core/flows/${getFlowYamlName(flowName)}`)
+              .then((yaml) => {
+                if (!yaml) return
+                const parsed = parseFlowStages(yaml.replace(/\r/g, ''))
+                if (!parsed) return
+                setPipelineStates(parsed.states)
+                setStageRoles(parsed.roles)
+                setStageSkills(parsed.skills)
+              })
           })
-          .catch(() => { /* flow YAML missing — FsmView uses fallback */ })
+          .catch(() => { /* neither DB nor seed available — FsmView uses default pipeline */ })
 
         const port = 8765
         const histParams = new URLSearchParams({ topic: effectiveTopic, project_root: projectPath })
@@ -226,7 +239,7 @@ export function useMonitorSession(): { effectiveTopic: string | null; showTabBar
       removeListener()
       es.close()
     }
-  }, [effectiveTopic, projectPath, setMonitorSource, setFsmState, setEvents, setPipelineStates, setActiveFlowSessions, activeTopic, setActiveMonitorTab])
+  }, [effectiveTopic, projectPath, setMonitorSource, setFsmState, setEvents, setPipelineStates, setStageRoles, setStageSkills, setActiveFlowSessions, activeTopic, setActiveMonitorTab])
 
   const effectiveTopicRef = useRef(effectiveTopic)
   effectiveTopicRef.current = effectiveTopic

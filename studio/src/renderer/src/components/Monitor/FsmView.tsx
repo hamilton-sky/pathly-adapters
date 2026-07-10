@@ -100,8 +100,10 @@ interface FsmViewProps {
 export function FsmView({ onStageClick }: FsmViewProps): JSX.Element {
   const fsmState = useStore((s) => s.fsmState)
   const pipelineStates = useStore((s) => s.pipelineStates)
+  const stageRoles = useStore((s) => s.stageRoles)
   const events = useStore((s) => s.events)
   const convLabelRef = useRef<HTMLDivElement>(null)
+  const hasRoles = Object.keys(stageRoles).length > 0
 
   useInjectCSS(PULSE_CSS)
 
@@ -109,11 +111,18 @@ export function FsmView({ onStageClick }: FsmViewProps): JSX.Element {
     convLabelRef.current?.setAttribute('aria-atomic', 'true')
   }, [])
 
-  const PIPELINE = useMemo(
-    () => (pipelineStates.length > 0 ? pipelineStates : ['STORMING', 'PLANNING', 'BUILDING', 'REVIEWING', 'DONE'])
-      .map((s) => s.replace(/^[-\s]+/, '').trim()),
-    [pipelineStates]
-  )
+  const PIPELINE = useMemo(() => {
+    const raw = (pipelineStates.length > 0
+      ? pipelineStates
+      : ['STORMING', 'PLANNING', 'BUILDING', 'REVIEWING', 'DONE']
+    ).map((s) => s.replace(/^[-\s]+/, '').trim())
+    // When the flow declares per-stage roles, drop non-agent pseudo-states
+    // (terminal failure markers like NO_DAG_SEEDED that carry no role_map entry)
+    // — always keeping DONE and the live current state so the timeline stays honest.
+    if (!hasRoles) return raw
+    const current = (fsmState?.current ?? '').toUpperCase()
+    return raw.filter((s) => s in stageRoles || s === 'DONE' || s === current)
+  }, [pipelineStates, stageRoles, hasRoles, fsmState])
 
   const retryMap = useMemo(() => {
     const map: Record<string, number> = {}
@@ -144,10 +153,13 @@ export function FsmView({ onStageClick }: FsmViewProps): JSX.Element {
 
   return (
     <div className={styles.fsmRoot}>
-      <div ref={convLabelRef} aria-live="polite" className={styles.fsmConvLabel}>
-        {convNum != null
-          ? `${convLabel} ${convNum} · ${doneCount} done · ${remainingCount} remaining`
-          : `${doneCount} done · ${remainingCount} remaining`}
+      <div className={styles.fsmHeader}>
+        <span className={styles.fsmSectionLabel}>Pipeline</span>
+        <div ref={convLabelRef} aria-live="polite" className={styles.fsmConvLabel}>
+          {convNum != null
+            ? `${convLabel} ${convNum} · ${doneCount} done · ${remainingCount} remaining`
+            : `${doneCount} done · ${remainingCount} remaining`}
+        </div>
       </div>
 
       <div
@@ -180,7 +192,7 @@ export function FsmView({ onStageClick }: FsmViewProps): JSX.Element {
                 <span className={`${styles.fsmStepLabel} ${labelClass(status)}`}>
                   {state}
                 </span>
-                <span className={styles.fsmStepAgent}>{STAGE_AGENTS[state] ?? ''}</span>
+                <span className={styles.fsmStepAgent}>{(hasRoles ? stageRoles[state] : STAGE_AGENTS[state]) ?? ''}</span>
                 {status === 'active-retry' && retryCount > 0 && (
                   <span className={styles.fsmRetryBadge}>↩{retryCount}</span>
                 )}

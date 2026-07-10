@@ -87,7 +87,7 @@ This guarantees the new server always starts, even against old server versions t
 **Sidebar collapse/expand** lives inside the sidebar, not the topbar:
 - `TabBar` (`sidebar/shell/TabBar.tsx`) — renders WORKSPACE / LIBRARY tabs plus a `PanelLeft` collapse button at the right of the tab bar.
 - `IconStrip` (`sidebar/shell/IconStrip.tsx`) — the collapsed sidebar; shows a `PanelLeft` expand button at the top plus icon shortcuts mirroring the six PANELS entries (Markdown Editor uses `FileText` here to avoid clashing with Library's `BookOpen`).
-- `BottomNav` (`sidebar/shell/BottomNav.tsx`) — the **PANELS** nav, pinned at the foot of the sidebar above `BrightskyProfile` and **outside** the scrolling `treeContainer` so it never scrolls away and is identical in the Workspace and Library tabs. Lists all six panels: Command Center, Monitor, DB Explorer, Markdown Editor, Canvas, Settings. Canvas restores the last-used flow via `openCanvas` in `Sidebar.tsx`.
+- `BottomNav` (`sidebar/shell/BottomNav.tsx`) — the **PANELS** nav, pinned at the foot of the sidebar above `BrightskyProfile` and **outside** the scrolling `treeContainer` so it never scrolls away and is identical in the Workspace and Library tabs. Lists all six panels: Command Center, Pipeline (flow stepper + stage config; internal panel id is still `monitor`, e.g. `sidebar-nav-monitor`), DB Explorer, Markdown Editor, Canvas, Settings. Canvas restores the last-used flow via `openCanvas` in `Sidebar.tsx`.
 
 ## CLI-engine spawn scheduler (`src/main/ipc/terminal.ts`)
 

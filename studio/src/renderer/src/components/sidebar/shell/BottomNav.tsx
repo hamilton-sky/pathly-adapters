@@ -46,7 +46,7 @@ export function BottomNav({
         onClick={onMonitor}
       >
         <span className={styles.bottomIcon}><span className={styles.monitorDot} /></span>
-        <span className={styles.bottomLabel}>Monitor</span>
+        <span className={styles.bottomLabel}>Pipeline</span>
       </button>
 
       <button
