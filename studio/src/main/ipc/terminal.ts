@@ -567,7 +567,12 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
         cols: 80,
         rows: 24,
         cwd: cwd,
-        env: process.env as Record<string, string>,
+        // Export PATHLY_PROJECT_ROOT so the stop hook (which runs as a child of this
+        // agent PTY) can find the active feature in the DB and write the BILLING_UPDATE.
+        // Without it, stop_telemetry.py hits `if not project_root: sys.exit(0)` and
+        // in-app COST silently stays blank. cwd IS the project root (validated above);
+        // the hook forward-slash-normalizes it, matching the stored fsm_events key.
+        env: { ...process.env, PATHLY_PROJECT_ROOT: cwd } as Record<string, string>,
       })
     } catch (e) {
       console.error('[spawn] pty.spawn FAILED', tabId, 'shell=' + shell, 'args=' + JSON.stringify(shellArgs).slice(0, 200), '→', (e as Error).message)
