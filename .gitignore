@@ -26,6 +26,12 @@ pathly/plans/**/*.db-shm
 *.db-shm
 # EVENTS.jsonl — events go to central DB; per-feature files are transient fallbacks only
 pathly/plans/**/EVENTS.jsonl
+# BOARD.json — per-board disk mirror of the DB-authoritative comms board (board disk-mirror).
+# Rewritten on every board write, so tracking it churns; the DB is the source and P2 hydration
+# rebuilds boards from these files LOCALLY (DB-loss recovery), not just on fresh clones. To ship
+# a FINISHED board with the repo (frozen → no churn), force-add it:
+#   git add -f pathly/features/<name>/BOARD.json
+pathly/**/BOARD.json
 # Transient per-file AI capture artifacts (file-based result capture, read into the DB then dead):
 #   AI Summary (.summary) · AI Split (.draft) · AI Analyze (.analysis)
 *.summary
