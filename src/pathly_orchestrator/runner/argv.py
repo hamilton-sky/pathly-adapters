@@ -12,7 +12,6 @@ from pathly_orchestrator.storage_paths import _safe_topic
 
 
 def _storage_path(flow: str, project_root: str, topic: str) -> Path:
-    topic = _safe_topic(topic)
     text = (
         files("pathly_data")
         .joinpath(f"core/flows/{flow}.flow.yaml")
@@ -20,6 +19,12 @@ def _storage_path(flow: str, project_root: str, topic: str) -> Path:
     )
     flow_config = yaml.safe_load(text)
     template = flow_config["storage_path"]
+    # A fixed storage_path (no {topic}) decouples storage from the topic — project-consultation
+    # uses a path-like project-scope topic. Only sanitize when the topic is actually a path
+    # segment; otherwise _safe_topic would reject the path-like / reserved 'project' topic.
+    if "{topic}" not in template:
+        return Path(project_root) / template
+    topic = _safe_topic(topic)
     return Path(project_root) / template.format(topic=topic)
 
 

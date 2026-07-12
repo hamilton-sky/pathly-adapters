@@ -67,8 +67,17 @@ def _load_flow(flow_name: str, project_root: str | None = None) -> dict:
 def _resolve_storage_path(
     flow_config: dict | None, project_root: str, topic: str
 ) -> Path:
-    topic = _safe_topic(topic)
     root = Path(project_root)
+    template = (flow_config or {}).get("storage_path") or "pathly/features/{topic}/"
+    # A flow with a FIXED storage_path (no {topic}) decouples storage from the topic —
+    # project-consultation's topic IS the path-like project scope (it keys the feature-count
+    # gate), pinned to pathly/project/. Return that path directly: the topic is not a path
+    # segment here, so it must NOT go through _safe_topic (which rejects a path-like / reserved
+    # 'project' topic → the "unsafe topic 'project'" failure) or the probes below (a
+    # Path-absolute topic would otherwise resolve to the project root itself).
+    if "{topic}" not in template:
+        return root / template
+    topic = _safe_topic(topic)
     for candidate in (
         root / "pathly" / "features" / topic,
         root / "pathly" / topic,
@@ -85,7 +94,6 @@ def _resolve_storage_path(
     # the otel CLI) only need "where does feature <topic> live" — not a flow template — so they get
     # the canonical flat home. The default MUST match team.flow.yaml's storage_path
     # (pathly/features/{topic}/) so a not-yet-created feature never resolves to legacy pathly/plans.
-    template = (flow_config or {}).get("storage_path") or "pathly/features/{topic}/"
     return root / template.format(topic=topic)
 
 
