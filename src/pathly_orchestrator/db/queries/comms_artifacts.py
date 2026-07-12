@@ -392,3 +392,7 @@ def update_artifact_summary(
                 (summary, artifact_id),
             )
         conn.commit()
+
+
+# insert_artifact_row lives in comms_hydrate.py (400-line cap); re-exported here.
+from .comms_hydrate import insert_artifact_row  # noqa: E402, F401

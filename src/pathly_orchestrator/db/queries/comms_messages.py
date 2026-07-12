@@ -388,3 +388,7 @@ def update_message_text(conn: sqlite3.Connection, message_id: str, text: str) ->
         )
         conn.commit()
     return "updated"
+
+
+# insert_message_row lives in comms_hydrate.py (400-line cap); re-exported here.
+from .comms_hydrate import insert_message_row  # noqa: E402, F401

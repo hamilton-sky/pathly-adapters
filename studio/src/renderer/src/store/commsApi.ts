@@ -697,6 +697,28 @@ export async function apiStopGoal(goalId: string): Promise<boolean> {
   }
 }
 
+/**
+ * Hydrate a project's on-disk BOARD.json mirrors back into the DB (board disk-mirror
+ * P2 — the fresh-clone story). Best-effort and DB-authoritative: it no-ops for any
+ * board that already has rows, so it's safe to call on every project open. Returns the
+ * hydrated/skipped scopes, or null on failure.
+ */
+export async function apiHydrateBoards(
+  projectRoot: string,
+): Promise<{ hydrated: string[]; skipped: string[] } | null> {
+  try {
+    const r = await apiFetch('/comms/hydrate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project_root: projectRoot }),
+    })
+    if (!r.ok) return null
+    return await r.json() as { hydrated: string[]; skipped: string[] }
+  } catch {
+    return null
+  }
+}
+
 // ── Board-scoped flow run (footer launcher → /runner/start) ──────────
 
 export interface StartFlowOpts {

@@ -4,6 +4,7 @@ import { MAX_SECTIONS } from './types'
 import { useCommsStore, type GlobalSearchHit } from '../../store/commsStore'
 import { useCommandCenterStore } from '../../store/commandCenterStore'
 import { useProjectStore } from '../../store/projectStore'
+import { apiHydrateBoards } from '../../store/commsApi'
 import { useSectionResize } from './hooks/useSectionResize'
 import { CommandCenterHeader } from './CommandCenterHeader/CommandCenterHeader'
 import { FeatureSidebar } from './FeatureSidebar/FeatureSidebar'
@@ -85,6 +86,10 @@ export function CommandCenter() {
 
   useEffect(() => {
     if (!projectPath) return
+    // Board disk-mirror P2: hydrate any on-disk BOARD.json mirrors into the DB (fresh
+    // clone). Best-effort + DB-authoritative (no-ops when a board already has rows), so
+    // it's safe once per project open; boards pick up hydrated rows on their next poll.
+    void apiHydrateBoards(projectPath.replace(/\\/g, '/').replace(/\/$/, ''))
     void store.loadFeatures(projectPath)
     // The features list (stages, blocked status, newly-created features) has no live
     // push channel — refresh it periodically so the sidebar/cards don't go stale

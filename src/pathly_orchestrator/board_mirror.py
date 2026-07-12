@@ -266,3 +266,9 @@ def mark_board_dirty_by_scope(scope: str) -> None:
         mark_board_dirty(board_from_scope(scope), scope)
     except Exception:
         logger.debug("mark_board_dirty_by_scope failed scope=%s", scope, exc_info=True)
+
+
+# ── Hydration: import BOARD.json mirrors back into the DB (P2) ──────────────────
+# hydrate_board/hydrate_project live in board_mirror_hydrate.py (keeps this file under
+# the project's 400-line cap); re-exported here for the conventional import path.
+from .board_mirror_hydrate import hydrate_board, hydrate_project  # noqa: E402, F401

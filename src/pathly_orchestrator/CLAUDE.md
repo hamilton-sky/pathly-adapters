@@ -92,6 +92,7 @@ GET  /comms/goals/refs-coverage ← per-goal context_refs coverage stats
 POST /comms/features/decompose ← decompose a feature board into a goal task-DAG (feature-consultation flow)
 POST /comms/project/decompose  ← decompose a project spec into a feature set + scaffold pathly/features/<slug>/ (project-consultation flow)
 POST /comms/consolidate     ← memory consolidation: near-dup dedup; mode=full adds the reflection pass
+POST /comms/hydrate         ← board disk-mirror: import a project's on-disk BOARD.json mirrors into the DB (fresh-clone; DB-authoritative, no-ops non-empty boards)
 GET  /events/comms          ← SSE stream of comms board updates (streams blueprint)
 ```
 
