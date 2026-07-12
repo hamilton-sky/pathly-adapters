@@ -146,7 +146,13 @@ def _log_query(
 
     Makes code lookups shared board context. Never raises — a logging failure
     must not break the gateway response (the never-500 contract).
+
+    Skips non-board sentinel scopes — an empty scope, or a parenthesized marker like
+    "(interactive)" (the main assistant's ad-hoc queries) — so exploratory lookups don't
+    post noise; only real feature/goal scopes become shared board context.
     """
+    if not scope or not scope.strip() or scope.strip().startswith("("):
+        return
     try:
         from pathly_orchestrator.db.connection import get_db
         from pathly_orchestrator.db.queries.comms import post_message

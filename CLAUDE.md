@@ -149,8 +149,9 @@ pathly-setup claude --apply --repair  # update already-installed files (fragment
 
 Understanding code structure or finding code (who calls X, a file's symbols, blast radius)?
 Query **Pathly's `/code/query` proxy** first, not raw Grep — it's the same path Pathly's
-agents use: it **self-heals the graph index** (re-indexes on demand), caches, and logs the
-query to the board.
+agents use: it **self-heals the graph index** (re-indexes on demand), caches, and logs real
+queries to the board as shared context. Use a **parenthesized `scope` like `(interactive)`**
+for ad-hoc exploration — those are NOT board-logged, so they add no board noise.
 
 ```bash
 # TARGET must be a FILE PATH (the graph is keyed by file — a bare symbol name misses).
