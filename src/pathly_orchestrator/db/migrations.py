@@ -370,3 +370,13 @@ END;
         backfill_invocations_from_events(conn)
     except Exception:
         pass
+    # board-disk-mirror P0: idempotent startup pass that exports every known project's
+    # comms boards to BOARD.json on disk (pure export; never mutates the DB). Same
+    # lazy-import + best-effort pattern as the invocation-projection backfill above —
+    # a mirror-write failure must never block DB startup.
+    try:
+        from pathly_orchestrator.board_mirror import backfill_board_mirrors
+
+        backfill_board_mirrors(conn)
+    except Exception:
+        pass

@@ -174,6 +174,19 @@ def get_messages(
     return merged
 
 
+def get_all_messages(conn: sqlite3.Connection, board: str, scope: str) -> list[dict]:
+    """Return EVERY non-deleted message for (board, scope) — no LIMIT, stable-sorted by
+    (ts, id) ascending. Used by the board disk-mirror exporter, which must snapshot the
+    entire live board (not a windowed feed) in a deterministic order for clean git diffs.
+    """
+    rows = conn.execute(
+        "SELECT * FROM comms_messages WHERE board=? AND scope=? AND deleted_at IS NULL "
+        "ORDER BY ts ASC, id ASC",
+        (board, scope),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
 def get_pending_decisions(
     conn: sqlite3.Connection,
     boards: list[str],

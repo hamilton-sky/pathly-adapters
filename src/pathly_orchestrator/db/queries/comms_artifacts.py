@@ -84,6 +84,24 @@ def list_artifacts_for_message(conn: sqlite3.Connection, message_id: str) -> lis
     return [dict(r) for r in rows]
 
 
+def list_artifacts_for_messages(
+    conn: sqlite3.Connection, message_ids: list[str]
+) -> list[dict]:
+    """Return every comms_artifacts row linked to any of *message_ids*, stable-sorted by
+    (created_at, id). Used by the board disk-mirror exporter to pull the full artifact
+    metadata set for a board snapshot in one query instead of N per-message lookups.
+    """
+    if not message_ids:
+        return []
+    ph = ",".join("?" * len(message_ids))
+    rows = conn.execute(
+        f"SELECT * FROM comms_artifacts WHERE message_id IN ({ph}) "  # nosec B608
+        "ORDER BY created_at ASC, id ASC",
+        message_ids,
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
 def reindex_artifact_sections(
     conn: sqlite3.Connection,
     artifact_id: str,
