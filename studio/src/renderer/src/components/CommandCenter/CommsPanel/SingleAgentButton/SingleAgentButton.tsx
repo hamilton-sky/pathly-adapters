@@ -42,6 +42,11 @@ export function SingleAgentButton({ boardKey, onRun, onRunFlow }: Props): JSX.El
   const runState: RunState = (boardRunState[boardKey] as RunState | undefined) ?? 'idle'
   const running = runState === 'running'
   const progress = useElapsedProgress(boardRunStart[boardKey] || undefined)
+  // Flow runs go through /runner/start with topic=boardKey, which resolves a feature
+  // storage dir (pathly/features/<topic>/) via _safe_topic — and that REJECTS the
+  // reserved 'project'/'global' scopes. So the Flow tab is offered on feature boards
+  // only; project/global boards get single-agent runs alone.
+  const isFeature = boardKey !== 'project' && boardKey !== 'global'
 
   function backdrop(e: MouseEvent<HTMLDivElement>): void {
     if (e.target === e.currentTarget) setOpen(false)
@@ -73,30 +78,32 @@ export function SingleAgentButton({ boardKey, onRun, onRunFlow }: Props): JSX.El
               </button>
             </header>
 
-            <div className={s.tabRow} role="tablist" aria-label="Run mode">
-              <button
-                type="button"
-                className={s.tab}
-                role="tab"
-                {...(mode === 'agent' ? { 'data-on': '', 'aria-selected': 'true' } : { 'aria-selected': 'false' })}
-                onClick={() => setMode('agent')}
-              >
-                <Bot size={13} /> Single agent
-              </button>
-              <button
-                type="button"
-                className={s.tab}
-                role="tab"
-                {...(mode === 'flow' ? { 'data-on': '', 'aria-selected': 'true' } : { 'aria-selected': 'false' })}
-                onClick={() => setMode('flow')}
-              >
-                <GitBranch size={13} /> Flow
-              </button>
-            </div>
+            {isFeature && (
+              <div className={s.tabRow} role="tablist" aria-label="Run mode">
+                <button
+                  type="button"
+                  className={s.tab}
+                  role="tab"
+                  {...(mode === 'agent' ? { 'data-on': '', 'aria-selected': 'true' } : { 'aria-selected': 'false' })}
+                  onClick={() => setMode('agent')}
+                >
+                  <Bot size={13} /> Single agent
+                </button>
+                <button
+                  type="button"
+                  className={s.tab}
+                  role="tab"
+                  {...(mode === 'flow' ? { 'data-on': '', 'aria-selected': 'true' } : { 'aria-selected': 'false' })}
+                  onClick={() => setMode('flow')}
+                >
+                  <GitBranch size={13} /> Flow
+                </button>
+              </div>
+            )}
 
-            {mode === 'agent'
-              ? <AgentForm running={running} onRun={onRun} onClose={close} />
-              : <FlowForm running={running} onRunFlow={onRunFlow} onClose={close} />}
+            {isFeature && mode === 'flow'
+              ? <FlowForm running={running} onRunFlow={onRunFlow} onClose={close} />
+              : <AgentForm running={running} onRun={onRun} onClose={close} />}
           </div>
         </div>,
         document.body,
