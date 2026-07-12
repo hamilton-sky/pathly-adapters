@@ -27,6 +27,7 @@ export interface CommandCenterActions {
   removeFeatureTab: (featureId: string) => void
   addAnySection: () => void
   setMainFeature: (fid: string) => void
+  syncToFeatures: (validIds: string[], preferred?: string) => void
   openFeatureFromRail: (fid: string) => void
   openNewFeature: (fid: string) => void
   toggleOpenFeature: (fid: string) => void
@@ -118,6 +119,51 @@ export const useCommandCenterStore = create<CommandCenterStore>()(
           const newSections = !inSections && newTabs.includes(fid) && s.sections.length < MAX_SECTIONS
             ? [...s.sections, mkFeature(fid)] : s.sections
           return { ...s, mainFeature: fid, featureTabs: newTabs, sections: newSections }
+        })
+      },
+
+      // Reconcile the open board layout with the active project's feature set.
+      // Called whenever the features list changes — critically on a PROJECT SWITCH,
+      // where the previously-open feature tabs/sections belong to the old project and
+      // must not linger (feature boards are keyed by feature id alone, so a stale tab
+      // would keep showing the old project's board). Feature tabs/sections whose id
+      // isn't in `validIds` are dropped; mainFeature/openFeature are re-seeded to a
+      // valid feature only when the current one is gone (so a user's arrangement on
+      // the same project is preserved across refreshes). Project/Global sections are
+      // project-agnostic and left untouched.
+      syncToFeatures: (validIds, preferred) => {
+        set((s) => {
+          const valid = new Set(validIds)
+          const featureTabs = s.featureTabs.filter((fid) => valid.has(fid))
+          let sections = s.sections.filter((sec) => sec.scope !== 'feature' || valid.has(sec.featureId))
+
+          let mainFeature = s.mainFeature
+          let tabs = featureTabs
+          if (!valid.has(mainFeature)) {
+            // Current main is gone (project switch, or it was archived) — re-seed to a
+            // valid feature and surface it, or clear when the project has none.
+            mainFeature = preferred && valid.has(preferred) ? preferred : (featureTabs[0] ?? validIds[0] ?? '')
+            if (mainFeature) {
+              if (!tabs.includes(mainFeature)) tabs = [...tabs, mainFeature]
+              if (!sections.some((sec) => sec.scope === 'feature' && sec.featureId === mainFeature)
+                  && sections.length < MAX_SECTIONS) {
+                sections = [...sections, mkFeature(mainFeature)]
+              }
+            }
+          }
+
+          // Keep a collapsed rail (openFeature === null) collapsed; only re-seed an
+          // openFeature that pointed at a now-missing feature.
+          const openFeature = s.openFeature === null || valid.has(s.openFeature)
+            ? s.openFeature
+            : (mainFeature || null)
+
+          // No-op guard: this runs on every features refresh — skip the state update
+          // (and its store-wide re-render) when the reconciled layout is unchanged.
+          const tabsSame = tabs.length === s.featureTabs.length && tabs.every((t, i) => t === s.featureTabs[i])
+          const secsSame = sections.length === s.sections.length && sections.every((sec, i) => sec.id === s.sections[i].id)
+          if (tabsSame && secsSame && mainFeature === s.mainFeature && openFeature === s.openFeature) return s
+          return { ...s, featureTabs: tabs, sections, mainFeature, openFeature }
         })
       },
 

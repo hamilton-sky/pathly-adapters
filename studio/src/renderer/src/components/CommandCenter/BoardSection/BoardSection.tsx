@@ -29,19 +29,25 @@ function getSectionFlex(props: BoardSectionProps): string {
   return '1 1 0'
 }
 
-function getBoardName(section: SectionDef): string {
+function getBoardName(section: SectionDef, projectName: string): string {
   if (section.scope === 'feature') return section.featureId
-  if (section.scope === 'project') return 'pathly-adapters'
+  if (section.scope === 'project') return projectName
   return 'all projects · all features'
 }
 
 export function BoardSection(props: BoardSectionProps) {
   const { section, mainFeature, onClose } = props
   const projectPath = useProjectStore((st) => st.projectPath)
+  const projects = useProjectStore((st) => st.projects)
   const sc = SCOPES[section.scope]
   const flexValue = getSectionFlex(props)
   const panelFeature = section.scope === 'feature' ? section.featureId : mainFeature
-  const boardName = getBoardName(section)
+  // Resolve the project's display name the same way the topbar ProjectSelector does,
+  // so the PROJECT board header tracks the active project instead of a hardcoded name.
+  const projectName =
+    projects.find((p) => p.path === projectPath)?.name
+    ?? (projectPath.split(/[/\\]/).filter(Boolean).pop() || 'project')
+  const boardName = getBoardName(section, projectName)
 
   // Tear this board off into its own window: open the pop-out (it reconnects to
   // the same local Pathly server independently, so it stays live), then hide the

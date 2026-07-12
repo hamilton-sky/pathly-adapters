@@ -92,14 +92,14 @@ export function CommandCenter() {
     return () => window.clearInterval(id)
   }, [projectPath, store.loadFeatures])
 
+  // Reconcile the open board layout whenever the active project's feature set
+  // changes — critically on a project switch, so feature tabs/sections from the
+  // previous project don't linger (they'd keep showing that project's board while a
+  // different project is selected). Prunes to valid features and re-seeds mainFeature
+  // (preferring activeTopic), or clears the feature area when the project has none.
   useEffect(() => {
-    if (store.features.length === 0) return
-    if (store.features.some((f) => f.id === cc.mainFeature)) return
-    const next = activeTopic && store.features.some((f) => f.id === activeTopic)
-      ? activeTopic
-      : store.features[0].id
-    cc.setMainFeature(next)
-  }, [store.features, cc.mainFeature, activeTopic, cc.setMainFeature])
+    cc.syncToFeatures(store.features.map((f) => f.id), activeTopic ?? undefined)
+  }, [store.features, activeTopic, cc.syncToFeatures])
 
   return (
     <div className={s.cc}>
