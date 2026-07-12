@@ -17,8 +17,10 @@ export const fsmPing         = (): Promise<boolean>                             
 export const watchStart      = (projectPath: string, topic: string): Promise<void>                           => window.pathly.watch.start(projectPath, topic)
 export const onWatchEvent    = (cb: (data: { path: string; content: string }) => void): (() => void)         => window.pathly.watch.onEvent(cb)
 
-/** Directories a fresh Pathly workspace ships with. */
-const PATHLY_SCAFFOLD_DIRS = ['features', 'debugs', 'explorations', 'lessons']
+/** Directories a fresh Pathly workspace ships with. `project` is the PROJECT-scope
+ *  home (its board's artifacts land in pathly/project/artifacts/), so it's scaffolded
+ *  up front like `features` rather than appearing only on first project artifact. */
+const PATHLY_SCAFFOLD_DIRS = ['features', 'project', 'debugs', 'explorations', 'lessons']
 
 /**
  * Ensure a picked folder is a Pathly workspace: if it has no pathly/ directory,
