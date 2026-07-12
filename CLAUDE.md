@@ -145,6 +145,34 @@ pathly-setup claude --apply --repair  # update already-installed files (fragment
 
 ---
 
+## Code intelligence — query through Pathly
+
+Understanding code structure or finding code (who calls X, a file's symbols, blast radius)?
+Query **Pathly's `/code/query` proxy** first, not raw Grep — it's the same path Pathly's
+agents use: it **self-heals the graph index** (re-indexes on demand), caches, and logs the
+query to the board.
+
+```bash
+# TARGET must be a FILE PATH (the graph is keyed by file — a bare symbol name misses).
+# op ∈ impact | callers | chain | context | symbol | pattern ; role=architect → full tier.
+curl -s -X POST http://127.0.0.1:8765/code/query -H 'Content-Type: application/json' \
+ -d '{"op":"impact","target":"src/pathly_orchestrator/http_server/sse.py","role":"architect","project_root":"<repo-root>","scope":"(interactive)"}'
+```
+
+The result is an **advisory** block (symbols + caller/callee counts) that says *"verify
+before acting"* — the graph can lag recent edits, so confirm against live code (Read/Grep)
+before relying on it. It returns **safe-null** (never 500s) when the FSM server is down or
+the backend is off → then just use Grep/Read. (`pathly-fsm-call code-query --op … --target …`
+is a shim, but the HTTP form passes `project_root`, which the proxy needs to resolve
+relative targets.)
+
+Backends behind the proxy (wired into agents via `src/pathly_data/adapters/*/_mcp/`):
+**codebase-memory-mcp** (whole-repo graph — breadth) + **Serena** (LSP — precise, always
+fresh; prefer it right after edits). Query those directly (`codebase-memory-mcp cli <tool> …`)
+only as a fallback when the FSM server isn't running.
+
+---
+
 ## Code architecture — SOLID rules
 
 These rules apply to all Python in `src/pathly_orchestrator/` and all TypeScript in `studio/src/`. Claude Code must enforce them when writing or reviewing code.
