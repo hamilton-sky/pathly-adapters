@@ -123,14 +123,18 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
   // Drop files onto the Artifacts view → copy each into the feature's artifacts/
   // dir (binary-safe, in-place reference would break if the original moves) → post
   // it as an artifact card. The dropped files then become board content the
-  // evaluator can read. Feature boards copy into the feature; project/global into a
-  // shared uploads dir.
+  // evaluator can read. Feature and project boards copy into their canonical scope
+  // artifacts dir (pathly/features/<feat>/artifacts, pathly/project/artifacts) so
+  // uploads sit alongside agent-produced artifacts; only the cross-project global
+  // board (no per-project home) stages into pathly/.uploads/global/.
   const handleDropFiles = async (files: File[]): Promise<void> => {
     if (!projectRoot || !files.length) return
     const params = scopeToParams(scope, boardKey)
     const base = scope === 'feature'
       ? await resolveFeaturePath(projectRoot, boardKey)
-      : `${projectRoot}/pathly/.uploads/${boardKey}`
+      : scope === 'project'
+        ? `${projectRoot}/pathly/project`
+        : `${projectRoot}/pathly/.uploads/${boardKey}`
     const dir = `${base}/artifacts`
     // Dedupe against files already in the dest dir + names taken earlier this drop.
     const taken = new Set<string>(await window.pathly.fs.list(dir).catch(() => []))
