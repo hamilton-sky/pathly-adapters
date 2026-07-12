@@ -1,5 +1,7 @@
 import { useCallback } from 'react'
 
+// Per-board width floor (px). Mirrored by `.board { min-width }` in BoardSection.module.css
+// so drag-resize and the auto-layout floor agree.
 const MIN = 220
 
 // Boards are always laid out side-by-side (row), so resizing is always horizontal —

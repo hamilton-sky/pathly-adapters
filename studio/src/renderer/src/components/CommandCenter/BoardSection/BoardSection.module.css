@@ -1,7 +1,9 @@
 .board {
   display: flex;
   flex-direction: column;
-  min-width: 0;
+  /* Floor mirrors useSectionResize MIN (220px): boards never shrink below this — the
+     .sections row scrolls horizontally once they otherwise would. */
+  min-width: 220px;
   min-height: 0;
   background: var(--bg-base);
   overflow: hidden;
