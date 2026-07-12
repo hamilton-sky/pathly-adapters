@@ -1,0 +1,5 @@
+name: designer
+description: UI/UX design intelligence agent. Generates design systems (style, palette, typography, UX rules) using UI UX Pro Max, writes DESIGN.md and DESIGN_REVIEW.md. Spawned for design system generation, UI review, component specs, and accessibility audits.
+model: gemini-2.5-flash
+tools: [Read, Glob, Grep, Write, Bash]
+can_spawn: [quick]

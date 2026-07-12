@@ -164,6 +164,7 @@ _AGENT_GROUPS = {
     "architect": "planning",
     "builder": "building",
     "designer": "building",
+    "evaluator": "research",
     "explorer": "research",
     "orchestrator": "support",
     "planner": "planning",

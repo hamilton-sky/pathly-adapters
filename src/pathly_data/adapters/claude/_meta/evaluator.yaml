@@ -1,0 +1,4 @@
+name: evaluator
+description: Board evaluation agent — reads a board's injected context, classifies its content (CODE / RESEARCH / BOTH), and produces (a) an analysis artifact posted to the board and (b) concrete next-step task posts or a recommended flow. Never executes work itself. Spawned automatically when a board has no active task and no flow selected.
+model: sonnet
+tools: [Read, Glob, Grep, Bash, Write]
