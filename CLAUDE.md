@@ -111,18 +111,19 @@ Design + phases: [pathly/features/storage-restructure/SPEC.md](pathly/features/s
 ```
 pathly/features/<name>/            FEATURE scope — team pipeline files live DIRECTLY here
   STATE.json                       current FSM state
+  BOARD.json                       comms board mirror (git-trackable; DB stays authoritative)
   EVENTS.jsonl                     append-only event log
   USER_STORIES.md                  acceptance criteria
   IMPLEMENTATION_PLAN.md           phase-by-phase plan; each phase → one board task (build work-list = board DAG)
   feedback/                        REVIEW_FAILURES.md, TEST_FAILURES.md
   goals/<slug>/                    per-goal decompose (planner/plan)
 pathly/features/.archive/<name>/   completed features (mirrors the shape above)
-pathly/project/                    PROJECT scope: artifacts/, SEQUENCING.md
+pathly/project/                    PROJECT scope: artifacts/, SEQUENCING.md, BOARD.json (board mirror)
 pathly/board-artifacts/            cross-feature board artifacts (e.g. BOARD_EVAL.md)
 pathly/lessons/                    promoted lessons (cross-feature)
 pathly/debugs/<slug>/  pathly/explorations/<slug>/   standalone (non-feature) investigations
 pathly/pipeline-walkthrough/<slug>/  point-in-time pipeline records (never sync these)
-~/.pathly/                         GLOBAL scope (cross-project): pathly.db, lessons/
+~/.pathly/                         GLOBAL scope (cross-project): pathly.db, lessons/, global/BOARD.json
 
 # Legacy, still resolved for back-compat: pathly/plans/<name>/
 ```

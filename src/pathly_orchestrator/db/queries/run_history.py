@@ -61,3 +61,18 @@ def read_run_history(
         (project_root, feature),
     ).fetchall()
     return [dict(r) for r in rows]
+
+
+def latest_project_root_for_feature(
+    conn: sqlite3.Connection, feature: str
+) -> str | None:
+    """The most-recent project_root that ran *feature*. This is the board disk-mirror's
+    ★ resolution for a feature board — its comms scope is the feature id alone, with no
+    root, so the live mirror writer reuses run_history's (project_root, feature) mapping
+    to place BOARD.json. No new column needed. None if the feature has no run history.
+    """
+    row = conn.execute(
+        "SELECT project_root FROM run_history WHERE feature=? ORDER BY id DESC LIMIT 1",
+        (feature,),
+    ).fetchone()
+    return row["project_root"] if row else None

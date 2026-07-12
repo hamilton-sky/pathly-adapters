@@ -221,3 +221,12 @@ def _broadcast_comms(scope: str, payload: dict) -> None:
                     pass
     except Exception:
         pass
+    # board-disk-mirror P1: this is the single choke point every board write calls, so
+    # queue a debounced BOARD.json rewrite for the changed scope. Best-effort + lazy
+    # import — a mirror failure must never affect the SSE broadcast.
+    try:
+        from pathly_orchestrator.board_mirror import mark_board_dirty_by_scope
+
+        mark_board_dirty_by_scope(scope)
+    except Exception:
+        pass

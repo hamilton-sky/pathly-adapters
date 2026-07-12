@@ -17,12 +17,20 @@ import json
 import logging
 import os
 import sqlite3
+import threading
+import time
 from pathlib import Path
 
+from pathly_orchestrator.db.connection import get_db
 from pathly_orchestrator.db.queries.comms_artifacts import list_artifacts_for_messages
 from pathly_orchestrator.db.queries.comms_messages import get_all_messages
+from pathly_orchestrator.db.queries.run_history import latest_project_root_for_feature
 
 logger = logging.getLogger("pathly.board_mirror")
+
+# Debounce window for the live mirror flusher — coalesces a burst of board writes
+# (e.g. a goal run posting many task updates) into a single BOARD.json rewrite.
+DEBOUNCE_SECONDS = 0.5
 
 
 def _norm_project_root(project_root: str | None) -> str | None:
@@ -54,6 +62,30 @@ def board_mirror_path(board: str, scope: str, project_root: str | None) -> Path 
     if board == "project":
         return Path(root) / "pathly" / "project" / "BOARD.json"
     return Path(root) / "pathly" / "features" / scope / "BOARD.json"
+
+
+def board_from_scope(scope: str) -> str:
+    """Derive the board kind from a DB scope string. Scope conventions: the global board
+    is the literal 'global'; a project board's scope is a normalized absolute path (has a
+    '/'); a feature board's scope is a bare slug (no '/')."""
+    if scope == "global":
+        return "global"
+    if "/" in scope:
+        return "project"
+    return "feature"
+
+
+def resolve_project_root(conn: sqlite3.Connection, board: str, scope: str) -> str | None:
+    """The project_root a (board, scope) mirror belongs to. global -> None (its mirror
+    lives in ~/.pathly, no root); project -> the scope itself (it IS the root); feature ->
+    the run_history lookup (★ — supersedes the SPEC's new-column idea; run_history already
+    maps feature->project_root). None when a feature has no run history yet: it can't be
+    placed on the live path, but the startup backfill's on-disk scan still catches it."""
+    if board == "global":
+        return None
+    if board == "project":
+        return _norm_project_root(scope)
+    return _norm_project_root(latest_project_root_for_feature(conn, scope))
 
 
 def serialize_board(conn: sqlite3.Connection, board: str, scope: str) -> dict:
@@ -88,11 +120,19 @@ def write_board_mirror(
     tmp_path = path.with_suffix(".tmp")
     try:
         snapshot = serialize_board(conn, board, scope)
-        payload = json.dumps(snapshot, indent=2, ensure_ascii=False)
+        payload = json.dumps(snapshot, indent=2, ensure_ascii=False) + "\n"
+        # Change-guard: skip the rewrite (and its git churn) when the board is byte-
+        # identical to what's already on disk. The live hook fires on transient
+        # lifecycle broadcasts too, so most flushes carry no real content change.
+        if path.exists():
+            try:
+                if path.read_text(encoding="utf-8") == payload:
+                    return True
+            except Exception:
+                pass  # unreadable existing file — fall through and rewrite it
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(tmp_path, "w", encoding="utf-8") as f:
             f.write(payload)
-            f.write("\n")
         os.replace(tmp_path, path)
         return True
     except Exception:
@@ -162,3 +202,67 @@ def backfill_board_mirrors(conn: sqlite3.Connection) -> None:
         write_board_mirror(conn, "global", "global", None)
     except Exception:
         logger.debug("backfill_board_mirrors failed", exc_info=True)
+
+
+# ── Live mirror: debounced write hook (P1) ───────────────────────────────────
+# The single hook is http_server/sse._broadcast_comms (called after every board
+# write); it calls mark_board_dirty_by_scope. A background flusher coalesces a
+# burst of writes to one board into a single BOARD.json rewrite.
+
+_dirty: set[tuple[str, str]] = set()
+_dirty_lock = threading.Lock()
+_flusher_started = False
+
+
+def flush_dirty(conn: sqlite3.Connection) -> int:
+    """Drain the dirty (board, scope) set and rewrite each board's mirror. Synchronous
+    and best-effort — the unit the background thread AND tests call. Returns the count of
+    mirrors written (a no-op change-guard hit still counts as written/True)."""
+    with _dirty_lock:
+        pending = list(_dirty)
+        _dirty.clear()
+    written = 0
+    for board, scope in pending:
+        try:
+            root = resolve_project_root(conn, board, scope)
+            if write_board_mirror(conn, board, scope, root):
+                written += 1
+        except Exception:
+            logger.debug(
+                "flush_dirty item failed board=%s scope=%s", board, scope, exc_info=True
+            )
+    return written
+
+
+def _flusher_loop() -> None:
+    """Daemon loop: every DEBOUNCE_SECONDS, flush the dirty set. Uses its OWN per-thread
+    get_db() connection (sqlite connections are check_same_thread=True — a connection from
+    another thread cannot be reused). Never dies."""
+    while True:
+        try:
+            time.sleep(DEBOUNCE_SECONDS)
+            if _dirty:
+                flush_dirty(get_db())
+        except Exception:
+            logger.debug("board-mirror flusher tick failed", exc_info=True)
+
+
+def mark_board_dirty(board: str, scope: str) -> None:
+    """Queue a board for a debounced mirror rewrite, lazily starting the flusher thread."""
+    global _flusher_started
+    with _dirty_lock:
+        _dirty.add((board, scope))
+        if not _flusher_started:
+            _flusher_started = True
+            threading.Thread(
+                target=_flusher_loop, name="board-mirror-flusher", daemon=True
+            ).start()
+
+
+def mark_board_dirty_by_scope(scope: str) -> None:
+    """Hook entry point: derive the board from the scope and queue it. Best-effort — never
+    raises into the caller (the SSE broadcast)."""
+    try:
+        mark_board_dirty(board_from_scope(scope), scope)
+    except Exception:
+        logger.debug("mark_board_dirty_by_scope failed scope=%s", scope, exc_info=True)
