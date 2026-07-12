@@ -288,7 +288,11 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
       // Feature-centric layout (storage-restructure Phase 1+): features live under
       // pathly/features/<id>/. This is what makes Phase-1 features show in the sidebar.
       const featureNames = await listDirs(`${pathlyDir}/features`).catch(() => [] as string[])
-      const featureIds = featureNames.filter((n) => n !== '.archive')
+      // Exclude structural/reserved dir names (RESERVED_TOPICS already covers '.archive')
+      // so a stray reserved-named dir under features/ — e.g. a 'project' left by a bad
+      // board write + its BOARD.json mirror — is never surfaced as a feature (its section
+      // id would collide with the literal project/global board section → duplicate React key).
+      const featureIds = featureNames.filter((n) => !RESERVED_TOPICS.has(n))
 
       // Feature-centric pathly/features/<id>/ + any new-style top-level pathly/<id>/.
       const allIds = [...new Set([...featureIds, ...newStyleIds])]

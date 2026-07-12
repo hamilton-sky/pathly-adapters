@@ -25,6 +25,7 @@ from pathly_orchestrator.db.connection import get_db
 from pathly_orchestrator.db.queries.comms_artifacts import list_artifacts_for_messages
 from pathly_orchestrator.db.queries.comms_messages import get_all_messages
 from pathly_orchestrator.db.queries.run_history import latest_project_root_for_feature
+from pathly_orchestrator.storage_paths import _RESERVED_TOPICS
 
 logger = logging.getLogger("pathly.board_mirror")
 
@@ -61,6 +62,12 @@ def board_mirror_path(board: str, scope: str, project_root: str | None) -> Path 
         return None
     if board == "project":
         return Path(root) / "pathly" / "project" / "BOARD.json"
+    # Defensive: never mirror a feature board whose scope is a reserved structural name
+    # (e.g. a stray 'project'/'global' literal from a mis-scoped write). It would create
+    # pathly/features/<reserved>/, and that dir's UI section id collides with the real
+    # project/global board section → duplicate React key → flicker.
+    if scope in _RESERVED_TOPICS:
+        return None
     return Path(root) / "pathly" / "features" / scope / "BOARD.json"
 
 
