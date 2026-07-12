@@ -70,3 +70,18 @@
   max-width: 280px;
   line-height: 1.5;
 }
+
+/* Opt-in "commit board snapshot" checkbox in the archive confirm dialog (footerSlot). */
+.archiveSnapshot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.archiveSnapshot input {
+  cursor: pointer;
+  flex-shrink: 0;
+}

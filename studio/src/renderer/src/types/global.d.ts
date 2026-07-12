@@ -212,6 +212,9 @@ declare global {
       board: {
         popout: (opts: { scope: 'feature' | 'project' | 'global'; feature: string; project: string; name: string }) => Promise<void>
       }
+      git: {
+        commitBoard: (projectPath: string, boardRelPath: string, message: string) => Promise<{ ok: boolean; committed: boolean; hash?: string; error?: string }>
+      }
       automation: {
         executeStep: (step: { type: 'click' | 'fill' | 'select' | 'navigate'; label: string; value?: string }) => Promise<{ success: boolean; tier: 1 | 2 | 3; error?: string; resolvedSelector?: string }>
       }

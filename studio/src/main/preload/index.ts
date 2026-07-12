@@ -145,6 +145,14 @@ contextBridge.exposeInMainWorld('pathly', {
     popout: (opts: { scope: string; feature: string; project: string; name: string }): Promise<void> =>
       ipcRenderer.invoke('board:popout', opts),
   },
+  git: {
+    commitBoard: (
+      projectPath: string,
+      boardRelPath: string,
+      message: string,
+    ): Promise<{ ok: boolean; committed: boolean; hash?: string; error?: string }> =>
+      ipcRenderer.invoke('git:commit-board', projectPath, boardRelPath, message),
+  },
   fs: {
     read: (path: string): Promise<string | null> => ipcRenderer.invoke('fs:read', path),
     write: (path: string, content: string): Promise<void> =>

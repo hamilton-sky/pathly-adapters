@@ -5,6 +5,7 @@ import { useCommsStore, type GlobalSearchHit } from '../../store/commsStore'
 import { useCommandCenterStore } from '../../store/commandCenterStore'
 import { useProjectStore } from '../../store/projectStore'
 import { apiHydrateBoards } from '../../store/commsApi'
+import { useToastStore } from '../../store/toastStore'
 import { useSectionResize } from './hooks/useSectionResize'
 import { CommandCenterHeader } from './CommandCenterHeader/CommandCenterHeader'
 import { FeatureSidebar } from './FeatureSidebar/FeatureSidebar'
@@ -20,6 +21,8 @@ export function CommandCenter() {
   const onResize = useSectionResize(cc.setSize)
 
   const [archivePending, setArchivePending] = useState<string | null>(null)
+  // Opt-in: also commit the archived board's frozen BOARD.json (gitignored by default).
+  const [commitSnapshot, setCommitSnapshot] = useState(false)
 
   const handleArchiveRequest = useCallback((id: string) => {
     setArchivePending(id)
@@ -27,7 +30,9 @@ export function CommandCenter() {
 
   const handleArchiveConfirm = useCallback(async () => {
     const topic = archivePending
+    const withSnapshot = commitSnapshot
     setArchivePending(null)
+    setCommitSnapshot(false)
     if (!topic || !projectPath) return
 
     // Detect whether this is a new-style (pathly/<topic>/) or feature-centric (pathly/features/<topic>/) feature.
@@ -49,7 +54,18 @@ export function CommandCenter() {
 
     // Evict the feature's tab and section from the board.
     cc.removeFeatureTab(topic)
-  }, [archivePending, projectPath, store, cc])
+
+    // Opt-in: commit the now-frozen board so it travels with the repo. BOARD.json is
+    // gitignored by default; this force-adds JUST this one file (local commit, no push).
+    if (withSnapshot) {
+      const boardRel = `${dest.slice(projectPath.length).replace(/^[\\/]/, '')}/BOARD.json`.replace(/\\/g, '/')
+      const res = await window.pathly.git.commitBoard(projectPath, boardRel, `board: archive ${topic} snapshot`)
+      const push = useToastStore.getState().push
+      if (res.ok && res.committed) push(`Committed ${topic} board snapshot · ${res.hash}`, 'success')
+      else if (res.ok) push(`Nothing to commit${res.error ? ` — ${res.error}` : ''}`, 'info')
+      else push(`Board commit failed${res.error ? ` — ${res.error}` : ''}`, 'error')
+    }
+  }, [archivePending, commitSnapshot, projectPath, store, cc])
 
   const handleCreate = useCallback(async (topic: string, description: string) => {
     if (!projectPath) return
@@ -130,7 +146,17 @@ export function CommandCenter() {
           title={<>Archive <b>{archivePending}</b>?</>}
           message="Moves the feature folder to .archive/ — recoverable by moving it back."
           confirmLabel="Archive"
-          onCancel={() => setArchivePending(null)}
+          footerSlot={
+            <label className={s.archiveSnapshot}>
+              <input
+                type="checkbox"
+                checked={commitSnapshot}
+                onChange={(e) => setCommitSnapshot(e.target.checked)}
+              />
+              Also commit this board&apos;s snapshot to git
+            </label>
+          }
+          onCancel={() => { setArchivePending(null); setCommitSnapshot(false) }}
           onConfirm={handleArchiveConfirm}
         />
       )}
