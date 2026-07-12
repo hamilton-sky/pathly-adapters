@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { CommandCenterState, Direction, SectionDef } from '../components/CommandCenter/types'
+import type { CommandCenterState, SectionDef } from '../components/CommandCenter/types'
 import { MAX_SECTIONS } from '../components/CommandCenter/types'
 
 const mkFeature = (fid: string): SectionDef => ({ id: fid, scope: 'feature', featureId: fid })
@@ -12,7 +12,6 @@ const INITIAL_FEATURE = 'send-to-agent-diff'
 const INITIAL: CommandCenterState = {
   sections: [mkFeature(INITIAL_FEATURE)],
   featureTabs: [INITIAL_FEATURE],
-  direction: 'row',
   preset: 'pipeline',
   mainFeature: INITIAL_FEATURE,
   sidebarCollapsed: false,
@@ -27,7 +26,6 @@ export interface CommandCenterActions {
   toggleFeatureSection: (featureId: string) => void
   removeFeatureTab: (featureId: string) => void
   addAnySection: () => void
-  toggleDirection: () => void
   setMainFeature: (fid: string) => void
   openFeatureFromRail: (fid: string) => void
   openNewFeature: (fid: string) => void
@@ -49,7 +47,7 @@ export const useCommandCenterStore = create<CommandCenterStore>()(
           const sections: SectionDef[] = preset === 'board'
             ? [GLOBAL_SEC, PROJECT_SEC, mkFeature(fid)]
             : [mkFeature(fid)]
-          return { ...s, sections, direction: 'row' as Direction, sidebarCollapsed: preset === 'focus', preset, sizes: {} }
+          return { ...s, sections, sidebarCollapsed: preset === 'focus', preset, sizes: {} }
         })
       },
 
@@ -109,10 +107,6 @@ export const useCommandCenterStore = create<CommandCenterStore>()(
           }
           return s
         })
-      },
-
-      toggleDirection: () => {
-        set((s) => ({ ...s, direction: (s.direction === 'row' ? 'column' : 'row') as Direction, sizes: {} }))
       },
 
       setMainFeature: (fid) => {

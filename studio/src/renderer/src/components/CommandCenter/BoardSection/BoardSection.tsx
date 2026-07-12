@@ -1,6 +1,6 @@
 import React from 'react'
 import { GitBranch, Folder, Globe, X, ExternalLink } from 'lucide-react'
-import type { BoardScope, Preset, Direction, SectionDef } from '../types'
+import type { BoardScope, Preset, SectionDef } from '../types'
 import { SCOPES } from '../constants'
 import { CommsPanel } from '../CommsPanel/CommsPanel/CommsPanel'
 import { useProjectStore } from '../../../store/projectStore'
@@ -11,7 +11,6 @@ export interface BoardSectionProps {
   section: SectionDef
   mainFeature: string
   preset: Preset
-  direction: Direction
   size?: number
   onClose: () => void
 }
@@ -26,7 +25,7 @@ const BOARD_WEIGHT: Record<BoardScope, number> = { feature: 50, project: 30, glo
 
 function getSectionFlex(props: BoardSectionProps): string {
   if (props.size) return `0 0 ${props.size}px`
-  if (props.preset === 'board' && props.direction === 'row') return `${BOARD_WEIGHT[props.section.scope]} 1 0`
+  if (props.preset === 'board') return `${BOARD_WEIGHT[props.section.scope]} 1 0`
   return '1 1 0'
 }
 

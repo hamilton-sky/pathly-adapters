@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { GitBranch, Folder, Globe, Plus, Columns2, List, LayoutGrid, ChevronDown, Check, X, Sparkles } from 'lucide-react'
-import type { BoardScope, Direction, Preset, SectionDef } from '../types'
+import { GitBranch, Folder, Globe, Plus, LayoutGrid, ChevronDown, Check, X, Sparkles } from 'lucide-react'
+import type { BoardScope, Preset, SectionDef } from '../types'
 import { SCOPES } from '../constants'
 import { Tooltip, CreatePopover, slugify } from '../../ui'
 import { GlobalSearch } from '../GlobalSearch/GlobalSearch'
@@ -11,7 +11,6 @@ export interface CommandCenterHeaderProps {
   sections: SectionDef[]
   featureTabs: string[]
   preset: Preset
-  direction: Direction
   mainFeature: string
   featurePending: number
   atCap: boolean
@@ -19,7 +18,6 @@ export interface CommandCenterHeaderProps {
   onToggleFeatureSection: (fid: string) => void
   onRemoveFeatureTab: (fid: string) => void
   onAddSection: () => void
-  onToggleDirection: () => void
   onApplyPreset: (preset: 'board' | 'pipeline' | 'focus') => void
   onCreateFeature: (topic: string, description: string) => void
   /** Navigate to a global-search hit's board and flash the matched message. */
@@ -48,13 +46,13 @@ export function CommandCenterHeader(p: CommandCenterHeaderProps): JSX.Element {
   const checkCompact = useCallback(() => {
     const el = headRef.current
     if (!el) return
-    // Brand ~190px + headRight (search icon ~34 + New feature ~120 + dirPill ~130 ≈ 315,
-    // or ~135 without the pill) + gaps 30px + ~122px per tab. headRight collapses to icons
-    // past this point (data-compact), so this is the labels-shown width we size against.
-    const headRightPx = p.sections.length >= 2 ? 315 : 135
+    // Brand ~220px + headRight (search icon ~34 + New feature icon ~34 + Presets ~110) + gaps
+    // ~30px + ~122px per tab. Presets collapses to an icon past this point (data-compact), so
+    // this is the labels-shown width we size against.
+    const headRightPx = 200
     const needed = 220 + headRightPx + (2 + p.featureTabs.length) * 122
     setCompact(el.offsetWidth < needed)
-  }, [p.featureTabs.length, p.sections.length])
+  }, [p.featureTabs.length])
 
   useEffect(() => {
     const obs = new ResizeObserver(checkCompact)
@@ -98,7 +96,6 @@ export function CommandCenterHeader(p: CommandCenterHeaderProps): JSX.Element {
           >
             {SCOPE_ICONS['global']}
             <span className={s.tabLabel}>{SCOPES['global'].label}</span>
-            <span className={s.st}>{globalOn ? '●' : '○'}</span>
           </button>
         </Tooltip>
 
@@ -117,7 +114,6 @@ export function CommandCenterHeader(p: CommandCenterHeaderProps): JSX.Element {
           >
             {SCOPE_ICONS['project']}
             <span className={s.tabLabel}>{SCOPES['project'].label}</span>
-            <span className={s.st}>{projectOn ? '●' : '○'}</span>
           </button>
         </Tooltip>
 
@@ -146,7 +142,6 @@ export function CommandCenterHeader(p: CommandCenterHeaderProps): JSX.Element {
                 >
                   <GitBranch size={13} />
                   <span className={s.tabLabel}>{fid}</span>
-                  <span className={s.st}>{isActive ? '●' : '○'}</span>
                   {pend > 0 && <span className={`${s.badge} ${s.msg}`}>{pend}</span>}
                 </button>
               </Tooltip>
@@ -190,7 +185,6 @@ export function CommandCenterHeader(p: CommandCenterHeaderProps): JSX.Element {
             onClick={() => setShowNewFeature(true)}
           >
             <Sparkles size={13} />
-            <span className={s.tabLabel}>New feature</span>
           </button>
         </Tooltip>
         {showNewFeature && (
@@ -207,30 +201,6 @@ export function CommandCenterHeader(p: CommandCenterHeaderProps): JSX.Element {
           />
         )}
 
-        {p.sections.length >= 2 && (
-          <div className={s.dirPill}>
-            <button
-              type="button"
-              className={s.dirOpt}
-              {...(p.direction === 'column' ? { 'data-active': '' } : {})}
-              {...(p.direction === 'column' ? { 'aria-pressed': 'true' } : { 'aria-pressed': 'false' })}
-              title="Stacked layout"
-              onClick={() => p.direction !== 'column' && p.onToggleDirection()}
-            >
-              <List size={13} /><span className={s.dirLabel}>Stacked</span>
-            </button>
-            <button
-              type="button"
-              className={s.dirOpt}
-              {...(p.direction === 'row' ? { 'data-active': '' } : {})}
-              {...(p.direction === 'row' ? { 'aria-pressed': 'true' } : { 'aria-pressed': 'false' })}
-              title="Side by side layout"
-              onClick={() => p.direction !== 'row' && p.onToggleDirection()}
-            >
-              <Columns2 size={13} /><span className={s.dirLabel}>Side by side</span>
-            </button>
-          </div>
-        )}
         <div className={s.menuWrap}>
           <button
             type="button"

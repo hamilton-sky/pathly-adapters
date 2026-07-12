@@ -23,8 +23,6 @@
   min-height: 0;
 }
 
-.stacked { flex-direction: column; }
-
 /* Drag resize handle */
 .resize {
   flex: 0 0 5px;
@@ -34,17 +32,16 @@
   z-index: 5;
 }
 
-.stacked .resize { cursor: row-resize; flex-basis: 5px; }
-
 .resize::after {
   content: '';
   position: absolute;
   inset: 0;
   margin: auto;
+  width: 1px;
+  height: 100%;
+  background: var(--border-color);
 }
 
-.sections:not(.stacked) .resize::after { width: 1px; height: 100%; background: var(--border-color); }
-.stacked .resize::after { width: 100%; height: 1px; background: var(--border-color); }
 .resize:hover::after { background: var(--accent); }
 
 /* Empty state */

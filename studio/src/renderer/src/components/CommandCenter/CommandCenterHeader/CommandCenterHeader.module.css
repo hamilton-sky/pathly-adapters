@@ -46,9 +46,6 @@
 .tab:hover { color: var(--text-primary); border-color: var(--accent-border); }
 .tab[data-on] { background: var(--accent-bg); border-color: var(--accent-border); color: var(--accent); }
 
-.st { font-size: 9px; opacity: 0.9; }
-.tab[data-on] .st { color: var(--accent); }
-
 .add { color: var(--text-muted); background: transparent; border-style: dashed; }
 
 .badge {
@@ -89,41 +86,6 @@
 
 .exit { width: 28px; padding: 0; justify-content: center; }
 .exit:hover { color: var(--red); border-color: var(--red-border); background: var(--red-bg); }
-
-/* Segmented pill for layout direction toggle */
-.dirPill {
-  display: flex;
-  background: var(--bg-surface0);
-  border: var(--border);
-  border-radius: var(--radius-md);
-  padding: 2px;
-  gap: 1px;
-}
-
-.dirOpt {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  height: 24px;
-  padding: 0 9px;
-  border: none;
-  border-radius: calc(var(--radius-md) - 2px);
-  background: transparent;
-  color: var(--text-muted);
-  font: 500 11px/1 var(--font-family-base);
-  cursor: pointer;
-  transition: background var(--transition-fast), color var(--transition-fast);
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.dirOpt:hover:not([data-active]) { background: var(--bg-surface1); color: var(--text-primary); }
-
-.dirOpt[data-active] {
-  background: var(--accent-bg);
-  color: var(--accent);
-  cursor: default;
-}
 
 /* Presets menu */
 .menuWrap { position: relative; }
@@ -171,13 +133,12 @@
 
 .iconSpacer { width: 13px; display: inline-block; }
 
-.newFeature { color: var(--accent); border-color: var(--accent-border); }
+.newFeature { width: 28px; padding: 0; justify-content: center; color: var(--accent); border-color: var(--accent-border); }
 .newFeature:hover { background: var(--accent-bg); }
 
-/* Collapse the top-right controls (New feature, layout pill, Presets) to icon-only
-   when the header runs out of room — the same `compact` signal that collapses the
-   board tabs. Icons keep their tooltips/titles so the actions stay discoverable. */
-.headRight[data-compact] .newFeature,
+/* Collapse Presets to icon-only when the header runs out of room — the same `compact`
+   signal that collapses the board tabs. The icon keeps its tooltip so the action stays
+   discoverable. (New feature is icon-only at all widths.) */
 .headRight[data-compact] .menuWrap .ctl {
   width: 28px;
   padding: 0;
@@ -185,16 +146,9 @@
   justify-content: center;
 }
 
-.headRight[data-compact] .newFeature .tabLabel,
 .headRight[data-compact] .presetLabel,
-.headRight[data-compact] .presetChevron,
-.headRight[data-compact] .dirLabel {
+.headRight[data-compact] .presetChevron {
   display: none;
-}
-
-.headRight[data-compact] .dirOpt {
-  padding: 0 7px;
-  gap: 0;
 }
 
 .featureTab {
@@ -223,7 +177,6 @@
 
 /* Inside a shrinking feature tab, only the label compresses — glyphs stay intact */
 .tabToggle > svg,
-.featureTab .st,
 .featureTab .badge { flex-shrink: 0; }
 
 .tabLabel {
@@ -240,10 +193,6 @@
   max-width: 0;
   opacity: 0;
   margin: 0;
-}
-
-.tabs[data-compact] .st {
-  display: none;
 }
 
 .tabClose {

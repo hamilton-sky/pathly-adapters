@@ -16,7 +16,7 @@ export function CommandCenter() {
   const cc = useCommandCenterStore()
   const projectPath = useProjectStore((s) => s.projectPath)
   const activeTopic = useProjectStore((s) => s.activeTopic)
-  const onResize = useSectionResize(cc.direction, cc.setSize)
+  const onResize = useSectionResize(cc.setSize)
 
   const [archivePending, setArchivePending] = useState<string | null>(null)
 
@@ -107,7 +107,6 @@ export function CommandCenter() {
         sections={cc.sections}
         featureTabs={cc.featureTabs}
         preset={cc.preset}
-        direction={cc.direction}
         mainFeature={cc.mainFeature}
         featurePending={store.pendingCount(cc.mainFeature)}
         atCap={cc.sections.length >= MAX_SECTIONS}
@@ -115,7 +114,6 @@ export function CommandCenter() {
         onToggleFeatureSection={cc.toggleFeatureSection}
         onRemoveFeatureTab={cc.removeFeatureTab}
         onAddSection={cc.addAnySection}
-        onToggleDirection={cc.toggleDirection}
         onApplyPreset={cc.applyPreset}
         onCreateFeature={handleCreate}
         onOpenSearchResult={handleOpenSearchResult}
@@ -157,14 +155,14 @@ export function CommandCenter() {
             </div>
           </div>
         ) : (
-          <div className={`${s.sections}${cc.direction === 'column' ? ` ${s.stacked}` : ''}`}>
+          <div className={s.sections}>
             {cc.sections.map((sec, i) => (
               <React.Fragment key={sec.id}>
                 {i > 0 && (
                   <div
                     className={s.resize}
                     role="separator"
-                    {...(cc.direction === 'row' ? { 'aria-orientation': 'vertical' } : { 'aria-orientation': 'horizontal' })}
+                    aria-orientation="vertical"
                     onMouseDown={(e) => onResize(e, cc.sections[i - 1].id, sec.id)}
                   />
                 )}
@@ -172,7 +170,6 @@ export function CommandCenter() {
                   section={sec}
                   mainFeature={cc.mainFeature}
                   preset={cc.preset}
-                  direction={cc.direction}
                   size={cc.sizes[sec.id]}
                   onClose={() => {
                     if (sec.scope === 'feature') cc.toggleFeatureSection(sec.featureId)

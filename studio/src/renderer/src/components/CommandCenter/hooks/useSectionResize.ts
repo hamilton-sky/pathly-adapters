@@ -1,10 +1,10 @@
 import { useCallback } from 'react'
-import type { Direction } from '../types'
 
 const MIN = 220
 
+// Boards are always laid out side-by-side (row), so resizing is always horizontal —
+// the handle adjusts the widths of the two boards it sits between.
 export function useSectionResize(
-  direction: Direction,
   onResize: (id: string, px: number) => void,
 ) {
   return useCallback(
@@ -15,13 +15,12 @@ export function useSectionResize(
       const nextEl = handle.nextElementSibling as HTMLElement | null
       if (!prevEl || !nextEl) return
 
-      const vertical = direction === 'column'
-      const startPos = vertical ? e.clientY : e.clientX
-      const startPrev = vertical ? prevEl.offsetHeight : prevEl.offsetWidth
-      const startNext = vertical ? nextEl.offsetHeight : nextEl.offsetWidth
+      const startPos = e.clientX
+      const startPrev = prevEl.offsetWidth
+      const startNext = nextEl.offsetWidth
 
       const move = (ev: MouseEvent) => {
-        const d = (vertical ? ev.clientY : ev.clientX) - startPos
+        const d = ev.clientX - startPos
         const np = Math.max(MIN, startPrev + d)
         const nn = Math.max(MIN, startNext - d)
         prevEl.style.flex = `0 0 ${np}px`
@@ -38,8 +37,8 @@ export function useSectionResize(
 
       document.addEventListener('mousemove', move)
       document.addEventListener('mouseup', up)
-      document.body.style.cursor = vertical ? 'row-resize' : 'col-resize'
+      document.body.style.cursor = 'col-resize'
     },
-    [direction, onResize],
+    [onResize],
   )
 }

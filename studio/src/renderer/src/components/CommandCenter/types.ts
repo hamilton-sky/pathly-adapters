@@ -85,7 +85,6 @@ export interface Feature {
  *  by feature id; project/global are keyed by the literal scope name. */
 export type Boards = Record<string, Message[]>
 
-export type Direction = 'row' | 'column'
 export type Preset = 'board' | 'pipeline' | 'focus' | 'custom'
 
 export type SectionDef =
@@ -98,7 +97,6 @@ export const MAX_SECTIONS = 3
 export interface CommandCenterState {
   sections: SectionDef[]
   featureTabs: string[]
-  direction: Direction
   preset: Preset
   mainFeature: string
   sidebarCollapsed: boolean
