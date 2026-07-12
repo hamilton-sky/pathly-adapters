@@ -47,6 +47,21 @@ function storageKey(scope: BoardScope, key: string): string {
   return scope === 'feature' ? key : scope
 }
 
+// Map a board KEY (a feature id, or the literal 'project'/'global') to its backend
+// {board, scope}. The project board's DB scope is the project ROOT — what loadBoard
+// and store.post read/write with — NOT the literal 'project', which the board never
+// queries and which collides across projects in the shared central DB. Feature/global
+// keys map straight through. Centralized so this project-scope trap can't recur (it
+// already bit posts, artifact drops, and board runs separately).
+function boardParamsForKey(key: string): { board: string; scope: string } {
+  const scope: BoardScope = key !== 'project' && key !== 'global' ? 'feature' : (key as BoardScope)
+  if (scope === 'project') {
+    const root = useProjectStore.getState().projectPath.replace(/\\/g, '/').replace(/\/$/, '')
+    return scopeToParams(scope, root)
+  }
+  return scopeToParams(scope, key)
+}
+
 // One global-search result: a message plus the board it lives on, so the UI can
 // jump to that board and flash the matched message.
 export interface GlobalSearchHit {
@@ -161,9 +176,7 @@ function _stopRunWatch(key: string): void {
 
 function _startRunWatch(key: string, runId?: string): void {
   _stopRunWatch(key)
-  const isFeature = key !== 'project' && key !== 'global'
-  const scope: BoardScope = isFeature ? 'feature' : (key as BoardScope)
-  const params = scopeToParams(scope, key)
+  const params = boardParamsForKey(key)
   const id = window.setInterval(() => {
     void (async () => {
       const st = useCommsStore.getState().boardRunState[key]
@@ -207,9 +220,7 @@ function _goalBoardParams(goalId: string): { board: string; scope: string } | nu
   const boards = useCommsStore.getState().boards
   for (const [key, msgs] of Object.entries(boards)) {
     if (msgs.some((m) => m.id === goalId)) {
-      const isFeature = key !== 'project' && key !== 'global'
-      const scope: BoardScope = isFeature ? 'feature' : (key as BoardScope)
-      return scopeToParams(scope, key)
+      return boardParamsForKey(key)
     }
   }
   return null
@@ -548,8 +559,7 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
     // and the board run broadcasts TERMINAL_SPAWN to topic=<feature>. Feature boards
     // only — global/project use a topic the feature-centric activeTopic can't match.
     if (isFeature) useProjectStore.getState().setActiveTopic(key)
-    const scope: BoardScope = isFeature ? 'feature' : key as BoardScope
-    const params = scopeToParams(scope, key)
+    const params = boardParamsForKey(key)
     // Always send the project root — it's the PTY's working directory. Sending
     // undefined for feature boards meant the agent spawned with an empty cwd, which
     // fails the PTY silently (no 'started' callback → terminal_spawn_timeout).
@@ -583,8 +593,7 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
 
     const isFeature = key !== 'project' && key !== 'global'
     if (isFeature) useProjectStore.getState().setActiveTopic(key)
-    const scope: BoardScope = isFeature ? 'feature' : key as BoardScope
-    const params = scopeToParams(scope, key)
+    const params = boardParamsForKey(key)
     const projectRoot = useProjectStore.getState().projectPath.replace(/\\/g, '/').replace(/\/$/, '')
 
     apiRunBoard(params.board, params.scope, 'evaluator', { projectRoot, ...opts })
@@ -666,9 +675,7 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
 
   stopBoard: (key) => {
     _stopRunWatch(key)
-    const isFeature = key !== 'project' && key !== 'global'
-    const scope: BoardScope = isFeature ? 'feature' : key as BoardScope
-    const params = scopeToParams(scope, key)
+    const params = boardParamsForKey(key)
     set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' } }))
     void apiStopBoard(params.board, params.scope)
   },

@@ -129,7 +129,10 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
   // board (no per-project home) stages into pathly/.uploads/global/.
   const handleDropFiles = async (files: File[]): Promise<void> => {
     if (!projectRoot || !files.length) return
-    const params = scopeToParams(scope, boardKey)
+    // Project board's DB scope is the project root (what loadBoard/store.post read with),
+    // NOT the literal 'project' — posting under 'project' lands it in a scope the board
+    // never queries, so the artifact never shows. Feature/global keys are already correct.
+    const params = scopeToParams(scope, scope === 'project' ? projectRoot : boardKey)
     const base = scope === 'feature'
       ? await resolveFeaturePath(projectRoot, boardKey)
       : scope === 'project'
@@ -162,7 +165,10 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
   // their existing path as an artifact (no copy needed).
   const handleDropPaths = async (items: { path: string; name: string }[]): Promise<void> => {
     if (!items.length) return
-    const params = scopeToParams(scope, boardKey)
+    // Project board's DB scope is the project root (what loadBoard/store.post read with),
+    // NOT the literal 'project' — posting under 'project' lands it in a scope the board
+    // never queries, so the artifact never shows. Feature/global keys are already correct.
+    const params = scopeToParams(scope, scope === 'project' ? projectRoot : boardKey)
     let posted = 0
     let failed = 0
     for (const it of items) {
