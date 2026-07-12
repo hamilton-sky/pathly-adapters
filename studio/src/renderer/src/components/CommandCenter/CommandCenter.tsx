@@ -53,9 +53,10 @@ export function CommandCenter() {
   const handleCreate = useCallback(async (topic: string, description: string) => {
     if (!projectPath) return
 
-    // 1. Create the feature root at pathly/<topic>/ by writing a .keep sentinel file.
-    //    fs.write calls mkdirSync(..., { recursive: true }) in the main process.
-    await window.pathly.fs.write(`${projectPath}/pathly/${topic}/.keep`, '')
+    // 1. Create the feature root at pathly/features/<topic>/ by writing a .keep sentinel
+    //    file — the canonical feature-centric home (mirrors the FSM's default storage
+    //    template `pathly/features/{topic}/`). fs.write mkdir -p's the parent.
+    await window.pathly.fs.write(`${projectPath}/pathly/features/${topic}/.keep`, '')
 
     // 2. Reload the feature list so the new folder shows up in the sidebar.
     await store.loadFeatures(projectPath)

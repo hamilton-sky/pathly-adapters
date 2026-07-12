@@ -3,6 +3,7 @@ import { GitBranch, Folder, Globe, Plus, LayoutGrid, ChevronDown, Check, X, Spar
 import type { BoardScope, Preset, SectionDef } from '../types'
 import { SCOPES } from '../constants'
 import { Tooltip, CreatePopover, slugify } from '../../ui'
+import { RESERVED_TOPICS } from '../../../store/reservedTopics'
 import { GlobalSearch } from '../GlobalSearch/GlobalSearch'
 import type { GlobalSearchHit } from '../../../store/commsStore'
 import s from './CommandCenterHeader.module.css'
@@ -196,6 +197,7 @@ export function CommandCenterHeader(p: CommandCenterHeaderProps): JSX.Element {
             descLabel="Description"
             descPlaceholder="What is this feature about?"
             showSlug
+            validate={(slug) => (RESERVED_TOPICS.has(slug) ? `"${slug}" is a reserved name — choose another` : null)}
             onSubmit={(title, desc) => { p.onCreateFeature(slugify(title), desc); setShowNewFeature(false) }}
             onClose={() => setShowNewFeature(false)}
           />

@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { Boards, Feature, Message, BoardScope, MessageType, FeatureStatus, Stage } from '../components/CommandCenter/types'
+import { RESERVED_TOPICS } from './reservedTopics'
 import {
   fetchBoard,
   apiPost,
@@ -267,15 +268,11 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
   loadFeatures: async (projectPath: string) => {
     try {
       // New-style features live directly under pathly/<id>/. Exclude the structural
-      // container dirs (mirror _RESERVED_TOPICS in storage_paths.py) so we never surface
-      // "plans"/"features"/"goals"/… as a bogus feature card.
-      const RESERVED = new Set([
-        'features', 'project', 'plans', 'debugs', 'explorations', 'fixes',
-        'goals', 'lessons', 'board-artifacts', 'pipeline-walkthrough', '.archive',
-      ])
+      // container dirs (RESERVED_TOPICS mirrors _RESERVED_TOPICS in storage_paths.py) so we
+      // never surface "plans"/"features"/"goals"/… as a bogus feature card.
       const pathlyDir = `${projectPath}/pathly`
       const topLevelNames = await listDirs(pathlyDir).catch(() => [] as string[])
-      const newStyleIds = topLevelNames.filter((n) => !RESERVED.has(n))
+      const newStyleIds = topLevelNames.filter((n) => !RESERVED_TOPICS.has(n))
 
       // Feature-centric layout (storage-restructure Phase 1+): features live under
       // pathly/features/<id>/. This is what makes Phase-1 features show in the sidebar.

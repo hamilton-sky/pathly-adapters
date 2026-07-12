@@ -22,6 +22,9 @@ interface Props {
   /** Show a live slug-ID preview under the title (feature creation). */
   showSlug?: boolean
   submitLabel?: string
+  /** Optional validation of the effective value (the slug when showSlug, else the trimmed
+   *  title). Return an error message to block submit and show it inline, or null when valid. */
+  validate?: (value: string) => string | null
   /** Receives the raw title + description; the caller slugifies for features. */
   onSubmit: (title: string, description: string) => void
   onClose: () => void
@@ -35,14 +38,17 @@ const WIDTH = 300
 // anchor and clamped to the viewport.
 export function CreatePopover({
   anchorEl, heading, titleLabel, titlePlaceholder, descLabel, descPlaceholder,
-  showSlug = false, submitLabel = 'Create', onSubmit, onClose,
+  showSlug = false, submitLabel = 'Create', validate, onSubmit, onClose,
 }: Props): JSX.Element | null {
   const cardRef = useRef<HTMLDivElement>(null)
   const [title, setTitle] = useState('')
   const [desc, setDesc] = useState('')
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
 
-  const canCreate = (showSlug ? slugify(title).length : title.trim().length) > 0
+  // The value the caller acts on: the derived slug for feature-style forms, else the title.
+  const effective = showSlug ? slugify(title) : title.trim()
+  const validationError = validate && effective.length > 0 ? validate(effective) : null
+  const canCreate = effective.length > 0 && !validationError
 
   useLayoutEffect(() => {
     if (!anchorEl) return
@@ -94,6 +100,7 @@ export function CreatePopover({
       {showSlug && title.trim().length > 0 && (
         <p className={s.slug}>ID: <code>{slugify(title) || '…'}</code></p>
       )}
+      {validationError && <p className={s.error}>{validationError}</p>}
 
       <label className={s.label} htmlFor="cp-desc">{descLabel} <span className={s.opt}>(optional)</span></label>
       <textarea
