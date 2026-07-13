@@ -22,8 +22,8 @@ export function DockCollapsed({ engines, onExpand, onClose, onGripPointerDown }:
 
   return (
     <div className={s.dock}>
-      <div className={s.head}>
-        <span className={s.grip} onPointerDown={onGripPointerDown} aria-label="Drag">
+      <div className={s.head} onPointerDown={onGripPointerDown}>
+        <span className={s.grip} aria-label="Drag">
           <GripHorizontal size={13} />
         </span>
         <span className={s.title}>Engines</span>

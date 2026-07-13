@@ -33,6 +33,9 @@ export function useDockDrag(anchorRef: RefObject<HTMLElement>): {
   const onGripPointerDown = useCallback(
     (e: ReactPointerEvent) => {
       if (e.button !== 0) return
+      // The whole header is the drag surface — but let its buttons (open / collapse / close /
+      // expand) click through instead of starting a drag.
+      if ((e.target as HTMLElement).closest('button')) return
       e.preventDefault()
       const rect = anchorRef.current?.getBoundingClientRect()
       const init = posRef.current ?? { x: rect?.left ?? 0, y: rect?.top ?? 0 }

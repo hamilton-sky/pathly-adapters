@@ -13,7 +13,10 @@
   gap: 9px;
   padding: 10px 12px;
   border-bottom: 1px solid var(--border-color);
+  cursor: grab;
 }
+
+.head:active { cursor: grabbing; }
 
 .grip { cursor: grab; color: var(--text-muted); display: inline-flex; }
 

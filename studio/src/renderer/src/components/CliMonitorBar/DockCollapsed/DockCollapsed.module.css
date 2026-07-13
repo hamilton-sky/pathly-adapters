@@ -12,7 +12,10 @@
   align-items: center;
   gap: 9px;
   padding: 10px 12px;
+  cursor: grab;
 }
+
+.head:active { cursor: grabbing; }
 
 .grip {
   cursor: grab;
