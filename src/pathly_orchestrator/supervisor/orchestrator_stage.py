@@ -50,6 +50,35 @@ def _resolve_stage_supervised(
             {"type": "RUNNER_ERROR", "topic": topic, "message": message, "kind": reason}
         )
 
+    def _post_human_escalation(file_name: str, res: dict) -> None:
+        """Surface a headless human-checkpoint on the board as an answerable escalation.
+
+        Otherwise a human gate just fails the run silently and writes a feedback file nobody
+        sees. Best-effort (never blocks the still-failing run) and layer-legal — the supervisor
+        posts directly via db.comms_messages. Uses the question text the FSM already put in the
+        result, so no feedback-file read is needed.
+        """
+        try:
+            from pathly_orchestrator.db.connection import get_db
+            from pathly_orchestrator.db.queries.comms_messages import post_message
+
+            content = res.get("instructions") or res.get("message") or ""
+            body = f"Human checkpoint required — {file_name}"
+            if content:
+                body += f"\n\n{content}"
+            post_message(
+                get_db(),
+                board="feature",
+                scope=topic,
+                from_agent="system",
+                to_agent="human",
+                type="escalation",
+                text=body,
+                goal_id=state.goal_id or None,
+            )
+        except Exception as exc:
+            logger.warning("human escalation post failed: %s", exc)
+
     while True:
         # Abort check before each FSM call
         with _lock:
@@ -134,6 +163,7 @@ def _resolve_stage_supervised(
             file_ = result.get("file", "")
 
             if target == "human":
+                _post_human_escalation(file_, result)
                 _fail("human_checkpoint", f"Human checkpoint required: {file_}")
                 return None
 

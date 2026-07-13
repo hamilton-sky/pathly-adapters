@@ -213,7 +213,11 @@ pathly_orchestrator/
                            #   at most one worker per lane; goal_id= scopes the frontier to one goal's tasks
     isolation.py           # lane / serial isolation strategies for the frontier loop
     file_claims.py         # per-file claim tracking so parallel tasks don't collide on writes
-    artifact_reconcile.py  # reconcile board artifacts after a stage / goal run
+    artifact_reconcile.py  # after a stage/goal run: attach ARTIFACTS.jsonl outputs AND
+                           #   <storage>/feedback/*.md (HUMAN_QUESTIONS/REVIEW/TEST_FAILURES)
+                           #   to the board (idempotent). A headless human checkpoint also posts
+                           #   a type='escalation' board message (orchestrator_stage.py) so it's
+                           #   answerable instead of failing silently.
     slug.py                # scope / slug helpers for goal + board addressing
     orchestrator_stage.py  # single-stage resolution helpers split out of orchestrator.py
     board_run.py           # start_board_run: board-lock + skill compose + async spawn helper
