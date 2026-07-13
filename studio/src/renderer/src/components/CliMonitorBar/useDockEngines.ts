@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { useTerminalStore } from '../../store/terminalStore'
 import { lastNLines } from './ansiUtils'
 import { fmtElapsed } from '../shared/RunPill/progress'
-import { formatRelative } from '../../utils/timestamp'
 import { loadCaps } from './SpawnQueuePanel'
 import type { EngineAdapter, EngineCategory, EngineRole, DockEngine } from './types'
 
@@ -14,8 +13,7 @@ function toEngineAdapter(id: string): EngineAdapter {
   return 'Claude'
 }
 
-// Stable empty fallback so a spawn:state that predates queuedEngines/recentEngines (e.g. a
-// main-process build lag) can't crash the dock with `undefined.map`, and doesn't churn renders.
+// Stable empty fallback so a spawn:state that predates queuedEngines can't crash the dock.
 const EMPTY: RunningEngine[] = []
 
 function baseRow(e: RunningEngine): Omit<DockEngine, 'status' | 'elapsed' | 'sub'> {
@@ -30,13 +28,12 @@ function baseRow(e: RunningEngine): Omit<DockEngine, 'status' | 'elapsed' | 'sub
   }
 }
 
-// Engine lists for the floating dock, projected from the authoritative spawn gate:
-//  • live   = running + queued engines (every CLI, across all features — parity with the panel board)
-//  • recent = the gate's bounded history of finished engines (survives a renderer reload)
-export function useDockEngines(): { live: DockEngine[]; recent: DockEngine[] } {
+// Live engine list for the floating dock — running + queued engines (every CLI, across all
+// features — parity with the panel board), projected from the authoritative spawn gate. The RECENT
+// history is a separate, DB-backed hook (useRecentSpawns).
+export function useDockEngines(): DockEngine[] {
   const engines = useTerminalStore((s) => s.spawnQueue.engines ?? EMPTY)
   const queued = useTerminalStore((s) => s.spawnQueue.queuedEngines ?? EMPTY)
-  const recent = useTerminalStore((s) => s.spawnQueue.recentEngines ?? EMPTY)
   const scrollbackByTabId = useTerminalStore((s) => s.scrollbackByTabId)
   const tabs = useTerminalStore((s) => s.tabs)
 
@@ -57,8 +54,8 @@ export function useDockEngines(): { live: DockEngine[]; recent: DockEngine[] } {
     return () => window.clearInterval(id)
   }, [engines.length])
 
-  return useMemo(() => {
-    const live: DockEngine[] = [
+  return useMemo(
+    () => [
       ...engines.map((e) => ({
         ...baseRow(e),
         status: 'running' as const,
@@ -74,13 +71,7 @@ export function useDockEngines(): { live: DockEngine[]; recent: DockEngine[] } {
         elapsed: '-',
         sub: 'queued · waiting for a slot',
       })),
-    ]
-    const recentRows: DockEngine[] = recent.map((e) => ({
-      ...baseRow(e),
-      status: 'done' as const,
-      elapsed: e.finishedAt ? formatRelative(e.finishedAt) : '-',
-      sub: 'finished',
-    }))
-    return { live, recent: recentRows }
-  }, [engines, queued, recent, scrollbackByTabId, tabs, now])
+    ],
+    [engines, queued, scrollbackByTabId, tabs, now],
+  )
 }

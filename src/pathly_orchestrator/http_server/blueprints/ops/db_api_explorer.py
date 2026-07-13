@@ -381,3 +381,31 @@ def db_stats_trends():
     except Exception as e:
         logger.exception("db_stats_trends error")
         return jsonify({"error": str(e)}), 500
+
+
+@bp.route("/db/recent", methods=["GET"])
+def db_recent():
+    """Recent spawns — the last N agent_invocations, newest first, for the monitor's RECENT/history
+    list (DB-backed persistent history). Optional project_root scope; limit default 20, max 100."""
+    try:
+        conn = _get_db()
+        pr = _project_root_param()
+        limit = min(int(request.args.get("limit", 20)), 100)
+        query = (
+            "SELECT feature, agent_role, provider, run_id, "
+            "  COALESCE(cost_usd,0) AS cost_usd, "
+            "  (COALESCE(tokens_in,0) + COALESCE(tokens_out,0)) AS tokens, "
+            "  finished_at, started_at, scope_tier, cost_source "
+            "FROM agent_invocations"
+        )
+        params: list = []
+        if pr:
+            query += " WHERE project_root=?"
+            params.append(pr)
+        query += " ORDER BY COALESCE(finished_at, started_at) DESC, id DESC LIMIT ?"
+        params.append(limit)
+        rows = conn.execute(query, params).fetchall()
+        return jsonify([dict(r) for r in rows])
+    except Exception as e:
+        logger.exception("db_recent error")
+        return jsonify({"error": str(e)}), 500

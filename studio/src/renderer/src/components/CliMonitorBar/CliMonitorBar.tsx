@@ -4,6 +4,7 @@ import { useUiStore } from '../../store/uiStore'
 import { useStore } from '../../store'
 import { useTerminalStore } from '../../store/terminalStore'
 import { useDockEngines } from './useDockEngines'
+import { useRecentSpawns } from './useRecentSpawns'
 import { useDockDrag } from './useDockDrag'
 import { DockCollapsed } from './DockCollapsed/DockCollapsed'
 import { DockExpanded } from './DockExpanded/DockExpanded'
@@ -22,7 +23,8 @@ export function CliMonitorBar(): JSX.Element | null {
   const toggleCliMonitor = useUiStore((st) => st.toggleCliMonitor)
   const setActivePanel = useStore((st) => st.setActivePanel)
   const spawnQueue = useTerminalStore((st) => st.spawnQueue)
-  const { live: engines, recent } = useDockEngines()
+  const engines = useDockEngines()
+  const recent = useRecentSpawns()
   const [expanded, setExpanded] = useState(true)
   const [queueOpen, setQueueOpen] = useState(false)
   const anchorRef = useRef<HTMLDivElement>(null)

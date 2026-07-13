@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react'
 import type { EngineAdapter, MonitorEngine } from '../types'
 import { CATEGORY_META } from '../constants'
 import { CategoryFilterBar, type CategoryFilter } from '../CategoryFilterBar/CategoryFilterBar'
+import { ScopeFilter } from '../ScopeFilter/ScopeFilter'
 import { EngineSection } from '../EngineSection/EngineSection'
 import { EngineDetailModal } from '../EngineDetailModal/EngineDetailModal'
 import s from './MonitorBoard.module.css'
@@ -19,6 +20,7 @@ interface Props {
 export function MonitorBoard({ engines, onAction }: Props): JSX.Element {
   const [category, setCategory] = useState<CategoryFilter>('all')
   const [adapter, setAdapter] = useState<EngineAdapter | null>(null)
+  const [scope, setScope] = useState<string | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
 
   const counts = useMemo(() => {
@@ -27,9 +29,19 @@ export function MonitorBoard({ engines, onAction }: Props): JSX.Element {
     return c
   }, [engines])
 
+  const scopes = useMemo(
+    () => Array.from(new Set(engines.map((e) => e.feature))).sort(),
+    [engines],
+  )
+
   const filtered = useMemo(
-    () => engines.filter((e) => adapter === null || e.adapter === adapter),
-    [engines, adapter],
+    () =>
+      engines.filter(
+        (e) =>
+          (adapter === null || e.adapter === adapter) &&
+          (scope === null || e.feature === scope),
+      ),
+    [engines, adapter, scope],
   )
 
   const running = useMemo(() => engines.filter((e) => e.status === 'running').length, [engines])
@@ -64,6 +76,8 @@ export function MonitorBoard({ engines, onAction }: Props): JSX.Element {
           onAdapter={setAdapter}
           counts={counts}
         />
+
+        <ScopeFilter scopes={scopes} value={scope} onChange={setScope} />
 
         {sections.map((sec) => (
           <EngineSection
