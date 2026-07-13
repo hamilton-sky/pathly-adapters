@@ -21,6 +21,7 @@ function toEngineAdapter(id: string): EngineAdapter {
 // AGENT_DONE, so those read '-'; flow engines inherit the panel's current FSM stage.
 export function useMonitorEngines(feature: string | null): MonitorEngine[] {
   const engines = useTerminalStore((s) => s.spawnQueue.engines)
+  const queued = useTerminalStore((s) => s.spawnQueue.queuedEngines)
   const scrollbackByTabId = useTerminalStore((s) => s.scrollbackByTabId)
   const tabs = useTerminalStore((s) => s.tabs)
   const fsmState = useStore((s) => s.fsmState)
@@ -71,6 +72,27 @@ export function useMonitorEngines(feature: string | null): MonitorEngine[] {
         snippet,
       })
     }
+    for (const e of queued) {
+      // Same feature scoping — a queued flow stage for this feature shows; global one-shots don't.
+      if (feature && e.feature !== feature) continue
+      const category = (e.category ?? 'single') as EngineCategory
+      rows.push({
+        id: e.tabId,
+        adapter: toEngineAdapter(e.adapter),
+        category,
+        role: (e.role ?? (category === 'flow' ? 'runner' : 'agent')) as EngineRole,
+        feature: e.feature ?? '(project)',
+        stage: category === 'flow' ? currentStage : '',
+        status: 'queued',
+        elapsed: '-',
+        started: '-',
+        tokensIn: '-',
+        tokensOut: '-',
+        tokens: '-',
+        cost: '-',
+        snippet: 'queued · waiting for a slot',
+      })
+    }
     return rows
-  }, [engines, scrollbackByTabId, tabs, now, feature, fsmState])
+  }, [engines, queued, scrollbackByTabId, tabs, now, feature, fsmState])
 }

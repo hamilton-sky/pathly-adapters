@@ -16,8 +16,10 @@ interface Props {
   onAction?: (engineId: string, actionId: string) => void
   onPauseAll?: () => void
   onManageQueue?: () => void
+  /** Whether the spawn queue is paused — shows a badge and flips the footer button to "Resume". */
+  paused?: boolean
   onGripPointerDown?: (e: React.PointerEvent) => void
-  /** Real queued count from the spawn gate (the engines prop is running-only). */
+  /** Authoritative queued count from the spawn gate. */
   queuedCount?: number
   /** Rendered between the rows and the footer when "Manage queue" is toggled on. */
   queueSlot?: React.ReactNode
@@ -28,7 +30,7 @@ interface Props {
 // control bar — each row carries its own contextual controls.
 export function DockExpanded({
   engines, onCollapse, onClose, onOpenMonitor, onOpenEngine, onAction,
-  onPauseAll, onManageQueue, onGripPointerDown, queuedCount, queueSlot,
+  onPauseAll, onManageQueue, paused, onGripPointerDown, queuedCount, queueSlot,
 }: Props): JSX.Element {
   const [filter, setFilter] = useState<DockCategoryFilter>('all')
 
@@ -51,6 +53,7 @@ export function DockExpanded({
         <span className={s.title}>Engines</span>
         <span className={s.live} />
         <span className={s.liveLabel}>{running} live</span>
+        {paused && <span className={s.paused}>paused</span>}
         <span className={s.actions}>
           <button type="button" className={s.icon} title="Open full Monitor" aria-label="Open full Monitor" onClick={onOpenMonitor}>
             <Maximize2 size={13} />
@@ -78,7 +81,7 @@ export function DockExpanded({
       <div className={s.foot}>
         <span className={s.queue}>{queued} queued · {running} of {MAX_SLOTS} slots</span>
         <span className={s.footActions}>
-          <button type="button" className={s.pill} onClick={onPauseAll}>Pause all</button>
+          <button type="button" className={s.pill} onClick={onPauseAll}>{paused ? 'Resume' : 'Pause all'}</button>
           <button type="button" className={s.pill} onClick={onManageQueue}>Manage queue</button>
         </span>
       </div>

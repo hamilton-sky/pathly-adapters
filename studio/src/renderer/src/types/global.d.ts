@@ -22,6 +22,8 @@ declare global {
     total: number
     /** Live engines (headless + interactive) — the CLI monitor's authoritative ACTIVE list. */
     engines: RunningEngine[]
+    /** Engines accepted but still waiting for a slot (queued/paused) — rendered as queued rows. */
+    queuedEngines: RunningEngine[]
     queued: string[]
     paused: boolean
     rateLimitedUntil: number

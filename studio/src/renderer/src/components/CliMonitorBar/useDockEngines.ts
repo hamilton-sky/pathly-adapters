@@ -13,18 +13,31 @@ function toEngineAdapter(id: string): EngineAdapter {
   return 'Claude'
 }
 
-// Global live-engine list for the floating dock — every running CLI engine across ALL features
-// (unlike the Pipeline panel's feature-scoped board), projected from the authoritative spawn gate
-// (spawnQueue.engines) so the dock, the panel board, and the header count all agree and survive a
-// renderer reload. Stage is left blank here (the dock spans features, so there's no single FSM
-// stage to attribute).
+function baseRow(e: RunningEngine): Omit<DockEngine, 'status' | 'elapsed' | 'sub'> {
+  const category = (e.category ?? 'single') as EngineCategory
+  return {
+    id: e.tabId,
+    adapter: toEngineAdapter(e.adapter),
+    category,
+    role: (e.role ?? (category === 'flow' ? 'runner' : 'agent')) as EngineRole,
+    feature: e.feature ?? '(project)',
+    stage: '',
+  }
+}
+
+// Global engine list for the floating dock — every RUNNING and QUEUED CLI engine across all
+// features (unlike the Pipeline panel's feature-scoped board), projected from the authoritative
+// spawn gate so the dock, the panel board, and the header count all agree and survive a renderer
+// reload. Queued engines carry the same identity they'll run with (the gate registers them at
+// request time), so a paused/queued run is visible instead of a silent count. Stage is left blank
+// (the dock spans features, so there's no single FSM stage to attribute).
 export function useDockEngines(): DockEngine[] {
   const engines = useTerminalStore((s) => s.spawnQueue.engines)
+  const queued = useTerminalStore((s) => s.spawnQueue.queuedEngines)
   const scrollbackByTabId = useTerminalStore((s) => s.scrollbackByTabId)
   const tabs = useTerminalStore((s) => s.tabs)
 
-  // Mirror the main-process spawn state into the store, and push persisted caps once on mount
-  // (same wiring the old bar used) so the dock works even when opened standalone.
+  // Mirror the main-process spawn state into the store, and push persisted caps once on mount.
   useEffect(() => {
     const api = window.pathly?.terminal
     if (!api?.onSpawnState) return
@@ -33,7 +46,7 @@ export function useDockEngines(): DockEngine[] {
     return api.onSpawnState((st) => useTerminalStore.getState().setSpawnQueue(st))
   }, [])
 
-  // Shared per-second clock so elapsed timers advance while engines are live.
+  // Shared per-second clock so running elapsed timers advance.
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
     if (engines.length === 0) return
@@ -42,26 +55,22 @@ export function useDockEngines(): DockEngine[] {
     return () => window.clearInterval(id)
   }, [engines.length])
 
-  return useMemo(
-    () =>
-      engines.map((e) => {
-        const category = (e.category ?? 'single') as EngineCategory
-        const sub =
-          lastNLines(scrollbackByTabId[e.tabId] ?? [], 1)[0] ??
-          tabs.find((t) => t.id === e.tabId)?.prompt?.slice(0, 80) ??
-          '…'
-        return {
-          id: e.tabId,
-          adapter: toEngineAdapter(e.adapter),
-          category,
-          role: (e.role ?? (category === 'flow' ? 'runner' : 'agent')) as EngineRole,
-          feature: e.feature ?? '(project)',
-          stage: '',
-          status: 'running' as const,
-          elapsed: fmtElapsed(Math.max(0, Math.floor((now - e.startedAt) / 1000))),
-          sub,
-        }
-      }),
-    [engines, scrollbackByTabId, tabs, now],
-  )
+  return useMemo(() => {
+    const running: DockEngine[] = engines.map((e) => ({
+      ...baseRow(e),
+      status: 'running',
+      elapsed: fmtElapsed(Math.max(0, Math.floor((now - e.startedAt) / 1000))),
+      sub:
+        lastNLines(scrollbackByTabId[e.tabId] ?? [], 1)[0] ??
+        tabs.find((t) => t.id === e.tabId)?.prompt?.slice(0, 80) ??
+        '…',
+    }))
+    const waiting: DockEngine[] = queued.map((e) => ({
+      ...baseRow(e),
+      status: 'queued',
+      elapsed: '-',
+      sub: 'queued · waiting for a slot',
+    }))
+    return [...running, ...waiting]
+  }, [engines, queued, scrollbackByTabId, tabs, now])
 }

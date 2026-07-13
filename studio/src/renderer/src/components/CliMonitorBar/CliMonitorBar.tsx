@@ -1,8 +1,10 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import type { CSSProperties } from 'react'
 import { useUiStore } from '../../store/uiStore'
 import { useStore } from '../../store'
 import { useTerminalStore } from '../../store/terminalStore'
 import { useDockEngines } from './useDockEngines'
+import { useDockDrag } from './useDockDrag'
 import { DockCollapsed } from './DockCollapsed/DockCollapsed'
 import { DockExpanded } from './DockExpanded/DockExpanded'
 import { SpawnQueuePanel } from './SpawnQueuePanel'
@@ -12,8 +14,9 @@ import s from './CliMonitorBar.module.css'
 // Monitor board in the Pipeline panel. Projects the authoritative spawn-gate engine list (global,
 // across features) via useDockEngines; per-engine controls live in each row. The footer's "Manage
 // queue" reveals the existing SpawnQueuePanel (live queue + caps). Run-starting is NOT here — it
-// lives on the board (goal/task Run) — so this dock is a pure monitor + queue tool. Stays mounted
-// whenever toggled open (even with no engines) so "Manage queue" is always reachable.
+// lives on the board (goal/task Run) — so this dock is a pure monitor + queue tool. Draggable by
+// its grip (useDockDrag); stays mounted whenever toggled open so "Manage queue" is always
+// reachable even when idle.
 export function CliMonitorBar(): JSX.Element | null {
   const open = useUiStore((st) => st.cliMonitorOpen)
   const toggleCliMonitor = useUiStore((st) => st.toggleCliMonitor)
@@ -22,6 +25,8 @@ export function CliMonitorBar(): JSX.Element | null {
   const engines = useDockEngines()
   const [expanded, setExpanded] = useState(true)
   const [queueOpen, setQueueOpen] = useState(false)
+  const anchorRef = useRef<HTMLDivElement>(null)
+  const { pos, onGripPointerDown } = useDockDrag(anchorRef)
 
   if (!open) return null
 
@@ -52,11 +57,16 @@ export function CliMonitorBar(): JSX.Element | null {
   }
 
   return (
-    <div className={s.anchor}>
+    <div
+      ref={anchorRef}
+      className={s.anchor}
+      {...(pos ? { 'data-dragged': '' } : {})}
+      style={pos ? ({ '--dock-x': `${pos.x}px`, '--dock-y': `${pos.y}px` } as CSSProperties) : undefined}
+    >
       {expanded ? (
         <DockExpanded
           engines={engines}
-          queuedCount={spawnQueue.queued.length}
+          queuedCount={spawnQueue.queuedEngines.length}
           queueSlot={queueOpen ? <SpawnQueuePanel spawnQueue={spawnQueue} /> : null}
           onCollapse={() => setExpanded(false)}
           onClose={toggleCliMonitor}
@@ -65,12 +75,15 @@ export function CliMonitorBar(): JSX.Element | null {
           onAction={handleAction}
           onPauseAll={pauseAll}
           onManageQueue={() => setQueueOpen((v) => !v)}
+          paused={spawnQueue.paused}
+          onGripPointerDown={onGripPointerDown}
         />
       ) : (
         <DockCollapsed
           engines={engines}
           onExpand={() => setExpanded(true)}
           onClose={toggleCliMonitor}
+          onGripPointerDown={onGripPointerDown}
         />
       )}
     </div>

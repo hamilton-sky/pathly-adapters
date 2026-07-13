@@ -377,6 +377,10 @@ interface RunningEngine {
   role?: string
 }
 const activeEngines = new Map<string, RunningEngine>()
+// Engines accepted by the gate but still WAITING for a slot (queued / paused). Same record shape,
+// startedAt = when queued. Registered at request time so the monitor can render queued rows with a
+// real adapter/category/feature, then moved to activeEngines when the PTY actually spawns.
+const queuedEngines = new Map<string, RunningEngine>()
 
 /** Normalize a launcher (bare 'claude' or a resolved '…\claude.ps1') to a CliAdapter id so the
  *  monitor badges it consistently regardless of how it was spawned. */
@@ -416,6 +420,7 @@ function broadcastSpawnState(): void {
       interactive: interactiveRunning.size,
       total: totalRunning(),
       engines: Array.from(activeEngines.values()),
+      queuedEngines: Array.from(queuedEngines.values()),
       queued: engineQueue.map((w) => w.tabId),
       paused: queuePaused,
       rateLimitedUntil,
@@ -424,12 +429,13 @@ function broadcastSpawnState(): void {
   } catch { /* ignore */ }
 }
 
-function acquireEngineSlot(tabId: string, priority = 0): Promise<void> {
+function acquireEngineSlot(tabId: string, priority = 0, meta?: RunningEngine): Promise<void> {
   if (canStartHeadless()) {
     gatedRunning.add(tabId)
     broadcastSpawnState()
     return Promise.resolve()
   }
+  if (meta) queuedEngines.set(tabId, meta)   // waiting for a slot → render it as a queued row
   return new Promise<void>((resolve, reject) => {
     const item: QueueItem = { tabId, priority, resolve, reject }
     // Keep priority items (runner/board) ahead of inline editor actions, preserving order in a tier.
@@ -445,12 +451,14 @@ function promoteQueue(): void {
   while (engineQueue.length && canStartHeadless()) {
     const next = engineQueue.shift() as QueueItem
     gatedRunning.add(next.tabId)
+    queuedEngines.delete(next.tabId)   // promoted to running — activeEngines.set follows after pty.spawn
     next.resolve()
   }
 }
 
 function releaseEngineSlot(tabId: string): void {
   const wasEngine = activeEngines.delete(tabId)   // live engine gone (exit/kill) — drop from the monitor registry
+  queuedEngines.delete(tabId)                     // also clear it if it was still waiting for a slot
   const qi = engineQueue.findIndex((w) => w.tabId === tabId)
   if (qi !== -1) {
     const [w] = engineQueue.splice(qi, 1) // cancelled while queued — reject so the spawn() call unblocks
@@ -544,6 +552,23 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
       ;({ shell, args: shellArgs } = resolveShell(command))
     }
 
+    // The monitor record for this engine, from what's known now: adapter, plus category/feature/
+    // role from the runner topic or spawn telemetry. Used both while queued (waiting for a slot)
+    // and once the PTY spawns, so a queued engine renders with the same identity it'll run with.
+    const buildEngineMeta = (startedAt: number): RunningEngine => {
+      const rmeta = runnerTabMeta.get(tabId)
+      const adapter = adapterIdFromLauncher(runnerArgv?.[0] ?? command ?? '')
+      return {
+        tabId,
+        adapter,
+        label: rmeta?.label ?? spawnMeta?.telemetry?.label ?? adapter,
+        startedAt,
+        category: rmeta ? 'flow' : 'single',
+        feature: rmeta?.topic ?? spawnMeta?.telemetry?.feature,
+        role: spawnMeta?.telemetry?.role,
+      }
+    }
+
     // Gate only headless CLI-engine runs (not interactive sessions or manual shells). The slot
     // is held until the PTY exits (released in onExit/kill), so the cap limits RUNNING engines.
     const argvEngine = !!runnerArgv && runnerArgv.length > 0 && CLI_ENGINES.has(runnerArgv[0])
@@ -555,7 +580,7 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
       // can't starve the pipeline. Then honor any active rate-limit cooldown.
       const priority = runnerTabMeta.has(tabId) ? 10 : 0
       slog('headless', tabId, canStartHeadless() ? 'run now' : 'QUEUED', 'priority=' + priority, '|', spawnCounts())
-      await acquireEngineSlot(tabId, priority)
+      await acquireEngineSlot(tabId, priority, buildEngineMeta(Date.now()))
       const cd = rateLimitedUntil - Date.now()
       if (cd > 0) slog('headless', tabId, `rate-limit cooldown ${cd}ms`)
       await awaitRateLimitCooldown()
@@ -596,20 +621,8 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
     // running engine — board/runner, editor one-shot, and manual REPL — from ONE source of truth,
     // not the renderer's per-tab status (which races the spawn round-trip and misses backend runs).
     if (headlessEngine || interactiveEngine) {
-      const adapterId = adapterIdFromLauncher(runnerArgv?.[0] ?? command ?? '')
-      const rmeta = runnerTabMeta.get(tabId)
-      activeEngines.set(tabId, {
-        tabId,
-        adapter: adapterId,
-        label: rmeta?.label ?? spawnMeta?.telemetry?.label ?? adapterId,
-        startedAt: ptyStartedAt,
-        // A registered runner tab is a flow stage; anything else (editor / AI one-shot, manual
-        // REPL) is a single shot. feature/role come from the runner topic or the spawn telemetry
-        // so the board can scope the card to its feature and label its role.
-        category: rmeta ? 'flow' : 'single',
-        feature: rmeta?.topic ?? spawnMeta?.telemetry?.feature,
-        role: spawnMeta?.telemetry?.role,
-      })
+      activeEngines.set(tabId, buildEngineMeta(ptyStartedAt))
+      queuedEngines.delete(tabId)   // was queued (if at all) → now running
       broadcastSpawnState()
     }
 

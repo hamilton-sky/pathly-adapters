@@ -34,6 +34,17 @@
 
 .liveLabel { font: 500 11px/1 var(--font-family-mono); color: var(--text-muted); }
 
+.paused {
+  font: 700 9px/1 var(--font-family-base);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--orange);
+  border: 1px solid color-mix(in srgb, var(--orange) 35%, transparent);
+  background: color-mix(in srgb, var(--orange) 14%, transparent);
+  border-radius: var(--radius-full);
+  padding: 2px 7px;
+}
+
 .actions { margin-left: auto; display: inline-flex; gap: 4px; align-items: center; }
 
 .icon {

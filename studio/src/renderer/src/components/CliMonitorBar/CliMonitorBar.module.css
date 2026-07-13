@@ -1,7 +1,15 @@
-/* Floating anchor for the CLI-engine dock — bottom-right, above the panels. */
+/* Floating anchor for the CLI-engine dock — bottom-right by default; switches to drag-driven
+   left/top (via useDockDrag) once the user drags it by the grip. */
 .anchor {
   position: fixed;
   right: 20px;
   bottom: 20px;
   z-index: 900;
+}
+
+.anchor[data-dragged] {
+  right: auto;
+  bottom: auto;
+  left: var(--dock-x);
+  top: var(--dock-y);
 }
