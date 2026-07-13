@@ -27,47 +27,13 @@ export const SPLIT_PROMPT_TEMPLATE = [
   `Do not write anything else. Exit when done.`,
 ].join('\n')
 
-export const ANALYZE_PROMPT_TEMPLATE = [
-  `You are reviewing a Pathly skill file for quality.`,
-  ``,
-  `Read the file at: {{FILE}}`,
-  ``,
-  `Write an analysis report to: {{FILE}}.analysis`,
-  ``,
-  `Format your report as markdown with these sections:`,
-  ``,
-  `## Summary`,
-  `1–2 sentence overview of what this skill does.`,
-  ``,
-  `## Strengths`,
-  `What this skill does well — clear instructions, good structure, appropriate scope.`,
-  ``,
-  `## Gaps & Ambiguities`,
-  `Unclear instructions, missing edge cases, or steps that could be misinterpreted.`,
-  `Reference exact phrases or sections where possible.`,
-  ``,
-  `## Redundancies`,
-  `Verbose or repeated sections that could be tightened without losing meaning.`,
-  ``,
-  `## Suggested Improvements`,
-  `Concrete, actionable changes ranked by impact. 1–2 sentences each.`,
-  ``,
-  `## Token Estimate`,
-  `Rough token cost per invocation and whether it is appropriate for the task complexity.`,
-  ``,
-  `Write the report as UTF-8 using your native file-writing tool — do NOT route it through shell`,
-  `commands (Get-Content/Set-Content/Out-File or > redirection), which corrupt Unicode on Windows.`,
-  `Do not write anything else. Exit when done.`,
-].join('\n')
+// The AI-Analyze prompts moved to EditorHeader/actionPresets.ts (ANALYZE_LENSES) when
+// Analyze became multi-report: every lens now APPENDS one entry to a `.analyses.json`
+// array sidecar (the Diagram model) instead of overwriting a single `.analysis` file.
 
 export function buildSplitPrompt(filePath: string): string {
   const norm = filePath.replace(/\\/g, '/')
   return resolvePrompt(SPLIT_PROMPT_TEMPLATE, { FILE: norm })
-}
-
-export function buildAnalyzePrompt(filePath: string): string {
-  const norm = filePath.replace(/\\/g, '/')
-  return resolvePrompt(ANALYZE_PROMPT_TEMPLATE, { FILE: norm })
 }
 
 export function deriveLineNumber(fileBody: string, anchorText: string): number {

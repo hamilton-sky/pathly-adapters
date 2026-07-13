@@ -99,7 +99,7 @@ export interface UiState {
   setMdEditorViewMode: (mode: 'cells' | 'editor') => void
   toggleMdEditorPreview: () => void
   setMdEditorSplitDraftPath: (p: string | null, forFile?: string) => void
-  setMdEditorAnalysisPath: (p: string | null, forFile?: string) => void
+  setMdEditorAnalysisPath: (p: string | null, forFile?: string, opts?: { open?: boolean }) => void
   /** Merge a patch into a file's action slot; pass null to clear the slot. */
   setMdEditorAction: (filePath: string, action: MdEditorAction, patch: Partial<MdEditorActionSlot> | null) => void
   requestMdEditorSave: () => void
@@ -171,7 +171,7 @@ export const useUiStore = create<UiState>()(
         }
         return { mdEditorSplitDraftPaths: { ...s.mdEditorSplitDraftPaths, [key]: p } }
       }),
-      setMdEditorAnalysisPath: (p, forFile) => set((s) => {
+      setMdEditorAnalysisPath: (p, forFile, opts) => set((s) => {
         const key = forFile ?? s.mdEditorPath ?? ''
         if (!key) return {}
         if (p === null) {
@@ -179,11 +179,14 @@ export const useUiStore = create<UiState>()(
           delete next[key]
           return { mdEditorAnalysisPaths: next }
         }
+        // `open` defaults true: a finished run pops the report gallery, but only for the file
+        // the user is currently viewing (a background file's completion must not pop a panel).
+        // On-open hydration passes open:false — it lights the header chip without covering the
+        // editor. Mirrors setMdEditorDiagramPath.
+        const open = opts?.open ?? true
         const update: Partial<UiState> = {
           mdEditorAnalysisPaths: { ...s.mdEditorAnalysisPaths, [key]: p },
-          // Only auto-open the report panel when the finished run is for the file the user
-          // is currently viewing — a background file's completion must not pop a panel here.
-          ...(key === s.mdEditorPath ? { mdEditorAnalysisPanelOpen: true } : {}),
+          ...(open && key === s.mdEditorPath ? { mdEditorAnalysisPanelOpen: true } : {}),
         }
         return update
       }),

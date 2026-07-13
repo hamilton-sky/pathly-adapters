@@ -1,0 +1,128 @@
+.card {
+  background: var(--bg-surface0);
+  border: var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: border-color var(--transition-fast);
+}
+
+.card:hover {
+  border-color: var(--accent-border);
+}
+
+/* Header is a full-width toggle button — click anywhere to expand/collapse. */
+.head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
+  border: none;
+  border-bottom: var(--border-subtle);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--transition-fast);
+}
+
+.head:hover {
+  background: var(--bg-surface1);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Per-lens hue. The dot inherits via currentColor. */
+.badge[data-lens='full'] {
+  color: var(--accent);
+}
+.badge[data-lens='clarity'] {
+  color: var(--blue);
+}
+.badge[data-lens='gaps'] {
+  color: var(--yellow);
+}
+.badge[data-lens='redundancy'] {
+  color: var(--purple);
+}
+.badge[data-lens='legacy'] {
+  color: var(--text-muted);
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.meta {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Rendered markdown report. Scrolls within its own bound so a long report never blows out
+   the panel; wide code/tables scroll horizontally instead of overflowing. */
+.report {
+  max-height: 420px;
+  overflow: auto;
+  padding: 4px 12px 10px;
+  border-bottom: var(--border-subtle);
+  font-size: var(--font-size-sm);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+}
+
+.iconBtn,
+.deleteBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  border: var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.iconBtn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.deleteBtn {
+  color: var(--text-muted);
+}
+
+.deleteBtn:hover {
+  color: var(--red);
+  border-color: var(--red);
+}

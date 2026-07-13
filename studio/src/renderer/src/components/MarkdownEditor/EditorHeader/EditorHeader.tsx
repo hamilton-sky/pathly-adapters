@@ -17,8 +17,9 @@ import {
 } from '../../../store/uiStore'
 import { useTerminalStore } from '../../../store/terminalStore'
 import { useEditorAgentActions } from './hooks/useEditorAgentActions'
+import { useEditorAnalysisAction } from './hooks/useEditorAnalysisAction'
 import { apiFetch } from '../../../lib/config'
-import { STORAGE_KEY_SPLIT, STORAGE_KEY_ANALYZE, getEffectivePrompt, buildSplitPrompt, buildAnalyzePrompt } from '../../Editor/commentUtils'
+import { STORAGE_KEY_SPLIT, STORAGE_KEY_ANALYZE, getEffectivePrompt, buildSplitPrompt } from '../../Editor/commentUtils'
 import PromptPeekModal from './PromptPeekModal/PromptPeekModal'
 import ExportMenu from './ExportMenu/ExportMenu'
 import ActionPill from '../../shared/ActionPill/ActionPill'
@@ -32,6 +33,7 @@ import { useEditorDiagramAction } from './hooks/useEditorDiagramAction'
 import { DIAGRAM_PRESETS, CLI_KEY_DIAGRAM, PRESET_KEY_DIAGRAM, STORAGE_KEY_DIAGRAM } from './diagramPresets'
 import { resolvePrompt } from '../../shared/PromptActionConfig/presetTypes'
 import { sidecarPathFor } from '../diagramTypes'
+import { analysisSidecarPathFor } from '../analysisTypes'
 import styles from './EditorHeader.module.css'
 
 export type MdEditorViewMode = 'cells' | 'editor'
@@ -93,14 +95,21 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
   const analyzeTitle = ANALYZE_LENSES.find((l) => l.name === analyzePreset)?.label ?? 'AI Analyze'
   const diagramTitle = DIAGRAM_PRESETS.find((p) => p.name === diagramPreset)?.label ?? 'Diagram'
 
-  const { handleSplit, handleAnalyze, stopSplit, stopAnalyze } = useEditorAgentActions(
+  const { handleSplit, stopSplit } = useEditorAgentActions(
     mdEditorPath,
     splitOncePrompt,
-    analyzeOncePrompt,
     () => setSplitOncePrompt(null),
-    () => setAnalyzeOncePrompt(null),
     splitCli,
+  )
+
+  // AI-Analyze is multi-report now (mirrors Diagram): each run appends a report to the
+  // `.analyses.json` sidecar via a dedicated spawn hook, not the split/composeClientSkill path.
+  const { handleAnalyze, stopAnalyze } = useEditorAnalysisAction(
+    mdEditorPath,
+    analyzeOncePrompt,
+    () => setAnalyzeOncePrompt(null),
     analyzeCli,
+    analyzePreset,
   )
 
   // ── Diagram feature: spawn hook ──
@@ -129,6 +138,23 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
     return resolvePrompt(template, vars)
   }
 
+  // Resolve the analyze prompt for the preview: stored override > selected lens, with
+  // {{FILE}} and {{SIDECAR}} substituted (mirrors buildDiagramPreviewPrompt).
+  const buildAnalyzePreviewPrompt = (filePath: string): string => {
+    const norm = filePath.replace(/\\/g, '/')
+    const vars = { FILE: norm, SIDECAR: analysisSidecarPathFor(norm) }
+    let template: string
+    try {
+      template = localStorage.getItem(STORAGE_KEY_ANALYZE) ?? ''
+    } catch {
+      template = ''
+    }
+    if (!template) {
+      template = (ANALYZE_LENSES.find((l) => l.name === analyzePreset) ?? ANALYZE_LENSES[0]).prompt
+    }
+    return resolvePrompt(template, vars)
+  }
+
   // Open the confirm-preview for a run; the actual spawn fires only on submit.
   const openSplitPreview = () => {
     if (!mdEditorPath) return
@@ -137,7 +163,9 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
   }
   const openAnalyzePreview = () => {
     if (!mdEditorPath) return
-    const prompt = analyzeOncePrompt ?? getEffectivePrompt(buildAnalyzePrompt, STORAGE_KEY_ANALYZE, mdEditorPath)
+    const norm = mdEditorPath.replace(/\\/g, '/')
+    const vars = { FILE: norm, SIDECAR: analysisSidecarPathFor(norm) }
+    const prompt = analyzeOncePrompt ? resolvePrompt(analyzeOncePrompt, vars) : buildAnalyzePreviewPrompt(mdEditorPath)
     setPendingRun({ kind: 'analyze', prompt, engine: cliLabel(analyzeCli), action: analyzeTitle })
   }
   const openDiagramPreview = () => {
@@ -422,7 +450,7 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
         title={analyzeTitle}
         runningVerb="Analyzing"
         mainIcon={<ScanText size={13} />}
-        idleTip={`AI will audit “${skillName}” for clarity, gaps, and redundancies — opens a quality report in a side panel`}
+        idleTip={`AI will audit “${skillName}” for clarity, gaps, and redundancies — adds a report to the gallery in a side panel`}
         runningTip={`Auditing “${skillName}” for quality issues…`}
         ariaName="AI Analyze"
         onRun={openAnalyzePreview}
@@ -430,12 +458,12 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
         configTip="View or edit the prompt sent to the AI engine"
         onToggleConfig={() => setAnalyzePeekOpen(v => !v)}
         resultIcon={<FileSearch size={13} />}
-        resultLabel="Report"
+        resultLabel="Reports"
         resultReady={!!mdEditorAnalysisPath}
         resultTip={
-          !mdEditorAnalysisPath ? 'No report yet — run Analyze first'
-          : mdEditorAnalysisPanelOpen ? 'Close report panel'
-          : 'Quality report ready — click to open'
+          !mdEditorAnalysisPath ? 'No reports yet — run Analyze first'
+          : mdEditorAnalysisPanelOpen ? 'Close reports panel'
+          : 'Quality reports ready — click to open'
         }
         onOpenResult={() => setMdEditorAnalysisPanelOpen(!mdEditorAnalysisPanelOpen)}
         tone="amber"

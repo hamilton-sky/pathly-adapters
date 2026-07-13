@@ -7,7 +7,9 @@ import EditorHeader, { MdEditorViewMode } from './EditorHeader/EditorHeader'
 import EditorCanvas from './EditorCanvas/EditorCanvas'
 import PreviewPanel from './PreviewPanel/PreviewPanel'
 import EditorLanding from './EditorLanding/EditorLanding'
-import AnalysisPanel from './AnalysisPanel/AnalysisPanel'
+// ── Multi-Analysis feature (report gallery, mirrors DiagramGalleryPanel) ──
+import AnalysisGalleryPanel from './AnalysisGalleryPanel/AnalysisGalleryPanel'
+import { useAnalysisHydrate } from './AnalysisGalleryPanel/useAnalysisHydrate'
 // ── Diagram feature ──
 import DiagramGalleryPanel from './DiagramGalleryPanel/DiagramGalleryPanel'
 import { useDiagramHydrate } from './DiagramGalleryPanel/useDiagramHydrate'
@@ -22,9 +24,11 @@ export default function MarkdownEditorPanel() {
   const togglePreview = useUiStore((s) => s.toggleMdEditorPreview)
   const preview = usePreviewResize()
 
-  // Reopened files keep their saved diagrams: hydrate the Gallery chip from the on-disk
-  // sidecar (the in-memory path map isn't persisted across sessions).
+  // Reopened files keep their saved diagrams / reports: hydrate the Gallery + Reports chips
+  // from the on-disk sidecars (the in-memory path maps aren't persisted across sessions).
+  // Analysis hydration also folds any legacy `<file>.analysis` into the array sidecar.
   useDiagramHydrate(mdEditorPath)
+  useAnalysisHydrate(mdEditorPath)
 
   if (!mdEditorPath) {
     return <EditorLanding />
@@ -32,8 +36,8 @@ export default function MarkdownEditorPanel() {
 
   return (
     <div className={styles.root}>
-      <AnalysisPanel />
-      {/* ── Diagram feature: right-docked gallery, shares the slot with AnalysisPanel.
+      <AnalysisGalleryPanel />
+      {/* ── Diagram feature: right-docked gallery, shares the slot with AnalysisGalleryPanel.
             Self-contained — View, Delete, "+ New" and per-card Regenerate all work without
             props (generation uses a panel-local hook seeded from the persisted CLI/preset).
             The Diagram pill in EditorHeader is the primary, confirm-modal run path. ── */}

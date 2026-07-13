@@ -135,6 +135,17 @@ The component formerly called "Notebook" is now fully renamed:
 - Store: `markdownEditorStore` (`src/renderer/src/store/markdownEditorStore.ts`)
 - State key prefix: `mdEditor*`
 
+### Editor AI actions — two storage models
+
+The header pills spawn one-shot CLI agents against the open file. There are two result shapes:
+
+| Model | Actions | Sidecar | Behaviour |
+|---|---|---|---|
+| **Overwrite** (one at a time) | AI Split | `<file>.split.draft` | agent rewrites the whole draft; shown as a diff |
+| **Append array** (accumulate → gallery) | AI Analyze, Diagram | `<file>.analyses.json`, `<file>.diagrams.json` | agent appends ONE entry per run; a right-docked gallery lists all entries; renderer only reads/removes |
+
+**Append-array contract (shared by Analyze + Diagram):** the AGENT owns appends (`{ version:1, source, <items>:[] }`); the renderer never appends — it reads (`readSidecar`), removes by id, and marks-on-board. The prompt presets carry the full append instruction and resolve `{{FILE}}`/`{{SIDECAR}}` at spawn time (`resolvePrompt`); these actions do NOT route through `composeClientSkill`. Each feature is a self-contained folder mirroring the other: `AnalysisGalleryPanel/` ↔ `DiagramGalleryPanel/` (sidecar I/O + `use*Sidecar` data hook + `use*Generation` panel-local hook + `use*Hydrate` on-open chip + gallery panel + card). Analyze's four **lenses** (full / clarity / gaps / redundancy) each append their own report, so they coexist instead of clobbering. `useAnalysisHydrate` also folds a pre-gallery `<file>.analysis` into the array once, then deletes it. Header run state for all three actions lives in `uiStore.mdEditorActions[file].{split|analyze|diagram}`.
+
 ## Key Zustand stores
 
 | Store | File | Purpose |
