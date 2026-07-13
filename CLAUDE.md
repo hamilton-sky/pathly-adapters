@@ -289,3 +289,13 @@ the chokepoint estimates cost from those tokens (`cost_source="estimated"`); `ag
 threaded into `BILLING_UPDATE` (`runner/events.py::_patch_last_agent_done` →
 `supervisor/terminal.py::_reconciliation_window`) so the projected row's `provider` and
 `run_id` columns get stamped even when the originating `AGENT_DONE` didn't carry them.
+
+**Renderer one-shots (editor Diagram/Analyze) get the same codex treatment via a parallel
+path**, because they post to `/db/invocation` (`source_seq NULL`) and so bypass the event
+projector + its `_price_if_needed`. Two mirrors close the gap: (1) the Studio spawn gate parses
+the codex stream itself — `studio/src/main/ipc/codexJson.ts::parseCodexResult` (mirror of
+`_codex_usage`) so a codex one-shot reports tokens instead of `0`; (2) the one-shot writer
+`runner/telemetry.py::project_agent_done` estimates cost from those tokens via
+`db/pricing.py::estimate_cost_for` — keyed by the **adapter slug** (`codex`→`gpt-5` family),
+since a one-shot spawns with no explicit `--model`. Same outcome: codex → `cost_source="estimated"`,
+token-less agy → `"unavailable"`.

@@ -106,3 +106,31 @@ def infer_provider(model: str) -> str:
 def estimate_cost(model: str, tokens_in: int, tokens_out: int) -> tuple[float, str]:
     """Resolve (cost_usd, cost_source) for *model*, inferring its provider from the name."""
     return PricingRegistry().compute(infer_provider(model), model, tokens_in, tokens_out)
+
+
+# When only an adapter slug is known (a renderer one-shot spawns with no explicit --model, so
+# the CLI runs its built-in default), fall back to that adapter's representative model family so
+# a token-bearing run can still be estimated. Advisory only (cost_source stays "estimated").
+ADAPTER_DEFAULT_MODEL: dict[str, str] = {
+    "codex": "gpt-5",
+    "claude": "claude-sonnet-4",
+    "agy": "gemini-2.5-pro",
+    "antigravity": "gemini-2.5-pro",
+    "gemini": "gemini-2.5-pro",
+}
+
+
+def estimate_cost_for(name: str, tokens_in: int, tokens_out: int) -> tuple[float, str]:
+    """Like :func:`estimate_cost`, but *name* may be a model OR an adapter slug.
+
+    Tries *name* as a model first; if it doesn't resolve to a priced provider, retries with the
+    adapter's default model family (``ADAPTER_DEFAULT_MODEL``). Returns (0.0, "unpriced") when
+    neither resolves or there are no tokens.
+    """
+    cost, src = estimate_cost(name, tokens_in, tokens_out)
+    if src == "estimated":
+        return cost, src
+    fallback = ADAPTER_DEFAULT_MODEL.get((name or "").strip().lower())
+    if fallback:
+        return estimate_cost(fallback, tokens_in, tokens_out)
+    return cost, src

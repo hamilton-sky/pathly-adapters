@@ -127,10 +127,25 @@ def project_agent_done(
         tout = int(ad.get("tokens_out") or 0)
         summary = ad.get("summary") or ad.get("result") or ""
         session_id = ad.get("session_id")
-        # The CLI's reported dollar cost is provider_reported; 0 stays unpriced (the
-        # reconciliation window upgrades it once the PTY billing arrives for early-
-        # advance executors). provider is the adapter so the rollup isn't all-NULL.
-        cost_source = "provider_reported" if cost > 0 else "unpriced"
+        # A CLI-reported dollar cost is provider_reported. When it reports none (codex emits
+        # tokens but never a cost), estimate from tokens via the pricing SSOT — keyed by the
+        # adapter slug, since a renderer one-shot carries no explicit model. This mirrors the
+        # event projector's _price_if_needed for the /db/invocation path it bypasses. A
+        # token-less agy/gemini row is 'unavailable' (no usage telemetry at all), not a
+        # misleading $0/'unpriced'. (The reconciliation window still upgrades early-advance
+        # executor rows once the PTY billing arrives.)
+        if cost > 0:
+            cost_source = "provider_reported"
+        else:
+            from pathly_orchestrator.db.pricing import estimate_cost_for
+
+            est, src = estimate_cost_for(adapter or "", tin, tout)
+            if src == "estimated":
+                cost, cost_source = est, "estimated"
+            elif (adapter or "").strip().lower() in ("agy", "antigravity"):
+                cost_source = "unavailable"
+            else:
+                cost_source = "unpriced"
         role = agent_role or ad.get("agent") or stage or "agent"
         sid = span_id or new_span_id()
         end_dt = datetime.now(timezone.utc)

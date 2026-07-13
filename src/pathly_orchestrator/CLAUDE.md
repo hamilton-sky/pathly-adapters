@@ -145,10 +145,13 @@ pathly_orchestrator/
                            # busy_timeout=5000 handle cross-process contention; the RLock handles
                            # cross-thread contention within the server process.
     migrations.py          # _run_migrations(), CREATE TABLE SQL
-    pricing.py             # PRICING table, PricingRegistry, estimate_cost()/infer_provider() —
-                           # the layer-safe pricing SSOT (db/ imports nothing internal, so the
-                           # projector below can price a row without importing upward into
-                           # http_server/). http_server/telemetry_registry.py re-exports these
+    pricing.py             # PRICING table, PricingRegistry, estimate_cost()/infer_provider(),
+                           # estimate_cost_for() (accepts a model OR an adapter slug — falls back
+                           # to the adapter's default model family so a renderer one-shot with no
+                           # explicit --model, e.g. codex, can still be priced; used by
+                           # project_agent_done for the /db/invocation path) — the layer-safe
+                           # pricing SSOT (db/ imports nothing internal, so the projector below
+                           # can price a row without importing upward into http_server/). http_server/telemetry_registry.py re-exports these
                            # symbols for back-compat; http_server/pricing.py (a separate file:
                            # MODEL_PRICING/compute_cost_usd) is unrelated and still imports FROM
                            # telemetry_registry, unchanged.

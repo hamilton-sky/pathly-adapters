@@ -59,6 +59,52 @@ def test_project_agent_done_writes_tagged_invocation_and_span(tmp_path):
     assert spans[0]["scope_tier"] == "project" and spans[0]["trace_id"] == "trace-1"
 
 
+def test_project_agent_done_estimates_codex_cost_from_tokens(tmp_path):
+    """A codex one-shot reports tokens but no dollar cost (and carries no explicit model, just the
+    adapter slug). The projector must estimate the cost from tokens rather than record $0."""
+    from pathly_orchestrator.db.connection import get_db
+    from pathly_orchestrator.db.queries.invocations import read_agent_invocations
+    from pathly_orchestrator.runner.telemetry import project_agent_done
+
+    pr, feat = str(tmp_path), "codex-oneshot"
+    project_agent_done(
+        project_root=pr,
+        feature=feat,
+        agent_done={"cost_usd": 0, "tokens_in": 1200, "tokens_out": 340, "agent": "diagrammer"},
+        run_id="diagram-x",
+        stage="ai-diagram",
+        scope_tier="project",
+        adapter="codex",
+        wall_seconds=1.0,
+    )
+    inv = read_agent_invocations(get_db(), pr, feat)[0]
+    assert inv["cost_source"] == "estimated"
+    assert inv["cost_usd"] > 0  # gpt-5 family rate applied to the reported tokens
+
+
+def test_project_agent_done_marks_agy_unavailable_not_zero(tmp_path):
+    """agy emits no usage telemetry at all — a token-less row is 'unavailable', not a $0 that
+    reads as a free run."""
+    from pathly_orchestrator.db.connection import get_db
+    from pathly_orchestrator.db.queries.invocations import read_agent_invocations
+    from pathly_orchestrator.runner.telemetry import project_agent_done
+
+    pr, feat = str(tmp_path), "agy-oneshot"
+    project_agent_done(
+        project_root=pr,
+        feature=feat,
+        agent_done={"cost_usd": 0, "tokens_in": 0, "tokens_out": 0, "agent": "diagrammer"},
+        run_id="diagram-y",
+        stage="ai-diagram",
+        scope_tier="project",
+        adapter="agy",
+        wall_seconds=1.0,
+    )
+    inv = read_agent_invocations(get_db(), pr, feat)[0]
+    assert inv["cost_source"] == "unavailable"
+    assert inv["cost_usd"] == 0.0
+
+
 def test_scope_tier_for_maps_board_to_tier():
     from pathly_orchestrator.runner.telemetry import scope_tier_for
 

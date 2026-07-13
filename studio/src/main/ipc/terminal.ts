@@ -6,6 +6,7 @@ import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
 import { parseClaudeJsonResult, feedStreamJson, newStreamJsonState, type StreamJsonState } from './claudeJson'
+import { parseCodexResult } from './codexJson'
 
 let pty: typeof import('node-pty') | null = null
 try {
@@ -810,6 +811,13 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
         if (isOneShotTelem && telem) {
           const wallSeconds = (Date.now() - ptyStartedAt) / 1000
           const engineBase = path.basename(runnerArgv?.[0] ?? '').toLowerCase().replace(/\.(ps1|cmd|exe)$/, '')
+          // claude reports cost + tokens + result in one JSON envelope; codex emits JSONL with
+          // tokens but NEVER a dollar cost, and parseClaudeJsonResult can't read it — so a codex
+          // one-shot would be stuck at $0 / 0 tokens. Parse the codex stream here for tokens (the
+          // server estimates cost from them via db/pricing.py) + the final agent message.
+          const codex = !oneShotParsed && engineBase.includes('codex')
+            ? parseCodexResult((ptyOutput.get(tabId) ?? []).join(''))
+            : null
           const usage = oneShotParsed?.usage
           const invBody = JSON.stringify({
             project_root: cwd,
@@ -820,11 +828,11 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
             agent_role: telem.role || engineBase || 'agent',
             adapter: engineBase || 'claude',
             cost_usd: oneShotParsed?.total_cost_usd ?? 0,
-            tokens_in: usage?.input_tokens ?? 0,
-            tokens_out: usage?.output_tokens ?? 0,
+            tokens_in: usage?.input_tokens ?? codex?.tokens_in ?? 0,
+            tokens_out: usage?.output_tokens ?? codex?.tokens_out ?? 0,
             tool_uses: streamState?.toolUses ?? 0,
             session_id: null,
-            summary: (oneShotParsed?.result ?? '').slice(0, 2000),
+            summary: (oneShotParsed?.result ?? codex?.result ?? '').slice(0, 2000),
             wall_seconds: wallSeconds,
           })
           const postInv = () => fetch('http://127.0.0.1:8765/db/invocation', {
