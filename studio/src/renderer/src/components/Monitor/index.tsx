@@ -13,16 +13,17 @@ import { RunCostBadge } from './RunCostBadge/RunCostBadge'
 import { ConfigurePhaseModal } from './ConfigurePhaseModal/ConfigurePhaseModal'
 import styles from './Monitor.module.css'
 
-// The Pipeline panel: the flow's stage timeline (click a stage to configure its agent/skill/host)
-// plus the live engine board (every CLI engine running THIS feature, grouped by how it runs) and
-// per-stage run output. The board is the runtime axis; ConfigurePhaseModal is the config axis —
-// a "Configure stage" control on a live engine bridges the two. Settled telemetry (tokens/cost)
-// still lives in DB Explorer; the cross-feature activity stream lives on the Command Center board.
+// The Pipeline panel: a GLOBAL live engine board (every running CLI engine — headless or
+// interactive, any feature or a project one-shot — in parity with the Engines dock) on top, then,
+// when a feature is selected, that feature's stage timeline (click a stage to configure its
+// agent/skill/host), settled run cost, and per-stage output. The board is deliberately NOT
+// feature-scoped and NOT gated behind a feature selection: if an engine shows in the dock it must
+// show here too.
 export function Monitor(): JSX.Element {
   const { activeTopic, activeFlowSessions, activeMonitorTab, setActiveMonitorTab, fsmState } = useStore()
   const { effectiveTopic, showTabBar, refresh } = useMonitorSession()
   const [configStage, setConfigStage] = useState<string | null>(null)
-  const engines = useMonitorEngines(effectiveTopic)
+  const engines = useMonitorEngines(null) // GLOBAL — every live engine, matching the dock
 
   function handleEngineAction(engineId: string, actionId: string): void {
     const term = useTerminalStore.getState()
@@ -32,8 +33,8 @@ export function Monitor(): JSX.Element {
         break
       case 'stop':
       case 'abort':
-        // Mirror CliMonitorBar's stop: kill releases the gate slot (dropping the card from the
-        // authoritative list), and updateTabStatus('done') before closeTab snapshots it to RECENT.
+        // Mirror the dock/CliMonitorBar: kill releases the gate slot (dropping the row from the
+        // authoritative list); updateTabStatus('done') before closeTab snapshots it to RECENT.
         void window.pathly.terminal.kill(engineId)
         term.updateTabStatus(engineId, 'done')
         term.closeTab(engineId)
@@ -45,7 +46,6 @@ export function Monitor(): JSX.Element {
         void window.pathly.terminal.queueControl({ type: 'reorder', tabId: engineId, dir: 'up' })
         break
       case 'configure': {
-        // The cross-link: from a live engine, open the config modal for the stage it is running.
         const eng = engines.find((e) => e.id === engineId)
         setConfigStage(String(eng?.stage || fsmState?.current || 'BUILDING'))
         break
@@ -53,31 +53,34 @@ export function Monitor(): JSX.Element {
     }
   }
 
-  if (!activeTopic) {
-    return (
-      <div className={styles.panel}>
-        <span className={styles.placeholder}>Select a feature above to see its pipeline</span>
-      </div>
-    )
-  }
-
   return (
     <div className={styles.panel}>
-      {showTabBar && (
-        <TabBar
-          sessions={activeFlowSessions}
-          activeTab={activeMonitorTab}
-          onTabSelect={setActiveMonitorTab}
-        />
+      {/* Global engine board — always shows every live CLI, in parity with the Engines dock. */}
+      {engines.length > 0 && <MonitorBoard engines={engines} onAction={handleEngineAction} />}
+
+      {activeTopic ? (
+        <>
+          {showTabBar && (
+            <TabBar
+              sessions={activeFlowSessions}
+              activeTab={activeMonitorTab}
+              onTabSelect={setActiveMonitorTab}
+            />
+          )}
+          <HeaderBar effectiveTopic={effectiveTopic} onRefresh={refresh} />
+          <RunCostBadge feature={effectiveTopic} />
+          <HealthCheck />
+          <FsmView onStageClick={(stage) => setConfigStage(stage)} />
+          <OutputTab />
+        </>
+      ) : (
+        engines.length === 0 && (
+          <span className={styles.placeholder}>
+            Select a feature above to see its pipeline — or spawn a CLI engine to see it here
+          </span>
+        )
       )}
-      <HeaderBar effectiveTopic={effectiveTopic} onRefresh={refresh} />
-      <RunCostBadge feature={effectiveTopic} />
-      <HealthCheck />
-      <FsmView onStageClick={(stage) => setConfigStage(stage)} />
-      {engines.length > 0 && (
-        <MonitorBoard engines={engines} onAction={handleEngineAction} />
-      )}
-      <OutputTab />
+
       {configStage && (
         <ConfigurePhaseModal stage={configStage} onClose={() => setConfigStage(null)} />
       )}
