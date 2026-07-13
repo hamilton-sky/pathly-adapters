@@ -1,11 +1,12 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { X, ZoomIn, ZoomOut, Maximize2, Minimize2, StickyNote } from 'lucide-react'
+import { X, ZoomIn, ZoomOut, Maximize2, Minimize2, StickyNote, FileText } from 'lucide-react'
 import type { Message } from '../../../types'
 import { Tooltip } from '../../../../ui'
 import MarkdownRenderer from '../../../../shared/MarkdownRenderer/MarkdownRenderer'
 import { CopyTextButton } from '../../../../shared/CopyTextButton/CopyTextButton'
 import { dagLayout, type DagNode, type DagOrient, type DagComment } from './dagLayout'
+import { edgePath, type Pt } from './edgePath'
 import { CommentNode } from './CommentNode/CommentNode'
 import s from './TaskDagView.module.css'
 
@@ -22,12 +23,6 @@ function clampScale(v: number): number {
   return Math.min(MAX_SCALE, Math.max(MIN_SCALE, v))
 }
 
-interface Pt { x: number; y: number }
-
-function edgePath(a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }): string {
-  return `M${a.x + a.w / 2},${a.y + a.h / 2} L${b.x + b.w / 2},${b.y + b.h / 2}`
-}
-
 interface Props {
   tasks: Message[]
   order: Message[]
@@ -38,7 +33,11 @@ interface Props {
 }
 
 export function TaskDagView({ tasks, order, orient, comments, onCommentsChange, onSaveNote }: Props): JSX.Element {
+  // `selected` drives the connection highlight + the corner "open text" icon; `previewFor`
+  // is the node whose text box is actually open. Selecting highlights only — the box opens
+  // on demand via the icon, so the graph stays legible while tracing dependencies.
   const [selected, setSelected] = useState<string | null>(null)
+  const [previewFor, setPreviewFor] = useState<string | null>(null)
   const [previewExpanded, setPreviewExpanded] = useState(false)
   const [moved, setMoved] = useState<Record<string, Pt>>({})
   const [view, setView] = useState({ tx: 0, ty: 0, scale: 1 })
@@ -68,7 +67,7 @@ export function TaskDagView({ tasks, order, orient, comments, onCommentsChange, 
     })
   }, [orient]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => { setPreviewExpanded(false) }, [selected])
+  useEffect(() => { setPreviewExpanded(false) }, [previewFor])
 
   function zoomBy(factor: number): void {
     setView((v) => ({ ...v, scale: clampScale(v.scale * factor) }))
@@ -101,7 +100,10 @@ export function TaskDagView({ tasks, order, orient, comments, onCommentsChange, 
     const d = drag.current
     drag.current = null
     try { e.currentTarget.releasePointerCapture(e.pointerId) } catch { /* gone */ }
-    if (d && !d.dragged) setSelected((cur) => (cur === n.id ? null : n.id))
+    if (d && !d.dragged) {
+      setSelected((cur) => (cur === n.id ? null : n.id))
+      setPreviewFor(null) // a click highlights; the text box opens only via the corner icon
+    }
   }
 
   // ── Canvas pan ───────────────────────────────────────────────────────────────
@@ -115,6 +117,8 @@ export function TaskDagView({ tasks, order, orient, comments, onCommentsChange, 
   }
   function onWrapDown(e: ReactPointerEvent<HTMLDivElement>): void {
     if (overInteractive(e.target as HTMLElement)) return
+    setSelected(null) // clicking empty canvas clears the highlight…
+    setPreviewFor(null) // …and closes the text box
     pan.current = { sx: e.clientX, sy: e.clientY, tx0: view.tx, ty0: view.ty }
     setPanning(true)
     e.currentTarget.setPointerCapture(e.pointerId)
@@ -134,15 +138,19 @@ export function TaskDagView({ tasks, order, orient, comments, onCommentsChange, 
     zoomBy(e.deltaY < 0 ? 1.1 : 0.9)
   }
 
+  // Close the open text box on any click outside it. The open-icon is excluded so its own
+  // click can (re)open the box; node/canvas clicks fall through to their handlers, which
+  // re-select or clear. Selection (the highlight) is intentionally left alone here.
   useEffect(() => {
-    if (!selected) return
+    if (!previewFor) return
     function onDown(e: MouseEvent): void {
       const el = e.target as HTMLElement | null
-      if (!el?.closest(`.${s.preview}`) && !el?.closest(`.${s.node}`)) setSelected(null)
+      if (el?.closest(`.${s.preview}`) || el?.closest(`.${s.openBtn}`)) return
+      setPreviewFor(null)
     }
     document.addEventListener('mousedown', onDown)
     return () => document.removeEventListener('mousedown', onDown)
-  }, [selected])
+  }, [previewFor])
 
   // ── Comment helpers ──────────────────────────────────────────────────────────
   function addComment(): void {
@@ -165,13 +173,14 @@ export function TaskDagView({ tasks, order, orient, comments, onCommentsChange, 
   if (tasks.length === 0) return <div className={s.empty}>No tasks to graph yet.</div>
 
   const sel = selected ? byId.get(selected) ?? null : null
+  const previewNode = previewFor ? byId.get(previewFor) ?? null : null
   const previewActualW = previewExpanded ? 520 : PREVIEW_W
 
   let previewPos: Pt | null = null
-  if (sel && wrapRef.current) {
+  if (previewNode && wrapRef.current) {
     const rect = wrapRef.current.getBoundingClientRect()
-    const x = rect.left + sel.x * view.scale + view.tx
-    const y = rect.top + (sel.y + sel.h) * view.scale + view.ty + 8
+    const x = rect.left + previewNode.x * view.scale + view.tx
+    const y = rect.top + (previewNode.y + previewNode.h) * view.scale + view.ty + 8
     previewPos = {
       x: Math.max(8, Math.min(x, window.innerWidth - previewActualW - 12)),
       y: Math.max(8, Math.min(y, window.innerHeight - 80)),
@@ -193,17 +202,42 @@ export function TaskDagView({ tasks, order, orient, comments, onCommentsChange, 
           className={s.canvas}
           style={{ '--cw': `${layout.width}px`, '--ch': `${layout.height}px`, '--tx': `${view.tx}px`, '--ty': `${view.ty}px`, '--scale': view.scale } as React.CSSProperties}
         >
-          <svg className={s.edges} width={layout.width} height={layout.height} aria-hidden="true">
+          <svg
+            className={s.edges}
+            width={layout.width}
+            height={layout.height}
+            aria-hidden="true"
+            data-has-selection={selected ? 'true' : 'false'}
+          >
+            <defs>
+              {/* Arrowhead. fill="context-stroke" makes it inherit each edge's stroke colour
+                  (muted / green-done / accent-active) — no per-colour marker needed. */}
+              <marker
+                id="dag-arrow"
+                viewBox="0 0 10 10"
+                refX="9"
+                refY="5"
+                markerWidth="8"
+                markerHeight="8"
+                markerUnits="userSpaceOnUse"
+                orient="auto"
+              >
+                <path d="M0,0 L10,5 L0,10 Z" fill="context-stroke" />
+              </marker>
+            </defs>
             {layout.edges.map((e) => {
               const a = byId.get(e.from)
               const b = byId.get(e.to)
               if (!a || !b) return null
+              const active = selected !== null && (e.from === selected || e.to === selected)
               return (
                 <path
                   key={`${e.from}->${e.to}`}
                   className={s.edge}
                   data-done={a.task.taskStatus === 'done' ? 'true' : 'false'}
+                  data-active={active ? 'true' : 'false'}
                   d={edgePath(a, b)}
+                  markerEnd="url(#dag-arrow)"
                 />
               )
             })}
@@ -240,6 +274,23 @@ export function TaskDagView({ tasks, order, orient, comments, onCommentsChange, 
               </button>
             </Tooltip>
           ))}
+
+          {/* Open-text icon: appears at the selected node's top-right corner. Selecting only
+              highlights; this is the explicit affordance to open the task text box. */}
+          {sel && (
+            <Tooltip label="Open task text" placement="top">
+              <button
+                type="button"
+                className={s.openBtn}
+                style={{ '--x': `${sel.x + sel.w}px`, '--y': `${sel.y}px` } as React.CSSProperties}
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => { e.stopPropagation(); setPreviewFor(sel.id) }}
+                aria-label="Open task text"
+              >
+                <FileText size={12} />
+              </button>
+            </Tooltip>
+          )}
 
           {comments.map((c) => (
             <CommentNode
@@ -282,7 +333,7 @@ export function TaskDagView({ tasks, order, orient, comments, onCommentsChange, 
         </div>
       </div>
 
-      {sel && previewPos && createPortal(
+      {previewNode && previewPos && createPortal(
         <div
           className={s.preview}
           role="dialog"
@@ -291,10 +342,10 @@ export function TaskDagView({ tasks, order, orient, comments, onCommentsChange, 
           style={{ '--x': `${previewPos.x}px`, '--y': `${previewPos.y}px` } as React.CSSProperties}
         >
           <div className={s.previewHead}>
-            <span className={s.previewStatus} data-status={sel.task.taskStatus ?? 'pending'}>
-              Task {sel.index} · {sel.task.taskStatus ?? 'pending'}
+            <span className={s.previewStatus} data-status={previewNode.task.taskStatus ?? 'pending'}>
+              Task {previewNode.index} · {previewNode.task.taskStatus ?? 'pending'}
             </span>
-            <CopyTextButton text={sel.task.text} label="task" />
+            <CopyTextButton text={previewNode.task.text} label="task" />
             <Tooltip label={previewExpanded ? 'Collapse text' : 'Expand full text'} placement="left">
               <button
                 type="button"
@@ -306,13 +357,13 @@ export function TaskDagView({ tasks, order, orient, comments, onCommentsChange, 
               </button>
             </Tooltip>
             <Tooltip label="Close preview" placement="left">
-              <button type="button" className={s.previewClose} onClick={() => setSelected(null)} aria-label="Close preview">
+              <button type="button" className={s.previewClose} onClick={() => setPreviewFor(null)} aria-label="Close preview">
                 <X size={13} />
               </button>
             </Tooltip>
           </div>
           <div className={s.previewBody}>
-            <MarkdownRenderer content={sel.task.text} />
+            <MarkdownRenderer content={previewNode.task.text} />
           </div>
         </div>,
         document.body,

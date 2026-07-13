@@ -1,0 +1,66 @@
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 100%;
+  min-width: 0;
+}
+
+.textarea {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  resize: vertical;
+  padding: 7px 9px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface0);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.5;
+  outline: none;
+}
+.textarea:focus-visible { outline: var(--focus-ring); outline-offset: -1px; }
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.hint {
+  flex: 1;
+  min-width: 0;
+  font-size: 10px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface1);
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast);
+}
+.btn:hover:not(:disabled) { color: var(--text-primary); background: var(--bg-surface2, var(--bg-surface0)); }
+.btn:focus-visible { outline: var(--focus-ring); outline-offset: -2px; }
+.btn:disabled { opacity: 0.4; cursor: default; }
+
+.btn[data-variant='save'] {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.btn[data-variant='save']:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 15%, transparent); }

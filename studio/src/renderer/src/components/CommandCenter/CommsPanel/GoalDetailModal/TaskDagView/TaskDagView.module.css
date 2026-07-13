@@ -42,8 +42,19 @@
   stroke-width: 2;
   stroke-linecap: round;
   opacity: 0.85;
+  transition: stroke var(--transition-fast), opacity var(--transition-fast), stroke-width var(--transition-fast);
 }
 .edge[data-done='true'] { stroke: var(--green, #4caf50); opacity: 0.9; }
+
+/* Selecting a node lifts its incoming/outgoing edges to accent and dims the rest, so a
+   single task's dependency lineage stays legible in a dense graph. `data-active` is placed
+   after `data-done` so it wins the (equal-specificity) colour on a selected done-edge. */
+.edge[data-active='true'] {
+  stroke: var(--accent);
+  stroke-width: 2.5;
+  opacity: 1;
+}
+.edges[data-has-selection='true'] .edge:not([data-active='true']) { opacity: 0.28; }
 
 /* Node — an absolutely-positioned button; coordinates come from dagLayout via CSS vars. */
 .node {
@@ -79,6 +90,31 @@
   border-color: var(--accent);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent);
 }
+
+/* Open-text icon — floats over the selected node's top-right corner (canvas space, so it
+   tracks the node on drag/zoom). Centred on the corner via the -50% translate. */
+.openBtn {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  transform: translate(-50%, -50%);
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1.5px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated, var(--bg-surface0));
+  color: var(--accent);
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  transition: background var(--transition-fast);
+}
+.openBtn:hover { background: color-mix(in srgb, var(--accent) 16%, var(--bg-elevated, var(--bg-surface0))); }
+.openBtn:focus-visible { outline: var(--focus-ring); outline-offset: 1px; }
 
 .nodeNum {
   flex-shrink: 0;

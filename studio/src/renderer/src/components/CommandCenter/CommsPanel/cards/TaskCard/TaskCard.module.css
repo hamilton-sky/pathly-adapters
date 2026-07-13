@@ -32,6 +32,25 @@
   flex: 1;
 }
 
+/* Edit pencil — matches CopyTextButton's muted icon-button idiom, sits beside it in the row. */
+.editBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+.editBtn:hover { color: var(--text-primary); background: var(--bg-surface1); }
+.editBtn:focus-visible { outline: var(--focus-ring); outline-offset: -2px; }
+
 /* Banner (clickable title region) + optional in-progress RunPill + copy icon, side-by-side. */
 .taskRow {
   display: flex;

@@ -95,6 +95,9 @@ export interface CommsState {
   deleteMessage: (key: string, messageId: string) => void
   /** Edit a message's text in place (e.g. rename a goal). */
   editMessage: (key: string, messageId: string, text: string) => void
+  /** Edit a task's text by id — resolves the board key internally (like runTask), so a
+   *  caller without a board key (e.g. TaskCard) can edit in place. */
+  editTaskText: (taskId: string, text: string) => void
 
   // Per-board one-shot flash: highlight + scroll to a single message on a board,
   // keyed by board key (feature id / 'project' / 'global'). Set on a fresh post and
@@ -468,6 +471,16 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
       return { boards: { ...s.boards, [key]: arr.map((x) => x.id === messageId ? { ...x, text } : x) } }
     })
     apiEditMessage(messageId, text).catch(() => { /* best-effort */ })
+  },
+
+  editTaskText: (taskId, text) => {
+    // Resolve which loaded board holds the task so the optimistic patch lands on it, then
+    // delegate to editMessage (id preserved server-side → dependsOn links survive the edit).
+    const s = get()
+    const key = Object.keys(s.boards).find((k) => (s.boards[k] || []).some((m) => m.id === taskId))
+    if (key) { get().editMessage(key, taskId, text); return }
+    // Not in any loaded board (shouldn't happen) — still persist; a board reload reconciles.
+    apiEditMessage(taskId, text).catch(() => { /* best-effort */ })
   },
 
   flashId: {},

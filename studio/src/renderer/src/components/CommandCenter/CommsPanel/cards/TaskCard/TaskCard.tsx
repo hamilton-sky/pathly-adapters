@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { FileText, ChevronRight, ChevronDown } from 'lucide-react'
+import { FileText, ChevronRight, ChevronDown, Pencil } from 'lucide-react'
 import type { Message } from '../../../types'
 import { Tooltip } from '../../../../ui'
 import MarkdownRenderer from '../../../../shared/MarkdownRenderer/MarkdownRenderer'
@@ -7,6 +7,7 @@ import { RunPill } from '../../../../shared/RunPill/RunPill'
 import { useElapsedProgress } from '../../../../shared/RunPill/progress'
 import { CopyTextButton } from '../../../../shared/CopyTextButton/CopyTextButton'
 import { useCommsStore } from '../../../../../store/commsStore'
+import { TaskEditor } from './TaskEditor/TaskEditor'
 import SendPreviewModal from '../../../../shared/SendPreviewModal/SendPreviewModal'
 import { GoalSelect } from '../../GoalRunButton/GoalSelect/GoalSelect'
 import {
@@ -71,13 +72,19 @@ export function TaskCard({ task: t, siblings }: Props): JSX.Element {
   // `justRan` is a brief optimistic flag until that status catches up (and prevents double-fire).
   const runTask = useCommsStore((st) => st.runTask)
   const stopTask = useCommsStore((st) => st.stopTask)
+  const editTaskText = useCommsStore((st) => st.editTaskText)
   const taskStart = useCommsStore((st) => st.taskRunStart[t.id])
   const progress = useElapsedProgress(taskStart || undefined)
   const ready = deps.every((d) => byId.get(d)?.taskStatus === 'done')
   const runnable = (status === 'pending' || status === 'failed') && ready
   const [justRan, setJustRan] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [editing, setEditing] = useState(false)
   useEffect(() => { if (status !== 'pending') setJustRan(false) }, [status])
+  // Editing is offered only for tasks not yet (or no longer) running — editing a live/done
+  // task is a foot-gun. The stored text is what a later run builds from, so edits take effect.
+  const editable = status === 'pending' || status === 'failed'
+  const handleSaveEdit = (text: string): void => { editTaskText(t.id, text); setEditing(false) }
   // Preview-gated like the goal Run / Evaluate controls: the pill opens a confirm modal and
   // confirming dispatches. The backend builds from the STORED task text (by id), so the preview
   // is read-only — editing here wouldn't change what runs.
@@ -98,52 +105,65 @@ export function TaskCard({ task: t, siblings }: Props): JSX.Element {
         aria-label={`Task status: ${STATUS_LABEL[status]}`}
       />
       <div className={s.taskMain}>
-        <div className={s.taskRow}>
-          <Tooltip label={expanded ? 'Collapse task' : 'Expand task'} placement="top">
-            <button
-              type="button"
-              className={s.banner}
-              onClick={() => setExpanded((e) => !e)}
-              {...(expanded ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
-              aria-label={expanded ? 'Collapse task' : 'Expand task'}
-            >
-              <span className={s.chev}>
-                {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-              </span>
-              <span className={s.bannerText}>{firstLine(t.text)}</span>
-            </button>
-          </Tooltip>
-          {status === 'in_progress' || justRan ? (
-            <RunPill size="sm" state="running" idleLabel="In progress" progress={progress} onStop={() => stopTask(t.id)} />
-          ) : runnable ? (
-            <Tooltip label="Build just this task" placement="top">
-              <RunPill size="sm" state="idle" idleLabel="Run" onRun={handleRun} />
-            </Tooltip>
-          ) : null}
-          <CopyTextButton text={t.text} label="task" />
-        </div>
-        {expanded && (
-          <div className={s.taskFull}>
-            <MarkdownRenderer content={t.text} />
-          </div>
-        )}
-        {t.artifactPath && (
-          <div className={s.taskArtifact}>
-            <FileText size={11} />
-            <span className={s.artName}>{basename(t.artifactPath)}</span>
-          </div>
-        )}
-        {deps.length > 0 && (
-          <div className={s.deps} aria-label="Dependencies">
-            {deps.map((d) => {
-              const depStatus = byId.get(d)?.taskStatus ?? 'pending'
-              return (
-                <span key={d} className={s.depBadge} data-status={depStatus}>
-                  dep
-                </span>
-              )
-            })}
-          </div>
+        {editing ? (
+          <TaskEditor initialText={t.text} onSave={handleSaveEdit} onCancel={() => setEditing(false)} />
+        ) : (
+          <>
+            <div className={s.taskRow}>
+              <Tooltip label={expanded ? 'Collapse task' : 'Expand task'} placement="top">
+                <button
+                  type="button"
+                  className={s.banner}
+                  onClick={() => setExpanded((e) => !e)}
+                  {...(expanded ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
+                  aria-label={expanded ? 'Collapse task' : 'Expand task'}
+                >
+                  <span className={s.chev}>
+                    {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                  </span>
+                  <span className={s.bannerText}>{firstLine(t.text)}</span>
+                </button>
+              </Tooltip>
+              {status === 'in_progress' || justRan ? (
+                <RunPill size="sm" state="running" idleLabel="In progress" progress={progress} onStop={() => stopTask(t.id)} />
+              ) : runnable ? (
+                <Tooltip label="Build just this task" placement="top">
+                  <RunPill size="sm" state="idle" idleLabel="Run" onRun={handleRun} />
+                </Tooltip>
+              ) : null}
+              {editable && (
+                <Tooltip label="Edit task text" placement="top">
+                  <button type="button" className={s.editBtn} onClick={() => setEditing(true)} aria-label="Edit task text">
+                    <Pencil size={12} />
+                  </button>
+                </Tooltip>
+              )}
+              <CopyTextButton text={t.text} label="task" />
+            </div>
+            {expanded && (
+              <div className={s.taskFull}>
+                <MarkdownRenderer content={t.text} />
+              </div>
+            )}
+            {t.artifactPath && (
+              <div className={s.taskArtifact}>
+                <FileText size={11} />
+                <span className={s.artName}>{basename(t.artifactPath)}</span>
+              </div>
+            )}
+            {deps.length > 0 && (
+              <div className={s.deps} aria-label="Dependencies">
+                {deps.map((d) => {
+                  const depStatus = byId.get(d)?.taskStatus ?? 'pending'
+                  return (
+                    <span key={d} className={s.depBadge} data-status={depStatus}>
+                      dep
+                    </span>
+                  )
+                })}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
