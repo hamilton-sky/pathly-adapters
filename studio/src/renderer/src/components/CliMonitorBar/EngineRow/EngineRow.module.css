@@ -1,0 +1,91 @@
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border-color);
+  cursor: default;
+  transition: background 120ms ease-out;
+}
+
+.row:hover { background: var(--bg-surface1); }
+
+/* reveal the control cluster on row hover (targets EngineRowControls .cluster) */
+.row:hover [class*='cluster'] { opacity: 1; }
+
+.row[data-status='queued'] { opacity: 0.7; }
+
+.cat {
+  width: 3px;
+  align-self: stretch;
+  border-radius: 2px;
+  background: var(--cat-color);
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--dot-color);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .dot[data-status='queued'] { animation: blink 1.4s ease-in-out infinite; }
+}
+
+@keyframes blink { 50% { opacity: 0.4; } }
+
+.adapter {
+  font: 600 9px/1 var(--font-family-mono);
+  letter-spacing: 0.03em;
+  color: var(--adapter);
+  border: 1px solid color-mix(in srgb, var(--adapter) 40%, transparent);
+  background: color-mix(in srgb, var(--adapter) 13%, transparent);
+  border-radius: 3px;
+  padding: 2px 5px;
+  flex-shrink: 0;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.feature {
+  font: 600 12px/1.1 var(--font-family-mono);
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sub {
+  font: 400 10px/1.2 var(--font-family-mono);
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stage {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  font: 600 9px/1.2 var(--font-family-mono);
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
+  color: var(--stage);
+  border: 1px solid color-mix(in srgb, var(--stage) 40%, transparent);
+  background: color-mix(in srgb, var(--stage) 13%, transparent);
+}
+
+.elapsed {
+  font: 400 10px/1 var(--font-family-mono);
+  color: var(--text-muted);
+  flex-shrink: 0;
+}

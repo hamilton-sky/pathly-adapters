@@ -1,149 +1,78 @@
-import React from 'react'
-import { GripHorizontal, X, Cpu } from 'lucide-react'
+import { useState } from 'react'
 import { useUiStore } from '../../store/uiStore'
+import { useStore } from '../../store'
 import { useTerminalStore } from '../../store/terminalStore'
-import { fmtElapsed } from '../shared/RunPill/progress'
-import { adapterLabel } from '../../services/cliEngine'
-import type { CliAdapter } from '../../services/cliEngine'
-import { useCliMonitor } from './useCliMonitor'
-import type { CliSession, SessionRecord } from './useCliMonitor'
+import { useDockEngines } from './useDockEngines'
+import { DockCollapsed } from './DockCollapsed/DockCollapsed'
+import { DockExpanded } from './DockExpanded/DockExpanded'
 import { SpawnQueuePanel } from './SpawnQueuePanel'
-import { CodeIntelControl } from './CodeIntelControl'
-import { FlowControlBar } from '../HQ/FlowControlBar/FlowControlBar'
-import { Timestamp } from '../Timestamp/Timestamp'
 import s from './CliMonitorBar.module.css'
 
-function SessionRow({ session, expanded, onToggle }: { session: CliSession; expanded: boolean; onToggle: () => void }): JSX.Element {
-  const { tabId, adapter, label, elapsedS, lastLines, prompt, hasTab } = session
-  // Mirror the MD-editor pill's stopRun: close the tab synchronously rather than wait for onExit —
-  // a force-killed PTY (taskkill /T /F) may never deliver a clean exit event. kill() also releases
-  // the gate slot, which drops this engine from the monitor's authoritative ACTIVE list.
-  // updateTabStatus('done') must precede closeTab so the run is snapshotted into RECENT.
-  const handleStop = () => {
-    void window.pathly.terminal.kill(tabId)
-    useTerminalStore.getState().updateTabStatus(tabId, 'done')
-    useTerminalStore.getState().closeTab(tabId)
-  }
-  const handleOpen = () => { useTerminalStore.getState().openTab(tabId) }
-
-  return (
-    <div className={s.rowGroup}>
-      <button type="button" className={s.row} onClick={onToggle} aria-expanded={expanded ? 'true' : 'false'}>
-        <span className={s.badge} data-adapter={adapter}>{adapterLabel(adapter as CliAdapter)}</span>
-        <span className={s.rowLabel}>{label}</span>
-        <span className={s.elapsed}>{fmtElapsed(elapsedS)}</span>
-        <span
-          role="button"
-          tabIndex={0}
-          className={s.stopBtn}
-          onClick={(e) => { e.stopPropagation(); handleStop() }}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); handleStop() } }}
-          aria-label="Stop engine"
-        >
-          &#9632;
-        </span>
-      </button>
-      {expanded && (
-        <div className={s.expanded}>
-          {lastLines.length > 0 && (
-            <div className={s.outputLines}>
-              {lastLines.map((l, i) => <div key={i}>{l}</div>)}
-            </div>
-          )}
-          {prompt && (
-            <div className={s.promptSnippet}>{prompt.slice(0, 120)}{prompt.length > 120 ? '…' : ''}</div>
-          )}
-          {hasTab && <button type="button" className={s.openTermBtn} onClick={handleOpen}>&#8599; open terminal</button>}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function HistoryRow({ record, expanded, onToggle }: { record: SessionRecord; expanded: boolean; onToggle: () => void }): JSX.Element {
-  const adapter = (record.kind ?? 'claude') as CliAdapter
-  return (
-    <div className={s.rowGroup}>
-      <button type="button" className={s.historyRow} onClick={onToggle} aria-expanded={expanded ? 'true' : 'false'}>
-        <span className={s.historyStatus} data-status={record.status}>{record.status === 'done' ? 'done' : 'fail'}</span>
-        <span className={s.badge} data-adapter={adapter}>{adapterLabel(adapter)}</span>
-        <span className={s.rowLabel}>{record.label}</span>
-        <Timestamp value={record.finishedAt} className={s.timeAgo} />
-      </button>
-      {expanded && (
-        <div className={s.expanded}>
-          {record.lastLines.length > 0 && (
-            <div className={s.outputLines}>
-              {record.lastLines.map((l, i) => <div key={i}>{l}</div>)}
-            </div>
-          )}
-          {record.prompt && (
-            <div className={s.promptSnippet}>{record.prompt.slice(0, 120)}{record.prompt.length > 120 ? '…' : ''}</div>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
+// The floating CLI-engine dock ("Engines") — a compact, always-available companion to the full
+// Monitor board in the Pipeline panel. Projects the authoritative spawn-gate engine list (global,
+// across features) via useDockEngines; per-engine controls live in each row. The footer's "Manage
+// queue" reveals the existing SpawnQueuePanel (live queue + caps). Run-starting is NOT here — it
+// lives on the board (goal/task Run) — so this dock is a pure monitor + queue tool. Stays mounted
+// whenever toggled open (even with no engines) so "Manage queue" is always reachable.
 export function CliMonitorBar(): JSX.Element | null {
-  const open = useUiStore((s) => s.cliMonitorOpen)
-  const toggleCliMonitor = useUiStore((s) => s.toggleCliMonitor)
-  const { sessions, history, spawnQueue, pos, onDragStart, expandedIds, toggleExpand } = useCliMonitor()
+  const open = useUiStore((st) => st.cliMonitorOpen)
+  const toggleCliMonitor = useUiStore((st) => st.toggleCliMonitor)
+  const setActivePanel = useStore((st) => st.setActivePanel)
+  const spawnQueue = useTerminalStore((st) => st.spawnQueue)
+  const engines = useDockEngines()
+  const [expanded, setExpanded] = useState(true)
+  const [queueOpen, setQueueOpen] = useState(false)
 
   if (!open) return null
 
-  const rateLimited = spawnQueue.rateLimitedUntil > Date.now()
+  function handleAction(engineId: string, actionId: string): void {
+    const term = useTerminalStore.getState()
+    switch (actionId) {
+      case 'open':
+        term.openTab(engineId)
+        break
+      case 'stop':
+        // Mirror the panel board: kill releases the gate slot (dropping the row from the
+        // authoritative list); updateTabStatus('done') before closeTab snapshots it to RECENT.
+        void window.pathly.terminal.kill(engineId)
+        term.updateTabStatus(engineId, 'done')
+        term.closeTab(engineId)
+        break
+      case 'cancel':
+        void window.pathly.terminal.queueControl({ type: 'cancel', tabId: engineId })
+        break
+      case 'up':
+        void window.pathly.terminal.queueControl({ type: 'reorder', tabId: engineId, dir: 'up' })
+        break
+    }
+  }
+
+  function pauseAll(): void {
+    void window.pathly.terminal.queueControl({ type: spawnQueue.paused ? 'resume' : 'pause' })
+  }
 
   return (
-    <div
-      className={s.bar}
-      style={{ '--bar-x': `${pos.x}px`, '--bar-y': `${pos.y}px` } as React.CSSProperties}
-    >
-      <div className={s.header} onMouseDown={onDragStart} role="toolbar" aria-label="Command Center">
-        <GripHorizontal size={12} className={s.grip} aria-hidden="true" />
-        <Cpu size={12} className={s.headerIcon} aria-hidden="true" />
-        <span className={s.title}>Command Center</span>
-        <span className={s.activeCount}>{spawnQueue.total}/{spawnQueue.caps.global}</span>
-        {spawnQueue.queued.length > 0 && (
-          <span className={s.queuedCount}>{spawnQueue.queued.length} queued</span>
-        )}
-        {spawnQueue.paused && <span className={s.pausedBadge}>paused</span>}
-        <button type="button" className={s.closeBtn} onClick={toggleCliMonitor} aria-label="Close CLI monitor">
-          <X size={12} />
-        </button>
-      </div>
-
-      <div className={s.body}>
-        <div className={s.flowSection}>
-          <div className={s.sectionLabel}>FLOW</div>
-          <FlowControlBar />
-        </div>
-        <CodeIntelControl />
-        {rateLimited && (
-          <div className={s.rateLimitBanner}>Rate-limited — backing off, runs are queued</div>
-        )}
-        <SpawnQueuePanel spawnQueue={spawnQueue} />
-        {sessions.length === 0 && history.length === 0 && !rateLimited && spawnQueue.queued.length === 0 && (
-          <p className={s.empty}>No active engines</p>
-        )}
-        {sessions.length > 0 && (
-          <>
-            <div className={s.sectionLabel}>ACTIVE</div>
-            {sessions.map((session) => (
-              <SessionRow key={session.tabId} session={session} expanded={expandedIds.has(session.tabId)} onToggle={() => toggleExpand(session.tabId)} />
-            ))}
-          </>
-        )}
-        {history.length > 0 && (
-          <>
-            <div className={s.sectionLabel}>RECENT</div>
-            {history.map((record) => (
-              <HistoryRow key={`${record.id}-${record.finishedAt}`} record={record} expanded={expandedIds.has(record.id)} onToggle={() => toggleExpand(record.id)} />
-            ))}
-          </>
-        )}
-      </div>
+    <div className={s.anchor}>
+      {expanded ? (
+        <DockExpanded
+          engines={engines}
+          queuedCount={spawnQueue.queued.length}
+          queueSlot={queueOpen ? <SpawnQueuePanel spawnQueue={spawnQueue} /> : null}
+          onCollapse={() => setExpanded(false)}
+          onClose={toggleCliMonitor}
+          onOpenMonitor={() => setActivePanel('monitor')}
+          onOpenEngine={(id) => useTerminalStore.getState().openTab(id)}
+          onAction={handleAction}
+          onPauseAll={pauseAll}
+          onManageQueue={() => setQueueOpen((v) => !v)}
+        />
+      ) : (
+        <DockCollapsed
+          engines={engines}
+          onExpand={() => setExpanded(true)}
+          onClose={toggleCliMonitor}
+        />
+      )}
     </div>
   )
 }

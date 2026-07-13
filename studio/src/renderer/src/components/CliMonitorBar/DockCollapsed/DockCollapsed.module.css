@@ -1,0 +1,95 @@
+.dock {
+  width: 360px;
+  background: var(--bg-surface0);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 12px;
+}
+
+.grip {
+  cursor: grab;
+  color: var(--text-muted);
+  display: inline-flex;
+}
+
+.title {
+  font: 600 11px/1 var(--font-family-base);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.live {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--runtime);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .live { animation: blink 1.4s ease-in-out infinite; }
+}
+
+@keyframes blink { 50% { opacity: 0.4; } }
+
+.liveLabel {
+  font: 500 11px/1 var(--font-family-mono);
+  color: var(--text-muted);
+}
+
+.tallies {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.tally {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font: 500 11px/1 var(--font-family-mono);
+  color: var(--text-secondary);
+}
+
+.tallyDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--tally-dot);
+}
+
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+  transition: background 120ms ease-out, color 120ms ease-out;
+}
+
+.icon:hover { background: var(--bg-surface1); color: var(--text-primary); }
+.icon:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.strip {
+  height: 3px;
+  display: flex;
+  gap: 1px;
+  background: var(--border-color);
+}
+
+.bar { flex: 1; background: var(--bar-color); }
