@@ -34,7 +34,6 @@ export function TaskEditor({ initialText, onSave, onCancel }: Props): JSX.Elemen
         onKeyDown={onKeyDown}
         aria-label="Edit task text"
         autoFocus
-        rows={Math.min(14, Math.max(3, draft.split('\n').length + 1))}
       />
       <div className={s.actions}>
         <span className={s.hint}>Ctrl/⌘+Enter to save · Esc to cancel</span>

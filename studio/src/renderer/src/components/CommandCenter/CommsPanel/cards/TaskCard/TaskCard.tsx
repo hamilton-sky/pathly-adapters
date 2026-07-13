@@ -81,9 +81,10 @@ export function TaskCard({ task: t, siblings }: Props): JSX.Element {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [editing, setEditing] = useState(false)
   useEffect(() => { if (status !== 'pending') setJustRan(false) }, [status])
-  // Editing is offered only for tasks not yet (or no longer) running — editing a live/done
-  // task is a foot-gun. The stored text is what a later run builds from, so edits take effect.
-  const editable = status === 'pending' || status === 'failed'
+  // Editing is offered for any task that isn't actively running — editing an in_progress task
+  // (a live agent is building it) is the only real foot-gun. Editing a done/pending/failed/
+  // blocked task is safe; the stored text is what a later run builds from, so edits take effect.
+  const editable = status !== 'in_progress'
   const handleSaveEdit = (text: string): void => { editTaskText(t.id, text); setEditing(false) }
   // Preview-gated like the goal Run / Evaluate controls: the pill opens a confirm modal and
   // confirming dispatches. The backend builds from the STORED task text (by id), so the preview

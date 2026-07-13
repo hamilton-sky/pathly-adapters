@@ -10,6 +10,12 @@
   width: 100%;
   min-width: 0;
   box-sizing: border-box;
+  /* Stable height so entering edit mode doesn't resize the card. Mirrors the expanded
+     reading box (.taskFull, max-height 240px); grows to 240 then scrolls, and the user
+     can still drag it taller. */
+  min-height: 200px;
+  max-height: 240px;
+  overflow: auto;
   resize: vertical;
   padding: 7px 9px;
   border: 1px solid var(--accent);
