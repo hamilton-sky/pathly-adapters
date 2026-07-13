@@ -1,0 +1,11 @@
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font: 600 10px/1.2 var(--font-family-mono);
+  letter-spacing: 0.04em;
+  color: var(--stage);
+  border: 1px solid color-mix(in srgb, var(--stage) 40%, transparent);
+  background: color-mix(in srgb, var(--stage) 13%, transparent);
+}

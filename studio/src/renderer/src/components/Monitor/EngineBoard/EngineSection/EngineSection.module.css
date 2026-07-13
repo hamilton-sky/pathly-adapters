@@ -1,0 +1,51 @@
+.section {
+  margin-bottom: 26px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 11px;
+}
+
+.dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  background: var(--section-dot);
+}
+
+.label {
+  font: 600 11px/1 var(--font-family-base);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.blurb {
+  font: 400 11px/1 var(--font-family-mono);
+  color: var(--text-muted);
+}
+
+.count {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: var(--radius-full);
+  background: var(--bg-surface1);
+  color: var(--text-secondary);
+  font: 600 11px/1 var(--font-family-mono);
+}
+
+.grid {
+  display: grid;
+  /* min(360px, 100%) so a panel narrower than a card doesn't overflow (studio ≤200px rule). */
+  grid-template-columns: repeat(auto-fill, minmax(min(360px, 100%), 1fr));
+  gap: 11px;
+  align-items: start;
+}

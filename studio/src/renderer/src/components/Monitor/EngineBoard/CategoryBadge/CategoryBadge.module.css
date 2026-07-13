@@ -1,0 +1,17 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  font: 600 10px/1 var(--font-family-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 3px 7px;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  background: var(--bg-surface1);
+}
+
+/* flow = sky accent · loop = purple · single = teal runtime */
+.badge[data-cat='flow']   { color: var(--accent);  background: color-mix(in srgb, var(--accent) 15%, transparent); }
+.badge[data-cat='loop']   { color: var(--purple);  background: color-mix(in srgb, var(--purple) 15%, transparent); }
+.badge[data-cat='single'] { color: var(--runtime); background: color-mix(in srgb, var(--runtime) 15%, transparent); }

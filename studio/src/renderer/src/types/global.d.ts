@@ -4,7 +4,18 @@ declare global {
   interface SpawnCaps { global: number; headless: number; interactive: number }
   /** One identified live CLI engine (PTY spawned, not yet exited). Carries enough to render a
    *  monitor row without the renderer's terminalStore, which a window reload would wipe. */
-  interface RunningEngine { tabId: string; adapter: string; label: string; startedAt: number }
+  interface RunningEngine {
+    tabId: string
+    adapter: string
+    label: string
+    startedAt: number
+    /** How the engine was spawned — the Monitor board's primary grouping. */
+    category: 'flow' | 'loop' | 'single'
+    /** Feature/topic this engine serves, when known (runner topic or spawn telemetry.feature). */
+    feature?: string
+    /** Agent role from spawn telemetry (single-shot editor/AI actions); absent for runner tabs. */
+    role?: string
+  }
   interface SpawnState {
     running: number
     interactive: number

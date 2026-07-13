@@ -364,7 +364,18 @@ const engineQueue: QueueItem[] = []           // ordered — front runs next
 // truth. Keyed by tabId; carries enough to render a monitor row WITHOUT the renderer's
 // terminalStore (which a window reload would wipe while these PTYs keep running here). Populated
 // right after pty.spawn; removed in releaseEngineSlot (the one place exit/kill/cancel converge).
-interface RunningEngine { tabId: string; adapter: string; label: string; startedAt: number }
+interface RunningEngine {
+  tabId: string
+  adapter: string
+  label: string
+  startedAt: number
+  /** How the engine was spawned — the board's primary grouping (runner tab → flow, else single). */
+  category: 'flow' | 'loop' | 'single'
+  /** Feature/topic this engine serves, when known (runner topic or spawn telemetry.feature). */
+  feature?: string
+  /** Agent role from spawn telemetry (single-shot editor/AI actions); absent for runner tabs. */
+  role?: string
+}
 const activeEngines = new Map<string, RunningEngine>()
 
 /** Normalize a launcher (bare 'claude' or a resolved '…\claude.ps1') to a CliAdapter id so the
@@ -586,11 +597,18 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
     // not the renderer's per-tab status (which races the spawn round-trip and misses backend runs).
     if (headlessEngine || interactiveEngine) {
       const adapterId = adapterIdFromLauncher(runnerArgv?.[0] ?? command ?? '')
+      const rmeta = runnerTabMeta.get(tabId)
       activeEngines.set(tabId, {
         tabId,
         adapter: adapterId,
-        label: runnerTabMeta.get(tabId)?.label ?? spawnMeta?.telemetry?.label ?? adapterId,
+        label: rmeta?.label ?? spawnMeta?.telemetry?.label ?? adapterId,
         startedAt: ptyStartedAt,
+        // A registered runner tab is a flow stage; anything else (editor / AI one-shot, manual
+        // REPL) is a single shot. feature/role come from the runner topic or the spawn telemetry
+        // so the board can scope the card to its feature and label its role.
+        category: rmeta ? 'flow' : 'single',
+        feature: rmeta?.topic ?? spawnMeta?.telemetry?.feature,
+        role: spawnMeta?.telemetry?.role,
       })
       broadcastSpawnState()
     }
