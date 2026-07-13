@@ -77,6 +77,15 @@ def _resolve_storage_path(
     # Path-absolute topic would otherwise resolve to the project root itself).
     if "{topic}" not in template:
         return root / template
+    # The PROJECT scope — the literal 'project' or the project-root path itself — is a
+    # structural marker, not a feature slug: resolve it to the canonical pathly/project/ dir
+    # instead of through _safe_topic, which rejects both the reserved 'project' literal AND
+    # absolute paths. The flow-LESS callers (telemetry / health / early-advance / board-run)
+    # pass flow_config=None here, so this is the one place that keeps a project run (its
+    # topic is the project scope) from crashing the supervisor loop after its first stage.
+    _nt = str(topic).replace("\\", "/").rstrip("/")
+    if topic == "project" or (_nt and _nt == str(project_root).replace("\\", "/").rstrip("/")):
+        return root / "pathly" / "project"
     topic = _safe_topic(topic)
     for candidate in (
         root / "pathly" / "features" / topic,
