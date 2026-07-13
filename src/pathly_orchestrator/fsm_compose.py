@@ -188,6 +188,15 @@ def build_prompt(
     # on — else the PO/architect/… artifacts orphan onto a throwaway slug-scoped
     # board instead of the board the consultation was spawned from (the bug fix).
     board_scope = feature
+    if feature == "project":
+        # A PROJECT-scoped run (storage pathly/project/ → basename 'project') posts to / reads
+        # the project board, whose scope is the NORMALIZED project_root — NOT the literal
+        # 'project' dir basename, which the board + comms_context never key by. Mirrors
+        # comms/project.py::_project_scope. Without this the stage's board writes (the
+        # project-decompose feature cards, PO/architect notes) orphan at scope='project',
+        # invisible on the per-root project board — AND the ≥2-features gate, which counts at
+        # scope=project_root, sees 0 and fails the run after it actually seeded features.
+        board_scope = (project_root or "").replace("\\", "/").rstrip("/") or feature
     if goal_id:
         try:
             from pathly_orchestrator.db.connection import get_db as _gd

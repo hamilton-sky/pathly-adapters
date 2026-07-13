@@ -6,8 +6,13 @@ on the PROJECT board into 2-5 sibling FEATURE cards (each scaffolded under
 ladder (light | full | consultation), the terminal emit is ``type=feature`` (not
 ``type=goal``) and the heavy tier runs the ``project-consultation`` flow.
 
-The project board's canonical scope is the literal ``"project"``; the consultation
-flow's ``storage_path: pathly/{topic}/`` then resolves to ``pathly/project/``.
+The project board's canonical scope is the NORMALIZED project_root path
+(``_project_scope``) — the literal ``"project"`` is only the no-root fallback and Studio's
+board KEY, never a real scope. The consultation keys its feature-count gate AND its board
+posts by that root scope; ``fsm_compose`` normalizes the stage's ``board_scope`` to the same
+root (a project run's storage basename is ``project``, which must NOT leak as the post
+scope) so agent posts land where the board reads them. Storage is the fixed
+``pathly/project/`` dir (decoupled from the path-like topic).
 """
 
 from __future__ import annotations
