@@ -16,6 +16,7 @@ import {
   fetchLastSummary,
   apiRunnerDecision,
   apiRunnerAwaitingDecision,
+  apiRunnerStatus,
   apiSearch,
   apiSupersede,
   apiAttach,
@@ -191,6 +192,29 @@ function _startRunWatch(key: string, runId?: string): void {
       if (status.running && (!runId || !status.holder || status.holder === runId)) return
       _stopRunWatch(key)
       // Re-check to avoid a double 'done' if the SSE completed it between poll + now.
+      if (useCommsStore.getState().boardRunState[key] === 'running') {
+        useCommsStore.getState().markBoardRunPhase(key, 'done')
+      }
+    })()
+  }, 4000)
+  _runWatchers.set(key, id)
+}
+
+// Completion watch for a board-launched FSM-FLOW run (project/feature consultation). Unlike a
+// single-agent board run, an FSM flow holds NO board-lock — so _startRunWatch's lock poll would
+// instantly false-complete it (the pill stops while the run keeps going, visible only in the CLI
+// monitor). Poll the FSM RUNNER status for the run's topic (= the board scope) instead, and clear
+// the pill only when the run is genuinely terminal (done / aborted / error / gone).
+function _startFsmRunWatch(key: string, scope: string): void {
+  _stopRunWatch(key)
+  const id = window.setInterval(() => {
+    void (async () => {
+      const st = useCommsStore.getState().boardRunState[key]
+      if (st !== 'running' && st !== 'busy') { _stopRunWatch(key); return }
+      const status = await apiRunnerStatus(scope)
+      if (status === null) return // network hiccup — keep watching, never false-complete
+      if (['running', 'paused', 'awaiting_decision', 'finalizing'].includes(status)) return
+      _stopRunWatch(key)
       if (useCommsStore.getState().boardRunState[key] === 'running') {
         useCommsStore.getState().markBoardRunPhase(key, 'done')
       }
@@ -644,8 +668,12 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
       .then((res) => {
         if (res === null) { set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' } })); return }
         if (!res.ok && res.reason === 'board_busy') { set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'busy' } })); return }
-        if (res.ok) _startRunWatch(key, res.run_id)
-        else set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' } }))
+        if (res.ok) {
+          // 'consultation' is an FSM-flow run (holds no board-lock) → watch the runner status
+          // for the board's topic; light/full are single-agent board runs (board-lock watch).
+          if (rigor === 'consultation') _startFsmRunWatch(key, boardParamsForKey(key).scope)
+          else _startRunWatch(key, res.run_id)
+        } else set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' } }))
       })
       .catch(() => { set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' } })) })
   },
@@ -662,8 +690,12 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
       .then((res) => {
         if (res === null) { set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' } })); return }
         if (!res.ok && res.reason === 'board_busy') { set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'busy' } })); return }
-        if (res.ok) _startRunWatch(key, res.run_id)
-        else set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' } }))
+        if (res.ok) {
+          // 'consultation' is an FSM-flow run (holds no board-lock) → watch the runner status
+          // for the board's topic; light/full are single-agent board runs (board-lock watch).
+          if (rigor === 'consultation') _startFsmRunWatch(key, boardParamsForKey(key).scope)
+          else _startRunWatch(key, res.run_id)
+        } else set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' } }))
       })
       .catch(() => { set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' } })) })
   },
