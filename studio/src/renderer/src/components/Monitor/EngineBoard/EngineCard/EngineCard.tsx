@@ -1,5 +1,5 @@
 import React from 'react'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, Square, X } from 'lucide-react'
 import type { MonitorEngine } from '../types'
 import { CategoryBadge } from '../CategoryBadge/CategoryBadge'
 import { AdapterBadge } from '../AdapterBadge/AdapterBadge'
@@ -10,19 +10,28 @@ import s from './EngineCard.module.css'
 interface Props {
   engine: MonitorEngine
   onOpen?: (id: string) => void
+  onAction?: (engineId: string, actionId: string) => void
 }
 
-// A clickable ticket for one CLI engine — the board's atomic unit. Carries the
-// engine's metadata (category, adapter, role, stage, tokens, cost, latest output).
-// Clicking opens the detail modal, where the contextual controls live.
-export function EngineCard({ engine: e, onOpen }: Props): JSX.Element {
+// A clickable ticket for one CLI engine — the board's atomic unit. Clicking (or Enter/Space) opens
+// the detail modal with the full contextual controls; a quick Stop (running) / Cancel (queued)
+// button sits on the card itself so the common action doesn't require opening the modal first.
+export function EngineCard({ engine: e, onOpen, onAction }: Props): JSX.Element {
   const queued = e.status === 'queued'
+  const running = e.status === 'running'
   return (
-    <button
-      type="button"
+    <div
       className={s.card}
+      role="button"
+      tabIndex={0}
       {...(queued ? { 'data-queued': '' } : {})}
       onClick={() => onOpen?.(e.id)}
+      onKeyDown={(ev) => {
+        if (ev.key === 'Enter' || ev.key === ' ') {
+          ev.preventDefault()
+          onOpen?.(e.id)
+        }
+      }}
     >
       <div className={s.head}>
         <CategoryBadge category={e.category} />
@@ -31,6 +40,28 @@ export function EngineCard({ engine: e, onOpen }: Props): JSX.Element {
           <StatusDot status={e.status} />
           <span className={s.elapsed}>{e.elapsed}</span>
         </span>
+        {running && onAction && (
+          <button
+            type="button"
+            className={s.stop}
+            title="Stop engine"
+            aria-label="Stop engine"
+            onClick={(ev) => { ev.stopPropagation(); onAction(e.id, 'stop') }}
+          >
+            <Square size={12} />
+          </button>
+        )}
+        {queued && onAction && (
+          <button
+            type="button"
+            className={s.stop}
+            title="Cancel queued run"
+            aria-label="Cancel queued run"
+            onClick={(ev) => { ev.stopPropagation(); onAction(e.id, 'cancel') }}
+          >
+            <X size={13} />
+          </button>
+        )}
       </div>
 
       <div className={s.feature}>{e.feature}</div>
@@ -45,6 +76,6 @@ export function EngineCard({ engine: e, onOpen }: Props): JSX.Element {
           <span className={s.details}>Details <ChevronRight size={12} /></span>
         </span>
       </div>
-    </button>
+    </div>
   )
 }

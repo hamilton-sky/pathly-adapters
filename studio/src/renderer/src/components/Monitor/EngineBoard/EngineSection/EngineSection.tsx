@@ -8,12 +8,13 @@ interface Props {
   meta: CategoryMeta
   engines: MonitorEngine[]
   onOpen?: (id: string) => void
+  onAction?: (engineId: string, actionId: string) => void
 }
 
 // One category band: colored heading dot + Title-Case label + muted blurb + count
 // badge, then a responsive grid of engine cards. Renders nothing when empty so the
 // board only shows categories that actually have engines.
-export function EngineSection({ meta, engines, onOpen }: Props): JSX.Element | null {
+export function EngineSection({ meta, engines, onOpen, onAction }: Props): JSX.Element | null {
   if (engines.length === 0) return null
   return (
     <section className={s.section}>
@@ -25,7 +26,7 @@ export function EngineSection({ meta, engines, onOpen }: Props): JSX.Element | n
       </div>
       <div className={s.grid}>
         {engines.map((e) => (
-          <EngineCard key={e.id} engine={e} onOpen={onOpen} />
+          <EngineCard key={e.id} engine={e} onOpen={onOpen} onAction={onAction} />
         ))}
       </div>
     </section>

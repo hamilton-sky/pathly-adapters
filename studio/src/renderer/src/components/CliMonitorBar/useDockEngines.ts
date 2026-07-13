@@ -14,6 +14,10 @@ function toEngineAdapter(id: string): EngineAdapter {
   return 'Claude'
 }
 
+// Stable empty fallback so a spawn:state that predates queuedEngines/recentEngines (e.g. a
+// main-process build lag) can't crash the dock with `undefined.map`, and doesn't churn renders.
+const EMPTY: RunningEngine[] = []
+
 function baseRow(e: RunningEngine): Omit<DockEngine, 'status' | 'elapsed' | 'sub'> {
   const category = (e.category ?? 'single') as EngineCategory
   return {
@@ -30,9 +34,9 @@ function baseRow(e: RunningEngine): Omit<DockEngine, 'status' | 'elapsed' | 'sub
 //  • live   = running + queued engines (every CLI, across all features — parity with the panel board)
 //  • recent = the gate's bounded history of finished engines (survives a renderer reload)
 export function useDockEngines(): { live: DockEngine[]; recent: DockEngine[] } {
-  const engines = useTerminalStore((s) => s.spawnQueue.engines)
-  const queued = useTerminalStore((s) => s.spawnQueue.queuedEngines)
-  const recent = useTerminalStore((s) => s.spawnQueue.recentEngines)
+  const engines = useTerminalStore((s) => s.spawnQueue.engines ?? EMPTY)
+  const queued = useTerminalStore((s) => s.spawnQueue.queuedEngines ?? EMPTY)
+  const recent = useTerminalStore((s) => s.spawnQueue.recentEngines ?? EMPTY)
   const scrollbackByTabId = useTerminalStore((s) => s.scrollbackByTabId)
   const tabs = useTerminalStore((s) => s.tabs)
 

@@ -44,6 +44,32 @@
   color: var(--text-muted);
 }
 
+.stop {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 120ms ease-out, border-color 120ms ease-out, color 120ms ease-out;
+}
+
+.stop:hover {
+  background: color-mix(in srgb, var(--red) 12%, transparent);
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.stop:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 .feature {
   font: 600 13px/1.2 var(--font-family-mono);
   color: var(--text-primary);

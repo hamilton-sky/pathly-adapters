@@ -71,6 +71,7 @@ export function MonitorBoard({ engines, onAction }: Props): JSX.Element {
             meta={sec.meta}
             engines={sec.engines}
             onOpen={setOpenId}
+            onAction={onAction}
           />
         ))}
 
