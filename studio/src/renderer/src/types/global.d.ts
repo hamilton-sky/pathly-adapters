@@ -15,6 +15,8 @@ declare global {
     feature?: string
     /** Agent role from spawn telemetry (single-shot editor/AI actions); absent for runner tabs. */
     role?: string
+    /** Pipeline run id (runner tabs only) — keys the per-flow cost rollup (/db/runs/<run_id>/cost). */
+    runId?: string
   }
   interface SpawnState {
     running: number

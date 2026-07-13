@@ -9,6 +9,7 @@ import { FsmView } from './FsmView'
 import { HealthCheck } from './HealthCheck'
 import { OutputTab } from './output/OutputTab'
 import { MonitorBoard } from './EngineBoard'
+import { RunCostBadge } from './RunCostBadge/RunCostBadge'
 import { ConfigurePhaseModal } from './ConfigurePhaseModal/ConfigurePhaseModal'
 import styles from './Monitor.module.css'
 
@@ -70,6 +71,7 @@ export function Monitor(): JSX.Element {
         />
       )}
       <HeaderBar effectiveTopic={effectiveTopic} onRefresh={refresh} />
+      <RunCostBadge feature={effectiveTopic} />
       <HealthCheck />
       <FsmView onStageClick={(stage) => setConfigStage(stage)} />
       {engines.length > 0 && (

@@ -375,6 +375,8 @@ interface RunningEngine {
   feature?: string
   /** Agent role from spawn telemetry (single-shot editor/AI actions); absent for runner tabs. */
   role?: string
+  /** Pipeline run id (runner tabs only) — keys the per-flow cost rollup (/db/runs/<run_id>/cost). */
+  runId?: string
 }
 const activeEngines = new Map<string, RunningEngine>()
 // Engines accepted by the gate but still WAITING for a slot (queued / paused). Same record shape,
@@ -566,6 +568,7 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
         category: rmeta ? 'flow' : 'single',
         feature: rmeta?.topic ?? spawnMeta?.telemetry?.feature,
         role: spawnMeta?.telemetry?.role,
+        runId: rmeta?.run_id,
       }
     }
 
