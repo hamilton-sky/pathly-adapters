@@ -33,7 +33,11 @@ def _project_scope(project_root: str, override: str = "") -> str:
     """Resolve the project-board scope key: an explicit override, else the
     normalized project_root path (``\\`` → ``/``, no trailing slash), else the
     literal fallback. Mirrors goal_executor's ``project_root or "project"``."""
-    if override:
+    # 'project' is the literal fallback AND the Studio project-board KEY — never a real
+    # scope override. Treat it as absent so the scope falls to the normalized project_root
+    # (what the board + comms_context key by); otherwise the consultation's features and
+    # lifecycle posts land at scope='project', invisible on the per-project-root board.
+    if override and override != _PROJECT_SCOPE:
         return override
     norm = (project_root or "").replace("\\", "/").rstrip("/")
     return norm or _PROJECT_SCOPE
