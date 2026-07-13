@@ -145,6 +145,13 @@ pathly_orchestrator/
                            # busy_timeout=5000 handle cross-process contention; the RLock handles
                            # cross-thread contention within the server process.
     migrations.py          # _run_migrations(), CREATE TABLE SQL
+    pricing.py             # PRICING table, PricingRegistry, estimate_cost()/infer_provider() —
+                           # the layer-safe pricing SSOT (db/ imports nothing internal, so the
+                           # projector below can price a row without importing upward into
+                           # http_server/). http_server/telemetry_registry.py re-exports these
+                           # symbols for back-compat; http_server/pricing.py (a separate file:
+                           # MODEL_PRICING/compute_cost_usd) is unrelated and still imports FROM
+                           # telemetry_registry, unchanged.
     queries/
       fsm_events.py        # append_event, read_events, read_last_agent_done
       fsm_state.py         # write_state, read_state
@@ -157,6 +164,13 @@ pathly_orchestrator/
                            #   backfill_invocations_from_events() (idempotent startup rebuild) +
                            #   on_event_appended() (live hook fired from fsm_events.append_event).
                            #   Editor/chat rows (/db/invocation, source_seq NULL) are left untouched.
+                           #   _price_if_needed() (chokepoint, applied on every projected row) calls
+                           #   db/pricing.estimate_cost() when cost_usd==0 AND tokens>0 (e.g. codex,
+                           #   which reports tokens but no dollar cost) — idempotent, never re-prices
+                           #   an already-priced row; a token-less agy/gemini row is marked
+                           #   cost_source='unavailable' instead of a misleading $0. run_id is now
+                           #   stamped on the projected row (AGENT_DONE.run_id, or a later
+                           #   BILLING_UPDATE.run_id via COALESCE) — backs GET /db/runs/<run_id>/cost.
       comms.py             # re-export shim — splits into comms_messages, comms_artifacts, comms_tasks, comms_embeddings, comms_counts, comms_goals_read (import from domain modules for new code)
       comms_messages.py    # board message CRUD; goal_id/executor columns back the Goals->Task-DAG model
       comms_artifacts.py   # artifact metadata CRUD (attach, list, section index, update_summary)

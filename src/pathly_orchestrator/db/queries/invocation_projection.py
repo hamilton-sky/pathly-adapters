@@ -46,6 +46,32 @@ def _num(v: object) -> float:
         return 0.0
 
 
+def _price_if_needed(
+    cost: float, cost_source: str, model: str | None, tokens_in: object, tokens_out: object
+) -> tuple[float, str]:
+    """Estimate cost from tokens when the event stream reported none.
+
+    Idempotent chokepoint: only fires when ``cost`` is exactly 0 (a priced cost —
+    provider-reported OR an earlier estimate — is never re-priced/overwritten).
+    agy/gemini rows with tokens still 0 are marked 'unavailable' rather than left
+    'unpriced' — agy emits no usage telemetry at all, so there is nothing to estimate.
+    """
+    if cost and cost > 0:
+        return cost, cost_source
+    tin, tout = int(_num(tokens_in)), int(_num(tokens_out))
+    if tin + tout > 0:
+        from ..pricing import estimate_cost  # intra-db import, layer-safe
+
+        est, src = estimate_cost(model or "", tin, tout)
+        if src == "estimated":
+            return est, "estimated"
+        return cost, cost_source
+    m = (model or "").lower()
+    if m.startswith("gemini-") or m in ("antigravity", "agy"):
+        return cost, "unavailable"
+    return cost, cost_source
+
+
 def _tier_for(conn: sqlite3.Connection, project_root: str, feature: str) -> str:
     """Best-effort board scope tier for (project_root, feature).
 
@@ -83,6 +109,7 @@ def _agent_done_rec(payload: dict) -> dict:
         "tool_uses": int(_num(payload.get("tool_uses"))),
         "summary": (payload.get("summary") or payload.get("result") or "")[:2000],
         "provider": payload.get("model") or payload.get("adapter") or None,
+        "run_id": payload.get("run_id"),
         "ts": payload.get("ts") or "",
     }
 
@@ -98,6 +125,9 @@ def _upsert_projected(
     """Insert-or-replace the projected invocation row keyed by (pr, feature, source_seq)."""
     cost = _num(rec.get("cost_usd"))
     cost_source = "provider_reported" if cost > 0 else "unpriced"
+    cost, cost_source = _price_if_needed(
+        cost, cost_source, rec.get("provider"), rec.get("tokens_in"), rec.get("tokens_out")
+    )
     with _get_write_lock(conn):
         conn.execute(
             "DELETE FROM agent_invocations "
@@ -113,7 +143,7 @@ def _upsert_projected(
             (
                 project_root,
                 feature,
-                None,
+                rec.get("run_id"),
                 rec.get("agent_role"),
                 rec.get("agent_role"),
                 rec.get("ts"),
@@ -297,7 +327,8 @@ def on_event_appended(
                 return
             anchor_seq = anchor[0]
             row = conn.execute(
-                "SELECT cost_usd, tokens_in, tokens_out FROM agent_invocations "
+                "SELECT cost_usd, tokens_in, tokens_out, provider, run_id "
+                "FROM agent_invocations "
                 "WHERE project_root=? AND feature=? AND source_seq=?",
                 (project_root, feature, anchor_seq),
             ).fetchone()
@@ -307,16 +338,32 @@ def on_event_appended(
                 "tokens_out": int(row[2]) if row and row[2] else 0,
             }
             _fold_billing(rec, event_dict)
+            # BILLING_UPDATE carries the model/run_id the original AGENT_DONE couldn't
+            # (see runner/events.py::_patch_last_agent_done) — fall back to whatever the
+            # row already has (COALESCE at the UPDATE) so an earlier value is preserved.
+            model = event_dict.get("model") or (row[3] if row else None)
+            run_id = event_dict.get("run_id") or (row[4] if row else None)
+            folded_cost = _num(rec.get("cost_usd"))
+            folded_source = "provider_reported" if folded_cost > 0 else "unpriced"
+            cost, cost_source = _price_if_needed(
+                folded_cost,
+                folded_source,
+                model,
+                rec.get("tokens_in"),
+                rec.get("tokens_out"),
+            )
             with _get_write_lock(conn):
-                cost = _num(rec.get("cost_usd"))
                 conn.execute(
                     "UPDATE agent_invocations SET cost_usd=?, tokens_in=?, tokens_out=?, "
-                    "cost_source=? WHERE project_root=? AND feature=? AND source_seq=?",
+                    "cost_source=?, provider=COALESCE(?,provider), run_id=COALESCE(?,run_id) "
+                    "WHERE project_root=? AND feature=? AND source_seq=?",
                     (
                         cost,
                         int(rec.get("tokens_in") or 0),
                         int(rec.get("tokens_out") or 0),
-                        "provider_reported" if cost > 0 else "unpriced",
+                        cost_source,
+                        model,
+                        run_id,
                         project_root,
                         feature,
                         anchor_seq,

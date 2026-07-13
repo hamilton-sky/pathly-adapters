@@ -115,7 +115,10 @@ TYPE_BILLING_UPDATE = "BILLING_UPDATE"
 # BILLING_UPDATE required: agent, conversation, cost_usd, tokens_in, tokens_out,
 #   total_tokens, wall_seconds, ts
 # BILLING_UPDATE optional: tool_uses,
-#   cost_source (default "unpriced"), cache_read_tokens (default 0), cache_write_tokens (default 0)
+#   cost_source (default "unpriced"), cache_read_tokens (default 0), cache_write_tokens (default 0),
+#   model (default null — threaded through so the invocation_projection pricing chokepoint
+#   can estimate cost from tokens when the CLI reports none, e.g. codex), run_id (default null —
+#   stamps the projected agent_invocations row so /db/runs/<run_id>/cost can sum it)
 
 TYPE_STAGE_INTERACTIVE_DONE = "STAGE_INTERACTIVE_DONE"
 # Schema: {"type": "STAGE_INTERACTIVE_DONE", "topic": str, "stage": str, "ts": str}

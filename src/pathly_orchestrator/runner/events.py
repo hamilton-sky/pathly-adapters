@@ -20,6 +20,8 @@ def _patch_last_agent_done(
     tokens_out: int,
     wall_seconds: int,
     tool_uses: int = 0,
+    model: str = "",
+    run_id: str = "",
 ) -> None:
     """Append a BILLING_UPDATE event with real cost/token data to DB.
 
@@ -53,6 +55,8 @@ def _patch_last_agent_done(
         "total_tokens": tokens_in + tokens_out,
         "wall_seconds": wall_seconds,
         "tool_uses": tool_uses,
+        "model": model or None,
+        "run_id": run_id or None,
         "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "schema_version": 1,
     }

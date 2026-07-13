@@ -267,6 +267,55 @@ def test_parse_result_codex_shape_drift():
     assert result["tool_uses"] == 0
 
 
+# ── codex `exec --json` JSONL token-usage capture (defensive — shape unconfirmed) ──
+
+
+def test_parse_result_codex_captures_tokens_from_typed_token_count_event():
+    raw = (
+        '{"type": "session_start", "session_id": "codex-abc"}\n'
+        '{"type": "token_count", "input_tokens": 1200, "output_tokens": 340}\n'
+        '{"type": "agent_message", "text": "done"}\n'
+    )
+    result = parse_result("codex", raw)
+    assert result["tokens_in"] == 1200
+    assert result["tokens_out"] == 340
+    assert result["cost_usd"] == 0.0  # codex never emits a dollar cost
+
+
+def test_parse_result_codex_captures_nested_usage_field():
+    raw = '{"usage": {"prompt_tokens": 500, "completion_tokens": 90}}'
+    result = parse_result("codex", raw)
+    assert result["tokens_in"] == 500
+    assert result["tokens_out"] == 90
+
+
+def test_parse_result_codex_captures_info_total_token_usage():
+    raw = (
+        '{"info": {"total_token_usage": {"input_tokens": 2000, '
+        '"cached_input_tokens": 300, "output_tokens": 150}}}'
+    )
+    result = parse_result("codex", raw)
+    assert result["tokens_in"] == 2300  # input + cached folded into tokens_in
+    assert result["tokens_out"] == 150
+
+
+def test_parse_result_codex_keeps_last_nonzero_usage_event():
+    raw = (
+        '{"usage": {"input_tokens": 100, "output_tokens": 20}}\n'
+        '{"usage": {"input_tokens": 400, "output_tokens": 80}}\n'
+    )
+    result = parse_result("codex", raw)
+    assert result["tokens_in"] == 400
+    assert result["tokens_out"] == 80
+
+
+def test_parse_result_codex_no_usage_event_yields_zero_tokens():
+    raw = '{"type": "agent_message", "text": "hello"}\n'
+    result = parse_result("codex", raw)
+    assert result["tokens_in"] == 0
+    assert result["tokens_out"] == 0
+
+
 # ── tail_agent_done ───────────────────────────────────────────────────────────
 
 

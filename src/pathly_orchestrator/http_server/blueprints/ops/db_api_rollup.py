@@ -124,3 +124,39 @@ def db_rollup():
     except Exception as e:
         logger.exception("db_rollup error")
         return jsonify({"error": str(e)}), 500
+
+
+@bp.route("/db/runs/<run_id>/cost", methods=["GET"])
+def db_run_cost(run_id: str):
+    """Per-flow (run_id) cost/token rollup.
+
+    Every agent_invocations row is already billing-reconciled (the projector folds a
+    superseding BILLING_UPDATE into its anchor row — see invocation_projection.py), so
+    a plain SUM over run_id is correct with no double-count. Zeros (not 404) for an
+    unknown run_id — there is no "run not found" error state, just no facts yet.
+    """
+    try:
+        conn = _get_db()
+        row = conn.execute(
+            "SELECT COUNT(*) AS invocations, "
+            "  COALESCE(SUM(cost_usd),0) AS cost_usd, "
+            "  COALESCE(SUM(tokens_in),0) AS tokens_in, "
+            "  COALESCE(SUM(tokens_out),0) AS tokens_out "
+            "FROM agent_invocations WHERE run_id=?",
+            (run_id,),
+        ).fetchone()
+        tokens_in = int(row["tokens_in"])
+        tokens_out = int(row["tokens_out"])
+        return jsonify(
+            {
+                "run_id": run_id,
+                "invocations": int(row["invocations"]),
+                "cost_usd": round(float(row["cost_usd"]), 6),
+                "tokens_in": tokens_in,
+                "tokens_out": tokens_out,
+                "tokens_total": tokens_in + tokens_out,
+            }
+        )
+    except Exception as e:
+        logger.exception("db_run_cost error")
+        return jsonify({"error": str(e)}), 500

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Any
+from typing import Any, Generator
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 
@@ -65,6 +65,81 @@ def _normalize_model_usage(raw: Any) -> dict[str, dict[str, Any]]:
     return out
 
 
+def _iter_json_objects(raw: str) -> Generator[dict[str, Any], None, None]:
+    """Yield every top-level JSON object in a (possibly JSONL) string.
+
+    Tolerant of ANSI escapes and non-JSON text interleaved between objects (codex
+    `exec --json` interleaves progress lines with JSONL events). Only attempts a
+    decode at a `{`/`[` character — matching ``_extract_json_payload``'s scan — and
+    skips forward past each decoded object's span so a nested object is never
+    re-yielded as a sibling top-level event.
+    """
+    cleaned = _ANSI_RE.sub("", raw or "").strip()
+    if not cleaned:
+        return
+    decoder = json.JSONDecoder()
+    idx = 0
+    n = len(cleaned)
+    while idx < n:
+        if cleaned[idx] not in "{[":
+            idx += 1
+            continue
+        try:
+            payload, end = decoder.raw_decode(cleaned, idx)
+        except json.JSONDecodeError:
+            idx += 1
+            continue
+        if isinstance(payload, dict):
+            yield payload
+        idx = max(end, idx + 1)
+
+
+def _codex_usage(raw_output: str) -> tuple[int, int]:
+    """Scan codex `exec --json` JSONL output for a token-usage event.
+
+    DEFENSIVE: codex's usage shape varies by CLI version (unconfirmed offline) — tolerate
+    a top-level ``usage`` object, a nested ``info.total_token_usage``, or a typed
+    ``token_count``/``token_usage`` event whose own fields ARE the usage. Field names are
+    tried in both snake_case and camelCase. Keeps the LAST non-zero usage event seen
+    (later events carry the running/final total). Returns (0, 0) when none is found.
+    """
+    tokens_in = tokens_out = 0
+    for obj in _iter_json_objects(raw_output):
+        usage = obj.get("usage")
+        if not isinstance(usage, dict):
+            info = obj.get("info")
+            if isinstance(info, dict) and isinstance(
+                info.get("total_token_usage"), dict
+            ):
+                usage = info["total_token_usage"]
+            elif obj.get("type") in ("token_count", "token_usage"):
+                usage = obj
+        if not isinstance(usage, dict):
+            continue
+        u_in = int(
+            (
+                usage.get("input_tokens")
+                or usage.get("prompt_tokens")
+                or usage.get("inputTokens")
+                or 0
+            )
+            + (
+                usage.get("cached_input_tokens")
+                or usage.get("cache_read_input_tokens")
+                or 0
+            )
+        )
+        u_out = int(
+            usage.get("output_tokens")
+            or usage.get("completion_tokens")
+            or usage.get("outputTokens")
+            or 0
+        )
+        if u_in or u_out:
+            tokens_in, tokens_out = u_in, u_out
+    return tokens_in, tokens_out
+
+
 def parse_result(adapter: str, raw_output: str) -> dict[str, Any]:
     payload = _extract_json_payload(raw_output)
     if adapter == "codex":
@@ -99,6 +174,11 @@ def parse_result(adapter: str, raw_output: str) -> dict[str, Any]:
         + (usage.get("cache_creation_input_tokens") or 0)
     )
     tokens_out = int(usage.get("output_tokens", 0) or usage.get("outputTokens", 0))
+
+    if adapter == "codex":
+        c_in, c_out = _codex_usage(raw_output)
+        if c_in or c_out:
+            tokens_in, tokens_out = c_in, c_out
 
     # Per-model usage breakdown (claude emits `modelUsage`: {model: {inputTokens,
     # outputTokens, cache*, costUSD}}). Capture it for per-model cost attribution, and use

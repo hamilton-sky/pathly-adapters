@@ -131,6 +131,7 @@ def _reconciliation_window(
     topic: str,
     events_path: str,
     timeout: float = 600,
+    model: str = "",
 ) -> None:
     """Wait up to `timeout` seconds for PTY billing POST after early FSM advance.
 
@@ -178,6 +179,8 @@ def _reconciliation_window(
                     tokens_out,
                     wall_seconds,
                     tool_uses,
+                    model=model,
+                    run_id=run.run_id,
                 )
             except Exception as exc:
                 logger.warning(
@@ -193,13 +196,24 @@ def _reconciliation_window(
                     update_invocation_billing,
                 )
 
+                billed_cost, billed_source = cost_usd, (
+                    "provider_reported" if cost_usd > 0 else "unpriced"
+                )
+                if cost_usd == 0 and (tokens_in + tokens_out) > 0 and model:
+                    from pathly_orchestrator.db.pricing import estimate_cost
+
+                    est_cost, est_source = estimate_cost(model, tokens_in, tokens_out)
+                    if est_source == "estimated":
+                        billed_cost, billed_source = est_cost, est_source
+
                 update_invocation_billing(
                     get_db(),
                     run.run_id,
-                    cost_usd=cost_usd,
+                    cost_usd=billed_cost,
                     tokens_in=tokens_in,
                     tokens_out=tokens_out,
-                    cost_source=("provider_reported" if cost_usd > 0 else "unpriced"),
+                    cost_source=billed_source,
+                    provider=model or None,
                 )
             except Exception as exc:
                 logger.debug(
@@ -485,6 +499,7 @@ def _run_stage_via_terminal(
                             state.topic,
                             events_path_for_recon,
                         ),
+                        kwargs={"model": model},
                         daemon=True,
                         name=f"recon-window-{run_id}",
                     )

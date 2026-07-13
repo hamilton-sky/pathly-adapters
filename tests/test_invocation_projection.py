@@ -50,6 +50,35 @@ def _billing(agent, conv, cost, tin=0, tout=0, ts="2026-07-06T12:01:00Z"):
     }
 
 
+def _ad_model(agent, conv, model, total_tokens, ts="2026-07-06T12:00:00Z"):
+    return {
+        "type": "AGENT_DONE",
+        "agent": agent,
+        "conversation": conv,
+        "cost_usd": 0.0,
+        "model": model,
+        "total_tokens": total_tokens,
+        "ts": ts,
+    }
+
+
+def _billing_model(
+    agent, conv, model, run_id, tin, tout, ts="2026-07-06T12:01:00Z"
+):
+    return {
+        "type": "BILLING_UPDATE",
+        "agent": agent,
+        "conversation": conv,
+        "cost_usd": 0.0,
+        "model": model,
+        "run_id": run_id,
+        "tokens_in": tin,
+        "tokens_out": tout,
+        "total_tokens": tin + tout,
+        "ts": ts,
+    }
+
+
 # ── live write-path hook (append_event → on_event_appended) ──────────────────────
 
 
@@ -104,6 +133,50 @@ def test_two_agents_same_conversation_two_rows():
     assert len(rows) == 2
     total = sum(r["cost_usd"] for r in rows)
     assert abs(total - 0.08) < 1e-9
+
+
+# ── pricing chokepoint (_price_if_needed): estimate cost from tokens+model ───────
+
+
+def test_agent_done_zero_cost_with_tokens_and_model_gets_estimated():
+    conn = get_db()
+    append_event(conn, PR, "f_price1", _ad_model("builder", 1, "gpt-4o", 100_000))
+    rows = _invocations(conn, "f_price1")
+    assert len(rows) == 1
+    assert rows[0]["cost_source"] == "estimated"
+    assert rows[0]["cost_usd"] > 0
+
+
+def test_billing_update_with_model_and_run_id_prices_and_stamps_run_id():
+    conn = get_db()
+    append_event(conn, PR, "f_price2", _ad("builder", 1, 0.0, 0))  # unpriced, no model
+    append_event(
+        conn,
+        PR,
+        "f_price2",
+        _billing_model("builder", 1, "gpt-4o", "run-xyz", 50_000, 10_000),
+    )
+    row = get_db().execute(
+        "SELECT cost_usd, cost_source, run_id, provider FROM agent_invocations "
+        "WHERE project_root=? AND feature=?",
+        (PR, "f_price2"),
+    ).fetchone()
+    assert row is not None
+    assert row["cost_source"] == "estimated"
+    assert row["cost_usd"] > 0
+    assert row["run_id"] == "run-xyz"
+    assert row["provider"] == "gpt-4o"
+
+
+def test_price_if_needed_never_touches_an_already_priced_cost():
+    """Idempotency guard: a priced cost (provider-reported or already estimated) must
+    never be re-priced by a later projection pass — no double count."""
+    conn = get_db()
+    append_event(conn, PR, "f_price3", _ad("builder", 1, 0.42, 8000))
+    rows = _invocations(conn, "f_price3")
+    assert len(rows) == 1
+    assert abs(rows[0]["cost_usd"] - 0.42) < 1e-9
+    assert rows[0]["cost_source"] == "provider_reported"
 
 
 # ── backfill (startup rebuild) ───────────────────────────────────────────────────

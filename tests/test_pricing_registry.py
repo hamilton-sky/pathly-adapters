@@ -71,3 +71,21 @@ def test_claude_sonnet_estimated(registry):
     )
     assert source == "estimated"
     assert cost > 0
+
+
+# ── db.pricing.estimate_cost — the layer-safe entry point used by the projector ──
+
+
+def test_estimate_cost_infers_provider_from_model_prefix():
+    from pathly_orchestrator.db.pricing import estimate_cost
+
+    cost, source = estimate_cost("gpt-4o", 1_000_000, 0)
+    assert source == "estimated"
+    assert abs(cost - 2.50) < 1e-5
+
+
+def test_estimate_cost_zero_tokens_is_unpriced():
+    from pathly_orchestrator.db.pricing import estimate_cost
+
+    cost, source = estimate_cost("claude-x", 0, 0)
+    assert (cost, source) == (0.0, "unpriced")

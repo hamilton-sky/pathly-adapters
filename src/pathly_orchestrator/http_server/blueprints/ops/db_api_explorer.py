@@ -103,13 +103,22 @@ def db_stats():
             "SELECT COUNT(*) FROM fsm_events WHERE event_type='AGENT_DONE'"
         ).fetchone()[0]
         # Cost + tokens read from agent_invocations — the SAME fact table the /db/rollup
-        # scope-tier panels sum, so the header strip and the roll-up always agree. (The
-        # old fsm_events sum double-counted every run that had both an AGENT_DONE and a
-        # superseding BILLING_UPDATE; agent_invocations folds those into one row.)
-        row = conn.execute(
-            "SELECT COALESCE(SUM(tokens_in + tokens_out),0), "
-            "       COALESCE(SUM(cost_usd),0) FROM agent_invocations"
-        ).fetchone()
+        # scope-tier panels AND /db/features sum, so the header strip, the roll-up, and
+        # the feature cards always agree. (The old fsm_events sum double-counted every
+        # run that had both an AGENT_DONE and a superseding BILLING_UPDATE;
+        # agent_invocations folds those into one row.) Scoped to project_root when given —
+        # otherwise the header would show a global total next to per-project feature cards.
+        if project_root:
+            row = conn.execute(
+                "SELECT COALESCE(SUM(tokens_in + tokens_out),0), "
+                "       COALESCE(SUM(cost_usd),0) FROM agent_invocations WHERE project_root=?",
+                (project_root,),
+            ).fetchone()
+        else:
+            row = conn.execute(
+                "SELECT COALESCE(SUM(tokens_in + tokens_out),0), "
+                "       COALESCE(SUM(cost_usd),0) FROM agent_invocations"
+            ).fetchone()
         total_tokens = int(row[0])
         total_cost = float(row[1])
 
@@ -168,25 +177,29 @@ def db_features():
         event_counts = {
             (r["project_root"], r["feature"]): r["cnt"] for r in event_count_rows
         }
+        # Read from agent_invocations — the SAME fact table /db/stats and /db/rollup sum
+        # (one row per AGENT_DONE, the superseding BILLING_UPDATE folded in), so the
+        # feature cards, the header strip, and the roll-up always agree. The old
+        # fsm_events json_extract sum double-counted every run that had both an
+        # AGENT_DONE and a BILLING_UPDATE. Keys (inv/total_tokens/total_cost) unchanged
+        # so the loop below is untouched.
         if pr_filter:
             inv_rows = conn.execute(
                 "SELECT project_root, feature, "
-                "COUNT(CASE WHEN event_type='AGENT_DONE' THEN 1 END) as inv, "
-                "COALESCE(SUM(CASE WHEN event_type='AGENT_DONE' "
-                "  THEN CAST(json_extract(payload,'$.total_tokens') AS INT) ELSE 0 END),0) as total_tokens, "
-                "COALESCE(SUM(CAST(json_extract(payload,'$.cost_usd') AS REAL)),0) as total_cost "
-                "FROM fsm_events WHERE event_type IN ('AGENT_DONE','BILLING_UPDATE') AND project_root=? "
+                "  COUNT(*) as inv, "
+                "  COALESCE(SUM(tokens_in + tokens_out),0) as total_tokens, "
+                "  COALESCE(SUM(cost_usd),0) as total_cost "
+                "FROM agent_invocations WHERE project_root=? "
                 "GROUP BY project_root, feature",
                 [pr_filter],
             ).fetchall()
         else:
             inv_rows = conn.execute(
                 "SELECT project_root, feature, "
-                "COUNT(CASE WHEN event_type='AGENT_DONE' THEN 1 END) as inv, "
-                "COALESCE(SUM(CASE WHEN event_type='AGENT_DONE' "
-                "  THEN CAST(json_extract(payload,'$.total_tokens') AS INT) ELSE 0 END),0) as total_tokens, "
-                "COALESCE(SUM(CAST(json_extract(payload,'$.cost_usd') AS REAL)),0) as total_cost "
-                "FROM fsm_events WHERE event_type IN ('AGENT_DONE','BILLING_UPDATE') "
+                "  COUNT(*) as inv, "
+                "  COALESCE(SUM(tokens_in + tokens_out),0) as total_tokens, "
+                "  COALESCE(SUM(cost_usd),0) as total_cost "
+                "FROM agent_invocations "
                 "GROUP BY project_root, feature"
             ).fetchall()
         inv_stats = {(r["project_root"], r["feature"]): dict(r) for r in inv_rows}

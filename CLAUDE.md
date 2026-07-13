@@ -253,7 +253,8 @@ active feature in the central SQLite DB (`~/.pathly/pathly.db`), and appends a
 display API-accurate costs. It always exits 0 — telemetry failure never blocks the user.
 
 **`agent_invocations` is a projection of the `AGENT_DONE` event stream** (telemetry-reconciliation).
-The DB-explorer roll-up (`/db/rollup`), header strip (`/db/stats`) and cost chart
+The DB-explorer roll-up (`/db/rollup`), header strip (`/db/stats`), feature cards
+(`/db/features`), per-flow rollup (`/db/runs/<run_id>/cost`) and cost chart
 (`/telemetry/trends`) all read `agent_invocations` — but the authoritative per-agent
 cost/tokens live in `fsm_events` (each agent writes `AGENT_DONE`; the stop hook /
 reconciliation window appends a `BILLING_UPDATE` that **supersedes** it). So the
@@ -268,3 +269,23 @@ one-shots posted via `/db/invocation` (feature `"(project)"`, no event) keep
 writers in `runner/telemetry.py` (`project_agent_done`, called with
 `write_invocation=False`) and `api_lifecycle._write_stage_telemetry` now write only the
 OTel **span** (for the Traces tab) — the invocation comes from the event projection.
+`/db/stats` and `/db/features` both honor `project_root` (scoped SUM/GROUP BY over the
+same table), so the header total always equals the sum of the feature cards for that
+project.
+
+**Cost is priced from tokens when the CLI reports none — `db/pricing.py`.** The
+pricing table/`PricingRegistry`/`estimate_cost`/`infer_provider` live in
+`db/pricing.py` (the layer-safe home — the projector is in `db/` and cannot import
+upward into `http_server/`); `http_server/telemetry_registry.py` re-exports them for
+back-compat. The projector applies a `_price_if_needed` chokepoint on every projected
+row (idempotent: only fires when `cost_usd==0` and `tokens_in+tokens_out>0`; a
+provider-reported or already-estimated cost is never re-priced). Per-adapter behavior:
+`codex exec --json` (JSONL events on stdout) never reports a dollar cost, so
+`runner/output.py::_codex_usage` scans the stream for a token-usage event
+(defensive — the exact field shape is unconfirmed, several layouts are tolerated) and
+the chokepoint estimates cost from those tokens (`cost_source="estimated"`); `agy`
+(Antigravity) emits no usage telemetry at all, so its rows are marked
+`cost_source="unavailable"` rather than a misleading `$0`. `model`/`run_id` are now
+threaded into `BILLING_UPDATE` (`runner/events.py::_patch_last_agent_done` →
+`supervisor/terminal.py::_reconciliation_window`) so the projected row's `provider` and
+`run_id` columns get stamped even when the originating `AGENT_DONE` didn't carry them.
