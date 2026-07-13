@@ -19,6 +19,10 @@ export function rowControls(status: EngineStatus, _category: EngineCategory): Ro
       { id: 'cancel', icon: '✕', title: 'Cancel',  kind: 'danger' },
     ]
   }
+  if (status === 'done' || status === 'failed') {
+    // RECENT/history rows — the engine is gone; only "open terminal" (its scrollback) makes sense.
+    return [{ id: 'open', icon: '↗', title: 'Open terminal', kind: 'default' }]
+  }
   return [
     { id: 'open', icon: '↗', title: 'Open terminal', kind: 'default' },
     { id: 'stop', icon: '■', title: 'Stop',          kind: 'danger' },

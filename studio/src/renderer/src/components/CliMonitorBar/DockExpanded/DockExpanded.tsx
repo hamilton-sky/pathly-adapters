@@ -23,6 +23,8 @@ interface Props {
   queuedCount?: number
   /** Rendered between the rows and the footer when "Manage queue" is toggled on. */
   queueSlot?: React.ReactNode
+  /** Recently-finished engines — the RECENT/history list (shown under the live rows). */
+  recent?: DockEngine[]
 }
 
 // The expanded dock: header (drag / promote / collapse / close), a mini category filter, the
@@ -30,7 +32,7 @@ interface Props {
 // control bar — each row carries its own contextual controls.
 export function DockExpanded({
   engines, onCollapse, onClose, onOpenMonitor, onOpenEngine, onAction,
-  onPauseAll, onManageQueue, paused, onGripPointerDown, queuedCount, queueSlot,
+  onPauseAll, onManageQueue, paused, onGripPointerDown, queuedCount, queueSlot, recent,
 }: Props): JSX.Element {
   const [filter, setFilter] = useState<DockCategoryFilter>('all')
 
@@ -43,6 +45,7 @@ export function DockExpanded({
   const running = engines.filter((e) => e.status === 'running').length
   const queued = queuedCount ?? engines.filter((e) => e.status === 'queued').length
   const rows = engines.filter((e) => filter === 'all' || e.category === filter)
+  const recentShown = (recent ?? []).filter((e) => filter === 'all' || e.category === filter).slice(0, 8)
 
   return (
     <div className={s.dock}>
@@ -74,6 +77,15 @@ export function DockExpanded({
           <EngineRow key={e.id} engine={e} onOpen={onOpenEngine} onAction={onAction} />
         ))}
         {rows.length === 0 && <div className={s.empty}>No engines in this view</div>}
+
+        {recentShown.length > 0 && (
+          <>
+            <div className={s.recentLabel}>Recent</div>
+            {recentShown.map((e, i) => (
+              <EngineRow key={`r-${e.id}-${i}`} engine={e} onOpen={onOpenEngine} onAction={onAction} />
+            ))}
+          </>
+        )}
       </div>
 
       {queueSlot}

@@ -79,6 +79,16 @@
   color: var(--text-muted);
 }
 
+.recentLabel {
+  padding: 8px 12px 4px;
+  font: 700 9px/1 var(--font-family-base);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border-color);
+  margin-top: 4px;
+}
+
 .foot {
   display: flex;
   align-items: center;

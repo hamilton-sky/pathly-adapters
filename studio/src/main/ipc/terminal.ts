@@ -377,12 +377,19 @@ interface RunningEngine {
   role?: string
   /** Pipeline run id (runner tabs only) — keys the per-flow cost rollup (/db/runs/<run_id>/cost). */
   runId?: string
+  /** When the engine finished — set only on RECENT/history entries. */
+  finishedAt?: number
 }
 const activeEngines = new Map<string, RunningEngine>()
 // Engines accepted by the gate but still WAITING for a slot (queued / paused). Same record shape,
 // startedAt = when queued. Registered at request time so the monitor can render queued rows with a
 // real adapter/category/feature, then moved to activeEngines when the PTY actually spawns.
 const queuedEngines = new Map<string, RunningEngine>()
+// Recently-finished engines (bounded, newest first) — the monitor's RECENT/history list. Pushed in
+// releaseEngineSlot (exit / kill / cancel) so a spawn's record is visible after it ends, and it
+// survives a renderer reload (it lives in the main process).
+const RECENT_CAP = 40
+const recentEngines: RunningEngine[] = []
 
 /** Normalize a launcher (bare 'claude' or a resolved '…\claude.ps1') to a CliAdapter id so the
  *  monitor badges it consistently regardless of how it was spawned. */
@@ -423,6 +430,7 @@ function broadcastSpawnState(): void {
       total: totalRunning(),
       engines: Array.from(activeEngines.values()),
       queuedEngines: Array.from(queuedEngines.values()),
+      recentEngines: [...recentEngines],
       queued: engineQueue.map((w) => w.tabId),
       paused: queuePaused,
       rateLimitedUntil,
@@ -459,8 +467,13 @@ function promoteQueue(): void {
 }
 
 function releaseEngineSlot(tabId: string): void {
+  const finished = activeEngines.get(tabId) ?? queuedEngines.get(tabId)  // capture before delete → RECENT
   const wasEngine = activeEngines.delete(tabId)   // live engine gone (exit/kill) — drop from the monitor registry
   queuedEngines.delete(tabId)                     // also clear it if it was still waiting for a slot
+  if (finished) {
+    recentEngines.unshift({ ...finished, finishedAt: Date.now() })
+    if (recentEngines.length > RECENT_CAP) recentEngines.length = RECENT_CAP
+  }
   const qi = engineQueue.findIndex((w) => w.tabId === tabId)
   if (qi !== -1) {
     const [w] = engineQueue.splice(qi, 1) // cancelled while queued — reject so the spawn() call unblocks

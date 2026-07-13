@@ -22,7 +22,7 @@ export function CliMonitorBar(): JSX.Element | null {
   const toggleCliMonitor = useUiStore((st) => st.toggleCliMonitor)
   const setActivePanel = useStore((st) => st.setActivePanel)
   const spawnQueue = useTerminalStore((st) => st.spawnQueue)
-  const engines = useDockEngines()
+  const { live: engines, recent } = useDockEngines()
   const [expanded, setExpanded] = useState(true)
   const [queueOpen, setQueueOpen] = useState(false)
   const anchorRef = useRef<HTMLDivElement>(null)
@@ -76,6 +76,7 @@ export function CliMonitorBar(): JSX.Element | null {
           onPauseAll={pauseAll}
           onManageQueue={() => setQueueOpen((v) => !v)}
           paused={spawnQueue.paused}
+          recent={recent}
           onGripPointerDown={onGripPointerDown}
         />
       ) : (

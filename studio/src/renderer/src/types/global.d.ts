@@ -17,6 +17,8 @@ declare global {
     role?: string
     /** Pipeline run id (runner tabs only) — keys the per-flow cost rollup (/db/runs/<run_id>/cost). */
     runId?: string
+    /** When the engine finished — set only on RECENT/history entries. */
+    finishedAt?: number
   }
   interface SpawnState {
     running: number
@@ -26,6 +28,8 @@ declare global {
     engines: RunningEngine[]
     /** Engines accepted but still waiting for a slot (queued/paused) — rendered as queued rows. */
     queuedEngines: RunningEngine[]
+    /** Recently-finished engines (newest first, bounded) — the RECENT/history list. */
+    recentEngines: RunningEngine[]
     queued: string[]
     paused: boolean
     rateLimitedUntil: number
