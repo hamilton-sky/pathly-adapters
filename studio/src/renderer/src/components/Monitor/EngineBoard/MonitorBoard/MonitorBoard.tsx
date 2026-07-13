@@ -10,6 +10,8 @@ import s from './MonitorBoard.module.css'
 interface Props {
   /** Live engines — map from your runner/terminal store. */
   engines: MonitorEngine[]
+  /** Recently-finished spawns (DB-backed history) — rendered as a 'Recent' section. */
+  recent?: MonitorEngine[]
   /** Fired when a control button in the detail modal is pressed. */
   onAction?: (engineId: string, actionId: string) => void
 }
@@ -17,7 +19,7 @@ interface Props {
 // The Monitor board: a CLI-engine board that groups engines by how they run
 // (Flow / Loop / Single), the same mechanism the Command Center uses to group
 // messages by scope. Clicking a card opens its detail modal.
-export function MonitorBoard({ engines, onAction }: Props): JSX.Element {
+export function MonitorBoard({ engines, recent, onAction }: Props): JSX.Element {
   const [category, setCategory] = useState<CategoryFilter>('all')
   const [adapter, setAdapter] = useState<EngineAdapter | null>(null)
   const [scope, setScope] = useState<string | null>(null)
@@ -52,7 +54,16 @@ export function MonitorBoard({ engines, onAction }: Props): JSX.Element {
     .map((m) => ({ meta: m, engines: filtered.filter((e) => e.category === m.key) }))
     .filter((sec) => sec.engines.length > 0)
 
-  const open = openId ? engines.find((e) => e.id === openId) ?? null : null
+  const recentFiltered = (recent ?? []).filter(
+    (e) =>
+      (category === 'all' || category === e.category) &&
+      (adapter === null || e.adapter === adapter) &&
+      (scope === null || e.feature === scope),
+  )
+
+  const open = openId
+    ? engines.find((e) => e.id === openId) ?? (recent ?? []).find((e) => e.id === openId) ?? null
+    : null
 
   return (
     <div className={s.root}>
@@ -89,7 +100,17 @@ export function MonitorBoard({ engines, onAction }: Props): JSX.Element {
           />
         ))}
 
-        {sections.length === 0 && (
+        {recentFiltered.length > 0 && (
+          <EngineSection
+            key="recent"
+            meta={{ key: 'single', label: 'Recent', blurb: 'finished · from history', color: 'var(--text-muted)' }}
+            engines={recentFiltered}
+            onOpen={setOpenId}
+            onAction={onAction}
+          />
+        )}
+
+        {sections.length === 0 && recentFiltered.length === 0 && (
           <p className={s.empty}>No engines in this view</p>
         )}
       </div>

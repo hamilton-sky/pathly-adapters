@@ -3,6 +3,7 @@ import { useStore } from '../../store'
 import { useTerminalStore } from '../../store/terminalStore'
 import { useMonitorSession } from './hooks/useMonitorSession'
 import { useMonitorEngines } from './hooks/useMonitorEngines'
+import { useRecentEngines } from './hooks/useRecentEngines'
 import { HeaderBar } from './HeaderBar'
 import { TabBar } from './TabBar'
 import { FsmView } from './FsmView'
@@ -24,6 +25,7 @@ export function Monitor(): JSX.Element {
   const { effectiveTopic, showTabBar, refresh } = useMonitorSession()
   const [configStage, setConfigStage] = useState<string | null>(null)
   const engines = useMonitorEngines(null) // GLOBAL — every live engine, matching the dock
+  const recent = useRecentEngines() // DB-backed history (finished spawns)
 
   function handleEngineAction(engineId: string, actionId: string): void {
     const term = useTerminalStore.getState()
@@ -56,7 +58,9 @@ export function Monitor(): JSX.Element {
   return (
     <div className={styles.panel}>
       {/* Global engine board — always shows every live CLI, in parity with the Engines dock. */}
-      {engines.length > 0 && <MonitorBoard engines={engines} onAction={handleEngineAction} />}
+      {(engines.length > 0 || recent.length > 0) && (
+        <MonitorBoard engines={engines} recent={recent} onAction={handleEngineAction} />
+      )}
 
       {activeTopic ? (
         <>
@@ -74,7 +78,7 @@ export function Monitor(): JSX.Element {
           <OutputTab />
         </>
       ) : (
-        engines.length === 0 && (
+        engines.length === 0 && recent.length === 0 && (
           <span className={styles.placeholder}>
             Select a feature above to see its pipeline — or spawn a CLI engine to see it here
           </span>
