@@ -98,7 +98,13 @@ def get_write_permissions(
     are merged onto the default table.
     """
     key = f"write_permissions:{project_root}"
-    raw = get_setting(conn, key)
+    try:
+        raw = get_setting(conn, key)
+    except sqlite3.OperationalError:
+        # app_settings table absent (a pre-migration connection or a test DB without
+        # migrations) — fall back to the built-in defaults rather than 500 the caller
+        # (/comms/post reads this on every post). Production always has the table.
+        raw = None
     result = {k: list(v) for k, v in _DEFAULT_WRITE_PERMISSIONS.items()}
     if raw is not None:
         try:
