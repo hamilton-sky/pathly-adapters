@@ -7,6 +7,7 @@ import { useRecentEngines } from './hooks/useRecentEngines'
 import { HeaderBar } from './HeaderBar'
 import { TabBar } from './TabBar'
 import { FsmView } from './FsmView'
+import { FlowControlBar } from '../HQ/FlowControlBar/FlowControlBar'
 import { HealthCheck } from './HealthCheck'
 import { OutputBanner } from './output/OutputBanner/OutputBanner'
 import { MonitorBoard } from './EngineBoard'
@@ -71,6 +72,10 @@ export function Monitor(): JSX.Element {
           <RunCostBadge feature={effectiveTopic} />
           <HealthCheck />
           <FsmView onStageClick={(stage) => setConfigStage(stage)} />
+          {/* Pipeline controls: pause / resume / advance / reroute / retry / abort, wired to the
+              /runner/* endpoints for the active run — the mid-flow control surface that was
+              previously only reachable via the unmounted HQ bar. */}
+          <FlowControlBar />
           <OutputBanner />
         </>
       ) : (
