@@ -8,7 +8,7 @@ import { HeaderBar } from './HeaderBar'
 import { TabBar } from './TabBar'
 import { FsmView } from './FsmView'
 import { HealthCheck } from './HealthCheck'
-import { OutputTab } from './output/OutputTab'
+import { OutputBanner } from './output/OutputBanner/OutputBanner'
 import { MonitorBoard } from './EngineBoard'
 import { RunCostBadge } from './RunCostBadge/RunCostBadge'
 import { ConfigurePhaseModal } from './ConfigurePhaseModal/ConfigurePhaseModal'
@@ -71,7 +71,7 @@ export function Monitor(): JSX.Element {
           <RunCostBadge feature={effectiveTopic} />
           <HealthCheck />
           <FsmView onStageClick={(stage) => setConfigStage(stage)} />
-          <OutputTab />
+          <OutputBanner />
         </>
       ) : (
         engines.length === 0 && recent.length === 0 && (
