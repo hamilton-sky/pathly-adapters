@@ -51,3 +51,48 @@ def test_resolve_command_raises_loudly_on_mismatch():
     # matching pair still builds argv
     out = resolve_command("claude", "do the thing", "claude-sonnet-4-6")
     assert "claude-sonnet-4-6" in out["argv"]
+
+
+# ── Per-stage model reconciliation (supervisor loop) ─────────────────────────
+# A flow's adapter_map can route ONE stage to a different engine than the run-level
+# model belongs to (the consultation flow runs PO_DISCUSSING + DESIGNING on codex while
+# the run model is claude-sonnet-4-6). The supervisor loop reconciles the model to the
+# per-stage adapter via _stage_model_for so it never spawns a mismatched pair — which
+# otherwise hard-crashes the loop (adapter_model_mismatch -> loop_crashed) and shows
+# "decomposition failed" on the board.
+
+
+def test_stage_model_for_drops_mismatched_model_to_engine_default():
+    from pathly_orchestrator.supervisor.orchestrator import _stage_model_for
+
+    # A claude model on a codex-routed stage falls back to codex's OWN default ("").
+    assert _stage_model_for("codex", "claude-sonnet-4-6") == ""
+    assert _stage_model_for("claude", "gpt-5") == ""
+
+
+def test_stage_model_for_keeps_matching_model():
+    from pathly_orchestrator.supervisor.orchestrator import _stage_model_for
+
+    assert _stage_model_for("claude", "claude-sonnet-4-6") == "claude-sonnet-4-6"
+    assert _stage_model_for("codex", "gpt-5.4") == "gpt-5.4"
+
+
+def test_stage_model_for_preserves_empty_and_unconstrained_and_unknown():
+    from pathly_orchestrator.supervisor.orchestrator import _stage_model_for
+
+    assert _stage_model_for("codex", "") == ""  # already the engine default
+    # copilot is an unconstrained proxy — never drop its model.
+    assert _stage_model_for("copilot", "claude-sonnet-4-6") == "claude-sonnet-4-6"
+    # An unknown/custom model is NOT dropped (don't guess which engine it belongs to).
+    assert _stage_model_for("codex", "some-custom-model") == "some-custom-model"
+
+
+def test_reconciled_pair_no_longer_raises_in_resolve_command():
+    """End-to-end: reconcile the codex stage, then resolve_command must build cleanly
+    instead of raising adapter_model_mismatch (the crash the consultation hit)."""
+    from pathly_orchestrator.supervisor.orchestrator import _stage_model_for
+
+    reconciled = _stage_model_for("codex", "claude-sonnet-4-6")  # -> ""
+    out = resolve_command("codex", "do the thing", reconciled)  # must NOT raise
+    assert out["argv"]  # built without a --model flag (engine default)
+    assert "claude-sonnet-4-6" not in out["argv"]

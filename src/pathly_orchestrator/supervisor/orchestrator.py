@@ -31,6 +31,24 @@ def _decompose_directive(agent: str, goal_id: str) -> str:
     )
 
 
+def _stage_model_for(adapter: str, model: str) -> str:
+    """The model to spawn a stage with, reconciled to that stage's (per-stage) engine.
+
+    A flow's ``adapter_map`` can route one stage to a different engine than the run-level
+    ``model`` belongs to — e.g. the consultation flow runs PO_DISCUSSING + DESIGNING on
+    ``codex`` while the run model is ``claude-sonnet-4-6``. Spawning that adapter with a
+    foreign-engine model hard-crashes the supervisor loop at ``resolve_command``'s mismatch
+    guard (``adapter_model_mismatch`` → ``loop_crashed`` → "decomposition failed"). When the
+    model doesn't belong to ``adapter``, fall back to that engine's OWN default by returning
+    ``""`` (``resolve_command`` then drops the ``--model`` pair). The run-level model is
+    returned unchanged whenever it matches — or when the adapter is unconstrained/unknown, so
+    a real model is never needlessly dropped.
+    """
+    from pathly_orchestrator.adapters import validate_adapter_model
+
+    return "" if validate_adapter_model(adapter, model) else model
+
+
 def _loop(state: RunnerState, broadcast_fn: Optional[Callable]) -> None:
     from pathly_orchestrator import fsm_http_client as fhc
     from pathly_orchestrator.adapters import resolve_command
@@ -147,6 +165,11 @@ def _loop(state: RunnerState, broadcast_fn: Optional[Callable]) -> None:
                     preferred_adapter = state._reroute_adapter
                     state._reroute_adapter = None
 
+            # Co-resolve the per-stage model with the per-stage adapter (see
+            # _stage_model_for): a flow's adapter_map can route a stage to a different engine
+            # than the run-level model belongs to, which otherwise hard-crashes the loop.
+            stage_model = _stage_model_for(preferred_adapter, model)
+
             # ── Session continuity ────────────────────────────────────────────
             with _lock:
                 open_sess = state.open_session
@@ -208,7 +231,7 @@ def _loop(state: RunnerState, broadcast_fn: Optional[Callable]) -> None:
                     state,
                     instructions,
                     preferred_adapter,
-                    model,
+                    stage_model,
                     run_id,
                     broadcast_fn,
                     session=session_id,
