@@ -246,11 +246,25 @@ A new endpoint goes into the matching domain file. If no domain matches, create 
 
 ## Telemetry
 
-Stop hook (`src/pathly_hooks/stop_telemetry.py`) fires after every Claude Code session.
-It reads the session usage payload (tokens, cost) from stdin, finds the most recently
-active feature in the central SQLite DB (`~/.pathly/pathly.db`), and appends a
-`BILLING_UPDATE` event (patching the last `AGENT_DONE` with real cost) so Studio can
-display API-accurate costs. It always exits 0 — telemetry failure never blocks the user.
+**Billing authority — the spawn gate, run-keyed, adapter-agnostic.** Every runner spawn
+(any adapter) flows through ONE chokepoint: `POST /runner/terminal/result`
+(`blueprints/runner/api_lifecycle.py`). That handler parses the CLI stdout with the
+**spawn-time adapter** (sent by `terminal.ts`, not the racy live `current_adapter`) and
+writes the authoritative `BILLING_UPDATE` for THAT run via `_patch_last_agent_done(...,
+run_id=…)` — so the invocation projection folds the REAL cost/tokens onto the run's
+`AGENT_DONE`, overriding the agent's (often-wrong) self-estimate. claude → real
+`total_cost_usd`; codex → tokens (cost estimated downstream). This fires reliably even
+when the supervisor's own `_reconcile_billing_now` races run completion (which is why
+consultation codex stages + the no-subagent planner used to show `$0`).
+
+Stop hook (`src/pathly_hooks/stop_telemetry.py`) is now a **fallback for INTERACTIVE claude
+only**. It fires after every Claude Code session, but runner spawns carry
+`PATHLY_GATE_BILLED` (set in `terminal.ts` for `runnerTabMeta` tabs), so the hook **skips
+them** — it would otherwise double-bill / mis-attribute (it can only guess the target via
+"the most recently active feature", racy under concurrent/goal runs). Interactive claude
+(no runner tab, no result callback) has no other cost source, so the hook still bills it:
+reads the session usage from stdin, finds the active feature, appends a `BILLING_UPDATE`.
+Always exits 0 — telemetry failure never blocks the user.
 
 **`agent_invocations` is a projection of the `AGENT_DONE` event stream** (telemetry-reconciliation).
 The DB-explorer roll-up (`/db/rollup`), header strip (`/db/stats`), feature cards

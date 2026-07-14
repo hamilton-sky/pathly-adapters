@@ -628,7 +628,15 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
         // Without it, stop_telemetry.py hits `if not project_root: sys.exit(0)` and
         // in-app COST silently stays blank. cwd IS the project root (validated above);
         // the hook forward-slash-normalizes it, matching the stored fsm_events key.
-        env: { ...process.env, PATHLY_PROJECT_ROOT: cwd } as Record<string, string>,
+        // Runner spawns are billed authoritatively by the gate → /runner/terminal/result
+        // (adapter-agnostic, run-keyed). Mark them so the claude stop hook SKIPS them and can't
+        // double-bill / mis-attribute via its "most recent feature" guess. Interactive claude
+        // (no runner tab) carries no marker, so the hook still bills it (its only cost source).
+        env: {
+          ...process.env,
+          PATHLY_PROJECT_ROOT: cwd,
+          ...(runnerTabMeta.has(tabId) ? { PATHLY_GATE_BILLED: '1' } : {}),
+        } as Record<string, string>,
       })
     } catch (e) {
       console.error('[spawn] pty.spawn FAILED', tabId, 'shell=' + shell, 'args=' + JSON.stringify(shellArgs).slice(0, 200), '→', (e as Error).message)

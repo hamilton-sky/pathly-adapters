@@ -285,9 +285,39 @@ def runner_terminal_result():
                         and agent_done.get("tool_uses", 0) > 0
                     ):
                         parsed["tool_uses"] = agent_done["tool_uses"]
+
+                    # ── Authoritative, run-keyed billing (adapter-agnostic) ──────────────
+                    # This handler is the ONE chokepoint every runner spawn (any adapter) hits.
+                    # Write a BILLING_UPDATE from the parsed CLI stdout for THIS run, keyed by
+                    # run_id, so the invocation projection folds the REAL cost/tokens onto this
+                    # run's AGENT_DONE — overriding the agent's (often-wrong) self-estimate and
+                    # NOT depending on the claude-only stop hook's "most recent feature" guess.
+                    # claude → real cost; codex → tokens (cost estimated downstream). Runs here
+                    # reliably even when the supervisor's own reconcile races run completion
+                    # (which is why the consultation planner/codex stages were $0). The
+                    # supervisor's _reconcile_billing_now is now a redundant belt (same values).
+                    _b_cost = float(parsed.get("cost_usd") or 0.0)
+                    _b_tin = int(parsed.get("tokens_in") or 0)
+                    _b_tout = int(parsed.get("tokens_out") or 0)
+                    if _b_cost > 0 or (_b_tin + _b_tout) > 0:
+                        from pathly_orchestrator.runner import (
+                            _patch_last_agent_done as _plad,
+                        )
+
+                        _mu = parsed.get("model_usage") or {}
+                        _plad(
+                            storage,
+                            _b_cost,
+                            _b_tin,
+                            _b_tout,
+                            int(data.get("wall_seconds") or 0),
+                            int(parsed.get("tool_uses") or 0),
+                            model=(next(iter(_mu), "") if _mu else ""),
+                            run_id=run_id,
+                        )
             except Exception as exc:
                 logging.getLogger("pathly.http").warning(
-                    "runner_terminal_result: EVENTS.jsonl read failed: %s", exc
+                    "runner_terminal_result: EVENTS.jsonl read / billing failed: %s", exc
                 )
 
         # Fill the otel_spans + agent_invocations trace tables (one span + one invocation

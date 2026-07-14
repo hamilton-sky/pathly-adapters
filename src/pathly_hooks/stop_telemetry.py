@@ -1,8 +1,14 @@
 """Stop hook: write BILLING_UPDATE to DB with real session cost.
 
 Claude Code fires this when the model stops. The payload on stdin contains
-session usage data (tokens, cost). We find the most recently active feature
-in the DB and append a BILLING_UPDATE event so Studio can display real costs.
+session usage data (tokens, cost).
+
+DEMOTED to a FALLBACK (adapter-agnostic billing refactor): the spawn gate now bills
+every runner spawn authoritatively (run-keyed, any adapter) via /runner/terminal/result,
+so those carry ``PATHLY_GATE_BILLED`` and this hook SKIPS them — it would otherwise
+double-bill / mis-attribute, since it can only guess the target via "the most recently
+active feature" (racy under concurrent/goal runs). This hook now bills ONLY INTERACTIVE
+claude sessions (no runner tab, no result callback) — the one case with no other source.
 
 Exits 0 always — telemetry failure must never block the user.
 """
@@ -105,6 +111,13 @@ def _write_billing_update_db(
 
 
 def main() -> None:
+    # Runner spawns are billed authoritatively by the spawn gate (adapter-agnostic, run-keyed)
+    # via /runner/terminal/result and carry this marker — SKIP them so this claude-only hook
+    # doesn't double-bill or mis-attribute. Interactive claude sessions carry no marker and fall
+    # through to be billed here (their only cost source).
+    if os.environ.get("PATHLY_GATE_BILLED"):
+        sys.exit(0)
+
     # Read stop hook payload
     try:
         payload = json.loads(sys.stdin.read())
