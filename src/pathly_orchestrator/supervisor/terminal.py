@@ -374,6 +374,11 @@ def _run_stage_via_terminal(
             "prompt": instructions,
             "stage": state.current_state,
             "interactive": use_interactive,
+            # Monitor category for this engine. Board one-shots (single-agent / evaluator /
+            # decompose) run with flow=='board-run' → 'single'; FSM pipeline stages → 'flow'.
+            # Without this the frontend tags EVERY registered runner tab 'flow' (terminal.ts
+            # buildEngineMeta), so a board single-agent run showed up as a FLOW run.
+            "category": "single" if (state.flow or "") == "board-run" else "flow",
         }
         if broadcast_fn:
             broadcast_fn(state.topic, payload)

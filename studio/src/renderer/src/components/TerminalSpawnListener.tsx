@@ -81,7 +81,10 @@ export function TerminalSpawnListener(): null {
       if (prompt) useRunnerStore.getState().recordStagePrompt(prompt)
       const argv = Array.isArray(data.argv) ? (data.argv as string[]) : undefined
       const initialInput = isInteractive && prompt ? prompt : undefined
-      void window.pathly.terminal.registerRunner(tab_id, topic, run_id, label)
+      // Carry the run kind (board one-shot → 'single', FSM pipeline → 'flow') so the Monitor
+      // categorizes it correctly instead of tagging every registered runner tab 'flow'.
+      const category = data.category as 'flow' | 'loop' | 'single' | undefined
+      void window.pathly.terminal.registerRunner(tab_id, topic, run_id, label, category)
         .then(() => window.pathly.terminal.spawn(tab_id, cwd, undefined, argv, initialInput))
         .then(() => {
           useTerminalStore.getState().updateTabStatus(tab_id, 'running')

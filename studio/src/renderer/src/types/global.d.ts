@@ -211,7 +211,7 @@ declare global {
         onExit: (cb: (tabId: string, exitCode?: number, tail?: string) => void) => () => void
         onSpawnState: (cb: (s: SpawnState) => void) => () => void
         queueControl: (action: QueueAction) => Promise<void>
-        registerRunner: (tabId: string, topic: string, runId: string, label?: string) => Promise<void>
+        registerRunner: (tabId: string, topic: string, runId: string, label?: string, category?: 'flow' | 'loop' | 'single') => Promise<void>
         onStageResult: (cb: (tabId: string, data: Record<string, unknown>) => void) => () => void
       }
       setup: {

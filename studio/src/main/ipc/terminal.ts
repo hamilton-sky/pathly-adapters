@@ -41,7 +41,7 @@ function tailMeaningfulOutput(chunks: string[]): string {
   return lines.slice(-6).join(' | ').slice(-600)
 }
 // Maps tabId → runner metadata registered before spawn
-const runnerTabMeta = new Map<string, { run_id: string; topic: string; spawnedAt: number; label: string }>()
+const runnerTabMeta = new Map<string, { run_id: string; topic: string; spawnedAt: number; label: string; category?: 'flow' | 'loop' | 'single' }>()
 // Tracks tabs killed by the user (not by the runner exiting naturally)
 const ptyKilledByRunner = new Set<string>()
 // Maps tabId → temp .ps1 script path created for that runner (Windows only)
@@ -579,7 +579,10 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
         adapter,
         label: rmeta?.label ?? spawnMeta?.telemetry?.label ?? adapter,
         startedAt,
-        category: rmeta ? 'flow' : 'single',
+        // Prefer the explicit category from the spawn payload (board one-shot → 'single',
+        // FSM pipeline → 'flow'); fall back to the old presence-based guess for any spawn
+        // that predates the threaded category. Fixes board single-agent runs reading as FLOW.
+        category: rmeta?.category ?? (rmeta ? 'flow' : 'single'),
         feature: rmeta?.topic ?? spawnMeta?.telemetry?.feature,
         role: spawnMeta?.telemetry?.role,
         runId: rmeta?.run_id,
@@ -909,8 +912,8 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
     }
   })
 
-  ipcMain.handle('terminal:register-runner', (_event, tabId: string, topic: string, runId: string, label?: string) => {
-    runnerTabMeta.set(tabId, { run_id: runId, topic, spawnedAt: Date.now(), label: label ?? tabId })
+  ipcMain.handle('terminal:register-runner', (_event, tabId: string, topic: string, runId: string, label?: string, category?: 'flow' | 'loop' | 'single') => {
+    runnerTabMeta.set(tabId, { run_id: runId, topic, spawnedAt: Date.now(), label: label ?? tabId, category })
   })
 
   ipcMain.handle('terminal:popout', (event, tabId: string, label: string) => {

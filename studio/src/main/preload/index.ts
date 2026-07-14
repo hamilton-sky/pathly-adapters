@@ -238,8 +238,8 @@ contextBridge.exposeInMainWorld('pathly', {
     },
     queueControl: (action: QueueAction): Promise<void> =>
       ipcRenderer.invoke('terminal:queue-control', action),
-    registerRunner: (tabId: string, topic: string, runId: string, label?: string): Promise<void> =>
-      ipcRenderer.invoke('terminal:register-runner', tabId, topic, runId, label),
+    registerRunner: (tabId: string, topic: string, runId: string, label?: string, category?: 'flow' | 'loop' | 'single'): Promise<void> =>
+      ipcRenderer.invoke('terminal:register-runner', tabId, topic, runId, label, category),
     onStageResult: (cb: (tabId: string, data: Record<string, unknown>) => void): (() => void) => {
       const listener = (_e: Electron.IpcRendererEvent, tabId: string, data: Record<string, unknown>): void => cb(tabId, data)
       ipcRenderer.on('terminal:stage-result', listener)
