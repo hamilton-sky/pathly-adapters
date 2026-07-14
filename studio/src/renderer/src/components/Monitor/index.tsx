@@ -14,12 +14,13 @@ import { RunCostBadge } from './RunCostBadge/RunCostBadge'
 import { ConfigurePhaseModal } from './ConfigurePhaseModal/ConfigurePhaseModal'
 import styles from './Monitor.module.css'
 
-// The Pipeline panel: a GLOBAL live engine board (every running CLI engine — headless or
-// interactive, any feature or a project one-shot — in parity with the Engines dock) on top, then,
-// when a feature is selected, that feature's stage timeline (click a stage to configure its
-// agent/skill/host), settled run cost, and per-stage output. The board is deliberately NOT
+// The Pipeline panel: when a feature is selected, that feature's stage timeline (click a stage to
+// configure its agent/skill/host), settled run cost, and per-stage output sit on TOP as the
+// primary content — it's the run you're actually watching. BELOW sits a GLOBAL live engine board
+// (every running CLI engine — headless or interactive, any feature or a project one-shot — in
+// parity with the Engines dock) as the ambient monitor. The board is deliberately NOT
 // feature-scoped and NOT gated behind a feature selection: if an engine shows in the dock it must
-// show here too.
+// show here too (with no feature selected the top is empty and the board is the only content).
 export function Monitor(): JSX.Element {
   const { activeTopic, activeFlowSessions, activeMonitorTab, setActiveMonitorTab, fsmState } = useStore()
   const { effectiveTopic, showTabBar, refresh } = useMonitorSession()
@@ -57,11 +58,6 @@ export function Monitor(): JSX.Element {
 
   return (
     <div className={styles.panel}>
-      {/* Global engine board — always shows every live CLI, in parity with the Engines dock. */}
-      {(engines.length > 0 || recent.length > 0) && (
-        <MonitorBoard engines={engines} recent={recent} onAction={handleEngineAction} />
-      )}
-
       {activeTopic ? (
         <>
           {showTabBar && (
@@ -80,9 +76,16 @@ export function Monitor(): JSX.Element {
       ) : (
         engines.length === 0 && recent.length === 0 && (
           <span className={styles.placeholder}>
-            Select a feature above to see its pipeline — or spawn a CLI engine to see it here
+            Select a feature to see its pipeline — or spawn a CLI engine to see it below
           </span>
         )
+      )}
+
+      {/* Global engine board — every live CLI + recent history, in parity with the Engines dock.
+          Rendered UNDER the selected feature's pipeline so the stage timeline stays the primary,
+          top content and the global board is the ambient monitor beneath it. */}
+      {(engines.length > 0 || recent.length > 0) && (
+        <MonitorBoard engines={engines} recent={recent} onAction={handleEngineAction} />
       )}
 
       {configStage && (
