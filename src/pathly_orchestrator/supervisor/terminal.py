@@ -362,6 +362,39 @@ def _run_stage_via_terminal(
             logger.warning("_reconcile_billing_now: patch failed: %s", exc)
 
     try:
+        # Early-advance baseline — capture feature_dir / feature / last_seq BEFORE the spawn
+        # broadcast below. The AGENT_DONE watcher only reports events with seq > last_seq; if the
+        # baseline is read AFTER the spawn, a fast AGENT_DONE (the test writes one ~50ms after
+        # TERMINAL_SPAWN; a real agent under CI DB contention likewise) can land at/under the
+        # baseline, and the watcher then waits the full timeout. Reading it here — before anything
+        # can spawn — makes "seq > last_seq" race-free.
+        ea_feature_dir = None
+        ea_feature = ""
+        ea_last_seq = 0
+        if feature_flags.early_advance:
+            from pathly_orchestrator.fsm_ops import _resolve_storage_path
+
+            ea_feature_dir = (
+                Path(state.storage_path)
+                if state.storage_path
+                else _resolve_storage_path(None, state.project_root, state.topic)
+            )
+            # Event-log key = storage-dir basename (run slug), NOT state.topic (a goal run's topic
+            # is the nested features/<f>/goals/<slug> path; append_event keys by the basename).
+            ea_feature = ea_feature_dir.name
+            try:
+                from pathly_orchestrator import db as _db
+
+                _row = _db.get_db().execute(
+                    "SELECT MAX(seq) FROM fsm_events WHERE project_root=? AND feature=?",
+                    (state.project_root, ea_feature),
+                ).fetchone()
+                ea_last_seq = _row[0] or 0
+            except Exception as exc:
+                logger.warning(
+                    "_run_stage_via_terminal: could not read last_seq: %s", exc
+                )
+
         payload = {
             "type": "TERMINAL_SPAWN",
             "topic": state.topic,
@@ -399,34 +432,12 @@ def _run_stage_via_terminal(
             )
 
         if feature_flags.early_advance:
-            from pathly_orchestrator.fsm_ops import _resolve_storage_path
-
-            feature_dir = (
-                Path(state.storage_path)
-                if state.storage_path
-                else _resolve_storage_path(None, state.project_root, state.topic)
-            )
-            # Watch/patch under the FSM/event-log key = the storage dir basename (the run slug),
-            # NOT state.topic. For a plain feature run these are identical; for a GOAL run
-            # state.topic is the nested path (features/<f>/goals/<slug>) while the AGENT_DONE the
-            # watcher looks for is keyed by the slug (eventlog.append_event derives feature from the
-            # dir basename). Keying by state.topic here made early-advance never fire for goal runs.
-            feature = feature_dir.name
-
-            last_seq = 0
-            try:
-                from pathly_orchestrator import db as _db
-
-                _db_conn = _db.get_db()
-                row = _db_conn.execute(
-                    "SELECT MAX(seq) FROM fsm_events WHERE project_root=? AND feature=?",
-                    (state.project_root, feature),
-                ).fetchone()
-                last_seq = row[0] or 0
-            except Exception as exc:
-                logger.warning(
-                    "_run_stage_via_terminal: could not read last_seq: %s", exc
-                )
+            # Baseline (feature_dir / feature / last_seq) was captured BEFORE the spawn broadcast
+            # above — reuse it. Re-reading it here would reintroduce the watcher-vs-AGENT_DONE race
+            # that hung goal/loop runs for the full terminal-result timeout under CI DB contention.
+            feature_dir = ea_feature_dir
+            feature = ea_feature
+            last_seq = ea_last_seq
 
             watcher_t = threading.Thread(
                 target=_agent_done_watcher,
