@@ -5,7 +5,7 @@ import { StatsStrip } from './StatsStrip'
 import { FeatureGrid } from './FeatureGrid'
 import FeatureStack from './FeatureStack'
 import { FeatureModal } from './FeatureModal'
-import { CostOverTimeChart, type CostPoint } from './CostOverTimeChart'
+import { CostOverTimeChart, type CostPoint, type ScopeMode } from './CostOverTimeChart'
 import { RollupView } from './RollupView/RollupView'
 import styles from './DBExplorer.module.css'
 
@@ -54,18 +54,18 @@ export function DBExplorer(): JSX.Element {
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
   const [loading, setLoading] = useState(true)
   const [costPoints, setCostPoints] = useState<CostPoint[]>([])
+  const [costScope, setCostScope] = useState<ScopeMode>('project')
+  const [costLoading, setCostLoading] = useState(true)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [rawFeatures, rawStats, rawTrends] = await Promise.all([
+      const [rawFeatures, rawStats] = await Promise.all([
         window.pathly.db.features(projectPath || undefined),
         window.pathly.db.stats(projectPath || undefined),
-        window.pathly.db.trends('', 30, projectPath || undefined),
       ])
       setFeatures(rawFeatures.map(dbFeatureToFeatureData))
       setStats(rawStats)
-      setCostPoints((rawTrends?.trends ?? []).map(bucketToCostPoint))
     } catch {
       // FSM may not be running yet — stay with empty list
     } finally {
@@ -73,14 +73,40 @@ export function DBExplorer(): JSX.Element {
     }
   }, [projectPath])
 
+  // Cost-over-time trends load on their own axis: the Project/Global scope switch
+  // (and a re-scope) must refetch the chart without reloading the whole panel.
+  const loadTrends = useCallback(async () => {
+    setCostLoading(true)
+    try {
+      const root = costScope === 'global' ? undefined : projectPath || undefined
+      const rawTrends = await window.pathly.db.trends('', 30, root)
+      setCostPoints((rawTrends?.trends ?? []).map(bucketToCostPoint))
+    } catch {
+      setCostPoints([])
+    } finally {
+      setCostLoading(false)
+    }
+  }, [projectPath, costScope])
+
   useEffect(() => { load() }, [load])
+  useEffect(() => { loadTrends() }, [loadTrends])
+
+  const refresh = useCallback(() => {
+    load()
+    loadTrends()
+  }, [load, loadTrends])
 
   return (
     <div className={styles.panel}>
-      <DBExplorerHeader viewMode={viewMode} onViewMode={setViewMode} onRefresh={load} />
+      <DBExplorerHeader viewMode={viewMode} onViewMode={setViewMode} onRefresh={refresh} />
       <StatsStrip stats={stats} features={features} />
       <div className={styles.chartSection}>
-        <CostOverTimeChart points={costPoints} loading={loading} />
+        <CostOverTimeChart
+          points={costPoints}
+          loading={costLoading}
+          scope={costScope}
+          onScope={setCostScope}
+        />
       </div>
       {loading
         ? <div className={styles.loading}>Loading…</div>

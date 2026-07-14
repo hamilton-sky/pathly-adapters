@@ -14,3 +14,5 @@ export interface CostPoint {
 export type RangeDays = 7 | 14 | 30
 
 export type ScaleMode = 'linear' | 'log'
+
+export type ScopeMode = 'project' | 'global'

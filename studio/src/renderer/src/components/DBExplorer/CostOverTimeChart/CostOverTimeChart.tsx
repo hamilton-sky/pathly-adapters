@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { ChartHeader } from './ChartHeader'
 import { CostBars } from './CostBars'
-import type { CostPoint, RangeDays, ScaleMode } from './types'
+import type { CostPoint, RangeDays, ScaleMode, ScopeMode } from './types'
 import styles from './CostOverTimeChart.module.css'
 
 interface CostOverTimeChartProps {
@@ -13,6 +13,9 @@ interface CostOverTimeChartProps {
   defaultScale?: ScaleMode
   /** While true and no points are loaded yet, show a loading placeholder. */
   loading?: boolean
+  /** When provided, render a Project/Global data-scope switch in the header. */
+  scope?: ScopeMode
+  onScope?: (s: ScopeMode) => void
 }
 
 /**
@@ -26,6 +29,8 @@ export function CostOverTimeChart({
   defaultRange = 30,
   defaultScale = 'linear',
   loading = false,
+  scope,
+  onScope,
 }: CostOverTimeChartProps): JSX.Element {
   const [range, setRange] = useState<RangeDays>(defaultRange)
   const [scale, setScale] = useState<ScaleMode>(defaultScale)
@@ -67,6 +72,8 @@ export function CostOverTimeChart({
         onRange={handleRange}
         scale={scale}
         onScale={setScale}
+        scope={scope}
+        onScope={onScope}
       />
       {view.length > 0 ? (
         <CostBars points={view} scale={scale} hoverIndex={hoverIndex} onHover={setHoverIndex} />

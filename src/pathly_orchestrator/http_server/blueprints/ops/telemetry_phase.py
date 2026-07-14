@@ -35,7 +35,10 @@ def trends_endpoint():
 
     days = request.args.get("days", 126, type=int)
     days = max(1, min(days, 365))
-    project_root = (request.args.get("project_root") or "").strip() or None
+    # Normalize backslashes → forward slashes so a Windows path from the client
+    # matches the forward-slashed project_root stored in agent_invocations
+    # (mirrors _project_root_param() used by the /db/* endpoints).
+    project_root = (request.args.get("project_root") or "").strip().replace("\\", "/") or None
 
     try:
         from pathly_orchestrator.db.queries.trends import (

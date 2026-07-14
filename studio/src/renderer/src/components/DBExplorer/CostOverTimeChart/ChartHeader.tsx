@@ -1,7 +1,7 @@
 import { SummaryStat } from './SummaryStat'
 import { SegmentedToggle } from './SegmentedToggle'
 import { fmtCost } from './chartMath'
-import type { RangeDays, ScaleMode } from './types'
+import type { RangeDays, ScaleMode, ScopeMode } from './types'
 import styles from './ChartHeader.module.css'
 
 interface ChartHeaderProps {
@@ -14,6 +14,9 @@ interface ChartHeaderProps {
   onRange: (r: RangeDays) => void
   scale: ScaleMode
   onScale: (s: ScaleMode) => void
+  /** When provided, render a Project/Global data-scope switch. */
+  scope?: ScopeMode
+  onScope?: (s: ScopeMode) => void
 }
 
 const RANGE_OPTIONS: { label: string; value: RangeDays }[] = [
@@ -27,6 +30,11 @@ const SCALE_OPTIONS: { label: string; value: ScaleMode }[] = [
   { label: 'Log', value: 'log' },
 ]
 
+const SCOPE_OPTIONS: { label: string; value: ScopeMode }[] = [
+  { label: 'Project', value: 'project' },
+  { label: 'Global', value: 'global' },
+]
+
 /** Title, summary metrics, and the range / scale switches. */
 export function ChartHeader({
   total,
@@ -38,6 +46,8 @@ export function ChartHeader({
   onRange,
   scale,
   onScale,
+  scope,
+  onScope,
 }: ChartHeaderProps): JSX.Element {
   return (
     <div className={styles.head}>
@@ -50,6 +60,9 @@ export function ChartHeader({
         </div>
       </div>
       <div className={styles.toggles}>
+        {scope && onScope && (
+          <SegmentedToggle options={SCOPE_OPTIONS} value={scope} onChange={onScope} ariaLabel="Data scope" />
+        )}
         <SegmentedToggle options={RANGE_OPTIONS} value={range} onChange={onRange} ariaLabel="Time range" />
         <SegmentedToggle options={SCALE_OPTIONS} value={scale} onChange={onScale} ariaLabel="Value scale" />
       </div>
