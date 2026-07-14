@@ -17,6 +17,7 @@ _PROJECT_WRITERS: frozenset[str] = frozenset(
         "architect",
         "planner",
         "designer",
+        "research",
         "director",
         "human",
     }

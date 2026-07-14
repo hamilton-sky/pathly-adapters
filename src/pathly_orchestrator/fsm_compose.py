@@ -80,6 +80,7 @@ def _inject_prompt_vars(
     agent_role: str,
     storage_path: Path | None = None,
     skill: str | None = None,
+    board_tier: str = "feature",
 ) -> str:
     """Replace log-phase markers and common placeholders with real values."""
 
@@ -103,6 +104,9 @@ def _inject_prompt_vars(
         flags=re.MULTILINE,
     )
     text = text.replace("<feature>", feature)
+    # <board> = the board TIER (feature|project) this stage writes to — set so the comms-post
+    # fragment targets the right channel (a project decompose's artifacts land on the project board).
+    text = text.replace("<board>", board_tier)
     text = text.replace("<project_root>", project_root)
     text = text.replace("<agent>", agent_role)
     # <fsm_feature> = the run's FSM/event-log key = the storage dir basename (the run slug).
@@ -218,6 +222,11 @@ def build_prompt(
                 board_scope = _bs[1]
         except Exception:
             board_scope = feature
+    # Board tier for the <board> prompt var → the comms-post fragment posts artifacts to the
+    # RIGHT channel. Only a project run (storage basename 'project') targets the project board;
+    # every other run stays 'feature' — also the value /comms/post coerces any unknown board to,
+    # so an unsubstituted <board> can never mis-post.
+    board_tier = "project" if feature == "project" else "feature"
     _role = _SKILL_AGENT_ROLE.get(agent)
     agent_role: str = (
         _role
@@ -267,6 +276,7 @@ def build_prompt(
         agent_role,
         storage_path=storage_path,
         skill=(agent if "/" in agent else None),
+        board_tier=board_tier,
     )
 
     context = (

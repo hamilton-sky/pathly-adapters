@@ -34,6 +34,7 @@ def post_message(
     executor: str | None = None,
     context_refs: list[dict] | None = None,
     files: list[str] | None = None,
+    slug: str | None = None,
 ) -> str:
     """Insert a new message into comms_messages. Returns the new message_id."""
     message_id = str(uuid.uuid4())
@@ -41,8 +42,8 @@ def post_message(
     with _get_write_lock(conn):
         conn.execute(
             "INSERT INTO comms_messages "
-            "(id, board, scope, from_agent, to_agent, type, text, options, reply_to, stage, conv, ts, depends_on, task_status, artifact_path, artifact_type, goal_id, executor, context_refs, files) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "(id, board, scope, from_agent, to_agent, type, text, options, reply_to, stage, conv, ts, depends_on, task_status, artifact_path, artifact_type, goal_id, executor, context_refs, files, slug) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 message_id,
                 board,
@@ -64,6 +65,7 @@ def post_message(
                 executor,
                 json.dumps(context_refs) if context_refs is not None else None,
                 json.dumps(files) if files is not None else None,
+                slug,
             ),
         )
         conn.commit()

@@ -352,6 +352,7 @@ def test_comms_write_perm_project_writers_constant():
         "architect",
         "planner",
         "designer",
+        "research",
         "director",
         "human",
     }

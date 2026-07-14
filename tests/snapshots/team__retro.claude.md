@@ -188,7 +188,7 @@ curl -s -X POST http://127.0.0.1:8765/comms/post \
     "from": "<your-role>",
     "type": "<type>",
     "text": "<one self-contained paragraph — what you found and why it matters>",
-    "board": "feature",
+    "board": "<board>",
     "stage": "<CURRENT_STATE>"
   }'
 ```
@@ -212,13 +212,15 @@ start the server or retry in a loop just to post.
     retrieval**, so make it cover the real section topics.
   ```bash
   curl -s -X POST http://127.0.0.1:8765/comms/post -H "Content-Type: application/json" -d '{
-    "feature": "<feature>", "from": "<your-role>", "type": "artifact", "board": "feature",
+    "feature": "<feature>", "from": "<your-role>", "type": "artifact", "board": "<board>",
     "text": "<1-2 sentence description>", "summary": "<topic map, one line per section>",
     "artifact_path": "<path to the file>", "artifact_type": "md"}'
   ```
 - Never paste full file content — keep `text` to 1–2 sentences and `summary` to one line per section.
-- Only `feature`-scope writes are unrestricted. `project`/`global` writes are role-gated and may
-  return 403 — that is expected; keep your post at `"board": "feature"` unless you are `director`/`human`.
+- `<board>` is set for you by the runner — it is the board **tier** your stage writes to
+  (`feature` for a feature/goal run, `project` for a project decompose). Post with
+  `"board": "<board>"` and your write lands on the right board. `global`-tier writes stay
+  role-gated (`director`/`human`); a `feature` write is always unrestricted.
 
 ### What each role typically posts
 
@@ -249,7 +251,7 @@ curl -s -X POST http://127.0.0.1:8765/comms/post \
       {"id": "a", "label": "<option A>", "description": "<short consequence>"},
       {"id": "b", "label": "<option B>", "description": "<short consequence>"}
     ],
-    "board": "feature",
+    "board": "<board>",
     "stage": "<CURRENT_STATE>"
   }'
 ```

@@ -124,6 +124,9 @@ def comms_post():
         depends_on = data.get("depends_on")
         goal_id = data.get("goal_id")
         executor = data.get("executor")
+        # Filesystem slug on a feature/goal card (e.g. project-decompose's sibling features).
+        # Persisted so slug-keyed lookups work; the slug also lives inside `text` for display.
+        slug = data.get("slug")
         artifact_path = data.get("artifact_path") or None
         artifact_type = data.get("artifact_type") or None
         if msg_type == "artifact" and not (
@@ -268,6 +271,7 @@ def comms_post():
             goal_id=goal_id,
             executor=executor,
             context_refs=context_refs,
+            slug=slug if isinstance(slug, str) and slug.strip() else None,
         )
 
         if (

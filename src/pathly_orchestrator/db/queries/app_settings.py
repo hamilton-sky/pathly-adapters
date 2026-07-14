@@ -78,6 +78,7 @@ _DEFAULT_WRITE_PERMISSIONS: dict[str, list[str]] = {
             "architect",
             "planner",
             "designer",
+            "research",
             "director",
             "human",
         ]

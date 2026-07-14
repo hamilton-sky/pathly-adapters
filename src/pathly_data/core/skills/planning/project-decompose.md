@@ -96,8 +96,10 @@ the Step-3 starting spec to `pathly/features/<slug>/SPEC.md`. Feature files live
 dir — never nest them under a `plans/` subdir.
 
 **4b. Materialize the feature's own board** (reuse `create-feature` mechanics) — post its root goal
-so the feature gets a Studio card and a board ready for feature→goals. Idempotent: if a `type=goal`
-already exists at `scope=<slug>`, reuse it and do not post a duplicate.
+so the feature gets a Studio card and a board ready for feature→goals. Wire the goal's
+`context_refs` to its own `SPEC.md` so the feature→goals decompose reads the real spec, not just
+the one-line goal title. Idempotent: if a `type=goal` already exists at `scope=<slug>`, reuse it
+and do not post a duplicate.
 ```bash
 curl -s -X POST http://127.0.0.1:8765/comms/post \
   -H "Content-Type: application/json" \
@@ -108,7 +110,28 @@ curl -s -X POST http://127.0.0.1:8765/comms/post \
     "board": "feature",
     "scope": "<slug>",
     "executor": "single",
-    "text": "Goal: <feature title>"
+    "text": "Goal: <feature title>",
+    "context_refs": [{"artifact": "pathly/features/<slug>/SPEC.md", "anchor": ""}]
+  }'
+```
+
+**4b-2. Attach the SPEC to the feature's own board.** Post the `SPEC.md` you wrote in 4a as a
+`type=artifact` on the feature board, so the board is self-contained — a human opening the feature
+sees its spec as a readable card, and the feature→goals decompose inherits it via board context.
+A `board=feature` + `scope=<slug>` write is unrestricted (no role gate), so this always lands.
+```bash
+curl -s -X POST http://127.0.0.1:8765/comms/post \
+  -H "Content-Type: application/json" \
+  -d '{
+    "feature": "<slug>",
+    "from": "planner",
+    "type": "artifact",
+    "board": "feature",
+    "scope": "<slug>",
+    "text": "SPEC.md — starting spec for the <slug> feature: the problem, the deliverable, and known constraints.",
+    "summary": "<one line per SPEC.md heading — the section topic map>",
+    "artifact_path": "pathly/features/<slug>/SPEC.md",
+    "artifact_type": "md"
   }'
 ```
 
