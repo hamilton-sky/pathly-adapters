@@ -187,6 +187,123 @@ def test_load_manifest_shape():
     ]
 
 
+# ── board_default: custom (absent) skills get the board bundle on board/flow runs ──
+
+# Distinctive H2 headings of the two board-bundle fragments.
+_COMMS_POST_MARKER = "## Posting to the Comms Board"
+_PROGRESS_MARKER = "## Live progress logging"
+
+# A real skill file on disk that is ABSENT from the shipped manifest (see
+# test_unconverted_skill_composes_raw_body). Used as the "custom skill" stand-in.
+_ABSENT_SKILL = "development/commit"
+
+
+def test_absent_skill_raw_without_board_default():
+    """Default (board_default=False): an absent skill is raw — no board fragments.
+
+    This is the build-time install / editor-preview contract; it must not change.
+    """
+    from pathly_orchestrator.compose import _read_skill_body
+
+    out = compose_skill(_ABSENT_SKILL, "claude")
+    assert out == _read_skill_body(_ABSENT_SKILL)
+    assert _COMMS_POST_MARKER not in out
+    assert _PROGRESS_MARKER not in out
+
+
+def test_absent_skill_gets_board_bundle_with_board_default():
+    """board_default=True: an absent (custom) skill composes comms-post + progress-logging.
+
+    This is the fix — a user-created skill run on a board still posts its artifacts/progress.
+    """
+    out = compose_skill(_ABSENT_SKILL, "claude", board_default=True)
+    assert _COMMS_POST_MARKER in out, "custom skill must get the comms-post recipe on a board"
+    assert _PROGRESS_MARKER in out, "custom skill must get progress-logging on a board"
+    # The skill body itself is still present (bundle is appended, not a replacement).
+    assert out.count(_COMMS_POST_MARKER) == 1
+
+
+def test_board_default_no_effect_on_listed_skill():
+    """The flag only touches the absent branch: a manifest-listed skill composes identically."""
+    assert compose_skill("team/build", "claude") == compose_skill(
+        "team/build", "claude", board_default=True
+    )
+
+
+def test_board_default_uses_manifest_board_defaults_key():
+    """When the manifest declares board_defaults, an absent skill composes exactly those."""
+    manifest = {
+        "version": 1,
+        "fragments_dir": "fragments",
+        "defaults": ["progress-logging"],
+        "board_defaults": ["comms-post"],  # comms-post only, no progress-logging
+        "skills": {"team/build": {"fragments": []}},
+    }
+    out = compose_skill(_ABSENT_SKILL, "claude", manifest=manifest, board_default=True)
+    assert _COMMS_POST_MARKER in out
+    assert _PROGRESS_MARKER not in out, "board_defaults must override the hardcoded bundle"
+
+
+def test_board_default_falls_back_to_hardcoded_bundle_when_key_absent():
+    """A manifest with no board_defaults key falls back to progress-logging + comms-post."""
+    manifest = {
+        "version": 1,
+        "fragments_dir": "fragments",
+        "defaults": ["progress-logging"],
+        "skills": {"team/build": {"fragments": []}},
+    }  # no board_defaults key
+    out = compose_skill(_ABSENT_SKILL, "claude", manifest=manifest, board_default=True)
+    assert _COMMS_POST_MARKER in out
+    assert _PROGRESS_MARKER in out
+
+
+def test_board_default_gates_fragment_on_capability():
+    """A gated board_defaults entry is dropped when the adapter lacks the capability."""
+    manifest = {
+        "version": 1,
+        "fragments_dir": "fragments",
+        "defaults": [],
+        "board_defaults": [{"name": "spawn-rules", "requires": "can_spawn"}],
+        "skills": {},
+    }
+    out = compose_skill(
+        _ABSENT_SKILL, {"can_spawn": False}, manifest=manifest, board_default=True
+    )
+    assert _SPAWN_RULES_MARKER not in out
+
+
+def test_real_manifest_board_defaults_bundle():
+    """The shipped manifest declares the comms-post + progress-logging board bundle."""
+    names = [
+        e if isinstance(e, str) else e.get("name")
+        for e in load_manifest().get("board_defaults", [])
+    ]
+    assert "comms-post" in names
+    assert "progress-logging" in names
+
+
+def test_validator_rejects_unknown_board_default_fragment():
+    manifest = {
+        "fragments_dir": "fragments",
+        "defaults": [],
+        "board_defaults": ["no-such-fragment"],
+        "skills": {},
+    }
+    with pytest.raises(ValueError, match="unknown fragment"):
+        validate_composition(manifest)
+
+
+def test_validator_rejects_duplicate_board_default_fragment():
+    manifest = {
+        "fragments_dir": "fragments",
+        "defaults": [],
+        "board_defaults": ["comms-post", "comms-post"],
+        "skills": {},
+    }
+    with pytest.raises(ValueError, match="duplicate"):
+        validate_composition(manifest)
+
+
 # ── Converted team/* family: golden snapshots + exactly-once guarantee ───────
 
 _CONVERTED_TEAM_SKILLS = [

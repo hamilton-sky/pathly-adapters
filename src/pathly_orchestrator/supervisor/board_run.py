@@ -117,7 +117,14 @@ def _compose_skill_body(skill: str, adapter: str, caps: dict | None = None) -> s
     try:
         from pathly_orchestrator.skills.compose import compose_skill
 
-        return compose_skill(skill, caps if caps is not None else (adapter or "claude"))
+        # board_default=True: a custom skill (absent from the manifest) run on a board still
+        # gets the default board bundle (comms-post + progress-logging) so it posts back —
+        # instead of being handed to the CLI raw. A recognized skill is unaffected.
+        return compose_skill(
+            skill,
+            caps if caps is not None else (adapter or "claude"),
+            board_default=True,
+        )
     except Exception:
         return ""
 

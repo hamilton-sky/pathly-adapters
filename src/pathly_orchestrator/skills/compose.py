@@ -10,7 +10,12 @@ skill path without the ``.md`` suffix — e.g. ``team/build``, ``development/bui
 Composition contract:
     assembled = [stage skill body] + [defaults + skill fragments, in declared order]
   - ``defaults`` apply ONLY to skills present in the ``skills:`` map.
-  - A skill ABSENT from ``skills:`` is returned raw and unchanged (no fragments, no defaults).
+  - A skill ABSENT from ``skills:`` is returned raw and unchanged (no fragments, no defaults)
+    — UNLESS ``compose_skill`` is called with ``board_default=True`` (the board-run / flow
+    paths do this for a genuinely custom skill), in which case the unrecognized skill instead
+    composes the ``board_defaults`` bundle (``progress-logging`` + ``comms-post``) so a
+    user-created skill run on a board still reads + posts to it. Build-time install and
+    editor-preview paths leave ``board_default`` False, preserving the raw contract.
   - A fragment entry is either a bare name (``feedback-protocol``) or an object with a gate
     (``{name: spawn-rules, requires: can_spawn}``); a gated fragment is dropped when the active
     adapter's capability flag is false.
@@ -29,6 +34,13 @@ _KNOWN_CAPABILITIES = {"can_spawn", "goal_id"}
 
 # Adapters whose ``_meta`` capability flags we can derive caps from.
 _KNOWN_ADAPTERS = {"claude", "codex", "copilot", "antigravity"}
+
+# Default board-fragment bundle given to a skill ABSENT from the manifest that is run on a
+# board (/comms/run) or in a flow (``board_default=True``). Used only when the manifest has no
+# explicit ``board_defaults:`` key. Keeps a custom skill wired to the board: ``comms-post``
+# (post artifacts/findings) + ``progress-logging`` (phase telemetry). Board *context* injection
+# is separate — it happens at the run level (start_board_run / retrieve_board_context).
+_BOARD_DEFAULT_FRAGMENTS = ["progress-logging", "comms-post"]
 
 # A composed prompt must NOT start with ``---``: it is delivered to the CLI via a
 # ``-p`` argv token, and an argument starting with ``--`` is parsed as an unknown
@@ -271,8 +283,23 @@ def compose_skill_with_block(
     return "\n\n".join(parts) + "\n"
 
 
+def _assemble(raw: str, entries: list, caps: dict, fragments_dir: str) -> str:
+    """Join a skill body with its resolved fragment bodies (gated entries dropped)."""
+    parts = [_strip_leading_frontmatter(raw).rstrip("\n")]
+    for entry in entries:
+        name, requires = _entry_parts(entry)
+        if requires and not caps.get(requires):
+            continue  # gated out for this adapter
+        parts.append(_read_fragment(fragments_dir, name).rstrip("\n"))
+    return "\n\n".join(parts) + "\n"
+
+
 def compose_skill(
-    skill: str, adapter_caps: Any, *, manifest: dict | None = None
+    skill: str,
+    adapter_caps: Any,
+    *,
+    manifest: dict | None = None,
+    board_default: bool = False,
 ) -> str:
     """Return the assembled markdown for ``skill`` under the given adapter caps.
 
@@ -280,17 +307,37 @@ def compose_skill(
     string (``"claude"``), which is resolved via :func:`adapter_caps_for`.
 
     A skill absent from the manifest's ``skills:`` map is returned raw and unchanged,
-    preserving current behaviour until it is explicitly converted.
+    preserving current behaviour until it is explicitly converted — UNLESS
+    ``board_default=True``, which the board-run / flow paths pass for a genuinely custom
+    skill. Then the unrecognized skill composes the ``board_defaults`` bundle
+    (:data:`_BOARD_DEFAULT_FRAGMENTS` = ``progress-logging`` + ``comms-post`` when the
+    manifest declares no ``board_defaults:`` key) so a user-created skill run on a board
+    still posts its artifacts/progress back. Build-time install and editor-preview paths
+    leave ``board_default`` False, keeping the raw contract. (Board *context* is injected
+    separately at the run level — start_board_run / retrieve_board_context.)
     """
     if manifest is None:
         manifest = load_manifest()
     skills_map = manifest.get("skills") or {}
     raw = _read_skill_body(skill)
-    if skill not in skills_map:
+
+    # Non-board callers (install, editor preview) keep the exact raw fast-path — no
+    # caps coercion, byte-identical body — for a skill absent from the manifest.
+    if skill not in skills_map and not board_default:
         return raw
 
     caps = _coerce_caps(adapter_caps)
     fragments_dir = manifest.get("fragments_dir", "fragments")
+
+    if skill not in skills_map:
+        # board_default=True on an unrecognized (custom) skill: hand it the default board
+        # bundle so it connects through fragments like every recognized skill. Falls back to
+        # the hardcoded bundle when the manifest omits `board_defaults:`.
+        board_frags = manifest.get("board_defaults")
+        if board_frags is None:
+            board_frags = list(_BOARD_DEFAULT_FRAGMENTS)
+        return _assemble(raw, board_frags, caps, fragments_dir)
+
     spec = skills_map[skill] or {}
     # `no_defaults: true` on a skill opts it out of the global defaults (e.g. progress-logging).
     # Pure client transforms (summarize/analyze/split) are one-shot file derivations with no
@@ -299,14 +346,7 @@ def compose_skill(
         [] if spec.get("no_defaults") else list(manifest.get("defaults") or [])
     )
     entries = default_frags + list(spec.get("fragments") or [])
-
-    parts = [_strip_leading_frontmatter(raw).rstrip("\n")]
-    for entry in entries:
-        name, requires = _entry_parts(entry)
-        if requires and not caps.get(requires):
-            continue  # gated out for this adapter
-        parts.append(_read_fragment(fragments_dir, name).rstrip("\n"))
-    return "\n\n".join(parts) + "\n"
+    return _assemble(raw, entries, caps, fragments_dir)
 
 
 # ── Validator ─────────────────────────────────────────────────────────────────
@@ -341,6 +381,21 @@ def validate_composition(manifest: dict | None = None) -> None:
         if name in seen_defaults:
             raise ValueError(f"composition: duplicate fragment {name!r} in defaults")
         seen_defaults.add(name)
+
+    # board_defaults (optional — absent key falls back to _BOARD_DEFAULT_FRAGMENTS at runtime)
+    seen_board_defaults: set[str] = set()
+    for entry in manifest.get("board_defaults") or []:
+        name, requires = _entry_parts(entry)
+        _check(name, "board_defaults")
+        if requires and requires not in _KNOWN_CAPABILITIES:
+            raise ValueError(
+                f"composition: unknown capability {requires!r} in board_defaults"
+            )
+        if name in seen_board_defaults:
+            raise ValueError(
+                f"composition: duplicate fragment {name!r} in board_defaults"
+            )
+        seen_board_defaults.add(name)
 
     # per-skill
     for skill, spec in (manifest.get("skills") or {}).items():

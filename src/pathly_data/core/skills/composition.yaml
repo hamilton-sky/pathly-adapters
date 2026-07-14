@@ -24,6 +24,16 @@ fragments_dir: fragments
 defaults:
   - progress-logging
 
+# Applied to a skill ABSENT from `skills:` when it is run on a board (POST /comms/run) or in a
+# flow — the board-run / flow call sites pass `board_default=True` (see compose_skill). This is
+# the "always compose through fragments" guarantee for user-created custom skills: without it a
+# custom skill would be handed to the CLI raw and never post its artifacts/progress to the board.
+# NOT applied on the build-time install path or editor previews (those keep the skill raw). Board
+# CONTEXT injection is separate — it happens at the run level (start_board_run/retrieve_board_context).
+board_defaults:
+  - progress-logging
+  - comms-post
+
 # Map of <skill name> -> { fragments: [...] }.
 # Two skill FAMILIES share the same fragments but keep distinct bodies (see IMPLEMENTATION_PLAN
 # "development vs team split"):

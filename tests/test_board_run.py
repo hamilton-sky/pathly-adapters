@@ -446,3 +446,51 @@ def test_system_prompt_and_board_framing_in_prompt():
     assert (
         "most recent message from the human on this board" in p
     )  # board-as-task framing
+
+
+def test_custom_skill_on_board_gets_context_and_comms_post(client):
+    """End-to-end (unified-cli-composition "compose through fragments"): a CUSTOM skill —
+    absent from composition.yaml, e.g. one a user created via the Run modal — run on a board
+    must receive BOTH (a) the board context block and (b) the comms-post artifact recipe, so it
+    auto-reads and posts to the board. (a) is injected at the run level (board_context_for);
+    (b) + progress-logging come from the board_default bundle in compose_skill. Without the
+    board_default wiring the custom skill would reach the CLI raw — no board write-back.
+    """
+    from pathlib import Path
+
+    import pathly_data
+    from pathly_orchestrator.supervisor.board_run import start_board_run
+
+    # A trivial custom skill under core/skills/custom/ — deliberately NOT in the manifest.
+    custom_dir = Path(pathly_data.__file__).parent / "core" / "skills" / "custom"
+    custom_dir.mkdir(parents=True, exist_ok=True)
+    probe = custom_dir / "_e2e_board_probe.md"
+    probe.write_text(
+        "# Custom board summarizer\n\nSummarize the board and write NOTES.md.\n",
+        encoding="utf-8",
+    )
+    try:
+        # Board context is non-empty: post a decision the agent must see.
+        _post_msg(client, msg_type="decision", text="Use Python 3.11 only")
+
+        cap: dict = {}
+        result = start_board_run(
+            "feature",
+            "f1",
+            "single-agent",
+            instructions="Do the custom task",
+            skill="custom/_e2e_board_probe",
+            spawn_fn=lambda **k: cap.update(prompt=k["prompt"]) or {"result": "ok"},
+            block=True,
+        )
+        assert result["ok"] is True
+        prompt = cap["prompt"]
+        # (a) board context block fires even for a custom/raw skill (run-level injection).
+        assert "Use Python 3.11 only" in prompt
+        # (b) comms-post + progress-logging come from the board_default bundle.
+        assert "## Posting to the Comms Board" in prompt
+        assert "## Live progress logging" in prompt
+        # The custom skill's own body is present (bundle is appended, not a replacement).
+        assert "Custom board summarizer" in prompt
+    finally:
+        probe.unlink(missing_ok=True)

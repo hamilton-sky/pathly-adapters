@@ -252,6 +252,10 @@ def build_prompt(
         manifest = load_effective_manifest(project_root)
         composition = flow_config.get("composition", {})
         block_name = composition.get(state_name)
+        # board_default=True: if a flow's agent_map points at a custom skill (absent from the
+        # manifest), give it the default board bundle rather than a raw body — the same
+        # "compose through fragments" guarantee the /comms/run board path provides. Recognized
+        # skills (team/build, …) are listed in the manifest, so this flag never affects them.
         if block_name:
             try:
                 agent_text = compose_skill_with_block(
@@ -263,9 +267,13 @@ def build_prompt(
                     block_name,
                     state_name,
                 )
-                agent_text = compose_skill(agent, caps, manifest=manifest)
+                agent_text = compose_skill(
+                    agent, caps, manifest=manifest, board_default=True
+                )
         else:
-            agent_text = compose_skill(agent, caps, manifest=manifest)
+            agent_text = compose_skill(
+                agent, caps, manifest=manifest, board_default=True
+            )
     else:
         agent_text = _load_agent_text(agent)
 
