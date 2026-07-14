@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react'
+import { LayoutGrid, Rows3 } from 'lucide-react'
 import type { EngineAdapter, MonitorEngine } from '../types'
 import { CATEGORY_META } from '../constants'
 import { CategoryFilterBar, type CategoryFilter } from '../CategoryFilterBar/CategoryFilterBar'
@@ -24,6 +25,7 @@ export function MonitorBoard({ engines, recent, onAction }: Props): JSX.Element 
   const [adapter, setAdapter] = useState<EngineAdapter | null>(null)
   const [scope, setScope] = useState<string | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
+  const [view, setView] = useState<'grid' | 'banner'>('grid')
 
   const counts = useMemo(() => {
     const c: Record<string, number> = { all: engines.length }
@@ -71,6 +73,30 @@ export function MonitorBoard({ engines, recent, onAction }: Props): JSX.Element 
         <header className={s.head}>
           <span className={s.title}>Monitor</span>
           <span className={s.summary}>{running} live · {queued} queued</span>
+          <div className={s.viewToggle} role="group" aria-label="Card layout">
+            <button
+              type="button"
+              className={s.viewBtn}
+              data-active={view === 'grid'}
+              onClick={() => setView('grid')}
+              title="Grid of cards"
+              aria-label="Grid view"
+              {...(view === 'grid' ? { 'aria-pressed': 'true' } : { 'aria-pressed': 'false' })}
+            >
+              <LayoutGrid size={14} />
+            </button>
+            <button
+              type="button"
+              className={s.viewBtn}
+              data-active={view === 'banner'}
+              onClick={() => setView('banner')}
+              title="Banner rows"
+              aria-label="Banner view"
+              {...(view === 'banner' ? { 'aria-pressed': 'true' } : { 'aria-pressed': 'false' })}
+            >
+              <Rows3 size={14} />
+            </button>
+          </div>
           <span className={s.live}>
             <span className={s.liveDot} />SSE live
           </span>
@@ -95,6 +121,7 @@ export function MonitorBoard({ engines, recent, onAction }: Props): JSX.Element 
             key={sec.meta.key}
             meta={sec.meta}
             engines={sec.engines}
+            view={view}
             onOpen={setOpenId}
             onAction={onAction}
           />
@@ -105,6 +132,7 @@ export function MonitorBoard({ engines, recent, onAction }: Props): JSX.Element 
             key="recent"
             meta={{ key: 'single', label: 'Recent', blurb: 'finished · from history', color: 'var(--text-muted)' }}
             engines={recentFiltered}
+            view={view}
             onOpen={setOpenId}
             onAction={onAction}
           />

@@ -7,6 +7,7 @@ import s from './EngineSection.module.css'
 interface Props {
   meta: CategoryMeta
   engines: MonitorEngine[]
+  view?: 'grid' | 'banner'
   onOpen?: (id: string) => void
   onAction?: (engineId: string, actionId: string) => void
 }
@@ -14,7 +15,7 @@ interface Props {
 // One category band: colored heading dot + Title-Case label + muted blurb + count
 // badge, then a responsive grid of engine cards. Renders nothing when empty so the
 // board only shows categories that actually have engines.
-export function EngineSection({ meta, engines, onOpen, onAction }: Props): JSX.Element | null {
+export function EngineSection({ meta, engines, view = 'grid', onOpen, onAction }: Props): JSX.Element | null {
   if (engines.length === 0) return null
   return (
     <section className={s.section}>
@@ -24,9 +25,9 @@ export function EngineSection({ meta, engines, onOpen, onAction }: Props): JSX.E
         <span className={s.blurb}>{meta.blurb}</span>
         <span className={s.count}>{engines.length}</span>
       </div>
-      <div className={s.grid}>
+      <div className={s.grid} data-view={view}>
         {engines.map((e) => (
-          <EngineCard key={e.id} engine={e} onOpen={onOpen} onAction={onAction} />
+          <EngineCard key={e.id} engine={e} view={view} onOpen={onOpen} onAction={onAction} />
         ))}
       </div>
     </section>

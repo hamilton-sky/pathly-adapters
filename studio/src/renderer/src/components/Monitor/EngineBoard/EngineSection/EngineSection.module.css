@@ -49,3 +49,9 @@
   gap: 11px;
   align-items: start;
 }
+
+/* Banner view: full-width single-column rows instead of the card grid. */
+.grid[data-view='banner'] {
+  grid-template-columns: 1fr;
+  gap: 7px;
+}

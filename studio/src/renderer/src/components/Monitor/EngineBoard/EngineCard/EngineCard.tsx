@@ -9,6 +9,7 @@ import s from './EngineCard.module.css'
 
 interface Props {
   engine: MonitorEngine
+  view?: 'grid' | 'banner'
   onOpen?: (id: string) => void
   onAction?: (engineId: string, actionId: string) => void
 }
@@ -16,7 +17,7 @@ interface Props {
 // A clickable ticket for one CLI engine — the board's atomic unit. Clicking (or Enter/Space) opens
 // the detail modal with the full contextual controls; a quick Stop (running) / Cancel (queued)
 // button sits on the card itself so the common action doesn't require opening the modal first.
-export function EngineCard({ engine: e, onOpen, onAction }: Props): JSX.Element {
+export function EngineCard({ engine: e, view = 'grid', onOpen, onAction }: Props): JSX.Element {
   const queued = e.status === 'queued'
   const running = e.status === 'running'
   return (
@@ -24,6 +25,7 @@ export function EngineCard({ engine: e, onOpen, onAction }: Props): JSX.Element 
       className={s.card}
       role="button"
       tabIndex={0}
+      data-view={view}
       {...(queued ? { 'data-queued': '' } : {})}
       onClick={() => onOpen?.(e.id)}
       onKeyDown={(ev) => {
