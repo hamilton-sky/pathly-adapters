@@ -21,6 +21,8 @@ export interface CommsRow {
   read_by: string | null
   acknowledged_by: string | null
   status: string | null
+  /** Question rows only: the option id the human chose (persisted by /comms/answer). */
+  answer_option?: string | null
   deleted_at: string | null
   artifact_path: string | null
   artifact_type: string | null
@@ -99,6 +101,9 @@ export function rowToMessage(row: CommsRow): Message {
 
   if (row.status) m.status = row.status as Message['status']
   if (options) m.options = options
+  // The chosen option id — restores the selected-option highlight on a board reload
+  // (the CardBody marks an option chosen via `m.answer === option.id`).
+  if (row.answer_option) m.answer = row.answer_option
 
   if (row.type === 'artifact' && row.artifact_path) {
     m.artifact = basename(row.artifact_path)

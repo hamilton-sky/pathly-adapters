@@ -293,9 +293,12 @@ def answer_question(
         reply_to=question_id,
     )
     with _get_write_lock(conn):
+        # Persist the chosen option id AND mark the question 'answered' (the status the
+        # board UI's question card reads) so the selection survives a board reload — the
+        # 5s fallback poll used to revert it because neither round-tripped.
         conn.execute(
-            "UPDATE comms_messages SET status='resolved' WHERE id=?",
-            (question_id,),
+            "UPDATE comms_messages SET status='answered', answer_option=? WHERE id=?",
+            (option_id, question_id),
         )
         conn.commit()
     return answer_id

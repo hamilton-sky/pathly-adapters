@@ -6,6 +6,7 @@ import logging
 
 from flask import jsonify, request
 
+from ...sse import _broadcast_comms
 from ._messages_bp import bp
 
 
@@ -195,6 +196,29 @@ def comms_answer():
         answer_id = _answer(
             conn, question_id=question_id, answer_text=answer_text, option_id=option_id
         )
+
+        # Instant cross-client sync: nudge every board subscribed to this question's
+        # scope to reload, so the 'answered' state + chosen option appear at once
+        # instead of waiting out the board's 5s fallback poll. Best-effort — a
+        # broadcast failure must never fail an answer that already persisted.
+        try:
+            row = conn.execute(
+                "SELECT board, scope FROM comms_messages WHERE id=?", (question_id,)
+            ).fetchone()
+            if row is not None:
+                _broadcast_comms(
+                    row["scope"],
+                    {
+                        "type": "COMMS_UPDATE",
+                        "message_id": question_id,
+                        "board": row["board"],
+                        "scope": row["scope"],
+                        "msg_type": "question",
+                    },
+                )
+        except Exception:
+            logging.debug("comms_answer broadcast failed", exc_info=True)
+
         return jsonify({"ok": True, "answer_id": answer_id}), 200
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 404

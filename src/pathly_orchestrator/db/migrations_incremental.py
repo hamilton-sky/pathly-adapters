@@ -101,6 +101,10 @@ def _add_additive_migrations(conn: sqlite3.Connection) -> None:
         ("comms_messages", "files", "TEXT"),
         # T5 goal-slug: stable filesystem slug for goal messages.
         ("comms_messages", "slug", "TEXT"),
+        # question-answer-persistence: the chosen option id on an answered question row.
+        # Without it the option id never round-trips, so the board's 5s fallback poll
+        # reloaded the question with no selection and reverted the highlight.
+        ("comms_messages", "answer_option", "TEXT"),
         # Phase 3 — staleness fingerprints for the section index (§3.4).
         # indexed_mtime: st_mtime at last index (cheap gate, one stat).
         # indexed_hash: sha256 of full file content at last index (content-change gate).
