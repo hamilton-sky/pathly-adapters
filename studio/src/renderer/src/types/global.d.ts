@@ -266,7 +266,7 @@ declare global {
         events: (feature: string, projectRoot?: string) => Promise<DbEvent[]>
         agents: (feature: string, projectRoot?: string) => Promise<DbAgent[]>
         otel: (feature: string, projectRoot?: string) => Promise<DbOtelSpan[]>
-        trends: (feature: string, days?: number) => Promise<TrendsResponse | null>
+        trends: (feature: string, days?: number, projectRoot?: string) => Promise<TrendsResponse | null>
         runs: (feature: string, projectRoot?: string) => Promise<DbRun[]>
         query: (sql: string) => Promise<{ rows: Record<string, unknown>[]; error?: string }>
         settings: () => Promise<Record<string, string>>

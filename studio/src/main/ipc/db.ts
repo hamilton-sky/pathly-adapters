@@ -73,9 +73,10 @@ export function registerDbHandlers(): void {
     try { return await fsmGet(`/db/features/${encodeURIComponent(feature)}/runs${qs}`) } catch { return [] }
   })
 
-  ipcMain.handle('db:trends', async (_e, feature: string, days?: number) => {
+  ipcMain.handle('db:trends', async (_e, feature: string, days?: number, projectRoot?: string) => {
     const qs = new URLSearchParams({ feature })
     if (days !== undefined) qs.set('days', String(days))
+    if (projectRoot) qs.set('project_root', projectRoot)
     try { return await fsmGet(`/telemetry/trends?${qs}`) } catch { return null }
   })
 

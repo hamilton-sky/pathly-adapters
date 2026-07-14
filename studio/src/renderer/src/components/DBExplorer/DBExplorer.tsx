@@ -61,7 +61,7 @@ export function DBExplorer(): JSX.Element {
       const [rawFeatures, rawStats, rawTrends] = await Promise.all([
         window.pathly.db.features(projectPath || undefined),
         window.pathly.db.stats(projectPath || undefined),
-        window.pathly.db.trends('', 30),
+        window.pathly.db.trends('', 30, projectPath || undefined),
       ])
       setFeatures(rawFeatures.map(dbFeatureToFeatureData))
       setStats(rawStats)

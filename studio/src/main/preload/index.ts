@@ -334,8 +334,8 @@ contextBridge.exposeInMainWorld('pathly', {
       ipcRenderer.invoke('db:agents', feature, projectRoot),
     otel: (feature: string, projectRoot?: string): Promise<DbOtelSpan[]> =>
       ipcRenderer.invoke('db:otel', feature, projectRoot),
-    trends: (feature: string, days?: number): Promise<TrendsResponse | null> =>
-      ipcRenderer.invoke('db:trends', feature, days),
+    trends: (feature: string, days?: number, projectRoot?: string): Promise<TrendsResponse | null> =>
+      ipcRenderer.invoke('db:trends', feature, days, projectRoot),
     runs: (feature: string, projectRoot?: string): Promise<DbRun[]> =>
       ipcRenderer.invoke('db:runs', feature, projectRoot),
     query: (sql: string): Promise<{ rows: Record<string, unknown>[]; error?: string }> =>
