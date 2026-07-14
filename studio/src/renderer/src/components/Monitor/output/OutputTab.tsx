@@ -14,7 +14,7 @@ function readViewMode(): ViewMode {
   try { return (localStorage.getItem(STORAGE_KEY) as ViewMode) ?? 'list' } catch { return 'list' }
 }
 
-export function OutputTab(): JSX.Element {
+export function OutputTab(): JSX.Element | null {
   const stageLog = useRunnerStore((s) => s.stageLog)
   const runHistory = useRunnerStore((s) => s.runHistory)
   const topic = useRunnerStore((s) => s.topic)
@@ -27,8 +27,11 @@ export function OutputTab(): JSX.Element {
     setViewMode(mode)
   }
 
+  // No output yet → render nothing (was a big empty "No output yet" panel). With the
+  // pipeline-on-top layout, this lets the global engine board directly below fill the
+  // space, so the grid is the panel's main content until a run actually produces output.
   if (stageLog.length === 0 && runHistory.length === 0) {
-    return <div className={styles.empty}>No output yet — start a run to see stage results here.</div>
+    return null
   }
 
   return (
