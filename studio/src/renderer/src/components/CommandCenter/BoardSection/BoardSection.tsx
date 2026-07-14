@@ -29,9 +29,14 @@ function getSectionFlex(props: BoardSectionProps): string {
   return '1 1 0'
 }
 
+// Feature boards show a bare slug; the PROJECT board must NOT be able to read
+// identically to a feature named the same as the repo (the "invoice-tracker" clash).
+// Qualify the project name with a scope suffix a feature slug can never contain (it
+// has a space + "·"), so the name self-disambiguates even standalone (tooltip, pop-out
+// title) — not only via the scope pill. Mirrors the global board's "· all features" style.
 function getBoardName(section: SectionDef, projectName: string): string {
   if (section.scope === 'feature') return section.featureId
-  if (section.scope === 'project') return projectName
+  if (section.scope === 'project') return `${projectName} · project`
   return 'all projects · all features'
 }
 
