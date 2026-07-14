@@ -1,4 +1,4 @@
-import { BookOpen, Layers, Activity, Database, Settings, PanelLeft, MessageSquare, FileText, LayoutGrid } from 'lucide-react'
+import { BookOpen, Layers, Activity, Database, Settings, PanelLeft, MessageSquare, FileText, LayoutGrid, Blocks } from 'lucide-react'
 import { useBrightskyStore } from '../../../store/brightskyStore'
 import { Tooltip } from '../../ui'
 import styles from './IconStrip.module.css'
@@ -13,6 +13,7 @@ interface IconStripProps {
   onMonitor: () => void
   onDbExplorer: () => void
   onMarkdownEditor: () => void
+  onSkillComposition: () => void
   onCanvas: () => void
   onSettings: () => void
 }
@@ -27,6 +28,7 @@ export function IconStrip({
   onMonitor,
   onDbExplorer,
   onMarkdownEditor,
+  onSkillComposition,
   onCanvas,
   onSettings,
 }: IconStripProps): JSX.Element {
@@ -110,6 +112,17 @@ export function IconStrip({
           aria-label="Markdown Editor"
         >
           <FileText size={16} />
+        </button>
+      </Tooltip>
+
+      <Tooltip label="Skill Composition" placement="right">
+        <button
+          type="button"
+          className={`${styles.iconBtn} ${activePanel === 'skill-composition' ? styles.iconBtnActive : ''}`}
+          onClick={onSkillComposition}
+          aria-label="Skill Composition"
+        >
+          <Blocks size={16} />
         </button>
       </Tooltip>
 

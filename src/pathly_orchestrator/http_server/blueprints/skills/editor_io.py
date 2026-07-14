@@ -112,3 +112,37 @@ def skills_export():
     except Exception as e:
         logging.exception("skills_export error")
         return jsonify({"error": str(e), "type": type(e).__name__}), 500
+
+
+@bp.route("/skills/composition", methods=["DELETE"])
+def skills_composition_delete():
+    """Delete a skill's per-project composition override, reverting it to the packaged default."""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Missing JSON body"}), 400
+
+        skill = data.get("skill", "")
+        if not isinstance(skill, str) or not skill.strip():
+            return jsonify({"error": "Field 'skill' must be a non-empty string"}), 400
+        if not _SKILL_KEY_RE.fullmatch(skill):
+            return (
+                jsonify(
+                    {
+                        "error": "Field 'skill' must be a skill name like 'team/build', not a path"
+                    }
+                ),
+                400,
+            )
+
+        project_root = (data.get("project_root") or "").strip() or None
+        from pathly_orchestrator.db import get_db
+        from pathly_orchestrator.db.queries.skill_composition import (
+            delete_composition_override,
+        )
+
+        delete_composition_override(get_db(project_root), project_root, skill)
+        return jsonify({"ok": True}), 200
+    except Exception as e:
+        logging.exception("skills_composition_delete error")
+        return jsonify({"error": str(e), "type": type(e).__name__}), 500

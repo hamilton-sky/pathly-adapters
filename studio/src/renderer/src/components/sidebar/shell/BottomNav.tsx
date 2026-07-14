@@ -1,4 +1,4 @@
-import { Database, Settings, MessageSquare, BookOpen, LayoutGrid } from 'lucide-react'
+import { Database, Settings, MessageSquare, BookOpen, LayoutGrid, Blocks } from 'lucide-react'
 import styles from '../Sidebar.module.css'
 
 interface BottomNavProps {
@@ -7,6 +7,7 @@ interface BottomNavProps {
   onMonitor: () => void
   onDbExplorer: () => void
   onMarkdownEditor: () => void
+  onSkillComposition: () => void
   onCanvas: () => void
   onSettings: () => void
 }
@@ -22,6 +23,7 @@ export function BottomNav({
   onMonitor,
   onDbExplorer,
   onMarkdownEditor,
+  onSkillComposition,
   onCanvas,
   onSettings,
 }: BottomNavProps): JSX.Element {
@@ -67,6 +69,16 @@ export function BottomNav({
       >
         <span className={styles.bottomIcon}><BookOpen size={15} strokeWidth={2} /></span>
         <span className={styles.bottomLabel}>Markdown Editor</span>
+      </button>
+
+      <button
+        type="button"
+        data-testid="sidebar-nav-skill-composition"
+        className={`${styles.bottomRow} ${activePanel === 'skill-composition' ? styles.bottomRowActive : ''}`}
+        onClick={onSkillComposition}
+      >
+        <span className={styles.bottomIcon}><Blocks size={15} strokeWidth={2} /></span>
+        <span className={styles.bottomLabel}>Skill Composition</span>
       </button>
 
       <button

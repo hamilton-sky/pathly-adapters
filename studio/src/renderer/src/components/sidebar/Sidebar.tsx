@@ -154,6 +154,7 @@ export function Sidebar(): JSX.Element | null {
         onMonitor={() => setActivePanel('monitor')}
         onDbExplorer={() => setActivePanel('db-explorer')}
         onMarkdownEditor={() => setActivePanel('markdown-editor')}
+        onSkillComposition={() => setActivePanel('skill-composition')}
         onCanvas={openCanvas}
         onSettings={() => setActivePanel('settings')}
       />
@@ -293,6 +294,7 @@ export function Sidebar(): JSX.Element | null {
         onMonitor={() => setActivePanel('monitor')}
         onDbExplorer={() => setActivePanel('db-explorer')}
         onMarkdownEditor={() => setActivePanel('markdown-editor')}
+        onSkillComposition={() => setActivePanel('skill-composition')}
         onCanvas={openCanvas}
         onSettings={() => setActivePanel('settings')}
       />

@@ -30,6 +30,58 @@ def skills_catalog():
         return jsonify({"error": str(e), "type": type(e).__name__}), 500
 
 
+@bp.route("/skills/composition", methods=["GET"])
+def skills_composition():
+    """Return every manifest skill's effective fragment list + the full fragment catalog.
+
+    Merges per-project DB overrides over the packaged composition.yaml (never writes it)
+    so the Skill Composition panel can show which skills are overridden and what fragments
+    are available to toggle. ``source`` is ``"override"`` when a DB row exists for that skill.
+    """
+    try:
+        from pathly_orchestrator.compose import (
+            load_manifest,
+            load_effective_manifest,
+            _known_fragments,
+            _entry_parts,
+        )
+        from pathly_orchestrator.db import get_db
+        from pathly_orchestrator.db.queries.skill_composition import (
+            get_composition_overrides,
+        )
+
+        project_root = (request.args.get("project_root") or "").strip() or None
+
+        base = load_manifest()
+        effective = load_effective_manifest(project_root)
+        fragments_dir = base.get("fragments_dir", "fragments")
+        all_fragments = sorted(_known_fragments(fragments_dir))
+
+        try:
+            overrides = get_composition_overrides(get_db(project_root), project_root)
+        except Exception:
+            overrides = {}
+
+        skills_out: dict[str, dict] = {}
+        for skill_key, spec in (effective.get("skills") or {}).items():
+            frag_names = []
+            for entry in (spec or {}).get("fragments") or []:
+                try:
+                    name, _requires = _entry_parts(entry)
+                except ValueError:
+                    continue
+                frag_names.append(name)
+            skills_out[skill_key] = {
+                "fragments": frag_names,
+                "source": "override" if skill_key in overrides else "manifest",
+            }
+
+        return jsonify({"skills": skills_out, "all_fragments": all_fragments}), 200
+    except Exception as e:
+        logging.exception("skills_composition error")
+        return jsonify({"error": str(e), "type": type(e).__name__}), 500
+
+
 @bp.route("/skills/parse", methods=["POST"])
 def skills_parse():
     """Parse a skill .md file into body cells and fragment cells."""

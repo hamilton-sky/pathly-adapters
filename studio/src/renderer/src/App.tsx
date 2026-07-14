@@ -16,6 +16,7 @@ import { PlanBoard } from './components/PlanBoard'
 import { Settings } from './components/Settings'
 import MarkdownEditorPanel from './components/MarkdownEditor/MarkdownEditor'
 import { DBExplorer } from './components/DBExplorer/DBExplorer'
+import { SkillComposition } from './components/SkillComposition/SkillComposition'
 import { Terminal } from './components/Terminal'
 import { PopoutTerminal } from './components/Terminal/PopoutTerminal'
 import { SetupScreen } from './components/SetupScreen'
@@ -61,6 +62,7 @@ function MainPanel(): JSX.Element {
   if (activePanel === 'settings') return <Settings />
   if (activePanel === 'markdown-editor') return <MarkdownEditorPanel />
   if (activePanel === 'db-explorer') return <DBExplorer />
+  if (activePanel === 'skill-composition') return <SkillComposition />
   if (activePanel === 'command-center') return <CommandCenter />
   return (
     <div className={appStyles.mainPanel}>
@@ -222,11 +224,11 @@ function MainApp(): JSX.Element | null {
         if (!useTerminalStore.getState().open) useTerminalStore.getState().toggle()
         return
       }
-      const allowed = new Set(['plan', 'editor', 'flow', 'monitor', 'settings', 'markdown-editor', 'db-explorer', 'command-center'])
+      const allowed = new Set(['plan', 'editor', 'flow', 'monitor', 'settings', 'markdown-editor', 'db-explorer', 'command-center', 'skill-composition'])
       if (!allowed.has(panelName)) {
         throw new Error(`Unknown panel: ${panelName}`)
       }
-      setActivePanel(panelName as 'plan' | 'editor' | 'flow' | 'monitor' | 'settings' | 'markdown-editor' | 'db-explorer' | 'command-center')
+      setActivePanel(panelName as 'plan' | 'editor' | 'flow' | 'monitor' | 'settings' | 'markdown-editor' | 'db-explorer' | 'command-center' | 'skill-composition')
     }
     return () => {
       delete bridge.__pathlyNavigate

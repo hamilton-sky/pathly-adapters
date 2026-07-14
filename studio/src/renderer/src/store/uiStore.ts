@@ -55,7 +55,7 @@ export interface UiState {
   sidebarCollapsed: boolean
   /** Which tab the expanded sidebar shows — persisted to localStorage 'pathly:sidebarTab' */
   sidebarTab: 'library' | 'workspace'
-  activePanel: 'plan' | 'editor' | 'flow' | 'monitor' | 'settings' | 'markdown-editor' | 'db-explorer' | 'command-center'
+  activePanel: 'plan' | 'editor' | 'flow' | 'monitor' | 'settings' | 'markdown-editor' | 'db-explorer' | 'command-center' | 'skill-composition'
   dirtyItems: Set<string>
   theme: ThemeName
   preferredDark: ThemeName
@@ -106,7 +106,7 @@ export interface UiState {
   requestMdEditorOpenDraft: () => void
   requestMdEditorUndo: () => void
   requestMdEditorRedo: () => void
-  setActivePanel: (p: 'plan' | 'editor' | 'flow' | 'monitor' | 'settings' | 'markdown-editor' | 'db-explorer' | 'command-center') => void
+  setActivePanel: (p: 'plan' | 'editor' | 'flow' | 'monitor' | 'settings' | 'markdown-editor' | 'db-explorer' | 'command-center' | 'skill-composition') => void
   setMdEditorPath: (path: string | null) => void
   markDirty: (path: string) => void
   clearDirty: (path: string) => void
