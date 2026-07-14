@@ -178,13 +178,35 @@ def get_db(_deprecated_path=None) -> sqlite3.Connection:
     db_dir.mkdir(parents=True, exist_ok=True)
     db_path = os.environ.get("PATHLY_DB_PATH") or str(db_dir / "pathly.db")
 
-    # Create this thread's connection if it doesn't have one yet. Serialize the
-    # open+PRAGMA setup under the global write lock: `PRAGMA journal_mode=WAL`
+    # Create this thread's connection if it doesn't have one yet — OR if the cached
+    # connection was opened for a DIFFERENT db_path than the one we resolved above.
+    # The path-mismatch case is the critical one: a long-lived daemon thread (the
+    # supervisor `_run_and_finalize` loop, a `_reconciliation_window`, an embed worker)
+    # opens its per-thread connection against one db, then calls get_db() again LATER —
+    # by which point a test has repatched Path.home() to a fresh tmp db (or, in prod,
+    # PATHLY_DB_PATH changed). Without this check the stale connection is reused, so the
+    # per-path prep below runs _run_migrations() against the WRONG connection while
+    # marking the NEW path as prepared — leaving the new db un-migrated ("no such table")
+    # the next time any thread opens it. Keying the cached connection to its db_path keeps
+    # the invariant "the connection we migrate and return matches the path we gate on".
+    # In production db_path never changes, so this branch only fires once per thread.
+    # Serialize the open+PRAGMA setup under the global write lock: `PRAGMA journal_mode=WAL`
     # briefly needs an exclusive DB lock, so concurrent first-time opens from many
     # threads otherwise race and intermittently raise "database is locked".
-    if not hasattr(_local, "conn") or _local.conn is None:
+    if (
+        not hasattr(_local, "conn")
+        or _local.conn is None
+        or getattr(_local, "conn_path", None) != db_path
+    ):
         with _global_write_lock:
+            stale = getattr(_local, "conn", None)
+            if stale is not None:
+                try:
+                    stale.close()
+                except Exception:
+                    pass
             _local.conn = _make_conn(db_path)
+            _local.conn_path = db_path
 
     conn = _local.conn
 
@@ -199,9 +221,12 @@ def get_db(_deprecated_path=None) -> sqlite3.Connection:
     # test swaps ~/.pathly to a fresh file. With the old single global flag, a leftover daemon
     # thread's get_db() (still pointing at the previous test's path) could win the lock and set
     # the flag, after which the next test's connection — to a brand-new, un-migrated db — would
-    # skip migration and hit "no such table". Keying on the db path closes that race AND avoids
-    # the contention/perf cost of re-migrating per connection: a path is prepared exactly once.
-    # In production this set holds a single entry, so this is a cheap membership check.
+    # skip migration and hit "no such table". Keying on the db path AND on the per-thread
+    # connection's own path (the reopen-on-mismatch above) closes that race — the gate alone
+    # was insufficient because a stale connection could migrate one db while marking another
+    # prepared. It also avoids the contention/perf cost of re-migrating per connection: a path
+    # is prepared exactly once. In production this set holds a single entry, so this is a cheap
+    # membership check.
     if not _init_once_done:
         with _init_lock:
             if not _init_once_done:
@@ -223,19 +248,26 @@ def get_db(_deprecated_path=None) -> sqlite3.Connection:
     if db_path not in _prepared_paths:
         with _init_lock:
             if db_path not in _prepared_paths:
+                # Create the schema FIRST and mark the path prepared only once it
+                # succeeds. Marking in a blanket `finally` (the old behaviour) latched a
+                # path whose _run_migrations() had raised as "prepared", so the next
+                # get_db() skipped migration and hit "no such table". Migrations are
+                # idempotent (CREATE TABLE IF NOT EXISTS + additive ALTERs skip existing
+                # columns), so a transient failure simply retries on the next call.
+                _run_migrations(conn, vec_available=_VEC_AVAILABLE)
+                # Probe for FTS5 table AFTER migrations — comms_fts is created there.
                 try:
-                    _run_migrations(conn, vec_available=_VEC_AVAILABLE)
-                    # Probe for FTS5 table AFTER migrations — comms_fts is created there.
-                    try:
-                        conn.execute("SELECT * FROM comms_fts LIMIT 0")
-                        _FTS_AVAILABLE = True
-                    except Exception:
-                        _FTS_AVAILABLE = False
-                    _seed_if_empty(conn)
-                    _refresh_catalog(conn)
-                    _refresh_flows(conn)
-                finally:
-                    _prepared_paths.add(db_path)
+                    conn.execute("SELECT * FROM comms_fts LIMIT 0")
+                    _FTS_AVAILABLE = True
+                except Exception:
+                    _FTS_AVAILABLE = False
+                # Schema is in place — safe to gate future calls off this path. Seed +
+                # catalog/flow refresh are best-effort follow-ups: they must NOT be able to
+                # un-prepare the path (that would loop re-migrating a valid schema forever).
+                _prepared_paths.add(db_path)
+                _seed_if_empty(conn)
+                _refresh_catalog(conn)
+                _refresh_flows(conn)
 
     return conn
 

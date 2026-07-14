@@ -59,25 +59,28 @@ def _isolate_db(monkeypatch, request):
     (fake_home / ".pathly").mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr(Path, "home", staticmethod(lambda: fake_home))
 
-    # Reset per-thread connection and one-time init flag so each test gets a fresh DB.
-    if hasattr(_conn_mod._local, "conn") and _conn_mod._local.conn is not None:
-        try:
-            _conn_mod._local.conn.close()
-        except Exception:
-            pass
+    def _reset_conn_state():
+        # Drop the MAIN-thread cached connection and ALL per-path / one-time init state so
+        # each test starts against a pristine, unprepared DB. This resets only the CURRENT
+        # thread's connection — the real cross-test fix lives in connection.get_db(), which
+        # reopens ANY thread's connection when the resolved db_path changes, so a leftover
+        # daemon thread can no longer migrate one test's db while marking another prepared.
+        # Clearing _prepared_paths keeps the "fresh DB per test" contract complete: without
+        # it the set just grows one entry per test (harmless, since paths are unique).
+        conn = getattr(_conn_mod._local, "conn", None)
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
         _conn_mod._local.conn = None
-    _conn_mod._init_once_done = False
+        _conn_mod._local.conn_path = None
+        _conn_mod._init_once_done = False
+        _conn_mod._prepared_paths.clear()
 
+    _reset_conn_state()
     yield
-
-    # Cleanup after test.
-    if hasattr(_conn_mod._local, "conn") and _conn_mod._local.conn is not None:
-        try:
-            _conn_mod._local.conn.close()
-        except Exception:
-            pass
-        _conn_mod._local.conn = None
-    _conn_mod._init_once_done = False
+    _reset_conn_state()
 
 
 @pytest.fixture(autouse=True)
