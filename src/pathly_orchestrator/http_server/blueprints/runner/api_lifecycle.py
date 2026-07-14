@@ -229,16 +229,23 @@ def runner_terminal_result():
             return jsonify({"error": "unknown run_id"}), 404
         with _sup._lock:
             runner_state = _sup._registry.get(topic)
-            if runner_state is not None:
-                adapter = runner_state.current_adapter or "claude"
-            else:
+        # Parse with the adapter that SPAWNED this run — the client sends it in the body.
+        # Inferring from runner_state.current_adapter is RACY: with early-advance the FSM may
+        # already have moved to the NEXT stage's engine by the time this result POSTs back, so a
+        # codex stage's output would be parsed by the claude parser (skipping _codex_usage) and
+        # record 0 tokens / $0. Fall back to current_adapter, then 'claude', for older clients.
+        adapter = (data.get("adapter") or "").strip().lower()
+        if not adapter:
+            adapter = (
+                runner_state.current_adapter if runner_state is not None else ""
+            ) or "claude"
+            if runner_state is None:
                 import logging as _logging
 
                 _logging.getLogger("pathly.http").warning(
-                    "runner_terminal_result: no RunnerState found for topic %r, falling back to 'claude'",
+                    "runner_terminal_result: no adapter in body + no RunnerState for topic %r → 'claude'",
                     topic,
                 )
-                adapter = "claude"
 
         parsed = parse_result(adapter, data.get("stdout_tail", ""))
         agent_done = None

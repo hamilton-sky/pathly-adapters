@@ -793,6 +793,11 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
           ? `\r\n\x1b[2m──\x1b[0m \x1b[1;32m${label} DONE\x1b[0m \x1b[2m──────────────────────────────\x1b[0m\r\n`
           : `\r\n\x1b[2m──\x1b[0m \x1b[1;31m${label} ABORTED\x1b[0m \x1b[2m──────────────────────────────\x1b[0m\r\n`
         sendToWindow(tabId, `terminal:data:${tabId}`, banner)
+        // The adapter that SPAWNED this run (its launcher). Sent so the server parses the result
+        // with the RIGHT usage parser instead of inferring from RunnerState.current_adapter,
+        // which — under early-advance — may already point at the NEXT stage's engine, so a codex
+        // stage's output would be parsed by the claude parser (no token usage) → 0 tokens / $0.
+        const runnerAdapter = path.basename(runnerArgv?.[0] ?? '').toLowerCase().replace(/\.(ps1|cmd|exe)$/, '')
         const postBody = JSON.stringify({
           run_id: runnerMeta.run_id,
           topic: runnerMeta.topic,
@@ -800,6 +805,7 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
           stdout_tail: stdoutTail,
           wall_seconds: wallSeconds,
           user_initiated: userInitiated,
+          adapter: runnerAdapter,
         })
         const doPost = () => fetch('http://127.0.0.1:8765/runner/terminal/result', {
           method: 'POST',
