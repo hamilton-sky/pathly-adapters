@@ -73,6 +73,7 @@ export function EngineDetailModal({ engine: e, onClose, onAction }: Props): JSX.
             <span className={s.feature}>{e.feature}</span>
             <StagePill stage={e.stage} />
           </div>
+          <div className={s.model}>{e.model ? e.model : '—'}</div>
         </div>
 
         <div className={s.metrics}>

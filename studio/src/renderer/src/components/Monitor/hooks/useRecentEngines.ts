@@ -54,6 +54,7 @@ export function useRecentEngines(): MonitorEngine[] {
     return {
       id: r.run_id || `${r.feature}-${r.started_at}`,
       adapter: adapterFromProvider(r.provider),
+      model: r.provider || '',
       category,
       role: (r.agent_role || 'agent') as EngineRole,
       feature: r.feature || '(project)',

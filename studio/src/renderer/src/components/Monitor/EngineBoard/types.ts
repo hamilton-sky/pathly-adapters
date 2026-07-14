@@ -25,6 +25,9 @@ export interface MonitorEngine {
   /** Stable id — maps to the runner tabId / spawn id. */
   id: string
   adapter: EngineAdapter
+  /** The concrete model id (e.g. gpt-5-codex, claude-sonnet-4-6). Known for finished spawns
+   *  (from /db/recent's provider); '' / undefined for live rows until they settle. */
+  model?: string
   category: EngineCategory
   role: EngineRole
   /** Feature / target the engine is working on (mono display). */
