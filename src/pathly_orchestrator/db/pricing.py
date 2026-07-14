@@ -1,4 +1,17 @@
-"""Provider-agnostic pricing registry and cost resolver — the pricing SSOT.
+"""Provider-agnostic pricing registry and cost resolver — the COST SSOT (Strategy B).
+
+Pathly tracks every CLI spawn's usage with TWO independent strategy layers:
+
+* **Strategy A — TOKEN COUNTING** (``runner/output.py::extract_tokens`` + ``_TOKEN_STRATEGIES``).
+  Tokens are the universal, must-capture primitive; each adapter reports them differently
+  (or not at all → local estimate). That layer answers *how many tokens*.
+* **Strategy B — COST PRICING (this module).** Cost is a SEPARATE, provider-owned,
+  frequently-changing concern, so it lives apart from token counting. Given (provider, model,
+  tokens) it answers *how many dollars*. This is the ONE place rates live — never hard-code a
+  $/token rate anywhere else; add it to ``PRICING`` here.
+
+Keeping the two apart means a rate change touches only this table, and a new engine's token
+extraction touches only ``_TOKEN_STRATEGIES`` — neither disturbs the other.
 
 Lives in ``db/`` (not ``http_server/``) so the invocation projector
 (``db/queries/invocation_projection.py``) can price a row without an upward import —

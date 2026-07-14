@@ -185,7 +185,9 @@ pathly_orchestrator/
       skill_composition.py # per-project skill-composition overrides (composition editor)
   runner/                  # CLI runner, agent invocation, argv, output parsing
     argv.py                # resolve_argv, resolve_interactive_argv, _storage_path
-    output.py              # parse_result, _extract_json_payload
+    output.py              # parse_result, _extract_json_payload; extract_tokens + the per-adapter
+                           # _TOKEN_STRATEGIES registry (Strategy A — token counting; cost is
+                           # Strategy B in db/pricing.py)
     events.py              # read_last_agent_done, _patch_last_agent_done, tail_agent_done
     history.py             # build_pipeline_history_block
     invoke.py              # invoke_agent(abort_callback=None, proc_callback=None)

@@ -140,6 +140,76 @@ def _codex_usage(raw_output: str) -> tuple[int, int]:
     return tokens_in, tokens_out
 
 
+# ── TOKEN-COUNT STRATEGY REGISTRY (per adapter) — the ONE place token counting lives ──
+# Tokens are the UNIVERSAL, must-capture primitive; cost is derived SEPARATELY (db/pricing.py,
+# the cost registry). Each engine reports usage differently — or not at all (antigravity/agy) —
+# so extraction is a strategy per adapter. Adding a new engine = adding one entry to
+# _TOKEN_STRATEGIES below; nothing else changes.
+
+
+def _claude_tokens(payload: dict[str, Any], raw_output: str) -> tuple[int, int]:
+    """Claude: lump ``usage`` from the result envelope (input + cache, output), with the
+    per-model ``modelUsage`` breakdown as a fallback when the lump is absent/partial."""
+    usage = payload.get("usage") or payload.get("inputUsage") or {}
+    tin = int(
+        (usage.get("input_tokens") or usage.get("inputTokens") or 0)
+        + (usage.get("cache_read_input_tokens") or 0)
+        + (usage.get("cache_creation_input_tokens") or 0)
+    )
+    tout = int(usage.get("output_tokens", 0) or usage.get("outputTokens", 0))
+    if not tin or not tout:
+        mu = _normalize_model_usage(
+            payload.get("modelUsage") or payload.get("model_usage") or {}
+        )
+        if mu:
+            tin = tin or sum(m["tokens_in"] for m in mu.values())
+            tout = tout or sum(m["tokens_out"] for m in mu.values())
+    return tin, tout
+
+
+def _codex_tokens(payload: dict[str, Any], raw_output: str) -> tuple[int, int]:
+    """Codex ``exec --json``: token usage from the JSONL event stream."""
+    return _codex_usage(raw_output)
+
+
+def estimate_tokens_from_text(text: str) -> int:
+    """Rough LOCAL token count for engines that report no usage: ~4 chars/token (an English
+    heuristic; deliberately provider-neutral). Swap for a real tokenizer per-adapter later."""
+    t = _ANSI_RE.sub("", text or "").strip()
+    return (len(t) + 3) // 4 if t else 0
+
+
+def _agy_tokens(payload: dict[str, Any], raw_output: str) -> tuple[int, int]:
+    """Antigravity / agy emits NO usage telemetry — ESTIMATE output tokens from the response
+    text with a local tokenizer, so even this engine yields a token count (marked estimated
+    downstream). The prompt isn't in stdout, so input stays 0 until the gate threads it."""
+    return 0, estimate_tokens_from_text(raw_output)
+
+
+# adapter (lowercased) → token-extraction strategy. Unknown/unlisted → the claude/generic
+# envelope parser. ``copilot`` is a multi-provider proxy with no usage of its own.
+_TOKEN_STRATEGIES: dict[str, Any] = {
+    "claude": _claude_tokens,
+    "codex": _codex_tokens,
+    "antigravity": _agy_tokens,
+    "agy": _agy_tokens,
+    "gemini": _agy_tokens,
+}
+
+
+def extract_tokens(
+    adapter: str, payload: dict[str, Any], raw_output: str
+) -> tuple[int, int]:
+    """The single entry point for per-adapter token counting (Strategy A). Returns
+    ``(tokens_in, tokens_out)``. Dispatches to the adapter's strategy in _TOKEN_STRATEGIES;
+    an unknown adapter falls back to the claude/generic envelope parser. Never raises."""
+    fn = _TOKEN_STRATEGIES.get((adapter or "claude").strip().lower(), _claude_tokens)
+    try:
+        return fn(payload, raw_output)
+    except Exception:
+        return 0, 0
+
+
 def parse_result(adapter: str, raw_output: str) -> dict[str, Any]:
     payload = _extract_json_payload(raw_output)
     if adapter == "codex":
@@ -167,33 +237,20 @@ def parse_result(adapter: str, raw_output: str) -> dict[str, Any]:
             ask_user_question = denial
             break
 
-    usage = payload.get("usage") or payload.get("inputUsage") or {}
-    tokens_in = int(
-        (usage.get("input_tokens") or usage.get("inputTokens") or 0)
-        + (usage.get("cache_read_input_tokens") or 0)
-        + (usage.get("cache_creation_input_tokens") or 0)
-    )
-    tokens_out = int(usage.get("output_tokens", 0) or usage.get("outputTokens", 0))
+    # Tokens — Strategy A: the per-adapter token registry (extract_tokens). Each engine's
+    # extraction (incl. claude's modelUsage token-fallback + codex JSONL + agy estimate) lives
+    # in its strategy above; adapter dispatch is no longer inlined here.
+    tokens_in, tokens_out = extract_tokens(adapter, payload, raw_output)
 
-    if adapter == "codex":
-        c_in, c_out = _codex_usage(raw_output)
-        if c_in or c_out:
-            tokens_in, tokens_out = c_in, c_out
-
-    # Per-model usage breakdown (claude emits `modelUsage`: {model: {inputTokens,
-    # outputTokens, cache*, costUSD}}). Capture it for per-model cost attribution, and use
-    # it as an accuracy fallback: if the adapter reported NO lump cost/tokens but DID report
-    # a per-model breakdown, derive the totals by summing it.
+    # Per-model usage breakdown (claude emits `modelUsage`). Kept for per-model attribution and
+    # a COST fallback only: when the CLI reported no lump cost but a per-model breakdown, sum it.
+    # Token totals come from the strategy above (cost is a separate concern — Strategy B,
+    # db/pricing.py).
     model_usage = _normalize_model_usage(
         payload.get("modelUsage") or payload.get("model_usage") or {}
     )
-    if model_usage:
-        if not cost_usd:
-            cost_usd = round(sum(m["cost_usd"] for m in model_usage.values()), 6)
-        if not tokens_in:
-            tokens_in = sum(m["tokens_in"] for m in model_usage.values())
-        if not tokens_out:
-            tokens_out = sum(m["tokens_out"] for m in model_usage.values())
+    if model_usage and not cost_usd:
+        cost_usd = round(sum(m["cost_usd"] for m in model_usage.values()), 6)
 
     messages = payload.get("messages", [])
     tool_uses = sum(

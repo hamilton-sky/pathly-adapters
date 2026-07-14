@@ -287,19 +287,34 @@ OTel **span** (for the Traces tab) — the invocation comes from the event proje
 same table), so the header total always equals the sum of the feature cards for that
 project.
 
-**Cost is priced from tokens when the CLI reports none — `db/pricing.py`.** The
+**Two strategies: token-counting is universal, cost is per-provider.** Tracking every CLI
+spawn's usage splits into two independent layers so a rate change never disturbs token
+extraction and a new engine never disturbs pricing: **Strategy A — token counting**
+(`runner/output.py::extract_tokens` + the per-adapter `_TOKEN_STRATEGIES` registry: claude →
+result-envelope `usage`/`modelUsage`, codex → JSONL usage event, antigravity/agy → a local
+`estimate_tokens_from_text` char heuristic since it emits no usage; unknown adapter → the
+claude/generic parser) answers *how many tokens*; **Strategy B — cost pricing** (`db/pricing.py`,
+below) answers *how many dollars*. Adding an engine = one entry in `_TOKEN_STRATEGIES`; changing
+a rate = one entry in `PRICING`. Tokens are the must-capture primitive — cost is always derivable
+from them via Strategy B when the CLI reports none.
+
+**Cost is priced from tokens when the CLI reports none — `db/pricing.py` (Strategy B).** The
 pricing table/`PricingRegistry`/`estimate_cost`/`infer_provider` live in
 `db/pricing.py` (the layer-safe home — the projector is in `db/` and cannot import
 upward into `http_server/`); `http_server/telemetry_registry.py` re-exports them for
 back-compat. The projector applies a `_price_if_needed` chokepoint on every projected
 row (idempotent: only fires when `cost_usd==0` and `tokens_in+tokens_out>0`; a
 provider-reported or already-estimated cost is never re-priced). Per-adapter behavior:
-`codex exec --json` (JSONL events on stdout) never reports a dollar cost, so
-`runner/output.py::_codex_usage` scans the stream for a token-usage event
-(defensive — the exact field shape is unconfirmed, several layouts are tolerated) and
-the chokepoint estimates cost from those tokens (`cost_source="estimated"`); `agy`
-(Antigravity) emits no usage telemetry at all, so its rows are marked
+`codex exec --json` (JSONL events on stdout) never reports a dollar cost, so its token
+strategy (`runner/output.py::_codex_tokens` → `_codex_usage`) scans the stream for a
+token-usage event (defensive — the exact field shape is unconfirmed, several layouts are
+tolerated) and the chokepoint estimates cost from those tokens (`cost_source="estimated"`);
+`agy` (Antigravity) reports no usage, so its strategy estimates output tokens locally and the
+chokepoint prices them, while a genuinely token-less row is marked
 `cost_source="unavailable"` rather than a misleading `$0`. `model`/`run_id` are now
+threaded into `BILLING_UPDATE` (`runner/events.py::_patch_last_agent_done` →
+`supervisor/terminal.py::_reconciliation_window`) so the projected row's `provider` and
+`run_id` columns get stamped even when the originating `AGENT_DONE` didn't carry them. `model`/`run_id` are now
 threaded into `BILLING_UPDATE` (`runner/events.py::_patch_last_agent_done` →
 `supervisor/terminal.py::_reconciliation_window`) so the projected row's `provider` and
 `run_id` columns get stamped even when the originating `AGENT_DONE` didn't carry them.
