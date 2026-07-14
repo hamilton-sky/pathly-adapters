@@ -167,10 +167,16 @@ the backend is off → then just use Grep/Read. (`pathly-fsm-call code-query --o
 is a shim, but the HTTP form passes `project_root`, which the proxy needs to resolve
 relative targets.)
 
-Backends behind the proxy (wired into agents via `src/pathly_data/adapters/*/_mcp/`):
-**codebase-memory-mcp** (whole-repo graph — breadth) + **Serena** (LSP — precise, always
-fresh; prefer it right after edits). Query those directly (`codebase-memory-mcp cli <tool> …`)
-only as a fallback when the FSM server isn't running.
+Backends behind the proxy: **codebase-memory-mcp** (whole-repo graph — breadth; needs
+indexing, self-heals via `maybe_reindex`) and **Serena** (LSP — precise, always-fresh, no
+index). Select per request with `"engine": "graph" | "lsp" | "both"`; when omitted the
+`code_context.backend` setting decides (`off` | `cli` | `lsp` | `both`). The `lsp` backend
+boots ONE long-lived Serena MCP session **server-side** on first use (`runner/code_context_lsp.py`),
+so the FIRST `engine=lsp` query for a project returns null (~1 min warm-up → degrade to
+Grep) and later ones are fast; the session is cached and torn down on root change / exit.
+Serena is ALSO wired as a direct agent MCP tool via `src/pathly_data/adapters/*/_mcp/serena.json`
+(that path is independent of the proxy). Fallback: query the graph directly
+(`codebase-memory-mcp cli <tool> …`) when the FSM server isn't running.
 
 ---
 

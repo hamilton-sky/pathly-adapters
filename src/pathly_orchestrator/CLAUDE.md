@@ -195,8 +195,9 @@ pathly_orchestrator/
     comms_context.py       # assembles board context (governance + referenced + semantic, relevance-gated); _matched_chunk surfaced as "matched topic: …" via comms_formatters.py
     sections.py            # parse_sections/slugify_heading/structure_key — markdown section index (anchors)
     hydrate.py             # hydrate_section/ensure_indexed — /section payload + staleness; index_artifact_async (eager, section-index only)
-    code_context.py        # CodeContextProvider protocol + get_provider()/build_block() — codebase-intelligence context injection
-    code_context_cli.py    # CliProvider — shells out to codebase-memory-mcp for code_context.py
+    code_context.py        # CodeContextProvider protocol + get_provider()/build_block() (backend=off|cli|lsp|both) — codebase-intelligence context injection
+    code_context_cli.py    # CliProvider — shells out to codebase-memory-mcp graph for code_context.py
+    code_context_lsp.py    # LspProvider — bridges a long-lived Serena MCP session (LSP, always-fresh); async warm-up, never-raise
     cli.py                 # run_flow, main, resolve_stage, handle_blocked, handle_decide
   supervisor/              # Visible runner: PTY spawning, SSE broadcast, registry
     state.py               # RunnerState, OpenSession dataclasses

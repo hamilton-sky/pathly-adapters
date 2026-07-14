@@ -27,6 +27,7 @@ import time
 from typing import Protocol, Sequence, runtime_checkable
 
 from .code_context_cli import CliProvider
+from .code_context_lsp import LspProvider
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +86,39 @@ class NoneProvider:
         return ""
 
 
+class CompositeProvider:
+    """Runs several backends and concatenates their non-empty blocks.
+
+    Backs the ``both`` engine: the graph (``cli``) gives breadth and the LSP
+    (``lsp``) gives always-fresh precision, so one ``/code/query`` returns both
+    under a single response. Never raises — a failing child simply contributes
+    nothing; the joined block is truncated to ``budget``.
+    """
+
+    name = "both"
+
+    def __init__(self, providers: Sequence[CodeContextProvider]) -> None:
+        self._providers = list(providers)
+
+    def build_block(
+        self,
+        scope: str,
+        files: Sequence[str],
+        role: str,
+        budget: int,
+        project_root: str = "",
+    ) -> str:
+        blocks: list[str] = []
+        for p in self._providers:
+            try:
+                b = p.build_block(scope, files, role, budget, project_root)
+            except Exception:
+                b = ""
+            if b:
+                blocks.append(b)
+        return "\n\n".join(blocks)[: max(0, int(budget))]
+
+
 # Static backend registry. ``none`` is a singleton; the ``cli`` backend is built
 # on demand in :func:`get_provider` because it is parameterised by the
 # ``code_context.tool`` setting. ``off`` maps to ``none``.
@@ -97,14 +131,20 @@ def get_provider(backend: str | None) -> CodeContextProvider:
     """Return the provider for ``backend``, falling back to the ``none`` no-op.
 
     ``off`` / unknown / ``None`` resolve to :class:`NoneProvider` (safe-off).
-    ``cli`` resolves to a :class:`CliProvider` configured with the current
-    ``code_context.tool`` setting. A bad or stale value can never raise.
+    ``cli`` → :class:`CliProvider` (codebase-memory-mcp graph). ``lsp`` →
+    :class:`LspProvider` (Serena, always-fresh). ``both`` → a
+    :class:`CompositeProvider` of graph + lsp. A bad or stale value can never
+    raise.
     """
     key = (backend or "none").strip().lower()
     if key == "off":
         key = "none"
     if key == "cli":
         return CliProvider(_resolve_tool())
+    if key == "lsp":
+        return LspProvider()
+    if key == "both":
+        return CompositeProvider([CliProvider(_resolve_tool()), LspProvider()])
     return _PROVIDERS.get(key, _PROVIDERS["none"])
 
 
@@ -129,12 +169,12 @@ def _get_setting(key: str, default: str) -> str:
 def _resolve_backend() -> str:
     """Return the active backend from the ``code_context.backend`` setting.
 
-    Values: ``off`` (default, safe-off → ``none``) or ``cli``. Persisted in
-    ``~/.pathly`` via app_settings and read at call time, so flipping it takes
-    effect without a server restart.
+    Values: ``off`` (default, safe-off → ``none``), ``cli`` (graph), ``lsp``
+    (Serena), or ``both``. Persisted in ``~/.pathly`` via app_settings and read
+    at call time, so flipping it takes effect without a server restart.
     """
     key = _get_setting("code_context.backend", "off").strip().lower()
-    return "cli" if key == "cli" else "none"
+    return key if key in ("cli", "lsp", "both") else "none"
 
 
 def _resolve_tool() -> str:
@@ -223,6 +263,7 @@ def build_block(
     role: str,
     budget: int = _DEFAULT_BUDGET,
     project_root: str = "",
+    backend: str | None = None,
 ) -> str:
     """Return an advisory ``## Code structure`` block for ``files``, or ``""``.
 
@@ -232,9 +273,15 @@ def build_block(
     ``project_root`` anchors relative ``files`` (agents pass the repo-relative
     changed-set) — without it the ``cli`` backend resolves paths against the
     server's process CWD and silently finds nothing.
+
+    ``backend`` overrides the configured backend for this call (the proxy maps
+    its ``engine`` param to ``cli``/``lsp``/``both``); ``None`` uses the persisted
+    ``code_context.backend`` setting.
     """
     try:
-        provider = get_provider(_resolve_backend())
+        provider = get_provider(
+            backend if backend is not None else _resolve_backend()
+        )
         return provider.build_block(
             scope,
             list(files or []),

@@ -35,6 +35,11 @@ bp = Blueprint("code", __name__)
 # runner.code_context._DEFAULT_BUDGET; callers may override via the request body.
 _DEFAULT_BUDGET = 1500
 
+# Optional per-request ``engine`` → backend mapping. Lets ONE endpoint serve the
+# graph (codebase-memory-mcp, breadth), the LSP (Serena, always-fresh), or both.
+# Absent / unknown → fall through to the configured ``code_context.backend``.
+_ENGINE_TO_BACKEND = {"graph": "cli", "cli": "cli", "lsp": "lsp", "both": "both"}
+
 # --- Role -> capability tiering (Approach C "code_intel.roles") ---------------
 # The gateway gates each query by the caller's role per the code-intel-proxy
 # APPROACH. Each role maps to a tier; each tier grants a set of ops. Excluded
@@ -102,7 +107,7 @@ def _gate(role: str, op: str) -> str | None:
 # file is served without re-querying the backend; editing the file changes the
 # hash and forces a fresh query. Gateway-local for now — when Phase 3 lands a
 # content-hash cache inside runner.code_context, this should delegate to it.
-_QUERY_CACHE: dict[tuple[str, str, str], "str | None"] = {}
+_QUERY_CACHE: dict[tuple[str, str, str, str], "str | None"] = {}
 
 
 def _content_hash(target: str, project_root: str) -> str:
@@ -175,9 +180,12 @@ def code_query():
 
     Request body (JSON): ``{"op": "impact|callers|symbol|pattern",
     "target": "<path-or-symbol>", "role": "<agent-role>", "scope": "<feature>",
-    "budget": <int>}``. ``op`` and ``target`` are required; the rest are
-    optional. Returns ``{ok, op, target, result, backend}`` — ``result`` is the
-    advisory block string, or ``null`` when the backend is off / has nothing.
+    "engine": "graph|lsp|both", "budget": <int>}``. ``op`` and ``target`` are
+    required; the rest are optional. ``engine`` selects the backend for this
+    request (graph = codebase-memory-mcp, lsp = Serena, both = merged); when
+    omitted the configured ``code_context.backend`` is used. Returns
+    ``{ok, op, target, result, backend}`` — ``result`` is the advisory block
+    string, or ``null`` when the backend is off / has nothing.
     """
     try:
         # http_server -> runner is an allowed (downward) import; keep it lazy
@@ -202,6 +210,11 @@ def code_query():
         except (TypeError, ValueError):
             budget = _DEFAULT_BUDGET
 
+        # Optional engine override — unifies graph + lsp under this one endpoint.
+        # None when unset/unknown → build_block uses the configured backend.
+        engine = str(data.get("engine") or "").strip().lower()
+        backend_override = _ENGINE_TO_BACKEND.get(engine)
+
         # Role allowlist (Approach C): deny excluded roles and out-of-tier ops up
         # front with a safe-null + reason, before touching the backend.
         denial = _gate(role, op)
@@ -220,10 +233,11 @@ def code_query():
                 200,
             )
 
-        # Backend name for the response envelope. `_resolve_backend` reads the
-        # `code_context.backend` setting from ~/.pathly (off→none | cli), so this
-        # reflects the live backend; flipping the setting takes effect without a restart.
-        backend = _cc.get_provider(_cc._resolve_backend()).name
+        # Effective backend for THIS request: an explicit `engine` wins, else the
+        # persisted `code_context.backend` setting (off→none | cli | lsp | both),
+        # read live so flipping it takes effect without a restart.
+        effective = backend_override or _cc._resolve_backend()
+        backend = _cc.get_provider(effective).name
 
         # On-demand freshness: fire a debounced background re-index so the graph keeps
         # up with edits between pipeline stages. No-op when the backend is off or inside
@@ -233,8 +247,10 @@ def code_query():
 
         # Content-hash cache: serve an unchanged (op, target) from cache without
         # re-querying the backend; an edit changes the hash and forces a refresh.
+        # The backend is part of the key — an lsp query must not be served a cached
+        # graph result for the same file (they carry different structure).
         chash = _content_hash(target, str(data.get("project_root") or ""))
-        key = (op.strip().lower(), target.strip(), chash)
+        key = (op.strip().lower(), target.strip(), chash, backend)
         cached = key in _QUERY_CACHE
         if cached:
             result = _QUERY_CACHE[key]
@@ -242,10 +258,22 @@ def code_query():
             # build_block never raises and returns "" when the backend is off;
             # map an empty block to JSON null so the agent gets a safe-null.
             block = _cc.build_block(
-                scope, [target], role, budget, str(data.get("project_root") or "")
+                scope,
+                [target],
+                role,
+                budget,
+                str(data.get("project_root") or ""),
+                backend=backend_override,
             )
             result = block or None
-            _QUERY_CACHE[key] = result
+            # Cache only NON-empty results. A null (backend off, LSP still warming
+            # up, or a file whose repo hasn't finished the graph's async auto-onboard)
+            # must NOT be pinned — otherwise the first file queried during indexing
+            # stays null until its content hash changes. Re-querying a null is cheap
+            # and lets the block appear the moment the index lands. (Mirrors
+            # CliProvider._file_section, which likewise caches only non-empty sections.)
+            if result is not None:
+                _QUERY_CACHE[key] = result
             # Log fresh queries to the board (shared context) with a hit/miss marker
             # so the board shows whether the backend returned data. Cache hits are not
             # re-logged — the board already carries the prior entry.
