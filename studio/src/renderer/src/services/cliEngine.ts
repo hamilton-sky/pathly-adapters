@@ -78,7 +78,11 @@ export function buildHeadlessArgv(adapter: CliAdapter, promptRaw: string, opts: 
   if (adapter === 'codex') {
     // --skip-git-repo-check: codex exec refuses to run ("Not inside a trusted directory")
     // when the cwd isn't a trusted git repo — e.g. an arbitrary file's folder for Analyze/Split.
-    const argv = ['codex', 'exec', '--skip-git-repo-check']
+    // --json: emit JSONL events (incl. token usage) so the spawn gate's parseCodexResult can
+    // capture tokens → the server estimates cost (db/pricing.py). Mirrors core/adapters.yaml's
+    // codex template; without it codex prints plain text, no usage is seen, and the one-shot
+    // records 0 tokens / $0 (the diagrammer/splitter gap). codex reports NO dollar cost either way.
+    const argv = ['codex', 'exec', '--skip-git-repo-check', '--json']
     if (autonomy) argv.push('--sandbox', 'workspace-write')
     if (model) argv.push('--model', model)
     if (session) argv.push('--continue')
