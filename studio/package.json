@@ -1,6 +1,6 @@
 {
   "name": "pathly-studio",
-  "version": "2.21.0",
+  "version": "2.21.1",
   "description": "Pathly Studio \u00e2\u20ac\u201d desktop app for configuring and monitoring the Pathly pipeline",
   "main": "out/main/index.js",
   "scripts": {
