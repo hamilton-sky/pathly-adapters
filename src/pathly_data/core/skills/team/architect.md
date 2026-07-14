@@ -26,6 +26,12 @@ Every logged event must include `"ts": "<iso-timestamp>"` (ISO-8601 UTC).
 
 log-phase PHASE_START architect
 
+**Scout the codebase first (optional).** If understanding the existing code would sharpen the
+design, run the Scout choreography (appended below) before the storm spawn: spawn `architect` with
+`phase: analyze` to emit a `## NEEDS_CONTEXT` block, scout it, and fold the compressed findings into
+the storm prompt. Also use `code-query` (appended) for a targeted symbol/impact lookup. Skip if the
+change is self-contained.
+
 **Spawn** `architect` with `phase: storm`:
 ```
 phase: storm

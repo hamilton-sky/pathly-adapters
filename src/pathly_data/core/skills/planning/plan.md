@@ -143,7 +143,7 @@ Standard produces 7 files:
 - `IMPLEMENTATION_PLAN.md`
 - `HAPPY_FLOW.md`
 - `EDGE_CASES.md`
-- `ARCHITECTURE_PROPOSAL.md`
+- `PLAN_ARCHITECTURE.md`
 - `FLOW_DIAGRAM.md`
 
 Standard is the current default.
@@ -199,16 +199,20 @@ Skip in `lite`; merge only relevant edge cases into `USER_STORIES.md` and `IMPLE
 
 For standard and strict, read `{{TEMPLATES_DIR}}/plan/EDGE_CASES.template.md` for the exact file structure.
 
-### 4h. ARCHITECTURE_PROPOSAL.md
+### 4h. PLAN_ARCHITECTURE.md
 
 Skip in `lite`; put short architecture notes directly in `IMPLEMENTATION_PLAN.md`.
 
-**Collision guard (decompose mode):** if `$PLAN_DIR/ARCHITECTURE_PROPOSAL.md` already exists
-(a consultation's architect stage wrote it), do NOT overwrite it — it is the authoritative
-proposal. Keep it, and only append a `## Phase Mapping` section at the end if the phase-anchor
-mapping is missing.
+**Distinct from the architect's proposal — never name this `ARCHITECTURE_PROPOSAL.md`.** The
+planner's file is `PLAN_ARCHITECTURE.md`: the plan-scoped architecture decisions and their phase
+mapping. In the consultation flow the architect stage already wrote the authoritative
+`ARCHITECTURE_PROPOSAL.md`, so reusing that name produces two colliding files (one per owner/home).
+**If `ARCHITECTURE_PROPOSAL.md` already exists** (the architect wrote it), treat it as the
+authoritative design — reference it, do not restate it, and keep `PLAN_ARCHITECTURE.md` focused on
+how that design maps onto the implementation phases (a `## Phase Mapping` section).
 
-For standard and strict, read `{{TEMPLATES_DIR}}/plan/ARCHITECTURE_PROPOSAL.template.md` for the exact file structure.
+For standard and strict, read `{{TEMPLATES_DIR}}/plan/ARCHITECTURE_PROPOSAL.template.md` for the
+section skeleton, but write the result to `PLAN_ARCHITECTURE.md`.
 
 ### 4i. FLOW_DIAGRAM.md
 
@@ -278,14 +282,14 @@ a **goal message** (`type=goal`): you post the goal first, then stamp every phas
 with `goal_id` pointing at it.
 
 **Advisory artifact heading convention (anchor-addressable phases).** When writing
-`EDGE_CASES.md`, `HAPPY_FLOW.md`, and `ARCHITECTURE_PROPOSAL.md`, you MUST use `## Phase N`
+`EDGE_CASES.md`, `HAPPY_FLOW.md`, and `PLAN_ARCHITECTURE.md`, you MUST use `## Phase N`
 headings that match the `## Phase N` headings in `IMPLEMENTATION_PLAN.md` (e.g.
 `## Phase 3 — Fix path prefixes`). This makes each phase's advisory content anchor-addressable
 (slug `phase-N`) so the retrieval system can deterministically link a phase task to its
 edge-case, happy-flow, and architecture sections. The heading text must contain `Phase <N>`
-(e.g. `## Phase 2 — Add migration`). For `ARCHITECTURE_PROPOSAL.md`, use phase-aligned
-`## Phase N` headings where the proposal maps to specific phases; a single-phase or
-phase-agnostic proposal may use descriptive headings instead.
+(e.g. `## Phase 2 — Add migration`). For `PLAN_ARCHITECTURE.md`, use phase-aligned
+`## Phase N` headings where the plan architecture maps to specific phases; a single-phase or
+phase-agnostic note may use descriptive headings instead.
 
 **Idempotency guard — skip only if THIS goal already has a task DAG.** After you resolve
 `$GOAL_ID` (the "Find OR create the goal" block just below), check for tasks **scoped to that goal**:
@@ -360,17 +364,17 @@ curl -s -X POST http://127.0.0.1:8765/comms/post \
     "artifact_type": "plan_artifact"
   }'
 
-# Post ARCHITECTURE_PROPOSAL.md if it exists
+# Post PLAN_ARCHITECTURE.md if it exists
 curl -s -X POST http://127.0.0.1:8765/comms/post \
   -H "Content-Type: application/json" \
   -d '{
     "feature": "$FEATURE",
     "from": "planner",
     "type": "artifact",
-    "text": "Advisory artifact: architecture proposal for $FEATURE",
+    "text": "Advisory artifact: plan architecture for $FEATURE",
     "board": "feature",
     "scope": "$FEATURE",
-    "artifact_path": "$PLAN_DIR/ARCHITECTURE_PROPOSAL.md",
+    "artifact_path": "$PLAN_DIR/PLAN_ARCHITECTURE.md",
     "artifact_type": "plan_artifact"
   }'
 ```
@@ -383,7 +387,7 @@ guard, task JSON shape, `depends_on` resolution, skip-if-down. For each phase in
 1. Extract: phase number N, title, Purpose, File, Done-when, Depends-on
 2. Compose the self-contained task `text` (same shape as before — Phase N: title, purpose,
    files, done-when, FEATURE_INDEX read note)
-3. Derive `context_refs` from phase N (EDGE_CASES, HAPPY_FLOW, ARCHITECTURE_PROPOSAL anchors
+3. Derive `context_refs` from phase N (EDGE_CASES, HAPPY_FLOW, PLAN_ARCHITECTURE anchors
    if those files exist) and `depends_on` from the depends-on phase map
 4. Post each task via the fragment mechanics
 
@@ -406,7 +410,7 @@ Files:
 - IMPLEMENTATION_PLAN.md - N phases (each becomes one board task in Step 6)
 - HAPPY_FLOW.md - ideal journey [standard/strict only]
 - EDGE_CASES.md - edge cases [standard/strict only]
-- ARCHITECTURE_PROPOSAL.md - design decisions [standard/strict only]
+- PLAN_ARCHITECTURE.md - design decisions [standard/strict only]
 - FLOW_DIAGRAM.md - ASCII flow diagram [standard/strict only]
 
 Board task DAG: [T tasks seeded under goal $GOAL_ID / not seeded — reason]

@@ -235,12 +235,17 @@ curl -s -X POST http://127.0.0.1:8765/code/query -H "Content-Type: application/j
   "op": "symbol",
   "target": "<file path OR symbol name>",
   "role": "<your-role>",
-  "scope": "<feature>" }'
+  "scope": "<feature>",
+  "engine": "both" }'
 ```
 
 - `op` — `symbol` (definition + signature) · `callers` (who calls it) · `impact` (what a change to
   it touches) · `chain` (call path between two symbols) · `context` (surrounding structure) ·
   `pattern` (find a code pattern). Your `role` gates which ops you may use.
+- `engine` (optional) — which backend answers: `graph` (whole-repo code graph — breadth, needs
+  indexing) · `lsp` (Serena/LSP — precise, always-fresh, no index; the first query per project pays
+  a ~1-min warm-up, then it's fast) · `both` (merge graph + LSP). Omit to use the server's configured
+  default. Prefer `lsp` or `both` right after edits, since the graph can lag recent changes.
 - The response is `{ "ok": true, "result": <block-or-null>, "backend": "<name>" }`.
 - **If `result` is `null`** (backend off, file not yet indexed, or path unresolved), first try the
   **direct-CLI fallback** below; then fall back to Grep/Read. Never block on it — an accelerator, not a gate.

@@ -140,6 +140,7 @@ skills:
   # the PO_NOTES artifact + open questions land on the board for downstream stages.
   planning/po:
     fragments:
+      - code-query
       - comms-post
 
   # Stand up feature boards on demand — a user can spawn a CLI agent and ask it to create
@@ -213,6 +214,8 @@ skills:
 
   team/design:
     fragments:
+      - code-query
+      - scout-choreography
       - completion-report
       - artifact-register
       - comms-post
@@ -223,10 +226,13 @@ skills:
   team/architect:
     fragments:
       - code-query
+      - scout-choreography
       - completion-report
       - comms-post
   team/research:
     fragments:
+      - code-query
+      - scout-choreography
       - completion-report
       - comms-post
 

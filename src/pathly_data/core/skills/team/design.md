@@ -51,6 +51,10 @@ Stack: <stack>
 Query: "<description>"
 ```
 
+**Scout existing UI first (optional).** If the project already ships UI components or design
+tokens, use `code-query` (appended) — or the Scout choreography (appended) where the adapter can
+spawn — to find them, so the generated system extends what exists instead of conflicting with it.
+
 **Primary — invoke `ui-ux-pro-max` skill via the Skill tool:**
 Call the Skill tool with:
 - skill: `"ui-ux-pro-max"`

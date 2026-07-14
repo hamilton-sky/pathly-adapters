@@ -30,6 +30,11 @@ Read `<feature_path>/ARCHITECTURE_PROPOSAL.md` and `PO_NOTES.md` to decide what
 external knowledge the design/plan will need. If nothing external is required (familiar
 stack, no new patterns), write a one-line `RESEARCH.md` saying so and skip the spawn.
 
+**Scout the codebase first (optional).** If *what* to research externally depends on what the
+project already uses (stack, libraries, conventions), run the Scout choreography (appended below),
+or a quick `code-query` (appended), to gather that codebase context first — then let it steer the
+external research.
+
 Otherwise **spawn** `web-researcher`:
 ```
 ROLE: architect — external research before design

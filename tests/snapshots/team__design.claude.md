@@ -51,6 +51,10 @@ Stack: <stack>
 Query: "<description>"
 ```
 
+**Scout existing UI first (optional).** If the project already ships UI components or design
+tokens, use `code-query` (appended) — or the Scout choreography (appended) where the adapter can
+spawn — to find them, so the generated system extends what exists instead of conflicting with it.
+
 **Primary — invoke `ui-ux-pro-max` skill via the Skill tool:**
 Call the Skill tool with:
 - skill: `"ui-ux-pro-max"`
@@ -155,6 +159,100 @@ If `pathly-fsm-call` fails or the server is not reachable:
 
 This makes phase logging reliable on any adapter (Codex, Copilot, CLI) where the
 FSM server is not automatically managed by the host environment.
+
+## Code intelligence (ask Pathly's code graph before Grep)
+
+When you need to understand code **structure** — where a symbol is defined, who calls it, or the
+blast radius of a change — ask Pathly's code-knowledge graph first. It is precise and fast, and each
+query is logged to the board as shared context for other agents.
+
+```bash
+curl -s -X POST http://127.0.0.1:8765/code/query -H "Content-Type: application/json" -d '{
+  "op": "symbol",
+  "target": "<file path OR symbol name>",
+  "role": "<your-role>",
+  "scope": "<feature>",
+  "engine": "both" }'
+```
+
+- `op` — `symbol` (definition + signature) · `callers` (who calls it) · `impact` (what a change to
+  it touches) · `chain` (call path between two symbols) · `context` (surrounding structure) ·
+  `pattern` (find a code pattern). Your `role` gates which ops you may use.
+- `engine` (optional) — which backend answers: `graph` (whole-repo code graph — breadth, needs
+  indexing) · `lsp` (Serena/LSP — precise, always-fresh, no index; the first query per project pays
+  a ~1-min warm-up, then it's fast) · `both` (merge graph + LSP). Omit to use the server's configured
+  default. Prefer `lsp` or `both` right after edits, since the graph can lag recent changes.
+- The response is `{ "ok": true, "result": <block-or-null>, "backend": "<name>" }`.
+- **If `result` is `null`** (backend off, file not yet indexed, or path unresolved), first try the
+  **direct-CLI fallback** below; then fall back to Grep/Read. Never block on it — an accelerator, not a gate.
+
+### Direct-CLI fallback (proxy returned null)
+
+If `codebase-memory-mcp` is on the PATH, query its pre-built code graph directly — this works in
+headless runs and covers cases the proxy misses (e.g. a file added since the last index). Resolve the
+project slug once, then search:
+
+```bash
+codebase-memory-mcp cli list_projects '{}'    # pick the project whose root_path is your repo → use its "name"
+codebase-memory-mcp cli search_code '{"project":"<name>","pattern":"<symbol_or_text>"}'   # ranked; note: pattern, not query
+codebase-memory-mcp cli query_graph '{"project":"<name>","query":"MATCH (n) WHERE n.name=\"<sym>\" RETURN n.name, n.file_path"}'
+```
+
+`search_code` takes `pattern` (grep-like over the graph); `query_graph` runs Cypher (callers/callees,
+call paths, impact). If the binary is absent or returns nothing, fall back to Grep/Read.
+
+Use it **before** editing an unfamiliar symbol (check `callers` / `impact` so you don't break a
+caller) and whenever a task names a symbol you haven't located yet (`symbol`). Prefer one targeted
+query over a broad Grep sweep.
+
+## Scout choreography (analyze → scout → compress)
+
+The stage agent (builder / reviewer / tester) declares what context it needs *before* doing the
+work, scouts gather that context in parallel, and the findings are compressed into the work prompt.
+
+### Phase 1 — Analyze
+
+Spawn the stage agent with `phase: analyze`. It outputs a `## NEEDS_CONTEXT` block **only** —
+the list of things it must know before implementing / reviewing / testing.
+
+NEEDS_CONTEXT format (one entry per line):
+```
+  - type: scout | scope: <files or directories> | question: <specific question>
+  - type: quick | question: <specific question>
+```
+
+Parse the `## NEEDS_CONTEXT` block. If it says `none`, skip Phase 2 (or use only the stage's
+default scout entry, where one is defined).
+
+### Phase 2 — Scout (parallel, max 4)
+
+Spawn all NEEDS_CONTEXT entries in parallel (max 4 total):
+- `type: quick` → spawn `quick` with `ROLE: <stage agent>` + the question
+- `type: scout` → spawn `scout` with `ROLE: <stage agent>` + scope + question
+
+After each scout/quick returns, parse its `<usage>` block (`subagent_tokens`, `tool_uses`) and
+record it immediately — non-blocking, skip if server unavailable:
+
+```bash
+# For each scout that returned — replace placeholders with actual values from <usage> block
+# model is claude-haiku-4-5-20251001 for scout/quick agents
+pathly-fsm-call record-activity \
+  --agent "scout" \
+  --feature "<feature>" \
+  --summary "<question truncated to 80 chars>" \
+  --conversation N \
+  --model "claude-haiku-4-5-20251001" \
+  --total-tokens SCOUT_TOKENS \
+  --tool-uses SCOUT_TOOL_USES \
+  --wall-seconds 0 \
+  --cost-usd SCOUT_COST_USD
+```
+
+Compute `SCOUT_COST_USD` using haiku rates (input $0.80/MTok, output $4.00/MTok) with 80/20 split.
+Add each scout's `SCOUT_TOKENS` to the stage running total for the final AGENT_DONE.
+
+Compress all returned findings into a short summary and inject it into the Phase 3 work prompt
+as the stage's findings section.
 
 ---
 
