@@ -36,6 +36,13 @@ export interface SpawnOpts {
    *  live "⚙ Tool" lines, so streaming UX is preserved while it captures cost / tokens /
    *  tool-call count from the final `result` event. Claude only — codex ignores it. */
   streamJson?: boolean
+  /** Single-envelope JSON output (claude `--output-format json`). Buffers to one final
+   *  `{type:result}` object — parsed by the gate for cost/tokens (parseClaudeJsonResult) and,
+   *  crucially, `--dangerously-skip-permissions` is HONORED for headless file writes in this
+   *  mode (unlike stream-json, whose permission loop blocks a one-shot's writes). Use for
+   *  file-writing one-shot actions (editor Analyze/Diagram/Split). Wins over streamJson if both
+   *  set. Claude only — codex ignores it (it uses `--json` unconditionally). */
+  jsonOutput?: boolean
 }
 
 /**
@@ -60,15 +67,19 @@ export function dashSafePrompt(prompt: string): string {
  * is never parsed as a CLI flag.
  */
 export function buildHeadlessArgv(adapter: CliAdapter, promptRaw: string, opts: SpawnOpts = {}): string[] {
-  const { model, session, autonomy = true, streamJson } = opts
+  const { model, session, autonomy = true, streamJson, jsonOutput } = opts
   const prompt = dashSafePrompt(promptRaw)
 
   if (adapter === 'claude') {
     const argv = ['claude', '-p', prompt, '--print']
-    // stream-json events → the spawn gate renders them to clean text + tool lines and reads
-    // cost/tokens/tool-count from the final result event. --verbose is required for the full
-    // event stream in -p mode.
-    if (streamJson) argv.push('--output-format', 'stream-json', '--verbose')
+    // Output format. json (single envelope): the gate reads cost/tokens via
+    // parseClaudeJsonResult AND --dangerously-skip-permissions is honored for headless writes
+    // (matches the supervisor adapters.yaml template — the reason supervisor claude runs write
+    // files but stream-json editor one-shots got blocked asking for approval). stream-json (event
+    // stream): live prose + "⚙ Tool" rendering by the gate; usage from the final result event.
+    // --verbose is required for the full event stream in -p mode. jsonOutput wins if both set.
+    if (jsonOutput) argv.push('--output-format', 'json')
+    else if (streamJson) argv.push('--output-format', 'stream-json', '--verbose')
     if (model) argv.push('--model', model)
     if (autonomy) argv.push('--dangerously-skip-permissions')
     if (session) argv.push('--resume', session)

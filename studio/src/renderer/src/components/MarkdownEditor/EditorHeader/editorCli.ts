@@ -60,12 +60,15 @@ export function saveEditorCli(key: string, cli: CliAdapter): void {
 }
 
 /** Resolve the spawn argv for the selected engine; falls back to Claude if unavailable.
- *  Uses claude's stream-json output: the main-process spawn gate (terminal.ts) renders the
- *  events back into clean prose + live "⚙ Tool" lines — so the editor's live progress is
- *  preserved AND the gate captures cost / tokens / tool-call count for telemetry. Editor
- *  actions still read their actual result from a file, so the output format never affects it. */
+ *  Uses claude's single-envelope `--output-format json` (NOT stream-json): these actions WRITE a
+ *  sidecar file, and stream-json's headless permission loop blocked the write — claude asked for
+ *  approval instead of writing, so no artifact AND no cost was recorded. json mode honors
+ *  `--dangerously-skip-permissions` (like the supervisor runs that write files fine) and the gate
+ *  captures cost/tokens reliably from the final result envelope. Trade-off: the terminal buffers
+ *  instead of streaming token-by-token; the result still lands in the gallery + progress toasts.
+ *  Codex is unaffected (it uses `--json` unconditionally). */
 export function buildCliArgv(cli: CliAdapter, prompt: string): string[] {
-  return buildHeadlessArgv(cli, prompt, { streamJson: true })
+  return buildHeadlessArgv(cli, prompt, { jsonOutput: true })
 }
 
 /** Human-friendly engine name for toasts/labels. */
