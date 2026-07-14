@@ -1,0 +1,23 @@
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.value {
+  font-family: var(--font-family-mono, monospace);
+  font-size: 22px;
+  font-weight: var(--font-weight-semibold, 600);
+  color: var(--text-primary);
+  line-height: 1.1;
+}
+
+.value[data-tone='green'] { color: var(--green); }
+.value[data-tone='teal']  { color: var(--teal, #6fd0d6); }
+
+.label {
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-disabled, var(--text-muted));
+}

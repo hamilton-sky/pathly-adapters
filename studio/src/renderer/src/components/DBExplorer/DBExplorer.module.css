@@ -92,6 +92,10 @@
   color: var(--accent);
 }
 
+.chartSection {
+  padding: 0 28px 18px;
+}
+
 .loading {
   padding: 2rem;
   text-align: center;

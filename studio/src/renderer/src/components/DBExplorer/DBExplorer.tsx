@@ -5,11 +5,20 @@ import { StatsStrip } from './StatsStrip'
 import { FeatureGrid } from './FeatureGrid'
 import FeatureStack from './FeatureStack'
 import { FeatureModal } from './FeatureModal'
-import { CostChart } from './CostChart/CostChart'
+import { CostOverTimeChart, type CostPoint } from './CostOverTimeChart'
 import { RollupView } from './RollupView/RollupView'
 import styles from './DBExplorer.module.css'
 
 type ViewMode = 'grid' | 'stack' | 'rollup'
+
+function bucketToCostPoint(b: DailyTrendBucket): CostPoint {
+  return {
+    day: b.bucket,
+    cost_usd: b.cost_usd_reported,
+    tokens: b.input_tokens,
+    span_count: b.count,
+  }
+}
 
 function dbFeatureToFeatureData(f: DbFeature): FeatureData {
   const state = mapState(f.state)
@@ -44,16 +53,19 @@ export function DBExplorer(): JSX.Element {
   const [modalFeature, setModalFeature] = useState<FeatureData | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
   const [loading, setLoading] = useState(true)
+  const [costPoints, setCostPoints] = useState<CostPoint[]>([])
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [rawFeatures, rawStats] = await Promise.all([
+      const [rawFeatures, rawStats, rawTrends] = await Promise.all([
         window.pathly.db.features(projectPath || undefined),
         window.pathly.db.stats(projectPath || undefined),
+        window.pathly.db.trends('', 30),
       ])
       setFeatures(rawFeatures.map(dbFeatureToFeatureData))
       setStats(rawStats)
+      setCostPoints((rawTrends?.trends ?? []).map(bucketToCostPoint))
     } catch {
       // FSM may not be running yet — stay with empty list
     } finally {
@@ -67,7 +79,9 @@ export function DBExplorer(): JSX.Element {
     <div className={styles.panel}>
       <DBExplorerHeader viewMode={viewMode} onViewMode={setViewMode} onRefresh={load} />
       <StatsStrip stats={stats} features={features} />
-      <CostChart featureName="" />
+      <div className={styles.chartSection}>
+        <CostOverTimeChart points={costPoints} loading={loading} />
+      </div>
       {loading
         ? <div className={styles.loading}>Loading…</div>
         : viewMode === 'rollup'

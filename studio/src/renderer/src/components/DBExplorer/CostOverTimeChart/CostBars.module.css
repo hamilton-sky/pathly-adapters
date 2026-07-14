@@ -1,0 +1,133 @@
+.plot {
+  display: flex;
+  gap: 12px;
+}
+
+/* ── Y axis ─────────────────────────────────────────────── */
+.yAxis {
+  position: relative;
+  width: 52px;
+  height: 210px;
+  flex: none;
+}
+
+.yLabel {
+  position: absolute;
+  right: 8px;
+  transform: translateY(50%);
+  font-family: var(--font-family-mono, monospace);
+  font-size: 10px;
+  color: var(--text-disabled, var(--text-muted));
+  white-space: nowrap;
+}
+
+/* ── Chart body ─────────────────────────────────────────── */
+.body {
+  flex: 1;
+}
+
+.canvas {
+  position: relative;
+  height: 210px;
+}
+
+.gridLine {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px dashed rgba(57, 67, 90, 0.55);
+  pointer-events: none;
+}
+
+.gridLine[data-base] {
+  border-top: 1px solid #39435a;
+}
+
+.guide {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(143, 184, 255, 0.35);
+  pointer-events: none;
+}
+
+/* ── Bars ───────────────────────────────────────────────── */
+.bars {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+}
+
+.col {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  position: relative;
+  cursor: pointer;
+}
+
+.bar {
+  width: 100%;
+  border-radius: 4px 4px 2px 2px;
+  transform-origin: bottom;
+  background: linear-gradient(180deg, #8fb8ff 0%, #5a82d8 100%);
+  transition: filter 0.12s;
+  animation: riseIn 0.5s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+
+.bar[data-peak] {
+  background: linear-gradient(180deg, #8fe0e6 0%, #4fb6bd 100%);
+}
+
+.bar[data-zero] {
+  background: transparent;
+  border-top: 2px dotted #39435a;
+  border-radius: 0;
+}
+
+/* dim siblings while another bar is hovered */
+.bars[data-hovering] .bar { filter: brightness(0.72) saturate(0.8); }
+.col:hover .bar {
+  filter: brightness(1.25) !important;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.25) inset;
+}
+
+.peakTag {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-family-mono, monospace);
+  font-size: 10px;
+  font-weight: var(--font-weight-semibold, 600);
+  color: var(--teal, #6fd0d6);
+  white-space: nowrap;
+}
+
+/* ── X axis ─────────────────────────────────────────────── */
+.xAxis {
+  display: flex;
+  margin-top: 9px;
+  border-top: var(--border, 1px solid #293142);
+  padding-top: 8px;
+}
+
+.xCell {
+  flex: 1;
+  text-align: center;
+}
+
+.xLabel {
+  font-family: var(--font-family-mono, monospace);
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+
+@keyframes riseIn {
+  from { transform: scaleY(0.2); opacity: 0; }
+  to   { transform: scaleY(1);   opacity: 1; }
+}
