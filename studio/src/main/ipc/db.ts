@@ -76,7 +76,11 @@ export function registerDbHandlers(): void {
   ipcMain.handle('db:trends', async (_e, feature: string, days?: number, projectRoot?: string) => {
     const qs = new URLSearchParams({ feature })
     if (days !== undefined) qs.set('days', String(days))
-    if (projectRoot) qs.set('project_root', projectRoot)
+    // Normalize backslashes so a Windows path matches the forward-slashed
+    // project_root stored in agent_invocations. The server normalizes too, but
+    // doing it here keeps scoping working against an FSM server that predates
+    // that fix (no dependency on the server having been restarted).
+    if (projectRoot) qs.set('project_root', projectRoot.replace(/\\/g, '/'))
     try { return await fsmGet(`/telemetry/trends?${qs}`) } catch { return null }
   })
 

@@ -5,7 +5,7 @@ import { StatsStrip } from './StatsStrip'
 import { FeatureGrid } from './FeatureGrid'
 import FeatureStack from './FeatureStack'
 import { FeatureModal } from './FeatureModal'
-import { CostOverTimeChart, type CostPoint, type ScopeMode } from './CostOverTimeChart'
+import { CostOverTimeChart, type CostPoint, type ScopeMode, type RangeDays } from './CostOverTimeChart'
 import { RollupView } from './RollupView/RollupView'
 import styles from './DBExplorer.module.css'
 
@@ -55,6 +55,7 @@ export function DBExplorer(): JSX.Element {
   const [loading, setLoading] = useState(true)
   const [costPoints, setCostPoints] = useState<CostPoint[]>([])
   const [costScope, setCostScope] = useState<ScopeMode>('project')
+  const [costRange, setCostRange] = useState<RangeDays>(30)
   const [costLoading, setCostLoading] = useState(true)
 
   const load = useCallback(async () => {
@@ -79,14 +80,14 @@ export function DBExplorer(): JSX.Element {
     setCostLoading(true)
     try {
       const root = costScope === 'global' ? undefined : projectPath || undefined
-      const rawTrends = await window.pathly.db.trends('', 30, root)
+      const rawTrends = await window.pathly.db.trends('', costRange, root)
       setCostPoints((rawTrends?.trends ?? []).map(bucketToCostPoint))
     } catch {
       setCostPoints([])
     } finally {
       setCostLoading(false)
     }
-  }, [projectPath, costScope])
+  }, [projectPath, costScope, costRange])
 
   useEffect(() => { load() }, [load])
   useEffect(() => { loadTrends() }, [loadTrends])
@@ -104,6 +105,8 @@ export function DBExplorer(): JSX.Element {
         <CostOverTimeChart
           points={costPoints}
           loading={costLoading}
+          range={costRange}
+          onRange={setCostRange}
           scope={costScope}
           onScope={setCostScope}
         />
