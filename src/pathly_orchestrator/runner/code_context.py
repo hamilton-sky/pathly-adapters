@@ -279,9 +279,7 @@ def build_block(
     ``code_context.backend`` setting.
     """
     try:
-        provider = get_provider(
-            backend if backend is not None else _resolve_backend()
-        )
+        provider = get_provider(backend if backend is not None else _resolve_backend())
         return provider.build_block(
             scope,
             list(files or []),

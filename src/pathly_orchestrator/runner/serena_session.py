@@ -47,7 +47,11 @@ def serena_argv() -> list[str]:
     if raw:
         try:
             argv = json.loads(raw)
-            if isinstance(argv, list) and argv and all(isinstance(a, str) for a in argv):
+            if (
+                isinstance(argv, list)
+                and argv
+                and all(isinstance(a, str) for a in argv)
+            ):
                 return argv
         except ValueError:
             pass

@@ -25,7 +25,9 @@ def test_warmup_returns_empty(monkeypatch):
     import pathly_orchestrator.runner.code_context_lsp as lsp
 
     monkeypatch.setattr(lsp, "_get_ready_session", lambda root: None)
-    assert lsp.LspProvider().build_block("s", ["src/x.py"], "architect", 1500, _ABS) == ""
+    assert (
+        lsp.LspProvider().build_block("s", ["src/x.py"], "architect", 1500, _ABS) == ""
+    )
 
 
 def test_ready_renders_block(monkeypatch):
@@ -54,7 +56,9 @@ def test_never_raises_on_session_error(monkeypatch):
             raise RuntimeError("boom")
 
     monkeypatch.setattr(lsp, "_get_ready_session", lambda root: BoomSession())
-    assert lsp.LspProvider().build_block("s", ["src/x.py"], "architect", 1500, _ABS) == ""
+    assert (
+        lsp.LspProvider().build_block("s", ["src/x.py"], "architect", 1500, _ABS) == ""
+    )
 
 
 def test_empty_files_is_noop(monkeypatch):
@@ -89,7 +93,9 @@ def test_render_overview_tolerates_shapes():
         "f.py", json.dumps({"symbols": [{"name": "b"}]}), 12
     )
     # dict-of-lists fallback
-    assert "- c" in _render_overview("f.py", json.dumps({"anything": [{"name": "c"}]}), 12)
+    assert "- c" in _render_overview(
+        "f.py", json.dumps({"anything": [{"name": "c"}]}), 12
+    )
     assert _render_overview("f.py", "not json", 12) == ""  # unparseable → ""
     assert _render_overview("f.py", json.dumps([]), 12) == ""  # empty → ""
 
@@ -148,9 +154,10 @@ def test_composite_skips_failing_child():
         def build_block(self, *a, **k):
             return "## ok\n- z"
 
-    assert CompositeProvider([Boom(), Ok()]).build_block(
-        "s", ["f"], "r", 1500, "root"
-    ) == "## ok\n- z"
+    assert (
+        CompositeProvider([Boom(), Ok()]).build_block("s", ["f"], "r", 1500, "root")
+        == "## ok\n- z"
+    )
 
 
 # --- dispatch: get_provider / _resolve_backend / build_block override -----
@@ -187,7 +194,9 @@ def test_build_block_backend_override_wins(monkeypatch):
             return "spy-block"
 
     monkeypatch.setattr(cc, "_resolve_backend", lambda: "none")  # config says off
-    monkeypatch.setattr(cc, "get_provider", lambda b: Spy() if b == "lsp" else cc.NoneProvider())
+    monkeypatch.setattr(
+        cc, "get_provider", lambda b: Spy() if b == "lsp" else cc.NoneProvider()
+    )
     assert cc.build_block("s", ["f"], "r", 1500, _ABS, backend="lsp") == "spy-block"
     assert seen.get("hit") is True
 
@@ -217,8 +226,13 @@ def test_engine_lsp_routes_backend(client, monkeypatch):
     monkeypatch.setattr(cc, "build_block", fake_build_block)
     resp = client.post(
         "/code/query",
-        json={"op": "symbol", "target": "src/x.py", "role": "architect",
-              "engine": "lsp", "project_root": _ABS},
+        json={
+            "op": "symbol",
+            "target": "src/x.py",
+            "role": "architect",
+            "engine": "lsp",
+            "project_root": _ABS,
+        },
     )
     data = resp.get_json()
     assert seen["backend"] == "lsp"
@@ -239,7 +253,12 @@ def test_cache_separates_by_backend(client, monkeypatch):
         return f"block-for-{backend}"
 
     monkeypatch.setattr(cc, "build_block", fake_build_block)
-    base = {"op": "symbol", "target": "src/x.py", "role": "architect", "project_root": _ABS}
+    base = {
+        "op": "symbol",
+        "target": "src/x.py",
+        "role": "architect",
+        "project_root": _ABS,
+    }
     r1 = client.post("/code/query", json={**base, "engine": "graph"}).get_json()
     r2 = client.post("/code/query", json={**base, "engine": "lsp"}).get_json()
     # Same (op,target) but different engine → NOT a cache collision; both ran.
@@ -265,8 +284,13 @@ def test_null_result_not_cached(client, monkeypatch):
         return outputs[min(i, len(outputs) - 1)]
 
     monkeypatch.setattr(cc, "build_block", fake_build_block)
-    body = {"op": "symbol", "target": "x.py", "role": "architect",
-            "engine": "graph", "project_root": _ABS}
+    body = {
+        "op": "symbol",
+        "target": "x.py",
+        "role": "architect",
+        "engine": "graph",
+        "project_root": _ABS,
+    }
     r1 = client.post("/code/query", json=body).get_json()
     r2 = client.post("/code/query", json=body).get_json()
     r3 = client.post("/code/query", json=body).get_json()
@@ -292,8 +316,13 @@ def test_unknown_engine_falls_through_to_config(client, monkeypatch):
     monkeypatch.setattr(cc, "build_block", fake_build_block)
     resp = client.post(
         "/code/query",
-        json={"op": "symbol", "target": "src/x.py", "role": "architect",
-              "engine": "wat", "project_root": _ABS},
+        json={
+            "op": "symbol",
+            "target": "src/x.py",
+            "role": "architect",
+            "engine": "wat",
+            "project_root": _ABS,
+        },
     )
     data = resp.get_json()
     assert seen["backend"] is None  # unknown engine → no override → config used
