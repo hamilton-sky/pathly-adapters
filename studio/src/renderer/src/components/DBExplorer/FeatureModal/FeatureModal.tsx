@@ -34,7 +34,13 @@ function calcDuration(from: string, to: string): string {
 }
 
 function eventsToTransitions(events: DbEvent[]): TransitionData[] {
-  const stateEvents = events.filter((e) => e.event_type === 'STATE_TRANSITION')
+  // Oldest→newest so the timeline reads as a forward flow (matching the legend below)
+  // and each state's `duration` measures the gap to the NEXT state, not the previous one.
+  // The events feed arrives newest-first, which rendered the flow backwards + all durations "—".
+  const stateEvents = events
+    .filter((e) => e.event_type === 'STATE_TRANSITION')
+    .slice()
+    .sort((a, b) => a.ts.localeCompare(b.ts))
   return stateEvents.map((e, i) => {
     const payload = e.payload as Record<string, unknown>
     const state = ((payload['to'] as string) ?? '').toUpperCase()
