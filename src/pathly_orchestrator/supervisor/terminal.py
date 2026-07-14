@@ -321,6 +321,46 @@ def _run_stage_via_terminal(
         except Exception:
             logger.debug("_emit_executor_telemetry skipped", exc_info=True)
 
+    def _reconcile_billing_now(data: Optional[dict]) -> None:
+        """Patch the last AGENT_DONE with the REAL CLI cost/tokens from a PTY result.
+
+        The 'pty_result' and slow paths (the PTY reports its result before/without early-advance
+        detecting AGENT_DONE — the common case for a fast headless stage) otherwise emit NO
+        BILLING_UPDATE, so the DB keeps only the completion-report's subagent-token self-estimate
+        — which is $0 for a stage that spawns no subagents (e.g. project-decompose/planner). This
+        restores the real-cost capture the invocation-projection refactor dropped from these paths
+        (early-advance is covered by _reconciliation_window). Best-effort; never raises into the loop.
+        """
+        billing = (data or {}).get("result") or {}
+        if not isinstance(billing, dict):
+            return
+        try:
+            cost = float(billing.get("cost_usd") or 0.0)
+            tokens_in = int(billing.get("tokens_in") or 0)
+            tokens_out = int(billing.get("tokens_out") or 0)
+            tool_uses = int(billing.get("tool_uses") or 0)
+            wall = int((data or {}).get("wall_seconds") or 0)
+        except (TypeError, ValueError):
+            return
+        # Nothing real to add → skip; a 0/0 update would only restate the self-estimate.
+        if cost <= 0 and (tokens_in + tokens_out) <= 0:
+            return
+        try:
+            from pathly_orchestrator.fsm_ops import _resolve_storage_path
+            from pathly_orchestrator.runner import _patch_last_agent_done
+
+            storage = (
+                Path(state.storage_path)
+                if state.storage_path
+                else _resolve_storage_path(None, state.project_root, state.topic)
+            )
+            _patch_last_agent_done(
+                storage, cost, tokens_in, tokens_out, wall, tool_uses,
+                model=model, run_id=run_id,
+            )
+        except Exception as exc:
+            logger.warning("_reconcile_billing_now: patch failed: %s", exc)
+
     try:
         payload = {
             "type": "TERMINAL_SPAWN",
@@ -516,6 +556,7 @@ def _run_stage_via_terminal(
                 raise RuntimeError(
                     f"terminal_exit_nonzero: PTY for {tab_id} exited with code {exit_code}"
                 )
+            _reconcile_billing_now(data)
             _emit_executor_telemetry(
                 data.get("result") or {}, float(data.get("wall_seconds") or 0)
             )
@@ -537,6 +578,7 @@ def _run_stage_via_terminal(
             raise RuntimeError(
                 f"terminal_exit_nonzero: PTY for {tab_id} exited with code {exit_code}"
             )
+        _reconcile_billing_now(data)
         _emit_executor_telemetry(
             data.get("result") or {}, float(data.get("wall_seconds") or 0)
         )
