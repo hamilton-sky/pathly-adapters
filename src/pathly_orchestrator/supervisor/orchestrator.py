@@ -138,7 +138,11 @@ def _loop(state: RunnerState, broadcast_fn: Optional[Callable]) -> None:
                         "goal_id": state.goal_id or None,
                     }
                 )
-            except RuntimeError as exc:
+            except Exception as exc:
+                # Belt-and-suspenders: ANY next_action failure (unreachable, socket timeout, or a
+                # malformed response) fails the run with a nameable reason instead of bubbling to the
+                # whole-loop catch-all and becoming an opaque loop_crashed. fsm_http_client already
+                # degrades a slow/timed-out self-call to the in-process path; this is the floor.
                 _fail("fsm_unreachable", str(exc))
                 return
 

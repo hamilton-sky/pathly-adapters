@@ -25,6 +25,13 @@ _RECORD_ACTIVITY_PATH = "/record_activity"
 _RECORD_PHASE_PATH = "/record_phase"
 _CODE_QUERY_PATH = "/code/query"
 
+# Prompt assembly inside /next_action + /complete_stage (skill compose + board-context retrieval +
+# code-context injection, which can trigger a codebase-memory-mcp re-index after a code edit)
+# legitimately takes many seconds. The old 10s default timed out on a heavy /next_action and, because
+# a socket TimeoutError isn't a RuntimeError, crashed the supervisor loop (loop_crashed). Give the two
+# heavy FSM calls a generous ceiling; on timeout they still degrade to the in-process path below.
+_FSM_CALL_TIMEOUT = 120.0
+
 
 class _ServerUnreachable(RuntimeError):
     """The FSM HTTP server can't be reached or started. Callers degrade to running
@@ -80,8 +87,13 @@ def _request_raw(
         body = exc.read().decode("utf-8", errors="replace").strip()
         detail = body or exc.reason
         raise RuntimeError(f"fsm-call error ({exc.code}): {detail}") from exc
-    except URLError as exc:
-        raise _ServerUnreachable(f"fsm-call: server unreachable: {exc.reason}") from exc
+    except (TimeoutError, URLError) as exc:
+        # A socket read/connect timeout raises a raw TimeoutError (NOT wrapped in URLError) — e.g. the
+        # supervisor's self-call to /next_action outlasting `timeout` because prompt assembly is slow.
+        # Treat timeout AND unreachable identically: degrade to the in-process fsm_ops path instead of
+        # letting the exception bubble to the supervisor loop's catch-all and become loop_crashed.
+        reason = getattr(exc, "reason", None) or "request timed out"
+        raise _ServerUnreachable(f"fsm-call: server not answering: {reason}") from exc
 
 
 def _request_json(
@@ -190,7 +202,9 @@ def next_action(
 ) -> dict:
     try:
         ensure_server_running(host=host, port=port)
-        return _request_json("POST", _NEXT_ACTION_PATH, payload, host=host, port=port)
+        return _request_json(
+            "POST", _NEXT_ACTION_PATH, payload, host=host, port=port, timeout=_FSM_CALL_TIMEOUT
+        )
     except _ServerUnreachable:
         return _inprocess("next_action", payload)
 
@@ -204,7 +218,12 @@ def complete_stage(
     try:
         ensure_server_running(host=host, port=port)
         return _request_json(
-            "POST", _COMPLETE_STAGE_PATH, payload, host=host, port=port
+            "POST",
+            _COMPLETE_STAGE_PATH,
+            payload,
+            host=host,
+            port=port,
+            timeout=_FSM_CALL_TIMEOUT,
         )
     except _ServerUnreachable:
         return _inprocess("complete_stage", payload)
