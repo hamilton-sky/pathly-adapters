@@ -45,6 +45,13 @@
   flex-direction: column;
   overflow: hidden;
   border-right: var(--border);
+  transition: width var(--transition-fast), min-width var(--transition-fast);
+}
+
+.leftPane[data-collapsed='true'] {
+  width: 46px;
+  min-width: 46px;
+  max-width: 46px;
 }
 
 .rightPane {

@@ -1,6 +1,7 @@
+import { useState } from 'react'
 import { useProjectStore } from '../../store/projectStore'
 import { useSkillCompositionCatalog } from './hooks/useSkillCompositionCatalog'
-import { SkillList } from './SkillList/SkillList'
+import { SkillSidebar } from './SkillSidebar/SkillSidebar'
 import { FragmentPanel } from './FragmentPanel/FragmentPanel'
 import styles from './SkillComposition.module.css'
 
@@ -8,6 +9,7 @@ export function SkillComposition(): JSX.Element {
   const projectRoot = useProjectStore((s) => s.projectPath)
   const { catalog, loading, error, selectedSkill, setSelectedSkill, refetch } =
     useSkillCompositionCatalog(projectRoot)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
   return (
     <div className={styles.root}>
@@ -17,12 +19,14 @@ export function SkillComposition(): JSX.Element {
       </div>
 
       <div className={styles.body}>
-        <div className={styles.leftPane}>
-          <SkillList
+        <div className={styles.leftPane} data-collapsed={sidebarCollapsed}>
+          <SkillSidebar
             skills={catalog?.skills ?? {}}
             selectedSkill={selectedSkill}
             onSelect={setSelectedSkill}
             loading={loading}
+            collapsed={sidebarCollapsed}
+            onToggleCollapse={() => setSidebarCollapsed((c) => !c)}
           />
         </div>
 
