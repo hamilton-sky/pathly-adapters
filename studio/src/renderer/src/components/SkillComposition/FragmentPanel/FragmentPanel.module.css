@@ -38,22 +38,3 @@
   flex: 1;
   min-width: 0;
 }
-
-.toggles {
-  flex-shrink: 0;
-  max-height: 40%;
-  overflow-y: auto;
-  padding: var(--space-4) var(--space-6);
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: var(--space-1) var(--space-4);
-  border-bottom: var(--border);
-}
-
-.emptyToggles {
-  grid-column: 1 / -1;
-  padding: var(--space-8) 0;
-  text-align: center;
-  color: var(--text-muted);
-  font-size: var(--font-size-sm);
-}

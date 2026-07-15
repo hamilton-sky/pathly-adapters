@@ -191,9 +191,35 @@ def skills_parse():
         return jsonify({"error": str(e), "type": type(e).__name__}), 500
 
 
+def _split_origin_sections(text: str, origin: str) -> list[dict]:
+    """Split ``text`` on ``## `` headings into preview sections tagged with ``origin``.
+
+    ``origin`` is the fragment name the text came from (or ``"body"`` for the skill's
+    own text) so a client can group sections by which fragment produced them (e.g. the
+    Skill Composition panel's fragment chips).
+    """
+    import re as _re
+
+    parts_list = _re.split(r"(?m)^(## .+)$", text)
+    sections: list[dict] = []
+    preamble = parts_list[0].strip()
+    if preamble:
+        sections.append({"heading": "", "content": preamble, "origin": origin})
+    for i in range(1, len(parts_list) - 1, 2):
+        heading = parts_list[i].strip()
+        content = parts_list[i + 1].strip() if i + 1 < len(parts_list) else ""
+        sections.append({"heading": heading, "content": content, "origin": origin})
+    return sections
+
+
 @bp.route("/skills/preview", methods=["POST"])
 def skills_preview():
-    """Preview an assembled skill with live fragment substitution."""
+    """Preview an assembled skill with live fragment substitution.
+
+    Each section is tagged with the ``origin`` (fragment name, or ``"body"`` for the
+    skill's own text) it was split from, computed by injecting + sectioning each part
+    independently before concatenating — so a client can isolate one fragment's content.
+    """
     try:
         from pathly_orchestrator.compose import compose_skill
         from pathly_orchestrator.fsm_compose import _inject_prompt_vars
@@ -239,20 +265,20 @@ def skills_preview():
                 except Exception:
                     skill_body = ""
 
-            fragment_bodies = []
+            origin_parts: list[tuple[str, str]] = [("body", skill_body.rstrip("\n"))]
             for fname in fragment_names:
                 try:
-                    fragment_bodies.append(
-                        _read_fragment(fragments_dir, fname).rstrip("\n")
+                    origin_parts.append(
+                        (fname, _read_fragment(fragments_dir, fname).rstrip("\n"))
                     )
                 except Exception:
                     pass
-            raw_parts = [skill_body.rstrip("\n")] + fragment_bodies
-            assembled = "\n\n".join(p for p in raw_parts if p) + "\n"
         else:
             from pathly_orchestrator.skills.compose import build_adapter_caps
 
-            assembled = compose_skill(skill, build_adapter_caps("claude"))
+            origin_parts = [
+                ("body", compose_skill(skill, build_adapter_caps("claude")).rstrip("\n"))
+            ]
 
         feature = Path(feature_path).name if feature_path else ""
         project_root = (
@@ -260,26 +286,23 @@ def skills_preview():
         )
         agent_role = skill.split("/")[-1] if "/" in skill else skill
         storage_path = Path(feature_path) if feature_path else None
-        assembled = _inject_prompt_vars(
-            assembled,
-            feature=feature,
-            project_root=project_root,
-            agent_role=agent_role,
-            storage_path=storage_path,
-        )
 
-        import re as _re
-
-        parts_list = _re.split(r"(?m)^(## .+)$", assembled)
         sections: list[dict] = []
-        preamble = parts_list[0].strip()
-        if preamble:
-            sections.append({"heading": "", "content": preamble, "origin": "body"})
-        for i in range(1, len(parts_list) - 1, 2):
-            heading = parts_list[i].strip()
-            content = parts_list[i + 1].strip() if i + 1 < len(parts_list) else ""
-            sections.append({"heading": heading, "content": content, "origin": "body"})
+        injected_parts: list[str] = []
+        for origin, part_text in origin_parts:
+            if not part_text:
+                continue
+            injected = _inject_prompt_vars(
+                part_text,
+                feature=feature,
+                project_root=project_root,
+                agent_role=agent_role,
+                storage_path=storage_path,
+            )
+            injected_parts.append(injected)
+            sections.extend(_split_origin_sections(injected, origin))
 
+        assembled = "\n\n".join(injected_parts) + "\n"
         tokens = int(len(assembled.split()) * 1.3)
         return jsonify({"sections": sections, "tokens": tokens}), 200
     except Exception as e:

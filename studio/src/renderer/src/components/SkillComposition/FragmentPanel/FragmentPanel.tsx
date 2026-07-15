@@ -2,8 +2,10 @@ import { Badge, Button } from '../../ui'
 import type { SkillCompositionEntry } from '../../../services/skillComposition'
 import { useFragmentToggles } from './hooks/useFragmentToggles'
 import { useComposedPreview } from './hooks/useComposedPreview'
-import { FragmentToggleRow } from '../FragmentToggleRow/FragmentToggleRow'
-import { ComposedPreview } from '../ComposedPreview/ComposedPreview'
+import { useChipSelection } from './hooks/useChipSelection'
+import { useActiveChipContent } from './hooks/useActiveChipContent'
+import { FragmentChipRow } from '../FragmentChipRow/FragmentChipRow'
+import { ChipMarkdownView } from '../ChipMarkdownView/ChipMarkdownView'
 import styles from './FragmentPanel.module.css'
 
 interface Props {
@@ -23,7 +25,9 @@ export function FragmentPanel({ skill, entry, allFragments, projectRoot, onChang
     projectRoot,
     onChanged,
   )
-  const { sections, tokens, loading: previewLoading } = useComposedPreview(skill, fragments, projectRoot)
+  const { sections, loading: previewLoading } = useComposedPreview(skill, fragments, projectRoot)
+  const { activeChipId, selectChip } = useChipSelection()
+  const active = useActiveChipContent(skill, projectRoot, fragments, sections, previewLoading, activeChipId)
 
   const overridden = source === 'override'
 
@@ -39,14 +43,15 @@ export function FragmentPanel({ skill, entry, allFragments, projectRoot, onChang
         </Button>
       </div>
 
-      <div className={styles.toggles}>
-        {allFragments.map((name) => (
-          <FragmentToggleRow key={name} name={name} checked={fragments.includes(name)} onToggle={toggleFragment} />
-        ))}
-        {allFragments.length === 0 && <div className={styles.emptyToggles}>No fragments found</div>}
-      </div>
+      <FragmentChipRow
+        fragments={fragments}
+        allFragments={allFragments}
+        activeChipId={activeChipId}
+        onSelectChip={selectChip}
+        onToggleFragment={toggleFragment}
+      />
 
-      <ComposedPreview sections={sections} tokens={tokens} loading={previewLoading} />
+      <ChipMarkdownView title={active.title} sections={active.sections} loading={active.loading} />
     </div>
   )
 }
