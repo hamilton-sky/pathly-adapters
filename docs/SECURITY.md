@@ -3,7 +3,7 @@
 This document records the security/reliability posture for pathly-adapters and
 the remaining hardening work before a production-ready label.
 
-Current status: public beta candidate (core install path stable at 2.20.0).
+Current status: public beta candidate (core install path stable at 2.21.1).
 
 The adapter architecture has good safety properties: thin adapters, an explicit
 stitch pipeline, dry-run support, a Pathly-owned-file manifest, and atomic
@@ -14,18 +14,18 @@ scope enforcement, and marketplace manifest integrity checks.
 
 ## FSM Server Authentication
 
-The FSM HTTP server requires a shared secret on all mutating endpoints.
+The FSM HTTP server requires a shared secret on mutating endpoints from browser-origin or non-loopback callers.
 
 **How it works:**
 
 - On first start, `~/.pathly/server_secret.txt` is created with a random 64-char hex token.
 - The token is loaded into `Settings.api_secret` at startup and injected into `middleware.configure()`.
-- Every `POST` request must carry `X-Pathly-Secret: <token>` or receive a `401 Unauthorized`.
+- A `POST` from a **browser origin** (a request carrying an `Origin` header) or from a **non-loopback** client must carry `X-Pathly-Secret: <token>` (header, or `?token=` query arg) or receive a `401 Unauthorized`. A **loopback non-browser** caller (Pathly's own agents hitting `/comms/*` via `curl`, which send no `Origin` header) is allowed through **without** the secret — the token lives in a user-readable file and never guarded against same-user local processes, so the check targets browser CSRF and off-machine callers.
 - `GET /events/*` endpoints are **exempt** — the browser `EventSource` API cannot send custom headers, so SSE streams are auth-by-IP-binding (127.0.0.1 only) rather than by header.
 - Studio's Electron main process reads the same file via `studio/src/main/apiConfig.ts`, exposes it to the renderer over IPC (`shell:apiConfig`), and injects it into every `apiFetch()` call via `lib/config.ts`.
 - PTY result callbacks (`POST /runner/terminal/result`) also include the header, injected in `studio/src/main/ipc/terminal.ts`.
 
-**Trust model:** the secret is effective against other local processes on the same machine. It does not protect against a process running as the same OS user (they can read `~/.pathly/server_secret.txt`). The server must only be bound to a loopback interface — this is now **enforced at startup** (see below).
+**Trust model:** the secret's real job is blocking **browser CSRF** (browser requests always carry an `Origin` header) and **non-loopback** callers. It does not protect against another local process running as the same OS user — such a process can read `~/.pathly/server_secret.txt`, and as a loopback non-browser client it can reach the mutating endpoints without the secret at all. The server must only be bound to a loopback interface — this is now **enforced at startup** (see below).
 
 **Bind-host enforcement:** `Settings.from_env()` (config.py) rejects any non-loopback value for `PATHLY_FSM_HTTP_HOST` with a hard `sys.exit(1)`. The only way to bind a non-loopback address is to also set `PATHLY_EXPOSE_HOST=true`, which prints a loud warning to stderr about the unauthenticated `/events/*` surface. This enforces the invariant that the SSE streams are never silently exposed on a network interface.
 
@@ -48,7 +48,7 @@ The FSM server uses SQLite in WAL mode at `~/.pathly/pathly.db`.
 - `PRAGMA journal_mode=WAL` — readers never block writers; writers never block readers.
 - `PRAGMA busy_timeout=5000` — a write that finds the WAL locked will retry for up to 5 seconds before raising `SQLITE_BUSY`.
 - `PRAGMA foreign_keys=ON` — referential integrity enforced at the DB layer.
-- A background daemon thread runs `PRAGMA wal_checkpoint(PASSIVE)` every 5 minutes to keep the WAL file from growing unbounded.
+- A background daemon thread runs `PRAGMA wal_checkpoint(TRUNCATE)` every 5 minutes to keep the WAL file from growing unbounded.
 
 **Risk:**
 
@@ -175,27 +175,14 @@ Production recommendation:
 
 ---
 
-## Telemetry Server DoS via Content-Length
+## Telemetry Server DoS via Content-Length — removed surface
 
-Risk:
-
-- `_read_message()` in `pathly_telemetry/server.py` called `stdin.read(length)` with no
-  upper bound on `length`. A caller advertising `Content-Length: 2GB` could cause a 2 GB
-  allocation attempt, hanging or OOM-killing the process.
-- `Content-Length: -1` was accepted; `stdin.read(-1)` reads until EOF (unbounded).
-- `int(headers.get("content-length", 0))` raised `ValueError` on non-integer header
-  values, crashing the server loop.
-
-Mitigation applied (security-fixes):
-
-- Reads are capped at `_MAX_BODY = 1_048_576` (1 MiB). Messages with a larger or negative
-  `Content-Length` are dropped without reading.
-- The `int()` parse is wrapped in `try/except ValueError`; a malformed `Content-Length` header causes `_read_message()` to return `None`, which terminates the server process cleanly.
-
-Production recommendation:
-
-- Consider logging dropped oversized or malformed messages to a diagnostic sink so
-  operators can detect probing attempts.
+The stdin telemetry server this section described (`pathly_telemetry/server.py`,
+`_read_message()` / `_MAX_BODY`) **no longer exists.** Telemetry was superseded by the DB
+event-projection architecture — `agent_invocations` is a projection of the `AGENT_DONE` event
+stream — so there is no hand-rolled `Content-Length` reader to bound; the FSM's HTTP body
+limits are handled by Flask/Werkzeug. The stdin `Content-Length` DoS surface documented here
+is therefore gone. Kept as a historical note.
 
 ---
 

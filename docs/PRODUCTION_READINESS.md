@@ -12,7 +12,7 @@ pathly-adapters publicly as a public beta / technical preview.
 
 ## Release Position
 
-pathly-adapters is currently at **version 2.20.0**:
+pathly-adapters is currently at **version 2.21.1**:
 
 - Stable for the core install path (`--dry-run`, `--apply`, `--uninstall`) with
   full rollback on failure.

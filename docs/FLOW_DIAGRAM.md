@@ -36,7 +36,7 @@ flowchart TD
     CX --> XA[codex adapter\n~/.codex/agents/ + ~/.agents/skills/]
     CP --> PA[copilot adapter\n~/.vscode/extensions/pathly/agents/ + skills/]
     AG --> AA[antigravity adapter\n~/.gemini/antigravity-cli/agents/ + skills/]
-    ST --> FS[pathly-fsm-http\nproject pathly/plans/**\nwindow.pathly.terminal]
+    ST --> FS[pathly-fsm-http\nproject pathly/features/**\nwindow.pathly.terminal]
 ```
 
 ## Install Flow
@@ -65,11 +65,11 @@ flowchart TD
 
 ```text
 ~/.claude/
-├── agents/                    ← 13 stitched behavioral contracts
+├── agents/                    ← 14 stitched behavioral contracts
 │   ├── builder.md
 │   ├── reviewer.md
 │   ├── architect.md
-│   └── ... (10 more)
+│   └── ... (11 more)
 ├── skills/                    ← stitched skill files (nested: each skill is a folder)
 │   ├── pathly/
 │   │   └── SKILL.md           ← main dispatcher
@@ -200,7 +200,7 @@ pathly-studio
 Studio is a local UI over the same files and HTTP runtime:
 
 - Canvas reads bundled and user flow YAMLs.
-- Plan reads and writes project-local `pathly/plans/**` artifacts.
+- Plan reads and writes project-local `pathly/features/**` artifacts (legacy `pathly/plans/**` still resolved).
 - Monitor tails `EVENTS.jsonl` through `GET /events/stream`.
 - Conductor routes chat work to Claude, Codex, or shell targets.
 - Terminal uses Electron PTY IPC through `window.pathly.terminal`.

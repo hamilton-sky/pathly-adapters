@@ -29,7 +29,7 @@ Copy `.env.example` to `.env` and configure:
 | `PATHLY_EXPOSE_HOST` | _(unset)_ | Set to `true` to allow a non-loopback `PATHLY_FSM_HTTP_HOST`. Prints a warning about unauthenticated SSE streams. Only needed when Studio and the FSM server run on different machines. |
 | `PATHLY_PROJECT_ROOT` | _(none)_ | Absolute path to your project root — **required for the feedback-file watcher** |
 | `PATHLY_API_SECRET` | _(auto)_ | Shared secret for `X-Pathly-Secret` auth. If unset, a 64-char hex token is auto-generated and saved to `~/.pathly/server_secret.txt` on first run. Set explicitly to pin the secret across restarts or share it with external callers. |
-| `PATHLY_CORS_ORIGIN` | `null` | Allowed CORS origin for SSE stream (e.g. `http://localhost:3000`) |
+| `PATHLY_CORS_ORIGIN` | `*` | Allowed CORS origin for SSE stream (e.g. `http://localhost:3000`) |
 
 ## Running the FSM HTTP Server
 

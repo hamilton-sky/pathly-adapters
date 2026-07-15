@@ -117,7 +117,7 @@ POST http://127.0.0.1:8765/runner/terminal/result    ← PTY exit callback from 
 POST http://127.0.0.1:8765/runner/terminal/started   ← PTY started confirmation from Studio
 ```
 
-**Authentication:** All `POST` routes require the `X-Pathly-Secret` header. The secret is a 64-char hex token auto-generated on first run and stored at `~/.pathly/server_secret.txt`. Studio reads and injects it automatically. `GET /events/*` endpoints are exempt (EventSource API cannot send custom headers). See [docs/SECURITY.md](docs/SECURITY.md#fsm-server-authentication).
+**Authentication:** `POST` routes require the `X-Pathly-Secret` header for browser-origin or non-loopback callers (the secret's job is blocking browser CSRF); Pathly's own loopback agents call the board via plain curl and are intentionally exempt. The secret is a 64-char hex token auto-generated on first run and stored at `~/.pathly/server_secret.txt`. Studio reads and injects it automatically. `GET /events/*` endpoints are exempt (EventSource API cannot send custom headers). See [docs/SECURITY.md](docs/SECURITY.md#fsm-server-authentication).
 
 **State storage:** The FSM uses SQLite (WAL mode) at `~/.pathly/pathly.db`. Each Flask thread gets its own connection via `threading.local()`. A single process-wide `threading.RLock` (`_global_write_lock`, reentrant) serializes all in-process writers — SQLite WAL + `busy_timeout=5000` handle cross-process contention. Flow definitions are stored in the `flow_definitions` table and refreshed from disk YAML on every server start.
 
@@ -202,7 +202,7 @@ see [github.com/hamilton-sky/pathly](https://github.com/hamilton-sky/pathly) —
 
 ## Release Status
 
-Current version: **2.20.0**. Four adapters ship: Claude Code, Codex, Copilot,
+Current version: **2.21.1**. Four adapters ship: Claude Code, Codex, Copilot,
 and Antigravity. Core install path (`--dry-run`, `--apply`, `--uninstall`) is
 verified with full rollback on failure. Copilot destination paths follow the VS
 Code Copilot agent spec and may require `--repair` after a VS Code update.
@@ -220,6 +220,6 @@ Antigravity model names are placeholders until verified against a live binary.
 
 - **Hook path validation requires Python 3.9+** — hook scripts use `Path.is_relative_to()`, introduced in Python 3.9. The project already requires Python 3.11+, so this is always satisfied.
 
-- **Hooks require `PATHLY_PROJECT_ROOT`** — hook scripts (`classify_feedback.py`, `inject_feedback_ttl.py`) read the `PATHLY_PROJECT_ROOT` environment variable to locate the active project's `plans/` directory. If this variable is not set, hooks exit immediately without performing any action.
+- **Hooks require `PATHLY_PROJECT_ROOT`** — hook scripts (`classify_feedback.py`, `inject_feedback_ttl.py`) read the `PATHLY_PROJECT_ROOT` environment variable to locate the active project's `pathly/features/` directory (legacy `pathly/plans/` still resolved). If this variable is not set, hooks exit immediately without performing any action.
 
 - **Hook parity gap** — Pathly hooks run automatically only under Claude Code. Codex and Copilot VS Code require manual install; see [Hook surface coverage](docs/SECURITY.md#hook-surface-coverage).

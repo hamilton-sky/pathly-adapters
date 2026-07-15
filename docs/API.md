@@ -527,6 +527,7 @@ not an error).
 | `scope` | string (or `feature`) | `""` | Feature/board scope, used for board logging |
 | `project_root` | string | `""` | Absolute path to the project root |
 | `budget` | number | `1500` | Soft character budget for the returned block |
+| `engine` | string | `code_context.backend` | `"graph"` (codebase-memory-mcp) \| `"lsp"` (Serena) \| `"both"` — selects the backend; omit to use the configured `code_context.backend` setting (`off` \| `cli` \| `lsp` \| `both`) |
 
 **Response — 200**
 ```json
@@ -606,7 +607,7 @@ While idle the server sends keepalive comments every ~25 seconds to prevent prox
 |---|---|
 | `Cache-Control` | `no-cache` |
 | `X-Accel-Buffering` | `no` |
-| `Access-Control-Allow-Origin` | Value of `PATHLY_CORS_ORIGIN` env var, or `null` if unset |
+| `Access-Control-Allow-Origin` | Value of `PATHLY_CORS_ORIGIN` env var, or `*` if unset |
 
 **Error responses**
 
