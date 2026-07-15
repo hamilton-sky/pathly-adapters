@@ -28,10 +28,14 @@ export function MonitorBoard({ engines, recent, onAction }: Props): JSX.Element 
   const [view, setView] = useState<'grid' | 'banner'>('grid')
 
   const counts = useMemo(() => {
-    const c: Record<string, number> = { all: engines.length }
-    for (const e of engines) c[e.category] = (c[e.category] ?? 0) + 1
+    // Count live engines AND the recent-history cards, so the tabs reflect what is
+    // actually on screen. Counting only `engines` showed Flow/Loop/Single = 0 whenever
+    // nothing was live even though the Recent list was full of finished flow cards.
+    const all = [...engines, ...(recent ?? [])]
+    const c: Record<string, number> = { all: all.length }
+    for (const e of all) c[e.category] = (c[e.category] ?? 0) + 1
     return c
-  }, [engines])
+  }, [engines, recent])
 
   const scopes = useMemo(
     () => Array.from(new Set(engines.map((e) => e.feature))).sort(),
