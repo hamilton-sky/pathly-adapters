@@ -1,4 +1,9 @@
 _comments: []
+adapter_map:
+  BUILDING: claude
+  REVIEWING: claude
+  TESTING: claude
+  default: claude
 agent_map:
   BUILDING: team/build
   RETRO: team/retro
@@ -93,8 +98,3 @@ transitions:
   - BUILDING
   - RETRO
 version: 1
-adapter_map:
-  default: claude
-  BUILDING: claude
-  REVIEWING: codex
-  TESTING: claude

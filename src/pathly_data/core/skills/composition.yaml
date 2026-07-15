@@ -56,6 +56,7 @@ blocks:
 skills:
   team/build:
     fragments:
+      - build-discipline
       - code-query
       - artifact-register
       - completion-report
@@ -86,6 +87,7 @@ skills:
       - comms-post
   development/build:
     fragments:
+      - build-discipline
       - code-query
       - completion-report
       - scout-choreography
@@ -106,6 +108,7 @@ skills:
 
   debug/build:
     fragments:
+      - build-discipline
       - code-query
       - completion-report
       - scout-choreography
@@ -123,6 +126,7 @@ skills:
 
   fix/build:
     fragments:
+      - build-discipline
       - code-query
       - completion-report
       - scout-choreography
