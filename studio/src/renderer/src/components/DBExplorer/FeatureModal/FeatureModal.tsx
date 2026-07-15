@@ -89,6 +89,15 @@ export function FeatureModal({ feature, onClose }: FeatureModalProps): JSX.Eleme
       .finally(() => setLoading(false))
   }, [feature?.name, refreshKey])
 
+  // Live-refresh while the run is active: re-fetch every few seconds so late BILLING_UPDATE /
+  // AGENT_DONE events (especially codex cost, which lands after the agent exits) appear without a
+  // manual Refresh. Stops once the run reports DONE.
+  useEffect(() => {
+    if (!feature || feature.state === 'DONE') return
+    const id = setInterval(() => setRefreshKey((k) => k + 1), 4000)
+    return () => clearInterval(id)
+  }, [feature?.name, feature?.state])
+
   const agentCount = data.rawEvents.filter((e) => e.event_type === 'AGENT_DONE').length
 
   const tabs: { id: TabId; label: string; count?: number }[] = [
