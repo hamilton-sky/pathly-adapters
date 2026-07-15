@@ -199,17 +199,16 @@ pathly-studio
 
 Studio is a local UI over the same files and HTTP runtime:
 
-- Canvas reads bundled and user flow YAMLs.
-- Plan reads and writes project-local `pathly/features/**` artifacts (legacy `pathly/plans/**` still resolved).
-- Monitor tails `EVENTS.jsonl` through `GET /events/stream`.
-- Conductor routes chat work to Claude, Codex, or shell targets.
-- Terminal uses Electron PTY IPC through `window.pathly.terminal`.
+- Command Center is the board — goals, task-DAGs, artifacts, decisions, questions.
+- Pipeline shows the selected feature's FSM stage stepper + a global live engine board.
+- DB Explorer surfaces telemetry: cost/token rollups, the event stream, and traces.
+- Markdown Editor edits project markdown with one-shot AI actions (Split, Analyze, Diagram).
+- Canvas reads and edits bundled + user flow YAMLs (graph + raw YAML, synced).
+- Settings holds app + runtime configuration.
 
-The full bottom terminal and Conductor mini terminal share one xterm instance per
-terminal `tabId` through `xtermRegistry`. Hiding a card or tab view preserves the
-process; the bin action kills the process and removes the instance. A hamburger
-button opens the right-side terminal instance rail for focus, hide, and kill
-controls.
+A floating Engines dock monitors every live CLI engine; a full Terminal hosts the PTY
+tabs — mini and full views share one xterm instance per `tabId` through `xtermRegistry`
+(hiding a view preserves the process; the bin action kills and removes the instance).
 
 ## pathly-setup Commands
 

@@ -134,20 +134,18 @@ The `fsm-call` skill (shared by all FSM-using skills) handles health-check, auto
 This repository also ships Pathly Studio, a local Electron UI for inspecting and
 driving Pathly workflows:
 
-- **Flow Editor**: visual canvas + raw YAML editor for flow definitions. Changes sync bidirectionally between the graph view and the YAML source. Save writes back to disk via `PUT /flows/<name>`. Export targets: `pathly-package` (overwrites the bundled `.flow.yaml`), `claude-code` (`.claude/pathly-flows/`), or `codex` (`.codex/pathly-flows/`). Export validates for errors before writing; warnings require confirmation.
-- **Canvas**: visual flow editing and validation for shipped flow YAMLs.
-- **Plan**: project-local plan files and workflow artifacts.
-- **Monitor**: live FSM events from `GET /events/stream`.
-- **Conductor**: chat-driven workflow control with Claude, Codex, and shell targets.
-- **Terminal**: full bottom terminal plus chat mini-terminal cards that share the
-  same xterm/PTY tab through `xtermRegistry`.
-- **HQ / Runner**: visual pipeline control panel — Start, Pause, Resume, Advance, Reroute, Abort. Each pipeline stage spawns a visible terminal tab with the agent running non-interactively; you can watch the output in real time. Skills are injected via argv at spawn time — no disk-installed skill files required for automated runs. When a stage completes, `cost_usd` and `session_id` are read from `--output-format=json` stdout; the semantic result text is read from the last `AGENT_DONE` event in `EVENTS.jsonl` — which is never subject to PTY output truncation. The agent's self-reported `outcome` (`success`/`failed`, + `error`) is read from that same event to gate task pass/fail. A CLI-engine spawn scheduler (dual-cap gate in `terminal.ts`) bounds concurrent engines: global ≤ 8, headless one-shots ≤ 5 (queued FIFO with priority), interactive sessions ≤ 5 (rejected over cap). Queue management UI lives in `SpawnQueuePanel`.
+The panels live in the sidebar **PANELS** nav:
 
-Studio terminal behavior is intentionally shared, not duplicated: the mini card
-and full terminal reparent one xterm instance per `tabId`. The chat card can be
-hidden without killing the process; the bin action kills/disposes/removes the
-terminal instance. The full terminal also has a hamburger-controlled instance
-rail for focusing, hiding, and killing open terminal sessions.
+- **Command Center**: the board — goals, task-DAGs, artifacts, decisions, and questions. The primary supervisory surface; goal and per-task runs start here.
+- **Pipeline**: the selected feature's FSM stage stepper + per-stage config, over a **global live engine board** showing every running CLI engine (board runs, editor one-shots, and manual REPLs alike).
+- **DB Explorer**: telemetry — per-feature and per-flow cost/token rollups, the event stream, and OpenTelemetry traces.
+- **Markdown Editor**: edit project markdown with one-shot AI actions (Split, Analyze, Diagram) that spawn CLI agents against the open file.
+- **Canvas**: visual flow editor — graph + raw YAML for `.flow.yaml` definitions, synced bidirectionally; Save writes via `PUT /flows/<name>`; export targets `pathly-package` / `claude-code` / `codex`.
+- **Settings**: app + runtime configuration.
+
+A floating **Engines** dock (`CliMonitorBar`) monitors every live CLI engine. A full **Terminal** hosts the PTY tabs — mini and full views share one xterm instance per `tabId` through `xtermRegistry` (hiding a view preserves the process; the bin action kills and removes the instance).
+
+**How runs execute:** each pipeline stage spawns a visible terminal tab with the agent running non-interactively — skills are injected via argv at spawn time, so no disk-installed skill files are needed for automated runs. On stage completion, `cost_usd` + `session_id` come from `--output-format=json` stdout, while the semantic result (and the `outcome` success/failed gate) comes from the last `AGENT_DONE` event — never subject to PTY truncation. A dual-cap spawn scheduler (`terminal.ts`) bounds concurrent engines: global ≤ 8, headless one-shots ≤ 5 (queued FIFO with priority), interactive ≤ 5 (rejected over cap); queue UI in `SpawnQueuePanel`.
 
 Studio always restarts the FSM server on launch — it gracefully shuts down any
 stale instance (POST `/shutdown`) and force-kills by port if needed, ensuring the
