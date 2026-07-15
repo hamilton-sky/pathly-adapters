@@ -41,7 +41,11 @@ function usageFromEvent(obj: Obj): { in: number; out: number } | null {
   const uin =
     (num(usage.input_tokens) || num(usage.prompt_tokens) || num(usage.inputTokens)) +
     (num(usage.cached_input_tokens) || num(usage.cache_read_input_tokens))
-  const uout = num(usage.output_tokens) || num(usage.completion_tokens) || num(usage.outputTokens)
+  // Reasoning tokens ARE billed as output (o-series / gpt-5 reasoning) — the real codex
+  // `turn.completed` usage carries them as reasoning_output_tokens. Mirror the Python fix.
+  const uout =
+    (num(usage.output_tokens) || num(usage.completion_tokens) || num(usage.outputTokens)) +
+    (num(usage.reasoning_output_tokens) || num(usage.reasoning_tokens))
   if (uin || uout) return { in: uin, out: uout }
   return null
 }

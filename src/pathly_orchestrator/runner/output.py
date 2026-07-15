@@ -130,10 +130,20 @@ def _codex_usage(raw_output: str) -> tuple[int, int]:
             )
         )
         u_out = int(
-            usage.get("output_tokens")
-            or usage.get("completion_tokens")
-            or usage.get("outputTokens")
-            or 0
+            (
+                usage.get("output_tokens")
+                or usage.get("completion_tokens")
+                or usage.get("outputTokens")
+                or 0
+            )
+            # Reasoning tokens ARE billed as output (o-series / gpt-5 with reasoning). The real
+            # codex `turn.completed` usage carries them separately as reasoning_output_tokens —
+            # add them or a reasoning-heavy run undercounts (verified against live codex output).
+            + (
+                usage.get("reasoning_output_tokens")
+                or usage.get("reasoning_tokens")
+                or 0
+            )
         )
         if u_in or u_out:
             tokens_in, tokens_out = u_in, u_out
