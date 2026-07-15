@@ -344,13 +344,17 @@ supervisor reads it as the authoritative result.
 
 ## Estimate cost
 
-3. Compute `cost_usd` from `total_tokens` and `model` using an 80/20 input/output token split:
+3. Compute a **fallback** `cost_usd` from `total_tokens` and `model` (80/20 input/output split).
+   This is ONLY a fallback: Pathly's spawn gate overrides it with the CLI's real cost when the run
+   reports one (claude's `total_cost_usd`) or prices codex/agy centrally from tokens (`db/pricing.py`).
+   **Never invent a cost for a non-claude model** — leave `other/unknown` at `0.0` and let the gate
+   price it. Current rates:
 
    | Model prefix | Input $/MTok | Output $/MTok |
    |---|---|---|
-   | `claude-opus-4` | 15.00 | 75.00 |
+   | `claude-opus-4` | 5.00 | 25.00 |
    | `claude-sonnet-4` | 3.00 | 15.00 |
-   | `claude-haiku-4` | 0.80 | 4.00 |
+   | `claude-haiku-4` | 1.00 | 5.00 |
    | other / unknown | — | set `cost_usd = 0.0` |
 
    Formula:
