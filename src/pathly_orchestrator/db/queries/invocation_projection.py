@@ -69,6 +69,12 @@ def _price_if_needed(
     m = (model or "").lower()
     if m.startswith("gemini-") or m in ("antigravity", "agy"):
         return cost, "unavailable"
+    # A codex/openai stage bills LATE via the spawn-gate BILLING_UPDATE — its AGENT_DONE
+    # self-reports 0 tokens, so a 0-token/0-cost row here is AWAITING that reconciliation,
+    # not genuinely free. Mark it 'pending' (not a misleading 'unpriced $0'); when the
+    # BILLING_UPDATE folds in the real tokens this re-prices to 'estimated'.
+    if m.startswith(("gpt-", "gpt5", "o1", "o3", "o4")) or "codex" in m:
+        return cost, "pending"
     return cost, cost_source
 
 

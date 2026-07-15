@@ -239,6 +239,32 @@ def test_price_if_needed_never_touches_an_already_priced_cost():
     assert rows[0]["cost_source"] == "provider_reported"
 
 
+def test_codex_zero_token_agent_done_is_pending_then_estimated():
+    """A codex/openai stage self-reports 0 tokens in AGENT_DONE and bills LATE via the
+    spawn-gate BILLING_UPDATE. Until that folds in, the row must read 'pending' (not a
+    misleading 'unpriced $0'); once billing lands with real tokens it re-prices to
+    'estimated'."""
+    conn = get_db()
+    append_event(conn, PR, "f_pending", _ad_model("reviewer", 1, "gpt-5-codex", 0))
+    rows = _invocations(conn, "f_pending")
+    assert len(rows) == 1
+    assert rows[0]["cost_source"] == "pending"
+    assert rows[0]["cost_usd"] == 0
+    append_event(
+        conn,
+        PR,
+        "f_pending",
+        _billing_model("reviewer", 1, "gpt-5-codex", "run-cx", 2_000_000, 5_000),
+    )
+    row = get_db().execute(
+        "SELECT cost_source, cost_usd FROM agent_invocations "
+        "WHERE project_root=? AND feature=?",
+        (PR, "f_pending"),
+    ).fetchone()
+    assert row["cost_source"] == "estimated"
+    assert row["cost_usd"] > 0
+
+
 # ── backfill (startup rebuild) ───────────────────────────────────────────────────
 
 
