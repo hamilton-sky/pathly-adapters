@@ -23,10 +23,13 @@ def _classify_content(content: str) -> str:
     tagged = []
     for line in lines:
         stripped = line.strip()
-        if (
-            stripped.startswith("- ")
-            and not stripped.startswith("- [REQ]")
-            and not stripped.startswith("- [ARCH]")
+        # Recognize all 5 smart-fix-routing tags as already-classified, so this watcher
+        # (the best-effort fallback for adapters whose PostToolUse classify_feedback hook
+        # does not run) never re-tags — and never double-tags — a line the 5-tag hook
+        # already wrote (e.g. would turn "- [DESIGN] x" into "- [ARCH] [DESIGN] x").
+        if stripped.startswith("- ") and not any(
+            stripped.startswith(f"- [{_t}]")
+            for _t in ("REQ", "PLAN", "ARCH", "DESIGN", "IMPL")
         ):
             question_text = stripped[2:]
             if _ARCH_QUESTION.search(question_text):
