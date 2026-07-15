@@ -167,16 +167,21 @@ the backend is off → then just use Grep/Read. (`pathly-fsm-call code-query --o
 is a shim, but the HTTP form passes `project_root`, which the proxy needs to resolve
 relative targets.)
 
-Backends behind the proxy: **codebase-memory-mcp** (whole-repo graph — breadth; needs
-indexing, self-heals via `maybe_reindex`) and **Serena** (LSP — precise, always-fresh, no
-index). Select per request with `"engine": "graph" | "lsp" | "both"`; when omitted the
-`code_context.backend` setting decides (`off` | `cli` | `lsp` | `both`). The `lsp` backend
-boots ONE long-lived Serena MCP session **server-side** on first use (`runner/code_context_lsp.py`),
-so the FIRST `engine=lsp` query for a project returns null (~1 min warm-up → degrade to
-Grep) and later ones are fast; the session is cached and torn down on root change / exit.
-Serena is ALSO wired as a direct agent MCP tool via `src/pathly_data/adapters/*/_mcp/serena.json`
-(that path is independent of the proxy). Fallback: query the graph directly
-(`codebase-memory-mcp cli <tool> …`) when the FSM server isn't running.
+Two backends sit behind the one proxy — pick per request with `"engine": "graph" | "lsp" | "both"`
+(omit → the `code_context.backend` setting decides: `off` | `cli` | `lsp` | `both`):
+
+| Engine | Backend | Strength | Freshness | Cost | Use for |
+|---|---|---|---|---|---|
+| `graph` | codebase-memory-mcp (whole-repo index) | breadth — whole repo | can **lag** recent edits (advisory; self-heals via `maybe_reindex`) | fast every call | "who calls X", impact, blast radius, architecture |
+| `lsp` | Serena (LSP, no index) | precision — one symbol's exact defn/refs | **always fresh** | ~1-min warm-up **once** per project, then fast | a specific symbol, **especially right after an edit** |
+| `both` | union of the two | breadth + precision | mixed | slowest | need both and can wait |
+
+The `lsp` backend boots ONE long-lived Serena MCP session **server-side** on first use
+(`runner/code_context_lsp.py`), so the FIRST `engine=lsp` query for a project returns `null`
+(~1 min warm-up → degrade to Grep); later calls are fast, and the session is torn down on root
+change / exit. Serena is ALSO wired as a direct agent MCP tool via
+`src/pathly_data/adapters/*/_mcp/serena.json` (independent of the proxy). Fallback when the FSM
+server isn't running: query the graph directly (`codebase-memory-mcp cli <tool> …`).
 
 ---
 
