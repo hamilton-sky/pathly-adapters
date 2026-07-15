@@ -228,3 +228,98 @@ def test_supervisor_loop_advances_through_real_fsm_to_done(tmp_path, monkeypatch
     # Before the fix this was "error" after one transition; the advance must reach DONE.
     assert state.status == "done", f"supervisor stalled at status={state.status!r}"
     assert state.iterations == 2
+
+
+# ── Smart fix-routing (pathly/features/smart-fix-routing/DESIGN.md) — drives the REAL
+# team.flow.yaml + REAL complete_stage/route_feedback across a full routing chain, per
+# DESIGN.md ss5's integration test plan. Only build_prompt (the non-blocked, state-advance
+# path) is stubbed — same technique as _patch_build_prompt above — build_prompt_for_agent
+# (the blocked-feedback path under test) is REAL throughout. ──────────────────────────────
+
+
+def _load_team_flow() -> dict:
+    from importlib.resources import files
+
+    import yaml
+
+    text = (
+        files("pathly_data")
+        .joinpath("core/flows/team.flow.yaml")
+        .read_text(encoding="utf-8")
+    )
+    return yaml.safe_load(text)
+
+
+def _team_feature_storage(tmp_path: Path, topic: str = "fix-routing-test") -> Path:
+    p = tmp_path / "pathly" / "features" / topic
+    p.mkdir(parents=True, exist_ok=True)
+    (p / "STATE.json").write_text(
+        json.dumps({"current": "REVIEWING"}), encoding="utf-8"
+    )
+    return p
+
+
+def test_smart_fix_routing_drives_real_team_flow(tmp_path, monkeypatch):
+    """ARCH_FEEDBACK.md -> architect (stays REVIEWING); swap to REVIEW_FAILURES.md only
+    -> builder (the REGRESSION assertion: byte-identical to before this feature, DESIGN.md
+    risk #1 / ss5 bullet 5); remove all feedback -> hits the REVIEW.md verify gate
+    (REVIEW_INCOMPLETE.md -> reviewer); write RESULT: PASS REVIEW.md -> advances
+    REVIEWING -> TESTING."""
+    team_flow = _load_team_flow()
+    monkeypatch.setattr(fsm_ops, "_load_flow", lambda *_: team_flow)
+    _patch_build_prompt(monkeypatch)
+
+    topic = "fix-routing-test"
+    storage = _team_feature_storage(tmp_path, topic)
+    fb_dir = storage / "feedback"
+    fb_dir.mkdir()
+    (fb_dir / "ARCH_FEEDBACK.md").write_text(
+        "- [ARCH] Layer boundary violated in the payments module.\n", encoding="utf-8"
+    )
+    payload = {"flow": "team", "topic": topic, "project_root": str(tmp_path)}
+
+    # 1. ARCH_FEEDBACK.md open -> routes to architect; state stays REVIEWING; the
+    # fix-mode block (build_prompt_for_agent) is REAL, not stubbed.
+    r1 = complete_stage(payload)
+    assert r1.get("blocked") is True
+    assert r1.get("target_agent") == "architect"
+    assert r1.get("current_state") == "REVIEWING"
+    assert r1.get("decision") == "block"
+    assert "next_state" not in r1
+    assert "## Fix mode" in (r1.get("instructions") or "")
+    assert "ARCHITECTURE_PROPOSAL.md" in (r1.get("instructions") or "")
+
+    # 2. Swap to REVIEW_FAILURES.md only -> routes to builder. REGRESSION ASSERTION
+    # (DESIGN.md ss5 bullet 5): a run whose only failure file is REVIEW_FAILURES.md
+    # produces the exact same target/state as before this feature.
+    (fb_dir / "ARCH_FEEDBACK.md").unlink()
+    (fb_dir / "REVIEW_FAILURES.md").write_text(
+        "- [IMPL] Off-by-one in the discount calculation.\n", encoding="utf-8"
+    )
+    r2 = complete_stage(payload)
+    assert r2.get("blocked") is True
+    assert r2.get("target_agent") == "builder"
+    assert r2.get("current_state") == "REVIEWING"
+    assert r2.get("decision") == "block"
+    assert "Fix mode" not in (r2.get("instructions") or "")
+
+    # 3. Remove all feedback -> no open feedback file -> falls through to the
+    # REVIEWING->TESTING gate, which fails (no REVIEW.md yet) and writes
+    # REVIEW_INCOMPLETE.md, routed to reviewer.
+    (fb_dir / "REVIEW_FAILURES.md").unlink()
+    r3 = complete_stage(payload)
+    assert r3.get("blocked") is True
+    assert r3.get("target_agent") == "reviewer"
+    assert r3.get("file") == "REVIEW_INCOMPLETE.md"
+    assert r3.get("current_state") == "REVIEWING"
+    assert (fb_dir / "REVIEW_INCOMPLETE.md").exists()
+
+    # 4. Resolve the gate: write REVIEW.md (RESULT: PASS) and clear the routed feedback
+    # file -> the flow advances REVIEWING -> TESTING.
+    (fb_dir / "REVIEW_INCOMPLETE.md").unlink()
+    (storage / "REVIEW.md").write_text(
+        "RESULT: PASS\nReviewed: conversation 1 — clean.\n", encoding="utf-8"
+    )
+    r4 = complete_stage(payload)
+    assert r4.get("next_state") == "TESTING"
+    assert r4.get("current_state") == "TESTING"
