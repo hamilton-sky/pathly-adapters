@@ -37,6 +37,7 @@ feedback_routing:
   REPRO_QUESTIONS: human
   TEST_FAILURES: builder
   HUMAN_QUESTIONS: human
+  ARCH_FEEDBACK: architect  # rare case: the fix needs a design/architecture change, not just a code fix
 transition_actions:
   FIXING->VERIFYING:
     - skill: commit

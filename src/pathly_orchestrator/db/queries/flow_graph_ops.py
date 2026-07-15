@@ -42,6 +42,7 @@ _ASSEMBLED_FLOW_KEYS = frozenset(
         "flow",
         "storage_path",
         "feedback_routing",
+        "feedback_priority",
         "scope_gate",
         "_comments",
         "adapter_default",
@@ -221,6 +222,13 @@ def _assemble_from_parts(
     feedback_routing = flow_level_config.get("feedback_routing")
     if feedback_routing is not None:
         result["feedback_routing"] = feedback_routing
+
+    # Smart fix-routing (DESIGN.md ss1.5) — an optional flow-level priority list, same
+    # shape/lifecycle as feedback_routing above: a plain list, not decomposed into
+    # nodes/edges, so it round-trips explicitly rather than through the structural tables.
+    feedback_priority = flow_level_config.get("feedback_priority")
+    if feedback_priority is not None:
+        result["feedback_priority"] = feedback_priority
 
     composition: dict = {}
     for r in sorted_nodes:

@@ -65,6 +65,7 @@ _KNOWN_OPTIONAL_FLOW_KEYS = {
     "transition_actions",
     "adapter_map",
     "composition",
+    "feedback_priority",
 }
 _ACTION_VOCAB = {
     "git_commit",

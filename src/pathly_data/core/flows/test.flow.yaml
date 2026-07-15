@@ -38,16 +38,31 @@ role_map:
   REVIEWING: reviewer
   TESTING: tester
 
-# Priority order is fixed: HUMAN_QUESTIONS > BLOCKED_ON_HUMAN > ARCH_FEEDBACK >
-# DESIGN_QUESTIONS > IMPL_QUESTIONS > REVIEW_FAILURES > TEST_FAILURES.
+# Upstream-first priority order for route_feedback when multiple feedback files are open
+# at once (smart-fix-routing DESIGN.md ss1.5), enforced via feedback_priority below. Files
+# not listed there keep their feedback_routing dict-order position, after every listed file.
 feedback_routing:
   HUMAN_QUESTIONS: human
   BLOCKED_ON_HUMAN: human
+  REQUIREMENT_GAP: po
+  PLAN_FEEDBACK: planner
   ARCH_FEEDBACK: architect
+  DESIGN_FEEDBACK: designer
   DESIGN_QUESTIONS: architect
   IMPL_QUESTIONS: planner
   REVIEW_FAILURES: builder
   TEST_FAILURES: builder
+  ACCEPTANCE_QUESTION: po
+
+feedback_priority:
+  - HUMAN_QUESTIONS
+  - BLOCKED_ON_HUMAN
+  - REQUIREMENT_GAP
+  - PLAN_FEEDBACK
+  - ARCH_FEEDBACK
+  - DESIGN_FEEDBACK
+  - REVIEW_FAILURES
+  - TEST_FAILURES
 
 transition_rules:
   PLANNING:

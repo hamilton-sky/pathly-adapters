@@ -91,7 +91,9 @@ def complete_stage(args: dict) -> dict:
         if feedback["target_agent"] != "human":
             try:
                 instructions = _fops.build_prompt_for_agent(
-                    feedback["target_agent"], storage_path
+                    feedback["target_agent"],
+                    storage_path,
+                    feedback_file=feedback["file"],
                 )
                 result["instructions"] = instructions
                 result["agent_hint"] = _fops._agent_hint(
@@ -185,7 +187,9 @@ def complete_stage(args: dict) -> dict:
         if feedback["target_agent"] != "human":
             try:
                 instructions = _fops.build_prompt_for_agent(
-                    feedback["target_agent"], storage_path
+                    feedback["target_agent"],
+                    storage_path,
+                    feedback_file=feedback["file"],
                 )
                 result["instructions"] = instructions
                 result["agent_hint"] = _fops._agent_hint(

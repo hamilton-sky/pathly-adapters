@@ -196,6 +196,121 @@ def test_classify_feedback_uses_word_boundary_arch_keywords(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# test_classify_feedback_five_way_split (smart-fix-routing)
+# ---------------------------------------------------------------------------
+
+
+def test_classify_feedback_five_way_split(tmp_path):
+    """Each keyword family maps to its tag; an untagged bullet in a FAILURE file
+    defaults to [IMPL] (risk #3 scoping — today's default was [REQ])."""
+    fb_dir = tmp_path / "pathly" / "features" / "my-feature" / "feedback"
+    fb_dir.mkdir(parents=True)
+    feedback_file = fb_dir / "REVIEW_FAILURES.md"
+    feedback_file.write_text(
+        "- Missing acceptance criteria for the login flow requirement.\n"
+        "- The phase sequencing in the plan needs to change.\n"
+        "- The module violates the intended architecture structure.\n"
+        "- The button layout and component style are wrong.\n"
+        "- Off-by-one error in the loop counter.\n",
+        encoding="utf-8",
+    )
+
+    result = _run_hook(
+        CLASSIFY_HOOK,
+        {"file": str(feedback_file)},
+        env={
+            "PATHLY_PROJECT_ROOT": str(tmp_path),
+            "ANTHROPIC_API_KEY": "test-key",
+        },
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert feedback_file.read_text(encoding="utf-8") == (
+        "- [REQ] Missing acceptance criteria for the login flow requirement.\n"
+        "- [PLAN] The phase sequencing in the plan needs to change.\n"
+        "- [ARCH] The module violates the intended architecture structure.\n"
+        "- [DESIGN] The button layout and component style are wrong.\n"
+        "- [IMPL] Off-by-one error in the loop counter.\n"
+    )
+
+
+# ---------------------------------------------------------------------------
+# test_classify_feedback_default_scoped_by_file_family
+# ---------------------------------------------------------------------------
+
+
+def test_classify_feedback_default_scoped_by_file_family(tmp_path):
+    """Risk #3: FAILURE files (REVIEW_FAILURES/TEST_FAILURES) default an untagged
+    bullet to [IMPL]; a QUESTION file (e.g. ARCH_FEEDBACK.md) keeps the [REQ] default."""
+    fb_dir = tmp_path / "pathly" / "features" / "my-feature" / "feedback"
+    fb_dir.mkdir(parents=True)
+
+    for filename, expected_tag in (
+        ("REVIEW_FAILURES.md", "IMPL"),
+        ("TEST_FAILURES.md", "IMPL"),
+        ("ARCH_FEEDBACK.md", "REQ"),
+    ):
+        feedback_file = fb_dir / filename
+        feedback_file.write_text("- Something went wrong.\n", encoding="utf-8")
+
+        result = _run_hook(
+            CLASSIFY_HOOK,
+            {"file": str(feedback_file)},
+            env={
+                "PATHLY_PROJECT_ROOT": str(tmp_path),
+                "ANTHROPIC_API_KEY": "test-key",
+            },
+        )
+
+        assert result.returncode == 0, result.stderr
+        assert (
+            feedback_file.read_text(encoding="utf-8")
+            == f"- [{expected_tag}] Something went wrong.\n"
+        ), f"{filename} default tag"
+
+
+# ---------------------------------------------------------------------------
+# test_classify_feedback_already_tagged_lines_untouched
+# ---------------------------------------------------------------------------
+
+
+def test_classify_feedback_already_tagged_lines_untouched(tmp_path):
+    """A bullet already tagged with any of the 5 tags is left byte-identical
+    (idempotent) — only a genuinely new bullet gets classified."""
+    fb_dir = tmp_path / "pathly" / "features" / "my-feature" / "feedback"
+    fb_dir.mkdir(parents=True)
+    feedback_file = fb_dir / "REVIEW_FAILURES.md"
+    feedback_file.write_text(
+        "- [REQ] Already tagged requirement note.\n"
+        "- [PLAN] Already tagged plan note.\n"
+        "- [ARCH] Already tagged architecture note.\n"
+        "- [DESIGN] Already tagged design note.\n"
+        "- [IMPL] Already tagged impl note.\n"
+        "- A brand-new untagged bullet.\n",
+        encoding="utf-8",
+    )
+
+    result = _run_hook(
+        CLASSIFY_HOOK,
+        {"file": str(feedback_file)},
+        env={
+            "PATHLY_PROJECT_ROOT": str(tmp_path),
+            "ANTHROPIC_API_KEY": "test-key",
+        },
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert feedback_file.read_text(encoding="utf-8") == (
+        "- [REQ] Already tagged requirement note.\n"
+        "- [PLAN] Already tagged plan note.\n"
+        "- [ARCH] Already tagged architecture note.\n"
+        "- [DESIGN] Already tagged design note.\n"
+        "- [IMPL] Already tagged impl note.\n"
+        "- [IMPL] A brand-new untagged bullet.\n"
+    )
+
+
+# ---------------------------------------------------------------------------
 # test_hook_missing_project_root
 # ---------------------------------------------------------------------------
 

@@ -56,6 +56,20 @@ _SKILL_AGENT_ROLE: dict[str, str] = {
     "team/retro": "planner",
 }
 
+# Smart fix-routing (fix mode) — role -> the artifact that role corrects when routed a
+# feedback file. Only these four are "root-cause" roles: they own a decision artifact
+# upstream of the code, so a routed hand-off means "fix your artifact, then hand off to
+# the builder" rather than "fix the code" (builder/reviewer/human are excluded — see
+# build_prompt_for_agent). Mirrors DESIGN.md ss3.1 (deliberately NOT artifact-manifest.yaml's
+# po -> PO_NOTES.md — ss3.1 pins po's fix-mode artifact to USER_STORIES.md, the file the team
+# pipeline actually keeps requirements in; reconciling the two is a follow-up, DESIGN.md risk #5).
+_FIX_MODE_ARTIFACT: dict[str, str] = {
+    "po": "USER_STORIES.md",
+    "planner": "IMPLEMENTATION_PLAN.md",
+    "architect": "ARCHITECTURE_PROPOSAL.md",
+    "designer": "DESIGN.md",
+}
+
 
 def _load_agent_text(agent: str) -> str:
     from importlib.resources import files
@@ -367,6 +381,7 @@ def build_prompt(
 def build_prompt_for_agent(
     agent_name: str,
     storage_path: Path,
+    feedback_file: str | None = None,
 ) -> str:
     agent_text = _load_agent_text(agent_name)
     context = (
@@ -374,7 +389,31 @@ def build_prompt_for_agent(
         f"Feature: {storage_path.name}\n"
         f"Storage path: {storage_path}\n"
     )
-    return agent_text + context
+    prompt = agent_text + context
+    # Fix mode (smart-fix-routing DESIGN.md ss3.1): only appended when the routed target is
+    # a root-cause role (po/planner/architect/designer) AND a feedback file was supplied —
+    # the builder/reviewer/human path stays byte-identical to before this feature.
+    artifact = _FIX_MODE_ARTIFACT.get(agent_name)
+    if feedback_file and artifact is not None:
+        feature_path = storage_path.as_posix().rstrip("/")
+        prompt += (
+            f"\n## Fix mode — you are resolving a routed review/test failure\n"
+            f"\n"
+            f"A reviewer/tester traced a failure to YOUR artifact. You are NOT re-running your\n"
+            f"whole stage — you are patching the specific decision that was wrong.\n"
+            f"\n"
+            f"1. Read  {feature_path}/feedback/{feedback_file}   (the failure + why it is yours).\n"
+            f"2. Correct YOUR artifact: {artifact}  (if absent, the nearest equivalent —\n"
+            f"   IMPLEMENTATION_PLAN.md / USER_STORIES.md). Change only what the failure requires.\n"
+            f"3. Hand off to the builder: if the corrected artifact implies code changes, write\n"
+            f"   (or APPEND to) {feature_path}/feedback/REVIEW_FAILURES.md a short [IMPL] section\n"
+            f'   naming the change ("implement per updated ARCHITECTURE_PROPOSAL.md §X").\n'
+            f"   If the correction is decision-only (no code), skip this — the re-review gate\n"
+            f"   will re-verify.\n"
+            f"4. Delete {feature_path}/feedback/{feedback_file} when your artifact is corrected.\n"
+            f"5. Report what changed. Do NOT run pathly-fsm-call / complete-stage (supervisor owns the FSM).\n"
+        )
+    return prompt
 
 
 def _codex_subagent_hint(agent: str, instructions: str | None) -> dict:

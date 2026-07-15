@@ -106,17 +106,36 @@ Run /test to verify each acceptance criterion.
 [compressed findings]
 
 For each criterion: PASS / FAIL / NOT COVERED.
-If any FAIL or NOT COVERED: write <feature_path>/feedback/TEST_FAILURES.md
-using the shared feedback protocol format.
+Classify each FAIL/NOT COVERED by root cause:
+- The acceptance criterion itself is wrong, ambiguous, or untestable as written:
+  write <feature_path>/feedback/ACCEPTANCE_QUESTION.md ([REQ] — the criteria are the suspect).
+- The implementation does not satisfy a criterion that IS correct as written:
+  write <feature_path>/feedback/TEST_FAILURES.md ([IMPL] — the code is the suspect).
+Use the shared feedback protocol formats. A criterion is only ever one or the other.
 ```
 
 log-phase PHASE_DONE test
 
 ## Fix loop
 
-After tester completes — check for `TEST_FAILURES.md`:
+After tester completes — check for `ACCEPTANCE_QUESTION.md` and `TEST_FAILURES.md`. Route
+the higher-priority file first (see Feedback protocol — priority order):
+`ACCEPTANCE_QUESTION.md` before `TEST_FAILURES.md`.
 
-**If `TEST_FAILURES.md` exists:**
+**If `ACCEPTANCE_QUESTION.md` exists:**
+Log file created for ACCEPTANCE_QUESTION.md.
+
+**Spawn** `po`:
+```
+Read <feature_path>/feedback/ACCEPTANCE_QUESTION.md.
+Correct <feature_path>/USER_STORIES.md so the acceptance criteria reflect the real intent.
+If the correction implies code changes, append a short [IMPL] section to
+<feature_path>/feedback/TEST_FAILURES.md naming the change.
+Delete <feature_path>/feedback/ACCEPTANCE_QUESTION.md when resolved.
+```
+After po resolves: log file deleted for ACCEPTANCE_QUESTION.md. Re-spawn tester.
+
+**If `TEST_FAILURES.md` exists (no `ACCEPTANCE_QUESTION.md`):**
 Increment `testRetryCount`. If `testRetryCount > 2`:
 Stop — "Test failures unresolved after 2 fix cycles. Manual intervention required."
 
@@ -130,7 +149,7 @@ Delete <feature_path>/feedback/TEST_FAILURES.md when resolved.
 ```
 After builder resolves: log file deleted for TEST_FAILURES.md. Re-spawn tester.
 
-**If no TEST_FAILURES.md:** all criteria pass.
+**If neither file exists:** all criteria pass.
 
 ## Advance
 
@@ -510,12 +529,34 @@ as the stage's findings section.
 All feedback files live in `<feature_path>/feedback/`. File exists = issue open.
 Absent = resolved.
 
-Priority order (highest first): `HUMAN_QUESTIONS.md` › `ARCH_FEEDBACK.md` › `DESIGN_QUESTIONS.md` ›
-`ACCEPTANCE_QUESTION.md` › `IMPL_QUESTIONS.md` › `REFLECT_CRITIQUE.md` › `REVIEW_FAILURES.md` › `TEST_FAILURES.md`
+Priority order (highest first, enforced by the flow's `feedback_priority`): `HUMAN_QUESTIONS.md` ›
+`BLOCKED_ON_HUMAN.md` › `REQUIREMENT_GAP.md` › `PLAN_FEEDBACK.md` › `ARCH_FEEDBACK.md` ›
+`DESIGN_FEEDBACK.md` › `REVIEW_FAILURES.md` › `TEST_FAILURES.md`. Other feedback files
+(`DESIGN_QUESTIONS.md`, `IMPL_QUESTIONS.md`, `ACCEPTANCE_QUESTION.md`, `REFLECT_CRITIQUE.md`, …)
+route after every listed file, in the flow's `feedback_routing` declaration order.
 
 When you write a feedback file, use the shared feedback protocol formats and then report blocked.
 The orchestrator routes the highest-priority open file to the responsible agent, one at a time,
 before advancing.
+
+### Root-cause classification — tag ⇄ file ⇄ role
+
+Classify each failure by ROOT CAUSE and write it into the matching file — the filename IS
+the routing (`route_feedback` matches on filename, not content). One failure with two
+causes is TWO files, not one file with two tags.
+
+| Tag | Feedback file | Routed role | That role corrects |
+|---|---|---|---|
+| `[REQ]` | `REQUIREMENT_GAP.md` | `po` | `USER_STORIES.md` (acceptance criteria / scope) |
+| `[PLAN]` | `PLAN_FEEDBACK.md` | `planner` | `IMPLEMENTATION_PLAN.md` (phases / task DAG) |
+| `[ARCH]` | `ARCH_FEEDBACK.md` | `architect` | `ARCHITECTURE_PROPOSAL.md` |
+| `[DESIGN]` | `DESIGN_FEEDBACK.md` | `designer` | `DESIGN.md` |
+| `[IMPL]` | `REVIEW_FAILURES.md` / `TEST_FAILURES.md` | `builder` | source code (default) |
+
+A routed non-builder role fixes ONLY its own artifact, then either hands off to the builder
+(append an `[IMPL]` item to `REVIEW_FAILURES.md`) or, if the fix was decision-only, deletes
+its feedback file and lets the re-review gate re-verify — see that role's fix-mode
+instructions, injected automatically whenever it is routed a feedback file.
 
 ### Guard — feedback-open check
 

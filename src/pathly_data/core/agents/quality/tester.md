@@ -24,8 +24,16 @@ Story N.N: [title]
   Criterion: [criterion text]
   Test: [what to run or check]
   Status: PASS / FAIL / NOT COVERED
+  Tag: [REQ|IMPL] (only if FAIL or NOT COVERED — see below)
   Notes: [only if FAIL or NOT COVERED]
 ```
+
+Tag each FAIL/NOT COVERED by ROOT CAUSE, at the point of judgment — the orchestrator
+writes it into the matching feedback file (the filename IS the routing):
+- `[REQ]` — the acceptance criterion itself is wrong, ambiguous, or untestable as written
+  (the criteria are the suspect) → `ACCEPTANCE_QUESTION.md`
+- `[IMPL]` — the implementation does not satisfy a criterion that IS correct as written
+  (the code is the suspect; default) → `TEST_FAILURES.md`
 
 ## Phase: analyze
 

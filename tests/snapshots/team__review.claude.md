@@ -102,10 +102,16 @@ and read the returned `text` field (the full advisory spec — edge cases / happ
 for the phase the builder implemented). The `summary` is a pointer, not the spec —
 read `text`. These are the same refs the builder hydrated; review against the same spec.
 
-Check against these rules and <feature_path>/ARCHITECTURE_PROPOSAL.md.
-If architectural violations found: write <feature_path>/feedback/ARCH_FEEDBACK.md
-If implementation violations found: write <feature_path>/feedback/REVIEW_FAILURES.md
-Use the shared feedback protocol formats.
+Check against these rules and <feature_path>/ARCHITECTURE_PROPOSAL.md. Classify each
+violation by ROOT CAUSE and write it into the matching file (see Feedback protocol —
+Root-cause classification for the full tag ⇄ file ⇄ role table):
+- Requirement/scope gap: <feature_path>/feedback/REQUIREMENT_GAP.md
+- Plan/phasing/task-DAG problem: <feature_path>/feedback/PLAN_FEEDBACK.md
+- Architectural violation: <feature_path>/feedback/ARCH_FEEDBACK.md
+- UI/UX/design-system violation: <feature_path>/feedback/DESIGN_FEEDBACK.md
+- Implementation defect (default): <feature_path>/feedback/REVIEW_FAILURES.md
+Use the shared feedback protocol formats. One review with violations from two root causes
+writes TWO files, not one file with two tags.
 If all clear: report PASS.
 ```
 
@@ -114,9 +120,39 @@ log-phase PHASE_DONE review
 ## Feedback routing after reviewer
 
 Apply the Feedback protocol retry-count guard before routing each file (escalate to
-HUMAN_QUESTIONS.md when the retry limit is exceeded).
+HUMAN_QUESTIONS.md when the retry limit is exceeded). Route the HIGHEST-PRIORITY open
+file first (see Feedback protocol — priority order): `REQUIREMENT_GAP.md` >
+`PLAN_FEEDBACK.md` > `ARCH_FEEDBACK.md` > `DESIGN_FEEDBACK.md` > `REVIEW_FAILURES.md`.
 
-### If `ARCH_FEEDBACK.md` exists
+### If `REQUIREMENT_GAP.md` exists
+
+After the retry guard, **spawn** `po`:
+```
+Read <feature_path>/feedback/REQUIREMENT_GAP.md.
+Correct <feature_path>/USER_STORIES.md so the acceptance criteria/scope match the failure.
+If the correction implies code changes, append a short [IMPL] section to
+<feature_path>/feedback/REVIEW_FAILURES.md naming the change.
+Delete <feature_path>/feedback/REQUIREMENT_GAP.md when resolved.
+Report: what changed in the requirement.
+```
+After po resolves: log file deleted for REQUIREMENT_GAP.md.
+Return. Orchestrator determines next state from transition_rules.
+
+### If `PLAN_FEEDBACK.md` exists (no `REQUIREMENT_GAP.md`)
+
+After the retry guard, **spawn** `planner`:
+```
+Read <feature_path>/feedback/PLAN_FEEDBACK.md.
+Correct the phasing/task DAG in <feature_path>/IMPLEMENTATION_PLAN.md.
+If the correction implies code changes, append a short [IMPL] section to
+<feature_path>/feedback/REVIEW_FAILURES.md naming the change.
+Delete <feature_path>/feedback/PLAN_FEEDBACK.md when resolved.
+Report: what changed in the plan.
+```
+After planner resolves: log file deleted for PLAN_FEEDBACK.md.
+Return. Orchestrator determines next state from transition_rules.
+
+### If `ARCH_FEEDBACK.md` exists (no `REQUIREMENT_GAP.md`/`PLAN_FEEDBACK.md`)
 
 After the retry guard, **spawn** `architect`:
 ```
@@ -130,7 +166,21 @@ Report: what changed in the design.
 After architect resolves: log file deleted for ARCH_FEEDBACK.md.
 Return. Orchestrator determines next state from transition_rules.
 
-### If `REVIEW_FAILURES.md` exists (no ARCH_FEEDBACK.md)
+### If `DESIGN_FEEDBACK.md` exists (no higher-priority file above)
+
+After the retry guard, **spawn** `designer`:
+```
+Read <feature_path>/feedback/DESIGN_FEEDBACK.md.
+Correct the UI/UX design system in <feature_path>/DESIGN.md.
+If the correction implies code changes, append a short [IMPL] section to
+<feature_path>/feedback/REVIEW_FAILURES.md naming the change.
+Delete <feature_path>/feedback/DESIGN_FEEDBACK.md when resolved.
+Report: what changed in the design system.
+```
+After designer resolves: log file deleted for DESIGN_FEEDBACK.md.
+Return. Orchestrator determines next state from transition_rules.
+
+### If `REVIEW_FAILURES.md` exists (no root-cause file above)
 
 After the retry guard, **spawn** `builder`:
 ```
@@ -541,12 +591,34 @@ as the stage's findings section.
 All feedback files live in `<feature_path>/feedback/`. File exists = issue open.
 Absent = resolved.
 
-Priority order (highest first): `HUMAN_QUESTIONS.md` › `ARCH_FEEDBACK.md` › `DESIGN_QUESTIONS.md` ›
-`ACCEPTANCE_QUESTION.md` › `IMPL_QUESTIONS.md` › `REFLECT_CRITIQUE.md` › `REVIEW_FAILURES.md` › `TEST_FAILURES.md`
+Priority order (highest first, enforced by the flow's `feedback_priority`): `HUMAN_QUESTIONS.md` ›
+`BLOCKED_ON_HUMAN.md` › `REQUIREMENT_GAP.md` › `PLAN_FEEDBACK.md` › `ARCH_FEEDBACK.md` ›
+`DESIGN_FEEDBACK.md` › `REVIEW_FAILURES.md` › `TEST_FAILURES.md`. Other feedback files
+(`DESIGN_QUESTIONS.md`, `IMPL_QUESTIONS.md`, `ACCEPTANCE_QUESTION.md`, `REFLECT_CRITIQUE.md`, …)
+route after every listed file, in the flow's `feedback_routing` declaration order.
 
 When you write a feedback file, use the shared feedback protocol formats and then report blocked.
 The orchestrator routes the highest-priority open file to the responsible agent, one at a time,
 before advancing.
+
+### Root-cause classification — tag ⇄ file ⇄ role
+
+Classify each failure by ROOT CAUSE and write it into the matching file — the filename IS
+the routing (`route_feedback` matches on filename, not content). One failure with two
+causes is TWO files, not one file with two tags.
+
+| Tag | Feedback file | Routed role | That role corrects |
+|---|---|---|---|
+| `[REQ]` | `REQUIREMENT_GAP.md` | `po` | `USER_STORIES.md` (acceptance criteria / scope) |
+| `[PLAN]` | `PLAN_FEEDBACK.md` | `planner` | `IMPLEMENTATION_PLAN.md` (phases / task DAG) |
+| `[ARCH]` | `ARCH_FEEDBACK.md` | `architect` | `ARCHITECTURE_PROPOSAL.md` |
+| `[DESIGN]` | `DESIGN_FEEDBACK.md` | `designer` | `DESIGN.md` |
+| `[IMPL]` | `REVIEW_FAILURES.md` / `TEST_FAILURES.md` | `builder` | source code (default) |
+
+A routed non-builder role fixes ONLY its own artifact, then either hands off to the builder
+(append an `[IMPL]` item to `REVIEW_FAILURES.md`) or, if the fix was decision-only, deletes
+its feedback file and lets the re-review gate re-verify — see that role's fix-mode
+instructions, injected automatically whenever it is routed a feedback file.
 
 ### Guard — feedback-open check
 

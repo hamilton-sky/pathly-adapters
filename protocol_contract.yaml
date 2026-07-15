@@ -12,9 +12,11 @@ version: "1.0"
 
 feedback_files:
   - ARCH_FEEDBACK.md
+  - DESIGN_FEEDBACK.md
   - DESIGN_QUESTIONS.md
   - HUMAN_QUESTIONS.md
   - IMPL_QUESTIONS.md
+  - PLAN_FEEDBACK.md
   - REVIEW_FAILURES.md
   - TEST_FAILURES.md
   - VERIFY_FAILURES.md

@@ -534,12 +534,34 @@ as the stage's findings section.
 All feedback files live in `<feature_path>/feedback/`. File exists = issue open.
 Absent = resolved.
 
-Priority order (highest first): `HUMAN_QUESTIONS.md` › `ARCH_FEEDBACK.md` › `DESIGN_QUESTIONS.md` ›
-`ACCEPTANCE_QUESTION.md` › `IMPL_QUESTIONS.md` › `REFLECT_CRITIQUE.md` › `REVIEW_FAILURES.md` › `TEST_FAILURES.md`
+Priority order (highest first, enforced by the flow's `feedback_priority`): `HUMAN_QUESTIONS.md` ›
+`BLOCKED_ON_HUMAN.md` › `REQUIREMENT_GAP.md` › `PLAN_FEEDBACK.md` › `ARCH_FEEDBACK.md` ›
+`DESIGN_FEEDBACK.md` › `REVIEW_FAILURES.md` › `TEST_FAILURES.md`. Other feedback files
+(`DESIGN_QUESTIONS.md`, `IMPL_QUESTIONS.md`, `ACCEPTANCE_QUESTION.md`, `REFLECT_CRITIQUE.md`, …)
+route after every listed file, in the flow's `feedback_routing` declaration order.
 
 When you write a feedback file, use the shared feedback protocol formats and then report blocked.
 The orchestrator routes the highest-priority open file to the responsible agent, one at a time,
 before advancing.
+
+### Root-cause classification — tag ⇄ file ⇄ role
+
+Classify each failure by ROOT CAUSE and write it into the matching file — the filename IS
+the routing (`route_feedback` matches on filename, not content). One failure with two
+causes is TWO files, not one file with two tags.
+
+| Tag | Feedback file | Routed role | That role corrects |
+|---|---|---|---|
+| `[REQ]` | `REQUIREMENT_GAP.md` | `po` | `USER_STORIES.md` (acceptance criteria / scope) |
+| `[PLAN]` | `PLAN_FEEDBACK.md` | `planner` | `IMPLEMENTATION_PLAN.md` (phases / task DAG) |
+| `[ARCH]` | `ARCH_FEEDBACK.md` | `architect` | `ARCHITECTURE_PROPOSAL.md` |
+| `[DESIGN]` | `DESIGN_FEEDBACK.md` | `designer` | `DESIGN.md` |
+| `[IMPL]` | `REVIEW_FAILURES.md` / `TEST_FAILURES.md` | `builder` | source code (default) |
+
+A routed non-builder role fixes ONLY its own artifact, then either hands off to the builder
+(append an `[IMPL]` item to `REVIEW_FAILURES.md`) or, if the fix was decision-only, deletes
+its feedback file and lets the re-review gate re-verify — see that role's fix-mode
+instructions, injected automatically whenever it is routed a feedback file.
 
 ### Guard — feedback-open check
 

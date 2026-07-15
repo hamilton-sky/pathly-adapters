@@ -30,7 +30,7 @@ Done when: Reviewer has read every changed file and written or cleared REVIEW_FA
 ## Review Report
 
 ### Violations
-- [file:line or file] — [rule violated] — [one-line description]
+- [REQ|PLAN|ARCH|DESIGN|IMPL] [file:line or file] — [rule violated] — [one-line description]
 
 ### Warnings (non-blocking)
 - [file] — [concern] — [one-line description]
@@ -38,6 +38,14 @@ Done when: Reviewer has read every changed file and written or cleared REVIEW_FA
 ### Pass
 - [what was checked and found clean]
 ```
+
+Tag each violation by ROOT CAUSE, at the point of judgment — the orchestrator writes it
+into the matching feedback file (the filename IS the routing):
+- `[REQ]` — the requirement/acceptance criteria are wrong, not the code → `REQUIREMENT_GAP.md`
+- `[PLAN]` — the phasing/task DAG is wrong → `PLAN_FEEDBACK.md`
+- `[ARCH]` — an architectural violation: dependency direction, layer boundary, structure → `ARCH_FEEDBACK.md`
+- `[DESIGN]` — a UI/UX/design-system violation → `DESIGN_FEEDBACK.md`
+- `[IMPL]` — a pure implementation defect (default when none of the above apply) → `REVIEW_FAILURES.md`
 
 ## [AUTO_FIX] — trivial findings
 

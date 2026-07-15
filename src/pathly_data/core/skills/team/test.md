@@ -106,17 +106,36 @@ Run /test to verify each acceptance criterion.
 [compressed findings]
 
 For each criterion: PASS / FAIL / NOT COVERED.
-If any FAIL or NOT COVERED: write <feature_path>/feedback/TEST_FAILURES.md
-using the shared feedback protocol format.
+Classify each FAIL/NOT COVERED by root cause:
+- The acceptance criterion itself is wrong, ambiguous, or untestable as written:
+  write <feature_path>/feedback/ACCEPTANCE_QUESTION.md ([REQ] — the criteria are the suspect).
+- The implementation does not satisfy a criterion that IS correct as written:
+  write <feature_path>/feedback/TEST_FAILURES.md ([IMPL] — the code is the suspect).
+Use the shared feedback protocol formats. A criterion is only ever one or the other.
 ```
 
 log-phase PHASE_DONE test
 
 ## Fix loop
 
-After tester completes — check for `TEST_FAILURES.md`:
+After tester completes — check for `ACCEPTANCE_QUESTION.md` and `TEST_FAILURES.md`. Route
+the higher-priority file first (see Feedback protocol — priority order):
+`ACCEPTANCE_QUESTION.md` before `TEST_FAILURES.md`.
 
-**If `TEST_FAILURES.md` exists:**
+**If `ACCEPTANCE_QUESTION.md` exists:**
+Log file created for ACCEPTANCE_QUESTION.md.
+
+**Spawn** `po`:
+```
+Read <feature_path>/feedback/ACCEPTANCE_QUESTION.md.
+Correct <feature_path>/USER_STORIES.md so the acceptance criteria reflect the real intent.
+If the correction implies code changes, append a short [IMPL] section to
+<feature_path>/feedback/TEST_FAILURES.md naming the change.
+Delete <feature_path>/feedback/ACCEPTANCE_QUESTION.md when resolved.
+```
+After po resolves: log file deleted for ACCEPTANCE_QUESTION.md. Re-spawn tester.
+
+**If `TEST_FAILURES.md` exists (no `ACCEPTANCE_QUESTION.md`):**
 Increment `testRetryCount`. If `testRetryCount > 2`:
 Stop — "Test failures unresolved after 2 fix cycles. Manual intervention required."
 
@@ -130,7 +149,7 @@ Delete <feature_path>/feedback/TEST_FAILURES.md when resolved.
 ```
 After builder resolves: log file deleted for TEST_FAILURES.md. Re-spawn tester.
 
-**If no TEST_FAILURES.md:** all criteria pass.
+**If neither file exists:** all criteria pass.
 
 ## Advance
 

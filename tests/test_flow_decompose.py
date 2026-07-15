@@ -298,3 +298,58 @@ def test_ensure_adapter_map_default_ignores_absent_map():
     graph = {"flow": "x"}
     ensure_adapter_map_default(graph)
     assert "adapter_map" not in graph
+
+
+# ---------------------------------------------------------------------------
+# feedback_priority round trip (smart-fix-routing DESIGN.md ss1.5 / ss4) — a
+# flow-level list, like feedback_routing, must survive the decompose/assemble
+# round trip verbatim (order preserved — it encodes the upstream-first priority
+# route_feedback sorts by).
+# ---------------------------------------------------------------------------
+
+
+def test_feedback_priority_round_trips_through_flow_graph():
+    fixture = dict(FIXTURE_ON_CONTENT)
+    fixture["feedback_priority"] = [
+        "REQUIREMENT_GAP",
+        "ARCH_FEEDBACK",
+        "REVIEW_FAILURES",
+        "TEST_FAILURES",
+    ]
+    flow_cfg, nodes, edges = _decompose_flow_dict(fixture)
+    reconstructed = _assemble_from_parts(flow_cfg, nodes, edges)
+    assert reconstructed["feedback_priority"] == [
+        "REQUIREMENT_GAP",
+        "ARCH_FEEDBACK",
+        "REVIEW_FAILURES",
+        "TEST_FAILURES",
+    ]
+
+
+def test_feedback_priority_absent_is_absent_after_round_trip():
+    flow_cfg, nodes, edges = _decompose_flow_dict(FIXTURE_ON_CONTENT)
+    reconstructed = _assemble_from_parts(flow_cfg, nodes, edges)
+    assert "feedback_priority" not in reconstructed
+
+
+def test_team_and_test_flows_declare_feedback_priority():
+    """team.flow.yaml / test.flow.yaml carry the canonical upstream-first order
+    (smart-fix-routing DESIGN.md ss1.5)."""
+    canonical = [
+        "HUMAN_QUESTIONS",
+        "BLOCKED_ON_HUMAN",
+        "REQUIREMENT_GAP",
+        "PLAN_FEEDBACK",
+        "ARCH_FEEDBACK",
+        "DESIGN_FEEDBACK",
+        "REVIEW_FAILURES",
+        "TEST_FAILURES",
+    ]
+    for flow_name in ("team", "test"):
+        text = (
+            files("pathly_data")
+            .joinpath(f"core/flows/{flow_name}.flow.yaml")
+            .read_text(encoding="utf-8")
+        )
+        flow = yaml.safe_load(text)
+        assert flow["feedback_priority"] == canonical, flow_name

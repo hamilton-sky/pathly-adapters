@@ -322,28 +322,50 @@ def route_feedback(
 
     feedback_routing = flow.get("feedback_routing", {})
     escalation_routing = flow.get("escalation_routing", {})
+    # Smart fix-routing (DESIGN.md ss1.5, small hardening): an optional flow-level priority
+    # list makes "upstream cause fixed first" deterministic regardless of feedback_routing's
+    # dict-insertion order (which can be disturbed by the DB round-trip or the Studio
+    # serializer). Absent/empty -> priority_index stays empty -> the sort below is skipped
+    # entirely, so `matches[0]` is exactly today's first-match-in-dict-order behavior.
+    feedback_priority = flow.get("feedback_priority") or []
+    priority_index: dict[str, int] = {}
+    for i, name in enumerate(feedback_priority):
+        pname = name if name.endswith(".md") else f"{name}.md"
+        priority_index.setdefault(pname, i)
     human_files = {"HUMAN_QUESTIONS.md", "BLOCKED_ON_HUMAN.md"}
     counts = (
         retry_counts if retry_counts is not None else _read_retry_counts(storage_path)
     )
 
     known_filenames: set[str] = set()
+    matches: list[tuple[str, str]] = []
     for stem, agent in feedback_routing.items():
         filename = stem if stem.endswith(".md") else f"{stem}.md"
         known_filenames.add(filename)
         if filename in md_files:
-            target = _resolve_feedback_target(
-                filename, agent, counts.get(filename, 0), escalation_routing
+            matches.append((filename, agent))
+
+    if matches:
+        if priority_index:
+            # Stable sort: a matched file absent from feedback_priority keeps its relative
+            # dict-order position at the tail — the fallback when a file has no declared
+            # priority (e.g. REFLECT_CRITIQUE, INCOMPLETE_TASKS).
+            matches.sort(
+                key=lambda pair: priority_index.get(pair[0], len(feedback_priority))
             )
-            result = {"file": filename, "target_agent": target}
-            if target == "human" or filename in human_files:
-                try:
-                    result["instructions"] = (feedback_dir / filename).read_text(
-                        encoding="utf-8"
-                    )
-                except OSError:
-                    result["instructions"] = ""
-            return result
+        filename, agent = matches[0]
+        target = _resolve_feedback_target(
+            filename, agent, counts.get(filename, 0), escalation_routing
+        )
+        result = {"file": filename, "target_agent": target}
+        if target == "human" or filename in human_files:
+            try:
+                result["instructions"] = (feedback_dir / filename).read_text(
+                    encoding="utf-8"
+                )
+            except OSError:
+                result["instructions"] = ""
+        return result
 
     unmatched = md_files - known_filenames
     if unmatched:
