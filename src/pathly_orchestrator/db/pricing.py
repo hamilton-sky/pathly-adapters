@@ -34,21 +34,43 @@ _ADAPTER_PREFIXES: list[tuple[tuple[str, ...], str]] = [
 
 # Keyed by provider slug → model-family-prefix → (input_$/MTok, output_$/MTok).
 # Prefix matching: longest matching prefix wins.
+#
+# Rates verified 2026-07-15 against the providers' own pricing:
+#   - Anthropic: the claude-api skill model table (platform.claude.com/docs/.../pricing).
+#   - OpenAI:    developers.openai.com/api/docs/pricing.
+#   - Google:    ai.google.dev/gemini-api/docs/pricing.
+# Longest-prefix wins, so a specific model (e.g. "claude-opus-4-1") overrides its family default.
 PRICING: dict[str, dict[str, tuple[float, float]]] = {
     "claude": {
-        "claude-opus-4": (15.00, 75.00),
-        "claude-sonnet-4": (3.00, 15.00),
-        "claude-haiku-4": (0.80, 4.00),
+        "claude-fable-5": (10.00, 50.00),
+        # Opus 4.5+ is $5/$25; only legacy 4.0/4.1 were $15/$75 (kept via the longer prefixes).
+        "claude-opus-4": (5.00, 25.00),
+        "claude-opus-4-0": (15.00, 75.00),
+        "claude-opus-4-1": (15.00, 75.00),
+        "claude-sonnet-5": (3.00, 15.00),  # $2/$10 intro through 2026-08-31
+        "claude-sonnet-4": (3.00, 15.00),  # Sonnet 4.5 / 4.6
+        "claude-haiku-4": (1.00, 5.00),    # Haiku 4.5
     },
+    # gpt-* → codex provider (see _ADAPTER_PREFIXES). codex spawns with no explicit --model, so the
+    # user's codex 0.142 runs report `gpt-5` / `gpt-5-codex` → priced via the "gpt-5" prefix.
     "codex": {
+        "gpt-5": (1.25, 10.00),          # base GPT-5 / gpt-5-codex (launch rate)
+        "gpt-5.3-codex": (1.75, 14.00),
+        "gpt-5.4": (2.50, 15.00),
+        "gpt-5.5": (5.00, 30.00),
+        "gpt-5.6-sol": (5.00, 30.00),
+        "gpt-5.6-terra": (2.50, 15.00),
+        "gpt-5.6-luna": (1.00, 6.00),
         "gpt-4o": (2.50, 10.00),
-        "gpt-5": (1.25, 10.00),  # codex default family; verify rate later
         "o1": (15.00, 60.00),
         "o3": (10.00, 40.00),
     },
+    # Gemini 2.5 Pro is context-tiered (≤200k / >200k); we price the ≤200k rate (the common case;
+    # >200k is (2.50, 15.00)). agy / antigravity default to gemini-2.5-pro.
     "google": {
         "gemini-2.5-pro": (1.25, 10.00),
-        "gemini-2.5-flash": (0.075, 0.30),
+        "gemini-2.5-flash-lite": (0.10, 0.40),
+        "gemini-2.5-flash": (0.30, 2.50),
     },
     "antigravity": {
         "gemini-2.5-pro": (1.25, 10.00),
