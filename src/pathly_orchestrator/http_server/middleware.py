@@ -73,12 +73,30 @@ class _JsonFormatter(logging.Formatter):
 
 
 def _setup_logging() -> None:
-    """Configure structured JSON logging."""
-    handler = logging.StreamHandler(sys.stderr)
-    handler.setFormatter(_JsonFormatter())
+    """Configure structured JSON logging — stderr AND a rotating file.
+
+    The file handler exists so supervisor tracebacks (e.g. a loop `loop_crashed`/`stage_error`)
+    survive: stderr goes to Studio's console, which isn't retrievable after the fact, so a crash
+    used to vanish. ~/.pathly/fsm.log keeps the last few MB. Best-effort — never blocks startup.
+    """
     root = logging.getLogger()
     root.handlers.clear()
-    root.addHandler(handler)
+    stream = logging.StreamHandler(sys.stderr)
+    stream.setFormatter(_JsonFormatter())
+    root.addHandler(stream)
+    try:
+        from logging.handlers import RotatingFileHandler
+        from pathlib import Path
+
+        log_dir = Path.home() / ".pathly"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        fh = RotatingFileHandler(
+            log_dir / "fsm.log", maxBytes=2_000_000, backupCount=3, encoding="utf-8"
+        )
+        fh.setFormatter(_JsonFormatter())
+        root.addHandler(fh)
+    except Exception:
+        pass  # file logging is best-effort; never block server startup
     root.setLevel(logging.INFO)
 
 

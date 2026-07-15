@@ -309,9 +309,23 @@ def _loop(state: RunnerState, broadcast_fn: Optional[Callable]) -> None:
             )
 
             # ── Resolve stage (feedback loop + decide) ────────────────────────
-            result = _resolve_stage_supervised(
-                state, flow, topic, project_root, model, broadcast_fn, fhc
-            )
+            # Per-stage resilience: a stage-level exception fails THIS stage with a nameable,
+            # retryable reason instead of bubbling to the whole-loop catch-all (`loop_crashed`),
+            # which killed the entire multi-stage run on one flaky stage (e.g. a codex sandbox
+            # error mid-review). Applies to EVERY FSM flow — team / consultation / debug /
+            # explore / test all drive this loop. The run stops with a clear reason the user can
+            # Retry, and the traceback is logged, instead of an opaque crash that loses the rest
+            # of the pipeline.
+            try:
+                result = _resolve_stage_supervised(
+                    state, flow, topic, project_root, model, broadcast_fn, fhc
+                )
+            except Exception as exc:
+                logger.exception(
+                    "Stage %s raised for topic %s: %s", state.current_state, topic, exc
+                )
+                _fail("stage_error", f"{state.current_state or 'stage'}: {exc}")
+                return
 
             if result is None:
                 return
