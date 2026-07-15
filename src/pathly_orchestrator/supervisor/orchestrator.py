@@ -143,6 +143,9 @@ def _loop(state: RunnerState, broadcast_fn: Optional[Callable]) -> None:
                 # malformed response) fails the run with a nameable reason instead of bubbling to the
                 # whole-loop catch-all and becoming an opaque loop_crashed. fsm_http_client already
                 # degrades a slow/timed-out self-call to the in-process path; this is the floor.
+                # Log the traceback so a genuine (non-timeout) next_action bug stays diagnosable —
+                # the old whole-loop catch-all logged it; a bare _fail() would swallow the stack.
+                logger.exception("next_action failed for topic %s: %s", topic, exc)
                 _fail("fsm_unreachable", str(exc))
                 return
 
