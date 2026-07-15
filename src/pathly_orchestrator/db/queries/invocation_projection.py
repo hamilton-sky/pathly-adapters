@@ -213,6 +213,7 @@ def backfill_invocations_from_events(
     # Fold the event stream into one record per AGENT_DONE (keyed by its seq).
     records: dict[int, dict] = {}
     last_ad: dict[tuple, int] = {}
+    last_ad_by_rid: dict[tuple, int] = {}
     touched: set[tuple] = set()
     for r in rows:
         seq, pr, feat, etype, raw = r[0], r[1], r[2], r[3], r[4]
@@ -221,16 +222,28 @@ def backfill_invocations_from_events(
         except (json.JSONDecodeError, TypeError):
             continue
         key = (pr, feat, payload.get("agent"), payload.get("conversation"))
+        rid = payload.get("run_id")
+        rid_key = (pr, feat, rid) if rid else None
         if etype == "AGENT_DONE":
             rec = _agent_done_rec(payload)
             rec["_pr"], rec["_feat"] = pr, feat
             records[seq] = rec
             last_ad[key] = seq
+            if rid_key is not None:
+                last_ad_by_rid[rid_key] = seq
             touched.add((pr, feat))
-        else:  # BILLING_UPDATE supersedes the last AGENT_DONE of this key
-            anchor = last_ad.get(key)
+        else:  # BILLING_UPDATE supersedes its AGENT_DONE — run_id first, then (agent, conversation)
+            anchor = last_ad_by_rid.get(rid_key) if rid_key is not None else None
+            if anchor is None:
+                anchor = last_ad.get(key)
             if anchor is not None:
                 _fold_billing(records[anchor], payload)
+                # Billing carries the model/run_id the AGENT_DONE may lack — stamp them so the
+                # folded row can be priced (codex/agy) and keyed to its run.
+                if payload.get("model") and not records[anchor].get("provider"):
+                    records[anchor]["provider"] = payload.get("model")
+                if payload.get("run_id") and not records[anchor].get("run_id"):
+                    records[anchor]["run_id"] = payload.get("run_id")
             else:
                 rec = _agent_done_rec(payload)
                 rec["_pr"], rec["_feat"] = pr, feat
@@ -296,20 +309,35 @@ def on_event_appended(
                 _tier_for(conn, project_root, feature),
             )
         elif etype == "BILLING_UPDATE":
-            anchor = conn.execute(
-                "SELECT seq FROM fsm_events WHERE project_root=? AND feature=? "
-                "AND event_type='AGENT_DONE' "
-                "AND json_extract(payload,'$.agent') IS ? "
-                "AND IFNULL(json_extract(payload,'$.conversation'),-1)=IFNULL(?,-1) "
-                "AND seq<? ORDER BY seq DESC LIMIT 1",
-                (
-                    project_root,
-                    feature,
-                    event_dict.get("agent"),
-                    event_dict.get("conversation"),
-                    seq,
-                ),
-            ).fetchone()
+            # Match the AGENT_DONE this billing supersedes. Prefer an EXACT run_id match —
+            # unambiguous per spawn — and only fall back to (agent, conversation) for events that
+            # predate run_id threading. Most stages use conversation=0, so the (agent, conversation)
+            # match is fragile; a billing that can't line up orphaned into a standalone "agent" row
+            # (no model → unpriced), which is the empty-cost cards in the Monitor.
+            b_run_id = event_dict.get("run_id")
+            anchor = None
+            if b_run_id:
+                anchor = conn.execute(
+                    "SELECT seq FROM fsm_events WHERE project_root=? AND feature=? "
+                    "AND event_type='AGENT_DONE' AND json_extract(payload,'$.run_id')=? "
+                    "AND seq<? ORDER BY seq DESC LIMIT 1",
+                    (project_root, feature, b_run_id, seq),
+                ).fetchone()
+            if anchor is None:
+                anchor = conn.execute(
+                    "SELECT seq FROM fsm_events WHERE project_root=? AND feature=? "
+                    "AND event_type='AGENT_DONE' "
+                    "AND json_extract(payload,'$.agent') IS ? "
+                    "AND IFNULL(json_extract(payload,'$.conversation'),-1)=IFNULL(?,-1) "
+                    "AND seq<? ORDER BY seq DESC LIMIT 1",
+                    (
+                        project_root,
+                        feature,
+                        event_dict.get("agent"),
+                        event_dict.get("conversation"),
+                        seq,
+                    ),
+                ).fetchone()
             if anchor is None:
                 # Orphan billing — a BILLING_UPDATE with no preceding AGENT_DONE for
                 # this key (e.g. the reconciliation window fired for a run whose agent

@@ -387,6 +387,7 @@ event = {
   'type': 'AGENT_DONE',
   'agent': 'AGENT_ROLE',
   'model': 'MODEL_ID',
+  'run_id': '<run_id>',
   'conversation': CONV_N,
   'result': 'DONE',
   'outcome': 'OUTCOME',
@@ -476,7 +477,10 @@ Replace the UPPER_CASE placeholders with actual values:
 
 ## Return to orchestrator
 
-`<feature>` and `<feature_path>` are pre-substituted by the runner — use the values as written.
+`<feature>`, `<feature_path>`, and `<run_id>` are pre-substituted by the runner — use the values as
+written. (`<run_id>` keys this AGENT_DONE to its spawn so the gate's real-cost BILLING_UPDATE folds
+onto it exactly instead of orphaning; if it is still literally `<run_id>`, this is an interactive run
+with no gate billing, and the fold falls back to the agent/conversation match.)
 
 Return. The orchestrator determines the next state from `transition_rules`.
 

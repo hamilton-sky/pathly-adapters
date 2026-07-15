@@ -258,6 +258,12 @@ def _run_stage_via_terminal(
     )
 
     feature_flags = FeatureFlags()
+    # Thread run_id into the prompt so the completion-report AGENT_DONE carries it. The gate's
+    # BILLING_UPDATE (see _reconciliation_window → _patch_last_agent_done) uses the SAME run_id, so
+    # the invocation projection folds real cost/tokens onto the right AGENT_DONE exactly — instead
+    # of the fragile (agent, conversation) match that orphaned billing into empty "agent" rows.
+    if instructions:
+        instructions = instructions.replace("<run_id>", run_id or "")
     use_interactive = state.interactive
     if use_interactive and not feature_flags.early_advance:
         msg = "Interactive mode requires PATHLY_RUNNER_EARLY_ADVANCE=1"
