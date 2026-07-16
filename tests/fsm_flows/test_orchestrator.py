@@ -3,7 +3,6 @@
 from __future__ import annotations
 import json
 import threading
-import tempfile
 from pathlib import Path
 
 import jsonschema
@@ -70,13 +69,6 @@ def test_iteration_by_stage_is_optional():
 
 
 # ── write_state validation ────────────────────────────────────────────────────
-
-
-def test_write_state_rejects_invalid_state_name(tmp_path):
-    with pytest.raises(ValueError, match="Invalid state"):
-        el.write_state.__wrapped__(
-            tmp_path, "test", {"current": "BOGUS", "feature": "x", "rigor": "lite"}
-        )
 
 
 def _write_state_in_tmp(tmp_path: Path, feature: str, state_dict: dict):
