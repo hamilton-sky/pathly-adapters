@@ -336,6 +336,15 @@ below) answers *how many dollars*. Adding an engine = one entry in `_TOKEN_STRAT
 a rate = one entry in `PRICING`. Tokens are the must-capture primitive — cost is always derivable
 from them via Strategy B when the CLI reports none.
 
+**Large claude envelopes survive the PTY tail buffer — `parse_result` truncation recovery.** A run
+with heavy cache reads emits a big `--output-format=json` envelope; Studio's rolling PTY tail
+(`terminal.ts`, last ~500 chunks) can drop its opening brace, so `_extract_json_payload` falls back
+to an inner `modelUsage` entry and the structured parse reads cost=0 / tokens=0 — which recorded a
+**headless board single-agent run at `$0`** despite a real $1.25 (the cost was right there in the
+CLI's own JSON, just past the truncation point). `runner/output.py::parse_result` regex-recovers
+`total_cost_usd` (or summed per-model `costUSD`) + the camelCase `modelUsage` token fields from the
+raw text, firing ONLY when the structured parse yields 0 (so a full envelope is never double-counted).
+
 **Cost is priced from tokens when the CLI reports none — `db/pricing.py` (Strategy B).** The
 pricing table/`PricingRegistry`/`estimate_cost`/`infer_provider` live in
 `db/pricing.py` (the layer-safe home — the projector is in `db/` and cannot import

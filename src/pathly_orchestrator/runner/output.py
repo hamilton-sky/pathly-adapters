@@ -65,6 +65,50 @@ def _normalize_model_usage(raw: Any) -> dict[str, dict[str, Any]]:
     return out
 
 
+def _recover_truncated_claude_usage(raw_output: str) -> tuple[float, int, int]:
+    """Regex-recover cost + tokens from a claude ``--output-format=json`` envelope whose LEADING
+    brace was dropped.
+
+    A large run (heavy cache reads → a big envelope) overflows the PTY tail buffer
+    (``terminal.ts`` keeps only the last ~500 chunks), so the retained tail starts mid-object.
+    ``_extract_json_payload`` then falls back to an INNER object (a lone ``modelUsage`` entry) with
+    no top-level ``total_cost_usd`` and no ``modelUsage`` map — and ``parse_result`` reads
+    cost=0 / tokens=0 despite the numbers being present as text. Recover them by regex: the last
+    ``total_cost_usd`` (or the sum of per-model ``costUSD``), and the summed camelCase ``modelUsage``
+    token fields (the top-level ``usage`` block is snake_case, so this never double-counts).
+    Returns ``(cost_usd, tokens_in, tokens_out)``; zeros when nothing is recoverable.
+    """
+    text = raw_output or ""
+
+    def _floats(pat: str) -> list[float]:
+        vals: list[float] = []
+        for x in re.findall(pat, text):
+            try:
+                vals.append(float(x))
+            except ValueError:
+                continue
+        return vals
+
+    def _sum_ints(pat: str) -> int:
+        total = 0
+        for x in re.findall(pat, text):
+            try:
+                total += int(x)
+            except ValueError:
+                continue
+        return total
+
+    tc = _floats(r'"total_cost_usd"\s*:\s*([0-9.eE+-]+)')
+    cost = tc[-1] if tc else round(sum(_floats(r'"costUSD"\s*:\s*([0-9.eE+-]+)')), 6)
+    tin = (
+        _sum_ints(r'"inputTokens"\s*:\s*([0-9]+)')
+        + _sum_ints(r'"cacheReadInputTokens"\s*:\s*([0-9]+)')
+        + _sum_ints(r'"cacheCreationInputTokens"\s*:\s*([0-9]+)')
+    )
+    tout = _sum_ints(r'"outputTokens"\s*:\s*([0-9]+)')
+    return cost, tin, tout
+
+
 def _iter_json_objects(raw: str) -> Generator[dict[str, Any], None, None]:
     """Yield every top-level JSON object in a (possibly JSONL) string.
 
@@ -264,6 +308,17 @@ def parse_result(adapter: str, raw_output: str) -> dict[str, Any]:
     )
     if model_usage and not cost_usd:
         cost_usd = round(sum(m["cost_usd"] for m in model_usage.values()), 6)
+
+    # Truncation recovery (claude/generic): a large envelope overflows the PTY tail buffer so
+    # _extract_json_payload returns an inner object with no usable top-level fields — cost/tokens
+    # then read 0 even though the numbers are present as text. Recover by regex. Fires ONLY when
+    # the structured parse found nothing, so it never double-counts. (codex has its own JSONL path.)
+    if adapter != "codex" and (cost_usd <= 0 or (tokens_in + tokens_out) == 0):
+        _rc, _rin, _rout = _recover_truncated_claude_usage(raw_output)
+        if cost_usd <= 0 and _rc > 0:
+            cost_usd = _rc
+        if (tokens_in + tokens_out) == 0 and (_rin or _rout):
+            tokens_in, tokens_out = _rin, _rout
 
     messages = payload.get("messages", [])
     tool_uses = sum(

@@ -4,7 +4,7 @@
 
 Cost/token telemetry — invocation projection, pricing, OTel export, observability, log formatting.
 
-12 test file(s).
+13 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -16,6 +16,7 @@ Cost/token telemetry — invocation projection, pricing, OTel export, observabil
 | `test_observability.py` | Tests for pathly-observability Conv 1: /record_phase endpoint and exempt_prefixes | 8 |
 | `test_otel_export.py` | covers no op when env unset; span payload structure; span status ok; … | 9 |
 | `test_otel_export_cli.py` | covers cli missing db; cli dry run; cli exports spans; … | 6 |
+| `test_output_parse_recovery.py` | Truncation-recovery for large claude ``--output-format=json`` envelopes (``output.parse_result``) | 4 |
 | `test_parse_result_model_usage.py` | parse_result must capture the adapter's per-model usage breakdown (`modelUsage`) | 4 |
 | `test_pricing_registry.py` | Unit tests for PricingRegistry.compute() | 10 |
 | `test_telemetry_cost_fix.py` | Tests for the telemetry-cost-fix plan (FIX B + FIX C) | 3 |
