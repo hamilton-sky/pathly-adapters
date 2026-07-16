@@ -14,6 +14,7 @@ interface DbRecent {
   finished_at: string
   started_at: string
   scope_tier: string
+  category: string | null
 }
 
 /** Provider (model id) or CliAdapter → the board's display adapter. */
@@ -48,7 +49,10 @@ export function useRecentEngines(): MonitorEngine[] {
   }, [projectPath])
 
   return db.map((r) => {
-    const category = (r.scope_tier === 'project' ? 'single' : 'flow') as EngineCategory
+    // Prefer the stamped run TYPE (flow/single/loop) so a finished board/single run buckets the
+    // same way its live card did; fall back to the scope_tier heuristic for rows written before
+    // the category stamp (and editor one-shots, which are project-scoped 'single').
+    const category = (r.category || (r.scope_tier === 'project' ? 'single' : 'flow')) as EngineCategory
     const ts = r.finished_at || r.started_at
     const tok = r.tokens >= 1000 ? `${(r.tokens / 1000).toFixed(1)}k tok` : r.tokens ? `${r.tokens} tok` : '-'
     return {

@@ -281,6 +281,17 @@ run (board/single/loop) whose agent self-reported none, keyed by `run_id` and ru
 `_reconcile_billing_now` so the `BILLING_UPDATE` folds onto it (not a stale same-feature event).
 So a missing `completion-report` no longer means "vanished + unbilled."
 
+**Run TYPE is a stamped column, not a guess.** The Monitor's RECENT list buckets finished runs
+into `flow` / `single` / `loop`, but the invocation's `scope_tier` (feature/project/global) is the
+board tier, not the run type — so board/single runs used to mis-bucket as `flow`. Now
+`agent_invocations.category` carries the real type, stamped INTO the `AGENT_DONE` event (so it
+survives the startup backfill): `completion-report` writes `<run_category>`, substituted to `flow`
+by `fsm_compose._inject_prompt_vars` (default) and to `single` by
+`board_run._inject_board_prompt_vars`; Fix A's synthetic `AGENT_DONE` stamps `single` (or `loop`
+for `flow=='goal-loop'`). The projection guards it to the valid set (an unsubstituted placeholder →
+NULL), and `useRecentEngines` prefers it, falling back to the old `scope_tier` heuristic only when
+NULL.
+
 Stop hook (`src/pathly_hooks/stop_telemetry.py`) is now a **fallback for INTERACTIVE claude
 only**. It fires after every Claude Code session, but runner spawns carry
 `PATHLY_GATE_BILLED` (set in `terminal.ts` for `runnerTabMeta` tabs), so the hook **skips

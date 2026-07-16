@@ -395,7 +395,7 @@ def db_recent():
             "SELECT feature, agent_role, provider, run_id, "
             "  COALESCE(cost_usd,0) AS cost_usd, "
             "  (COALESCE(tokens_in,0) + COALESCE(tokens_out,0)) AS tokens, "
-            "  finished_at, started_at, scope_tier, cost_source "
+            "  finished_at, started_at, scope_tier, cost_source, category "
             "FROM agent_invocations"
         )
         params: list = []

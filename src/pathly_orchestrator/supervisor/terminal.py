@@ -403,6 +403,9 @@ def _run_stage_via_terminal(
                 "agent": state.current_state or "agent",
                 "model": model or None,
                 "run_id": run_id,
+                # Executor-owned run TYPE for the Monitor's RECENT bucketing (goal-loop → loop,
+                # board/single runs → single) — mirrors the completion-report <run_category>.
+                "category": "loop" if (state.flow or "").lower() == "goal-loop" else "single",
                 "conversation": 0,
                 "result": "DONE",
                 "outcome": "success",

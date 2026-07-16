@@ -174,6 +174,10 @@ pathly_orchestrator/
                            #   cost_source='unavailable' instead of a misleading $0. run_id is now
                            #   stamped on the projected row (AGENT_DONE.run_id, or a later
                            #   BILLING_UPDATE.run_id via COALESCE) — backs GET /db/runs/<run_id>/cost.
+                           #   `category` (flow|single|loop) is the run TYPE, read from the
+                           #   AGENT_DONE payload (completion-report's <run_category>, or Fix A's
+                           #   synthetic) and guarded to the valid set — backs the Monitor RECENT
+                           #   bucketing (scope_tier is the board tier, not the run type).
       comms.py             # re-export shim — splits into comms_messages, comms_artifacts, comms_tasks, comms_embeddings, comms_counts, comms_goals_read (import from domain modules for new code)
       comms_messages.py    # board message CRUD; goal_id/executor columns back the Goals->Task-DAG model
       comms_artifacts.py   # artifact metadata CRUD (attach, list, section index, update_summary)

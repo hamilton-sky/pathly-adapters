@@ -63,6 +63,10 @@ def _add_additive_migrations(conn: sqlite3.Connection) -> None:
         # The projector keys rows by (project_root, feature, source_seq) so the
         # backfill + live hook stay idempotent and never double-count.
         ("agent_invocations", "source_seq", "INTEGER"),
+        # recent-category: run TYPE ('flow'|'single'|'loop') — scope_tier (the board tier)
+        # can't express it, so the Monitor's RECENT list mis-bucketed board/single runs as
+        # 'flow'. Stamped into the AGENT_DONE event (<run_category>) so it survives the backfill.
+        ("agent_invocations", "category", "TEXT"),
         # flow-nodes-edges-migration: normalized storage for flow graph
         ("flow_nodes", "agent", "TEXT"),
         ("flow_nodes", "role", "TEXT"),

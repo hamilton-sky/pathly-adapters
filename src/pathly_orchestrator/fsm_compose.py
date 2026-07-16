@@ -95,8 +95,15 @@ def _inject_prompt_vars(
     storage_path: Path | None = None,
     skill: str | None = None,
     board_tier: str = "feature",
+    run_category: str = "flow",
 ) -> str:
-    """Replace log-phase markers and common placeholders with real values."""
+    """Replace log-phase markers and common placeholders with real values.
+
+    ``run_category`` is the run TYPE (``flow``|``single``|``loop``) written into the
+    completion-report ``AGENT_DONE`` so the Monitor's RECENT list buckets a finished run the
+    same way its live card did. FSM/team stages are ``flow`` (this default); board/single runs
+    override it to ``single`` via ``board_run._inject_board_prompt_vars``.
+    """
 
     def _make_log_phase_cmd(m: re.Match) -> str:  # type: ignore[type-arg]
         event_type = m.group(1)
@@ -118,6 +125,7 @@ def _inject_prompt_vars(
         flags=re.MULTILINE,
     )
     text = text.replace("<feature>", feature)
+    text = text.replace("<run_category>", run_category)
     # <board> = the board TIER (feature|project) this stage writes to — set so the comms-post
     # fragment targets the right channel (a project decompose's artifacts land on the project board).
     text = text.replace("<board>", board_tier)

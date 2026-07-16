@@ -622,6 +622,7 @@ event = {
   'agent': 'AGENT_ROLE',
   'model': 'MODEL_ID',
   'run_id': '<run_id>',
+  'category': '<run_category>',
   'conversation': CONV_N,
   'result': 'DONE',
   'outcome': 'OUTCOME',

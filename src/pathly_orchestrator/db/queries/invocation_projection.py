@@ -103,9 +103,16 @@ def _tier_for(conn: sqlite3.Connection, project_root: str, feature: str) -> str:
 def _agent_done_rec(payload: dict) -> dict:
     """Build the invocation fields an AGENT_DONE payload can supply."""
     total_tok = int(_num(payload.get("total_tokens")))
+    # Run TYPE for the Monitor's RECENT bucketing. Guarded so an unsubstituted
+    # <run_category> placeholder (a raw/interactive skill that skipped injection) lands as
+    # NULL, not a junk bucket — the renderer then falls back to its scope_tier heuristic.
+    cat = payload.get("category")
+    if cat not in ("flow", "single", "loop"):
+        cat = None
     return {
         "agent_role": payload.get("agent") or "agent",
         "conversation": payload.get("conversation"),
+        "category": cat,
         "cost_usd": _num(payload.get("cost_usd")),
         # AGENT_DONE only ever carries total_tokens (never an in/out split); park the
         # total in tokens_in so SUM(tokens_in+tokens_out) is the true total. A later
@@ -144,8 +151,8 @@ def _upsert_projected(
             "INSERT INTO agent_invocations "
             "(project_root, feature, run_id, stage, agent_role, started_at, finished_at, "
             " tokens_in, tokens_out, cost_usd, session_id, summary, scope_tier, "
-            " provider, cost_source, source_seq) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            " provider, cost_source, source_seq, category) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 project_root,
                 feature,
@@ -163,6 +170,7 @@ def _upsert_projected(
                 rec.get("provider"),
                 cost_source,
                 source_seq,
+                rec.get("category"),
             ),
         )
         conn.commit()
