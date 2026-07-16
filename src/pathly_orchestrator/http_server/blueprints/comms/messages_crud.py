@@ -236,9 +236,22 @@ def comms_edit():
             update_message_text as _update_text,
         )
 
-        data = request.get_json()
+        # Windows clients may POST cp1252-encoded JSON (a stray em-dash → byte 0x97), which strict
+        # UTF-8 parsing rejects with a 500 — dropping the edit. Decode leniently: UTF-8 first, then
+        # cp1252 (mirrors comms_post) so an edit carrying a smart-quote/em-dash lands cleanly.
+        import json as _json
+
+        raw = request.get_data()
+        data = None
+        if raw:
+            for _enc in ("utf-8", "cp1252"):
+                try:
+                    data = _json.loads(raw.decode(_enc))
+                    break
+                except (UnicodeDecodeError, ValueError):
+                    continue
         if not data:
-            return jsonify({"error": "Missing JSON body"}), 400
+            return jsonify({"error": "Missing or invalid JSON body"}), 400
 
         message_id = data.get("message_id", "")
         if not isinstance(message_id, str) or not message_id.strip():

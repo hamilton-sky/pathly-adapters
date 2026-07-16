@@ -68,6 +68,7 @@ def _default_spawn(
     project_root: str,
     model: str,
     adapter: str,
+    agent: str = "",
     broadcast_fn=None,
     interactive: bool = False,
 ) -> dict:
@@ -90,7 +91,11 @@ def _default_spawn(
         model=model,
         timeout=600,
         run_id=run_id,
-        current_state=(mode or "board-run"),
+        # Prefer the selected agent (e.g. 'planner') over the bare mode ('single-agent') so a run
+        # that doesn't self-report an AGENT_DONE still labels its synthetic one with the real role
+        # (terminal._synthesize_agent_done_if_missing reads current_state) — the RECENT card then
+        # shows 'planner', not 'single-agent'.
+        current_state=(agent or mode or "board-run"),
         current_adapter=adapter,
         interactive=interactive,
     )
@@ -393,6 +398,7 @@ def start_board_run(
                 project_root=project_root,
                 model=model,
                 adapter=adapter,
+                agent=agent,
                 broadcast_fn=broadcast_fn,
                 interactive=interactive,
             )
