@@ -3,6 +3,7 @@ import {
   feedStreamJson,
   newStreamJsonState,
   parseClaudeJsonResult,
+  recoverClaudeUsage,
   streamToolLabel,
 } from './claudeJson'
 
@@ -114,5 +115,37 @@ describe('parseClaudeJsonResult', () => {
 
   it('returns null when there is no result object', () => {
     expect(parseClaudeJsonResult('just some plain text, no json here')).toBeNull()
+  })
+
+  it('recovers cost + tokens from a TRUNCATED envelope (opening brace dropped)', () => {
+    // A large editor one-shot overflows the PTY tail buffer; the "type":"result" marker + opening
+    // brace fall off the front, leaving only the tail with the modelUsage entry. This is exactly
+    // the case that recorded claude one-shots at $0. Recovery pulls cost/tokens from the raw text.
+    const truncated =
+      'sonnet-4-6":{"inputTokens":29,"outputTokens":17290,"cacheReadInputTokens":1916016,' +
+      '"cacheCreationInputTokens":69871,"costUSD":1.2534678,"contextWindow":200000}},' +
+      '"permission_denials":[],"uuid":"c36a9aa1"}'
+    const r = parseClaudeJsonResult(truncated)
+    expect(r?.total_cost_usd).toBeCloseTo(1.2534678, 6)
+    expect(r?.usage.input_tokens).toBe(29 + 1916016 + 69871)
+    expect(r?.usage.output_tokens).toBe(17290)
+  })
+
+  it('does NOT double-count a full envelope (structured parse wins over recovery)', () => {
+    const full = JSON.stringify({
+      type: 'result',
+      result: 'ok',
+      total_cost_usd: 0.5,
+      usage: { input_tokens: 100, output_tokens: 50 },
+      modelUsage: { 'claude-sonnet-4-6': { inputTokens: 100, outputTokens: 50, costUSD: 0.5 } },
+    })
+    const r = parseClaudeJsonResult(full)
+    expect(r?.total_cost_usd).toBe(0.5)
+    expect(r?.usage.input_tokens).toBe(100)
+    expect(r?.usage.output_tokens).toBe(50)
+  })
+
+  it('recoverClaudeUsage returns null when nothing is present', () => {
+    expect(recoverClaudeUsage('no numbers here')).toBeNull()
   })
 })

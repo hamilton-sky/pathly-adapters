@@ -1,6 +1,7 @@
 import type { Comment } from './useComments'
 import { resolvePrompt } from '../shared/PromptActionConfig/presetTypes'
 import type { PromptPreset } from '../shared/PromptActionConfig/presetTypes'
+import { useProjectStore } from '../../store/projectStore'
 
 export const SPLIT_PROMPT_TEMPLATE = [
   `You are restructuring a Pathly skill file into well-organized sections.`,
@@ -44,9 +45,19 @@ export function deriveLineNumber(fileBody: string, anchorText: string): number {
 }
 
 export function getSpawnCwd(filePath: string): string {
+  // Prefer the OPEN project root. One-shot telemetry is grouped (and shown in the Monitor's
+  // RECENT list) by EXACT project_root — so a spawn cwd of the file's OWN directory (a file in
+  // docs/ or src/, outside any /pathly/ feature tree) mis-scoped the run's invocation and it
+  // never appeared in history. Editor actions address the file by ABSOLUTE path, so running the
+  // CLI at the project root is safe and makes the scope consistent.
+  try {
+    const root = useProjectStore.getState().projectPath
+    if (root) return root.replace(/\\/g, '/').replace(/\/+$/, '')
+  } catch {
+    /* store unavailable — fall back to the path heuristic below */
+  }
   const norm = filePath.replace(/\\/g, '/')
-  // Anchor on the /pathly/ segment (features/, plans/, debugs/, …) so the spawn cwd is the
-  // project root for any feature-workspace tree, not just the legacy plans/ layout.
+  // Fallback: anchor on the /pathly/ segment (features/, plans/, debugs/, …); else the file dir.
   const pathlyIdx = norm.indexOf('/pathly/')
   return pathlyIdx !== -1 ? norm.slice(0, pathlyIdx) : norm.slice(0, norm.lastIndexOf('/'))
 }

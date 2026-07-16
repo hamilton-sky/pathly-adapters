@@ -844,6 +844,9 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
             label: telem.label || 'one-shot',
             agent_role: telem.role || engineBase || 'agent',
             adapter: engineBase || 'claude',
+            // The server re-parses stdout_tail with the ONE robust parser (parse_result) and
+            // prefers it; these client-parsed values are a fallback (spawn-parse-unification).
+            stdout_tail: (ptyOutput.get(tabId) ?? []).join(''),
             cost_usd: oneShotParsed?.total_cost_usd ?? 0,
             tokens_in: usage?.input_tokens ?? codex?.tokens_in ?? 0,
             tokens_out: usage?.output_tokens ?? codex?.tokens_out ?? 0,

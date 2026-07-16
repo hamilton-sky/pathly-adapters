@@ -266,3 +266,45 @@ def test_post_db_invocation_writes_one_invocation_and_span(client):
     assert invs[0]["scope_tier"] == "project"
     assert abs(invs[0]["cost_usd"] - 0.042) < 1e-9
     assert spans[0]["scope_tier"] == "project"
+
+
+def test_post_db_invocation_parses_stdout_tail_server_side(client):
+    """spawn-parse-unification: the server re-parses raw stdout_tail with the ONE parser
+    (parse_result) and PREFERS it over the client cost/tokens — so a claude editor one-shot whose
+    client parser bailed on a truncated envelope (recorded $0) is recovered server-side.
+    """
+    c, tmp_path = client
+    from pathly_orchestrator.db.connection import get_db
+    from pathly_orchestrator.db.queries.invocations import read_agent_invocations
+
+    pr = str(tmp_path / "proj-oneshot").replace("\\", "/")
+    # A truncated claude envelope: the opening brace + "type":"result" are gone; only the tail with
+    # the modelUsage entry survives — the exact shape that recorded claude one-shots at $0.
+    truncated = (
+        'sonnet-4-6":{"inputTokens":29,"outputTokens":17290,"cacheReadInputTokens":1916016,'
+        '"cacheCreationInputTokens":69871,"costUSD":1.2534678}},"uuid":"x"}'
+    )
+    resp = c.post(
+        "/db/invocation",
+        json={
+            "project_root": pr,
+            "feature": "editor-ai",
+            "scope_tier": "project",
+            "label": "diagram",
+            "agent_role": "diagrammer",
+            "adapter": "claude",
+            "stdout_tail": truncated,
+            # the client parsed nothing (the $0 bug) — the server must recover from stdout_tail
+            "cost_usd": 0,
+            "tokens_in": 0,
+            "tokens_out": 0,
+        },
+        content_type="application/json",
+    )
+    assert resp.status_code == 200
+    invs = read_agent_invocations(get_db(), pr, "editor-ai")
+    assert len(invs) == 1
+    assert abs(invs[0]["cost_usd"] - 1.2534678) < 1e-6
+    assert (invs[0]["tokens_in"] + invs[0]["tokens_out"]) == (
+        29 + 1916016 + 69871 + 17290
+    )

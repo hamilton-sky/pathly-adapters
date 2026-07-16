@@ -48,22 +48,26 @@ export function extractBalancedJson(s: string): string | null {
 export function parseClaudeJsonResult(stdout: string): ClaudeJsonResult | null {
   // Strip ANSI escape sequences
   const stripped = stdout.replace(/\x1b\[[0-9;]*[mGKHFABCDJsu]/g, '')
+  // Try the structured extraction first; if it fails (a large one-shot overflows the PTY tail
+  // buffer, dropping the object's opening brace / the "type":"result" marker), recover the
+  // cost + tokens from the raw text so the run is still billed — never $0.
+  return extractResultObject(stripped) ?? recoverClaudeUsage(stripped)
+}
 
-  // Claude emits {"type":"result",...} as compact JSON on one logical line, but
-  // the PTY terminal wraps it at the column width with \r\n sequences.  We find
-  // the marker, walk back to the opening brace, flatten the PTY wrapping in
-  // that section, then extract a balanced { } object before parsing.
+/** Pull the balanced {"type":"result",…} object out of buffered --output-format=json stdout.
+ *  Claude emits it as compact JSON on one logical line, but the PTY wraps it at the column width
+ *  with \r\n; find the marker, walk back to the opening brace, flatten the wrapping, extract the
+ *  balanced object, parse. Returns null if the object isn't fully present (→ recovery). */
+function extractResultObject(stripped: string): ClaudeJsonResult | null {
   const idxA = stripped.lastIndexOf('"type":"result"')
   const idxB = stripped.lastIndexOf('"type": "result"')
   const markerIdx = Math.max(idxA, idxB)
   if (markerIdx === -1) return null
 
-  // Walk backward to find the opening brace for this object
   let start = markerIdx
   while (start > 0 && stripped[start] !== '{') start--
   if (stripped[start] !== '{') return null
 
-  // Flatten PTY-introduced \r\n wrapping within the JSON section only
   const flat = stripped.slice(start).replace(/\r\n/g, '').replace(/\r/g, '')
   const json = extractBalancedJson(flat)
   if (!json) return null
@@ -73,6 +77,40 @@ export function parseClaudeJsonResult(stdout: string): ClaudeJsonResult | null {
     if (parsed.type === 'result') return parsed
   } catch { /* malformed */ }
   return null
+}
+
+/** Regex-recover cost + tokens when the structured extraction failed (truncated envelope).
+ *  Mirrors the server-side `runner/output.py::parse_result` recovery. Uses the camelCase
+ *  `modelUsage` token fields — which appear ONCE, in the final `result` event — never the
+ *  top-level snake_case `usage`, which a stream-json run repeats per turn, so it never
+ *  double-counts. Returns null when nothing is recoverable. */
+export function recoverClaudeUsage(text: string): ClaudeJsonResult | null {
+  const floats = (re: RegExp): number[] =>
+    [...text.matchAll(re)].map((m) => Number(m[1])).filter((n) => Number.isFinite(n))
+  const sumInts = (re: RegExp): number =>
+    [...text.matchAll(re)].reduce((s, m) => s + (parseInt(m[1], 10) || 0), 0)
+
+  const tc = floats(/"total_cost_usd"\s*:\s*([0-9.eE+-]+)/g)
+  const cost = tc.length
+    ? tc[tc.length - 1]
+    : floats(/"costUSD"\s*:\s*([0-9.eE+-]+)/g).reduce((s, n) => s + n, 0)
+  const tin =
+    sumInts(/"inputTokens"\s*:\s*([0-9]+)/g) +
+    sumInts(/"cacheReadInputTokens"\s*:\s*([0-9]+)/g) +
+    sumInts(/"cacheCreationInputTokens"\s*:\s*([0-9]+)/g)
+  const tout = sumInts(/"outputTokens"\s*:\s*([0-9]+)/g)
+  if (cost <= 0 && tin === 0 && tout === 0) return null
+  return {
+    result: '',
+    total_cost_usd: cost,
+    duration_ms: 0,
+    usage: {
+      input_tokens: tin,
+      output_tokens: tout,
+      cache_read_input_tokens: 0,
+      cache_creation_input_tokens: 0,
+    },
+  }
 }
 
 // ── stream-json renderer ─────────────────────────────────────────────────────

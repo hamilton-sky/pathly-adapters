@@ -375,3 +375,17 @@ the codex stream itself — `studio/src/main/ipc/codexJson.ts::parseCodexResult`
 `db/pricing.py::estimate_cost_for` — keyed by the **adapter slug** (`codex`→`gpt-5` family),
 since a one-shot spawns with no explicit `--model`. Same outcome: codex → `cost_source="estimated"`,
 token-less agy → `"unavailable"`.
+
+**Spawn-parse-unification — the server is the single telemetry parser.** The two-parser design
+above (Python `parse_result` for runner spawns; Studio `parseClaudeJsonResult`/`parseCodexResult`
+for one-shots) is why **claude editor one-shots recorded `$0`**: the *Studio* parser bailed to
+`null` when a large envelope overflowed the PTY tail buffer (the `"type":"result"` marker fell off
+the front) — the same truncation the Python parser now regex-recovers. Closed on both sides: (1)
+`parseClaudeJsonResult` (`claudeJson.ts`) gained the same regex recovery (`recoverClaudeUsage`,
+using the once-per-run camelCase `modelUsage` token fields, never the per-turn snake `usage`, so
+stream-json never double-counts); (2) more fundamentally, `terminal.ts` now sends the **raw
+`stdout_tail`** on the `/db/invocation` post, and `db_api_invocation.py` parses it with the **one**
+robust server parser (`runner/output.py::parse_result`) and PREFERS it over the client-parsed
+cost/tokens (kept only as a fallback). So the same parser (incl. truncation recovery) now backs
+BOTH the runner path (`/runner/terminal/result`) and the one-shot path (`/db/invocation`); the
+Studio parsers remain for the live terminal display.

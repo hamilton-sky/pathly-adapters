@@ -33,9 +33,11 @@ def db_invocation():
       label         str            — action name (maps to stage); default ""
       agent_role    str            — default ""
       adapter       str            — default ""
-      cost_usd      number         — default 0
-      tokens_in     int            — default 0
-      tokens_out    int            — default 0
+      cost_usd      number         — fallback cost if no stdout_tail / server parse finds none
+      tokens_in     int            — fallback; default 0
+      tokens_out    int            — fallback; default 0
+      stdout_tail   str            — raw CLI stdout; parsed server-side by parse_result (the ONE
+                                     robust parser) and PREFERRED over the client cost/tokens above
       session_id    str|null       — default null
       summary       str            — default ""
       wall_seconds  number         — default 0
@@ -60,6 +62,33 @@ def db_invocation():
         session_id = body.get("session_id") or None
         summary = body.get("summary") or ""
         wall_seconds = float(body.get("wall_seconds") or 0)
+
+        # Unified telemetry parse (spawn-parse-unification): if the client sends the raw CLI
+        # stdout, parse cost/tokens with the ONE server-side parser — runner/output.py::parse_result,
+        # the same robust parser (incl. truncation recovery) that runner spawns use — instead of
+        # trusting a second, drift-prone client-side parser. This is why claude editor one-shots
+        # recorded $0: the Studio parser bailed on a truncated envelope. The client-parsed cost/
+        # tokens above stay as a FALLBACK (older clients / when the server parse finds nothing), so
+        # a good client parse never regresses to $0.
+        stdout_tail = body.get("stdout_tail") or ""
+        if stdout_tail and adapter:
+            try:
+                from pathly_orchestrator.runner import parse_result
+
+                parsed = parse_result(adapter, stdout_tail)
+                p_cost = float(parsed.get("cost_usd") or 0)
+                p_in = int(parsed.get("tokens_in") or 0)
+                p_out = int(parsed.get("tokens_out") or 0)
+                if p_cost > 0:
+                    cost_usd = p_cost
+                if (p_in + p_out) > 0:
+                    tokens_in, tokens_out = p_in, p_out
+                if not tool_uses and parsed.get("tool_uses"):
+                    tool_uses = int(parsed.get("tool_uses") or 0)
+                if not summary and parsed.get("result"):
+                    summary = str(parsed.get("result"))[:2000]
+            except Exception:
+                logger.debug("db_invocation: server-side parse skipped", exc_info=True)
 
         from pathly_orchestrator.runner.telemetry import (
             new_trace_id,

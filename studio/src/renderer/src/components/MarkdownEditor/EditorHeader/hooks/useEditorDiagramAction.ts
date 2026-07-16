@@ -118,14 +118,15 @@ export function useEditorDiagramAction(
               // Setting the path opens the gallery automatically when forFile is visible
               // (the store's setMdEditorDiagramPath flips mdEditorDiagramPanelOpen).
               setMdEditorDiagramPath(sidecarPathFor(forFile), forFile)
+              // Keep the terminal tab (do NOT closeTab) so the agent's output stays inspectable —
+              // the diagram lands in the gallery, but the raw run is still viewable in the terminal.
               useTerminalStore.getState().updateTabStatus(tabId, 'done')
-              useTerminalStore.getState().closeTab(tabId)
               setMdEditorAction(forFile, 'diagram', { status: 'success', tabId, stopping: false })
               toast(`Diagram ready · ${fileName}`, 'success', 'agent_done')
               setTimeout(() => clearIfStill(forFile, tabId), 3000)
             } else {
+              // Keep the tab on failure too, so the error output is inspectable.
               useTerminalStore.getState().updateTabStatus(tabId, 'error')
-              useTerminalStore.getState().closeTab(tabId)
               setMdEditorAction(forFile, 'diagram', { status: 'error', tabId, stopping: false })
               toast(describeAgentFailure('Diagram', fileName, exitCode, tail), 'error', 'agent_done')
               setTimeout(() => clearIfStill(forFile, tabId), 3000)
