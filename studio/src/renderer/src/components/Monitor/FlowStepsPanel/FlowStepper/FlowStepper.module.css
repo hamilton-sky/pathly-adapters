@@ -1,0 +1,144 @@
+.stepper {
+  list-style: none;
+  margin: 0;
+  padding: 4px 6px;
+}
+
+.empty {
+  color: var(--text-muted);
+  font-size: 12px;
+  padding: 16px 12px;
+  text-align: center;
+}
+
+/* ── One step: decorative rail (dot + connector) + a clickable label column ── */
+.row {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--bg-surface1);
+  color: var(--text-muted);
+}
+
+.dot[data-status='completed'] {
+  background: #1d9e75;
+  color: #fff;
+}
+
+.dot[data-status='active'],
+.dot[data-status='active-retry'] {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 0 0 3px var(--bg-accent, rgba(55, 138, 221, 0.16));
+}
+
+.dot[data-status='pending'] {
+  background: transparent;
+  border: 2px solid var(--border);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .dot[data-status='active'],
+  .dot[data-status='active-retry'] {
+    animation: flowDotPulse 1.6s ease-in-out infinite;
+  }
+}
+
+@keyframes flowDotPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px var(--bg-accent, rgba(55, 138, 221, 0.18));
+  }
+  50% {
+    box-shadow: 0 0 0 6px var(--bg-accent, rgba(55, 138, 221, 0.05));
+  }
+}
+
+.connector {
+  width: 2px;
+  flex: 1;
+  min-height: 14px;
+  background: var(--border);
+  margin: 2px 0;
+}
+
+.connector[data-done] {
+  background: #5dcaa5;
+}
+
+/* ── Label column: state name + role, click → Configure-phase modal ── */
+.stepBtn {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 0 0 12px 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+}
+
+.state {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stepBtn:hover .state {
+  text-decoration: underline;
+}
+
+.state[data-status='active'],
+.state[data-status='active-retry'] {
+  color: var(--accent);
+}
+
+.state[data-status='pending'] {
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.role {
+  font-size: 10px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.retry {
+  font-size: 10px;
+  color: var(--orange, #f97316);
+  flex-shrink: 0;
+}

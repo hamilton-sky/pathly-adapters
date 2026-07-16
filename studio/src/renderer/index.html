@@ -21,6 +21,42 @@
       ::-webkit-scrollbar-thumb:hover { background: var(--text-muted, #5a5d8a); }
       ::-webkit-scrollbar-corner { background: transparent; }
     </style>
+    <script>
+      // net-heal (dev server only): Chromium aborts EVERY in-flight socket — including
+      // localhost ones — when the OS network state flips (VPN/Wi-Fi reconnect, sleep/wake,
+      // adapter change), surfacing as ERR_NETWORK_CHANGED. Because Vite dev serves each
+      // source file as a separate /@fs/ ESM request, one blip aborts a whole burst of module
+      // fetches at once → the module graph never finishes → white screen. This runs BEFORE
+      // /src/main.tsx (inline head script, no fetch dependency), so its listeners are armed
+      // when those fetches fail: it reloads once (guarded, one heal per 8s → no reload loop)
+      // to re-fetch the graph cleanly instead of leaving the window broken. Prod is served
+      // over file:// (no network stack, no ERR_NETWORK_CHANGED), so the http-origin gate
+      // makes this a no-op there.
+      (function () {
+        try {
+          if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
+          var KEY = 'pathly:netHealReloadAt';
+          function recentlyHealed() {
+            return Date.now() - Number(sessionStorage.getItem(KEY) || 0) < 8000;
+          }
+          function heal(why) {
+            if (recentlyHealed()) return;
+            sessionStorage.setItem(KEY, String(Date.now()));
+            console.warn('[net-heal] reloading renderer after ' + why);
+            setTimeout(function () { location.reload(); }, 350);
+          }
+          window.addEventListener('vite:preloadError', function () { heal('vite:preloadError'); });
+          window.addEventListener('error', function (e) {
+            var t = e && e.target;
+            if (t && (t.tagName === 'SCRIPT' || t.tagName === 'LINK')) { heal('resource:' + t.tagName); return; }
+            var msg = (e && e.message) || '';
+            // Only ESM graph-load failures — never generic app fetch() rejections (e.g. a
+            // down FSM server), which must NOT bounce the whole window.
+            if (/module script|dynamically imported module/i.test(msg)) heal('module-fetch');
+          }, true);
+        } catch (_e) { /* never let the guard itself break boot */ }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

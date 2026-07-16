@@ -5,25 +5,24 @@ import { useMonitorSession } from './hooks/useMonitorSession'
 import { useMonitorEngines } from './hooks/useMonitorEngines'
 import { useRecentEngines } from './hooks/useRecentEngines'
 import { HeaderBar } from './HeaderBar'
-import { TabBar } from './TabBar'
-import { FsmView } from './FsmView'
-import { FlowControlBar } from '../HQ/FlowControlBar/FlowControlBar'
 import { HealthCheck } from './HealthCheck'
 import { OutputBanner } from './output/OutputBanner/OutputBanner'
 import { MonitorBoard } from './EngineBoard'
 import { RunCostBadge } from './RunCostBadge/RunCostBadge'
 import { ConfigurePhaseModal } from './ConfigurePhaseModal/ConfigurePhaseModal'
+import { FlowStepsPanel } from './FlowStepsPanel/FlowStepsPanel'
 import styles from './Monitor.module.css'
 
-// The Pipeline panel: when a feature is selected, that feature's stage timeline (click a stage to
-// configure its agent/skill/host), settled run cost, and per-stage output sit on TOP as the
-// primary content — it's the run you're actually watching. BELOW sits a GLOBAL live engine board
-// (every running CLI engine — headless or interactive, any feature or a project one-shot — in
-// parity with the Engines dock) as the ambient monitor. The board is deliberately NOT
-// feature-scoped and NOT gated behind a feature selection: if an engine shows in the dock it must
-// show here too (with no feature selected the top is empty and the board is the only content).
+// The Pipeline panel, laid out as a row: the GLOBAL live engine board is the MAIN content (left) —
+// every running CLI engine (headless or interactive, any feature or a project one-shot), in parity
+// with the Engines dock; deliberately NOT feature-scoped and NOT gated behind a feature selection.
+// The feature's stage timeline + runner controls used to sit as a fixed bar on TOP; they now live
+// in FlowStepsPanel, a collapsible RIGHT dock that renders whichever flow is selected as a vertical
+// stepper (click a stage to configure its agent/skill/host) with the runner controls beneath it —
+// reclaiming the vertical space the board needs. HeaderBar / cost / health / output stay above the
+// board in the main column.
 export function Monitor(): JSX.Element {
-  const { activeTopic, activeFlowSessions, activeMonitorTab, setActiveMonitorTab, fsmState } = useStore()
+  const { activeTopic, fsmState } = useStore()
   const { effectiveTopic, showTabBar, refresh } = useMonitorSession()
   const [configStage, setConfigStage] = useState<string | null>(null)
   const engines = useMonitorEngines(null) // GLOBAL — every live engine, matching the dock
@@ -59,39 +58,40 @@ export function Monitor(): JSX.Element {
 
   return (
     <div className={styles.panel}>
-      {activeTopic ? (
-        <>
-          {showTabBar && (
-            <TabBar
-              sessions={activeFlowSessions}
-              activeTab={activeMonitorTab}
-              onTabSelect={setActiveMonitorTab}
-            />
+      <div className={styles.body}>
+        <div className={styles.main}>
+          {activeTopic ? (
+            <>
+              <HeaderBar effectiveTopic={effectiveTopic} onRefresh={refresh} />
+              <RunCostBadge feature={effectiveTopic} />
+              <HealthCheck />
+              <OutputBanner />
+            </>
+          ) : (
+            engines.length === 0 && recent.length === 0 && (
+              <span className={styles.placeholder}>
+                Select a feature to see its pipeline — or spawn a CLI engine to see it below
+              </span>
+            )
           )}
-          <HeaderBar effectiveTopic={effectiveTopic} onRefresh={refresh} />
-          <RunCostBadge feature={effectiveTopic} />
-          <HealthCheck />
-          <FsmView onStageClick={(stage) => setConfigStage(stage)} />
-          {/* Pipeline controls: pause / resume / advance / reroute / retry / abort, wired to the
-              /runner/* endpoints for the active run — the mid-flow control surface that was
-              previously only reachable via the unmounted HQ bar. */}
-          <FlowControlBar />
-          <OutputBanner />
-        </>
-      ) : (
-        engines.length === 0 && recent.length === 0 && (
-          <span className={styles.placeholder}>
-            Select a feature to see its pipeline — or spawn a CLI engine to see it below
-          </span>
-        )
-      )}
 
-      {/* Global engine board — every live CLI + recent history, in parity with the Engines dock.
-          Rendered UNDER the selected feature's pipeline so the stage timeline stays the primary,
-          top content and the global board is the ambient monitor beneath it. */}
-      {(engines.length > 0 || recent.length > 0) && (
-        <MonitorBoard engines={engines} recent={recent} onAction={handleEngineAction} />
-      )}
+          {/* Global engine board — every live CLI + recent history, in parity with the Engines
+              dock. It's the main content of the panel now that the stage timeline moved to the
+              right dock. */}
+          {(engines.length > 0 || recent.length > 0) && (
+            <MonitorBoard engines={engines} recent={recent} onAction={handleEngineAction} />
+          )}
+        </div>
+
+        {/* Collapsible right-side flow dock: the selected flow's vertical stepper + the runner
+            controls (pause / resume / advance / reroute / retry / abort). The flow tabs inside it
+            toggle which running flow the dock steps through. Replaces the old fixed top bar. */}
+        <FlowStepsPanel
+          effectiveTopic={effectiveTopic}
+          showTabBar={showTabBar}
+          onStageClick={(stage) => setConfigStage(stage)}
+        />
+      </div>
 
       {configStage && (
         <ConfigurePhaseModal stage={configStage} onClose={() => setConfigStage(null)} />

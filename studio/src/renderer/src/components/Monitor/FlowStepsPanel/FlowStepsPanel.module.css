@@ -1,0 +1,130 @@
+/* ── Expanded dock ── */
+.dock {
+  width: 216px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-surface0);
+  border-left: 1px solid var(--bg-surface1);
+  overflow: hidden;
+}
+
+/* ── Collapsed rail ── */
+.rail {
+  width: 34px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  background: var(--bg-surface0);
+  border-left: 1px solid var(--bg-surface1);
+}
+
+.railLabel {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.railDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--green, #22c55e);
+  margin-top: auto;
+  margin-bottom: 4px;
+}
+
+.iconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.iconBtn:hover {
+  background: var(--bg-surface1);
+  color: var(--text-primary);
+}
+
+/* ── Header ── */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 8px 8px 6px;
+  border-bottom: 1px solid var(--bg-surface1);
+  flex-shrink: 0;
+}
+
+.flowName {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-family: var(--font-family-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stateBadge {
+  flex-shrink: 0;
+  font-size: 10px;
+  color: var(--text-secondary);
+  background: var(--bg-surface1);
+  border-radius: var(--radius-full);
+  padding: 1px 7px;
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stateBadge[data-live] {
+  color: var(--accent);
+  background: var(--bg-accent, rgba(55, 138, 221, 0.14));
+}
+
+/* ── Flow tabs (multi-flow switch) ── */
+.tabs {
+  flex-shrink: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border-bottom: 1px solid var(--bg-surface1);
+}
+
+/* ── Stepper (scrolls) ── */
+.stepperWrap {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.empty {
+  color: var(--text-muted);
+  font-size: 12px;
+  padding: 18px 12px;
+  text-align: center;
+  line-height: 1.5;
+}
+
+/* ── Runner controls, re-homed from the old top bar ── */
+.footer {
+  flex-shrink: 0;
+  border-top: 1px solid var(--bg-surface1);
+}

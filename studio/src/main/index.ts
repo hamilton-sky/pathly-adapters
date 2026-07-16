@@ -121,6 +121,38 @@ function startFsmServer(): void {
   })
 }
 
+// Transient Chromium network errors that warrant a retry of the top-level dev navigation.
+// ERR_NETWORK_CHANGED (-21) is the headline case (OS network-state flip aborts in-flight
+// sockets, localhost included); the rest cover dev-server restarts + sleep/wake. ERR_ABORTED
+// (-3) is deliberately excluded — it fires on intentional navigations/HMR, not real failures.
+const _TRANSIENT_LOAD_ERRORS = new Set([-7, -21, -100, -101, -102, -105, -106, -118, -137, -264])
+
+// Main-frame backstop for the renderer net-heal in index.html: if the top-level document
+// navigation itself is aborted by a network flip (so the inline guard never even loads),
+// reload the dev URL with bounded backoff so the window self-heals instead of sitting blank.
+// Sub-resource /@fs/ module failures do NOT fire did-fail-load — those are handled in the
+// renderer; this only catches the initial navigation.
+function attachDevLoadResilience(win: BrowserWindow, url: string): void {
+  let attempts = 0
+  win.webContents.on(
+    'did-fail-load',
+    (_e, errorCode, errorDescription, _validatedURL, isMainFrame) => {
+      if (!isMainFrame || !_TRANSIENT_LOAD_ERRORS.has(errorCode) || attempts >= 5) return
+      attempts += 1
+      const delay = Math.min(2000, 300 * attempts)
+      console.warn(
+        `[net-heal] main-frame load failed (${errorCode} ${errorDescription}) — retry ${attempts}/5 in ${delay}ms`,
+      )
+      setTimeout(() => {
+        if (!win.isDestroyed()) win.loadURL(url)
+      }, delay)
+    },
+  )
+  win.webContents.on('did-finish-load', () => {
+    attempts = 0
+  })
+}
+
 function createWindow(projectPath?: string): BrowserWindow {
   const win = new BrowserWindow({
     width: 1280,
@@ -156,6 +188,7 @@ function createWindow(projectPath?: string): BrowserWindow {
     const url = projectPath
       ? `${devServerUrl}?PROJECT_PATH=${encodeURIComponent(projectPath)}`
       : devServerUrl
+    attachDevLoadResilience(win, url)
     win.loadURL(url)
   } else {
     const indexPath = join(__dirname, '../renderer/index.html')
