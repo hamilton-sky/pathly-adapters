@@ -59,6 +59,12 @@ jobs:
       - name: Install package and audit deps
         run: |
           pip install -e .
+          # pip-audit (unpinned below, so it tracks the latest CVE DB) audits the WHOLE installed
+          # env — so a fresh setuptools CVE (e.g. PYSEC-2026-3447 in 79.0.1) fails the job even
+          # though setuptools is only the BUILD backend, not a Pathly runtime dep. Resolve it by
+          # upgrading the env's setuptools to the current release — NOT by adding a build tool to
+          # [project] dependencies (which would force the constraint on every install).
+          pip install --upgrade setuptools
           # bandit is pinned so a new release can't add a check and break the job
           # repo-wide (same drift that bit black/mypy). pip-audit stays unpinned so
           # it always audits against the latest CVE database.
