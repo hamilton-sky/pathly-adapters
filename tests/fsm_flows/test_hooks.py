@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-REPO_ROOT = Path(__file__).parent.parent
+from _paths import REPO_ROOT
 CLASSIFY_HOOK = REPO_ROOT / "src" / "pathly_hooks" / "classify_feedback.py"
 INJECT_HOOK = REPO_ROOT / "src" / "pathly_hooks" / "inject_feedback_ttl.py"
 

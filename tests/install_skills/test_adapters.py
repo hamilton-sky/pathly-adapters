@@ -3,13 +3,11 @@
 from __future__ import annotations
 
 import sys
-from pathlib import Path
 
 import pytest
 import yaml
 
-ROOT = Path(__file__).parent.parent
-
+from _paths import REPO_ROOT as ROOT
 
 # ── Phase 1: adapters.yaml shape ──────────────────────────────────────────────
 

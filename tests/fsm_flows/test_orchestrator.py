@@ -9,16 +9,11 @@ from pathlib import Path
 import jsonschema
 import pytest
 
+from _paths import SRC
 from pathly_orchestrator.state import VALID_STATES, TRANSITIONS, STATES
 from pathly_orchestrator import eventlog as el
 
-SCHEMA_PATH = (
-    Path(__file__).parent.parent
-    / "src"
-    / "pathly_data"
-    / "schemas"
-    / "state.schema.json"
-)
+SCHEMA_PATH = SRC / "pathly_data" / "schemas" / "state.schema.json"
 SCHEMA = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
 
 

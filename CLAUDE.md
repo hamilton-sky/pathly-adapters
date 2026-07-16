@@ -137,11 +137,14 @@ pathly/pipeline-walkthrough/<slug>/  point-in-time pipeline records (never sync 
 python -m pytest tests/ -q
 python -m build                     # rebuilds all adapters from core
 python3 scripts/check_version_sync.py
+python scripts/gen_test_index.py    # regenerate tests/*/INDEX.md after adding/moving tests
 
 # Install / propagate agent+skill changes to ~/.claude
 pathly-setup claude --apply           # first install
 pathly-setup claude --apply --repair  # update already-installed files (fragments, skills, agents)
 ```
+
+**Test layout:** tests live in domain folders under `tests/` (index: [tests/INDEX.md](tests/INDEX.md)), each with a generated `INDEX.md`. A new test goes in the matching domain folder. To locate a repo file, import `REPO_ROOT`/`SRC`/`SNAPSHOT_DIR` from `tests/_paths.py` (or use the `repo_root`/`snapshot_dir` fixtures) — never `Path(__file__).parent.parent`, which silently resolves to `tests/` once a file is nested. Rerun `scripts/gen_test_index.py` after adding, moving, or removing a test (`--check` fails if an index is stale).
 
 ---
 

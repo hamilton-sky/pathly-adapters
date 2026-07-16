@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 import sys
-from pathlib import Path
 
 import pytest
 import yaml
 
+from _paths import SRC
 from pathly_orchestrator.state import get_transition_actions, validate_flow_cli
 
-FLOWS_DIR = Path(__file__).parent.parent / "src" / "pathly_data" / "core" / "flows"
+FLOWS_DIR = SRC / "pathly_data" / "core" / "flows"
 
 
 # ── get_transition_actions() ──────────────────────────────────────────────────

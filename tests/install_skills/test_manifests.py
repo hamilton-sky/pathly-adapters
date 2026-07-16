@@ -1,10 +1,9 @@
 import json
-from pathlib import Path
 import tomllib
 
 import pytest
 
-_REPO_ROOT = Path(__file__).parent.parent
+from _paths import REPO_ROOT as _REPO_ROOT
 
 _PLUGIN_JSON_PATHS = [
     _REPO_ROOT / "src/pathly_data/adapters/claude/.claude-plugin/plugin.json",

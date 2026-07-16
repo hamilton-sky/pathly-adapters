@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
+from _paths import REPO_ROOT
 from install_cli.detect import detect_hosts, _HOST_MARKERS
 from install_cli.materialize import (
     materialize,
@@ -255,12 +256,7 @@ def test_codex_install_injects_execution_contract_into_skills(monkeypatch):
 def test_skill_execution_md_decision_values():
     """SKILL_EXECUTION.md must document all three FSM decision values."""
     skill_exec = (
-        Path(__file__).parent.parent
-        / "src"
-        / "pathly_data"
-        / "adapters"
-        / "codex"
-        / "SKILL_EXECUTION.md"
+        REPO_ROOT / "src" / "pathly_data" / "adapters" / "codex" / "SKILL_EXECUTION.md"
     )
     content = skill_exec.read_text(encoding="utf-8")
     assert "continue" in content
@@ -271,12 +267,7 @@ def test_skill_execution_md_decision_values():
 def test_skill_execution_md_agent_hint_is_primary():
     """SKILL_EXECUTION.md must reference agent_hint as primary contract."""
     skill_exec = (
-        Path(__file__).parent.parent
-        / "src"
-        / "pathly_data"
-        / "adapters"
-        / "codex"
-        / "SKILL_EXECUTION.md"
+        REPO_ROOT / "src" / "pathly_data" / "adapters" / "codex" / "SKILL_EXECUTION.md"
     )
     content = skill_exec.read_text(encoding="utf-8")
     assert "agent_hint" in content
@@ -285,12 +276,7 @@ def test_skill_execution_md_agent_hint_is_primary():
 def test_skill_execution_md_no_codex_subagent_primary_dispatch():
     """codex_subagent must not appear as a primary dispatch reference."""
     skill_exec = (
-        Path(__file__).parent.parent
-        / "src"
-        / "pathly_data"
-        / "adapters"
-        / "codex"
-        / "SKILL_EXECUTION.md"
+        REPO_ROOT / "src" / "pathly_data" / "adapters" / "codex" / "SKILL_EXECUTION.md"
     )
     content = skill_exec.read_text(encoding="utf-8")
     assert "codex_subagent" not in content
@@ -481,7 +467,7 @@ def test_apply_hooks_install_yaml_uses_module_notation():
     import yaml as _yaml
 
     install_yaml = (
-        Path(__file__).parent.parent
+        REPO_ROOT
         / "src"
         / "pathly_data"
         / "adapters"

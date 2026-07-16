@@ -12,12 +12,12 @@ If the two YAML files drift apart, the tests in the OTHER repo will catch it.
 from __future__ import annotations
 
 import re
-from pathlib import Path
 
 import yaml
+
+from _paths import REPO_ROOT as _REPO_ROOT
 from pathly_hooks import FEEDBACK_PROTOCOL_VERSION
 
-_REPO_ROOT = Path(__file__).parent.parent
 _CONTRACT_PATH = _REPO_ROOT / "protocol_contract.yaml"
 
 CONTRACT = yaml.safe_load(_CONTRACT_PATH.read_text(encoding="utf-8"))

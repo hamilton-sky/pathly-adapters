@@ -6,17 +6,14 @@ Verifies:
 - The core agent file exists and is parseable (has expected front-matter and sections).
 """
 
-from pathlib import Path
-
-import pytest
-
+from _paths import SRC
 from pathly_orchestrator.compose import compose_skill, validate_composition
 
 # Marker from fragments/comms-post.md — proves the fragment was composed in.
 _COMMS_POST_MARKER = "Posting to the Comms Board"
 
 # Root of the core data package
-_CORE_ROOT = Path(__file__).parent.parent / "src" / "pathly_data" / "core"
+_CORE_ROOT = SRC / "pathly_data" / "core"
 
 
 # ── Composition ──────────────────────────────────────────────────────────────

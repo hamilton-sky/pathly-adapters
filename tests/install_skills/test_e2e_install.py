@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-REPO_ROOT = Path(__file__).parent.parent
+from _paths import REPO_ROOT
 
 
 def _make_env(tmp_path: Path) -> dict[str, str]:

@@ -6,10 +6,9 @@ while the real manifest's `skills:` map is empty, every skill composes
 byte-identical to its raw body.
 """
 
-from pathlib import Path
-
 import pytest
 
+from _paths import SNAPSHOT_DIR
 from pathly_orchestrator.compose import (
     adapter_caps_for,
     compose_skill,
@@ -21,7 +20,7 @@ from pathly_orchestrator.compose import (
 # A distinctive line from fragments/spawn-rules.md — used to assert gating.
 _SPAWN_RULES_MARKER = "## Sub-agent spawning rules"
 
-_SNAPSHOT_DIR = Path(__file__).parent / "snapshots"
+_SNAPSHOT_DIR = SNAPSHOT_DIR
 
 # The five shared-section H2 headings; each must appear exactly once in a composed skill.
 _SHARED_SECTIONS = [

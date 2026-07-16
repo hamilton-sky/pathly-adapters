@@ -1,8 +1,8 @@
-from pathlib import Path
+from _paths import REPO_ROOT
 
 _PROMPT_ROOTS = [
-    Path(__file__).parent.parent / "src/pathly_data/core/skills",
-    Path(__file__).parent.parent / "src/pathly_data/core/agents",
+    REPO_ROOT / "src/pathly_data/core/skills",
+    REPO_ROOT / "src/pathly_data/core/agents",
 ]
 
 

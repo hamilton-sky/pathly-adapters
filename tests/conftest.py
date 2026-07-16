@@ -2,10 +2,18 @@
 
 import os
 import shutil
+import sys
 import tempfile
 from pathlib import Path
 
+# Put tests/ on sys.path (before any test module is collected) so tests in domain
+# subfolders can `from _paths import REPO_ROOT`. conftest.py lives at tests/ root and
+# never moves, so this anchor is stable regardless of how deeply a test is nested.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
 import pytest
+
+import _paths  # noqa: E402  (depends on the sys.path insert above)
 
 
 @pytest.fixture
@@ -112,3 +120,19 @@ def _reset_rate_limiter(request):
     _clear()
     yield
     _clear()
+
+
+@pytest.fixture
+def repo_root() -> Path:
+    """Absolute repo root (pyproject.toml marker) — depth-independent.
+
+    Prefer this over ``Path(__file__).parent.parent`` in new tests: it resolves
+    correctly no matter which domain subfolder the test lives in.
+    """
+    return _paths.REPO_ROOT
+
+
+@pytest.fixture
+def snapshot_dir() -> Path:
+    """Absolute path to tests/snapshots/ (compose snapshot fixtures)."""
+    return _paths.SNAPSHOT_DIR
