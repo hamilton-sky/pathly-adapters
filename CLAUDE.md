@@ -268,6 +268,19 @@ run_id=…)` — so the invocation projection folds the REAL cost/tokens onto th
 when the supervisor's own `_reconcile_billing_now` races run completion (which is why
 consultation codex stages + the no-subagent planner used to show `$0`).
 
+**Every run gets a row, even one that self-reports nothing.** `BILLING_UPDATE` *patches an
+existing* `AGENT_DONE`; a run that writes none has nothing to patch → no projected invocation →
+it never appears in the Monitor's RECENT list and its cost is lost. This bit the board
+**evaluator** + **consolidate** runs (their `planning/evaluate` / `planning/consolidate` skills
+lacked the `completion-report` fragment, unlike every other terminal emitter). Two fixes close
+it: (1) both skills now compose `completion-report`, and `supervisor/board_run.py`
+(`_inject_board_prompt_vars`) substitutes the `<fsm_feature>`/`<feature_path>` placeholders it
+needs (board runs bypass `fsm_compose`); (2) a safety net — `supervisor/terminal.py`
+(`_synthesize_agent_done_if_missing`) writes a synthetic `AGENT_DONE` for any **executor-owned**
+run (board/single/loop) whose agent self-reported none, keyed by `run_id` and run *before*
+`_reconcile_billing_now` so the `BILLING_UPDATE` folds onto it (not a stale same-feature event).
+So a missing `completion-report` no longer means "vanished + unbilled."
+
 Stop hook (`src/pathly_hooks/stop_telemetry.py`) is now a **fallback for INTERACTIVE claude
 only**. It fires after every Claude Code session, but runner spawns carry
 `PATHLY_GATE_BILLED` (set in `terminal.ts` for `runnerTabMeta` tabs), so the hook **skips

@@ -178,6 +178,47 @@ def _resolve_progress(progress: str) -> str:
         return "normal"
 
 
+def _inject_board_prompt_vars(
+    skill_body: str,
+    *,
+    scope: str,
+    board: str,
+    agent: str,
+    skill: str,
+    project_root: str,
+    storage_path: str,
+) -> str:
+    """Substitute fragment placeholders in a board-run skill body.
+
+    Board runs assemble the prompt HERE, bypassing ``fsm_compose.build_prompt`` — so fragment
+    placeholders (``<fsm_feature>``, ``<feature_path>``, ``<feature>``, ``<board>``, ``<agent>``)
+    arrive raw. ``completion-report`` writes its ``AGENT_DONE`` keyed by ``<fsm_feature>``; if that
+    stays the literal string the event (and its projected invocation) is mis-keyed, so the run has
+    no telemetry row — it vanishes from the Monitor's RECENT list and goes unbilled. Reuse the flow
+    path's injector so board and flow substitution never drift. (``<run_id>`` is substituted
+    downstream in ``_run_stage_via_terminal``.) Best-effort — a raw placeholder never blocks a run.
+    """
+    try:
+        from pathlib import Path
+
+        from pathly_orchestrator.fsm_compose import _inject_prompt_vars
+        from pathly_orchestrator.fsm_ops import _resolve_storage_path
+
+        raw = storage_path or _resolve_storage_path(None, project_root, scope)
+        storage = Path(str(raw)) if raw else None
+        return _inject_prompt_vars(
+            skill_body,
+            feature=scope,
+            project_root=project_root or "",
+            agent_role=(agent or "agent"),
+            storage_path=storage,
+            skill=skill or None,
+            board_tier=board if board in ("feature", "project", "global") else "feature",
+        )
+    except Exception:
+        return skill_body
+
+
 def start_board_run(
     board: str,
     scope: str,
@@ -264,6 +305,15 @@ def start_board_run(
     # The composed skill body is the agent's behavior contract for this run.
     skill_body = _compose_skill_body(skill, adapter, caps=caps)
     if skill_body:
+        skill_body = _inject_board_prompt_vars(
+            skill_body,
+            scope=scope,
+            board=board,
+            agent=agent,
+            skill=skill,
+            project_root=project_root,
+            storage_path=storage_path,
+        )
         prompt_parts.append(skill_body)
     if system_prompt:
         prompt_parts.append("## System instructions\n\n" + system_prompt.strip())

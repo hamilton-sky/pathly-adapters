@@ -367,6 +367,63 @@ def _run_stage_via_terminal(
         except Exception as exc:
             logger.warning("_reconcile_billing_now: patch failed: %s", exc)
 
+    def _synthesize_agent_done_if_missing(data: Optional[dict]) -> None:
+        """Safety net: give an executor-owned run (board/single/loop) a telemetry row even when
+        its agent wrote NO AGENT_DONE. The invocation projection is keyed on AGENT_DONE, so a run
+        that self-reports none has no row — it never appears in the Monitor's RECENT list and its
+        cost is unbilled (the board evaluator/consolidate were exactly this before they got
+        completion-report). When a real AGENT_DONE for THIS run_id already exists, do nothing (the
+        agent self-reported). Otherwise write a synthetic AGENT_DONE carrying the PTY billing, keyed
+        by run_id, so the projector creates an invocation and the reconciliation BILLING_UPDATE
+        folds onto IT — not a stale same-feature AGENT_DONE. Runs BEFORE _reconcile_billing_now so
+        _patch_last_agent_done sees this as the last event. Best-effort; never raises into the loop."""
+        if not getattr(state, "executor_owned_telemetry", False):
+            return
+        try:
+            import time as _time
+
+            from pathly_orchestrator.fsm_ops import _resolve_storage_path
+            from pathly_orchestrator.runner import read_last_agent_done as _read_last
+
+            storage = (
+                Path(state.storage_path)
+                if state.storage_path
+                else _resolve_storage_path(None, state.project_root, state.topic)
+            )
+            last = _read_last(storage)
+            if last and last.get("run_id") == run_id:
+                return  # the agent self-reported this run — nothing to synthesize
+            billing = (data or {}).get("result") or {}
+            if not isinstance(billing, dict):
+                billing = {}
+            tin = int(billing.get("tokens_in") or 0)
+            tout = int(billing.get("tokens_out") or 0)
+            event = {
+                "type": "AGENT_DONE",
+                "agent": state.current_state or "agent",
+                "model": model or None,
+                "run_id": run_id,
+                "conversation": 0,
+                "result": "DONE",
+                "outcome": "success",
+                "summary": str(billing.get("summary") or "")[:2000],
+                "cost_usd": float(billing.get("cost_usd") or 0.0),
+                "tokens_in": tin,
+                "tokens_out": tout,
+                "total_tokens": tin + tout,
+                "wall_seconds": int((data or {}).get("wall_seconds") or 0),
+                "tool_uses": int(billing.get("tool_uses") or 0),
+                "ts": _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime()),
+                "schema_version": 1,
+                "synthetic": True,
+            }
+            _eventlog.append_event(str(storage), event)
+            logger.info(
+                "synthesized AGENT_DONE for executor run %s (agent wrote none)", run_id[:8]
+            )
+        except Exception as exc:
+            logger.debug("_synthesize_agent_done_if_missing skipped: %s", exc)
+
     try:
         # Early-advance baseline — capture feature_dir / feature / last_seq BEFORE the spawn
         # broadcast below. The AGENT_DONE watcher only reports events with seq > last_seq; if the
@@ -578,6 +635,7 @@ def _run_stage_via_terminal(
                 raise RuntimeError(
                     f"terminal_exit_nonzero: PTY for {tab_id} exited with code {exit_code}"
                 )
+            _synthesize_agent_done_if_missing(data)
             _reconcile_billing_now(data)
             _emit_executor_telemetry(
                 data.get("result") or {}, float(data.get("wall_seconds") or 0)
@@ -600,6 +658,7 @@ def _run_stage_via_terminal(
             raise RuntimeError(
                 f"terminal_exit_nonzero: PTY for {tab_id} exited with code {exit_code}"
             )
+        _synthesize_agent_done_if_missing(data)
         _reconcile_billing_now(data)
         _emit_executor_telemetry(
             data.get("result") or {}, float(data.get("wall_seconds") or 0)
