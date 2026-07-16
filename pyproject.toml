@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pathly-adapters"
-version = "2.21.1"
+version = "2.22.0"
 description = "Pathly adapter installer â€” stitches and deploys agent files to AI host tools."
 requires-python = ">=3.11"
 dependencies = ["pyyaml>=6.0,<7", "flask>=2.3,<4", "sqlite-vec==0.1.6", "sentence-transformers>=2.7.0"]

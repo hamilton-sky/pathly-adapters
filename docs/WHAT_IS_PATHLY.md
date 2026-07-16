@@ -37,6 +37,21 @@ This document is the north star: read it first. For package layout see [PATHLY_A
 
 Read it as a loop: the human seeds the **board**, the **app** decides and spawns the next agent, the **agent** does the work and connects back to the board through **fragments**, and the app advances — repeating until done.
 
+The same loop as a graph:
+
+```mermaid
+flowchart TB
+    H["👤 Human = supervisor<br/>sets goals · answers · adjudicates<br/><i>not per-step driving</i>"]
+    B["THE BOARD — comms_messages<br/>goals → task-DAG → artifacts → decisions → context"]
+    APP["APP ORCHESTRATION — headless<br/>supervisor loop + passive FSM<br/>decides each next step"]
+    CLI["CLI AGENT — claude / codex / …<br/>prompt = skill + FRAGMENTS<br/>comms-post · catalog-pull · progress · completion"]
+    H -->|"goal / decision / answer"| B
+    B -->|"decompose / dispatch"| APP
+    APP -->|"spawn per stage / task"| CLI
+    CLI -->|"progress · artifacts · decisions · completion<br/>(fragments ARE the wires back)"| B
+    B -.->|"context read into every prompt"| APP
+```
+
 ---
 
 ## 1. The board is the substrate
@@ -53,6 +68,24 @@ Everything in Pathly is mediated by a DB-backed message board (`comms_messages` 
 - A **goal** is decomposed into a **task-DAG** (dependency-ordered `type=task` rows).
 - An **executor** (`single` · `loop` · `team`) drains the DAG — the board *is* the queue, not an agent's memory.
 - Agents post **artifacts, decisions, discoveries, warnings, and progress** back to the board; the board is read back into the next agent's prompt. No agent is blind to what came before.
+
+```mermaid
+flowchart LR
+    G["GOAL<br/>type=goal<br/>executor = single | loop | team"]
+    G -->|decompose| DAG
+    subgraph DAG["TASK-DAG · type=task · depends_on"]
+      direction LR
+      T1["task 1"] --> T2["task 2"]
+      T1 --> T3["task 3"] --> T4["task 4"]
+    end
+    DAG --> EX{"executor<br/>drains the DAG"}
+    EX -->|single| S["one agent drains<br/>the whole DAG"]
+    EX -->|loop| L["supervisor owns the frontier<br/>≥1 worker, one per lane"]
+    EX -->|team| TM["FSM flow per task<br/>build → review → test"]
+    S --> ART["artifacts + decisions<br/>→ board → context"]
+    L --> ART
+    TM --> ART
+```
 
 The human's role here is **supervisory**: create goals, answer non-blocking questions, adjudicate escalations — outside the per-step loop.
 
@@ -85,6 +118,26 @@ Key facts (each independently confirmed by reading the code):
 - The supervisor decides every next step; **a `human` target in headless mode is treated as an error** (`cannot block waiting for human in headless mode`).
 - The agent's semantic result is **`AGENT_DONE.summary`** written to the DB by the agent itself (via the `completion-report` fragment) — *not* scraped from stdout. Stdout is only used for `session_id` + `cost_usd`. The same fragment writes an explicit **`AGENT_DONE.outcome`** (`success`/`failed`, + `error`) — the supervisor treats a clean process exit with `outcome:"failed"` as a task failure, not a success (silent-failure guard).
 - The same flow is **adapter-agnostic**: different stages can route to different CLI back-ends (`claude`, `codex`, …) via the flow's `adapter_map`.
+
+The full `team` pipeline the FSM walks (trimmed flows like `team-build`, `consultation`, `debug`, and `quick-fix` are subsets or reshapes of it — and a user can author any flow in the Canvas):
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> STORMING
+    STORMING --> PLANNING
+    PLANNING --> DESIGNING
+    DESIGNING --> BUILDING
+    BUILDING --> REVIEWING
+    REVIEWING --> BUILDING: review fails → route to owner
+    REVIEWING --> TESTING
+    TESTING --> BUILDING: test fails
+    TESTING --> RETRO
+    RETRO --> DONE
+    DONE --> [*]
+```
+
+Failure feedback is **routed to the role that owns the root cause** (a design flaw → architect, a scope gap → po/planner) which fixes its artifact before the builder re-implements — not blindly bounced back to the builder.
 
 ---
 

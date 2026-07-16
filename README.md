@@ -14,6 +14,76 @@ Typing `/pathly` commands into a single CLI by hand is a **secondary** mode — 
 
 This repository (`pathly-adapters`) is two things in one package: the **installer/stitcher** that deploys agent + skill files into your AI host tools, *and* the **local orchestration engine** (FSM HTTP server + SQLite board) that the Pathly Studio desktop app drives.
 
+## Architecture at a glance
+
+**The loop** — the human seeds the board, the app decides and spawns the next agent, the agent connects back through *fragments*, and the app advances until done:
+
+```mermaid
+flowchart LR
+    H["👤 Human<br/>supervisor"] -->|"goals · answers · decisions"| B
+    subgraph BOARD["THE BOARD — comms_messages · /comms/*"]
+      B["goals → task-DAG<br/>artifacts · decisions · context"]
+    end
+    B -->|"decompose · dispatch"| APP
+    subgraph APP["APP ORCHESTRATION — headless"]
+      direction TB
+      FSM["passive FSM<br/>computes next step,<br/>never spawns"]
+      SUP["supervisor loop<br/>spawns each stage"]
+      FSM --- SUP
+    end
+    APP -->|"spawn per stage / task<br/>prompt = skill + fragments"| CLI["CLI agents<br/>claude · codex · copilot · antigravity"]
+    CLI -->|"progress · artifacts · decisions · AGENT_DONE<br/>(via fragments)"| B
+    B -.->|"context read into every prompt"| APP
+```
+
+**The stack** — a local engine on `:8765` (Python) driven by the Studio desktop app; the engine emits `TERMINAL_SPAWN` over SSE, Studio opens a PTY per stage, and the CLI's result flows back:
+
+```mermaid
+flowchart TB
+    subgraph Studio["Pathly Studio — Electron desktop app"]
+      direction LR
+      CC["Command Center<br/>(the board)"]
+      PIPE["Pipeline<br/>flow dock + engine board"]
+      DBX["DB Explorer<br/>cost · tokens · OTel traces"]
+      CANVAS["Canvas<br/>visual flow editor"]
+    end
+    subgraph Engine["pathly_orchestrator — local engine · :8765"]
+      direction TB
+      HTTP["http_server<br/>FSM · /comms · /runner · /db · /code"]
+      SUP["supervisor<br/>PTY spawn · billing reconcile"]
+      RUN["runner<br/>argv · output parse · telemetry"]
+      DB[("db<br/>SQLite<br/>~/.pathly/pathly.db")]
+      HTTP --> SUP --> RUN --> DB
+      HTTP --> DB
+    end
+    Studio -->|"HTTP + SSE"| HTTP
+    SUP -->|"TERMINAL_SPAWN (SSE)"| Studio
+    Studio -->|"spawn PTY per stage"| CLIS["CLI engines<br/>claude · codex · copilot · agy"]
+    CLIS -->|"/runner/terminal/result"| HTTP
+```
+
+**A single headless stage** — the FSM decides, the supervisor spawns, the agent works + reports, the loop advances:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Sup as Supervisor
+    participant FSM as FSM (passive)
+    participant Studio
+    participant CLI as CLI agent
+    participant Board as Board (DB)
+    Sup->>FSM: POST /next_action
+    FSM-->>Sup: agent_hint.instructions + preferred_adapter
+    Sup->>Studio: TERMINAL_SPAWN (SSE)
+    Studio->>CLI: spawn PTY — prompt via -p argv
+    CLI->>Board: post progress · artifacts · decisions
+    CLI->>Board: write AGENT_DONE (summary · outcome · cost)
+    CLI-->>Studio: PTY exits
+    Studio->>Sup: POST /runner/terminal/result (real cost/tokens)
+    Sup->>FSM: POST /complete_stage
+    FSM-->>Sup: next state — repeat until DONE
+```
+
 ## Install (end users)
 
 Requires Python 3.11+. Install [pipx](https://pipx.pypa.io) if you don't have it:
@@ -137,7 +207,7 @@ driving Pathly workflows:
 The panels live in the sidebar **PANELS** nav:
 
 - **Command Center**: the board — goals, task-DAGs, artifacts, decisions, and questions. The primary supervisory surface; goal and per-task runs start here.
-- **Pipeline**: the selected feature's FSM stage stepper + per-stage config, over a **global live engine board** showing every running CLI engine (board runs, editor one-shots, and manual REPLs alike).
+- **Pipeline**: a **global live engine board** (every running CLI engine — board runs, editor one-shots, and manual REPLs alike) as the main content, with a **collapsible right-side flow dock** beside it — the selected flow rendered as a vertical stepper (any built-in *or* user-created flow shows its real phases, current stage highlighted), the runner controls (pause / resume / reroute / abort), and tabs to switch between concurrently-running flows. Click a stage to reconfigure its host/agent/skill.
 - **DB Explorer**: telemetry — per-feature and per-flow cost/token rollups, the event stream, and OpenTelemetry traces.
 - **Markdown Editor**: edit project markdown with one-shot AI actions (Split, Analyze, Diagram) that spawn CLI agents against the open file.
 - **Canvas**: visual flow editor — graph + raw YAML for `.flow.yaml` definitions, synced bidirectionally; Save writes via `PUT /flows/<name>`; export targets `pathly-package` / `claude-code` / `codex`.
@@ -145,7 +215,7 @@ The panels live in the sidebar **PANELS** nav:
 
 A floating **Engines** dock (`CliMonitorBar`) monitors every live CLI engine. A full **Terminal** hosts the PTY tabs — mini and full views share one xterm instance per `tabId` through `xtermRegistry` (hiding a view preserves the process; the bin action kills and removes the instance).
 
-**How runs execute:** each pipeline stage spawns a visible terminal tab with the agent running non-interactively — skills are injected via argv at spawn time, so no disk-installed skill files are needed for automated runs. On stage completion, `cost_usd` + `session_id` come from `--output-format=json` stdout, while the semantic result (and the `outcome` success/failed gate) comes from the last `AGENT_DONE` event — never subject to PTY truncation. A dual-cap spawn scheduler (`terminal.ts`) bounds concurrent engines: global ≤ 8, headless one-shots ≤ 5 (queued FIFO with priority), interactive ≤ 5 (rejected over cap); queue UI in `SpawnQueuePanel`.
+**How runs execute:** each pipeline stage spawns a visible terminal tab with the agent running non-interactively — skills are injected via argv at spawn time, so no disk-installed skill files are needed for automated runs. On stage completion the semantic result (and the `outcome` success/failed gate) comes from the last `AGENT_DONE` event — never subject to PTY truncation — while real `cost_usd` + tokens come from parsing the `--output-format=json` stdout (with a regex fallback that recovers them even when a large envelope overflows the PTY tail buffer). Every runner spawn is billed through one chokepoint (`POST /runner/terminal/result`), and a run that self-reports no `AGENT_DONE` still gets a synthesized one so it appears in the Monitor and is billed. A dual-cap spawn scheduler (`terminal.ts`) bounds concurrent engines: global ≤ 8, headless one-shots ≤ 5 (queued FIFO with priority), interactive ≤ 5 (rejected over cap); queue UI in `SpawnQueuePanel`.
 
 Studio always restarts the FSM server on launch — it gracefully shuts down any
 stale instance (POST `/shutdown`) and force-kills by port if needed, ensuring the
@@ -200,7 +270,7 @@ see [github.com/hamilton-sky/pathly](https://github.com/hamilton-sky/pathly) —
 
 ## Release Status
 
-Current version: **2.21.1**. Four adapters ship: Claude Code, Codex, Copilot,
+Current version: **2.22.0**. Four adapters ship: Claude Code, Codex, Copilot,
 and Antigravity. Core install path (`--dry-run`, `--apply`, `--uninstall`) is
 verified with full rollback on failure. Copilot destination paths follow the VS
 Code Copilot agent spec and may require `--repair` after a VS Code update.
