@@ -30,7 +30,7 @@ interface Props {
 
 export default function DiagramLightbox({ entry, fileName, onClose, onSaveLayout }: Props) {
   const stageRef = useRef<HTMLDivElement>(null)
-  const { zoom, pan, onWheel, onPointerDown, onPointerMove, onPointerUp, reset, zoomIn, zoomOut } =
+  const { zoom, pan, wheelRef, onPointerDown, onPointerMove, onPointerUp, reset, zoomIn, zoomOut } =
     useSvgPanZoom()
   const canArrange = useMemo(() => isArrangeable(entry.style, entry.content), [entry.style, entry.content])
   const [arranging, setArranging] = useState(false)
@@ -111,8 +111,8 @@ export default function DiagramLightbox({ entry, fileName, onClose, onSaveLayout
           </div>
         ) : (
           <div
+            ref={wheelRef}
             className={styles.viewport}
-            onWheel={onWheel}
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}

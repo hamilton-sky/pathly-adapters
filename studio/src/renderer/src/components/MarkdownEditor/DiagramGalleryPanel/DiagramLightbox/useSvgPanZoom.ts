@@ -2,7 +2,7 @@
 // pointer-drag pans; the lightbox feeds zoom/pan into the .stage via CSS custom properties.
 
 import { useCallback, useRef, useState } from 'react'
-import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from 'react'
+import type { PointerEvent as ReactPointerEvent } from 'react'
 
 const MIN_ZOOM = 0.5
 const MAX_ZOOM = 8
@@ -13,10 +13,23 @@ export function useSvgPanZoom() {
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const drag = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null)
 
-  const onWheel = useCallback((e: ReactWheelEvent) => {
+  // React registers `wheel` listeners as PASSIVE (for scroll perf), so preventDefault() inside a
+  // synthetic onWheel is a no-op — the browser logs "Unable to preventDefault inside passive event
+  // listener" on every scroll. Attach a NATIVE { passive: false } listener via this ref callback so
+  // we can actually cancel the page scroll while zooming. Put `ref={wheelRef}` on the viewport.
+  const wheelElRef = useRef<HTMLElement | null>(null)
+  const onWheelNative = useCallback((e: WheelEvent) => {
     e.preventDefault()
     setZoom((z) => clamp(z - Math.sign(e.deltaY) * 0.15 * z, MIN_ZOOM, MAX_ZOOM))
   }, [])
+  const wheelRef = useCallback(
+    (el: HTMLElement | null) => {
+      if (wheelElRef.current) wheelElRef.current.removeEventListener('wheel', onWheelNative)
+      wheelElRef.current = el
+      if (el) el.addEventListener('wheel', onWheelNative, { passive: false })
+    },
+    [onWheelNative],
+  )
 
   const onPointerDown = useCallback(
     (e: ReactPointerEvent) => {
@@ -46,5 +59,5 @@ export function useSvgPanZoom() {
   const zoomIn = useCallback(() => setZoom((z) => clamp(z * 1.25, MIN_ZOOM, MAX_ZOOM)), [])
   const zoomOut = useCallback(() => setZoom((z) => clamp(z / 1.25, MIN_ZOOM, MAX_ZOOM)), [])
 
-  return { zoom, pan, onWheel, onPointerDown, onPointerMove, onPointerUp, reset, zoomIn, zoomOut }
+  return { zoom, pan, wheelRef, onPointerDown, onPointerMove, onPointerUp, reset, zoomIn, zoomOut }
 }
