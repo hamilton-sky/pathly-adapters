@@ -361,8 +361,14 @@ def _run_stage_via_terminal(
                 else _resolve_storage_path(None, state.project_root, state.topic)
             )
             _patch_last_agent_done(
-                storage, cost, tokens_in, tokens_out, wall, tool_uses,
-                model=model, run_id=run_id,
+                storage,
+                cost,
+                tokens_in,
+                tokens_out,
+                wall,
+                tool_uses,
+                model=model,
+                run_id=run_id,
             )
         except Exception as exc:
             logger.warning("_reconcile_billing_now: patch failed: %s", exc)
@@ -376,7 +382,8 @@ def _run_stage_via_terminal(
         agent self-reported). Otherwise write a synthetic AGENT_DONE carrying the PTY billing, keyed
         by run_id, so the projector creates an invocation and the reconciliation BILLING_UPDATE
         folds onto IT — not a stale same-feature AGENT_DONE. Runs BEFORE _reconcile_billing_now so
-        _patch_last_agent_done sees this as the last event. Best-effort; never raises into the loop."""
+        _patch_last_agent_done sees this as the last event. Best-effort; never raises into the loop.
+        """
         if not getattr(state, "executor_owned_telemetry", False):
             return
         try:
@@ -405,7 +412,9 @@ def _run_stage_via_terminal(
                 "run_id": run_id,
                 # Executor-owned run TYPE for the Monitor's RECENT bucketing (goal-loop → loop,
                 # board/single runs → single) — mirrors the completion-report <run_category>.
-                "category": "loop" if (state.flow or "").lower() == "goal-loop" else "single",
+                "category": (
+                    "loop" if (state.flow or "").lower() == "goal-loop" else "single"
+                ),
                 "conversation": 0,
                 "result": "DONE",
                 "outcome": "success",
@@ -422,7 +431,8 @@ def _run_stage_via_terminal(
             }
             _eventlog.append_event(str(storage), event)
             logger.info(
-                "synthesized AGENT_DONE for executor run %s (agent wrote none)", run_id[:8]
+                "synthesized AGENT_DONE for executor run %s (agent wrote none)",
+                run_id[:8],
             )
         except Exception as exc:
             logger.debug("_synthesize_agent_done_if_missing skipped: %s", exc)
@@ -451,10 +461,14 @@ def _run_stage_via_terminal(
             try:
                 from pathly_orchestrator import db as _db
 
-                _row = _db.get_db().execute(
-                    "SELECT MAX(seq) FROM fsm_events WHERE project_root=? AND feature=?",
-                    (state.project_root, ea_feature),
-                ).fetchone()
+                _row = (
+                    _db.get_db()
+                    .execute(
+                        "SELECT MAX(seq) FROM fsm_events WHERE project_root=? AND feature=?",
+                        (state.project_root, ea_feature),
+                    )
+                    .fetchone()
+                )
                 ea_last_seq = _row[0] or 0
             except Exception as exc:
                 logger.warning(

@@ -49,12 +49,12 @@ PRICING: dict[str, dict[str, tuple[float, float]]] = {
         "claude-opus-4-1": (15.00, 75.00),
         "claude-sonnet-5": (3.00, 15.00),  # $2/$10 intro through 2026-08-31
         "claude-sonnet-4": (3.00, 15.00),  # Sonnet 4.5 / 4.6
-        "claude-haiku-4": (1.00, 5.00),    # Haiku 4.5
+        "claude-haiku-4": (1.00, 5.00),  # Haiku 4.5
     },
     # gpt-* → codex provider (see _ADAPTER_PREFIXES). codex spawns with no explicit --model, so the
     # user's codex 0.142 runs report `gpt-5` / `gpt-5-codex` → priced via the "gpt-5" prefix.
     "codex": {
-        "gpt-5": (1.25, 10.00),          # base GPT-5 / gpt-5-codex (launch rate)
+        "gpt-5": (1.25, 10.00),  # base GPT-5 / gpt-5-codex (launch rate)
         "gpt-5.3-codex": (1.75, 14.00),
         "gpt-5.4": (2.50, 15.00),
         "gpt-5.5": (5.00, 30.00),
@@ -140,7 +140,9 @@ def infer_provider(model: str) -> str:
 
 def estimate_cost(model: str, tokens_in: int, tokens_out: int) -> tuple[float, str]:
     """Resolve (cost_usd, cost_source) for *model*, inferring its provider from the name."""
-    return PricingRegistry().compute(infer_provider(model), model, tokens_in, tokens_out)
+    return PricingRegistry().compute(
+        infer_provider(model), model, tokens_in, tokens_out
+    )
 
 
 # When only an adapter slug is known (a renderer one-shot spawns with no explicit --model, so

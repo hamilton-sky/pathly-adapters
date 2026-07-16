@@ -21,9 +21,11 @@ from pathly_orchestrator.board_mirror import (
 )
 from pathly_orchestrator.db.connection import get_db
 from pathly_orchestrator.db.queries.comms_artifacts import insert_artifact
-from pathly_orchestrator.db.queries.comms_messages import post_message, soft_delete_message
+from pathly_orchestrator.db.queries.comms_messages import (
+    post_message,
+    soft_delete_message,
+)
 from pathly_orchestrator.db.queries.run_history import upsert_run
-
 
 # ── board_mirror_path ──────────────────────────────────────────────────────────────
 
@@ -31,7 +33,9 @@ from pathly_orchestrator.db.queries.run_history import upsert_run
 def test_board_mirror_path_global_ignores_project_root(tmp_path):
     with_root = board_mirror_path("global", "global", str(tmp_path / "somewhere"))
     without_root = board_mirror_path("global", "global", None)
-    assert with_root == without_root == Path.home() / ".pathly" / "global" / "BOARD.json"
+    assert (
+        with_root == without_root == Path.home() / ".pathly" / "global" / "BOARD.json"
+    )
 
 
 def test_board_mirror_path_project(tmp_path):
@@ -72,7 +76,14 @@ def test_board_mirror_path_normalizes_root(tmp_path):
 
 def test_serialize_board_shape_and_content():
     conn = get_db()
-    post_message(conn, board="feature", scope="s1", from_agent="human", type="nudge", text="hello")
+    post_message(
+        conn,
+        board="feature",
+        scope="s1",
+        from_agent="human",
+        type="nudge",
+        text="hello",
+    )
     data = serialize_board(conn, "feature", "s1")
     assert data["board"] == "feature"
     assert data["scope"] == "s1"
@@ -101,11 +112,19 @@ def test_serialize_board_excludes_soft_deleted():
 
 def test_serialize_board_sorted_by_ts_then_id():
     conn = get_db()
-    mid_a = post_message(conn, board="feature", scope="s3", from_agent="human", type="nudge", text="a")
-    mid_b = post_message(conn, board="feature", scope="s3", from_agent="human", type="nudge", text="b")
+    mid_a = post_message(
+        conn, board="feature", scope="s3", from_agent="human", type="nudge", text="a"
+    )
+    mid_b = post_message(
+        conn, board="feature", scope="s3", from_agent="human", type="nudge", text="b"
+    )
     # Force a deterministic order regardless of insertion order / wall-clock timing.
-    conn.execute("UPDATE comms_messages SET ts=? WHERE id=?", ("2026-01-01T00:00:02Z", mid_a))
-    conn.execute("UPDATE comms_messages SET ts=? WHERE id=?", ("2026-01-01T00:00:01Z", mid_b))
+    conn.execute(
+        "UPDATE comms_messages SET ts=? WHERE id=?", ("2026-01-01T00:00:02Z", mid_a)
+    )
+    conn.execute(
+        "UPDATE comms_messages SET ts=? WHERE id=?", ("2026-01-01T00:00:01Z", mid_b)
+    )
     conn.commit()
 
     data = serialize_board(conn, "feature", "s3")
@@ -114,9 +133,20 @@ def test_serialize_board_sorted_by_ts_then_id():
 
 def test_serialize_board_includes_linked_artifacts():
     conn = get_db()
-    mid = post_message(conn, board="feature", scope="s4", from_agent="human", type="artifact", text="art")
+    mid = post_message(
+        conn,
+        board="feature",
+        scope="s4",
+        from_agent="human",
+        type="artifact",
+        text="art",
+    )
     insert_artifact(
-        conn, message_id=mid, path="pathly/features/s4/NOTES.md", type="md", title="Notes"
+        conn,
+        message_id=mid,
+        path="pathly/features/s4/NOTES.md",
+        type="md",
+        title="Notes",
     )
     data = serialize_board(conn, "feature", "s4")
     assert len(data["artifacts"]) == 1
@@ -130,7 +160,14 @@ def test_serialize_board_includes_linked_artifacts():
 def test_write_board_mirror_writes_valid_json(tmp_path):
     conn = get_db()
     root = str(tmp_path / "proj1")
-    post_message(conn, board="feature", scope="featx", from_agent="human", type="nudge", text="hello")
+    post_message(
+        conn,
+        board="feature",
+        scope="featx",
+        from_agent="human",
+        type="nudge",
+        text="hello",
+    )
 
     ok = write_board_mirror(conn, "feature", "featx", root)
     assert ok is True
@@ -175,12 +212,33 @@ def test_export_project_boards_writes_existing_dirs_only(tmp_path):
     norm_root = root.replace("\\", "/").rstrip("/")
 
     # Project board: its scope MUST equal the normalized project_root.
-    post_message(conn, board="project", scope=norm_root, from_agent="human", type="nudge", text="hi project")
+    post_message(
+        conn,
+        board="project",
+        scope=norm_root,
+        from_agent="human",
+        type="nudge",
+        text="hi project",
+    )
     # Feature board A: its directory exists on disk.
     (root_dir / "pathly" / "features" / "featA").mkdir(parents=True)
-    post_message(conn, board="feature", scope="featA", from_agent="human", type="nudge", text="hi A")
+    post_message(
+        conn,
+        board="feature",
+        scope="featA",
+        from_agent="human",
+        type="nudge",
+        text="hi A",
+    )
     # Feature board B: no directory on disk -> must NOT be exported.
-    post_message(conn, board="feature", scope="featB", from_agent="human", type="nudge", text="hi B")
+    post_message(
+        conn,
+        board="feature",
+        scope="featB",
+        from_agent="human",
+        type="nudge",
+        text="hi B",
+    )
 
     count = export_project_boards(conn, root)
 
@@ -206,7 +264,14 @@ def test_export_project_boards_normalizes_root_for_scope_match(tmp_path):
     conn = get_db()
     root_dir = tmp_path / "proj4"
     clean_root = str(root_dir).replace("\\", "/").rstrip("/")
-    post_message(conn, board="project", scope=clean_root, from_agent="human", type="nudge", text="hi")
+    post_message(
+        conn,
+        board="project",
+        scope=clean_root,
+        from_agent="human",
+        type="nudge",
+        text="hi",
+    )
 
     messy_root = str(root_dir) + os.sep  # OS-native trailing separator
     count = export_project_boards(conn, messy_root)
@@ -224,7 +289,14 @@ def test_backfill_board_mirrors_exports_known_roots(tmp_path):
     root_dir = tmp_path / "proj5"
     norm_root = str(root_dir).replace("\\", "/").rstrip("/")
     upsert_run(conn, norm_root, "featx", "run-1", "done")
-    post_message(conn, board="project", scope=norm_root, from_agent="human", type="nudge", text="hi")
+    post_message(
+        conn,
+        board="project",
+        scope=norm_root,
+        from_agent="human",
+        type="nudge",
+        text="hi",
+    )
 
     backfill_board_mirrors(conn)
 

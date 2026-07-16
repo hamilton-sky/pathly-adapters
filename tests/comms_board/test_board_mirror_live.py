@@ -48,12 +48,18 @@ def test_board_from_scope_feature_is_a_slug():
 
 def test_resolve_project_root_project_is_the_scope():
     conn = get_db()
-    assert resolve_project_root(conn, "project", "C:/Users/Yafit/proj") == "C:/Users/Yafit/proj"
+    assert (
+        resolve_project_root(conn, "project", "C:/Users/Yafit/proj")
+        == "C:/Users/Yafit/proj"
+    )
 
 
 def test_resolve_project_root_project_normalizes():
     conn = get_db()
-    assert resolve_project_root(conn, "project", "C:\\Users\\Yafit\\proj\\") == "C:/Users/Yafit/proj"
+    assert (
+        resolve_project_root(conn, "project", "C:\\Users\\Yafit\\proj\\")
+        == "C:/Users/Yafit/proj"
+    )
 
 
 def test_resolve_project_root_global_is_none():
@@ -63,7 +69,13 @@ def test_resolve_project_root_global_is_none():
 
 def test_resolve_project_root_feature_from_run_history():
     conn = get_db()
-    upsert_run(conn, project_root="C:/Users/Yafit/proj", feature="feat-x", run_id="r1", status="done")
+    upsert_run(
+        conn,
+        project_root="C:/Users/Yafit/proj",
+        feature="feat-x",
+        run_id="r1",
+        status="done",
+    )
     assert resolve_project_root(conn, "feature", "feat-x") == "C:/Users/Yafit/proj"
 
 
@@ -79,7 +91,9 @@ def test_write_board_mirror_change_guard_skips_identical(tmp_path):
     conn = get_db()
     root = str(tmp_path / "proj")
     scope = root.replace("\\", "/").rstrip("/")
-    post_message(conn, board="project", scope=scope, from_agent="human", type="nudge", text="hi")
+    post_message(
+        conn, board="project", scope=scope, from_agent="human", type="nudge", text="hi"
+    )
     path = board_mirror_path("project", scope, root)
 
     assert write_board_mirror(conn, "project", scope, root) is True
@@ -100,7 +114,9 @@ def test_flush_dirty_writes_a_marked_project_board(tmp_path):
     _reset_dirty()
     conn = get_db()
     root = str(tmp_path / "proj").replace("\\", "/").rstrip("/")
-    post_message(conn, board="project", scope=root, from_agent="human", type="nudge", text="hi")
+    post_message(
+        conn, board="project", scope=root, from_agent="human", type="nudge", text="hi"
+    )
 
     with bm._dirty_lock:
         bm._dirty.add(("project", root))
@@ -117,7 +133,14 @@ def test_flush_dirty_resolves_feature_root_via_run_history(tmp_path):
     _reset_dirty()
     conn = get_db()
     root = str(tmp_path / "proj").replace("\\", "/").rstrip("/")
-    post_message(conn, board="feature", scope="feat-live", from_agent="human", type="nudge", text="hi")
+    post_message(
+        conn,
+        board="feature",
+        scope="feat-live",
+        from_agent="human",
+        type="nudge",
+        text="hi",
+    )
     upsert_run(conn, project_root=root, feature="feat-live", run_id="r1", status="done")
 
     with bm._dirty_lock:

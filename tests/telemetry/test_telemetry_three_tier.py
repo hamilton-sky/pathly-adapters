@@ -61,7 +61,8 @@ def test_project_agent_done_writes_tagged_invocation_and_span(tmp_path):
 
 def test_project_agent_done_estimates_codex_cost_from_tokens(tmp_path):
     """A codex one-shot reports tokens but no dollar cost (and carries no explicit model, just the
-    adapter slug). The projector must estimate the cost from tokens rather than record $0."""
+    adapter slug). The projector must estimate the cost from tokens rather than record $0.
+    """
     from pathly_orchestrator.db.connection import get_db
     from pathly_orchestrator.db.queries.invocations import read_agent_invocations
     from pathly_orchestrator.runner.telemetry import project_agent_done
@@ -70,7 +71,12 @@ def test_project_agent_done_estimates_codex_cost_from_tokens(tmp_path):
     project_agent_done(
         project_root=pr,
         feature=feat,
-        agent_done={"cost_usd": 0, "tokens_in": 1200, "tokens_out": 340, "agent": "diagrammer"},
+        agent_done={
+            "cost_usd": 0,
+            "tokens_in": 1200,
+            "tokens_out": 340,
+            "agent": "diagrammer",
+        },
         run_id="diagram-x",
         stage="ai-diagram",
         scope_tier="project",
@@ -93,7 +99,12 @@ def test_project_agent_done_marks_agy_unavailable_not_zero(tmp_path):
     project_agent_done(
         project_root=pr,
         feature=feat,
-        agent_done={"cost_usd": 0, "tokens_in": 0, "tokens_out": 0, "agent": "diagrammer"},
+        agent_done={
+            "cost_usd": 0,
+            "tokens_in": 0,
+            "tokens_out": 0,
+            "agent": "diagrammer",
+        },
         run_id="diagram-y",
         stage="ai-diagram",
         scope_tier="project",

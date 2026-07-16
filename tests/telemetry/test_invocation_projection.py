@@ -62,9 +62,7 @@ def _ad_model(agent, conv, model, total_tokens, ts="2026-07-06T12:00:00Z"):
     }
 
 
-def _billing_model(
-    agent, conv, model, run_id, tin, tout, ts="2026-07-06T12:01:00Z"
-):
+def _billing_model(agent, conv, model, run_id, tin, tout, ts="2026-07-06T12:01:00Z"):
     return {
         "type": "BILLING_UPDATE",
         "agent": agent,
@@ -79,7 +77,9 @@ def _billing_model(
     }
 
 
-def _ad_run(agent, conv, model, run_id, cost=0.0, total_tokens=0, ts="2026-07-06T12:00:00Z"):
+def _ad_run(
+    agent, conv, model, run_id, cost=0.0, total_tokens=0, ts="2026-07-06T12:00:00Z"
+):
     return {
         "type": "AGENT_DONE",
         "agent": agent,
@@ -162,10 +162,19 @@ def test_billing_folds_by_run_id_when_agent_is_none():
     Monitor cards: codex AGENT_DONE reports 0 tokens/0 cost; the gate's real tokens fold in
     by run_id and get priced."""
     conn = get_db()
-    append_event(conn, PR, "f_rid", _ad_run("reviewer", 0, "gpt-5-codex", "run-abc", 0.0, 0))
-    append_event(conn, PR, "f_rid", _billing_none_agent("run-abc", "gpt-5-codex", 0.0, 629778, 5781))
+    append_event(
+        conn, PR, "f_rid", _ad_run("reviewer", 0, "gpt-5-codex", "run-abc", 0.0, 0)
+    )
+    append_event(
+        conn,
+        PR,
+        "f_rid",
+        _billing_none_agent("run-abc", "gpt-5-codex", 0.0, 629778, 5781),
+    )
     rows = _invocations(conn, "f_rid")
-    assert len(rows) == 1, "billing must fold by run_id onto the reviewer row, not orphan"
+    assert (
+        len(rows) == 1
+    ), "billing must fold by run_id onto the reviewer row, not orphan"
     assert rows[0]["agent_role"] == "reviewer"
     assert rows[0]["tokens_in"] == 629778 and rows[0]["tokens_out"] == 5781
     assert rows[0]["cost_source"] == "estimated" and rows[0]["cost_usd"] > 0
@@ -176,13 +185,27 @@ def test_backfill_folds_by_run_id_when_agent_is_none():
     gate BILLING_UPDATE with agent=None but matching run_id → ONE row, billing's real
     (cache-aware) cost wins, no orphan."""
     conn = get_db()
-    append_event(conn, PR, "f_rid2", _ad_run("builder", 1, "claude-sonnet-4-6", "run-def", 0.28, 51951))
-    append_event(conn, PR, "f_rid2", _billing_none_agent("run-def", "claude-sonnet-4-6", 0.745, 1296172, 7293))
+    append_event(
+        conn,
+        PR,
+        "f_rid2",
+        _ad_run("builder", 1, "claude-sonnet-4-6", "run-def", 0.28, 51951),
+    )
+    append_event(
+        conn,
+        PR,
+        "f_rid2",
+        _billing_none_agent("run-def", "claude-sonnet-4-6", 0.745, 1296172, 7293),
+    )
     backfill_invocations_from_events(conn)
     rows = _invocations(conn, "f_rid2")
-    assert len(rows) == 1, "backfill must fold by run_id, not create an orphan 'agent' row"
+    assert (
+        len(rows) == 1
+    ), "backfill must fold by run_id, not create an orphan 'agent' row"
     assert rows[0]["agent_role"] == "builder"
-    assert abs(rows[0]["cost_usd"] - 0.745) < 1e-9  # billing's real cost supersedes the estimate
+    assert (
+        abs(rows[0]["cost_usd"] - 0.745) < 1e-9
+    )  # billing's real cost supersedes the estimate
 
 
 def test_two_agents_same_conversation_two_rows():
@@ -216,11 +239,15 @@ def test_billing_update_with_model_and_run_id_prices_and_stamps_run_id():
         "f_price2",
         _billing_model("builder", 1, "gpt-4o", "run-xyz", 50_000, 10_000),
     )
-    row = get_db().execute(
-        "SELECT cost_usd, cost_source, run_id, provider FROM agent_invocations "
-        "WHERE project_root=? AND feature=?",
-        (PR, "f_price2"),
-    ).fetchone()
+    row = (
+        get_db()
+        .execute(
+            "SELECT cost_usd, cost_source, run_id, provider FROM agent_invocations "
+            "WHERE project_root=? AND feature=?",
+            (PR, "f_price2"),
+        )
+        .fetchone()
+    )
     assert row is not None
     assert row["cost_source"] == "estimated"
     assert row["cost_usd"] > 0
@@ -256,11 +283,15 @@ def test_codex_zero_token_agent_done_is_pending_then_estimated():
         "f_pending",
         _billing_model("reviewer", 1, "gpt-5-codex", "run-cx", 2_000_000, 5_000),
     )
-    row = get_db().execute(
-        "SELECT cost_source, cost_usd FROM agent_invocations "
-        "WHERE project_root=? AND feature=?",
-        (PR, "f_pending"),
-    ).fetchone()
+    row = (
+        get_db()
+        .execute(
+            "SELECT cost_source, cost_usd FROM agent_invocations "
+            "WHERE project_root=? AND feature=?",
+            (PR, "f_pending"),
+        )
+        .fetchone()
+    )
     assert row["cost_source"] == "estimated"
     assert row["cost_usd"] > 0
 

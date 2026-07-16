@@ -763,7 +763,8 @@ def test_on_scope_count_fails_closed_on_db_error(tmp_path, monkeypatch):
 
 def test_count_ready_and_incomplete_tasks_for_scope_span_goals():
     """count_ready_tasks_for_scope / count_incomplete_tasks_for_scope must count across ALL
-    goals sharing a (board, scope) — the whole feature's task frontier, not one goal's."""
+    goals sharing a (board, scope) — the whole feature's task frontier, not one goal's.
+    """
     import sqlite3
     from pathly_orchestrator.db.migrations import _run_migrations
     from pathly_orchestrator.db.migrations_incremental import _add_additive_migrations
@@ -883,16 +884,18 @@ def test_complete_stage_feature_scoped_board_loop(tmp_path, monkeypatch):
     r1 = complete_stage(
         {"flow": "test", "topic": FEATURE, "project_root": str(tmp_path)}
     )
-    assert r1.get("current_state") == "BUILDING", r1  # on_scope_count(ready>0) looped back
+    assert (
+        r1.get("current_state") == "BUILDING"
+    ), r1  # on_scope_count(ready>0) looped back
 
     # Drain the DAG: mark the only task done → no ready tasks, none incomplete.
     with conn:
-        conn.execute(
-            "UPDATE comms_messages SET task_status='done' WHERE id=?", (t1,)
-        )
+        conn.execute("UPDATE comms_messages SET task_status='done' WHERE id=?", (t1,))
     eventlog.write_state(str(storage), {"current": "REVIEWING", "feature": FEATURE})
 
     r2 = complete_stage(
         {"flow": "test", "topic": FEATURE, "project_root": str(tmp_path)}
     )
-    assert r2.get("current_state") == "TESTING", r2  # DAG drained + require_tasks_done passed
+    assert (
+        r2.get("current_state") == "TESTING"
+    ), r2  # DAG drained + require_tasks_done passed

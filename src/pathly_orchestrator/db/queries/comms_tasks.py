@@ -260,7 +260,9 @@ def count_incomplete_tasks_for_goal(conn: sqlite3.Connection, goal_id: str) -> i
     return int(row["n"]) if row else 0
 
 
-def count_ready_tasks_for_scope(conn: sqlite3.Connection, board: str, scope: str) -> int:
+def count_ready_tasks_for_scope(
+    conn: sqlite3.Connection, board: str, scope: str
+) -> int:
     """Feature-scoped mirror of ``count_ready_tasks_for_goal``: BUILDABLE tasks (pending with
     every dependency done) across ALL goals in a ``(board, scope)``. This is the frontier
     ``team/build`` fetches by feature+scope, so the linear team pipeline's REVIEWING loop counts
@@ -286,7 +288,9 @@ def count_ready_tasks_for_scope(conn: sqlite3.Connection, board: str, scope: str
     return n
 
 
-def count_incomplete_tasks_for_scope(conn: sqlite3.Connection, board: str, scope: str) -> int:
+def count_incomplete_tasks_for_scope(
+    conn: sqlite3.Connection, board: str, scope: str
+) -> int:
     """Feature-scoped mirror of ``count_incomplete_tasks_for_goal``: tasks NOT done across ALL
     goals in a ``(board, scope)``. Drives the linear team pipeline's REVIEWING->TESTING
     completeness gate."""

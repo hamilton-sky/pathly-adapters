@@ -317,7 +317,8 @@ def runner_terminal_result():
                         )
             except Exception as exc:
                 logging.getLogger("pathly.http").warning(
-                    "runner_terminal_result: EVENTS.jsonl read / billing failed: %s", exc
+                    "runner_terminal_result: EVENTS.jsonl read / billing failed: %s",
+                    exc,
                 )
 
         # Fill the otel_spans + agent_invocations trace tables (one span + one invocation

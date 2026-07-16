@@ -47,7 +47,11 @@ def _num(v: object) -> float:
 
 
 def _price_if_needed(
-    cost: float, cost_source: str, model: str | None, tokens_in: object, tokens_out: object
+    cost: float,
+    cost_source: str,
+    model: str | None,
+    tokens_in: object,
+    tokens_out: object,
 ) -> tuple[float, str]:
     """Estimate cost from tokens when the event stream reported none.
 
@@ -139,7 +143,11 @@ def _upsert_projected(
     cost = _num(rec.get("cost_usd"))
     cost_source = "provider_reported" if cost > 0 else "unpriced"
     cost, cost_source = _price_if_needed(
-        cost, cost_source, rec.get("provider"), rec.get("tokens_in"), rec.get("tokens_out")
+        cost,
+        cost_source,
+        rec.get("provider"),
+        rec.get("tokens_in"),
+        rec.get("tokens_out"),
     )
     with _get_write_lock(conn):
         conn.execute(

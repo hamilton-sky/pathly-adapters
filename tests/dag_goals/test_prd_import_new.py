@@ -19,7 +19,13 @@ pytestmark = pytest.mark.no_pathly_autouse
 
 
 def _skill_text() -> str:
-    p = Path(pathly_data.__file__).parent / "core" / "skills" / "planning" / "prd-import.md"
+    p = (
+        Path(pathly_data.__file__).parent
+        / "core"
+        / "skills"
+        / "planning"
+        / "prd-import.md"
+    )
     return p.read_text(encoding="utf-8")
 
 

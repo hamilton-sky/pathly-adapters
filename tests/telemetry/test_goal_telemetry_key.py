@@ -72,8 +72,12 @@ def test_completion_report_posts_agent_done_under_fsm_feature():
     key. It must be <fsm_feature> (the slug) so the goal panel + reconciliation find the event.
     """
     out = compose_skill("team/build", "claude")
-    assert "'feature': '<fsm_feature>'" in out, "AGENT_DONE POST must key by <fsm_feature>"
-    assert "'feature': '<feature>'" not in out, "AGENT_DONE POST must NOT key by board scope"
+    assert (
+        "'feature': '<fsm_feature>'" in out
+    ), "AGENT_DONE POST must key by <fsm_feature>"
+    assert (
+        "'feature': '<feature>'" not in out
+    ), "AGENT_DONE POST must NOT key by board scope"
 
 
 def test_completion_report_fragment_source_uses_fsm_feature():

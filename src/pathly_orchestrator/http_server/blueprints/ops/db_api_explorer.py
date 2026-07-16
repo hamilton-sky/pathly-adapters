@@ -386,7 +386,8 @@ def db_stats_trends():
 @bp.route("/db/recent", methods=["GET"])
 def db_recent():
     """Recent spawns — the last N agent_invocations, newest first, for the monitor's RECENT/history
-    list (DB-backed persistent history). Optional project_root scope; limit default 20, max 100."""
+    list (DB-backed persistent history). Optional project_root scope; limit default 20, max 100.
+    """
     try:
         conn = _get_db()
         pr = _project_root_param()

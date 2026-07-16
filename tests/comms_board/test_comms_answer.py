@@ -40,7 +40,9 @@ def spy(monkeypatch):
     import pathly_orchestrator.http_server.blueprints.comms.messages_crud as mc
 
     events: list[tuple[str, dict]] = []
-    monkeypatch.setattr(mc, "_broadcast_comms", lambda scope, payload: events.append((scope, payload)))
+    monkeypatch.setattr(
+        mc, "_broadcast_comms", lambda scope, payload: events.append((scope, payload))
+    )
     return events
 
 

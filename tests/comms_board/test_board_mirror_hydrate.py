@@ -13,13 +13,15 @@ import json
 
 from pathly_orchestrator.board_mirror import hydrate_board, hydrate_project
 from pathly_orchestrator.db.connection import get_db
-from pathly_orchestrator.db.queries.comms_artifacts import insert_artifact, insert_artifact_row
+from pathly_orchestrator.db.queries.comms_artifacts import (
+    insert_artifact,
+    insert_artifact_row,
+)
 from pathly_orchestrator.db.queries.comms_messages import (
     get_all_messages,
     insert_message_row,
     post_message,
 )
-
 
 # ── insert_message_row ───────────────────────────────────────────────────────────
 
@@ -27,7 +29,12 @@ from pathly_orchestrator.db.queries.comms_messages import (
 def test_insert_message_row_round_trip_preserves_all_fields():
     conn = get_db()
     mid = post_message(
-        conn, board="feature", scope="s-rt1", from_agent="human", type="nudge", text="hello"
+        conn,
+        board="feature",
+        scope="s-rt1",
+        from_agent="human",
+        type="nudge",
+        text="hello",
     )
     conn.execute(
         "UPDATE comms_messages SET status=?, read_by=?, acknowledged_by=?, ts=? WHERE id=?",
@@ -40,11 +47,16 @@ def test_insert_message_row_round_trip_preserves_all_fields():
 
     conn.execute("DELETE FROM comms_messages WHERE id=?", (mid,))
     conn.commit()
-    assert conn.execute("SELECT * FROM comms_messages WHERE id=?", (mid,)).fetchone() is None
+    assert (
+        conn.execute("SELECT * FROM comms_messages WHERE id=?", (mid,)).fetchone()
+        is None
+    )
 
     insert_message_row(conn, original)
 
-    restored = conn.execute("SELECT * FROM comms_messages WHERE id=?", (mid,)).fetchone()
+    restored = conn.execute(
+        "SELECT * FROM comms_messages WHERE id=?", (mid,)
+    ).fetchone()
     assert restored is not None
     assert dict(restored) == original
 
@@ -52,14 +64,23 @@ def test_insert_message_row_round_trip_preserves_all_fields():
 def test_insert_message_row_idempotent_on_id_collision():
     conn = get_db()
     mid = post_message(
-        conn, board="feature", scope="s-rt3", from_agent="human", type="nudge", text="original"
+        conn,
+        board="feature",
+        scope="s-rt3",
+        from_agent="human",
+        type="nudge",
+        text="original",
     )
-    row = dict(conn.execute("SELECT * FROM comms_messages WHERE id=?", (mid,)).fetchone())
+    row = dict(
+        conn.execute("SELECT * FROM comms_messages WHERE id=?", (mid,)).fetchone()
+    )
     row["text"] = "would-be overwrite"
 
     insert_message_row(conn, row)  # id already exists -> INSERT OR IGNORE no-op
 
-    current = conn.execute("SELECT text FROM comms_messages WHERE id=?", (mid,)).fetchone()
+    current = conn.execute(
+        "SELECT text FROM comms_messages WHERE id=?", (mid,)
+    ).fetchone()
     assert current["text"] == "original"
 
 
@@ -97,7 +118,12 @@ def test_insert_message_row_empty_dict_is_a_noop():
 def test_insert_artifact_row_round_trip_preserves_all_fields():
     conn = get_db()
     mid = post_message(
-        conn, board="feature", scope="s-rt2", from_agent="human", type="artifact", text="art"
+        conn,
+        board="feature",
+        scope="s-rt2",
+        from_agent="human",
+        type="artifact",
+        text="art",
     )
     aid = insert_artifact(
         conn,
@@ -121,11 +147,16 @@ def test_insert_artifact_row_round_trip_preserves_all_fields():
 
     conn.execute("DELETE FROM comms_artifacts WHERE id=?", (aid,))
     conn.commit()
-    assert conn.execute("SELECT * FROM comms_artifacts WHERE id=?", (aid,)).fetchone() is None
+    assert (
+        conn.execute("SELECT * FROM comms_artifacts WHERE id=?", (aid,)).fetchone()
+        is None
+    )
 
     insert_artifact_row(conn, original)
 
-    restored = conn.execute("SELECT * FROM comms_artifacts WHERE id=?", (aid,)).fetchone()
+    restored = conn.execute(
+        "SELECT * FROM comms_artifacts WHERE id=?", (aid,)
+    ).fetchone()
     assert restored is not None
     assert dict(restored) == original
 
@@ -133,17 +164,30 @@ def test_insert_artifact_row_round_trip_preserves_all_fields():
 def test_insert_artifact_row_idempotent_on_id_collision():
     conn = get_db()
     mid = post_message(
-        conn, board="feature", scope="s-rt5", from_agent="human", type="artifact", text="art"
+        conn,
+        board="feature",
+        scope="s-rt5",
+        from_agent="human",
+        type="artifact",
+        text="art",
     )
     aid = insert_artifact(
-        conn, message_id=mid, path="pathly/features/s-rt5/A.md", type="md", title="original"
+        conn,
+        message_id=mid,
+        path="pathly/features/s-rt5/A.md",
+        type="md",
+        title="original",
     )
-    row = dict(conn.execute("SELECT * FROM comms_artifacts WHERE id=?", (aid,)).fetchone())
+    row = dict(
+        conn.execute("SELECT * FROM comms_artifacts WHERE id=?", (aid,)).fetchone()
+    )
     row["title"] = "would-be overwrite"
 
     insert_artifact_row(conn, row)  # id already exists -> INSERT OR IGNORE no-op
 
-    current = conn.execute("SELECT title FROM comms_artifacts WHERE id=?", (aid,)).fetchone()
+    current = conn.execute(
+        "SELECT title FROM comms_artifacts WHERE id=?", (aid,)
+    ).fetchone()
     assert current["title"] == "original"
 
 

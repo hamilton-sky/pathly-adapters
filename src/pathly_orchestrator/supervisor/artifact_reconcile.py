@@ -99,7 +99,9 @@ def reconcile_artifacts(
                     n += 1
                 except Exception as exc:
                     logger.warning(
-                        "reconcile_artifacts: feedback attach failed for %s: %s", fb, exc
+                        "reconcile_artifacts: feedback attach failed for %s: %s",
+                        fb,
+                        exc,
                     )
     except Exception as exc:
         logger.warning("reconcile_artifacts: feedback scan failed: %s", exc)

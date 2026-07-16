@@ -213,7 +213,9 @@ def _inject_board_prompt_vars(
             agent_role=(agent or "agent"),
             storage_path=storage,
             skill=skill or None,
-            board_tier=board if board in ("feature", "project", "global") else "feature",
+            board_tier=(
+                board if board in ("feature", "project", "global") else "feature"
+            ),
             # A board run IS a 'single' engine — so its completion-report AGENT_DONE stamps
             # category='single' and the Monitor's RECENT list buckets it correctly (not 'flow').
             run_category="single",

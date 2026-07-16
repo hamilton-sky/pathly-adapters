@@ -277,7 +277,10 @@ def skills_preview():
             from pathly_orchestrator.skills.compose import build_adapter_caps
 
             origin_parts = [
-                ("body", compose_skill(skill, build_adapter_caps("claude")).rstrip("\n"))
+                (
+                    "body",
+                    compose_skill(skill, build_adapter_caps("claude")).rstrip("\n"),
+                )
             ]
 
         feature = Path(feature_path).name if feature_path else ""

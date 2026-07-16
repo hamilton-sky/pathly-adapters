@@ -384,7 +384,9 @@ def run_gates(
                         get_db(), board or "feature", feature_scope
                     )
             except Exception:
-                incomplete = 0  # DB read error → fail-open (never wedge on a read hiccup)
+                incomplete = (
+                    0  # DB read error → fail-open (never wedge on a read hiccup)
+                )
             if incomplete > 0:
                 reason = (
                     f"{incomplete} task(s) are not done — the flow cannot advance while tasks "

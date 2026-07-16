@@ -203,7 +203,12 @@ def next_action(
     try:
         ensure_server_running(host=host, port=port)
         return _request_json(
-            "POST", _NEXT_ACTION_PATH, payload, host=host, port=port, timeout=_FSM_CALL_TIMEOUT
+            "POST",
+            _NEXT_ACTION_PATH,
+            payload,
+            host=host,
+            port=port,
+            timeout=_FSM_CALL_TIMEOUT,
         )
     except _ServerUnreachable:
         return _inprocess("next_action", payload)

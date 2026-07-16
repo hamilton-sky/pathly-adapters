@@ -184,7 +184,8 @@ def _codex_tokens(payload: dict[str, Any], raw_output: str) -> tuple[int, int]:
 
 def estimate_tokens_from_text(text: str) -> int:
     """Rough LOCAL token count for engines that report no usage: ~4 chars/token (an English
-    heuristic; deliberately provider-neutral). Swap for a real tokenizer per-adapter later."""
+    heuristic; deliberately provider-neutral). Swap for a real tokenizer per-adapter later.
+    """
     t = _ANSI_RE.sub("", text or "").strip()
     return (len(t) + 3) // 4 if t else 0
 
@@ -192,7 +193,8 @@ def estimate_tokens_from_text(text: str) -> int:
 def _agy_tokens(payload: dict[str, Any], raw_output: str) -> tuple[int, int]:
     """Antigravity / agy emits NO usage telemetry — ESTIMATE output tokens from the response
     text with a local tokenizer, so even this engine yields a token count (marked estimated
-    downstream). The prompt isn't in stdout, so input stays 0 until the gate threads it."""
+    downstream). The prompt isn't in stdout, so input stays 0 until the gate threads it.
+    """
     return 0, estimate_tokens_from_text(raw_output)
 
 
@@ -212,7 +214,8 @@ def extract_tokens(
 ) -> tuple[int, int]:
     """The single entry point for per-adapter token counting (Strategy A). Returns
     ``(tokens_in, tokens_out)``. Dispatches to the adapter's strategy in _TOKEN_STRATEGIES;
-    an unknown adapter falls back to the claude/generic envelope parser. Never raises."""
+    an unknown adapter falls back to the claude/generic envelope parser. Never raises.
+    """
     fn = _TOKEN_STRATEGIES.get((adapter or "claude").strip().lower(), _claude_tokens)
     try:
         return fn(payload, raw_output)

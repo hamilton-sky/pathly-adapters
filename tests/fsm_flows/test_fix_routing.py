@@ -73,7 +73,8 @@ def test_regression_review_failures_only_routes_builder(tmp_path):
 
 def test_priority_arch_before_review_failures(tmp_path):
     """Upstream-first: both ARCH_FEEDBACK and REVIEW_FAILURES open -> the architect
-    (root cause) is routed first per feedback_priority, not feedback_routing dict order."""
+    (root cause) is routed first per feedback_priority, not feedback_routing dict order.
+    """
     _write(tmp_path, "REVIEW_FAILURES.md")
     _write(tmp_path, "ARCH_FEEDBACK.md")
     result = route_feedback(FLOW, tmp_path)
@@ -154,7 +155,9 @@ def test_build_prompt_for_agent_architect_fix_mode(tmp_path):
 def test_build_prompt_for_agent_fix_mode_role_artifact_map(tmp_path, role, artifact):
     """Role -> artifact map from DESIGN.md ss3.1."""
     storage_path = _feature_storage(tmp_path)
-    prompt = build_prompt_for_agent(role, storage_path, feedback_file="SOME_FEEDBACK.md")
+    prompt = build_prompt_for_agent(
+        role, storage_path, feedback_file="SOME_FEEDBACK.md"
+    )
     assert "## Fix mode" in prompt
     assert f"Correct YOUR artifact: {artifact}" in prompt
 

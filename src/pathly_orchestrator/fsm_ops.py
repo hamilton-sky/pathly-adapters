@@ -84,7 +84,9 @@ def _resolve_storage_path(
     # pass flow_config=None here, so this is the one place that keeps a project run (its
     # topic is the project scope) from crashing the supervisor loop after its first stage.
     _nt = str(topic).replace("\\", "/").rstrip("/")
-    if topic == "project" or (_nt and _nt == str(project_root).replace("\\", "/").rstrip("/")):
+    if topic == "project" or (
+        _nt and _nt == str(project_root).replace("\\", "/").rstrip("/")
+    ):
         return root / "pathly" / "project"
     topic = _safe_topic(topic)
     for candidate in (

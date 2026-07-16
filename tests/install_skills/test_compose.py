@@ -216,7 +216,9 @@ def test_absent_skill_gets_board_bundle_with_board_default():
     This is the fix — a user-created skill run on a board still posts its artifacts/progress.
     """
     out = compose_skill(_ABSENT_SKILL, "claude", board_default=True)
-    assert _COMMS_POST_MARKER in out, "custom skill must get the comms-post recipe on a board"
+    assert (
+        _COMMS_POST_MARKER in out
+    ), "custom skill must get the comms-post recipe on a board"
     assert _PROGRESS_MARKER in out, "custom skill must get progress-logging on a board"
     # The skill body itself is still present (bundle is appended, not a replacement).
     assert out.count(_COMMS_POST_MARKER) == 1
@@ -240,7 +242,9 @@ def test_board_default_uses_manifest_board_defaults_key():
     }
     out = compose_skill(_ABSENT_SKILL, "claude", manifest=manifest, board_default=True)
     assert _COMMS_POST_MARKER in out
-    assert _PROGRESS_MARKER not in out, "board_defaults must override the hardcoded bundle"
+    assert (
+        _PROGRESS_MARKER not in out
+    ), "board_defaults must override the hardcoded bundle"
 
 
 def test_board_default_falls_back_to_hardcoded_bundle_when_key_absent():

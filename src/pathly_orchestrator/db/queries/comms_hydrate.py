@@ -35,7 +35,9 @@ def _insert_snapshot_row(conn: sqlite3.Connection, table: str, row: dict) -> Non
     try:
         cols = {
             c["name"]
-            for c in conn.execute(f"PRAGMA table_info({table})").fetchall()  # nosec B608
+            for c in conn.execute(
+                f"PRAGMA table_info({table})"
+            ).fetchall()  # nosec B608
         }
         keys = [k for k in row.keys() if k in cols]
         if not keys:

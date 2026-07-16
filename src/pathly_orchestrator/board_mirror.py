@@ -82,12 +82,15 @@ def board_from_scope(scope: str) -> str:
     return "feature"
 
 
-def resolve_project_root(conn: sqlite3.Connection, board: str, scope: str) -> str | None:
+def resolve_project_root(
+    conn: sqlite3.Connection, board: str, scope: str
+) -> str | None:
     """The project_root a (board, scope) mirror belongs to. global -> None (its mirror
     lives in ~/.pathly, no root); project -> the scope itself (it IS the root); feature ->
     the run_history lookup (★ — supersedes the SPEC's new-column idea; run_history already
     maps feature->project_root). None when a feature has no run history yet: it can't be
-    placed on the live path, but the startup backfill's on-disk scan still catches it."""
+    placed on the live path, but the startup backfill's on-disk scan still catches it.
+    """
     if board == "global":
         return None
     if board == "project":
@@ -144,7 +147,10 @@ def write_board_mirror(
         return True
     except Exception:
         logger.debug(
-            "write_board_mirror failed for board=%s scope=%s", board, scope, exc_info=True
+            "write_board_mirror failed for board=%s scope=%s",
+            board,
+            scope,
+            exc_info=True,
         )
         try:
             tmp_path.unlink(missing_ok=True)

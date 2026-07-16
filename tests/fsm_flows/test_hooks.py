@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 
 from _paths import REPO_ROOT
+
 CLASSIFY_HOOK = REPO_ROOT / "src" / "pathly_hooks" / "classify_feedback.py"
 INJECT_HOOK = REPO_ROOT / "src" / "pathly_hooks" / "inject_feedback_ttl.py"
 
@@ -241,7 +242,8 @@ def test_classify_feedback_five_way_split(tmp_path):
 
 def test_classify_feedback_default_scoped_by_file_family(tmp_path):
     """Risk #3: FAILURE files (REVIEW_FAILURES/TEST_FAILURES) default an untagged
-    bullet to [IMPL]; a QUESTION file (e.g. ARCH_FEEDBACK.md) keeps the [REQ] default."""
+    bullet to [IMPL]; a QUESTION file (e.g. ARCH_FEEDBACK.md) keeps the [REQ] default.
+    """
     fb_dir = tmp_path / "pathly" / "features" / "my-feature" / "feedback"
     fb_dir.mkdir(parents=True)
 

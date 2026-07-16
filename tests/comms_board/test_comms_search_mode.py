@@ -404,7 +404,9 @@ def test_comms_search_k_bounded_and_rejects_bool(client, monkeypatch):
     )
     for payload_k, expect in [(True, 5), (100000, 50), (0, 5), (7, 7)]:
         seen.clear()
-        client.post("/comms/search", json={"query": "q", "feature": "demo", "k": payload_k})
+        client.post(
+            "/comms/search", json={"query": "q", "feature": "demo", "k": payload_k}
+        )
         assert seen == [expect], f"k={payload_k!r} -> {seen}, expected {expect}"
 
 
@@ -419,7 +421,9 @@ def test_hybrid_reattaches_matched_chunk_on_dual_hit(monkeypatch):
     monkeypatch.setattr(
         _emb_q,
         "search_by_embedding",
-        lambda *a, **k: [{"id": "m1", "text": "t", "_distance": 0.4, "_matched_chunk": "the chunk"}],
+        lambda *a, **k: [
+            {"id": "m1", "text": "t", "_distance": 0.4, "_matched_chunk": "the chunk"}
+        ],
     )
     out = _emb_q.search_by_hybrid(None, "q", [0.0] * 384, ["feature"], ["demo"], 5)
     assert len(out) == 1
