@@ -187,6 +187,7 @@ pathly_orchestrator/
       comms_goals_read.py  # get_goals_with_rollup() — backs GET /comms/goals
       comms_summary.py     # per-artifact AI-summary selection/style/note setters+getters (unified-ai-routing)
       skill_composition.py # per-project skill-composition overrides (composition editor)
+      prompt_library.py    # prompt_library table CRUD — the ONE store behind every prompt dropdown (kind=preset single-select | ability stackable) + layer-3 ability packs; global/project merge, name-upsert, idempotent seed
   runner/                  # CLI runner, agent invocation, argv, output parsing
     argv.py                # resolve_argv, resolve_interactive_argv, _storage_path
     output.py              # parse_result, _extract_json_payload; extract_tokens + the per-adapter
@@ -243,7 +244,7 @@ pathly_orchestrator/
       runner/              # api.py + api_lifecycle.py + api_control.py — 13 /runner/* routes; streams.py (GET /events/menu|runner|spawn|history|stream|comms)
       flows/               # defs.py (flow CRUD); stage_configs.py (per-stage agent/model overrides)
       catalog/             # items.py (file-tree catalog)
-      skills/              # editor.py re-export shim; editor_render.py (/skills/catalog|parse|preview|compose|summary-format/<style>); editor_io.py (/skills/save|export)
+      skills/              # editor.py re-export shim; editor_render.py (/skills/catalog|parse|preview|compose [returns segments+tokens]|summary-format/<style>); editor_io.py (/skills/save|export); prompt_library.py (/skills/prompts — DB prompt-library CRUD)
       comms/               # board + goals/DAG, split by domain: messages*.py, tasks.py, artifacts*.py, runs.py, goals.py, goals_read.py (GET /comms/goals rollup), settings.py, context.py, features.py (/comms/features/decompose), project.py (/comms/project/decompose) (+ _helpers.py); see "Comms board endpoints" above
       ops/                 # telemetry*.py (/record_activity, /record_phase*, /telemetry/*); menu.py (/menu, /metrics); db_api*.py (/db/* read API); chat.py (/chat); export.py
       code/                # query.py (POST /code/query — codebase-intelligence)

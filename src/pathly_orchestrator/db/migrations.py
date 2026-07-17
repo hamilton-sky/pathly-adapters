@@ -238,6 +238,33 @@ CREATE TABLE IF NOT EXISTS app_settings (
     updated_at TEXT NOT NULL
 );
 
+-- The ONE library behind every prompt dropdown + the layer-3 ability packs.
+--   kind='preset'  → single-select alternatives (analyze/diagram/eval/system dropdowns)
+--   kind='ability' → additive, stackable modifiers (domain/approach packs)
+-- category buckets within a kind. skill_ref is the optional compose bridge. source is
+-- 'builtin' (seeded) or 'user' (added in the UI). project_root IS NULL is a GLOBAL row;
+-- a project row overrides a global one on the same (kind, category, name).
+CREATE TABLE IF NOT EXISTS prompt_library (
+    id           TEXT PRIMARY KEY,
+    project_root TEXT,
+    kind         TEXT NOT NULL,
+    category     TEXT NOT NULL,
+    name         TEXT NOT NULL,
+    label        TEXT NOT NULL,
+    hint         TEXT,
+    body         TEXT NOT NULL,
+    skill_ref    TEXT,
+    source       TEXT NOT NULL DEFAULT 'user',
+    sort_order   INTEGER DEFAULT 0,
+    created_at   TEXT NOT NULL,
+    updated_at   TEXT NOT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_prompt_lib_global
+    ON prompt_library(kind, category, name) WHERE project_root IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_prompt_lib_proj
+    ON prompt_library(kind, category, name, project_root) WHERE project_root IS NOT NULL;
+
 CREATE TABLE IF NOT EXISTS comms_messages (
     id                TEXT PRIMARY KEY,
     board             TEXT NOT NULL,

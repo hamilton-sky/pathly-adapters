@@ -317,7 +317,11 @@ def skills_preview():
 def skills_compose():
     """Compose a skill into one complete, dash-safe prompt for a client-side action."""
     try:
-        from pathly_orchestrator.compose import compose_skill, load_effective_manifest
+        from pathly_orchestrator.compose import (
+            compose_skill,
+            compose_skill_segments,
+            load_effective_manifest,
+        )
         from pathly_orchestrator.fsm_compose import _inject_prompt_vars
 
         data = request.get_json()
@@ -342,34 +346,53 @@ def skills_compose():
 
             _caps = build_adapter_caps(adapter, goal_id=goal_id)
             prompt = compose_skill(skill, _caps, manifest=manifest)
+            segments = compose_skill_segments(skill, _caps, manifest=manifest)
         except Exception:
             return jsonify({"error": f"unknown or unreadable skill {skill!r}"}), 404
 
         feature = (data.get("feature") or "").strip()
         agent_role = (data.get("agent_role") or skill.split("/")[-1]).strip()
-        prompt = _inject_prompt_vars(
-            prompt,
-            feature=feature,
-            project_root=project_root,
-            agent_role=agent_role,
-        )
+        _summary_fmt = _read_summary_format(_SUMMARY_FORMAT_BY_SKILL.get(skill, ""))
 
-        prompt = (
-            prompt.replace("<source_path>", str(transform.get("source_path") or ""))
-            .replace("<out_path>", str(transform.get("out_path") or ""))
-            .replace(
-                "<transform_kind>",
-                str(transform.get("kind") or transform.get("transform_kind") or ""),
+        def _apply_subs(text: str) -> str:
+            """The same placeholder substitutions, applied to the whole prompt AND to
+            each segment's text — so join(segments) stays byte-identical to prompt
+            (``_inject_prompt_vars`` + these replaces are all str.replace, distributive
+            over the segment boundaries)."""
+            text = _inject_prompt_vars(
+                text,
+                feature=feature,
+                project_root=project_root,
+                agent_role=agent_role,
             )
-        )
-
-        if "<summary_format>" in prompt:
-            prompt = prompt.replace(
-                "<summary_format>",
-                _read_summary_format(_SUMMARY_FORMAT_BY_SKILL.get(skill, "")),
+            text = (
+                text.replace("<source_path>", str(transform.get("source_path") or ""))
+                .replace("<out_path>", str(transform.get("out_path") or ""))
+                .replace(
+                    "<transform_kind>",
+                    str(transform.get("kind") or transform.get("transform_kind") or ""),
+                )
             )
+            if "<summary_format>" in text:
+                text = text.replace("<summary_format>", _summary_fmt)
+            return text
 
-        return jsonify({"prompt": prompt, "skill": skill, "composed": composed}), 200
+        prompt = _apply_subs(prompt)
+        segments = [{**s, "text": _apply_subs(s["text"])} for s in segments]
+        tokens = int(len(prompt.split()) * 1.3)
+
+        return (
+            jsonify(
+                {
+                    "prompt": prompt,
+                    "segments": segments,
+                    "tokens": tokens,
+                    "skill": skill,
+                    "composed": composed,
+                }
+            ),
+            200,
+        )
     except Exception as e:
         logging.exception("skills_compose error")
         return jsonify({"error": str(e), "type": type(e).__name__}), 500

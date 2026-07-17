@@ -10,6 +10,8 @@ from pathly_orchestrator.skills.compose import (  # noqa: F401
     resolve_block,
     compose_skill_with_block,
     compose_skill,
+    compose_skill_segments,
+    segments_to_prompt,
     validate_composition,
     _KNOWN_CAPABILITIES,
     _KNOWN_ADAPTERS,

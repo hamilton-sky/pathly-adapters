@@ -4,6 +4,8 @@ import { Tooltip } from '../../ui'
 import { COMMENT_COLORS } from '../useComments'
 import type { CommentColor } from '../useComments'
 import { PromptActionConfig } from '../../shared/PromptActionConfig/PromptActionConfig'
+import { useMergedPresets } from '../../shared/PromptActionConfig/useMergedPresets'
+import { useProjectStore } from '../../../store/projectStore'
 import { COMMENT_VERBS } from '../commentVerbs'
 import { CommentAnchor } from './CommentAnchor'
 import { useDraggable } from './hooks/useDraggable'
@@ -39,6 +41,13 @@ export function CommentModal({ anchorText, x, y, initialBody, onAdd, onSendNow, 
   const canSubmit = body.trim().length > 0
   const ref = useRef<HTMLDivElement>(null)
   const { onHandleMouseDown } = useDraggable(ref)
+  // Show the user's DB-backed 'comment' verbs alongside the built-ins in the ACTION dropdown.
+  const projectRoot = useProjectStore((s) => s.projectPath)
+  const { presets: mergedVerbs } = useMergedPresets(COMMENT_VERBS, {
+    kind: 'preset',
+    category: 'comment',
+    projectRoot,
+  })
 
   useEffect(() => {
     const el = ref.current
@@ -124,7 +133,7 @@ export function CommentModal({ anchorText, x, y, initialBody, onAdd, onSendNow, 
       <PromptActionConfig
         heading=""
         presetLabel="ACTION"
-        presets={COMMENT_VERBS}
+        presets={mergedVerbs}
         selectedPreset={verb}
         promptText=""
         extra=""

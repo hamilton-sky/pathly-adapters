@@ -432,6 +432,7 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
           filePath={mdEditorPath}
           storageKey={STORAGE_KEY_SPLIT}
           presets={SPLIT_PRESETS}
+          library={{ kind: 'preset', category: 'split', projectRoot: useProjectStore.getState().projectPath }}
           selectedPreset={splitPreset}
           presetPersistKey={PRESET_KEY_SPLIT}
           cli={splitCli}
@@ -476,6 +477,7 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
           filePath={mdEditorPath}
           storageKey={STORAGE_KEY_ANALYZE}
           presets={ANALYZE_LENSES}
+          library={{ kind: 'preset', category: 'analyze', projectRoot: useProjectStore.getState().projectPath }}
           selectedPreset={analyzePreset}
           presetPersistKey={PRESET_KEY_ANALYZE}
           cli={analyzeCli}
@@ -520,6 +522,7 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
           filePath={mdEditorPath}
           storageKey={STORAGE_KEY_DIAGRAM}
           presets={DIAGRAM_PRESETS}
+          library={{ kind: 'preset', category: 'diagram', projectRoot: useProjectStore.getState().projectPath }}
           selectedPreset={diagramPreset}
           presetPersistKey={PRESET_KEY_DIAGRAM}
           cli={diagramCli}

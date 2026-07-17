@@ -25,6 +25,8 @@ import { useComments } from './useComments'
 import type { CommentColor } from './useComments'
 import { deriveLineNumber, buildSendPrompt, getSpawnCwd } from './commentUtils'
 import { COMMENT_VERBS } from './commentVerbs'
+import { useMergedPresets } from '../shared/PromptActionConfig/useMergedPresets'
+import { useProjectStore } from '../../store/projectStore'
 import styles from './index.module.css'
 
 type TabMode = 'edit' | 'preview' | 'split'
@@ -95,6 +97,14 @@ function typeFromPath(p: string): 'skill' | 'agent' | 'template' | 'other' {
 
 export function Editor({ path: pathOverride, embedded }: { path?: string | null; embedded?: boolean } = {}): JSX.Element {
   const { selectedItem, markDirty, clearDirty, dirtyItems } = useStore()
+  // Merge the user's DB-backed 'comment' verbs so a saved verb picked in the modal resolves
+  // to its prompt on send (fail-soft: just the built-ins when the library is empty/unreachable).
+  const commentProjectRoot = useProjectStore((s) => s.projectPath)
+  const { presets: mergedCommentVerbs } = useMergedPresets(COMMENT_VERBS, {
+    kind: 'preset',
+    category: 'comment',
+    projectRoot: commentProjectRoot,
+  })
   const resetLastAppliedPath = useMarkdownEditorStore((s) => s.resetLastAppliedPath)
   const setMdEditorSplitDraftPath = useUiStore(s => s.setMdEditorSplitDraftPath)
   const splitDraftPath            = useUiStore(selectMdEditorSplitDraftPath)
@@ -299,7 +309,7 @@ export function Editor({ path: pathOverride, embedded }: { path?: string | null;
     const allUnresolved = [...comments.filter((c) => !c.resolved), newItem]
     const norm = effectivePath.replace(/\\/g, '/')
     const fileName = norm.split('/').pop() ?? 'file'
-    const verb = COMMENT_VERBS.find((v) => v.name === verbName)
+    const verb = mergedCommentVerbs.find((v) => v.name === verbName)
     const prompt = buildSendPrompt(effectivePath, body, allUnresolved, verb, extra)
     const tabId = `review-${Date.now().toString(36)}`
     addTab(tabId, `Review · ${fileName}`)

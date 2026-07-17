@@ -5,6 +5,7 @@ import { type EditorCli } from '../../MarkdownEditor/EditorHeader/editorCli'
 import { BoardSelect } from '../BoardSelect/BoardSelect'
 import { PromptBanner } from '../PromptPreview/PromptPreview'
 import { ConfigFooter } from './ConfigFooter'
+import { PresetAddRow } from './PresetAddRow'
 import type { PromptPreset } from './presetTypes'
 import s from './PromptActionConfig.module.css'
 
@@ -24,6 +25,8 @@ interface Props {
   onCliChange: (cli: EditorCli) => void
   onReset: () => void
   onPrimary: () => void
+  /** When set, renders a "Save current as prompt" affordance that persists to the library. */
+  onAddPreset?: (name: string) => void | Promise<void>
   bannerSlot?: ReactNode
   footerNote?: ReactNode
   secondaryLabel?: string
@@ -54,6 +57,7 @@ export function PromptActionConfig({
   onCliChange,
   onReset,
   onPrimary,
+  onAddPreset,
   bannerSlot,
   footerNote,
   secondaryLabel,
@@ -80,6 +84,7 @@ export function PromptActionConfig({
           (bannerSlot ?? (
             <PromptBanner editable editValue={promptText} onEditChange={onPromptTextChange} />
           ))}
+        {onAddPreset && <PresetAddRow onAdd={onAddPreset} />}
       </section>
 
       {showExtra !== false && (

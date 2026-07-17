@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom'
 import { SlidersHorizontal } from 'lucide-react'
 import { Tooltip } from '../../../ui'
 import { PromptActionConfig } from '../../../shared/PromptActionConfig/PromptActionConfig'
+import { useMergedPresets } from '../../../shared/PromptActionConfig/useMergedPresets'
+import { useProjectStore } from '../../../../store/projectStore'
 import { COMMENT_VERBS } from '../../commentVerbs'
 import {
   CLI_KEY_COMMENT,
@@ -34,6 +36,15 @@ export function CommentConfigButton({ onCliChange, onPresetChange }: Props): JSX
     return COMMENT_VERBS.find((v) => v.name === loadPreset(PRESET_KEY_COMMENT))?.prompt ?? ''
   })
   const [extra, setExtra] = useState(() => loadPreset(COMMENT_EXTRA_KEY))
+
+  // Merge the built-in comment verbs with the user's DB-backed 'comment' library prompts;
+  // the merged array drives BOTH the dropdown and preset→prompt resolution.
+  const projectRoot = useProjectStore((st) => st.projectPath)
+  const { presets: mergedVerbs, addPreset } = useMergedPresets(COMMENT_VERBS, {
+    kind: 'preset',
+    category: 'comment',
+    projectRoot,
+  })
 
   const triggerRef = useRef<HTMLButtonElement>(null)
   const popRef = useRef<HTMLDivElement>(null)
@@ -79,7 +90,7 @@ export function CommentConfigButton({ onCliChange, onPresetChange }: Props): JSX
     setSelectedPreset(name)
     savePreset(PRESET_KEY_COMMENT, name)
     onPresetChange(name)
-    const next = COMMENT_VERBS.find((v) => v.name === name)?.prompt ?? ''
+    const next = mergedVerbs.find((v) => v.name === name)?.prompt ?? ''
     setPromptText(next)
     savePreset(COMMENT_PROMPT_KEY, next)
   }
@@ -127,7 +138,7 @@ export function CommentConfigButton({ onCliChange, onPresetChange }: Props): JSX
             <PromptActionConfig
               heading="Comment defaults"
               presetLabel="ACTION"
-              presets={COMMENT_VERBS}
+              presets={mergedVerbs}
               selectedPreset={selectedPreset}
               promptText={promptText}
               extra={extra}
@@ -139,6 +150,7 @@ export function CommentConfigButton({ onCliChange, onPresetChange }: Props): JSX
               onCliChange={handleCliChange}
               onReset={handleReset}
               onPrimary={() => setOpen(false)}
+              onAddPreset={(name) => addPreset(name, promptText)}
             />
           </div>,
           document.body,

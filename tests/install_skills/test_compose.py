@@ -12,8 +12,10 @@ from _paths import SNAPSHOT_DIR
 from pathly_orchestrator.compose import (
     adapter_caps_for,
     compose_skill,
+    compose_skill_segments,
     load_manifest,
     resolve_block,
+    segments_to_prompt,
     validate_composition,
 )
 
@@ -671,3 +673,101 @@ def test_artifact_register_never_last():
             or "comms-post" in tail.lower()
             or "Completion" in tail
         ), f"{skill}: artifact-register appears to be the last section"
+
+
+# ── Segmented composition (K) — segments are the source of truth, string is join ──
+#
+# The UI renders SEGMENTS (body + each fragment/ability as a togglable unit); the CLI
+# spawns the STRING. These lock the two together so the preview can never diverge from
+# what actually runs: segments_to_prompt(compose_skill_segments(x)) == compose_skill(x).
+
+_SEGMENT_EQUIV_SKILLS = [
+    "development/commit",  # absent from manifest → raw passthrough
+    "development/analyze",  # no_defaults transform (client-file-output + artifact-transform)
+    "team/build",  # manifest skill, defaults + many fragments (+ gated spawn-rules)
+    "team/test",  # manifest skill, no spawn-rules
+    "planning/plan",  # manifest skill
+    "development/review",  # manifest skill, keeps its own PASS/FAIL exit
+]
+
+
+@pytest.mark.parametrize("skill", _SEGMENT_EQUIV_SKILLS)
+def test_segments_join_equals_compose_skill(skill):
+    """The join of the segments is byte-identical to compose_skill, for both cap sets."""
+    for caps in ("claude", {"can_spawn": False}):
+        segs = compose_skill_segments(skill, caps)
+        assert segments_to_prompt(segs) == compose_skill(
+            skill, caps
+        ), f"{skill} @ {caps}: segment join drifted from compose_skill"
+
+
+def test_segments_equivalence_with_goal_gated_fragments():
+    """Fragments gated on goal_id still round-trip for both goal / no-goal caps."""
+    from pathly_orchestrator.skills.compose import build_adapter_caps
+
+    for caps in (
+        build_adapter_caps("claude", goal_id="g1"),
+        build_adapter_caps("claude"),
+    ):
+        segs = compose_skill_segments("planning/dag-sketch", caps)
+        assert segments_to_prompt(segs) == compose_skill("planning/dag-sketch", caps)
+
+
+def test_segments_equivalence_board_default():
+    """board_default=True (a custom skill run on a board) also round-trips."""
+    segs = compose_skill_segments("development/commit", "claude", board_default=True)
+    assert segments_to_prompt(segs) == compose_skill(
+        "development/commit", "claude", board_default=True
+    )
+
+
+def test_segment_shape_body_first_and_labeled():
+    """First segment is the body; every segment carries the documented JSON-safe keys."""
+    segs = compose_skill_segments("team/build", "claude")
+    assert segs[0]["kind"] == "body"
+    assert segs[0]["id"] == "body"
+    assert segs[0]["source"] == "skill"
+    keys = {"id", "kind", "label", "text", "source", "optional", "requires", "included"}
+    for s in segs:
+        assert keys.issubset(s), f"segment missing keys: {keys - set(s)}"
+    # body is frontmatter-stripped (composed path)
+    assert not segs[0]["text"].startswith("---")
+
+
+def test_segment_gated_fragment_carried_but_excluded_when_cap_false():
+    """A gated-out fragment is LISTED (included=False) for the UI but NOT joined."""
+    segs = compose_skill_segments("team/build", {"can_spawn": False})
+    spawn = [s for s in segs if s["id"] == "spawn-rules"]
+    assert spawn, "spawn-rules segment must still be listed so the UI can grey it"
+    assert spawn[0]["included"] is False
+    assert spawn[0]["requires"] == "can_spawn"
+    assert _SPAWN_RULES_MARKER not in segments_to_prompt(segs)
+
+
+def test_segment_gated_fragment_included_when_cap_true():
+    segs = compose_skill_segments("team/build", {"can_spawn": True})
+    spawn = [s for s in segs if s["id"] == "spawn-rules"]
+    assert spawn and spawn[0]["included"] is True
+    assert _SPAWN_RULES_MARKER in segments_to_prompt(segs)
+
+
+def test_extra_segments_append_after_fragments():
+    """Layer-3 abilities: extra_segments append AFTER the skill's own fragments (server-side)."""
+    ability = {
+        "id": "ability:react-web",
+        "kind": "ability",
+        "label": "React web",
+        "text": "## Ability: React web\nPrefer function components.",
+        "source": "ability",
+        "optional": True,
+        "requires": None,
+        "included": True,
+        "raw": False,
+    }
+    segs = compose_skill_segments("team/build", "claude", extra_segments=[ability])
+    assert segs[-1]["id"] == "ability:react-web"
+    joined = segments_to_prompt(segs)
+    assert "## Ability: React web" in joined
+    assert joined.rstrip().endswith("Prefer function components.")
+    # the ability adds content the base compose_skill does not have
+    assert "## Ability: React web" not in compose_skill("team/build", "claude")
