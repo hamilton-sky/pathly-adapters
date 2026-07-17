@@ -249,3 +249,32 @@ def seed_builtins(conn: sqlite3.Connection, rows: list[dict]) -> int:
             inserted += 1
         conn.commit()
     return inserted
+
+
+def ability_segments(conn: sqlite3.Connection, ability_ids: list) -> list[dict]:
+    """Turn selected kind='ability' row ids into compose 'ability' segments (appended after a
+    skill's own fragments). Fail-soft: an unknown / non-ability id is skipped. Layer-safe home
+    (db/) so BOTH the /skills/compose route and supervisor/board_run build the same segments
+    without importing across layers."""
+    out: list[dict] = []
+    for aid in ability_ids or []:
+        try:
+            row = get_prompt(conn, aid)
+        except Exception:
+            row = None
+        if not row or row.get("kind") != "ability":
+            continue
+        out.append(
+            {
+                "id": "ability:" + row["name"],
+                "kind": "ability",
+                "label": row.get("label") or row["name"],
+                "text": (row.get("body") or "").rstrip("\n"),
+                "source": "ability",
+                "optional": True,
+                "requires": None,
+                "included": True,
+                "raw": False,
+            }
+        )
+    return out

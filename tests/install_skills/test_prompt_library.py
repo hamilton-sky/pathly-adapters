@@ -140,6 +140,30 @@ def test_ability_segments_from_library():
     assert _ability_segments([preset["id"], "pl_nope"], "") == []
 
 
+def test_board_run_composes_abilities():
+    """supervisor.board_run._compose_skill_body appends selected ability packs at spawn, and
+    is byte-identical to the plain board-default compose when none are selected."""
+    from pathly_orchestrator.supervisor.board_run import _compose_skill_body
+    from pathly_orchestrator.skills.compose import compose_skill
+
+    conn = get_db()
+    a = create_prompt(
+        conn,
+        kind="ability",
+        category="build",
+        name="react",
+        label="React",
+        body="## React\nUse function components.",
+    )
+    body = _compose_skill_body("development/build", "claude", ability_ids=[a["id"]])
+    assert "Use function components." in body
+
+    # No abilities → byte-identical to the plain board-default compose (no drift).
+    assert _compose_skill_body("development/build", "claude") == compose_skill(
+        "development/build", "claude", board_default=True
+    )
+
+
 def test_seed_builtins_idempotent_and_preserves_user_edit():
     conn = get_db()
     rows = [

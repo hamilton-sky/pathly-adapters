@@ -643,6 +643,8 @@ export interface RunBoardOpts {
   instructions?: string
   /** Headless board-progress verbosity: 'quiet' | 'normal' | 'verbose'. */
   progress?: string
+  /** Layer-3 ability library row ids to compose after the skill's fragments. */
+  abilityIds?: string[]
 }
 
 export async function apiRunBoard(
@@ -661,6 +663,7 @@ export async function apiRunBoard(
     if (opts.adapter) body.adapter = opts.adapter
     if (opts.instructions) body.instructions = opts.instructions
     if (opts.progress) body.progress = opts.progress
+    if (opts.abilityIds?.length) body.ability_ids = opts.abilityIds
     const r = await apiFetch('/comms/run', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

@@ -121,7 +121,7 @@ export interface CommsState {
   boardRunState: Record<string, 'idle' | 'running' | 'busy' | 'done'>
   /** Epoch ms when the board run started — drives the elapsed clock in RunPill. */
   boardRunStart: Record<string, number>
-  runSingleAgent: (key: string, opts: { agent?: string; skill?: string; systemPrompt?: string; interactive?: boolean; adapter?: string; instructions?: string; progress?: string }) => void
+  runSingleAgent: (key: string, opts: { agent?: string; skill?: string; systemPrompt?: string; interactive?: boolean; adapter?: string; instructions?: string; progress?: string; abilityIds?: string[] }) => void
   /** Run the evaluator on a board: classify its content and propose concrete tasks.
    *  `systemPrompt` carries the optional evaluation lens; `instructions` carries
    *  the optional extra-instructions box. */

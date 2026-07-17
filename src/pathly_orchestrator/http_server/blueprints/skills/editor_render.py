@@ -314,37 +314,15 @@ def skills_preview():
 
 
 def _ability_segments(ability_ids: list, project_root: str) -> list:
-    """Fetch selected layer-3 ability rows (prompt_library kind='ability') and turn each
-    into an 'ability' segment appended after the skill's own fragments. Fail-soft: an
-    unknown / non-ability id is skipped, so a bad selection never breaks composition."""
+    """Fetch selected layer-3 ability rows (prompt_library kind='ability') as compose
+    segments. Thin wrapper over the layer-safe db helper (shared with supervisor/board_run).
+    """
     if not ability_ids:
         return []
     from pathly_orchestrator.db.connection import get_db
-    from pathly_orchestrator.db.queries.prompt_library import get_prompt
+    from pathly_orchestrator.db.queries.prompt_library import ability_segments
 
-    conn = get_db(project_root or None)
-    out: list = []
-    for aid in ability_ids:
-        try:
-            row = get_prompt(conn, aid)
-        except Exception:
-            row = None
-        if not row or row.get("kind") != "ability":
-            continue
-        out.append(
-            {
-                "id": "ability:" + row["name"],
-                "kind": "ability",
-                "label": row.get("label") or row["name"],
-                "text": (row.get("body") or "").rstrip("\n"),
-                "source": "ability",
-                "optional": True,
-                "requires": None,
-                "included": True,
-                "raw": False,
-            }
-        )
-    return out
+    return ability_segments(get_db(project_root or None), ability_ids)
 
 
 @bp.route("/skills/compose", methods=["POST"])

@@ -29,6 +29,11 @@ def comms_run():
         agent = data.get("agent", "") or ""
         skill = data.get("skill", "") or ""
         system_prompt = data.get("system_prompt", "") or ""
+        # Layer-3 abilities: prompt_library row ids to compose after the skill's fragments.
+        ability_ids = data.get("ability_ids")
+        if not isinstance(ability_ids, list):
+            ability_ids = []
+        ability_ids = [a for a in ability_ids if isinstance(a, str)]
         interactive = bool(data.get("interactive", False))
 
         # "" (unset) is passed through so start_board_run resolves the app-wide default
@@ -114,7 +119,13 @@ def comms_run():
                         # evaluate's mandatory primary deliverable and must always exist. Capture
                         # the run's reply AS that artifact so a re-run isn't required.
                         reply = (summary or "").strip()
-                        trivial = reply.lower() in ("", "done", "finished", "complete", "ok")
+                        trivial = reply.lower() in (
+                            "",
+                            "done",
+                            "finished",
+                            "complete",
+                            "ok",
+                        )
                         saved = False
                         if project_root and not trivial:
                             try:
@@ -162,7 +173,8 @@ def comms_run():
                                 saved = True
                             except Exception:
                                 logging.debug(
-                                    "evaluator BOARD_EVAL salvage-write failed", exc_info=True
+                                    "evaluator BOARD_EVAL salvage-write failed",
+                                    exc_info=True,
                                 )
                         if not saved:
                             # Nothing meaningful to salvage → keep the original warning.
@@ -204,6 +216,7 @@ def comms_run():
             agent=agent if isinstance(agent, str) else "",
             skill=skill if isinstance(skill, str) else "",
             system_prompt=system_prompt if isinstance(system_prompt, str) else "",
+            ability_ids=ability_ids or None,
             interactive=interactive,
             progress=progress,
             broadcast_fn=_broadcast_runner,

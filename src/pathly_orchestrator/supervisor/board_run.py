@@ -113,23 +113,44 @@ def _default_spawn(
     return _run_stage_via_terminal(state, prompt, adapter, model, run_id, broadcast_fn)
 
 
-def _compose_skill_body(skill: str, adapter: str, caps: dict | None = None) -> str:
+def _compose_skill_body(
+    skill: str,
+    adapter: str,
+    caps: dict | None = None,
+    ability_ids: list | None = None,
+    project_root: str = "",
+) -> str:
     """Compose the chosen skill into its full prompt body (runner-mode delivery —
     assembled in Python and injected via argv; the CLI reads nothing from disk).
-    Returns '' on any failure so a board run is never blocked by a bad skill name."""
+    Returns '' on any failure so a board run is never blocked by a bad skill name.
+
+    ``ability_ids`` (layer-3) append the selected ability packs AFTER the skill's own
+    fragments via the segmented composer — byte-identical to the plain compose_skill path
+    when none are selected."""
     if not skill:
         return ""
+    _caps = caps if caps is not None else (adapter or "claude")
     try:
         from pathly_orchestrator.skills.compose import compose_skill
 
         # board_default=True: a custom skill (absent from the manifest) run on a board still
         # gets the default board bundle (comms-post + progress-logging) so it posts back —
         # instead of being handed to the CLI raw. A recognized skill is unaffected.
-        return compose_skill(
-            skill,
-            caps if caps is not None else (adapter or "claude"),
-            board_default=True,
+        if not ability_ids:
+            return compose_skill(skill, _caps, board_default=True)
+
+        from pathly_orchestrator.skills.compose import (
+            compose_skill_segments,
+            segments_to_prompt,
         )
+        from pathly_orchestrator.db.connection import get_db
+        from pathly_orchestrator.db.queries.prompt_library import ability_segments
+
+        extra = ability_segments(get_db(project_root or None), ability_ids)
+        segs = compose_skill_segments(
+            skill, _caps, board_default=True, extra_segments=extra
+        )
+        return segments_to_prompt(segs)
     except Exception:
         return ""
 
@@ -245,6 +266,7 @@ def start_board_run(
     progress: str = "",
     storage_path: str = "",
     caps: dict | None = None,
+    ability_ids: list | None = None,
     broadcast_fn=None,
     spawn_fn: Callable | None = None,
     on_start: Optional[Callable] = None,
@@ -313,7 +335,9 @@ def start_board_run(
     context = board_context_for(board, scope, project_root or "", instructions or "")
     prompt_parts: list[str] = []
     # The composed skill body is the agent's behavior contract for this run.
-    skill_body = _compose_skill_body(skill, adapter, caps=caps)
+    skill_body = _compose_skill_body(
+        skill, adapter, caps=caps, ability_ids=ability_ids, project_root=project_root
+    )
     if skill_body:
         skill_body = _inject_board_prompt_vars(
             skill_body,
