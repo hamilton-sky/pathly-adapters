@@ -313,14 +313,48 @@ def skills_preview():
         return jsonify({"error": str(e), "type": type(e).__name__}), 500
 
 
+def _ability_segments(ability_ids: list, project_root: str) -> list:
+    """Fetch selected layer-3 ability rows (prompt_library kind='ability') and turn each
+    into an 'ability' segment appended after the skill's own fragments. Fail-soft: an
+    unknown / non-ability id is skipped, so a bad selection never breaks composition."""
+    if not ability_ids:
+        return []
+    from pathly_orchestrator.db.connection import get_db
+    from pathly_orchestrator.db.queries.prompt_library import get_prompt
+
+    conn = get_db(project_root or None)
+    out: list = []
+    for aid in ability_ids:
+        try:
+            row = get_prompt(conn, aid)
+        except Exception:
+            row = None
+        if not row or row.get("kind") != "ability":
+            continue
+        out.append(
+            {
+                "id": "ability:" + row["name"],
+                "kind": "ability",
+                "label": row.get("label") or row["name"],
+                "text": (row.get("body") or "").rstrip("\n"),
+                "source": "ability",
+                "optional": True,
+                "requires": None,
+                "included": True,
+                "raw": False,
+            }
+        )
+    return out
+
+
 @bp.route("/skills/compose", methods=["POST"])
 def skills_compose():
     """Compose a skill into one complete, dash-safe prompt for a client-side action."""
     try:
         from pathly_orchestrator.compose import (
-            compose_skill,
             compose_skill_segments,
             load_effective_manifest,
+            segments_to_prompt,
         )
         from pathly_orchestrator.fsm_compose import _inject_prompt_vars
 
@@ -339,14 +373,22 @@ def skills_compose():
         if not isinstance(transform, dict):
             transform = {}
 
+        # Layer-3 abilities: prompt_library row ids (kind='ability') to append to the skill.
+        ability_ids = data.get("ability_ids")
+        if not isinstance(ability_ids, list):
+            ability_ids = []
+        ability_ids = [a for a in ability_ids if isinstance(a, str)]
+
         manifest = load_effective_manifest(project_root or None)
         composed = skill in (manifest.get("skills") or {})
         try:
             from pathly_orchestrator.skills.compose import build_adapter_caps
 
             _caps = build_adapter_caps(adapter, goal_id=goal_id)
-            prompt = compose_skill(skill, _caps, manifest=manifest)
-            segments = compose_skill_segments(skill, _caps, manifest=manifest)
+            extra_segments = _ability_segments(ability_ids, project_root)
+            segments = compose_skill_segments(
+                skill, _caps, manifest=manifest, extra_segments=extra_segments
+            )
         except Exception:
             return jsonify({"error": f"unknown or unreadable skill {skill!r}"}), 404
 
@@ -377,8 +419,10 @@ def skills_compose():
                 text = text.replace("<summary_format>", _summary_fmt)
             return text
 
-        prompt = _apply_subs(prompt)
         segments = [{**s, "text": _apply_subs(s["text"])} for s in segments]
+        # Prompt is the join of the (substituted) segments — so selected abilities flow into
+        # both; identical to the old compose_skill path when no abilities are selected.
+        prompt = segments_to_prompt(segments)
         tokens = int(len(prompt.split()) * 1.3)
 
         return (

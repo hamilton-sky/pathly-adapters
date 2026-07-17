@@ -111,6 +111,35 @@ def test_update_unknown_id_returns_none():
     assert update_prompt(get_db(), "pl_nope", {"label": "x"}) is None
 
 
+def test_ability_segments_from_library():
+    """editor_render._ability_segments turns kind='ability' rows into ability segments,
+    skipping unknown / non-ability ids (fail-soft)."""
+    from pathly_orchestrator.http_server.blueprints.skills.editor_render import (
+        _ability_segments,
+    )
+
+    conn = get_db()
+    row = create_prompt(
+        conn,
+        kind="ability",
+        category="build",
+        name="react-web",
+        label="React web",
+        body="## React web\nPrefer function components.",
+    )
+    segs = _ability_segments([row["id"]], "")
+    assert len(segs) == 1
+    assert segs[0]["kind"] == "ability" and segs[0]["source"] == "ability"
+    assert segs[0]["optional"] is True
+    assert "Prefer function components." in segs[0]["text"]
+
+    # a preset id (non-ability) and an unknown id are both skipped
+    preset = create_prompt(
+        conn, kind="preset", category="system", name="p", label="P", body="x"
+    )
+    assert _ability_segments([preset["id"], "pl_nope"], "") == []
+
+
 def test_seed_builtins_idempotent_and_preserves_user_edit():
     conn = get_db()
     rows = [
