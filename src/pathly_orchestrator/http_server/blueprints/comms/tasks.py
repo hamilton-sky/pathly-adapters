@@ -222,6 +222,15 @@ def comms_tasks_run():
         )
         project_root = data.get("project_root", "") or ""
         progress = data.get("progress", "") or ""
+        # Layer-3 abilities compose after the build skill's fragments; a gate Sections trim
+        # (prompt_override) is sent verbatim in place of the composed build prompt.
+        ability_ids = data.get("ability_ids")
+        if not isinstance(ability_ids, list):
+            ability_ids = []
+        ability_ids = [a for a in ability_ids if isinstance(a, str)]
+        prompt_override = data.get("prompt_override", "") or ""
+        if not isinstance(prompt_override, str):
+            prompt_override = ""
 
         conn = _get_db()
         row = conn.execute(
@@ -309,6 +318,8 @@ def comms_tasks_run():
             model=model,
             adapter=adapter,
             skill="development/build",
+            ability_ids=ability_ids or None,
+            prompt_override=prompt_override or "",
             progress=progress,
             broadcast_fn=_broadcast_runner,
             on_done=_on_done,

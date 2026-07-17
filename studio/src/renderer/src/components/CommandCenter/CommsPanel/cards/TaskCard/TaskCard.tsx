@@ -9,6 +9,11 @@ import { CopyTextButton } from '../../../../shared/CopyTextButton/CopyTextButton
 import { useCommsStore } from '../../../../../store/commsStore'
 import { TaskEditor } from './TaskEditor/TaskEditor'
 import SendPreviewModal from '../../../../shared/SendPreviewModal/SendPreviewModal'
+import { AbilityToggles } from '../../../../shared/AbilityToggles/AbilityToggles'
+import type { Ability } from '../../../../../services/abilities'
+import { headingLayers } from '../../../../../services/skillCompose'
+import { useStore } from '../../../../../store'
+import { useTaskRunPreview } from './useTaskRunPreview'
 import { GoalSelect } from '../../GoalRunButton/GoalSelect/GoalSelect'
 import {
   type EditorCli,
@@ -71,6 +76,7 @@ export function TaskCard({ task: t, siblings }: Props): JSX.Element {
   // claims the task (→ in_progress) and completes it, so the task's own status drives the pill;
   // `justRan` is a brief optimistic flag until that status catches up (and prevents double-fire).
   const runTask = useCommsStore((st) => st.runTask)
+  const projectPath = useStore((st) => st.projectPath)
   const stopTask = useCommsStore((st) => st.stopTask)
   const editTaskText = useCommsStore((st) => st.editTaskText)
   const taskStart = useCommsStore((st) => st.taskRunStart[t.id])
@@ -79,6 +85,7 @@ export function TaskCard({ task: t, siblings }: Props): JSX.Element {
   const runnable = (status === 'pending' || status === 'failed') && ready
   const [justRan, setJustRan] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [abilities, setAbilities] = useState<Ability[]>([])
   const [editing, setEditing] = useState(false)
   useEffect(() => { if (status !== 'pending') setJustRan(false) }, [status])
   // Editing is offered for any task that isn't actively running — editing an in_progress task
@@ -94,8 +101,19 @@ export function TaskCard({ task: t, siblings }: Props): JSX.Element {
     return TASK_UNAVAILABLE[a] ? 'claude' : a
   })
   const handleAdapter = (v: string): void => { setAdapter(v as EditorCli); saveEditorCli(CLI_KEY_TASK, v as EditorCli) }
+  // The composed build prompt shown in the gate — a Sections trim is sent verbatim as
+  // prompt_override; selected abilities compose into the build prompt either way.
+  const preview = useTaskRunPreview(confirmOpen, t.text, abilities.map((a) => a.id))
   const handleRun = (): void => { setConfirmOpen(true) }
-  const doRun = (): void => { setConfirmOpen(false); setJustRan(true); runTask(t.id, { adapter }) }
+  const doRun = (finalPrompt?: string, sectionsUsed?: boolean): void => {
+    setConfirmOpen(false)
+    setJustRan(true)
+    runTask(t.id, {
+      adapter,
+      abilityIds: abilities.length ? abilities.map((a) => a.id) : undefined,
+      promptOverride: sectionsUsed ? finalPrompt : undefined,
+    })
+  }
 
   return (
     <>
@@ -173,23 +191,27 @@ export function TaskCard({ task: t, siblings }: Props): JSX.Element {
         title="Run task"
         engineLabel={cliLabel(adapter)}
         fileName={firstLine(t.text)}
-        prompt={t.text}
+        prompt={preview.prompt}
         readOnly
+        headingLayers={headingLayers(preview.segments)}
         meta={[
           { label: 'Action', value: 'Build just this task' },
           { label: 'Skill', value: 'development/build' },
         ]}
         submitLabel="Run"
         footerSlot={
-          <GoalSelect
-            value={adapter}
-            options={ADAPTER_OPTIONS}
-            onChange={handleAdapter}
-            ariaLabel="CLI engine"
-            minWidth={110}
-          />
+          <div className={s.gateControls}>
+            <AbilityToggles projectRoot={projectPath} selectedIds={abilities.map((a) => a.id)} onChange={setAbilities} />
+            <GoalSelect
+              value={adapter}
+              options={ADAPTER_OPTIONS}
+              onChange={handleAdapter}
+              ariaLabel="CLI engine"
+              minWidth={110}
+            />
+          </div>
         }
-        onSubmit={doRun}
+        onSubmit={(finalPrompt, sectionsUsed) => doRun(finalPrompt, sectionsUsed)}
         onCancel={() => setConfirmOpen(false)}
       />
     )}

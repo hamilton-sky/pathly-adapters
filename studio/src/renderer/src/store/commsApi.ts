@@ -888,12 +888,15 @@ export async function apiRunGoal(
 // in_progress/done via the board feed, so callers don't track a separate run state.
 export async function apiRunTask(
   taskId: string,
-  opts: { projectRoot?: string; adapter?: string } = {},
+  opts: { projectRoot?: string; adapter?: string; abilityIds?: string[]; promptOverride?: string } = {},
 ): Promise<{ ok: boolean; reason?: string; run_id?: string } | null> {
   try {
     const body: Record<string, unknown> = { message_id: taskId }
     if (opts.projectRoot) body.project_root = opts.projectRoot
     if (opts.adapter) body.adapter = opts.adapter
+    // Layer-3 abilities compose into the build prompt; a Sections trim is sent verbatim.
+    if (opts.abilityIds?.length) body.ability_ids = opts.abilityIds
+    if (opts.promptOverride) body.prompt_override = opts.promptOverride
     const r = await apiFetch('/comms/tasks/run', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
