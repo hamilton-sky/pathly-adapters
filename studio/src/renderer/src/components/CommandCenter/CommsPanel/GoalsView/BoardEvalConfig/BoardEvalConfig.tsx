@@ -2,6 +2,7 @@ import { ArrowRight } from 'lucide-react'
 import { type EditorCli } from '../../../../MarkdownEditor/EditorHeader/editorCli'
 import { PromptBanner, usePromptContent } from '../../../../shared/PromptPreview/PromptPreview'
 import { PromptActionConfig } from '../../../../shared/PromptActionConfig/PromptActionConfig'
+import { useMergedPresets } from '../../../../shared/PromptActionConfig/useMergedPresets'
 import { useSkillCatalog } from '../../../../Monitor/ConfigurePhaseModal/hooks/usePhaseModalCatalog'
 import { useStore } from '../../../../../store'
 import { useUiStore } from '../../../../../store/uiStore'
@@ -37,8 +38,23 @@ export function BoardEvalConfig({
   const setActivePanel = useUiStore((st) => st.setActivePanel)
   const skillCatalog = useSkillCatalog(projectPath)
 
-  const lensPrompt = EVAL_LENSES.find((l) => l.name === selectedLens)?.prompt ?? ''
+  // Merge the built-in lenses with the user's DB-backed 'eval' library prompts.
+  const { presets: mergedLenses, addPreset } = useMergedPresets(EVAL_LENSES, {
+    kind: 'preset',
+    category: 'eval',
+    projectRoot: projectPath,
+  })
+
+  // A DB lens carries a prompt too → not the default → show the editable banner, not the skill preview.
+  const lensPrompt = mergedLenses.find((l) => l.name === selectedLens)?.prompt ?? ''
   const isDefaultLens = !lensPrompt
+
+  function handleSelectLens(name: string): void {
+    onSelectLens(name)
+    // A DB lens isn't in EVAL_LENSES, so the parent's pickLens can't resolve its body — load it here.
+    const dbLens = mergedLenses.find((l) => l.name === name)
+    if (dbLens && !EVAL_LENSES.some((l) => l.name === name)) onLensTextChange(dbLens.prompt)
+  }
 
   const evaluateContent = usePromptContent(
     isDefaultLens ? EVAL_SKILL_REL : '',
@@ -73,19 +89,20 @@ export function BoardEvalConfig({
     <PromptActionConfig
       heading="Configure evaluator"
       presetLabel="LENS"
-      presets={EVAL_LENSES}
+      presets={mergedLenses}
       selectedPreset={selectedLens}
       promptText={lensText}
       extra={extraPrompt}
       cli={selectedCli}
       running={running}
       primaryLabel="Run now"
-      onSelectPreset={onSelectLens}
+      onSelectPreset={handleSelectLens}
       onPromptTextChange={onLensTextChange}
       onExtraChange={onExtraPromptChange}
       onCliChange={onCliChange}
       onReset={onReset}
       onPrimary={onRun}
+      onAddPreset={lensText.trim() ? (name) => addPreset(name, lensText) : undefined}
       bannerSlot={bannerSlot}
       footerNote={footerNote}
     />

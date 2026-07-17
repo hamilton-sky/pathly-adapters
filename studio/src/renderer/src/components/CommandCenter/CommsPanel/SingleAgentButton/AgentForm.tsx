@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Send } from 'lucide-react'
 import { useStore } from '../../../../store'
 import { useUiStore } from '../../../../store/uiStore'
@@ -8,6 +8,8 @@ import {
 import { useAgentCatalog, useSkillCatalog } from '../../../Monitor/ConfigurePhaseModal/hooks/usePhaseModalCatalog'
 import { BoardSelect, type BoardSelectOption } from '../../../shared/BoardSelect/BoardSelect'
 import { PromptBanner, usePromptContent, findPath } from '../../../shared/PromptPreview/PromptPreview'
+import { useMergedPresets } from '../../../shared/PromptActionConfig/useMergedPresets'
+import { PresetAddRow } from '../../../shared/PromptActionConfig/PresetAddRow'
 import { ENGINES, PROGRESS_LEVELS, SYSTEM_PROMPTS } from './agentFormData'
 import s from './SingleAgentButton.module.css'
 
@@ -52,6 +54,18 @@ export function AgentForm({ running, onRun, onClose }: Props): JSX.Element {
   const setActivePanel = useUiStore((st) => st.setActivePanel)
   const agentCatalog = useAgentCatalog(projectPath)
   const skillCatalog = useSkillCatalog(projectPath)
+
+  // System-prompt dropdown merges the built-in starters with the user's DB-backed
+  // 'system' library prompts; ＋Save persists the current editable text back.
+  const sysBuiltins = useMemo(
+    () => SYSTEM_PROMPTS.map((p) => ({ name: p.name, label: p.name, hint: p.prompt, prompt: p.prompt })),
+    [],
+  )
+  const { presets: mergedSys, addPreset: addSysPreset } = useMergedPresets(sysBuiltins, {
+    kind: 'preset',
+    category: 'system',
+    projectRoot: projectPath,
+  })
   const agentNames = agentCatalog.length ? agentCatalog.map((i) => i.name) : [...AGENTS]
   const skillNames = skillCatalog.length ? skillCatalog.map((i) => i.name) : [...SKILLS]
 
@@ -60,7 +74,7 @@ export function AgentForm({ running, onRun, onClose }: Props): JSX.Element {
   const skillOptions: BoardSelectOption[] = [{ value: '', label: NONE }, ...skillNames.map((sk) => ({ value: sk, label: sk }))]
   const sysOptions: BoardSelectOption[] = [
     { value: '', label: NONE },
-    ...SYSTEM_PROMPTS.map((p) => ({ value: p.name, label: p.name, hint: p.prompt })),
+    ...mergedSys.map((p) => ({ value: p.name, label: p.name, hint: p.prompt })),
   ]
   const progressOptions: BoardSelectOption[] = PROGRESS_LEVELS.map((p) => ({ value: p.value, label: p.label }))
 
@@ -95,7 +109,7 @@ export function AgentForm({ running, onRun, onClose }: Props): JSX.Element {
   // Selecting a preset seeds the editable text; the user can then tweak it inline.
   function pickSys(name: string): void {
     setSysName(name)
-    setSysText(SYSTEM_PROMPTS.find((p) => p.name === name)?.prompt ?? '')
+    setSysText(mergedSys.find((p) => p.name === name)?.prompt ?? '')
   }
 
   // A run needs something to act on: a typed message, a skill (which encodes the
@@ -161,6 +175,7 @@ export function AgentForm({ running, onRun, onClose }: Props): JSX.Element {
         {sysName && (
           <PromptBanner editable editValue={sysText} onEditChange={setSysText} />
         )}
+        {sysText.trim() && <PresetAddRow onAdd={(name) => addSysPreset(name, sysText)} />}
 
         {!interactive && (
           <>
