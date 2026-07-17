@@ -17,7 +17,7 @@ import { useArtifactSummaryTarget } from '../hooks/useArtifactSummaryTarget'
 import { useBoardSummaryNote } from '../hooks/useBoardSummaryNote'
 import { useCommsPanel } from '../hooks/useCommsPanel'
 import { useStore } from '../../../../store'
-import { apiStartFlow, apiPostArtifact, resolveFeaturePath, scopeToParams } from '../../../../store/commsApi'
+import { apiStartFlow, apiDecomposeProject, apiDecomposeFeature, apiPostArtifact, resolveFeaturePath, scopeToParams } from '../../../../store/commsApi'
 import { isOff } from '../../../../services/aiRouter'
 import { useToastStore } from '../../../../store/toastStore'
 import s from './CommsPanel.module.css'
@@ -104,6 +104,19 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
   // runner spawns each stage as a terminal — same path as the Start button.
   const handleRunFlow = (flow: string, opts: { interactive: boolean }): void => {
     const projectRoot = projectPath.replace(/\\/g, '/').replace(/\/$/, '')
+    // Consultation flows can't go through /runner/start (it rejects the reserved project/global
+    // scopes and needs a feature storage dir) — they dispatch via the decompose endpoints, and
+    // only on the board they belong to.
+    const isProject = boardKey === 'project'
+    const isGlobal = boardKey === 'global'
+    if (flow === 'project-consultation' && isProject) {
+      void apiDecomposeProject(boardKey, 'consultation', { projectRoot })
+      return
+    }
+    if (flow === 'feature-consultation' && !isProject && !isGlobal) {
+      void apiDecomposeFeature(boardKey, 'consultation', { projectRoot })
+      return
+    }
     void apiStartFlow(boardKey, flow, { projectRoot, interactive: opts.interactive })
   }
 

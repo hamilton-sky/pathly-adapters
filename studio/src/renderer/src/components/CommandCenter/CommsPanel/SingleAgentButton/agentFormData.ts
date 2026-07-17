@@ -1,9 +1,13 @@
 // Static option lists for the single-agent form (extracted to keep AgentForm lean).
 
-// Engines that can run a board agent (have a headless command on the backend).
+// The CLI adapters Pathly can spawn. claude/codex have the fullest headless support;
+// copilot + antigravity (Gemini) are offered too (antigravity has no stdin path, so large
+// composed prompts can overflow on Windows — fine for small board tasks).
 export const ENGINES: { value: string; label: string }[] = [
   { value: 'claude', label: 'Claude' },
   { value: 'codex', label: 'Codex' },
+  { value: 'copilot', label: 'Copilot' },
+  { value: 'antigravity', label: 'Gemini' },
 ]
 
 // How chatty a headless run is on the board. Headless-only: in interactive mode

@@ -42,11 +42,11 @@ export function SingleAgentButton({ boardKey, onRun, onRunFlow }: Props): JSX.El
   const runState: RunState = (boardRunState[boardKey] as RunState | undefined) ?? 'idle'
   const running = runState === 'running'
   const progress = useElapsedProgress(boardRunStart[boardKey] || undefined)
-  // Flow runs go through /runner/start with topic=boardKey, which resolves a feature
-  // storage dir (pathly/features/<topic>/) via _safe_topic — and that REJECTS the
-  // reserved 'project'/'global' scopes. So the Flow tab is offered on feature boards
-  // only; project/global boards get single-agent runs alone.
-  const isFeature = boardKey !== 'project' && boardKey !== 'global'
+  // Flow tab is offered on feature AND project boards (global has no board flow). Feature
+  // flows go through /runner/start; the project board's project-consultation can't (that route
+  // rejects the reserved 'project' scope), so the caller's onRunFlow routes it to the
+  // project-decompose endpoint instead. FlowForm scopes its list per board.
+  const canFlow = boardKey !== 'global'
 
   function backdrop(e: MouseEvent<HTMLDivElement>): void {
     if (e.target === e.currentTarget) setOpen(false)
@@ -78,7 +78,7 @@ export function SingleAgentButton({ boardKey, onRun, onRunFlow }: Props): JSX.El
               </button>
             </header>
 
-            {isFeature && (
+            {canFlow && (
               <div className={s.tabRow} role="tablist" aria-label="Run mode">
                 <button
                   type="button"
@@ -101,8 +101,8 @@ export function SingleAgentButton({ boardKey, onRun, onRunFlow }: Props): JSX.El
               </div>
             )}
 
-            {isFeature && mode === 'flow'
-              ? <FlowForm running={running} onRunFlow={onRunFlow} onClose={close} />
+            {canFlow && mode === 'flow'
+              ? <FlowForm boardKey={boardKey} running={running} onRunFlow={onRunFlow} onClose={close} />
               : <AgentForm running={running} onRun={onRun} onClose={close} />}
           </div>
         </div>,
