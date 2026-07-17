@@ -99,7 +99,7 @@ export function EvaluateBoardButton({ boardKey, goals = [], boardScope }: Props)
             : [{ label: 'Lens', value: e.lensLabel ?? 'Built-in evaluator' }]}
           submitLabel={e.isGoalTarget ? 'Run decompose' : 'Run Evaluate'}
           footerSlot={<ProgressSelect value={e.verbosity} onChange={e.setVerbosity} allowInherit label="Board updates" id="eval-progress" />}
-          onSubmit={e.confirmWholeBoard}
+          onSubmit={(finalPrompt) => e.confirmWholeBoard(finalPrompt)}
           onCancel={e.cancelWholeBoard}
         />
       )}

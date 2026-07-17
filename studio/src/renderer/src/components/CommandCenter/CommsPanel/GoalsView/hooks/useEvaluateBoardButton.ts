@@ -84,11 +84,19 @@ export function useEvaluateBoardButton(boardKey: string, boardScope?: BoardScope
     setLensText(EVAL_LENSES.find((l) => l.name === name)?.prompt ?? '')
   }
 
-  // The actual dispatch — no gating. Goal target → decompose; else → whole-board evaluate.
-  function dispatch(): void {
+  // The actual dispatch. Goal target → decompose; else → whole-board evaluate. finalPrompt is the
+  // gate's Sections-trimmed prompt (whole-board only): sent as prompt_override, with lens/extra
+  // already baked into it (so they are NOT also sent as system/instructions — no duplication).
+  function dispatch(finalPrompt?: string): void {
     const adapter = selectedCli !== 'claude' ? selectedCli : undefined
     if (isGoalTarget) {
       decomposeGoal(targetGoalId, rigorMode, { adapter, progress: verbosity || undefined })
+    } else if (finalPrompt) {
+      runEvaluator(boardKey, {
+        adapter,
+        promptOverride: finalPrompt,
+        progress: verbosity || undefined,
+      })
     } else {
       runEvaluator(boardKey, {
         adapter,
@@ -168,7 +176,7 @@ export function useEvaluateBoardButton(boardKey: string, boardScope?: BoardScope
     // handlers
     handleCliChange, pickLens, setLensText, setExtraPrompt, setTargetGoalId, setRigorMode, setVerbosity,
     handleReset, handleStop, onPillRun, onConfigRun, dispatch,
-    confirmWholeBoard: () => { setConfirmOpen(false); dispatch() },
+    confirmWholeBoard: (finalPrompt?: string) => { setConfirmOpen(false); dispatch(finalPrompt) },
     cancelWholeBoard: () => setConfirmOpen(false),
     confirmGoal: () => { setConfirmGoalOpen(false); dispatch() },
     cancelGoal: () => setConfirmGoalOpen(false),

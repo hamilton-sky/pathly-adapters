@@ -645,6 +645,8 @@ export interface RunBoardOpts {
   progress?: string
   /** Layer-3 ability library row ids to compose after the skill's fragments. */
   abilityIds?: string[]
+  /** Gate "use once" prompt override (Sections trim) — sent verbatim instead of composing. */
+  promptOverride?: string
 }
 
 export async function apiRunBoard(
@@ -664,6 +666,7 @@ export async function apiRunBoard(
     if (opts.instructions) body.instructions = opts.instructions
     if (opts.progress) body.progress = opts.progress
     if (opts.abilityIds?.length) body.ability_ids = opts.abilityIds
+    if (opts.promptOverride) body.prompt_override = opts.promptOverride
     const r = await apiFetch('/comms/run', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

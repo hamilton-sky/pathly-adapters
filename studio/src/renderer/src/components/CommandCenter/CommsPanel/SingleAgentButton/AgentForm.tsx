@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Send } from 'lucide-react'
 import { useStore } from '../../../../store'
 import { useUiStore } from '../../../../store/uiStore'
@@ -14,6 +14,7 @@ import { ENGINES, PROGRESS_LEVELS, SYSTEM_PROMPTS } from './agentFormData'
 import SendPreviewModal from '../../../shared/SendPreviewModal/SendPreviewModal'
 import { AbilityToggles } from '../../../shared/AbilityToggles/AbilityToggles'
 import type { PromptLibraryRow } from '../../../../services/promptLibrary'
+import { composeSkillPrompt } from '../../../../services/skillCompose'
 import s from './SingleAgentButton.module.css'
 
 export interface SingleAgentConfig {
@@ -29,6 +30,8 @@ export interface SingleAgentConfig {
   message?: string
   /** Layer-3 ability library row ids to compose after the skill's fragments. */
   abilityIds?: string[]
+  /** Gate "use once" prompt override (Sections trim) — the composed body, sent verbatim. */
+  promptOverride?: string
 }
 
 interface Props {
@@ -54,6 +57,7 @@ export function AgentForm({ running, onRun, onClose }: Props): JSX.Element {
   const [message, setMessage] = useState<string>('')
   const [previewOpen, setPreviewOpen] = useState(false)
   const [abilities, setAbilities] = useState<PromptLibraryRow[]>([])
+  const [composedBody, setComposedBody] = useState<string | null>(null)
 
   // Full agent/skill lists from the real core/ dirs (fall back to common picks).
   const projectPath = useStore((st) => st.projectPath)
@@ -123,26 +127,50 @@ export function AgentForm({ running, onRun, onClose }: Props): JSX.Element {
   // task), or a system prompt (a directive). Any one of the three enables Send.
   const canSend = !running && (message.trim().length > 0 || skill !== '' || sysName !== '')
 
-  // F2 gate: reconstruct what the agent will see (client approximation — the skill body,
-  // Pathly fragments, and board context are composed server-side at spawn), shown read-only
-  // in the confirm modal before dispatch.
+  // When the gate opens with a skill, compose the REAL skill body (+ abilities) so the Sections
+  // editor operates on the actual prompt and a trim can be sent verbatim as the override.
+  useEffect(() => {
+    if (!previewOpen || !skill) {
+      setComposedBody(null)
+      return
+    }
+    let cancelled = false
+    void composeSkillPrompt(skill, {
+      adapter: engine,
+      abilityIds: abilities.map((a) => a.id),
+      projectRoot: projectPath,
+    }).then((p) => {
+      if (!cancelled) setComposedBody(p)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [previewOpen, skill, engine, abilities, projectPath])
+
+  // F2 gate preview. With a skill, show the REAL composed body (skill + abilities) — it's
+  // Sections-trimmable and sent verbatim as the override. Message/System/Agent are separate cfg
+  // fields (shown as meta), so they compose around the body at spawn without duplication.
   const previewPrompt = useMemo(() => {
+    if (skill && composedBody) return composedBody
     const parts: string[] = []
     if (message.trim()) parts.push(`# Task\n\n${message.trim()}`)
     if (sysText.trim()) parts.push(`# System prompt\n\n${sysText.trim()}`)
-    if (skill) parts.push(`# Skill: \`${skill}\`\n\n_The skill body + Pathly fragments are composed at spawn time._`)
+    if (skill) parts.push(`# Skill: \`${skill}\`\n\n_The skill body + Pathly fragments compose at spawn._`)
     for (const ab of abilities) parts.push(`# Ability: ${ab.label}\n\n${ab.body}`)
-    if (agent) parts.push(`# Agent: \`${agent}\`\n\n_The agent persona is applied at spawn time._`)
+    if (agent) parts.push(`# Agent: \`${agent}\`\n\n_The agent persona is applied at spawn._`)
     parts.push('---\n_Board context is retrieved and prepended when the agent runs, so it is not shown verbatim above._')
     return parts.join('\n\n')
-  }, [message, sysText, skill, agent, abilities])
+  }, [message, sysText, skill, agent, abilities, composedBody])
 
   function send(): void {
     if (!canSend) return
     setPreviewOpen(true)
   }
 
-  function confirmSend(): void {
+  function confirmSend(finalPrompt?: string): void {
+    // With a composed skill body, send it (possibly Sections-trimmed) as the authoritative
+    // override — the human decided exactly what the agent's skill body should be.
+    const override = skill && composedBody ? finalPrompt ?? composedBody : undefined
     onRun({
       adapter: engine,
       agent: agent || undefined,
@@ -153,6 +181,7 @@ export function AgentForm({ running, onRun, onClose }: Props): JSX.Element {
       progress: interactive ? undefined : progress,
       message: message.trim(),
       abilityIds: abilities.length ? abilities.map((a) => a.id) : undefined,
+      promptOverride: override,
     })
     setMessage('')
     setPreviewOpen(false)
@@ -277,8 +306,13 @@ export function AgentForm({ running, onRun, onClose }: Props): JSX.Element {
           fileName={interactive ? 'interactive' : 'headless'}
           prompt={previewPrompt}
           readOnly
+          meta={[
+            ...(message.trim() ? [{ label: 'Message', value: message.trim().slice(0, 50) }] : []),
+            ...(sysName ? [{ label: 'System', value: sysName }] : []),
+            ...(abilities.length ? [{ label: 'Abilities', value: String(abilities.length) }] : []),
+          ]}
           submitLabel="Send to agent"
-          onSubmit={confirmSend}
+          onSubmit={(finalPrompt) => confirmSend(finalPrompt)}
           onCancel={() => setPreviewOpen(false)}
         />
       )}

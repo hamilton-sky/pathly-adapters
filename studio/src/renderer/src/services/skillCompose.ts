@@ -53,3 +53,33 @@ export async function composeClientSkill(
     return null
   }
 }
+
+/**
+ * Compose a skill's full body WITH layer-3 abilities appended — the real prompt a board run
+ * will send. Used by the run gates so the Sections cell-editor operates on the actual composed
+ * prompt (skill + abilities), and the trimmed result can be sent verbatim as prompt_override.
+ * @returns the composed skill body, or `null` on any failure (caller falls back to server compose).
+ */
+export async function composeSkillPrompt(
+  skill: string,
+  opts: { adapter?: string; abilityIds?: string[]; projectRoot?: string } = {},
+): Promise<string | null> {
+  if (!skill) return null
+  try {
+    const r = await apiFetch('/skills/compose', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        skill,
+        adapter: opts.adapter ?? 'claude',
+        ability_ids: opts.abilityIds ?? [],
+        project_root: opts.projectRoot ?? '',
+      }),
+    })
+    if (!r.ok) return null
+    const data = (await r.json()) as { prompt?: string }
+    return typeof data.prompt === 'string' && data.prompt.trim() ? data.prompt : null
+  } catch {
+    return null
+  }
+}

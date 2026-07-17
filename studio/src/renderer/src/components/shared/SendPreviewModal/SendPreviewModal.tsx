@@ -140,11 +140,9 @@ export default function SendPreviewModal({ title, engineLabel, fileName, prompt,
         {footerSlot && <div className={styles.footerSlot}>{footerSlot}</div>}
 
         <div className={styles.footer}>
-          {!readOnly && (
-            <button type="button" className={styles.cancelBtn} onClick={() => setSplitOpen(true)} title="Include or exclude prompt sections for this run">
-              <Rows3 size={13} /> Sections
-            </button>
-          )}
+          <button type="button" className={styles.cancelBtn} onClick={() => setSplitOpen(true)} title="Include or exclude prompt sections for this run">
+            <Rows3 size={13} /> Sections
+          </button>
           <button type="button" className={styles.cancelBtn} onClick={onCancel}>Cancel</button>
           <button
             ref={submitRef}

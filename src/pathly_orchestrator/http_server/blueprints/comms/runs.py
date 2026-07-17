@@ -34,6 +34,8 @@ def comms_run():
         if not isinstance(ability_ids, list):
             ability_ids = []
         ability_ids = [a for a in ability_ids if isinstance(a, str)]
+        # Gate "use once" Sections trim: an explicit prompt that overrides composition.
+        prompt_override = data.get("prompt_override", "") or ""
         interactive = bool(data.get("interactive", False))
 
         # "" (unset) is passed through so start_board_run resolves the app-wide default
@@ -217,6 +219,7 @@ def comms_run():
             skill=skill if isinstance(skill, str) else "",
             system_prompt=system_prompt if isinstance(system_prompt, str) else "",
             ability_ids=ability_ids or None,
+            prompt_override=prompt_override if isinstance(prompt_override, str) else "",
             interactive=interactive,
             progress=progress,
             broadcast_fn=_broadcast_runner,

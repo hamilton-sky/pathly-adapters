@@ -121,11 +121,11 @@ export interface CommsState {
   boardRunState: Record<string, 'idle' | 'running' | 'busy' | 'done'>
   /** Epoch ms when the board run started — drives the elapsed clock in RunPill. */
   boardRunStart: Record<string, number>
-  runSingleAgent: (key: string, opts: { agent?: string; skill?: string; systemPrompt?: string; interactive?: boolean; adapter?: string; instructions?: string; progress?: string; abilityIds?: string[] }) => void
+  runSingleAgent: (key: string, opts: { agent?: string; skill?: string; systemPrompt?: string; interactive?: boolean; adapter?: string; instructions?: string; progress?: string; abilityIds?: string[]; promptOverride?: string }) => void
   /** Run the evaluator on a board: classify its content and propose concrete tasks.
    *  `systemPrompt` carries the optional evaluation lens; `instructions` carries
    *  the optional extra-instructions box. */
-  runEvaluator: (key: string, opts?: { adapter?: string; systemPrompt?: string; instructions?: string; progress?: string }) => void
+  runEvaluator: (key: string, opts?: { adapter?: string; systemPrompt?: string; instructions?: string; progress?: string; promptOverride?: string }) => void
   /** Decompose a whole FEATURE board into sibling goals (light/full/consultation rigor). */
   decomposeFeature: (key: string, rigor: 'light' | 'full' | 'consultation', opts?: { adapter?: string }) => void
   /** Decompose the whole PROJECT board into sibling features (light/full/consultation rigor). */

@@ -92,7 +92,7 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
   // Post it to the board as a nudge so there's a record, then run the configured
   // agent on it — passing the text as instructions so the agent gets it directly.
   const handleRunAgent = (cfg: {
-    agent?: string; skill?: string; systemPrompt?: string; interactive?: boolean; adapter?: string; progress?: string; message?: string; abilityIds?: string[]
+    agent?: string; skill?: string; systemPrompt?: string; interactive?: boolean; adapter?: string; progress?: string; message?: string; abilityIds?: string[]; promptOverride?: string
   }): void => {
     const { message, ...config } = cfg
     const t = (message ?? '').trim()

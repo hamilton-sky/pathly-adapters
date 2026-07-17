@@ -267,6 +267,7 @@ def start_board_run(
     storage_path: str = "",
     caps: dict | None = None,
     ability_ids: list | None = None,
+    prompt_override: str = "",
     broadcast_fn=None,
     spawn_fn: Callable | None = None,
     on_start: Optional[Callable] = None,
@@ -335,9 +336,18 @@ def start_board_run(
     context = board_context_for(board, scope, project_root or "", instructions or "")
     prompt_parts: list[str] = []
     # The composed skill body is the agent's behavior contract for this run.
-    skill_body = _compose_skill_body(
-        skill, adapter, caps=caps, ability_ids=ability_ids, project_root=project_root
-    )
+    # A gate-configured "use once" prompt (the Sections cell-trim) overrides composition
+    # entirely — the human has already decided exactly what the agent should see.
+    if prompt_override and prompt_override.strip():
+        skill_body = prompt_override
+    else:
+        skill_body = _compose_skill_body(
+            skill,
+            adapter,
+            caps=caps,
+            ability_ids=ability_ids,
+            project_root=project_root,
+        )
     if skill_body:
         skill_body = _inject_board_prompt_vars(
             skill_body,
