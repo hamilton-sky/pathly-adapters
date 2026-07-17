@@ -108,30 +108,88 @@ def comms_run():
                         (scope, cutoff),
                     ).fetchone()
                     if not has_eval:
-                        mid = _post_message(
-                            c,
-                            board=board,
-                            scope=scope,
-                            from_agent="system",
-                            type="warning",
-                            text=(
-                                "Evaluate finished but posted no BOARD_EVAL analysis artifact — "
-                                "the run returned only a text reply. Re-run Evaluate; if the board "
-                                "already has a goal/task DAG, the evaluator must still post the "
-                                "analysis artifact (it may skip only the goal/task proposals)."
-                            ),
-                        )
-                        _broadcast_comms(
-                            scope,
-                            {
-                                "type": "COMMS_UPDATE",
-                                "event": "board_run",
-                                "message_id": mid,
-                                "board": board,
-                                "scope": scope,
-                                "phase": "warning",
-                            },
-                        )
+                        # SALVAGE the analysis instead of only warning. The agent commonly
+                        # over-applies Step 4's "DAG already exists → skip" to the WHOLE run and
+                        # returns a text-only reply — but Step 3 (the BOARD_EVAL artifact) is
+                        # evaluate's mandatory primary deliverable and must always exist. Capture
+                        # the run's reply AS that artifact so a re-run isn't required.
+                        reply = (summary or "").strip()
+                        trivial = reply.lower() in ("", "done", "finished", "complete", "ok")
+                        saved = False
+                        if project_root and not trivial:
+                            try:
+                                import os as _os
+
+                                sub = (
+                                    _os.path.join("pathly", "project")
+                                    if board == "project"
+                                    else _os.path.join("pathly", "features", scope)
+                                )
+                                art_dir = _os.path.join(project_root, sub, "artifacts")
+                                _os.makedirs(art_dir, exist_ok=True)
+                                art_path = _os.path.join(art_dir, "BOARD_EVAL.md")
+                                with open(art_path, "w", encoding="utf-8") as _f:
+                                    _f.write(
+                                        "# Board Evaluation\n\n"
+                                        "_Auto-captured from the evaluate run's reply — the agent "
+                                        "returned a text-only answer instead of posting the "
+                                        "artifact itself._\n\n" + reply + "\n"
+                                    )
+                                mid = _post_message(
+                                    c,
+                                    board=board,
+                                    scope=scope,
+                                    from_agent="evaluator",
+                                    type="artifact",
+                                    text=(
+                                        "Board evaluation (auto-captured from the run reply). "
+                                        + reply[:200]
+                                    ),
+                                    artifact_path=art_path.replace("\\", "/"),
+                                    artifact_type="md",
+                                )
+                                _broadcast_comms(
+                                    scope,
+                                    {
+                                        "type": "COMMS_UPDATE",
+                                        "event": "board_run",
+                                        "message_id": mid,
+                                        "board": board,
+                                        "scope": scope,
+                                        "phase": "done",
+                                    },
+                                )
+                                saved = True
+                            except Exception:
+                                logging.debug(
+                                    "evaluator BOARD_EVAL salvage-write failed", exc_info=True
+                                )
+                        if not saved:
+                            # Nothing meaningful to salvage → keep the original warning.
+                            mid = _post_message(
+                                c,
+                                board=board,
+                                scope=scope,
+                                from_agent="system",
+                                type="warning",
+                                text=(
+                                    "Evaluate finished but posted no BOARD_EVAL analysis artifact — "
+                                    "the run returned only a text reply. Re-run Evaluate; if the board "
+                                    "already has a goal/task DAG, the evaluator must still post the "
+                                    "analysis artifact (it may skip only the goal/task proposals)."
+                                ),
+                            )
+                            _broadcast_comms(
+                                scope,
+                                {
+                                    "type": "COMMS_UPDATE",
+                                    "event": "board_run",
+                                    "message_id": mid,
+                                    "board": board,
+                                    "scope": scope,
+                                    "phase": "warning",
+                                },
+                            )
                 except Exception:
                     logging.debug("evaluator BOARD_EVAL backstop failed", exc_info=True)
 
