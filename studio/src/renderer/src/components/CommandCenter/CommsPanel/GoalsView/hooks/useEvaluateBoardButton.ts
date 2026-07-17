@@ -116,11 +116,13 @@ export function useEvaluateBoardButton(boardKey: string, boardScope?: BoardScope
     else dispatchFeatureDecompose()
   }
 
-  // Goal decompose is gated only for the heavy consultation tier (full team run); quick/full
-  // dispatch immediately. Returns having either dispatched or opened the confirm gate.
+  // Goal decompose: the heavy consultation tier opens the consultation confirm; quick/full (the
+  // decompose planner) now open the SendPreviewModal preview gate — the same one whole-board
+  // evaluate uses — so no decompose spawns without a prompt preview first. confirmWholeBoard
+  // calls dispatch(), which already routes a goal target to decomposeGoal.
   function requestGoalRun(): void {
     if (rigorMode === 'consultation') setConfirmGoalOpen(true)
-    else dispatch()
+    else setConfirmOpen(true)
   }
 
   // Main pill: board evaluate → preview modal; board decompose → consultation gate or direct

@@ -30,6 +30,15 @@ interface Props {
 export function EvaluateBoardButton({ boardKey, goals = [], boardScope }: Props): JSX.Element {
   const e = useEvaluateBoardButton(boardKey, boardScope)
 
+  // Decompose-planner preview (goal target): the planner reads the board + this goal and posts a
+  // task DAG. The planner skill body + board context compose at spawn, so they're shown as a note.
+  const goalText = goals.find((g) => g.id === e.targetGoalId)?.text ?? ''
+  const decomposePreview =
+    `# Decompose goal into a task DAG\n\n**Goal:** ${goalText || '_(the selected goal)_'}\n\n` +
+    '_The planner reads the board and this goal, then posts a task DAG (tasks, dependencies, ' +
+    'context refs). The planner skill body and board context are composed at spawn, so they are ' +
+    'not shown verbatim above._'
+
   return (
     <>
       <ActionPill
@@ -78,15 +87,17 @@ export function EvaluateBoardButton({ boardKey, goals = [], boardScope }: Props)
         />
       )}
 
-      {e.confirmOpen && !e.targetGoalId && (
+      {e.confirmOpen && (
         <SendPreviewModal
-          title={e.activeLabel}
+          title={e.isGoalTarget ? 'Decompose goal' : e.activeLabel}
           engineLabel={cliLabel(e.selectedCli)}
           fileName={boardKey}
-          prompt={e.previewPrompt}
+          prompt={e.isGoalTarget ? decomposePreview : e.previewPrompt}
           readOnly
-          meta={[{ label: 'Lens', value: e.lensLabel ?? 'Built-in evaluator' }]}
-          submitLabel="Run Evaluate"
+          meta={e.isGoalTarget
+            ? [{ label: 'Rigor', value: e.rigorMode }]
+            : [{ label: 'Lens', value: e.lensLabel ?? 'Built-in evaluator' }]}
+          submitLabel={e.isGoalTarget ? 'Run decompose' : 'Run Evaluate'}
           footerSlot={<ProgressSelect value={e.verbosity} onChange={e.setVerbosity} allowInherit label="Board updates" id="eval-progress" />}
           onSubmit={e.confirmWholeBoard}
           onCancel={e.cancelWholeBoard}
