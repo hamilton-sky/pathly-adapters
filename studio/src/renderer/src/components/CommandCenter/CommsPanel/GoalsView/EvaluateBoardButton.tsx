@@ -4,7 +4,7 @@ import SendPreviewModal from '../../../shared/SendPreviewModal/SendPreviewModal'
 import { ConfirmModal } from '../../../shared/ConfirmModal/ConfirmModal'
 import { ProgressSelect } from '../../../shared/ProgressSelect/ProgressSelect'
 import { cliLabel } from '../.././../MarkdownEditor/EditorHeader/editorCli'
-import { platformHeadings } from '../../../../services/skillCompose'
+import { headingLayers } from '../../../../services/skillCompose'
 import type { BoardScope } from '../../types'
 import { EvalConfigPopover } from './EvalConfigPopover'
 import { useEvaluateBoardButton } from './hooks/useEvaluateBoardButton'
@@ -95,7 +95,7 @@ export function EvaluateBoardButton({ boardKey, goals = [], boardScope }: Props)
           fileName={boardKey}
           prompt={e.isGoalTarget ? decomposePreview : e.previewPrompt}
           readOnly
-          lockedHeadings={e.isGoalTarget ? undefined : platformHeadings(e.previewSegments)}
+          headingLayers={e.isGoalTarget ? undefined : headingLayers(e.previewSegments)}
           meta={e.isGoalTarget
             ? [{ label: 'Rigor', value: e.rigorMode }]
             : [{ label: 'Lens', value: e.lensLabel ?? 'Built-in evaluator' }]}

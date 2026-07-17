@@ -105,18 +105,31 @@ export async function composeSkillPrompt(
 }
 
 /**
- * The `## ` headings that belong to Pathly's PLATFORM layer (defaults + fragments) — the
- * un-editable layer that owns board CRUD, progress logging, and the AGENT_DONE completion
- * report. The Sections cell-editor locks these: unchecking `## Completion report` would make
- * the run write no AGENT_DONE (it vanishes from RECENT and goes unbilled), and unchecking
- * `comms-post` would silently stop it posting to the board.
+ * The prompt's four-layer model, as the Sections editor sees it:
+ *   'skill'    — the skill body (the task). Togglable.
+ *   'ability'  — layer-3 approach/domain packs the user opted in. Togglable.
+ *   'fragment' — Pathly's PLATFORM layer (defaults + fragments): board CRUD, progress
+ *                logging, the AGENT_DONE completion report. LOCKED — unchecking
+ *                `## Completion report` makes the run write no AGENT_DONE (it vanishes from
+ *                RECENT and goes unbilled); unchecking comms-post silently stops board posts.
  */
-export function platformHeadings(segments: ComposedSegment[]): string[] {
-  const out: string[] = []
+export type PromptLayer = 'skill' | 'ability' | 'fragment'
+
+/**
+ * Map every heading in the composed prompt to the LAYER it came from, so the Sections editor
+ * can group/colour cells and lock the platform layer. Covers `# ` and `## ` (the depths the
+ * cell splitter uses). Headings not in the map default to 'skill'.
+ */
+export function headingLayers(segments: ComposedSegment[]): Record<string, PromptLayer> {
+  const out: Record<string, PromptLayer> = {}
   for (const s of segments) {
-    if (s.kind !== 'fragment' && s.kind !== 'default') continue
+    const layer: PromptLayer =
+      s.kind === 'ability' ? 'ability' : s.kind === 'body' ? 'skill' : 'fragment'
     for (const line of s.text.split('\n')) {
-      if (line.startsWith('## ') && !line.startsWith('### ')) out.push(line.slice(3).trim())
+      const isH1 = line.startsWith('# ') && !line.startsWith('## ')
+      const isH2 = line.startsWith('## ') && !line.startsWith('### ')
+      if (!isH1 && !isH2) continue
+      out[(isH2 ? line.slice(3) : line.slice(2)).trim()] = layer
     }
   }
   return out

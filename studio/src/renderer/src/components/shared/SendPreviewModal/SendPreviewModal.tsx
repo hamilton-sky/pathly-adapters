@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { SendHorizonal, X, Check, Rows3 } from 'lucide-react'
 import { PromptBanner } from '../PromptPreview/PromptPreview'
 import SkillSplitModal, { cellsToMarkdown } from '../SkillSplitModal/SkillSplitModal'
+import type { PromptLayer } from '../../../services/skillCompose'
 import styles from './SendPreviewModal.module.css'
 
 export interface SendPreviewMeta {
@@ -38,9 +39,9 @@ interface Props {
   /** Render the prompt as a read-only preview (no edit toggle). Use when the final prompt
    *  is assembled elsewhere (e.g. server-side) and the modal is a confirm-and-preview gate. */
   readOnly?: boolean
-  /** Platform `## ` headings to LOCK in the Sections editor — Pathly's fragments (board posts,
-   *  progress, completion report). Visible but never uncheckable; dropping one breaks the run. */
-  lockedHeadings?: string[]
+  /** Heading → prompt layer, for the Sections editor's tabs/colours + the platform LOCK
+   *  (Pathly's fragments are visible but never uncheckable — dropping one breaks the run). */
+  headingLayers?: Record<string, PromptLayer>
   /** Optional controls rendered in the footer, left of the buttons (e.g. a per-run progress selector). */
   footerSlot?: ReactNode
   /** Receives the (possibly edited) prompt — that exact text is what gets sent. `sectionsUsed`
@@ -53,7 +54,7 @@ interface Props {
 // Confirm-before-send: a compact gate showing the target engine + summary, an optional
 // per-item selection list (comments), and the prompt in a collapsible banner (eye = preview ·
 // pencil = edit). Whatever the banner holds on submit is the exact text dispatched.
-export default function SendPreviewModal({ title, engineLabel, fileName, prompt, meta = [], items, itemsLabel = 'Include', onToggleItem, submitLabel = 'Send', readOnly = false, lockedHeadings, footerSlot, onSubmit, onCancel }: Props) {
+export default function SendPreviewModal({ title, engineLabel, fileName, prompt, meta = [], items, itemsLabel = 'Include', onToggleItem, submitLabel = 'Send', readOnly = false, headingLayers, footerSlot, onSubmit, onCancel }: Props) {
   const submitRef = useRef<HTMLButtonElement>(null)
   const [text, setText] = useState(prompt)
   const [splitOpen, setSplitOpen] = useState(false)
@@ -172,7 +173,7 @@ export default function SendPreviewModal({ title, engineLabel, fileName, prompt,
           subtitle="Include or exclude sections for this run — used once. Save reusable prompts in the library instead."
           confirmLabel="Use these sections"
           hideInsertOne
-          lockedHeadings={lockedHeadings}
+          headingLayers={headingLayers}
           onConfirm={(cells) => { setText(cellsToMarkdown(cells)); setSectionsUsed(true); setSplitOpen(false) }}
           onInsertOne={() => setSplitOpen(false)}
           onClose={() => setSplitOpen(false)}

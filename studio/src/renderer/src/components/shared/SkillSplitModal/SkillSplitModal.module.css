@@ -137,6 +137,73 @@
   padding: 2px 6px;
 }
 
+/* ── Layer tabs — group 40+ undifferentiated cells into the prompt's four layers ────── */
+
+.layerTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 0 16px 8px;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.layerTab {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  background: transparent;
+  border: 1px solid var(--bg-surface1);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.layerTab:hover {
+  color: var(--text-primary);
+}
+
+.layerTab[data-active='true'] {
+  color: var(--text-primary);
+  border-color: currentColor;
+}
+
+.layerTab[data-active='true'][data-layer='skill'] {
+  color: var(--green);
+}
+
+.layerTab[data-active='true'][data-layer='ability'] {
+  color: var(--accent);
+}
+
+.layerTabCount {
+  font-size: 9px;
+  font-weight: 600;
+  opacity: 0.7;
+}
+
+/* Layer colour on the card: ability = accent, locked Pathly fragment = muted + inert. */
+.cellCard[data-layer='ability'] {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--bg-surface1));
+}
+
+.cellCard[data-layer='fragment'] {
+  border-color: var(--bg-surface1);
+  background: color-mix(in srgb, var(--bg-surface1) 40%, var(--bg-surface0));
+  cursor: default;
+}
+
+.typeBadge[data-layer='ability'] {
+  color: var(--accent);
+}
+
+.typeBadge[data-layer='fragment'] {
+  color: var(--text-muted);
+}
+
 /* ── Cell cards — notebook style ── */
 .cellsList {
   flex: 1;

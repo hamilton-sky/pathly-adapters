@@ -2,6 +2,7 @@
 import { ChevronUp, ChevronDown } from 'lucide-react'
 import { Tooltip } from '../../ui'
 import MarkdownRenderer from '../MarkdownRenderer/MarkdownRenderer'
+import type { PromptLayer } from '../../../services/skillCompose'
 import styles from './SkillSplitModal.module.css'
 
 export interface ProposedCell {
@@ -35,11 +36,11 @@ interface Props {
   confirmLabel?: string
   /** Hide the "Insert as one cell" secondary action (not meaningful outside the editor). */
   hideInsertOne?: boolean
-  /** `## ` headings from Pathly's PLATFORM layer (defaults + fragments) — rendered LOCKED:
-   *  always included, never uncheckable. They are what makes an agent talk to Pathly, so
-   *  dropping one silently breaks the run (no AGENT_DONE → vanishes + unbilled; no comms-post
-   *  → stops posting to the board). Visible for inspection, not editable. */
-  lockedHeadings?: string[]
+  /** Heading → prompt LAYER ('skill' | 'ability' | 'fragment'). Drives the layer tabs, the
+   *  per-layer colour, and the LOCK: 'fragment' cells are Pathly's platform layer — always
+   *  included, never uncheckable (dropping one silently breaks the run: no AGENT_DONE →
+   *  vanishes + unbilled; no comms-post → stops posting to the board). */
+  headingLayers?: Record<string, PromptLayer>
   onConfirm: (cells: ProposedCell[]) => void
   onInsertOne: (rawContent: string) => void
   onClose: () => void
@@ -84,7 +85,7 @@ function parseMdToCells(raw: string, depth: 1 | 2 | 3 = 2): ProposedCell[] {
   return cells
 }
 
-export default function SkillSplitModal({ filePath, fileName, rawContent: rawContentProp, title, subtitle, confirmLabel, hideInsertOne, lockedHeadings, onConfirm, onInsertOne, onClose }: Props) {
+export default function SkillSplitModal({ filePath, fileName, rawContent: rawContentProp, title, subtitle, confirmLabel, hideInsertOne, headingLayers, onConfirm, onInsertOne, onClose }: Props) {
   const [rawContent, setRawContent] = useState(rawContentProp ?? '')
   const [cells, setCells] = useState<ProposedCell[]>(() => rawContentProp ? parseMdToCells(rawContentProp, 2) : [])
   const [splitDepth, setSplitDepth] = useState<1 | 2 | 3>(2)
@@ -105,14 +106,24 @@ export default function SkillSplitModal({ filePath, fileName, rawContent: rawCon
     setCells(parseMdToCells(rawContent, splitDepth))
   }, [splitDepth, rawContent])
 
-  // Pathly's platform fragments (comms-post / completion-report / progress-logging …) are shown
-  // but LOCKED — they're the layer that makes the agent report back. Unchecking one silently
-  // breaks the run, so they always count as included regardless of the checkbox.
-  const locked = useMemo(() => new Set(lockedHeadings ?? []), [lockedHeadings])
-  const isLocked = (c: ProposedCell): boolean => locked.has(c.heading)
+  // Every cell belongs to a layer. Pathly's platform fragments (comms-post /
+  // completion-report / progress-logging …) are shown but LOCKED — they're the layer that
+  // makes the agent report back, so they always count as included whatever the checkbox says.
+  const layerOf = (c: ProposedCell): PromptLayer => headingLayers?.[c.heading] ?? 'skill'
+  const isLocked = (c: ProposedCell): boolean => layerOf(c) === 'fragment'
 
   const checkedCount = cells.filter(c => c.checked || isLocked(c)).length
   const checkedCells = cells.filter(c => c.checked || isLocked(c))
+
+  // Layer tabs FILTER the view only — checked state (and the confirm) always spans every cell,
+  // so switching tabs can never silently drop a section.
+  const [tab, setTab] = useState<'all' | PromptLayer>('all')
+  const layerCounts = useMemo(() => {
+    const n = { skill: 0, ability: 0, fragment: 0 }
+    for (const c of cells) n[headingLayers?.[c.heading] ?? 'skill'] += 1
+    return n
+  }, [cells, headingLayers])
+  const visibleCells = tab === 'all' ? cells : cells.filter(c => layerOf(c) === tab)
 
   function toggleCell(id: string) {
     setCells(prev => prev.map(c => (c.id === id && !isLocked(c) ? { ...c, checked: !c.checked } : c)))
@@ -174,11 +185,38 @@ export default function SkillSplitModal({ filePath, fileName, rawContent: rawCon
               <div className={styles.panelTitle}>PROPOSED CELLS</div>
               <span className={styles.cellCountBadge}>{checkedCount} CELLS</span>
             </div>
+            {headingLayers && (
+              <div className={styles.layerTabs} role="tablist" aria-label="Prompt layer">
+                {([
+                  ['all', 'All', cells.length],
+                  ['skill', 'Skill', layerCounts.skill],
+                  ['ability', 'Abilities', layerCounts.ability],
+                  ['fragment', '🔒 Pathly', layerCounts.fragment],
+                ] as const).map(([key, label, n]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    role="tab"
+                    className={styles.layerTab}
+                    data-layer={key}
+                    data-active={tab === key ? 'true' : 'false'}
+                    {...(tab === key ? { 'aria-selected': 'true' } : { 'aria-selected': 'false' })}
+                    onClick={() => setTab(key)}
+                  >
+                    {label} <span className={styles.layerTabCount}>{n}</span>
+                  </button>
+                ))}
+              </div>
+            )}
             <div className={styles.cellsList}>
-              {cells.map((cell, idx) => (
+              {visibleCells.map((cell) => {
+                // Reorder acts on the FULL list, so resolve the real index even when filtered.
+                const idx = cells.findIndex((c) => c.id === cell.id)
+                return (
                 <div
                   key={cell.id}
-                  className={`${styles.cellCard} ${cell.type === 'heading' ? styles.cellCardHeading : styles.cellCardBody}${!cell.checked ? ` ${styles.cellCardUnchecked}` : ''}`}
+                  className={`${styles.cellCard} ${cell.type === 'heading' ? styles.cellCardHeading : styles.cellCardBody}${!cell.checked && !isLocked(cell) ? ` ${styles.cellCardUnchecked}` : ''}`}
+                  data-layer={layerOf(cell)}
                   onClick={() => toggleCell(cell.id)}
                 >
                   <div className={styles.strip}>
@@ -195,9 +233,22 @@ export default function SkillSplitModal({ filePath, fileName, rawContent: rawCon
                     />
                     <span
                       className={styles.typeBadge}
-                      title={isLocked(cell) ? 'Pathly platform fragment — always sent' : undefined}
+                      data-layer={layerOf(cell)}
+                      title={
+                        isLocked(cell)
+                          ? 'Pathly platform fragment — always sent, cannot be removed'
+                          : layerOf(cell) === 'ability'
+                            ? 'Layer-3 ability — your approach pack'
+                            : undefined
+                      }
                     >
-                      {isLocked(cell) ? '🔒 PATHLY' : cell.type === 'heading' ? 'HEADING' : 'BODY'}
+                      {isLocked(cell)
+                        ? '🔒 PATHLY'
+                        : layerOf(cell) === 'ability'
+                          ? 'ABILITY'
+                          : cell.type === 'heading'
+                            ? 'HEADING'
+                            : 'BODY'}
                     </span>
                     <span className={styles.stripDiv} />
                     <Tooltip label="Move up" placement="top">
@@ -228,7 +279,8 @@ export default function SkillSplitModal({ filePath, fileName, rawContent: rawCon
                     <div className={styles.cellPreview}>{cell.content.split('\n')[0]}</div>
                   )}
                 </div>
-              ))}
+                )
+              })}
             </div>
           </div>
 

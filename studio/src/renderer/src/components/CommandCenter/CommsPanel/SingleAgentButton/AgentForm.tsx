@@ -14,7 +14,7 @@ import { ENGINES, PROGRESS_LEVELS, SYSTEM_PROMPTS } from './agentFormData'
 import SendPreviewModal from '../../../shared/SendPreviewModal/SendPreviewModal'
 import { AbilityToggles } from '../../../shared/AbilityToggles/AbilityToggles'
 import type { Ability } from '../../../../services/abilities'
-import { composeSkillPrompt, platformHeadings, type ComposedSegment } from '../../../../services/skillCompose'
+import { composeSkillPrompt, headingLayers, type ComposedSegment } from '../../../../services/skillCompose'
 import s from './SingleAgentButton.module.css'
 
 export interface SingleAgentConfig {
@@ -312,7 +312,7 @@ export function AgentForm({ running, onRun, onClose }: Props): JSX.Element {
           fileName={interactive ? 'interactive' : 'headless'}
           prompt={previewPrompt}
           readOnly
-          lockedHeadings={platformHeadings(composedSegments)}
+          headingLayers={headingLayers(composedSegments)}
           meta={[
             ...(message.trim() ? [{ label: 'Message', value: message.trim().slice(0, 50) }] : []),
             ...(sysName ? [{ label: 'System', value: sysName }] : []),
