@@ -4,6 +4,7 @@ import { Target } from 'lucide-react'
 import { type EditorCli } from '../.././../MarkdownEditor/EditorHeader/editorCli'
 import { BoardSelect } from '../../../shared/BoardSelect/BoardSelect'
 import type { DecomposeMode } from '../../../../store/commsApi'
+import type { Ability } from '../../../../services/abilities'
 import type { GoalStub } from './EvaluateBoardButton'
 import { BoardEvalConfig } from './BoardEvalConfig/BoardEvalConfig'
 import { GoalTargetConfig } from './GoalTargetConfig/GoalTargetConfig'
@@ -29,6 +30,10 @@ interface Props {
    *  instead of goals. */
   isProjectBoard: boolean
   rigorMode: DecomposeMode
+  /** Project root + selected ability ids for the per-goal decompose ability picker. */
+  projectRoot: string
+  decomposeAbilityIds: string[]
+  onDecomposeAbilitiesChange: (rows: Ability[]) => void
   /** Whole-board "Decompose into goals" rigor (light/full/consultation). */
   featureRigor: FeatureRigor
   onFeatureRigorChange: (r: FeatureRigor) => void
@@ -82,6 +87,7 @@ function buildTargetOptions(
 export function EvalConfigPopover({
   anchorEl, selectedLens, lensText, extraPrompt, selectedCli,
   running, goals, targetGoalId, isProjectBoard, rigorMode,
+  projectRoot, decomposeAbilityIds, onDecomposeAbilitiesChange,
   featureRigor, onFeatureRigorChange, onFeatureDecompose,
   onSelectLens, onLensTextChange, onExtraPromptChange, onCliChange,
   onTargetChange, onRigorChange, onReset, onRun, onClose,
@@ -141,6 +147,9 @@ export function EvalConfigPopover({
           rigorMode={rigorMode}
           selectedCli={selectedCli}
           running={running}
+          projectRoot={projectRoot}
+          abilityIds={decomposeAbilityIds}
+          onAbilitiesChange={onDecomposeAbilitiesChange}
           onRigorChange={onRigorChange}
           onCliChange={onCliChange}
           onRun={onRun}

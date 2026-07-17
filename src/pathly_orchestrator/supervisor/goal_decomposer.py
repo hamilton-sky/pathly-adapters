@@ -62,6 +62,8 @@ def start_goal_decompose(
     adapter: str = "claude",
     model: str = "",
     progress: str = "",
+    ability_ids: Optional[list] = None,
+    prompt_override: str = "",
     broadcast_fn: Optional[Callable] = None,
     on_start: Optional[Callable] = None,
     on_done: Optional[Callable] = None,
@@ -74,6 +76,10 @@ def start_goal_decompose(
     mode='planner' — one agent run, fast, DAG-only.
     mode='consultation' — heavy PO→architect→researcher→designer→planner flow.
     Refuses if the goal already has tasks.
+
+    ``ability_ids`` (layer-3 packs composed after the planner skill's fragments) and
+    ``prompt_override`` (a gate "use once" Sections trim, sent verbatim) apply only to the
+    single-agent planner/plan decomposers — consultation is an FSM flow with no single prompt.
     """
     from pathly_orchestrator.db.connection import get_db
 
@@ -122,6 +128,8 @@ def start_goal_decompose(
             adapter=adapter,
             model=model,
             progress=progress,
+            ability_ids=ability_ids,
+            prompt_override=prompt_override,
             broadcast_fn=broadcast_fn,
             on_start=on_start,
             on_done=on_done,
@@ -138,6 +146,8 @@ def start_goal_decompose(
             adapter=adapter,
             model=model,
             progress=progress,
+            ability_ids=ability_ids,
+            prompt_override=prompt_override,
             broadcast_fn=broadcast_fn,
             on_start=on_start,
             on_done=on_done,
@@ -173,6 +183,8 @@ def _decompose_planner(
     adapter: str,
     model: str,
     progress: str,
+    ability_ids,
+    prompt_override,
     broadcast_fn,
     on_start,
     on_done,
@@ -223,6 +235,8 @@ def _decompose_planner(
         adapter=adapter or "claude",
         skill="planning/dag-sketch",
         agent="planner",
+        ability_ids=ability_ids or None,
+        prompt_override=prompt_override or "",
         progress=progress,
         broadcast_fn=broadcast_fn,
         on_start=on_start,
@@ -248,6 +262,8 @@ def _decompose_plan(
     adapter: str,
     model: str,
     progress: str,
+    ability_ids,
+    prompt_override,
     broadcast_fn,
     on_start,
     on_done,
@@ -301,6 +317,8 @@ def _decompose_plan(
         adapter=adapter or "claude",
         skill="planning/plan",
         agent="planner",
+        ability_ids=ability_ids or None,
+        prompt_override=prompt_override or "",
         progress=progress,
         broadcast_fn=broadcast_fn,
         on_start=on_start,

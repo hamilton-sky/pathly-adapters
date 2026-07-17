@@ -8,6 +8,7 @@ import { type EditorCli, loadEditorCli, saveEditorCli } from '../../../../Markdo
 import { useEvaluatePreview } from '../useEvaluatePreview'
 import { EVAL_LENSES } from '../../SingleAgentButton/agentFormData'
 import { DECOMPOSE_TARGET, type FeatureRigor } from '../FeatureDecomposeConfig/FeatureDecomposeConfig'
+import type { Ability } from '../../../../../services/abilities'
 
 // Persistent localStorage key for the evaluate button's engine choice.
 const CLI_KEY_EVAL = 'pathly.comms.cli.eval'
@@ -50,6 +51,8 @@ export function useEvaluateBoardButton(boardKey: string, boardScope?: BoardScope
   const [featureRigor, setFeatureRigor] = useState<FeatureRigor>('light')
   // Per-run board-updates verbosity override; '' = inherit the Settings default.
   const [verbosity, setVerbosity] = useState('')
+  // Layer-3 abilities selected for a per-goal decompose — composed into the planner prompt.
+  const [decomposeAbilities, setDecomposeAbilities] = useState<Ability[]>([])
   const gearRef = useRef<HTMLButtonElement>(null)
 
   // Three targets, two run-state homes: a real goal tracks its own decompose state;
@@ -92,7 +95,15 @@ export function useEvaluateBoardButton(boardKey: string, boardScope?: BoardScope
   function dispatch(finalPrompt?: string): void {
     const adapter = selectedCli !== 'claude' ? selectedCli : undefined
     if (isGoalTarget) {
-      decomposeGoal(targetGoalId, rigorMode, { adapter, progress: verbosity || undefined })
+      // finalPrompt is already gated on sectionsUsed by confirmWholeBoard — so a plain
+      // "Run decompose" sends no override (server composes) while a Sections trim sends the
+      // full planner prompt verbatim. Selected abilities compose in either way.
+      decomposeGoal(targetGoalId, rigorMode, {
+        adapter,
+        progress: verbosity || undefined,
+        abilityIds: decomposeAbilities.length ? decomposeAbilities.map((a) => a.id) : undefined,
+        promptOverride: finalPrompt,
+      })
     } else if (finalPrompt) {
       runEvaluator(boardKey, {
         adapter,
@@ -175,6 +186,8 @@ export function useEvaluateBoardButton(boardKey: string, boardScope?: BoardScope
     configOpen, setConfigOpen, confirmOpen, confirmGoalOpen, confirmFeatureOpen, gearRef,
     // preview
     previewPrompt, previewSegments,
+    // per-goal decompose abilities
+    decomposeAbilities, setDecomposeAbilities,
     // handlers
     handleCliChange, pickLens, setLensText, setExtraPrompt, setTargetGoalId, setRigorMode, setVerbosity,
     handleReset, handleStop, onPillRun, onConfigRun, dispatch,

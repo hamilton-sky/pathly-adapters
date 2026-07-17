@@ -5,8 +5,10 @@ import { ConfirmModal } from '../../../shared/ConfirmModal/ConfirmModal'
 import { ProgressSelect } from '../../../shared/ProgressSelect/ProgressSelect'
 import { cliLabel } from '../.././../MarkdownEditor/EditorHeader/editorCli'
 import { headingLayers } from '../../../../services/skillCompose'
+import { useStore } from '../../../../store'
 import type { BoardScope } from '../../types'
 import { EvalConfigPopover } from './EvalConfigPopover'
+import { useDecomposePreview } from './useDecomposePreview'
 import { useEvaluateBoardButton } from './hooks/useEvaluateBoardButton'
 
 export interface GoalStub {
@@ -30,15 +32,19 @@ interface Props {
 // useEvaluateBoardButton; this component is the JSX shell.
 export function EvaluateBoardButton({ boardKey, goals = [], boardScope }: Props): JSX.Element {
   const e = useEvaluateBoardButton(boardKey, boardScope)
+  const projectPath = useStore((st) => st.projectPath)
 
-  // Decompose-planner preview (goal target): the planner reads the board + this goal and posts a
-  // task DAG. The planner skill body + board context compose at spawn, so they're shown as a note.
+  // Decompose-planner preview (goal target): the REAL composed planner prompt (skill + fragments
+  // + selected abilities + the decompose task directive), so a Sections trim is meaningful and
+  // sent verbatim as prompt_override. Composes only while the gate is open on a goal target.
   const goalText = goals.find((g) => g.id === e.targetGoalId)?.text ?? ''
-  const decomposePreview =
-    `# Decompose goal into a task DAG\n\n**Goal:** ${goalText || '_(the selected goal)_'}\n\n` +
-    '_The planner reads the board and this goal, then posts a task DAG (tasks, dependencies, ' +
-    'context refs). The planner skill body and board context are composed at spawn, so they are ' +
-    'not shown verbatim above._'
+  const decompose = useDecomposePreview(
+    e.confirmOpen && e.isGoalTarget,
+    e.rigorMode,
+    goalText,
+    e.targetGoalId,
+    e.decomposeAbilities.map((a) => a.id),
+  )
 
   return (
     <>
@@ -73,6 +79,9 @@ export function EvaluateBoardButton({ boardKey, goals = [], boardScope }: Props)
           targetGoalId={e.targetGoalId}
           isProjectBoard={e.isProjectBoard}
           rigorMode={e.rigorMode}
+          projectRoot={projectPath}
+          decomposeAbilityIds={e.decomposeAbilities.map((a) => a.id)}
+          onDecomposeAbilitiesChange={e.setDecomposeAbilities}
           onSelectLens={e.pickLens}
           onLensTextChange={e.setLensText}
           onExtraPromptChange={e.setExtraPrompt}
@@ -93,9 +102,9 @@ export function EvaluateBoardButton({ boardKey, goals = [], boardScope }: Props)
           title={e.isGoalTarget ? 'Decompose goal' : e.activeLabel}
           engineLabel={cliLabel(e.selectedCli)}
           fileName={boardKey}
-          prompt={e.isGoalTarget ? decomposePreview : e.previewPrompt}
+          prompt={e.isGoalTarget ? decompose.prompt : e.previewPrompt}
           readOnly
-          headingLayers={e.isGoalTarget ? undefined : headingLayers(e.previewSegments)}
+          headingLayers={headingLayers(e.isGoalTarget ? decompose.segments : e.previewSegments)}
           meta={e.isGoalTarget
             ? [{ label: 'Rigor', value: e.rigorMode }]
             : [{ label: 'Lens', value: e.lensLabel ?? 'Built-in evaluator' }]}

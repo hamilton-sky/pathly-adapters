@@ -278,6 +278,16 @@ def comms_goals_decompose():
         project_root = data.get("project_root", "") or ""
         # "" (unset) lets start_board_run resolve the app-wide default from Settings.
         progress = data.get("progress", "") or ""
+        # Layer-3 abilities (compose after the planner skill's fragments) + a gate "use once"
+        # Sections trim. Both apply only to the single-agent decomposers (planner/plan); the
+        # consultation FSM flow has no single prompt to override, so it ignores them.
+        ability_ids = data.get("ability_ids")
+        if not isinstance(ability_ids, list):
+            ability_ids = []
+        ability_ids = [a for a in ability_ids if isinstance(a, str)]
+        prompt_override = data.get("prompt_override", "") or ""
+        if not isinstance(prompt_override, str):
+            prompt_override = ""
 
         conn = _get_db()
         goal = conn.execute(
@@ -345,6 +355,8 @@ def comms_goals_decompose():
             adapter=adapter,
             model=model,
             progress=progress,
+            ability_ids=ability_ids or None,
+            prompt_override=prompt_override,
             broadcast_fn=_broadcast_runner,
             on_start=_on_start,
             on_done=_on_done,

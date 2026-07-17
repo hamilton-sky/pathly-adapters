@@ -830,7 +830,7 @@ export type DecomposeMode = 'planner' | 'plan' | 'consultation'
 export async function apiDecomposeGoal(
   goal_id: string,
   mode: DecomposeMode,
-  opts: { adapter?: string; projectRoot?: string; model?: string; progress?: string } = {},
+  opts: { adapter?: string; projectRoot?: string; model?: string; progress?: string; abilityIds?: string[]; promptOverride?: string } = {},
 ): Promise<{ ok: boolean; reason?: string } | null> {
   try {
     const body: Record<string, unknown> = { goal_id, mode }
@@ -838,6 +838,9 @@ export async function apiDecomposeGoal(
     if (opts.projectRoot) body.project_root = opts.projectRoot
     if (opts.model) body.model = opts.model
     if (opts.progress) body.progress = opts.progress
+    // Layer-3 abilities compose into the planner prompt; a Sections trim is sent verbatim.
+    if (opts.abilityIds?.length) body.ability_ids = opts.abilityIds
+    if (opts.promptOverride) body.prompt_override = opts.promptOverride
     const r = await apiFetch('/comms/goals/decompose', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

@@ -146,7 +146,7 @@ export interface CommsState {
   /** Epoch ms when a per-task run started — drives the task pill's elapsed timer. */
   taskRunStart: Record<string, number>
   /** Decompose a goal into a task DAG (planner = fast, consultation = deep). */
-  decomposeGoal: (goal_id: string, mode: DecomposeMode, opts?: { adapter?: string; model?: string; progress?: string }) => void
+  decomposeGoal: (goal_id: string, mode: DecomposeMode, opts?: { adapter?: string; model?: string; progress?: string; abilityIds?: string[]; promptOverride?: string }) => void
   /** Update a goal's run state from a goal_run/goal_decompose SSE phase. */
   markGoalRunPhase: (goal_id: string, phase: string) => void
   stopGoal: (goal_id: string) => void
