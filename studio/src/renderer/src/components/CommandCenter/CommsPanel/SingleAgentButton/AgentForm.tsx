@@ -151,11 +151,22 @@ export function AgentForm({ running, onRun, onClose }: Props): JSX.Element {
     }
   }, [previewOpen, skill, engine, abilities, projectPath])
 
-  // F2 gate preview. With a skill, show the REAL composed body (skill + abilities) — it's
-  // Sections-trimmable and sent verbatim as the override. Message/System/Agent are separate cfg
-  // fields (shown as meta), so they compose around the body at spawn without duplication.
+  // F2 gate preview — the FULL prompt the server will assemble, in the same order
+  // (start_board_run): composed skill body (skill + abilities + Pathly fragments), then the
+  // system prompt, the agent role line, and the task. Showing all of it is what lets a Sections
+  // trim send the COMPLETE prompt as the override (the server then uses only that, and does NOT
+  // re-append system/agent/task — so no duplication). NOTE: only the agent ROLE line is sent for
+  // a board run, never the agent's .md persona (shown separately in the banner for reference).
   const previewPrompt = useMemo(() => {
-    if (skill && composedBody) return composedBody
+    if (skill && composedBody) {
+      const parts: string[] = [composedBody]
+      if (sysText.trim()) parts.push('## System instructions\n\n' + sysText.trim())
+      if (agent) parts.push(`## Agent\n\nYou are acting as the **${agent}** agent for this board.`)
+      if (message.trim()) parts.push('## Task\n\n' + message.trim())
+      parts.push('---\n_Board context is retrieved and prepended when the agent runs, so it is not shown verbatim above._')
+      return parts.join('\n\n')
+    }
+    // No skill (or still composing): show the layered pieces as a readable summary.
     const parts: string[] = []
     if (message.trim()) parts.push(`# Task\n\n${message.trim()}`)
     if (sysText.trim()) parts.push(`# System prompt\n\n${sysText.trim()}`)

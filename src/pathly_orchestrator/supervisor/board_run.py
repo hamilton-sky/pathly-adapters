@@ -334,22 +334,10 @@ def start_board_run(
 
     context = board_context_for(board, scope, project_root or "", instructions or "")
     prompt_parts: list[str] = []
-    # The composed skill body is the agent's behavior contract for this run.
-    # A gate-configured "use once" prompt (the Sections cell-trim) overrides composition
-    # entirely — the human has already decided exactly what the agent should see.
-    if prompt_override and prompt_override.strip():
-        skill_body = prompt_override
-    else:
-        skill_body = _compose_skill_body(
-            skill,
-            adapter,
-            caps=caps,
-            ability_ids=ability_ids,
-            project_root=project_root,
-        )
-    if skill_body:
-        skill_body = _inject_board_prompt_vars(
-            skill_body,
+
+    def _inject(text: str) -> str:
+        return _inject_board_prompt_vars(
+            text,
             scope=scope,
             board=board,
             agent=agent,
@@ -357,13 +345,36 @@ def start_board_run(
             project_root=project_root,
             storage_path=storage_path,
         )
-        prompt_parts.append(skill_body)
-    if system_prompt:
-        prompt_parts.append("## System instructions\n\n" + system_prompt.strip())
-    if agent:
-        prompt_parts.append(f"You are acting as the **{agent}** agent for this board.")
-    if instructions:
-        prompt_parts.append("## Task\n\n" + instructions.strip())
+
+    if prompt_override and prompt_override.strip():
+        # A gate-configured "use once" prompt (the Sections cell-trim) REPLACES the whole
+        # client-knowable prompt — skill body + system instructions + agent line + task. The
+        # human already decided exactly what the agent sees, so those must NOT be appended
+        # again below (that would duplicate them). Board context / cadence / cwd still are:
+        # they're server-side, and the gate showed them as a note rather than verbatim.
+        prompt_parts.append(_inject(prompt_override))
+    else:
+        # The composed skill body is the agent's behavior contract for this run.
+        skill_body = _compose_skill_body(
+            skill,
+            adapter,
+            caps=caps,
+            ability_ids=ability_ids,
+            project_root=project_root,
+        )
+        if skill_body:
+            prompt_parts.append(_inject(skill_body))
+        if system_prompt:
+            prompt_parts.append("## System instructions\n\n" + system_prompt.strip())
+        if agent:
+            # NOTE: the agent's .md persona is NOT sent for a board run — only this role
+            # line. Headed so it splits into its own cell and the gate preview matches the
+            # spawned prompt verbatim.
+            prompt_parts.append(
+                f"## Agent\n\nYou are acting as the **{agent}** agent for this board."
+            )
+        if instructions:
+            prompt_parts.append("## Task\n\n" + instructions.strip())
     # The board IS the conversation: the task is the latest human message; reply there.
     # This run is headless — the terminal does not stream — so the agent must narrate
     # its progress to the board or the human is blind. These POSTs are how the human
