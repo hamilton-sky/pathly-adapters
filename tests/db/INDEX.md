@@ -4,10 +4,11 @@
 
 Database layer — schema/queries, connection isolation, write guard.
 
-3 test file(s).
+4 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
 | `test_db.py` | Unit tests for pathly_orchestrator.db — all tables and helpers | 20 |
 | `test_db_isolation.py` | covers project root isolation; get db reopens connection when db path changes | 2 |
 | `test_db_write_guard.py` | Regression: a write that raises inside `_get_write_lock` must roll back and | 3 |
+| `test_stage_configs.py` | stage_configs query helpers — flow-phase-inspector (#5) per-stage selection persistence | 5 |

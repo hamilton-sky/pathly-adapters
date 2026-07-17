@@ -18,7 +18,7 @@ FSM engine, gates, transitions, flow definitions, feedback protocol & fix-routin
 | `test_gates.py` | Unit and integration tests for run_gates() — Conv 1 and Conv 2 (scope_gate) | 31 |
 | `test_golden_path.py` | T1 — the end-to-end GOLDEN-PATH smoke test (production-readiness P0) | 7 |
 | `test_hooks.py` | End-to-end tests for hook scripts via subprocess | 11 |
-| `test_orchestrator.py` | Tests for Conv 2: STATE.json schema validation, state/transition enforcement, concurrency | 18 |
+| `test_orchestrator.py` | Tests for Conv 2: STATE.json schema validation, state/transition enforcement, concurrency | 17 |
 | `test_rollback.py` | covers no orphans after mid install failure; failed install leaves no manifest; uninstall without manifest returns empty; … | 4 |
 | `test_team_build_per_task.py` | team-build per-task loop + goal-DAG completeness gate | 9 |
 | `test_transition_actions.py` | Tests for get_transition_actions() and validate_flow_cli() in state.py | 21 |

@@ -77,6 +77,11 @@ def _add_additive_migrations(conn: sqlite3.Connection) -> None:
         ("flow_edges", "config_json", "TEXT"),
         ("flow_edges", "ordinal", "INTEGER DEFAULT 0"),
         ("flow_definitions", "config_json", "TEXT"),
+        # flow-phase-inspector (#5): per-stage layer-3 ability ids + excluded section
+        # headings, each a JSON list. The SELECTION (not frozen prompt text) — fsm_compose
+        # composes fresh at spawn and applies it, so an upstream skill edit never stale-seeds.
+        ("stage_configs", "ability_ids", "TEXT"),
+        ("stage_configs", "excluded_sections", "TEXT"),
         # Phase 1.4a (comms-board): supersede stale decisions
         ("comms_messages", "superseded_by", "TEXT"),
         # Phase 14 (comms-board-skills): DAG task decomposition

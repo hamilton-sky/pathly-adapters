@@ -108,14 +108,16 @@ CREATE TABLE IF NOT EXISTS skill_overrides (
 );
 
 CREATE TABLE IF NOT EXISTS stage_configs (
-    id           INTEGER PRIMARY KEY AUTOINCREMENT,
-    project_root TEXT NOT NULL,
-    feature      TEXT NOT NULL,
-    stage        TEXT NOT NULL,
-    agent        TEXT,
-    adapter      TEXT,
-    skill        TEXT,
-    updated_at   TEXT NOT NULL,
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_root      TEXT NOT NULL,
+    feature           TEXT NOT NULL,
+    stage             TEXT NOT NULL,
+    agent             TEXT,
+    adapter           TEXT,
+    skill             TEXT,
+    ability_ids       TEXT,
+    excluded_sections TEXT,
+    updated_at        TEXT NOT NULL,
     UNIQUE(project_root, feature, stage)
 );
 
