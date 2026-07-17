@@ -11,3 +11,4 @@ from ._editor_bp import bp  # noqa: F401
 from . import editor_render as _er  # noqa: F401
 from . import editor_io as _ei  # noqa: F401
 from . import prompt_library as _pl  # noqa: F401
+from . import abilities as _ab  # noqa: F401

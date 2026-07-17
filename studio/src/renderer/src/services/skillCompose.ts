@@ -54,16 +54,35 @@ export async function composeClientSkill(
   }
 }
 
+/** One labeled part of a composed prompt (mirrors compose_skill_segments). */
+export interface ComposedSegment {
+  id: string
+  /** 'body' | 'default' | 'fragment' | 'ability' — the layer this part came from. */
+  kind: string
+  label: string
+  text: string
+  source: string
+  optional: boolean
+  requires: string | null
+  included: boolean
+}
+
+export interface ComposedSkill {
+  prompt: string
+  segments: ComposedSegment[]
+}
+
 /**
  * Compose a skill's full body WITH layer-3 abilities appended — the real prompt a board run
- * will send. Used by the run gates so the Sections cell-editor operates on the actual composed
- * prompt (skill + abilities), and the trimmed result can be sent verbatim as prompt_override.
- * @returns the composed skill body, or `null` on any failure (caller falls back to server compose).
+ * will send, plus its labeled segments. Used by the run gates so the Sections cell-editor
+ * operates on the ACTUAL composed prompt (skill + fragments + abilities) and knows each cell's
+ * layer; the trimmed result can then be sent verbatim as prompt_override.
+ * @returns the composed prompt + segments, or `null` on any failure (caller falls back).
  */
 export async function composeSkillPrompt(
   skill: string,
   opts: { adapter?: string; abilityIds?: string[]; projectRoot?: string } = {},
-): Promise<string | null> {
+): Promise<ComposedSkill | null> {
   if (!skill) return null
   try {
     const r = await apiFetch('/skills/compose', {
@@ -77,9 +96,28 @@ export async function composeSkillPrompt(
       }),
     })
     if (!r.ok) return null
-    const data = (await r.json()) as { prompt?: string }
-    return typeof data.prompt === 'string' && data.prompt.trim() ? data.prompt : null
+    const data = (await r.json()) as { prompt?: string; segments?: ComposedSegment[] }
+    if (typeof data.prompt !== 'string' || !data.prompt.trim()) return null
+    return { prompt: data.prompt, segments: Array.isArray(data.segments) ? data.segments : [] }
   } catch {
     return null
   }
+}
+
+/**
+ * The `## ` headings that belong to Pathly's PLATFORM layer (defaults + fragments) — the
+ * un-editable layer that owns board CRUD, progress logging, and the AGENT_DONE completion
+ * report. The Sections cell-editor locks these: unchecking `## Completion report` would make
+ * the run write no AGENT_DONE (it vanishes from RECENT and goes unbilled), and unchecking
+ * `comms-post` would silently stop it posting to the board.
+ */
+export function platformHeadings(segments: ComposedSegment[]): string[] {
+  const out: string[] = []
+  for (const s of segments) {
+    if (s.kind !== 'fragment' && s.kind !== 'default') continue
+    for (const line of s.text.split('\n')) {
+      if (line.startsWith('## ') && !line.startsWith('### ')) out.push(line.slice(3).trim())
+    }
+  }
+  return out
 }

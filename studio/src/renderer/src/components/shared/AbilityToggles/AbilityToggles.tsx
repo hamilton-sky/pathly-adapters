@@ -6,25 +6,21 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { Plus, Check, X } from 'lucide-react'
-import {
-  listUserPrompts,
-  saveUserPrompt,
-  type PromptLibraryRow,
-} from '../../../services/promptLibrary'
+import { listAbilities, saveAbility, type Ability } from '../../../services/abilities'
 import s from './AbilityToggles.module.css'
 
 const CATEGORIES = ['plan', 'build', 'review', 'test'] as const
 
 interface Props {
   projectRoot: string
-  /** Currently-selected ability row ids. */
+  /** Currently-selected ability ids ("<category>/<name>"). */
   selectedIds: string[]
   /** Fires with the full selected rows (so the host can show bodies + send ids). */
-  onChange: (rows: PromptLibraryRow[]) => void
+  onChange: (rows: Ability[]) => void
 }
 
 export function AbilityToggles({ projectRoot, selectedIds, onChange }: Props): JSX.Element {
-  const [abilities, setAbilities] = useState<PromptLibraryRow[]>([])
+  const [abilities, setAbilities] = useState<Ability[]>([])
   const [nonce, setNonce] = useState(0)
   const [adding, setAdding] = useState(false)
   const [name, setName] = useState('')
@@ -33,7 +29,7 @@ export function AbilityToggles({ projectRoot, selectedIds, onChange }: Props): J
 
   useEffect(() => {
     let cancelled = false
-    void listUserPrompts({ kind: 'ability', projectRoot }).then((rows) => {
+    void listAbilities(projectRoot).then((rows) => {
       if (!cancelled) setAbilities(rows)
     })
     return () => {
@@ -42,7 +38,7 @@ export function AbilityToggles({ projectRoot, selectedIds, onChange }: Props): J
   }, [projectRoot, nonce])
 
   const toggle = useCallback(
-    (row: PromptLibraryRow) => {
+    (row: Ability) => {
       const nextIds = selectedIds.includes(row.id)
         ? selectedIds.filter((id) => id !== row.id)
         : [...selectedIds, row.id]
@@ -54,7 +50,7 @@ export function AbilityToggles({ projectRoot, selectedIds, onChange }: Props): J
   async function saveNew(): Promise<void> {
     const n = name.trim()
     if (!n || !body.trim()) return
-    await saveUserPrompt({ kind: 'ability', category, name: n, label: n, body, projectRoot })
+    await saveAbility({ category, name: n, body, projectRoot })
     setName('')
     setBody('')
     setAdding(false)

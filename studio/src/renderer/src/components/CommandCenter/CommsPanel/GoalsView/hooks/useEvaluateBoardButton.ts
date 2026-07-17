@@ -72,7 +72,9 @@ export function useEvaluateBoardButton(boardKey: string, boardScope?: BoardScope
   const lensLabel = EVAL_LENSES.find((l) => l.name === selectedLens && l.name)?.label
   const activeLabel = isDecomposeTarget ? 'Decompose' : (lensLabel ?? 'Evaluate')
 
-  const previewPrompt = useEvaluatePreview(confirmOpen && !targetGoalId, lensText, extraPrompt)
+  const evalPreview = useEvaluatePreview(confirmOpen && !targetGoalId, lensText, extraPrompt)
+  const previewPrompt = evalPreview.prompt
+  const previewSegments = evalPreview.segments
 
   function handleCliChange(cli: EditorCli): void {
     setSelectedCli(cli)
@@ -172,11 +174,17 @@ export function useEvaluateBoardButton(boardKey: string, boardScope?: BoardScope
     // popover / modal open state
     configOpen, setConfigOpen, confirmOpen, confirmGoalOpen, confirmFeatureOpen, gearRef,
     // preview
-    previewPrompt,
+    previewPrompt, previewSegments,
     // handlers
     handleCliChange, pickLens, setLensText, setExtraPrompt, setTargetGoalId, setRigorMode, setVerbosity,
     handleReset, handleStop, onPillRun, onConfigRun, dispatch,
-    confirmWholeBoard: (finalPrompt?: string) => { setConfirmOpen(false); dispatch(finalPrompt) },
+    // Only a CONFIRMED Sections config overrides composition — a plain "Run Evaluate" must
+    // leave it to the server, else the run ships a body without the platform fragments
+    // (no BOARD_EVAL post, no AGENT_DONE → vanishes from RECENT and goes unbilled).
+    confirmWholeBoard: (finalPrompt?: string, sectionsUsed?: boolean) => {
+      setConfirmOpen(false)
+      dispatch(sectionsUsed ? finalPrompt : undefined)
+    },
     cancelWholeBoard: () => setConfirmOpen(false),
     confirmGoal: () => { setConfirmGoalOpen(false); dispatch() },
     cancelGoal: () => setConfirmGoalOpen(false),

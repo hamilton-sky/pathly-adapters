@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react'
+﻿import React, { useState, useEffect, useMemo } from 'react'
 import { ChevronUp, ChevronDown } from 'lucide-react'
 import { Tooltip } from '../../ui'
 import MarkdownRenderer from '../MarkdownRenderer/MarkdownRenderer'
@@ -35,6 +35,11 @@ interface Props {
   confirmLabel?: string
   /** Hide the "Insert as one cell" secondary action (not meaningful outside the editor). */
   hideInsertOne?: boolean
+  /** `## ` headings from Pathly's PLATFORM layer (defaults + fragments) — rendered LOCKED:
+   *  always included, never uncheckable. They are what makes an agent talk to Pathly, so
+   *  dropping one silently breaks the run (no AGENT_DONE → vanishes + unbilled; no comms-post
+   *  → stops posting to the board). Visible for inspection, not editable. */
+  lockedHeadings?: string[]
   onConfirm: (cells: ProposedCell[]) => void
   onInsertOne: (rawContent: string) => void
   onClose: () => void
@@ -79,7 +84,7 @@ function parseMdToCells(raw: string, depth: 1 | 2 | 3 = 2): ProposedCell[] {
   return cells
 }
 
-export default function SkillSplitModal({ filePath, fileName, rawContent: rawContentProp, title, subtitle, confirmLabel, hideInsertOne, onConfirm, onInsertOne, onClose }: Props) {
+export default function SkillSplitModal({ filePath, fileName, rawContent: rawContentProp, title, subtitle, confirmLabel, hideInsertOne, lockedHeadings, onConfirm, onInsertOne, onClose }: Props) {
   const [rawContent, setRawContent] = useState(rawContentProp ?? '')
   const [cells, setCells] = useState<ProposedCell[]>(() => rawContentProp ? parseMdToCells(rawContentProp, 2) : [])
   const [splitDepth, setSplitDepth] = useState<1 | 2 | 3>(2)
@@ -100,11 +105,17 @@ export default function SkillSplitModal({ filePath, fileName, rawContent: rawCon
     setCells(parseMdToCells(rawContent, splitDepth))
   }, [splitDepth, rawContent])
 
-  const checkedCount = cells.filter(c => c.checked).length
-  const checkedCells = cells.filter(c => c.checked)
+  // Pathly's platform fragments (comms-post / completion-report / progress-logging …) are shown
+  // but LOCKED — they're the layer that makes the agent report back. Unchecking one silently
+  // breaks the run, so they always count as included regardless of the checkbox.
+  const locked = useMemo(() => new Set(lockedHeadings ?? []), [lockedHeadings])
+  const isLocked = (c: ProposedCell): boolean => locked.has(c.heading)
+
+  const checkedCount = cells.filter(c => c.checked || isLocked(c)).length
+  const checkedCells = cells.filter(c => c.checked || isLocked(c))
 
   function toggleCell(id: string) {
-    setCells(prev => prev.map(c => c.id === id ? { ...c, checked: !c.checked } : c))
+    setCells(prev => prev.map(c => (c.id === id && !isLocked(c) ? { ...c, checked: !c.checked } : c)))
   }
 
   function moveUp(id: string) {
@@ -174,13 +185,19 @@ export default function SkillSplitModal({ filePath, fileName, rawContent: rawCon
                     <input
                       type="checkbox"
                       className={styles.cellCheck}
-                      aria-label={`Include ${cell.type} cell`}
-                      checked={cell.checked}
+                      aria-label={isLocked(cell)
+                        ? `${cell.heading} — required by Pathly, always included`
+                        : `Include ${cell.type} cell`}
+                      checked={cell.checked || isLocked(cell)}
+                      disabled={isLocked(cell)}
                       onChange={() => toggleCell(cell.id)}
                       onClick={e => e.stopPropagation()}
                     />
-                    <span className={styles.typeBadge}>
-                      {cell.type === 'heading' ? 'HEADING' : 'BODY'}
+                    <span
+                      className={styles.typeBadge}
+                      title={isLocked(cell) ? 'Pathly platform fragment — always sent' : undefined}
+                    >
+                      {isLocked(cell) ? '🔒 PATHLY' : cell.type === 'heading' ? 'HEADING' : 'BODY'}
                     </span>
                     <span className={styles.stripDiv} />
                     <Tooltip label="Move up" placement="top">
@@ -246,7 +263,7 @@ export default function SkillSplitModal({ filePath, fileName, rawContent: rawCon
             type="button"
             className={styles.btnPrimary}
             disabled={checkedCount === 0}
-            onClick={() => onConfirm(cells.filter(c => c.checked))}
+            onClick={() => onConfirm(checkedCells)}
           >
             {confirmLabel ?? `Confirm split — ${checkedCount} cells`}
           </button>

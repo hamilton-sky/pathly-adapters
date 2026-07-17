@@ -143,10 +143,9 @@ def _compose_skill_body(
             compose_skill_segments,
             segments_to_prompt,
         )
-        from pathly_orchestrator.db.connection import get_db
-        from pathly_orchestrator.db.queries.prompt_library import ability_segments
+        from pathly_orchestrator.skills.abilities import ability_segments
 
-        extra = ability_segments(get_db(project_root or None), ability_ids)
+        extra = ability_segments(ability_ids, project_root or None)
         segs = compose_skill_segments(
             skill, _caps, board_default=True, extra_segments=extra
         )

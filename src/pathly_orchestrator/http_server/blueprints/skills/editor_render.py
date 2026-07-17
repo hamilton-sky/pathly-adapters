@@ -314,15 +314,14 @@ def skills_preview():
 
 
 def _ability_segments(ability_ids: list, project_root: str) -> list:
-    """Fetch selected layer-3 ability rows (prompt_library kind='ability') as compose
-    segments. Thin wrapper over the layer-safe db helper (shared with supervisor/board_run).
+    """Selected layer-3 abilities as compose segments. Thin wrapper over skills/abilities
+    (FILES — the same helper supervisor/board_run uses, so preview and spawn can't disagree).
     """
     if not ability_ids:
         return []
-    from pathly_orchestrator.db.connection import get_db
-    from pathly_orchestrator.db.queries.prompt_library import ability_segments
+    from pathly_orchestrator.skills.abilities import ability_segments
 
-    return ability_segments(get_db(project_root or None), ability_ids)
+    return ability_segments(ability_ids, project_root or None)
 
 
 @bp.route("/skills/compose", methods=["POST"])

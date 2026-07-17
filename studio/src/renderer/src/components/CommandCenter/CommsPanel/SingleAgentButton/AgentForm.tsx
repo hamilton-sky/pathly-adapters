@@ -13,8 +13,8 @@ import { PresetAddRow } from '../../../shared/PromptActionConfig/PresetAddRow'
 import { ENGINES, PROGRESS_LEVELS, SYSTEM_PROMPTS } from './agentFormData'
 import SendPreviewModal from '../../../shared/SendPreviewModal/SendPreviewModal'
 import { AbilityToggles } from '../../../shared/AbilityToggles/AbilityToggles'
-import type { PromptLibraryRow } from '../../../../services/promptLibrary'
-import { composeSkillPrompt } from '../../../../services/skillCompose'
+import type { Ability } from '../../../../services/abilities'
+import { composeSkillPrompt, platformHeadings, type ComposedSegment } from '../../../../services/skillCompose'
 import s from './SingleAgentButton.module.css'
 
 export interface SingleAgentConfig {
@@ -56,8 +56,9 @@ export function AgentForm({ running, onRun, onClose }: Props): JSX.Element {
   const [progress, setProgress] = useState<string>('normal')
   const [message, setMessage] = useState<string>('')
   const [previewOpen, setPreviewOpen] = useState(false)
-  const [abilities, setAbilities] = useState<PromptLibraryRow[]>([])
+  const [abilities, setAbilities] = useState<Ability[]>([])
   const [composedBody, setComposedBody] = useState<string | null>(null)
+  const [composedSegments, setComposedSegments] = useState<ComposedSegment[]>([])
 
   // Full agent/skill lists from the real core/ dirs (fall back to common picks).
   const projectPath = useStore((st) => st.projectPath)
@@ -132,6 +133,7 @@ export function AgentForm({ running, onRun, onClose }: Props): JSX.Element {
   useEffect(() => {
     if (!previewOpen || !skill) {
       setComposedBody(null)
+      setComposedSegments([])
       return
     }
     let cancelled = false
@@ -139,8 +141,10 @@ export function AgentForm({ running, onRun, onClose }: Props): JSX.Element {
       adapter: engine,
       abilityIds: abilities.map((a) => a.id),
       projectRoot: projectPath,
-    }).then((p) => {
-      if (!cancelled) setComposedBody(p)
+    }).then((r) => {
+      if (cancelled) return
+      setComposedBody(r?.prompt ?? null)
+      setComposedSegments(r?.segments ?? [])
     })
     return () => {
       cancelled = true
@@ -167,10 +171,12 @@ export function AgentForm({ running, onRun, onClose }: Props): JSX.Element {
     setPreviewOpen(true)
   }
 
-  function confirmSend(finalPrompt?: string): void {
-    // With a composed skill body, send it (possibly Sections-trimmed) as the authoritative
-    // override — the human decided exactly what the agent's skill body should be.
-    const override = skill && composedBody ? finalPrompt ?? composedBody : undefined
+  function confirmSend(finalPrompt?: string, sectionsUsed?: boolean): void {
+    // ONLY a confirmed Sections config overrides composition — otherwise leave it to the
+    // server (skill + fragments + abilities). Sending the client prompt on every run would
+    // risk shipping a body without the platform fragments (no AGENT_DONE → the run vanishes
+    // from RECENT and goes unbilled).
+    const override = sectionsUsed && skill && composedBody ? finalPrompt : undefined
     onRun({
       adapter: engine,
       agent: agent || undefined,
@@ -306,13 +312,14 @@ export function AgentForm({ running, onRun, onClose }: Props): JSX.Element {
           fileName={interactive ? 'interactive' : 'headless'}
           prompt={previewPrompt}
           readOnly
+          lockedHeadings={platformHeadings(composedSegments)}
           meta={[
             ...(message.trim() ? [{ label: 'Message', value: message.trim().slice(0, 50) }] : []),
             ...(sysName ? [{ label: 'System', value: sysName }] : []),
             ...(abilities.length ? [{ label: 'Abilities', value: String(abilities.length) }] : []),
           ]}
           submitLabel="Send to agent"
-          onSubmit={(finalPrompt) => confirmSend(finalPrompt)}
+          onSubmit={(finalPrompt, sectionsUsed) => confirmSend(finalPrompt, sectionsUsed)}
           onCancel={() => setPreviewOpen(false)}
         />
       )}

@@ -38,20 +38,28 @@ interface Props {
   /** Render the prompt as a read-only preview (no edit toggle). Use when the final prompt
    *  is assembled elsewhere (e.g. server-side) and the modal is a confirm-and-preview gate. */
   readOnly?: boolean
+  /** Platform `## ` headings to LOCK in the Sections editor — Pathly's fragments (board posts,
+   *  progress, completion report). Visible but never uncheckable; dropping one breaks the run. */
+  lockedHeadings?: string[]
   /** Optional controls rendered in the footer, left of the buttons (e.g. a per-run progress selector). */
   footerSlot?: ReactNode
-  /** Receives the (possibly edited) prompt — that exact text is what gets sent. */
-  onSubmit: (prompt: string) => void
+  /** Receives the (possibly edited) prompt — that exact text is what gets sent. `sectionsUsed`
+   *  is true only when the user actually confirmed a Sections cell-config: server-composed
+   *  gates must ONLY send a prompt_override in that case, never on a plain submit. */
+  onSubmit: (prompt: string, sectionsUsed?: boolean) => void
   onCancel: () => void
 }
 
 // Confirm-before-send: a compact gate showing the target engine + summary, an optional
 // per-item selection list (comments), and the prompt in a collapsible banner (eye = preview ·
 // pencil = edit). Whatever the banner holds on submit is the exact text dispatched.
-export default function SendPreviewModal({ title, engineLabel, fileName, prompt, meta = [], items, itemsLabel = 'Include', onToggleItem, submitLabel = 'Send', readOnly = false, footerSlot, onSubmit, onCancel }: Props) {
+export default function SendPreviewModal({ title, engineLabel, fileName, prompt, meta = [], items, itemsLabel = 'Include', onToggleItem, submitLabel = 'Send', readOnly = false, lockedHeadings, footerSlot, onSubmit, onCancel }: Props) {
   const submitRef = useRef<HTMLButtonElement>(null)
   const [text, setText] = useState(prompt)
   const [splitOpen, setSplitOpen] = useState(false)
+  // True once the user CONFIRMS a Sections config. Server-composed gates key their
+  // prompt_override off this — a plain submit must leave composition to the server.
+  const [sectionsUsed, setSectionsUsed] = useState(false)
 
   // Re-seed the editable text whenever the incoming prompt changes — e.g. when toggling
   // which comments are included rebuilds it. For Split/Analyze the prompt is stable, so a
@@ -68,7 +76,7 @@ export default function SendPreviewModal({ title, engineLabel, fileName, prompt,
         onCancel()
       } else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault()
-        onSubmit(text)
+        onSubmit(text, sectionsUsed)
       }
     }
     document.addEventListener('keydown', onKey)
@@ -149,7 +157,7 @@ export default function SendPreviewModal({ title, engineLabel, fileName, prompt,
             type="button"
             className={styles.submitBtn}
             disabled={noneSelected}
-            onClick={() => onSubmit(text)}
+            onClick={() => onSubmit(text, sectionsUsed)}
           >
             <SendHorizonal size={14} />
             {submitLabel}
@@ -164,7 +172,8 @@ export default function SendPreviewModal({ title, engineLabel, fileName, prompt,
           subtitle="Include or exclude sections for this run — used once. Save reusable prompts in the library instead."
           confirmLabel="Use these sections"
           hideInsertOne
-          onConfirm={(cells) => { setText(cellsToMarkdown(cells)); setSplitOpen(false) }}
+          lockedHeadings={lockedHeadings}
+          onConfirm={(cells) => { setText(cellsToMarkdown(cells)); setSectionsUsed(true); setSplitOpen(false) }}
           onInsertOne={() => setSplitOpen(false)}
           onClose={() => setSplitOpen(false)}
         />
