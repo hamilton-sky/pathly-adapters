@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { SendHorizonal, X, Check } from 'lucide-react'
+import { SendHorizonal, X, Check, Rows3 } from 'lucide-react'
 import { PromptBanner } from '../PromptPreview/PromptPreview'
+import SkillSplitModal, { cellsToMarkdown } from '../SkillSplitModal/SkillSplitModal'
 import styles from './SendPreviewModal.module.css'
 
 export interface SendPreviewMeta {
@@ -50,6 +51,7 @@ interface Props {
 export default function SendPreviewModal({ title, engineLabel, fileName, prompt, meta = [], items, itemsLabel = 'Include', onToggleItem, submitLabel = 'Send', readOnly = false, footerSlot, onSubmit, onCancel }: Props) {
   const submitRef = useRef<HTMLButtonElement>(null)
   const [text, setText] = useState(prompt)
+  const [splitOpen, setSplitOpen] = useState(false)
 
   // Re-seed the editable text whenever the incoming prompt changes — e.g. when toggling
   // which comments are included rebuilds it. For Split/Analyze the prompt is stable, so a
@@ -77,6 +79,7 @@ export default function SendPreviewModal({ title, engineLabel, fileName, prompt,
   const noneSelected = !!items && items.length > 0 && items.every((i) => !i.selected)
 
   return (
+    <>
     <div className={styles.backdrop} onClick={onCancel}>
       <div
         className={styles.modal}
@@ -137,6 +140,11 @@ export default function SendPreviewModal({ title, engineLabel, fileName, prompt,
         {footerSlot && <div className={styles.footerSlot}>{footerSlot}</div>}
 
         <div className={styles.footer}>
+          {!readOnly && (
+            <button type="button" className={styles.cancelBtn} onClick={() => setSplitOpen(true)} title="Include or exclude prompt sections for this run">
+              <Rows3 size={13} /> Sections
+            </button>
+          )}
           <button type="button" className={styles.cancelBtn} onClick={onCancel}>Cancel</button>
           <button
             ref={submitRef}
@@ -151,5 +159,18 @@ export default function SendPreviewModal({ title, engineLabel, fileName, prompt,
         </div>
       </div>
     </div>
+      {splitOpen && (
+        <SkillSplitModal
+          rawContent={text}
+          title="Configure prompt sections"
+          subtitle="Include or exclude sections for this run — used once. Save reusable prompts in the library instead."
+          confirmLabel="Use these sections"
+          hideInsertOne
+          onConfirm={(cells) => { setText(cellsToMarkdown(cells)); setSplitOpen(false) }}
+          onInsertOne={() => setSplitOpen(false)}
+          onClose={() => setSplitOpen(false)}
+        />
+      )}
+    </>
   )
 }

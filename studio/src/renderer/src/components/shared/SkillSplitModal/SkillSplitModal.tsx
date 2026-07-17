@@ -4,7 +4,7 @@ import { Tooltip } from '../../ui'
 import MarkdownRenderer from '../MarkdownRenderer/MarkdownRenderer'
 import styles from './SkillSplitModal.module.css'
 
-interface ProposedCell {
+export interface ProposedCell {
   id: string
   type: 'heading' | 'markdown'
   heading: string
@@ -12,10 +12,29 @@ interface ProposedCell {
   checked: boolean
 }
 
+/** Serialize the (checked, possibly-reordered) cells back into a markdown prompt — the
+ *  inverse of parseMdToCells, used by the run gate's "use once" section config. */
+export function cellsToMarkdown(cells: ProposedCell[]): string {
+  return cells
+    .map((c) => {
+      const h = c.type === 'heading' ? `# ${c.heading}` : c.heading ? `## ${c.heading}` : ''
+      return [h, c.content].filter(Boolean).join('\n\n')
+    })
+    .join('\n\n')
+    .trim()
+}
+
 interface Props {
   filePath?: string
   fileName?: string
   rawContent?: string
+  /** Override the editor-flavored heading (e.g. the run-gate "configure sections" use). */
+  title?: string
+  subtitle?: string
+  /** Primary button label. Defaults to "Confirm split — N cells". */
+  confirmLabel?: string
+  /** Hide the "Insert as one cell" secondary action (not meaningful outside the editor). */
+  hideInsertOne?: boolean
   onConfirm: (cells: ProposedCell[]) => void
   onInsertOne: (rawContent: string) => void
   onClose: () => void
@@ -60,7 +79,7 @@ function parseMdToCells(raw: string, depth: 1 | 2 | 3 = 2): ProposedCell[] {
   return cells
 }
 
-export default function SkillSplitModal({ filePath, fileName, rawContent: rawContentProp, onConfirm, onInsertOne, onClose }: Props) {
+export default function SkillSplitModal({ filePath, fileName, rawContent: rawContentProp, title, subtitle, confirmLabel, hideInsertOne, onConfirm, onInsertOne, onClose }: Props) {
   const [rawContent, setRawContent] = useState(rawContentProp ?? '')
   const [cells, setCells] = useState<ProposedCell[]>(() => rawContentProp ? parseMdToCells(rawContentProp, 2) : [])
   const [splitDepth, setSplitDepth] = useState<1 | 2 | 3>(2)
@@ -108,10 +127,12 @@ export default function SkillSplitModal({ filePath, fileName, rawContent: rawCon
     })
   }
 
-  const modalTitle = fileName ? 'Add markdown as cells' : 'Split into cells'
-  const modalSubtitle = fileName
-    ? `Dropped ${fileName} — here's how Pathly will split it. Confirm, or insert as a single cell.`
-    : "Here's how Pathly will split this cell. Confirm, or insert as a single cell."
+  const modalTitle = title ?? (fileName ? 'Add markdown as cells' : 'Split into cells')
+  const modalSubtitle =
+    subtitle ??
+    (fileName
+      ? `Dropped ${fileName} — here's how Pathly will split it. Confirm, or insert as a single cell.`
+      : "Here's how Pathly will split this cell. Confirm, or insert as a single cell.")
 
   return (
     <div className={styles.backdrop} onClick={onClose} tabIndex={-1}>
@@ -213,9 +234,11 @@ export default function SkillSplitModal({ filePath, fileName, rawContent: rawCon
         </div>
 
         <div className={styles.footer}>
-          <button type="button" className={styles.btnSecondary} onClick={() => onInsertOne(rawContent)}>
-            Insert as one cell
-          </button>
+          {!hideInsertOne && (
+            <button type="button" className={styles.btnSecondary} onClick={() => onInsertOne(rawContent)}>
+              Insert as one cell
+            </button>
+          )}
           <button type="button" className={styles.btnCancel} onClick={onClose}>
             Cancel
           </button>
@@ -225,7 +248,7 @@ export default function SkillSplitModal({ filePath, fileName, rawContent: rawCon
             disabled={checkedCount === 0}
             onClick={() => onConfirm(cells.filter(c => c.checked))}
           >
-            Confirm split — {checkedCount} cells
+            {confirmLabel ?? `Confirm split — ${checkedCount} cells`}
           </button>
         </div>
       </div>
