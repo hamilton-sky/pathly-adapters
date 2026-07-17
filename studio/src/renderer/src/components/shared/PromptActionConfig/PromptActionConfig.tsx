@@ -28,6 +28,8 @@ interface Props {
   /** When set, renders a "Save current as prompt" affordance that persists to the library. */
   onAddPreset?: (name: string) => void | Promise<void>
   bannerSlot?: ReactNode
+  /** Optional layer-3 abilities picker, rendered as its own section above ENGINE. */
+  abilitiesSlot?: ReactNode
   footerNote?: ReactNode
   secondaryLabel?: string
   onSecondary?: () => void
@@ -59,6 +61,7 @@ export function PromptActionConfig({
   onPrimary,
   onAddPreset,
   bannerSlot,
+  abilitiesSlot,
   footerNote,
   secondaryLabel,
   onSecondary,
@@ -103,6 +106,13 @@ export function PromptActionConfig({
               if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); onPrimary() }
             }}
           />
+        </section>
+      )}
+
+      {abilitiesSlot && (
+        <section className={s.section}>
+          <span className={s.sectionLabel}>ABILITIES</span>
+          {abilitiesSlot}
         </section>
       )}
 

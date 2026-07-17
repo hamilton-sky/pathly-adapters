@@ -3,6 +3,8 @@ import { type EditorCli } from '../../../../MarkdownEditor/EditorHeader/editorCl
 import { PromptBanner, usePromptContent } from '../../../../shared/PromptPreview/PromptPreview'
 import { PromptActionConfig } from '../../../../shared/PromptActionConfig/PromptActionConfig'
 import { useMergedPresets } from '../../../../shared/PromptActionConfig/useMergedPresets'
+import { AbilityToggles } from '../../../../shared/AbilityToggles/AbilityToggles'
+import type { Ability } from '../../../../../services/abilities'
 import { useSkillCatalog } from '../../../../Monitor/ConfigurePhaseModal/hooks/usePhaseModalCatalog'
 import { useStore } from '../../../../../store'
 import { useUiStore } from '../../../../../store/uiStore'
@@ -17,6 +19,9 @@ interface Props {
   extraPrompt: string
   selectedCli: EditorCli
   running: boolean
+  /** Selected layer-3 ability ids composed into the evaluator prompt. */
+  abilityIds: string[]
+  onAbilitiesChange: (rows: Ability[]) => void
   onSelectLens: (name: string) => void
   onLensTextChange: (v: string) => void
   onExtraPromptChange: (v: string) => void
@@ -30,7 +35,7 @@ interface Props {
 // with a live preview banner of the built-in evaluate skill (openable in the editor). Shown
 // when the Evaluate target is the whole board rather than a specific goal.
 export function BoardEvalConfig({
-  selectedLens, lensText, extraPrompt, selectedCli, running,
+  selectedLens, lensText, extraPrompt, selectedCli, running, abilityIds, onAbilitiesChange,
   onSelectLens, onLensTextChange, onExtraPromptChange, onCliChange, onReset, onRun, onClose,
 }: Props): JSX.Element {
   const projectPath = useStore((st) => st.projectPath)
@@ -104,6 +109,9 @@ export function BoardEvalConfig({
       onPrimary={onRun}
       onAddPreset={lensText.trim() ? (name) => addPreset(name, lensText) : undefined}
       bannerSlot={bannerSlot}
+      abilitiesSlot={
+        <AbilityToggles projectRoot={projectPath} selectedIds={abilityIds} onChange={onAbilitiesChange} />
+      }
       footerNote={footerNote}
     />
   )

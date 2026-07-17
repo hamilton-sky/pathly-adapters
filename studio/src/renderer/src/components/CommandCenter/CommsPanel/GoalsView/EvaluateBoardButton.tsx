@@ -82,6 +82,8 @@ export function EvaluateBoardButton({ boardKey, goals = [], boardScope }: Props)
           projectRoot={projectPath}
           decomposeAbilityIds={e.decomposeAbilities.map((a) => a.id)}
           onDecomposeAbilitiesChange={e.setDecomposeAbilities}
+          evalAbilityIds={e.evalAbilities.map((a) => a.id)}
+          onEvalAbilitiesChange={e.setEvalAbilities}
           onSelectLens={e.pickLens}
           onLensTextChange={e.setLensText}
           onExtraPromptChange={e.setExtraPrompt}

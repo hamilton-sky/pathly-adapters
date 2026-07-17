@@ -53,6 +53,8 @@ export function useEvaluateBoardButton(boardKey: string, boardScope?: BoardScope
   const [verbosity, setVerbosity] = useState('')
   // Layer-3 abilities selected for a per-goal decompose — composed into the planner prompt.
   const [decomposeAbilities, setDecomposeAbilities] = useState<Ability[]>([])
+  // Layer-3 abilities selected for a whole-board evaluate — composed into the evaluator prompt.
+  const [evalAbilities, setEvalAbilities] = useState<Ability[]>([])
   const gearRef = useRef<HTMLButtonElement>(null)
 
   // Three targets, two run-state homes: a real goal tracks its own decompose state;
@@ -75,7 +77,12 @@ export function useEvaluateBoardButton(boardKey: string, boardScope?: BoardScope
   const lensLabel = EVAL_LENSES.find((l) => l.name === selectedLens && l.name)?.label
   const activeLabel = isDecomposeTarget ? 'Decompose' : (lensLabel ?? 'Evaluate')
 
-  const evalPreview = useEvaluatePreview(confirmOpen && !targetGoalId, lensText, extraPrompt)
+  const evalPreview = useEvaluatePreview(
+    confirmOpen && !targetGoalId,
+    lensText,
+    extraPrompt,
+    evalAbilities.map((a) => a.id),
+  )
   const previewPrompt = evalPreview.prompt
   const previewSegments = evalPreview.segments
 
@@ -109,6 +116,7 @@ export function useEvaluateBoardButton(boardKey: string, boardScope?: BoardScope
         adapter,
         promptOverride: finalPrompt,
         progress: verbosity || undefined,
+        abilityIds: evalAbilities.length ? evalAbilities.map((a) => a.id) : undefined,
       })
     } else {
       runEvaluator(boardKey, {
@@ -116,6 +124,7 @@ export function useEvaluateBoardButton(boardKey: string, boardScope?: BoardScope
         systemPrompt: lensText || undefined,
         instructions: extraPrompt || undefined,
         progress: verbosity || undefined,
+        abilityIds: evalAbilities.length ? evalAbilities.map((a) => a.id) : undefined,
       })
     }
   }
@@ -188,6 +197,8 @@ export function useEvaluateBoardButton(boardKey: string, boardScope?: BoardScope
     previewPrompt, previewSegments,
     // per-goal decompose abilities
     decomposeAbilities, setDecomposeAbilities,
+    // whole-board evaluate abilities
+    evalAbilities, setEvalAbilities,
     // handlers
     handleCliChange, pickLens, setLensText, setExtraPrompt, setTargetGoalId, setRigorMode, setVerbosity,
     handleReset, handleStop, onPillRun, onConfigRun, dispatch,
