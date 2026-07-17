@@ -11,6 +11,7 @@ import { PromptBanner, usePromptContent, findPath } from '../../../shared/Prompt
 import { useMergedPresets } from '../../../shared/PromptActionConfig/useMergedPresets'
 import { PresetAddRow } from '../../../shared/PromptActionConfig/PresetAddRow'
 import { ENGINES, PROGRESS_LEVELS, SYSTEM_PROMPTS } from './agentFormData'
+import SendPreviewModal from '../../../shared/SendPreviewModal/SendPreviewModal'
 import s from './SingleAgentButton.module.css'
 
 export interface SingleAgentConfig {
@@ -47,6 +48,7 @@ export function AgentForm({ running, onRun, onClose }: Props): JSX.Element {
   const [interactive, setInteractive] = useState(false)
   const [progress, setProgress] = useState<string>('normal')
   const [message, setMessage] = useState<string>('')
+  const [previewOpen, setPreviewOpen] = useState(false)
 
   // Full agent/skill lists from the real core/ dirs (fall back to common picks).
   const projectPath = useStore((st) => st.projectPath)
@@ -116,8 +118,25 @@ export function AgentForm({ running, onRun, onClose }: Props): JSX.Element {
   // task), or a system prompt (a directive). Any one of the three enables Send.
   const canSend = !running && (message.trim().length > 0 || skill !== '' || sysName !== '')
 
+  // F2 gate: reconstruct what the agent will see (client approximation — the skill body,
+  // Pathly fragments, and board context are composed server-side at spawn), shown read-only
+  // in the confirm modal before dispatch.
+  const previewPrompt = useMemo(() => {
+    const parts: string[] = []
+    if (message.trim()) parts.push(`# Task\n\n${message.trim()}`)
+    if (sysText.trim()) parts.push(`# System prompt\n\n${sysText.trim()}`)
+    if (skill) parts.push(`# Skill: \`${skill}\`\n\n_The skill body + Pathly fragments are composed at spawn time._`)
+    if (agent) parts.push(`# Agent: \`${agent}\`\n\n_The agent persona is applied at spawn time._`)
+    parts.push('---\n_Board context is retrieved and prepended when the agent runs, so it is not shown verbatim above._')
+    return parts.join('\n\n')
+  }, [message, sysText, skill, agent])
+
   function send(): void {
     if (!canSend) return
+    setPreviewOpen(true)
+  }
+
+  function confirmSend(): void {
     onRun({
       adapter: engine,
       agent: agent || undefined,
@@ -129,6 +148,7 @@ export function AgentForm({ running, onRun, onClose }: Props): JSX.Element {
       message: message.trim(),
     })
     setMessage('')
+    setPreviewOpen(false)
     onClose()
   }
 
@@ -235,6 +255,19 @@ export function AgentForm({ running, onRun, onClose }: Props): JSX.Element {
           <Send size={12} /> Send to agent
         </button>
       </footer>
+
+      {previewOpen && (
+        <SendPreviewModal
+          title="Run on this board"
+          engineLabel={ENGINES.find((e) => e.value === engine)?.label ?? engine}
+          fileName={interactive ? 'interactive' : 'headless'}
+          prompt={previewPrompt}
+          readOnly
+          submitLabel="Send to agent"
+          onSubmit={confirmSend}
+          onCancel={() => setPreviewOpen(false)}
+        />
+      )}
     </>
   )
 }
