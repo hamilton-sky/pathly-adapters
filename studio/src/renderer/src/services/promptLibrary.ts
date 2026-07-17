@@ -23,14 +23,16 @@ export interface PromptLibraryRow {
 
 export interface PromptLibraryQuery {
   kind: 'preset' | 'ability'
-  category: string
+  /** Omit to list every category of that kind (e.g. all abilities). */
+  category?: string
   projectRoot?: string
 }
 
-/** List library prompts for a (kind, category), global + project merged. `[]` on any error. */
+/** List library prompts for a kind (+ optional category), global + project merged. `[]` on any error. */
 export async function listUserPrompts(q: PromptLibraryQuery): Promise<PromptLibraryRow[]> {
   try {
-    const params = new URLSearchParams({ kind: q.kind, category: q.category })
+    const params = new URLSearchParams({ kind: q.kind })
+    if (q.category) params.set('category', q.category)
     if (q.projectRoot) params.set('project_root', q.projectRoot)
     const r = await apiFetch(`/skills/prompts?${params.toString()}`)
     if (!r.ok) return []

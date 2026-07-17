@@ -12,6 +12,8 @@ import { useMergedPresets } from '../../../shared/PromptActionConfig/useMergedPr
 import { PresetAddRow } from '../../../shared/PromptActionConfig/PresetAddRow'
 import { ENGINES, PROGRESS_LEVELS, SYSTEM_PROMPTS } from './agentFormData'
 import SendPreviewModal from '../../../shared/SendPreviewModal/SendPreviewModal'
+import { AbilityToggles } from '../../../shared/AbilityToggles/AbilityToggles'
+import type { PromptLibraryRow } from '../../../../services/promptLibrary'
 import s from './SingleAgentButton.module.css'
 
 export interface SingleAgentConfig {
@@ -25,6 +27,8 @@ export interface SingleAgentConfig {
   progress?: string
   /** The prompt typed in the form — posted to the board and sent to the agent. */
   message?: string
+  /** Layer-3 ability library row ids to compose after the skill's fragments. */
+  abilityIds?: string[]
 }
 
 interface Props {
@@ -49,6 +53,7 @@ export function AgentForm({ running, onRun, onClose }: Props): JSX.Element {
   const [progress, setProgress] = useState<string>('normal')
   const [message, setMessage] = useState<string>('')
   const [previewOpen, setPreviewOpen] = useState(false)
+  const [abilities, setAbilities] = useState<PromptLibraryRow[]>([])
 
   // Full agent/skill lists from the real core/ dirs (fall back to common picks).
   const projectPath = useStore((st) => st.projectPath)
@@ -126,10 +131,11 @@ export function AgentForm({ running, onRun, onClose }: Props): JSX.Element {
     if (message.trim()) parts.push(`# Task\n\n${message.trim()}`)
     if (sysText.trim()) parts.push(`# System prompt\n\n${sysText.trim()}`)
     if (skill) parts.push(`# Skill: \`${skill}\`\n\n_The skill body + Pathly fragments are composed at spawn time._`)
+    for (const ab of abilities) parts.push(`# Ability: ${ab.label}\n\n${ab.body}`)
     if (agent) parts.push(`# Agent: \`${agent}\`\n\n_The agent persona is applied at spawn time._`)
     parts.push('---\n_Board context is retrieved and prepended when the agent runs, so it is not shown verbatim above._')
     return parts.join('\n\n')
-  }, [message, sysText, skill, agent])
+  }, [message, sysText, skill, agent, abilities])
 
   function send(): void {
     if (!canSend) return
@@ -146,6 +152,7 @@ export function AgentForm({ running, onRun, onClose }: Props): JSX.Element {
       // Progress cadence only applies headless — interactive shows the terminal.
       progress: interactive ? undefined : progress,
       message: message.trim(),
+      abilityIds: abilities.length ? abilities.map((a) => a.id) : undefined,
     })
     setMessage('')
     setPreviewOpen(false)
@@ -189,6 +196,13 @@ export function AgentForm({ running, onRun, onClose }: Props): JSX.Element {
             onOpenMdEditor={() => openMdEditor(skillMdEditorPath)}
           />
         )}
+
+        <label className={s.label}>Abilities <span className={s.optional}>· optional approach / domain packs</span></label>
+        <AbilityToggles
+          projectRoot={projectPath}
+          selectedIds={abilities.map((a) => a.id)}
+          onChange={setAbilities}
+        />
 
         <label className={s.label} htmlFor="sa-sys">System prompt</label>
         <BoardSelect id="sa-sys" ariaLabel="System prompt" value={sysName} options={sysOptions} onChange={pickSys} placeholder={NONE} />
