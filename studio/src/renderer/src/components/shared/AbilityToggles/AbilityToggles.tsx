@@ -1,6 +1,7 @@
-// AbilityToggles — layer-3: pick optional domain/approach "abilities" (prompt_library
-// kind='ability') to STACK onto a run, and create new ones inline. Abilities are the
-// voluntary "how it approaches THIS task" layer (React-web vs desktop, TDD-per-task vs
+// AbilityToggles — layer-3: pick optional domain/approach "abilities" to STACK onto a run,
+// and create new ones inline. Abilities are MARKDOWN FILES (pathly/abilities/<cat>/<name>.md
+// + ~/.pathly/abilities/, read at compose time like fragments — NOT prompt_library rows), and
+// are the voluntary "how it approaches THIS task" layer (React-web vs desktop, TDD-per-task vs
 // at-end) — orthogonal to the skill (the task). Selected abilities compose server-side
 // (POST /skills/compose ability_ids → extra_segments) AFTER the skill's own fragments.
 
