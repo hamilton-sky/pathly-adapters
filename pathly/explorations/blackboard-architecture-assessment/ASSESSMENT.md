@@ -20,8 +20,11 @@ the classic pattern (Hearsay-II / HASP / BB1) are all present and **structurally
 merely conventional:
 
 1. **One shared blackboard** — `comms_messages` + `comms_artifacts`, the sole memory.
-2. **Stateless knowledge-source agents that never call each other** — they read the board and
-   contribute back, nothing else.
+2. **Knowledge-source agents that connect back through the board** — they read the board and
+   contribute back. This is pure under the `single`/`loop` executors (each agent is a fresh CLI
+   process, no agent-to-agent calls). It is **partial under `team`**: on spawn-capable hosts the
+   `spawn-rules` fragment has an orchestrator spawn `builder`/`reviewer`/`scout` sub-agents directly
+   (a delegation tree), so invocation/result can travel parent→child outside the board.
 3. **A separate control component** — passive FSM + supervisor loop + executor.
 
 The enforcement mechanism is **fragments** (the un-editable prompt layer that owns all board I/O):
@@ -46,14 +49,15 @@ currently *trusted, not enforced*.** None is a rewrite. This doc enumerates them
 | Shared blackboard | `comms_messages` (typed rows) + `comms_artifacts` | single DB, `/comms/*` routes |
 | Levels of abstraction | granularity axis: task → goal → feature → project | `goal_id`, `type` columns; decompose/aggregate KSs |
 | Knowledge sources | CLI agents (architect/builder/reviewer/…) | `agent_definitions`, spawned per stage/task |
-| KSs never call each other | agents connect back **only** through fragments | `core/skills/fragments/` (un-editable) |
+| KSs connect back through the board | via fragments (pure in `single`/`loop`; `team` adds a direct-spawn delegation tree via `spawn-rules`) | `core/skills/fragments/` (un-editable) |
 | KS trigger condition | task readiness (`depends_on` met) + role match | executor drains the DAG |
 | Control component | passive FSM + supervisor loop + executor | `single` / `loop` / `team` |
 
-**The load-bearing constraint is "board is the only memory."** Agents are stateless w.r.t. each
-other; `retrieve_board_context` re-reads the board into every next prompt. This is the classic KS
-independence property, and Pathly enforces it *structurally* (via fragments) rather than by
-documentation. This is the strongest thing in the architecture.
+**The load-bearing constraint is "board is the only memory."** In `single`/`loop`, agents are
+stateless w.r.t. each other; `retrieve_board_context` re-reads the board into every next prompt.
+This is the classic KS independence property, and Pathly enforces it *structurally* (via fragments)
+rather than by documentation — the strongest thing in the architecture. (Under `team` the
+`spawn-rules` delegation tree weakens "only memory" to "primary memory"; see §0, item 2.)
 
 ---
 
@@ -82,7 +86,11 @@ project_root / literally `global`). `retrieve_board_context` (`runner/comms_cont
 **aggregates across all three tiers by default** — feature-priority, with stricter per-tier cosine
 cutoffs (`{feature:0.75, project:0.55, global:0.50}`) so only genuinely-close cross-tier items are
 admitted. So the tiers **union relevant context**; they do **not** shadow each other. (My earlier
-"resolve by override" was simply wrong for the board.)
+"resolve by override" was simply wrong for the board.) **The cutoff gates only *scored semantic*
+matches**: governance (pending decisions + active escalations) is injected *unconditionally* across
+tiers, and when embeddings are unavailable the recency fallback keeps unscored cross-tier rows — so
+cross-tier isolation is relevance-gated for semantic hits only, not for governance or the
+no-embedding path.
 
 ### Axis C — Ability / skill scopes (the ONLY override chain — a composition input, not the board)
 ```

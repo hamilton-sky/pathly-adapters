@@ -91,10 +91,20 @@ The human's role here is **supervisory**: create goals, answer non-blocking ques
 
 ### 1a. Two axes of "layering" — don't conflate them
 
-Pathly is a **blackboard system** in the classic sense (Hearsay-II / BB1): one shared board, stateless
-knowledge-source agents that never call each other (they connect back *only* through fragments), and a
-separate control component (the passive FSM + supervisor loop) that decides what runs next. "The board
-is the only memory" is the load-bearing constraint, and fragments enforce it structurally.
+Pathly is a **blackboard system** in the classic sense (Hearsay-II / BB1): one shared board,
+knowledge-source agents that connect back through fragments, and a separate control component (the
+passive FSM + supervisor loop) that decides what runs next. "The board is the only memory" is the
+load-bearing constraint.
+
+**One qualification — direct sub-agent delegation.** The pure "agents never call each other" model
+holds for the headless `single`/`loop` executors, where the supervisor spawns each agent as a fresh
+CLI process and all state flows through the board. But on **spawn-capable hosts** (the `team`
+executor / Claude Code's Task capability), composed skills include the `spawn-rules` fragment, which
+tells an orchestrating agent to spawn `builder`/`reviewer`/`scout` **sub-agents directly** (up to 4
+at once). That is a real **agent-to-agent invocation tree**, not solely board-mediated flow — the
+spawned workers still post to the board, but the *invocation and result* can travel parent→child
+outside it. So auditability via "everything is on the board" is strongest in `single`/`loop` and
+partial under `team`.
 
 Within that, the word "layer"/"scope" gets used for **three distinct things that compose
 differently**. Keep them apart:
@@ -110,10 +120,15 @@ Two traps this dissolves:
 
 - **Board tiers do NOT override — they aggregate.** `retrieve_board_context`
   (`runner/comms_context.py`) enables feature, project, *and* global boards by default and collects
-  from all three (feature-priority, per-tier cosine cutoffs `{feature:0.75, project:0.55,
-  global:0.50}` so tangential cross-tier items stay out). Cross-tier context is **intended**, not a
-  leak. The **override** ("nearest scope wins") belongs to **abilities/skills** — files, a
+  from all three. The **override** ("nearest scope wins") belongs to **abilities/skills** — files, a
   composition input — not to the message board.
+  - **The relevance cutoff gates only *scored semantic* matches.** Feature-priority + per-tier cosine
+    cutoffs (`{feature:0.75, project:0.55, global:0.50}`) keep tangential cross-tier items out **when
+    an embedding is present**. Two deliberate exceptions bypass that gate: (1) **governance** —
+    pending decisions + active escalations are injected *unconditionally* across all tiers ("always
+    applies — do not override"); (2) **recency fallback** — when embeddings are unavailable, unscored
+    cross-tier rows are kept so cross-tier context isn't starved. So "only genuinely-close cross-tier
+    items" is true for semantic matches, not for governance or the no-embedding path.
 - **A board instance is the `(board, scope)` PAIR, not `scope` alone.** `board` is the tier;
   `scope` is the instance key (and `global`'s scope value is literally `global`). Isolation therefore
   requires matching **both** columns — a `scope`-only filter can mix records when two tiers share a
