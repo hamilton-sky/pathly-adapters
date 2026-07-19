@@ -32,15 +32,24 @@ merely conventional:
    (a delegation tree), so invocation/result can travel parent→child outside the board.
 3. **A separate control component** — passive FSM + supervisor loop + executor.
 
-The enforcement mechanism is **fragments** (the un-editable prompt layer that owns all board I/O):
-on the **composed** path, agents have no channel back to the system *except* the board. That is the
+The enforcement mechanism is **fragments** — a prompt layer that owns all board I/O. On the
+**default composed** path, agents have no channel back to the system *except* the board. That is the
 property most "multi-agent" tools violate on day one, and it is the reason Pathly gets auditability,
-resumability, and multi-agent coherence at the design level. **Caveat (not absolute):** the
-guarantee holds for composed prompts, but a nonempty `prompt_override` in `supervisor/board_run.py`
-*replaces* the skill body rather than composing fragments — so the supported override path can spawn
-an agent with no `completion-report` / `comms-post` wiring. "Structurally enforced" is therefore true
-for the default path and **intentionally escapable** via override (see ISSUE-3 / §4) — which is
-exactly why the override needs to be folded back into the audit model.
+resumability, and multi-agent coherence at the design level. But **"structurally enforced" overstates
+it — there is no server-side check that a spawned prompt actually contains the wire fragments.** Two
+supported paths bypass the wiring:
+1. **`prompt_override`** (`supervisor/board_run.py`) *replaces* the skill body outright — an override
+   run can carry no `completion-report`/`comms-post` at all.
+2. **The composition editor** — `PUT /skills/export` accepts *any* list of fragment names (including
+   `[]`; it validates only "list of strings"), and `load_effective_manifest` **full-replaces** the
+   skill's fragment list from that `skill_composition` row. A project override of `team/build` to a
+   list missing `completion-report` drops the `AGENT_DONE` signal from **every ordinary composed
+   run** — no `prompt_override` needed. The fragment *files* are packaged/un-editable, but *which
+   fragments compose* is unguarded per-project.
+
+So the guarantee is "enforced by the *default* composition," not "structurally locked." Both bypasses
+argue for the same fix — a compose-time invariant checker (ISSUE-4) — plus recording overrides in the
+audit model (ISSUE-3).
 
 **The concept is right. The gap to "trustworthy" is a set of composition/board invariants that are
 currently *trusted, not enforced*.** None is a rewrite. This doc enumerates them.
@@ -54,7 +63,7 @@ currently *trusted, not enforced*.** None is a rewrite. This doc enumerates them
 | Shared blackboard (knowledge) | `comms_messages` (typed rows) + `comms_artifacts`; control/result state (`AGENT_DONE`) lives separately in `fsm_events` | single DB, `/comms/*` routes; `fsm_events` via `/runner/event` |
 | Levels of abstraction | granularity axis: `task → goal` (within a board); `feature → project → global` is the *board-tier* axis, §2 Axis B — not this ladder | `goal_id`, `type` columns; decompose/aggregate KSs |
 | Knowledge sources | CLI agents (architect/builder/reviewer/…) | `agent_definitions`, spawned per stage/task |
-| KSs connect back through the board | via fragments (pure in `single`/`loop`; `team` adds a direct-spawn delegation tree via `spawn-rules`) | `core/skills/fragments/` (un-editable) |
+| KSs connect back through the board | via fragments (pure in `single`/`loop`; `team` adds a direct-spawn delegation tree via `spawn-rules`) | fragment *files* packaged; but the per-skill fragment *list* is DB-overridable + `prompt_override`-bypassable — see ISSUE-4 |
 | KS trigger condition | task readiness (`depends_on` met) + role match | executor drains the DAG |
 | Control component | passive FSM + supervisor loop + executor | `single` / `loop` / `team` |
 
@@ -162,10 +171,12 @@ glass box** you can read *and* edit at the moment of spawn. Exposing the control
 
 **As mutation — a hole in the architecture's own thesis (ISSUE-3).** Pathly's foundational claim is
 *"every prompt flows through fragments; fragments are un-editable; ONE authority."* A full
-`prompt_override` **bypasses composition** — a deliberate hole in that wall. The code is careful
-(platform fragments are locked; you can trim sections but not delete board-CRUD wiring), which shows
-the author saw the danger. But the moment an operator hand-edits a prompt, **that run is no longer
-reproducible from board state** — the exact property that made the blackboard auditable.
+`prompt_override` **bypasses composition** — a deliberate hole in that wall. The section-trim gate is
+careful (it locks *platform* fragments so a Sections trim can't drop board-CRUD wiring), but that
+lock is **only on the trim path** — it does *not* cover the composition editor (§0, bypass 2: a
+`skill_composition` override can drop `completion-report` server-side) or `prompt_override`. And the
+moment an operator hand-edits a prompt, **that run is no longer reproducible from board state** — the
+exact property that made the blackboard auditable.
 
 **Fix (small, not polish):** a runtime override should itself be **posted back to the board as a
 `type=decision` artifact** ("operator overrode stage X's prompt — diff attached"). Then the override
@@ -192,10 +203,12 @@ compose time. One authority, layered.** Well-factored.
 
 **Risk (ISSUE-4) — combinatorial safety, not architecture.** With user-authored agents
 (`tools_json`, `can_spawn_json`), skills, abilities, *and* flows, composed across three scope tiers
-with runtime overrides on top, the space of distinct prompt-assemblies explodes. Nothing validates
-that a user-authored agent's skill still receives the mandatory board-CRUD fragments, or that a user
-flow is acyclic. The un-editable-fragment lock is the *only* guardrail. Fine for self-use; for a
-shared/product setting the missing piece is a **compose-time invariant checker**.
+with runtime overrides on top, the space of distinct prompt-assemblies explodes. **Nothing on the
+server validates that a spawned prompt still carries the mandatory board-CRUD fragments** — not the
+composition editor (`/skills/export` accepts `[]`), not `prompt_override`, not a user-authored agent's
+skill — nor that a user flow is acyclic. There is **no server-side fragment lock at all** on these
+paths (only the section-trim gate locks platform fragments, and only for trims). Fine for self-use;
+for a shared/product setting the missing piece is a **compose-time invariant checker**.
 
 ---
 
@@ -206,7 +219,7 @@ shared/product setting the missing piece is a **compose-time invariant checker**
 | **ISSUE-1** | Board identity is the `(board, scope)` **pair**, enforced only by query predicate — a read matching the wrong pair (missing `board` half, or an un-gated cross-tier union) mixes instances that share a `scope` value | `comms_messages` flat table; every `db/queries/comms_*` read | **Medium** (mostly design-gated: cross-tier aggregation is intentional + relevance-cutoff-gated, so this is a wrong-pair/un-gated-read risk, not a blanket bleed) | invariant test: assert every board read targets an explicit `(board, scope)` pair; consider a query wrapper that *requires* both args |
 | **ISSUE-3** | Runtime `prompt_override` bypasses composition → run not reproducible from board | `supervisor/board_run.py` | **High** (breaks audit thesis) | post the override + diff back as a `type=decision` artifact; reproducibility = board + recorded overrides |
 | **ISSUE-2** | Derived artifacts (reconstructed MD, diagrams) have no enforced provenance — versioning columns stubbed | `comms_artifacts.version/last_edit_*/supersedes` | **Medium** (stale-higher-level drift) | wire editor-save hooks to populate version/`supersedes`; link derived → source |
-| **ISSUE-4** | No compose-time invariant that every spawned prompt contains the wire fragments / every flow is acyclic | `skills/compose.py`, flow defs | **Medium** (grows with user-authoring) | a `validate_composition()` gate: assert board-CRUD fragments present; assert flow DAG acyclic; assert abilities resolve |
+| **ISSUE-4** | No compose-time invariant that a spawned prompt keeps the wire fragments — `/skills/export` accepts an empty/trimmed fragment list and `load_effective_manifest` full-replaces, so a `skill_composition` override silently drops `completion-report`/`AGENT_DONE` from ordinary composed runs (also via `prompt_override` and user-authored skills); flows aren't checked acyclic either | `skills/compose.py::load_effective_manifest`, `blueprints/skills/editor_io.py`, flow defs | **Medium→High** (a dropped `completion-report` = vanished + unbilled run; server-side, not just UI) | a `validate_composition()` gate: assert board-CRUD fragments present in the effective manifest; assert flow DAG acyclic; assert abilities resolve |
 | **ISSUE-5** | Narrative conflates abstraction levels with scope tiers | docs | **Low** (clarity/onboarding) | ✅ addressed in `WHAT_IS_PATHLY.md §1a` |
 
 **Through-line:** every issue is the same species — *guarantees resting on invariants that are
