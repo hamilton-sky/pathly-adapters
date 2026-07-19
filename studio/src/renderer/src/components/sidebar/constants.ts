@@ -10,12 +10,13 @@ export const PATHLY_SECTIONS: Section[] = [
 export const USER_LIBRARY_SECTIONS: Section[] = [
   { label: 'UserAgents',    type: 'agent',    dir: 'agents'    },
   { label: 'UserSkills',    type: 'skill',    dir: 'skills'    },
+  { label: 'UserAbilities', type: 'explore',  dir: 'abilities' },
   { label: 'UserTemplates', type: 'template', dir: 'templates' },
   { label: 'UserFlows',     type: 'flow',     dir: 'flows'     },
 ]
 
 export const USER_LIBRARY_DISPLAY_LABELS: Record<string, string> = {
-  UserAgents: 'Agents', UserSkills: 'Skills', UserTemplates: 'Templates', UserFlows: 'Flows',
+  UserAgents: 'Agents', UserSkills: 'Skills', UserAbilities: 'Abilities', UserTemplates: 'Templates', UserFlows: 'Flows',
 }
 
 export const WORKSPACE_USER_SECTIONS: Section[] = [

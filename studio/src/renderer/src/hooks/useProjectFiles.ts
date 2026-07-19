@@ -21,6 +21,7 @@ const WORKSPACE_SECTIONS = [
 const USER_LIBRARY_SECTIONS = [
   { label: 'UserAgents',    type: 'agent'    as const, dir: 'agents'    },
   { label: 'UserSkills',    type: 'skill'    as const, dir: 'skills'    },
+  { label: 'UserAbilities', type: 'explore'  as const, dir: 'abilities' },
   { label: 'UserTemplates', type: 'template' as const, dir: 'templates' },
   { label: 'UserFlows',     type: 'flow'     as const, dir: 'flows'     },
 ]
@@ -43,6 +44,7 @@ const INITIAL_SECTIONS: Record<string, SectionState> = {
   'Pipeline-walkthrough': { items: [], open: false },
   UserAgents:    { items: [], open: false },
   UserSkills:    { items: [], open: false },
+  UserAbilities: { items: [], open: false },
   UserTemplates: { items: [], open: false },
   UserFlows:     { items: [], open: false },
   'My Agents':    { items: [], open: false },
