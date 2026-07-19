@@ -25,9 +25,14 @@ merely conventional:
 3. **A separate control component** — passive FSM + supervisor loop + executor.
 
 The enforcement mechanism is **fragments** (the un-editable prompt layer that owns all board I/O):
-agents have no channel back to the system *except* the board. That is the property most
-"multi-agent" tools violate on day one, and it is the reason Pathly gets auditability, resumability,
-and multi-agent coherence at the design level.
+on the **composed** path, agents have no channel back to the system *except* the board. That is the
+property most "multi-agent" tools violate on day one, and it is the reason Pathly gets auditability,
+resumability, and multi-agent coherence at the design level. **Caveat (not absolute):** the
+guarantee holds for composed prompts, but a nonempty `prompt_override` in `supervisor/board_run.py`
+*replaces* the skill body rather than composing fragments — so the supported override path can spawn
+an agent with no `completion-report` / `comms-post` wiring. "Structurally enforced" is therefore true
+for the default path and **intentionally escapable** via override (see ISSUE-3 / §4) — which is
+exactly why the override needs to be folded back into the audit model.
 
 **The concept is right. The gap to "trustworthy" is a set of composition/board invariants that are
 currently *trusted, not enforced*.** None is a rewrite. This doc enumerates them.
@@ -52,41 +57,54 @@ documentation. This is the strongest thing in the architecture.
 
 ---
 
-## 2. The layering is TWO orthogonal ideas the narrative treats as one
+## 2. Three "scope"-like axes the narrative treats as one
 
-This is the one conceptual correction worth making permanent (now in `WHAT_IS_PATHLY.md §1a`).
+This is the conceptual correction worth making permanent (now in `WHAT_IS_PATHLY.md §1a`). An earlier
+draft of this doc got it wrong — it called the board tiers an "override chain." They are not; only
+*abilities* override. Corrected model:
 
-There are **two independent axes**, and they are different *kinds* of thing:
-
-### Axis A — Abstraction hierarchy (a genuine blackboard property)
+### Axis A — Abstraction levels (a genuine blackboard property, within one board)
 ```
-task  →  goal  →  feature  →  project
+task  →  goal
 ```
 A completed task-DAG *raises* a goal to done; a goal is itself a contribution at the goal level.
 `goal_decomposer` is a **downward KS** (goal → tasks); completion aggregation is an **upward KS**
 (tasks → goal). This is exactly Hearsay-II's signal→word→phrase abstraction ladder. **Faithful,
 principled, and the best-realized part of the design.**
 
-### Axis B — Scope-tier inheritance (NOT a blackboard property)
+### Axis B — Board tiers (also a blackboard property — cross-board aggregation, NOT override)
 ```
-global (~/.pathly)  →  project (project_root)  →  feature
+feature  →  project  →  global
+```
+A board instance is the **`(board, scope)` pair**: `comms_messages.board` is the **tier**
+(`feature`/`project`/`global`), `comms_messages.scope` is the **instance key** (feature name /
+project_root / literally `global`). `retrieve_board_context` (`runner/comms_context.py`)
+**aggregates across all three tiers by default** — feature-priority, with stricter per-tier cosine
+cutoffs (`{feature:0.75, project:0.55, global:0.50}`) so only genuinely-close cross-tier items are
+admitted. So the tiers **union relevant context**; they do **not** shadow each other. (My earlier
+"resolve by override" was simply wrong for the board.)
+
+### Axis C — Ability / skill scopes (the ONLY override chain — a composition input, not the board)
+```
+project  overrides  global      (files)
 ```
 A project ability **overrides** a global one with the same `<category>/<name>`
-(`skills/abilities.py`); project-board context feeds feature boards. This is **lexical scoping /
-prototype-chain override**, not levels of abstraction. It is a good idea — but a *different* idea
-wearing the same "layering" vocabulary.
+(`skills/abilities.py`). *This* is the lexical-scoping / prototype-chain override — and it lives in
+the **composition layer** (files read at compose time), not in the message board.
 
-**Why the conflation matters:** they compose differently. Abstraction levels *aggregate upward*
-(children complete → parent completes). Scope tiers *resolve by override* (nearest scope wins).
-Calling both "layers" invites a contributor to expect aggregation semantics where there is override
-semantics (and vice-versa). **Name them distinctly: "abstraction levels" vs "scope tiers."**
+**Why the conflation matters:** the three compose differently — levels aggregate upward, board tiers
+aggregate across, abilities override by nearest. Calling all three "scope/layer" invites a
+contributor to expect override where there is aggregation (and vice-versa). **Name them distinctly.**
 
 ### Structural consequence (a real correctness surface)
-`scope_tier` and `goal_id` are **both plain columns on the same flat `comms_messages` table**.
-"Which board am I on" is therefore a **query predicate, not a structural boundary** — isolation
-between tiers is only as strong as every query's `WHERE scope = ?` clause. A single missing scope
-filter leaks project context into a feature agent's prompt (or vice-versa). This is the highest-value
-place for an invariant/test harness (see §6, ISSUE-1).
+`board`, `scope`, and `goal_id` are **all plain columns on the same flat `comms_messages` table**.
+"Which board am I on" is therefore a **query predicate, not a structural boundary** — and the
+identity is the **`(board, scope)` pair**, not `scope` alone (a `scope`-only filter can mix records
+when two tiers share a `scope` value). Note the invariant is **"reads target the intended
+`(board, scope)` pairs,"** *not* "never cross tiers": cross-tier aggregation is a deliberate,
+relevance-gated feature. The genuine risk is a read that matches the *wrong* pair (missing `board`
+half, or an un-gated cross-tier union). This is the highest-value place for an invariant/test
+harness (see §6, ISSUE-1).
 
 ---
 
@@ -172,7 +190,7 @@ shared/product setting the missing piece is a **compose-time invariant checker**
 
 | # | Issue | Where | Severity | Fix shape |
 |---|---|---|---|---|
-| **ISSUE-1** | Tier isolation is a query predicate, not a boundary — a missing `WHERE scope=?` leaks context across tiers | `comms_messages` flat table; every `db/queries/comms_*` read | **High** (silent context bleed) | invariant test: assert every board read is scope-filtered; consider a query wrapper that *requires* a scope arg |
+| **ISSUE-1** | Board identity is the `(board, scope)` **pair**, enforced only by query predicate — a read matching the wrong pair (missing `board` half, or an un-gated cross-tier union) mixes instances that share a `scope` value | `comms_messages` flat table; every `db/queries/comms_*` read | **Medium** (mostly design-gated: cross-tier aggregation is intentional + relevance-cutoff-gated, so this is a wrong-pair/un-gated-read risk, not a blanket bleed) | invariant test: assert every board read targets an explicit `(board, scope)` pair; consider a query wrapper that *requires* both args |
 | **ISSUE-3** | Runtime `prompt_override` bypasses composition → run not reproducible from board | `supervisor/board_run.py` | **High** (breaks audit thesis) | post the override + diff back as a `type=decision` artifact; reproducibility = board + recorded overrides |
 | **ISSUE-2** | Derived artifacts (reconstructed MD, diagrams) have no enforced provenance — versioning columns stubbed | `comms_artifacts.version/last_edit_*/supersedes` | **Medium** (stale-higher-level drift) | wire editor-save hooks to populate version/`supersedes`; link derived → source |
 | **ISSUE-4** | No compose-time invariant that every spawned prompt contains the wire fragments / every flow is acyclic | `skills/compose.py`, flow defs | **Medium** (grows with user-authoring) | a `validate_composition()` gate: assert board-CRUD fragments present; assert flow DAG acyclic; assert abilities resolve |
@@ -202,8 +220,8 @@ checks belong.
   `SerialIsolation(max_concurrency=1)`; `LaneIsolation` exists (tests only); `WorktreeIsolation` is
   `NotImplementedError("P3")`. The blackboard data model is already parallel-ready (the board *is* a
   shared queue) — which is precisely why P3 is "flip k>1 by lane," not a redesign. But it also means
-  ISSUE-1 (scope isolation) gets *sharper* under parallelism, because concurrent lanes reading the
-  same flat table with weak predicates is where a bleed becomes a race.
+  ISSUE-1 (`(board, scope)`-pair isolation) gets *sharper* under parallelism, because concurrent
+  lanes reading the same flat table with wrong-pair predicates is where a mixup becomes a race.
 - **"One authority, everything else a projection" is the real north star** (commit `1a970bf`), and it
   is *mostly* true: `agent_invocations` is a projection of the `AGENT_DONE` event stream; `BOARD.json`
   mirrors the DB; abilities/skills resolve from files+DB overrides at read time. The two places the

@@ -96,25 +96,31 @@ knowledge-source agents that never call each other (they connect back *only* thr
 separate control component (the passive FSM + supervisor loop) that decides what runs next. "The board
 is the only memory" is the load-bearing constraint, and fragments enforce it structurally.
 
-Within that, the word "layer" gets used for **two orthogonal things that compose differently**. Keep
-them distinct:
+Within that, the word "layer"/"scope" gets used for **three distinct things that compose
+differently**. Keep them apart:
 
-| | **Abstraction levels** (a blackboard property) | **Scope tiers** (an inheritance chain) |
-|---|---|---|
-| Ladder | `task → goal → feature → project` | `global (~/.pathly) → project → feature` |
-| Backed by | `goal_id` / `type` columns; decompose + aggregate KSs | `scope` column; `pathly/abilities/`, board scope |
-| Compose rule | **aggregate upward** — children complete ⇒ parent completes | **override by nearest scope** — project ability overrides global |
-| Blackboard? | **Yes** — signal→word→phrase abstraction ladder (`goal_decomposer` = downward KS; completion = upward KS) | **No** — this is lexical scoping / prototype-chain override |
+| | **Abstraction levels** | **Board tiers** | **Ability / skill scopes** |
+|---|---|---|---|
+| Ladder | `task → goal` (within one board) | `feature → project → global` (across boards) | `project → global` (files) |
+| Backed by | `goal_id` / `type` / `depends_on` | the **`board`** column (tier) + **`scope`** column (the board-instance key: feature name / project_root / `global`) | `pathly/abilities/`, `~/.pathly/abilities/`; composition |
+| Compose rule | **aggregate upward** — children complete ⇒ parent completes | **aggregate across tiers** — `retrieve_board_context` deliberately unions feature+project+global, with feature priority + stricter cross-tier relevance cutoffs | **override by nearest scope** — a project ability shadows a global one of the same id |
+| Blackboard? | **Yes** — signal→word→phrase abstraction ladder (`goal_decomposer` = downward KS; completion = upward KS) | **Yes** — cross-board context union is a KS reading several panels | **No** — this is lexical scoping / prototype-chain override, a *composition input*, not the board |
 
-- **Abstraction levels aggregate.** Finishing a task-DAG *raises* its goal; a goal is itself a
-  contribution at the goal level. This is the genuine hierarchical-blackboard axis.
-- **Scope tiers resolve by override.** The *nearest* scope wins (a project `plan/react-web.md`
-  ability shadows a global one of the same id); nothing "aggregates" from global up to feature.
+Two traps this dissolves:
 
-Because they compose differently, don't expect aggregation semantics where there is override
-semantics, or vice-versa. Note also that both `scope` (tier) and `goal_id` (level) are plain columns
-on the **one flat `comms_messages` table** — so a board boundary is a **query predicate, not a
-structural wall**: every board read must carry its `scope` filter, or context bleeds across tiers.
+- **Board tiers do NOT override — they aggregate.** `retrieve_board_context`
+  (`runner/comms_context.py`) enables feature, project, *and* global boards by default and collects
+  from all three (feature-priority, per-tier cosine cutoffs `{feature:0.75, project:0.55,
+  global:0.50}` so tangential cross-tier items stay out). Cross-tier context is **intended**, not a
+  leak. The **override** ("nearest scope wins") belongs to **abilities/skills** — files, a
+  composition input — not to the message board.
+- **A board instance is the `(board, scope)` PAIR, not `scope` alone.** `board` is the tier;
+  `scope` is the instance key (and `global`'s scope value is literally `global`). Isolation therefore
+  requires matching **both** columns — a `scope`-only filter can mix records when two tiers share a
+  `scope` value. Because `board`, `scope`, and `goal_id` are all plain columns on the **one flat
+  `comms_messages` table**, a board boundary is a **query predicate, not a structural wall**: the
+  invariant is "every read targets the intended `(board, scope)` pairs," *not* "never cross tiers"
+  (crossing, relevance-gated, is the feature).
 
 A fuller blackboard-lens critique + the open invariants this implies live in
 [`pathly/explorations/blackboard-architecture-assessment/ASSESSMENT.md`](../pathly/explorations/blackboard-architecture-assessment/ASSESSMENT.md).
