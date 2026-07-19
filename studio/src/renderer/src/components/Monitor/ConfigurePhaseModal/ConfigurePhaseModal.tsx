@@ -30,6 +30,7 @@ import {
 } from './configurePhaseModalData'
 import { useAgentCatalog, useSkillCatalog } from './hooks/usePhaseModalCatalog'
 import { CatalogDropdown } from './CatalogDropdown/CatalogDropdown'
+import { AbilityToggles } from '../../shared/AbilityToggles/AbilityToggles'
 
 // ── Presentational design-system pieces ─────────────────────────────────────
 import { Modal } from './components/Modal/Modal'
@@ -70,6 +71,10 @@ export function ConfigurePhaseModal({ stage, onClose }: Props): JSX.Element {
   const [skill, setSkill] = useState<string>(defaults.skill)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved]   = useState(false)
+  // flow-phase-inspector (#5): per-stage layer-3 abilities + excluded section headings.
+  // Both persist as the SELECTION on stage_configs and apply fresh at spawn (build_prompt).
+  const [abilityIds, setAbilityIds] = useState<string[]>([])
+  const [excludedSections, setExcludedSections] = useState<string[]>([])
 
   const agentCatalog = useAgentCatalog(projectPath)
   const skillCatalog = useSkillCatalog(projectPath)
@@ -83,6 +88,8 @@ export function ConfigurePhaseModal({ stage, onClose }: Props): JSX.Element {
     setHost('Claude Code')
     setAgent(defaults.agent)
     setSkill(defaults.skill)
+    setAbilityIds([])
+    setExcludedSections([])
     if (!projectPath || !activeTopic) return
     const params = new URLSearchParams({ project_root: projectPath, feature: activeTopic, stage })
     fetch(`${PATHLY_API_BASE}/flows/stage-config?${params}`)
@@ -92,6 +99,8 @@ export function ConfigurePhaseModal({ stage, onClose }: Props): JSX.Element {
         if (cfg.agent)   setAgent(cfg.agent)
         if (cfg.adapter) setHost(ADAPTER_TO_HOST[cfg.adapter] ?? 'Claude Code')
         if (cfg.skill)   setSkill(cfg.skill)
+        if (Array.isArray(cfg.ability_ids)) setAbilityIds(cfg.ability_ids)
+        if (Array.isArray(cfg.excluded_sections)) setExcludedSections(cfg.excluded_sections)
       })
       .catch(() => undefined)
   }, [projectPath, activeTopic, stage, defaults.agent, defaults.skill])
@@ -120,6 +129,7 @@ export function ConfigurePhaseModal({ stage, onClose }: Props): JSX.Element {
   const basePreview = loadedSkillText ?? SKILL_PROMPTS[skill] ?? `# ${skill}\n\nNo preview available.`
   const preview     = basePreview.replace(/^Host: [^\n]+/m, `Host: ${host} · Agent: ${agent}`)
   const isModified  = host !== 'Claude Code' || agent !== defaults.agent || skill !== defaults.skill
+    || abilityIds.length > 0 || excludedSections.length > 0
 
   // ── Actions ──────────────────────────────────────────────────────────────
   function handleApply(): void {
@@ -135,6 +145,8 @@ export function ConfigurePhaseModal({ stage, onClose }: Props): JSX.Element {
         agent,
         adapter: HOST_TO_ADAPTER[host] ?? host,
         skill,
+        ability_ids: abilityIds,
+        excluded_sections: excludedSections,
       }),
     })
       .then(() => { setSaving(false); setSaved(true); setTimeout(() => setSaved(false), 2000) })
@@ -148,7 +160,10 @@ export function ConfigurePhaseModal({ stage, onClose }: Props): JSX.Element {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ project_root: projectPath, feature: activeTopic, stage }),
     })
-      .then(() => { setHost('Claude Code'); setAgent(defaults.agent); setSkill(defaults.skill) })
+      .then(() => {
+        setHost('Claude Code'); setAgent(defaults.agent); setSkill(defaults.skill)
+        setAbilityIds([]); setExcludedSections([])
+      })
       .catch(() => undefined)
   }
 
@@ -220,6 +235,15 @@ export function ConfigurePhaseModal({ stage, onClose }: Props): JSX.Element {
             />
           }
         />
+
+        <div>
+          <SectionLabel>Abilities</SectionLabel>
+          <AbilityToggles
+            projectRoot={projectPath}
+            selectedIds={abilityIds}
+            onChange={(rows) => setAbilityIds(rows.map((r) => r.id))}
+          />
+        </div>
 
         <div>
           <SectionLabel>Prompt Preview</SectionLabel>
