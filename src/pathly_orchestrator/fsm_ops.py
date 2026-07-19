@@ -228,6 +228,8 @@ def next_action(args: dict) -> dict:
         )
         prior_state = stamped_state
 
+    _stage_ability_ids: list = []
+    _stage_excluded: list = []
     try:
         from pathly_orchestrator.db.connection import get_db as _get_db
         from pathly_orchestrator.db.queries.stage_configs import (
@@ -250,6 +252,10 @@ def next_action(args: dict) -> dict:
                 flow_config["adapter_map"][state_info["current_state"]] = _stage_cfg[
                     "adapter"
                 ]
+            # flow-phase-inspector (#5): the per-stage abilities + section trim, applied
+            # at compose time by build_prompt (composed fresh, never stored as text).
+            _stage_ability_ids = _stage_cfg.get("ability_ids") or []
+            _stage_excluded = _stage_cfg.get("excluded_sections") or []
     except Exception:
         pass
 
@@ -286,7 +292,12 @@ def next_action(args: dict) -> dict:
         return {"done": True}
 
     instructions = build_prompt(
-        flow_config, state_info["current_state"], storage_path, goal_id
+        flow_config,
+        state_info["current_state"],
+        storage_path,
+        goal_id,
+        ability_ids=_stage_ability_ids,
+        excluded_sections=_stage_excluded,
     )
     agent = flow_config["agent_map"][state_info["current_state"]]
     menu = build_menu_payload(flow_config, state_info["current_state"], storage_path)

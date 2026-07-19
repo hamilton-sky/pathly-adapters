@@ -209,7 +209,7 @@ def _patch_build_prompt(monkeypatch) -> None:
     monkeypatch.setattr(
         fsm_ops,
         "build_prompt",
-        lambda *args: f"instructions for {args[1]}",
+        lambda *args, **kwargs: f"instructions for {args[1]}",
     )
 
 
