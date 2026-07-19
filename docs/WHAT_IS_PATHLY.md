@@ -117,8 +117,8 @@ differently**. Keep them apart:
 |---|---|---|---|
 | Ladder | `task → goal` (within one board) | `feature → project → global` (across boards) | `project → global` (files) |
 | Backed by | `goal_id` / `type` / `depends_on` | the **`board`** column (tier) + **`scope`** column (the board-instance key: feature name / project_root / `global`) | `pathly/abilities/`, `~/.pathly/abilities/`; composition |
-| Compose rule | **aggregate upward** — children complete ⇒ parent completes | **aggregate across tiers** — `retrieve_board_context` deliberately unions feature+project+global, with feature priority + stricter cross-tier relevance cutoffs | **override by nearest scope** — a project ability shadows a global one of the same id |
-| Blackboard? | **Yes** — signal→word→phrase abstraction ladder (`goal_decomposer` = downward KS; completion = upward KS) | **Yes** — cross-board context union is a KS reading several panels | **No** — this is lexical scoping / prototype-chain override, a *composition input*, not the board |
+| Compose rule | **decompose downward, roll up as a read-model** — a goal decomposes into a task-DAG; completion *aggregates* by a computed rollup (`get_goals_with_rollup`), **not** an automatic goal-state write (`complete_task` only sets the task's `task_status`; no upward "goal done" transition exists today) | **aggregate across tiers** — `retrieve_board_context` deliberately unions feature+project+global, with feature priority + stricter cross-tier relevance cutoffs | **override by nearest scope** — a project ability shadows a global one of the same id |
+| Blackboard? | **Partly** — the abstraction ladder + downward decompose (`goal_decomposer`) are real; the upward "completion" is a computed rollup view, not a state-writing KS | **Yes** — cross-board context union is a KS reading several panels | **No** — this is lexical scoping / prototype-chain override, a *composition input*, not the board |
 
 Two traps this dissolves:
 

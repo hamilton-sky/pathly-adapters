@@ -61,8 +61,8 @@ currently *trusted, not enforced*.** None is a rewrite. This doc enumerates them
 | Classic blackboard concept | Pathly realization | Enforced how |
 |---|---|---|
 | Shared blackboard (knowledge) | `comms_messages` (typed rows) + `comms_artifacts`; control/result state (`AGENT_DONE`) lives separately in `fsm_events` | single DB, `/comms/*` routes; `fsm_events` via `/runner/event` |
-| Levels of abstraction | granularity axis: `task → goal` (within a board); `feature → project → global` is the *board-tier* axis, §2 Axis B — not this ladder | `goal_id`, `type` columns; decompose/aggregate KSs |
-| Knowledge sources | CLI agents (architect/builder/reviewer/…) | `agent_definitions`, spawned per stage/task |
+| Levels of abstraction | granularity axis: `task → goal` (within a board); `feature → project → global` is the *board-tier* axis, §2 Axis B — not this ladder | `goal_id`, `type`, `depends_on`; downward decompose (`goal_decomposer`) is real, upward completion is a computed rollup, not a state write (§2 Axis A) |
+| Knowledge sources | CLI agents (architect/builder/reviewer/…) | spawned per stage/task from **packaged** agent text (`fsm_compose._load_agent_text` reads `pathly_data/core/agents/…`) — **not** the `agent_definitions` table (see §5) |
 | KSs connect back through the board | via fragments (pure in `single`/`loop`; `team` adds a direct-spawn delegation tree via `spawn-rules`) | fragment *files* packaged; but the per-skill fragment *list* is DB-overridable + `prompt_override`-bypassable — see ISSUE-4 |
 | KS trigger condition | task readiness (`depends_on` met) + role match | executor drains the DAG |
 | Control component | passive FSM + supervisor loop + executor | `single` / `loop` / `team` |
@@ -81,14 +81,19 @@ This is the conceptual correction worth making permanent (now in `WHAT_IS_PATHLY
 draft of this doc got it wrong — it called the board tiers an "override chain." They are not; only
 *abilities* override. Corrected model:
 
-### Axis A — Abstraction levels (a genuine blackboard property, within one board)
+### Axis A — Abstraction levels (a blackboard property — but the upward half is a read-model)
 ```
 task  →  goal
 ```
-A completed task-DAG *raises* a goal to done; a goal is itself a contribution at the goal level.
-`goal_decomposer` is a **downward KS** (goal → tasks); completion aggregation is an **upward KS**
-(tasks → goal). This is exactly Hearsay-II's signal→word→phrase abstraction ladder. **Faithful,
-principled, and the best-realized part of the design.**
+The ladder is real: `goal_id`/`type`/`depends_on` structure a goal into a task-DAG, and
+`goal_decomposer` is a genuine **downward KS** (goal → tasks) — Hearsay-II's signal→word→phrase
+decomposition. **But the upward half is not a state transition.** `complete_task` only sets the
+task's `task_status='done'` (and computes newly-ready dependents); nothing writes the parent goal to
+"done" (the sole UPDATE on a `type='goal'` row sets `executor`). Completion is *observed* by a
+computed rollup (`get_goals_with_rollup` → `{done, total, …}`), a **read-model**, not an
+upward-writing KS. So the abstraction hierarchy is real and inspectable, but "children complete ⇒
+parent completes" is a derived view, not an implemented invariant — itself an instance of this doc's
+observable-but-not-written theme.
 
 ### Axis B — Board tiers (also a blackboard property — cross-board aggregation, NOT override)
 ```
@@ -114,8 +119,8 @@ A project ability **overrides** a global one with the same `<category>/<name>`
 (`skills/abilities.py`). *This* is the lexical-scoping / prototype-chain override — and it lives in
 the **composition layer** (files read at compose time), not in the message board.
 
-**Why the conflation matters:** the three compose differently — levels aggregate upward, board tiers
-aggregate across, abilities override by nearest. Calling all three "scope/layer" invites a
+**Why the conflation matters:** the three compose differently — levels decompose downward (and roll
+up only as a computed view), board tiers aggregate across, abilities override by nearest. Calling all three "scope/layer" invites a
 contributor to expect override where there is aggregation (and vice-versa). **Name them distinctly.**
 
 ### Structural consequence (a real correctness surface)
