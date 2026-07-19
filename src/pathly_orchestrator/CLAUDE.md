@@ -242,7 +242,7 @@ pathly_orchestrator/
     blueprints/            # registered in app.py via the all_blueprints list
       core/                # health.py (GET /health,/status; POST /shutdown); fsm.py (POST /next_action,/complete_stage)
       runner/              # api.py + api_lifecycle.py + api_control.py — 13 /runner/* routes; streams.py (GET /events/menu|runner|spawn|history|stream|comms)
-      flows/               # defs.py (flow CRUD); stage_configs.py (per-stage agent/model overrides)
+      flows/               # defs.py (flow CRUD); stage_configs.py (per-stage overrides: agent/adapter/skill + layer-3 ability_ids + excluded_sections — the flow-phase-inspector SELECTION, applied FRESH at spawn by fsm_compose.build_prompt, never stored as trimmed text)
       catalog/             # items.py (file-tree catalog)
       skills/              # editor.py re-export shim; editor_render.py (/skills/catalog|parse|preview|compose [returns segments+tokens; accepts ability_ids]|summary-format/<style>); editor_io.py (/skills/save|export); prompt_library.py (/skills/prompts — DB preset CRUD); abilities.py (/skills/abilities — layer-3 ability FILES, see skills/abilities.py)
       comms/               # board + goals/DAG, split by domain: messages*.py, tasks.py, artifacts*.py, runs.py, goals.py, goals_read.py (GET /comms/goals rollup), settings.py, context.py, features.py (/comms/features/decompose), project.py (/comms/project/decompose) (+ _helpers.py); see "Comms board endpoints" above
