@@ -262,17 +262,22 @@ export function Sidebar(): JSX.Element | null {
             }}
             onAddCells={(item) => setSplitModalItem(item)}
             onNewItem={async (type, category, name) => {
+              // Abilities browse+open only in the Library (own /skills/abilities store + the
+              // ＋Ability run-gate picker); every catalog-API CRUD path guards 'ability' so the
+              // new type never hits /catalog/* (which doesn't know it).
+              if (type === 'ability') return
               if (type === 'flow') {
                 setShowFlowWizard(true)
               } else {
                 await createNewCatalogItem(type, category, name)
               }
             }}
-            onDeleteItem={(item, type) => deleteItemViaAPI(item, type)}
-            onMoveItem={(item, type, cat) => moveCatalogItem(item, type, cat)}
-            onRenameItem={(item, type, stem) => renameCatalogItem(item, type, stem)}
-            onRenameCategory={(type, old, n) => renameCatalogCategory(type, old, n)}
+            onDeleteItem={async (item, type) => { if (type === 'ability') return; await deleteItemViaAPI(item, type) }}
+            onMoveItem={async (item, type, cat) => { if (type === 'ability') return; await moveCatalogItem(item, type, cat) }}
+            onRenameItem={async (item, type, stem) => { if (type === 'ability') return; await renameCatalogItem(item, type, stem) }}
+            onRenameCategory={async (type, old, n) => { if (type === 'ability') return; await renameCatalogCategory(type, old, n) }}
             onNewCategory={async (type, name) => {
+              if (type === 'ability') return
               await apiFetch('/catalog/category/new', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -280,6 +285,7 @@ export function Sidebar(): JSX.Element | null {
               })
             }}
             onDeleteCategory={async (type, category) => {
+              if (type === 'ability') return
               await apiFetch(`/catalog/category?type=${type}&name=${encodeURIComponent(category)}`, { method: 'DELETE' })
             }}
           />

@@ -1,5 +1,5 @@
 import React from 'react'
-import { Brain, Diamond, BookOpen, LayoutGrid, GitBranch } from 'lucide-react'
+import { Brain, Diamond, BookOpen, LayoutGrid, GitBranch, Sparkles } from 'lucide-react'
 import type { CatalogItemData, CatalogGroup } from './useCatalogData'
 
 export function GroupIcon({ icon }: { icon: CatalogGroup['icon'] }) {
@@ -7,6 +7,7 @@ export function GroupIcon({ icon }: { icon: CatalogGroup['icon'] }) {
   if (icon === 'diamond') return <Diamond size={15} />
   if (icon === 'book-open') return <BookOpen size={15} />
   if (icon === 'git-branch') return <GitBranch size={15} />
+  if (icon === 'sparkles') return <Sparkles size={15} />
   return <LayoutGrid size={15} />
 }
 

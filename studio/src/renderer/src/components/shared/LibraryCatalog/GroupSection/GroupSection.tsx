@@ -49,7 +49,7 @@ export function GroupSection({
   }, [groupMenuOpen])
 
   const supportsCategories = group.type === 'skill' || group.type === 'agent'
-    || group.type === 'template' || group.type === 'fragment'
+    || group.type === 'template' || group.type === 'fragment' || group.type === 'ability'
 
   const useSubcategories = supportsCategories &&
     group.items.some(i => i.category && i.category !== group.type)
