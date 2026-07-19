@@ -91,10 +91,14 @@ The human's role here is **supervisory**: create goals, answer non-blocking ques
 
 ### 1a. Two axes of "layering" — don't conflate them
 
-Pathly is a **blackboard system** in the classic sense (Hearsay-II / BB1): one shared board,
-knowledge-source agents that connect back through fragments, and a separate control component (the
-passive FSM + supervisor loop) that decides what runs next. "The board is the only memory" is the
-load-bearing constraint.
+Pathly is a **blackboard system** in the classic sense (Hearsay-II / BB1): one shared board for
+knowledge, knowledge-source agents that connect back through fragments, and a separate control
+component (the passive FSM + supervisor loop) that decides what runs next. The board is the shared
+*knowledge/context* memory — with one important split: the authoritative per-stage **result** signal
+(`AGENT_DONE`, written by the mandatory `completion-report` fragment via `/runner/event`) lives in
+the separate **`fsm_events`** control-event stream that the supervisor reads as the stage outcome. So
+"everything is on the board" is true for *knowledge/context*; *control/result* state lives in
+`fsm_events`. Both matter for auditability.
 
 **One qualification — direct sub-agent delegation.** The pure "agents never call each other" model
 holds for the headless `single`/`loop` executors, where the supervisor spawns each agent as a fresh

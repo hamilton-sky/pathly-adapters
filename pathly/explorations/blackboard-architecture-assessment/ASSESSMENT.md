@@ -19,7 +19,12 @@ Pathly is a **faithful blackboard system**, not a metaphorical one. The three de
 the classic pattern (Hearsay-II / HASP / BB1) are all present and **structurally enforced**, not
 merely conventional:
 
-1. **One shared blackboard** — `comms_messages` + `comms_artifacts`, the sole memory.
+1. **One shared blackboard for knowledge** — `comms_messages` + `comms_artifacts`, the shared
+   *context/knowledge* substrate. (Not the *sole* store: the authoritative per-stage **result**
+   signal — `AGENT_DONE`, written by the mandatory `completion-report` fragment via `/runner/event`,
+   EVENTS.jsonl fallback — lives in the separate **`fsm_events`** control-event stream that the
+   supervisor reads as the stage outcome. So "board is the only memory" is an oversimplification:
+   knowledge lives on the comms board, control/result state lives in `fsm_events`.)
 2. **Knowledge-source agents that connect back through the board** — they read the board and
    contribute back. This is pure under the `single`/`loop` executors (each agent is a fresh CLI
    process, no agent-to-agent calls). It is **partial under `team`**: on spawn-capable hosts the
@@ -46,8 +51,8 @@ currently *trusted, not enforced*.** None is a rewrite. This doc enumerates them
 
 | Classic blackboard concept | Pathly realization | Enforced how |
 |---|---|---|
-| Shared blackboard | `comms_messages` (typed rows) + `comms_artifacts` | single DB, `/comms/*` routes |
-| Levels of abstraction | granularity axis: task → goal → feature → project | `goal_id`, `type` columns; decompose/aggregate KSs |
+| Shared blackboard (knowledge) | `comms_messages` (typed rows) + `comms_artifacts`; control/result state (`AGENT_DONE`) lives separately in `fsm_events` | single DB, `/comms/*` routes; `fsm_events` via `/runner/event` |
+| Levels of abstraction | granularity axis: `task → goal` (within a board); `feature → project → global` is the *board-tier* axis, §2 Axis B — not this ladder | `goal_id`, `type` columns; decompose/aggregate KSs |
 | Knowledge sources | CLI agents (architect/builder/reviewer/…) | `agent_definitions`, spawned per stage/task |
 | KSs connect back through the board | via fragments (pure in `single`/`loop`; `team` adds a direct-spawn delegation tree via `spawn-rules`) | `core/skills/fragments/` (un-editable) |
 | KS trigger condition | task readiness (`depends_on` met) + role match | executor drains the DAG |
