@@ -159,10 +159,13 @@ not closed.
 
 ## 4. Runtime prompt control — the sharpest double edge
 
-**What the code does:** `start_board_run` accepts `prompt_override`, `ability_ids`,
-`excluded_sections` (`supervisor/board_run.py`); `stage_configs` persists per-stage
-`{ability_ids, excluded_sections}`; the preview gate renders the **composed** prompt before spawn; a
-Sections trim or full override changes what actually ships to the CLI.
+**What the code does:** `start_board_run` (`supervisor/board_run.py`) accepts `ability_ids` and
+`prompt_override` — but **not** `excluded_sections`. The per-stage `{ability_ids, excluded_sections}`
+is persisted in the **`stage_configs`** table (`db/queries/stage_configs.py`), and a **Sections trim
+is realized by computing the trimmed prompt and delivering it via `prompt_override`** (the "Sections
+gate … (prompt_override)" path), not by a separate board-run argument. The preview gate renders the
+**composed** prompt before spawn; a Sections trim or full override changes what actually ships to the
+CLI.
 
 **As inspection — a real advance.** The hardest thing to debug in an agent system is that the prompt
 is a black box assembled deep in the plumbing. Pathly makes the **blackboard→prompt projection a
