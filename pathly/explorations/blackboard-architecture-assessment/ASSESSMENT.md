@@ -32,11 +32,14 @@ merely conventional:
    (a delegation tree), so invocation/result can travel parent→child outside the board.
 3. **A separate control component** — passive FSM + supervisor loop + executor.
 
-The enforcement mechanism is **fragments** — a prompt layer that owns all board I/O. On the
-**default composed** path, agents have no channel back to the system *except* the board. That is the
-property most "multi-agent" tools violate on day one, and it is the reason Pathly gets auditability,
-resumability, and multi-agent coherence at the design level. But **"structurally enforced" overstates
-it — there is no server-side check that a spawned prompt actually contains the wire fragments.** Two
+The enforcement mechanism is **fragments** — a prompt layer that owns the agent's channels back to
+the system. On the **default composed** path, every return path is a fragment-owned one: board I/O
+(`comms`) for knowledge/context, plus the `completion-report` fragment's `AGENT_DONE`→`fsm_events`
+for the result/outcome (point 1). The property that matters is that there is **no *undeclared*
+side-channel** — an agent can't stash state anywhere fragments don't route — which is what most
+"multi-agent" tools lose on day one, and the reason Pathly gets auditability, resumability, and
+multi-agent coherence at the design level. But **"structurally enforced" overstates it — there is no
+server-side check that a spawned prompt actually contains the wire fragments.** Two
 supported paths bypass the wiring:
 1. **`prompt_override`** (`supervisor/board_run.py`) *replaces* the skill body outright — an override
    run can carry no `completion-report`/`comms-post` at all.
@@ -67,11 +70,14 @@ currently *trusted, not enforced*.** None is a rewrite. This doc enumerates them
 | KS trigger condition | task readiness (`depends_on` met) + role match | executor drains the DAG |
 | Control component | passive FSM + supervisor loop + executor | `single` / `loop` / `team` |
 
-**The load-bearing constraint is "board is the only memory."** In `single`/`loop`, agents are
-stateless w.r.t. each other; `retrieve_board_context` re-reads the board into every next prompt.
-This is the classic KS independence property, and Pathly enforces it *structurally* (via fragments)
-rather than by documentation — the strongest thing in the architecture. (Under `team` the
-`spawn-rules` delegation tree weakens "only memory" to "primary memory"; see §0, item 2.)
+**The load-bearing constraint is KS independence: agents share state only through fragment-owned
+channels.** In `single`/`loop`, agents are stateless w.r.t. each other; `retrieve_board_context`
+re-reads the board into every next prompt. This is the classic KS independence property, and Pathly
+enforces it *structurally* (via fragments) rather than by documentation — the strongest thing in the
+architecture. Two caveats keep "board is the *only* memory" from being literally true: the result
+signal travels the `AGENT_DONE`→`fsm_events` channel, not the comms board (§0, item 1), and under
+`team` the `spawn-rules` delegation tree adds a parent→child path (§0, item 2). So it's "shared state
+only through governed channels," of which the comms board is the primary.
 
 ---
 
