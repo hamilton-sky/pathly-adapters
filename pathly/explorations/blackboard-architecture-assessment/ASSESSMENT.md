@@ -1,0 +1,211 @@
+# Pathly as a Blackboard System — Architecture Assessment & Open Issues
+
+**Author:** exploration session (Claude Opus 4.8) · **Date:** 2026-07-19 · **Baseline:** v2.22.0
+**Method:** read against code at HEAD (branch `claude/app-state-discussion-kfuaca`) — schema
+(`db/migrations.py`), compose path (`skills/compose.py`, `skills/abilities.py`,
+`supervisor/board_run.py`), scope columns (`db/migrations_incremental.py`). Not doc-trusted.
+
+> **Scope of this doc:** it is a *record* (a point-in-time critique), not a living contract.
+> It states the classic-blackboard lens on Pathly and lists the seams that are **designed-for but
+> not-yet-enforced**. The one durable clarification it produces — separating the *blackboard
+> abstraction hierarchy* from the *scope-tier inheritance chain* — has been folded into the living
+> north-star doc (`docs/WHAT_IS_PATHLY.md §1a`); everything else here is analysis, not a spec.
+
+---
+
+## 0. Bottom line
+
+Pathly is a **faithful blackboard system**, not a metaphorical one. The three defining properties of
+the classic pattern (Hearsay-II / HASP / BB1) are all present and **structurally enforced**, not
+merely conventional:
+
+1. **One shared blackboard** — `comms_messages` + `comms_artifacts`, the sole memory.
+2. **Stateless knowledge-source agents that never call each other** — they read the board and
+   contribute back, nothing else.
+3. **A separate control component** — passive FSM + supervisor loop + executor.
+
+The enforcement mechanism is **fragments** (the un-editable prompt layer that owns all board I/O):
+agents have no channel back to the system *except* the board. That is the property most
+"multi-agent" tools violate on day one, and it is the reason Pathly gets auditability, resumability,
+and multi-agent coherence at the design level.
+
+**The concept is right. The gap to "trustworthy" is a set of composition/board invariants that are
+currently *trusted, not enforced*.** None is a rewrite. This doc enumerates them.
+
+---
+
+## 1. The blackboard mapping (why it's genuine, not marketing)
+
+| Classic blackboard concept | Pathly realization | Enforced how |
+|---|---|---|
+| Shared blackboard | `comms_messages` (typed rows) + `comms_artifacts` | single DB, `/comms/*` routes |
+| Levels of abstraction | granularity axis: task → goal → feature → project | `goal_id`, `type` columns; decompose/aggregate KSs |
+| Knowledge sources | CLI agents (architect/builder/reviewer/…) | `agent_definitions`, spawned per stage/task |
+| KSs never call each other | agents connect back **only** through fragments | `core/skills/fragments/` (un-editable) |
+| KS trigger condition | task readiness (`depends_on` met) + role match | executor drains the DAG |
+| Control component | passive FSM + supervisor loop + executor | `single` / `loop` / `team` |
+
+**The load-bearing constraint is "board is the only memory."** Agents are stateless w.r.t. each
+other; `retrieve_board_context` re-reads the board into every next prompt. This is the classic KS
+independence property, and Pathly enforces it *structurally* (via fragments) rather than by
+documentation. This is the strongest thing in the architecture.
+
+---
+
+## 2. The layering is TWO orthogonal ideas the narrative treats as one
+
+This is the one conceptual correction worth making permanent (now in `WHAT_IS_PATHLY.md §1a`).
+
+There are **two independent axes**, and they are different *kinds* of thing:
+
+### Axis A — Abstraction hierarchy (a genuine blackboard property)
+```
+task  →  goal  →  feature  →  project
+```
+A completed task-DAG *raises* a goal to done; a goal is itself a contribution at the goal level.
+`goal_decomposer` is a **downward KS** (goal → tasks); completion aggregation is an **upward KS**
+(tasks → goal). This is exactly Hearsay-II's signal→word→phrase abstraction ladder. **Faithful,
+principled, and the best-realized part of the design.**
+
+### Axis B — Scope-tier inheritance (NOT a blackboard property)
+```
+global (~/.pathly)  →  project (project_root)  →  feature
+```
+A project ability **overrides** a global one with the same `<category>/<name>`
+(`skills/abilities.py`); project-board context feeds feature boards. This is **lexical scoping /
+prototype-chain override**, not levels of abstraction. It is a good idea — but a *different* idea
+wearing the same "layering" vocabulary.
+
+**Why the conflation matters:** they compose differently. Abstraction levels *aggregate upward*
+(children complete → parent completes). Scope tiers *resolve by override* (nearest scope wins).
+Calling both "layers" invites a contributor to expect aggregation semantics where there is override
+semantics (and vice-versa). **Name them distinctly: "abstraction levels" vs "scope tiers."**
+
+### Structural consequence (a real correctness surface)
+`scope_tier` and `goal_id` are **both plain columns on the same flat `comms_messages` table**.
+"Which board am I on" is therefore a **query predicate, not a structural boundary** — isolation
+between tiers is only as strong as every query's `WHERE scope = ?` clause. A single missing scope
+filter leaks project context into a feature agent's prompt (or vice-versa). This is the highest-value
+place for an invariant/test harness (see §6, ISSUE-1).
+
+---
+
+## 3. The human-as-knowledge-source surface (the most original contribution)
+
+Classic blackboard systems **do not model the human** — control is fully automated. Pathly's
+whole-board manipulation surface is effectively **"the human as a first-class KS, operating at every
+abstraction level"**:
+
+- **Re-analyze the board different ways → post back** = a human-driven KS contribution.
+- **Reorder / reconstruct MD artifacts, generate diagrams** = human-performed *abstraction-level
+  translation* (sprawling artifact → digestible one) — literally a KS's job, done by a person.
+- **Comments with competing approaches** = posting rival *partial solutions* for the control layer
+  (or a downstream agent) to adjudicate.
+
+**Why this is right:** abilities are **files composed at read-time exactly like fragments**
+(`compose._read_fragment`; `##`-splittable into per-section toggles). The human's contribution enters
+through the **same governed channel** as agent contributions — no side-door, no out-of-band override
+that corrupts the audit trail. Most tools bolt human input on as an override that breaks provenance;
+Pathly routes it through the same pipe. **Rate this highly; lead with it in positioning.**
+
+**Reservation (ISSUE-2):** diagrams and reconstructed MD are *derived* artifacts, and the versioning
+that keeps them honest is **stubbed**. `comms_artifacts.version` / `last_edit_*` / `supersedes`
+columns exist but the schema comment admits they "stay at defaults — the editor-save + versioning
+hooks that populate them are a deferred follow-up." A stale higher-level artifact that no longer
+reflects the level below it is *the* classic blackboard failure mode. Anticipated (columns present),
+not closed.
+
+---
+
+## 4. Runtime prompt control — the sharpest double edge
+
+**What the code does:** `start_board_run` accepts `prompt_override`, `ability_ids`,
+`excluded_sections` (`supervisor/board_run.py`); `stage_configs` persists per-stage
+`{ability_ids, excluded_sections}`; the preview gate renders the **composed** prompt before spawn; a
+Sections trim or full override changes what actually ships to the CLI.
+
+**As inspection — a real advance.** The hardest thing to debug in an agent system is that the prompt
+is a black box assembled deep in the plumbing. Pathly makes the **blackboard→prompt projection a
+glass box** you can read *and* edit at the moment of spawn. Exposing the control component's decision
+*and its inputs* is strictly better than both hardcoded pipelines and opaque autonomous swarms.
+
+**As mutation — a hole in the architecture's own thesis (ISSUE-3).** Pathly's foundational claim is
+*"every prompt flows through fragments; fragments are un-editable; ONE authority."* A full
+`prompt_override` **bypasses composition** — a deliberate hole in that wall. The code is careful
+(platform fragments are locked; you can trim sections but not delete board-CRUD wiring), which shows
+the author saw the danger. But the moment an operator hand-edits a prompt, **that run is no longer
+reproducible from board state** — the exact property that made the blackboard auditable.
+
+**Fix (small, not polish):** a runtime override should itself be **posted back to the board as a
+`type=decision` artifact** ("operator overrode stage X's prompt — diff attached"). Then the override
+lives *inside* the audit model, and reproducibility is preserved as "board state + recorded
+overrides." Treat as a correctness requirement before any unattended use.
+
+---
+
+## 5. User-authored KSs (extensibility as KS registration)
+
+Letting users author agents / skills / abilities / flows is, structurally, **registering new
+knowledge sources.** The tables back it cleanly and *consistently with the rest of the override
+model*:
+
+- `skill_definitions` / `agent_definitions` — DB-backed, `project_root`-scoped; user content
+  overrides packaged defaults **without editing installed files** (which `--repair` clobbers and
+  `python -m build` regenerates). Correct, hard-won choice.
+- `skill_composition` — per-project fragment-list overrides merged over the YAML seed at read time
+  (`compose.load_effective_manifest`).
+
+So the extensibility model is the **same override-chain idea** as abilities and scope tiers, applied
+to the KS registry: **packaged defaults = seed; user contributions = DB-layer overrides; resolved at
+compose time. One authority, layered.** Well-factored.
+
+**Risk (ISSUE-4) — combinatorial safety, not architecture.** With user-authored agents
+(`tools_json`, `can_spawn_json`), skills, abilities, *and* flows, composed across three scope tiers
+with runtime overrides on top, the space of distinct prompt-assemblies explodes. Nothing validates
+that a user-authored agent's skill still receives the mandatory board-CRUD fragments, or that a user
+flow is acyclic. The un-editable-fragment lock is the *only* guardrail. Fine for self-use; for a
+shared/product setting the missing piece is a **compose-time invariant checker**.
+
+---
+
+## 6. Open issues (ranked)
+
+| # | Issue | Where | Severity | Fix shape |
+|---|---|---|---|---|
+| **ISSUE-1** | Tier isolation is a query predicate, not a boundary — a missing `WHERE scope=?` leaks context across tiers | `comms_messages` flat table; every `db/queries/comms_*` read | **High** (silent context bleed) | invariant test: assert every board read is scope-filtered; consider a query wrapper that *requires* a scope arg |
+| **ISSUE-3** | Runtime `prompt_override` bypasses composition → run not reproducible from board | `supervisor/board_run.py` | **High** (breaks audit thesis) | post the override + diff back as a `type=decision` artifact; reproducibility = board + recorded overrides |
+| **ISSUE-2** | Derived artifacts (reconstructed MD, diagrams) have no enforced provenance — versioning columns stubbed | `comms_artifacts.version/last_edit_*/supersedes` | **Medium** (stale-higher-level drift) | wire editor-save hooks to populate version/`supersedes`; link derived → source |
+| **ISSUE-4** | No compose-time invariant that every spawned prompt contains the wire fragments / every flow is acyclic | `skills/compose.py`, flow defs | **Medium** (grows with user-authoring) | a `validate_composition()` gate: assert board-CRUD fragments present; assert flow DAG acyclic; assert abilities resolve |
+| **ISSUE-5** | Narrative conflates abstraction levels with scope tiers | docs | **Low** (clarity/onboarding) | ✅ addressed in `WHAT_IS_PATHLY.md §1a` |
+
+**Through-line:** every issue is the same species — *guarantees resting on invariants that are
+currently trusted, not enforced.* One flat table partitioned by predicate; overrides layered three
+deep; user-authored KSs; runtime edits. The architecture is sound; the maturation work is
+**turning trusted invariants into checked ones**, and it is smaller than it looks because the author
+has already left the seams (reserved columns, fragment locks, spawn-time-adapter billing) where the
+checks belong.
+
+---
+
+## 7. Other insights encountered during research (not the main thread)
+
+- **The billing chokepoint is a good model for where invariants belong.** `POST
+  /runner/terminal/result` is the *single* run-keyed billing authority, using the **spawn-time**
+  adapter (not the racy live `current_adapter`). This "one chokepoint, keyed by run_id" pattern is
+  exactly the shape ISSUE-1/ISSUE-4 want: a single place every write must pass through. The telemetry
+  layer already demonstrates the team can build these; the board-read layer hasn't had one applied yet.
+- **"Headless" ≠ "unattended."** The supervisor spawns PTYs via `TERMINAL_SPAWN` SSE into the Electron
+  renderer — Studio is a *required host*, not optional. "Headless" here means *no human in the
+  per-step loop*, not serverless. `runner/invoke.py` exists but is used only by the separate
+  `runner/cli.py`, not the supervisor. Honest-scope item, orthogonal to the blackboard critique.
+- **Parallelism is serial-only inside a goal's DAG.** `_run_loop` hardcodes
+  `SerialIsolation(max_concurrency=1)`; `LaneIsolation` exists (tests only); `WorktreeIsolation` is
+  `NotImplementedError("P3")`. The blackboard data model is already parallel-ready (the board *is* a
+  shared queue) — which is precisely why P3 is "flip k>1 by lane," not a redesign. But it also means
+  ISSUE-1 (scope isolation) gets *sharper* under parallelism, because concurrent lanes reading the
+  same flat table with weak predicates is where a bleed becomes a race.
+- **"One authority, everything else a projection" is the real north star** (commit `1a970bf`), and it
+  is *mostly* true: `agent_invocations` is a projection of the `AGENT_DONE` event stream; `BOARD.json`
+  mirrors the DB; abilities/skills resolve from files+DB overrides at read time. The two places the
+  "one authority" claim is currently *aspirational rather than proven* are exactly ISSUE-1 (tier
+  isolation) and ISSUE-3 (runtime overrides) — close those and the slogan becomes a theorem.

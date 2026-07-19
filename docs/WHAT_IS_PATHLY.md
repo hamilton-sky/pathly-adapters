@@ -89,6 +89,36 @@ flowchart LR
 
 The human's role here is **supervisory**: create goals, answer non-blocking questions, adjudicate escalations — outside the per-step loop.
 
+### 1a. Two axes of "layering" — don't conflate them
+
+Pathly is a **blackboard system** in the classic sense (Hearsay-II / BB1): one shared board, stateless
+knowledge-source agents that never call each other (they connect back *only* through fragments), and a
+separate control component (the passive FSM + supervisor loop) that decides what runs next. "The board
+is the only memory" is the load-bearing constraint, and fragments enforce it structurally.
+
+Within that, the word "layer" gets used for **two orthogonal things that compose differently**. Keep
+them distinct:
+
+| | **Abstraction levels** (a blackboard property) | **Scope tiers** (an inheritance chain) |
+|---|---|---|
+| Ladder | `task → goal → feature → project` | `global (~/.pathly) → project → feature` |
+| Backed by | `goal_id` / `type` columns; decompose + aggregate KSs | `scope` column; `pathly/abilities/`, board scope |
+| Compose rule | **aggregate upward** — children complete ⇒ parent completes | **override by nearest scope** — project ability overrides global |
+| Blackboard? | **Yes** — signal→word→phrase abstraction ladder (`goal_decomposer` = downward KS; completion = upward KS) | **No** — this is lexical scoping / prototype-chain override |
+
+- **Abstraction levels aggregate.** Finishing a task-DAG *raises* its goal; a goal is itself a
+  contribution at the goal level. This is the genuine hierarchical-blackboard axis.
+- **Scope tiers resolve by override.** The *nearest* scope wins (a project `plan/react-web.md`
+  ability shadows a global one of the same id); nothing "aggregates" from global up to feature.
+
+Because they compose differently, don't expect aggregation semantics where there is override
+semantics, or vice-versa. Note also that both `scope` (tier) and `goal_id` (level) are plain columns
+on the **one flat `comms_messages` table** — so a board boundary is a **query predicate, not a
+structural wall**: every board read must carry its `scope` filter, or context bleeds across tiers.
+
+A fuller blackboard-lens critique + the open invariants this implies live in
+[`pathly/explorations/blackboard-architecture-assessment/ASSESSMENT.md`](../pathly/explorations/blackboard-architecture-assessment/ASSESSMENT.md).
+
 ---
 
 ## 2. How a headless run actually works
