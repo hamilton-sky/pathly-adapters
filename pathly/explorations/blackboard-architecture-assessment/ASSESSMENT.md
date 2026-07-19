@@ -16,8 +16,9 @@
 ## 0. Bottom line
 
 Pathly is a **faithful blackboard system**, not a metaphorical one. The three defining properties of
-the classic pattern (Hearsay-II / HASP / BB1) are all present and **structurally enforced**, not
-merely conventional:
+the classic pattern (Hearsay-II / HASP / BB1) are all present and mostly **enforced by construction**
+(not merely conventional) — with the important qualifier, detailed below, that the fragment *wiring*
+itself is enforced by the *default* composition rather than by a server-side check:
 
 1. **One shared blackboard for knowledge** — `comms_messages` + `comms_artifacts`, the shared
    *context/knowledge* substrate. (Not the *sole* store: the authoritative per-stage **result**
