@@ -135,10 +135,12 @@ def evaluate_transition_rules(
                     count_ready_tasks_for_scope,
                 )
 
-                _counter = {
-                    "incomplete": count_incomplete_tasks_for_scope,
-                }.get(metric, count_ready_tasks_for_scope)
-                count = _counter(get_db(), board, feature_scope)
+                if metric == "incomplete":
+                    count = count_incomplete_tasks_for_scope(
+                        get_db(), board, feature_scope
+                    )
+                else:
+                    count = count_ready_tasks_for_scope(get_db(), board, feature_scope)
                 if op_fn(count, int(compare_to)):
                     return next_s
             except Exception:

@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import logging
 import sqlite3
+from collections.abc import Callable
 from pathlib import Path
 
 from pathly_orchestrator.db.queries.comms_artifacts import insert_artifact_row
@@ -52,11 +53,11 @@ def hydrate_board(conn: sqlite3.Connection, board: str, scope: str, path: Path) 
     for art in artifacts:
         insert_artifact_row(conn, art)
 
-    _embed_fn = None
+    _embed_fn: Callable[[str, str, str], None] | None = None
     try:
-        from pathly_orchestrator.runner.embeddings import (
-            embed_artifact_async as _embed_fn,
-        )
+        from pathly_orchestrator.runner.embeddings import embed_artifact_async
+
+        _embed_fn = embed_artifact_async
     except Exception:
         pass  # embedder unavailable — hydration still succeeded, skip re-embed silently
 

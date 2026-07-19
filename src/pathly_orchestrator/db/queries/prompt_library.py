@@ -75,7 +75,7 @@ def list_prompts(
         where.append("category = ?")
         params.append(category)
     rows = conn.execute(
-        f"SELECT {', '.join(_FIELDS)} FROM prompt_library "
+        f"SELECT {', '.join(_FIELDS)} FROM prompt_library "  # nosec B608 - _FIELDS/where are literal identifiers; all values bound via ?
         f"WHERE {' AND '.join(where)} "
         # NULL (global) first so a project row overwrites it in the merge below.
         "ORDER BY (project_root IS NOT NULL), sort_order, created_at",
@@ -90,7 +90,7 @@ def list_prompts(
 
 def get_prompt(conn: sqlite3.Connection, prompt_id: str) -> dict | None:
     r = conn.execute(
-        f"SELECT {', '.join(_FIELDS)} FROM prompt_library WHERE id = ?",
+        f"SELECT {', '.join(_FIELDS)} FROM prompt_library WHERE id = ?",  # nosec B608 - _FIELDS is a literal tuple; id bound via ?
         (prompt_id,),
     ).fetchone()
     return _row_to_dict(r) if r else None
@@ -141,7 +141,7 @@ def create_prompt(
         )
         if cur.rowcount == 0:
             conn.execute(
-                f"INSERT INTO prompt_library ({', '.join(_FIELDS)}) "
+                f"INSERT INTO prompt_library ({', '.join(_FIELDS)}) "  # nosec B608 - _FIELDS is a literal tuple; all values bound via ?
                 f"VALUES ({', '.join(['?'] * len(_FIELDS))})",
                 (
                     pid,
@@ -161,7 +161,7 @@ def create_prompt(
             )
         conn.commit()
     row = conn.execute(
-        f"SELECT {', '.join(_FIELDS)} FROM prompt_library "
+        f"SELECT {', '.join(_FIELDS)} FROM prompt_library "  # nosec B608 - _FIELDS is a literal tuple; all values bound via ?
         "WHERE kind=? AND category=? AND name=? "
         "AND ((project_root IS NULL AND ? IS NULL) OR project_root=?)",
         (kind, category, name, project_root, project_root),
@@ -228,7 +228,7 @@ def seed_builtins(conn: sqlite3.Connection, rows: list[dict]) -> int:
             if exists:
                 continue
             conn.execute(
-                f"INSERT INTO prompt_library ({', '.join(_FIELDS)}) "
+                f"INSERT INTO prompt_library ({', '.join(_FIELDS)}) "  # nosec B608 - _FIELDS is a literal tuple; all values bound via ?
                 f"VALUES ({', '.join(['?'] * len(_FIELDS))})",
                 (
                     _new_id(),
