@@ -1,36 +1,51 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useStore } from '../../../../store'
-import { usePromptContent } from '../../../shared/PromptPreview/PromptPreview'
-import { useSkillCatalog } from '../../../Monitor/ConfigurePhaseModal/hooks/usePhaseModalCatalog'
+import { composeSkillPrompt, type ComposedSegment } from '../../../../services/skillCompose'
 import { executorInfo } from './executorInfo'
 
-// Reconstruct the prompt a goal run sends, as faithfully as the renderer can — mirrors
-// supervisor/goal_executor.py: the goal, then the executor's skill body, then a note that the
-// live task-DAG and board context are appended at spawn time (so they can't be shown verbatim).
-// Fetches the skill only while `enabled` (the preview modal is open) to avoid idle reads.
+// The prompt a goal run sends, as faithfully as the renderer can — mirrors
+// supervisor/goal_executor.py: the goal, then the executor's COMPOSED skill body (skill +
+// Pathly fragments), then a note that the live task-DAG + board context are appended at spawn.
+//
+// It COMPOSES (POST /skills/compose) rather than reading the raw skill file, so the gate shows
+// the FULL prompt — skill + fragments — and the returned segments drive the Sections modal's
+// layer tabs + fragment lock. 'team' has no single skill (multi-stage FSM flow), so it keeps a
+// note. Composes only while `enabled` (the preview modal is open).
 export function useGoalRunPreview(
   enabled: boolean,
   executor: string,
   goalText: string,
   taskLine: string,
-): string {
+): { prompt: string; segments: ComposedSegment[] } {
   const projectPath = useStore((st) => st.projectPath)
-  const skillCatalog = useSkillCatalog(projectPath)
   const skillRel = executorInfo(executor).skillRel
-  const skillBody = usePromptContent(
-    enabled && skillRel ? skillRel : '',
-    'src/pathly_data/core/skills', skillCatalog,
-    skillRel ? { [skillRel]: skillRel } : {}, {}, projectPath,
-  )
+  const [composed, setComposed] = useState<{
+    prompt: string
+    segments: ComposedSegment[]
+  } | null>(null)
 
-  return useMemo(() => {
+  useEffect(() => {
+    if (!enabled || !skillRel) {
+      setComposed(null)
+      return
+    }
+    let cancelled = false
+    void composeSkillPrompt(skillRel, { projectRoot: projectPath }).then((r) => {
+      if (!cancelled) setComposed(r)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [enabled, skillRel, projectPath])
+
+  const prompt = useMemo(() => {
     const parts: string[] = [
       `# Goal\n\n${goalText.trim() || '_(untitled goal)_'}\n\n_${taskLine}_`,
     ]
     if (skillRel) {
       parts.push(
-        skillBody?.trim() ||
-          `# ${skillRel}\n_(The skill body loads from the project at spawn time.)_`,
+        composed?.prompt?.trim() ||
+          `# ${skillRel}\n_(The ${skillRel} skill composes at spawn time.)_`,
       )
     } else {
       parts.push(
@@ -44,5 +59,7 @@ export function useGoalRunPreview(
         'when the engine runs, so they are not shown verbatim above._',
     )
     return parts.join('\n\n')
-  }, [skillBody, skillRel, goalText, taskLine])
+  }, [composed, skillRel, goalText, taskLine])
+
+  return { prompt, segments: composed?.segments ?? [] }
 }

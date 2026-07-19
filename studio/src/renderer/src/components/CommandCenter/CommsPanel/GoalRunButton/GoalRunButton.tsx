@@ -4,6 +4,7 @@ import { useElapsedProgress } from '../../../shared/RunPill/progress'
 import { RunPill } from '../../../shared/RunPill/RunPill'
 import SendPreviewModal from '../../../shared/SendPreviewModal/SendPreviewModal'
 import { ProgressSelect } from '../../../shared/ProgressSelect/ProgressSelect'
+import { headingLayers } from '../../../../services/skillCompose'
 import { GoalSelect } from './GoalSelect/GoalSelect'
 import { useGoalRunPreview } from './useGoalRunPreview'
 import { executorInfo } from './executorInfo'
@@ -73,7 +74,7 @@ export function GoalRunButton({ goalId, defaultExecutor = 'single', goalText = '
   const taskLine = `${total} task${total !== 1 ? 's' : ''} · ${ready} ready`
   const executorLabel = EXECUTOR_OPTIONS.find((o) => o.value === executor)?.label ?? executor
   const info = executorInfo(executor)
-  const previewPrompt = useGoalRunPreview(confirmOpen, executor, goalText, taskLine)
+  const preview = useGoalRunPreview(confirmOpen, executor, goalText, taskLine)
 
   function handleAdapterChange(v: string): void {
     setAdapter(v as EditorCli)
@@ -137,8 +138,9 @@ export function GoalRunButton({ goalId, defaultExecutor = 'single', goalText = '
           title="Run goal"
           engineLabel={adapterApplies ? cliLabel(adapter) : 'per-stage (team)'}
           fileName={goalText || goalId}
-          prompt={previewPrompt}
+          prompt={preview.prompt}
           readOnly
+          headingLayers={headingLayers(preview.segments)}
           meta={[
             { label: 'Executor', value: executorLabel },
             { label: 'Agent', value: info.agent },
