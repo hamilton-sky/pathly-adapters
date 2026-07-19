@@ -191,27 +191,36 @@ overrides." Treat as a correctness requirement before any unattended use.
 ## 5. User-authored KSs (extensibility as KS registration)
 
 Letting users author agents / skills / abilities / flows is, structurally, **registering new
-knowledge sources.** The tables back it cleanly and *consistently with the rest of the override
-model*:
+knowledge sources** — *for the layers actually wired into compose*. The tables split into two groups
+by whether they reach the runtime:
 
-- `skill_definitions` / `agent_definitions` — DB-backed, `project_root`-scoped; user content
-  overrides packaged defaults **without editing installed files** (which `--repair` clobbers and
-  `python -m build` regenerates). Correct, hard-won choice.
-- `skill_composition` — per-project fragment-list overrides merged over the YAML seed at read time
-  (`compose.load_effective_manifest`).
+- `skill_composition` (fragment-list overrides, `compose.load_effective_manifest`) **and** abilities
+  (files, appended at compose time) are the only two DB/file layers that actually reach the
+  **runtime** prompt — merged over the packaged YAML/`.md` seed at read time, without editing installed
+  files (which `--repair` clobbers and `python -m build` regenerates). Correct, hard-won choice.
+- `skill_definitions` / `agent_definitions` — **caveat: these do NOT feed the compose/spawn runtime.**
+  `compose_skill` always reads the packaged body via `_read_skill_body()` (a file read), and
+  `load_effective_manifest` applies only `skill_composition` fragment overrides — neither consults the
+  definition tables. They are read by the skill-notebook editor (`blueprints/skills/editor_io.py`) and
+  `services/config_service.py`, i.e. authoring/config surfaces. So a user who creates a project-scoped
+  skill/agent *definition* does **not** thereby override the executable packaged prompt — an
+  authored-vs-executed gap that is itself an instance of this doc's theme.
 
-So the extensibility model is the **same override-chain idea** as abilities and scope tiers, applied
-to the KS registry: **packaged defaults = seed; user contributions = DB-layer overrides; resolved at
-compose time. One authority, layered.** Well-factored.
+So the extensibility model *aspires* to the **same override-chain idea** as abilities and scope
+tiers — **packaged defaults = seed; user contributions = DB-layer overrides** — and delivers it for
+the two layers that reach the runtime (`skill_composition` + abilities). The definition tables are
+the gap: authored/edited but not wired into compose, so "resolved at compose time, one authority" is
+true for fragments/abilities but **not** for skill/agent definitions. Well-factored where it's
+wired; incompletely wired where it isn't.
 
-**Risk (ISSUE-4) — combinatorial safety, not architecture.** With user-authored agents
-(`tools_json`, `can_spawn_json`), skills, abilities, *and* flows, composed across three scope tiers
-with runtime overrides on top, the space of distinct prompt-assemblies explodes. **Nothing on the
-server validates that a spawned prompt still carries the mandatory board-CRUD fragments** — not the
-composition editor (`/skills/export` accepts `[]`), not `prompt_override`, not a user-authored agent's
-skill — nor that a user flow is acyclic. There is **no server-side fragment lock at all** on these
-paths (only the section-trim gate locks platform fragments, and only for trims). Fine for self-use;
-for a shared/product setting the missing piece is a **compose-time invariant checker**.
+**Risk (ISSUE-4) — combinatorial safety, not architecture.** With `skill_composition` fragment
+overrides, abilities, `prompt_override`, and user-authored flows composed across scope tiers, the
+space of distinct prompt-assemblies explodes. **Nothing on the server validates that a spawned prompt
+still carries the mandatory board-CRUD fragments** — not the composition editor (`/skills/export`
+accepts `[]`), not `prompt_override` — nor that a user flow is acyclic. There is **no server-side
+fragment lock at all** on the paths that *do* reach the runtime (only the section-trim gate locks
+platform fragments, and only for trims). Fine for self-use; for a shared/product setting the missing
+piece is a **compose-time invariant checker**.
 
 ---
 
@@ -222,7 +231,7 @@ for a shared/product setting the missing piece is a **compose-time invariant che
 | **ISSUE-1** | Board identity is the `(board, scope)` **pair**, enforced only by query predicate — a read matching the wrong pair (missing `board` half, or an un-gated cross-tier union) mixes instances that share a `scope` value | `comms_messages` flat table; every `db/queries/comms_*` read | **Medium** (mostly design-gated: cross-tier aggregation is intentional + relevance-cutoff-gated, so this is a wrong-pair/un-gated-read risk, not a blanket bleed) | invariant test: assert every board read targets an explicit `(board, scope)` pair; consider a query wrapper that *requires* both args |
 | **ISSUE-3** | Runtime `prompt_override` bypasses composition → run not reproducible from board | `supervisor/board_run.py` | **High** (breaks audit thesis) | post the override + diff back as a `type=decision` artifact; reproducibility = board + recorded overrides |
 | **ISSUE-2** | Derived artifacts (reconstructed MD, diagrams) have no enforced provenance — versioning columns stubbed | `comms_artifacts.version/last_edit_*/supersedes` | **Medium** (stale-higher-level drift) | wire editor-save hooks to populate version/`supersedes`; link derived → source |
-| **ISSUE-4** | No compose-time invariant that a spawned prompt keeps the wire fragments — `/skills/export` accepts an empty/trimmed fragment list and `load_effective_manifest` full-replaces, so a `skill_composition` override silently drops `completion-report`/`AGENT_DONE` from ordinary composed runs (also via `prompt_override` and user-authored skills); flows aren't checked acyclic either | `skills/compose.py::load_effective_manifest`, `blueprints/skills/editor_io.py`, flow defs | **Medium→High** (a dropped `completion-report` = vanished + unbilled run; server-side, not just UI) | a `validate_composition()` gate: assert board-CRUD fragments present in the effective manifest; assert flow DAG acyclic; assert abilities resolve |
+| **ISSUE-4** | No compose-time invariant that a spawned prompt keeps the wire fragments — `/skills/export` accepts an empty/trimmed fragment list and `load_effective_manifest` full-replaces, so a `skill_composition` override silently drops `completion-report`/`AGENT_DONE` from ordinary composed runs (also via `prompt_override`); flows aren't checked acyclic either | `skills/compose.py::load_effective_manifest`, `blueprints/skills/editor_io.py`, flow defs | **Medium→High** (a dropped `completion-report` = vanished + unbilled run; server-side, not just UI) | a `validate_composition()` gate: assert board-CRUD fragments present in the effective manifest; assert flow DAG acyclic; assert abilities resolve |
 | **ISSUE-5** | Narrative conflates abstraction levels with scope tiers | docs | **Low** (clarity/onboarding) | ✅ addressed in `WHAT_IS_PATHLY.md §1a` |
 
 **Through-line:** every issue is the same species — *guarantees resting on invariants that are
