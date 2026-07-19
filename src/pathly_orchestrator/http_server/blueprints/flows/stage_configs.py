@@ -44,6 +44,15 @@ def set_stage_config():
     try:
         from pathly_orchestrator.db.queries.stage_configs import upsert_stage_config
 
+        # flow-phase-inspector (#5): per-stage layer-3 abilities + excluded section headings.
+        # Coerce to list-or-None so a malformed body never persists a non-list blob.
+        ability_ids = data.get("ability_ids")
+        ability_ids = ability_ids if isinstance(ability_ids, list) else None
+        excluded_sections = data.get("excluded_sections")
+        excluded_sections = (
+            excluded_sections if isinstance(excluded_sections, list) else None
+        )
+
         conn = _get_conn()
         upsert_stage_config(
             conn,
@@ -53,6 +62,8 @@ def set_stage_config():
             agent=data.get("agent"),
             adapter=data.get("adapter"),
             skill=data.get("skill"),
+            ability_ids=ability_ids,
+            excluded_sections=excluded_sections,
         )
         return jsonify({"ok": True})
     except Exception as e:
