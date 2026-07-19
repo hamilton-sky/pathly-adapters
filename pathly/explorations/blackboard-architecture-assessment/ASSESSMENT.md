@@ -162,10 +162,13 @@ abstraction level"**:
   (or a downstream agent) to adjudicate.
 
 **Why this is right:** abilities are **files composed at read-time exactly like fragments**
-(`compose._read_fragment`; `##`-splittable into per-section toggles). The human's contribution enters
-through the **same governed channel** as agent contributions — no side-door, no out-of-band override
-that corrupts the audit trail. Most tools bolt human input on as an override that breaks provenance;
-Pathly routes it through the same pipe. **Rate this highly; lead with it in positioning.**
+(`compose._read_fragment`; `##`-splittable into per-section toggles). Via *this* channel the human's
+contribution enters through the **same governed path** as agent contributions — no side-door: an
+ability shows up in the composed prompt and the Library, not as an opaque out-of-band injection. Most
+tools bolt human input on as an override that breaks provenance; the *abilities* pipe doesn't.
+(Operator inputs on the *other* paths — `prompt_override`, composition-editor edits, §4/§0 — are the
+un-governed ones; this praise is scoped to the abilities channel, not to every human input.) **Rate
+the abilities channel highly; lead with it in positioning.**
 
 **Reservation (ISSUE-2):** diagrams and reconstructed MD are *derived* artifacts, and the versioning
 that keeps them honest is **stubbed**. `comms_artifacts.version` / `last_edit_*` / `supersedes`
