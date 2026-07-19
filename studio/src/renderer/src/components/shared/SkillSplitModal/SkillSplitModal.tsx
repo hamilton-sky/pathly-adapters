@@ -25,6 +25,14 @@ export function cellsToMarkdown(cells: ProposedCell[]): string {
     .trim()
 }
 
+/** Seed cells as UNCHECKED for the given headings — lets a caller reopen the section picker
+ *  reflecting a previously-saved exclusion set. No-op when unset (byte-identical for the gates). */
+function seedUnchecked(cells: ProposedCell[], unchecked?: string[]): ProposedCell[] {
+  if (!unchecked || unchecked.length === 0) return cells
+  const set = new Set(unchecked)
+  return cells.map((c) => (set.has(c.heading) ? { ...c, checked: false } : c))
+}
+
 interface Props {
   filePath?: string
   fileName?: string
@@ -41,6 +49,8 @@ interface Props {
    *  included, never uncheckable (dropping one silently breaks the run: no AGENT_DONE →
    *  vanishes + unbilled; no comms-post → stops posting to the board). */
   headingLayers?: Record<string, PromptLayer>
+  /** Headings to start UNCHECKED (excluded) — reflects a saved per-stage section selection. */
+  initialUnchecked?: string[]
   onConfirm: (cells: ProposedCell[]) => void
   onInsertOne: (rawContent: string) => void
   onClose: () => void
@@ -85,26 +95,26 @@ function parseMdToCells(raw: string, depth: 1 | 2 | 3 = 2): ProposedCell[] {
   return cells
 }
 
-export default function SkillSplitModal({ filePath, fileName, rawContent: rawContentProp, title, subtitle, confirmLabel, hideInsertOne, headingLayers, onConfirm, onInsertOne, onClose }: Props) {
+export default function SkillSplitModal({ filePath, fileName, rawContent: rawContentProp, title, subtitle, confirmLabel, hideInsertOne, headingLayers, initialUnchecked, onConfirm, onInsertOne, onClose }: Props) {
   const [rawContent, setRawContent] = useState(rawContentProp ?? '')
-  const [cells, setCells] = useState<ProposedCell[]>(() => rawContentProp ? parseMdToCells(rawContentProp, 2) : [])
+  const [cells, setCells] = useState<ProposedCell[]>(() => rawContentProp ? seedUnchecked(parseMdToCells(rawContentProp, 2), initialUnchecked) : [])
   const [splitDepth, setSplitDepth] = useState<1 | 2 | 3>(2)
 
   useEffect(() => {
     if (rawContentProp !== undefined) {
       setRawContent(rawContentProp)
-      setCells(parseMdToCells(rawContentProp, splitDepth))
+      setCells(seedUnchecked(parseMdToCells(rawContentProp, splitDepth), initialUnchecked))
     } else if (filePath) {
       window.pathly.fs.read(filePath).then((content) => {
         setRawContent(content ?? '')
-        setCells(parseMdToCells(content ?? '', splitDepth))
+        setCells(seedUnchecked(parseMdToCells(content ?? '', splitDepth), initialUnchecked))
       }).catch(() => {})
     }
-  }, [filePath, rawContentProp])
+  }, [filePath, rawContentProp, initialUnchecked])
 
   useEffect(() => {
-    setCells(parseMdToCells(rawContent, splitDepth))
-  }, [splitDepth, rawContent])
+    setCells(seedUnchecked(parseMdToCells(rawContent, splitDepth), initialUnchecked))
+  }, [splitDepth, rawContent, initialUnchecked])
 
   // Every cell belongs to a layer. Pathly's platform fragments (comms-post /
   // completion-report / progress-logging …) are shown but LOCKED — they're the layer that

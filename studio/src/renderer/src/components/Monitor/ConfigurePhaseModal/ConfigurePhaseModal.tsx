@@ -31,6 +31,7 @@ import {
 import { useAgentCatalog, useSkillCatalog } from './hooks/usePhaseModalCatalog'
 import { CatalogDropdown } from './CatalogDropdown/CatalogDropdown'
 import { AbilityToggles } from '../../shared/AbilityToggles/AbilityToggles'
+import { StageSectionsButton } from './StageSectionsButton/StageSectionsButton'
 
 // ── Presentational design-system pieces ─────────────────────────────────────
 import { Modal } from './components/Modal/Modal'
@@ -242,6 +243,17 @@ export function ConfigurePhaseModal({ stage, onClose }: Props): JSX.Element {
             projectRoot={projectPath}
             selectedIds={abilityIds}
             onChange={(rows) => setAbilityIds(rows.map((r) => r.id))}
+          />
+        </div>
+
+        <div>
+          <SectionLabel>Sections</SectionLabel>
+          <StageSectionsButton
+            projectRoot={projectPath}
+            skill={skill}
+            abilityIds={abilityIds}
+            excludedSections={excludedSections}
+            onChange={setExcludedSections}
           />
         </div>
 

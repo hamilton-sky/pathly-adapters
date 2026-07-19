@@ -1,0 +1,32 @@
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 5px 11px;
+  border: 1px solid var(--bg-surface1);
+  border-radius: 7px;
+  background: var(--bg-surface0);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-family: var(--font-family-base);
+  cursor: pointer;
+  transition: background 80ms, color 80ms, border-color 80ms;
+}
+
+.btn:hover:not(:disabled) {
+  color: var(--text-primary);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--bg-surface1));
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* A stage with exclusions reads as "modified" — accent it like the other active controls. */
+.btn[data-active='true'] {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--bg-surface1));
+  background: color-mix(in srgb, var(--accent) 10%, var(--bg-surface0));
+}
