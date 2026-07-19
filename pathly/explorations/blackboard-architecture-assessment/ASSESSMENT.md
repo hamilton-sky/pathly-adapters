@@ -33,13 +33,18 @@ itself is enforced by the *default* composition rather than by a server-side che
    (a delegation tree), so invocation/result can travel parent→child outside the board.
 3. **A separate control component** — passive FSM + supervisor loop + executor.
 
-The enforcement mechanism is **fragments** — a prompt layer that owns the agent's channels back to
-the system. On the **default composed** path, every return path is a fragment-owned one: board I/O
-(`comms`) for knowledge/context, plus the `completion-report` fragment's `AGENT_DONE`→`fsm_events`
-for the result/outcome (point 1). The property that matters is that there is **no *undeclared*
-side-channel** — an agent can't stash state anywhere fragments don't route — which is what most
-"multi-agent" tools lose on day one, and the reason Pathly gets auditability, resumability, and
-multi-agent coherence at the design level. But **"structurally enforced" overstates it — there is no
+The enforcement mechanism is **fragments** — a prompt layer that owns the agent's *declared* channels
+back to the system: board I/O (`comms`) for knowledge/context, plus the `completion-report`
+fragment's `AGENT_DONE`→`fsm_events` for the result/outcome (point 1). Routing those through one
+governed layer is what most "multi-agent" tools lose on day one, and the reason Pathly gets
+auditability, resumability, and multi-agent coherence at the design level. **But one big channel is
+*not* governed: the shared workspace.** Agents spawn with `cwd=project_root` (`supervisor/terminal.py`)
+and are told to create files, so a stage can leave arbitrary files / Git changes that a later stage
+reads **without any board post** — the filesystem + working tree is a real out-of-band channel.
+Pathly only *best-effort* reconciles the *declared* slice of it after the fact (`artifact_reconcile`
+sweeps `ARTIFACTS.jsonl` + `feedback/*.md` onto the board, non-fatal); ungoverned file/Git state is
+not captured. So the guarantee is "declared prompt/return channels are fragment-owned," not "the
+agent can stash nothing off-board." But **"structurally enforced" overstates even that — there is no
 server-side check that a spawned prompt actually contains the wire fragments.** Two
 supported paths bypass the wiring:
 1. **`prompt_override`** (`supervisor/board_run.py`) *replaces* the skill body outright — an override
@@ -71,14 +76,16 @@ currently *trusted, not enforced*.** None is a rewrite. This doc enumerates them
 | KS trigger condition | task readiness (`depends_on` met) + role match | executor drains the DAG |
 | Control component | passive FSM + supervisor loop + executor | `single` / `loop` / `team` |
 
-**The load-bearing constraint is KS independence: agents share state only through fragment-owned
-channels.** In `single`/`loop`, agents are stateless w.r.t. each other; `retrieve_board_context`
-re-reads the board into every next prompt. This is the classic KS independence property, and Pathly
-enforces it *structurally* (via fragments) rather than by documentation — the strongest thing in the
-architecture. Two caveats keep "board is the *only* memory" from being literally true: the result
-signal travels the `AGENT_DONE`→`fsm_events` channel, not the comms board (§0, item 1), and under
-`team` the `spawn-rules` delegation tree adds a parent→child path (§0, item 2). So it's "shared state
-only through governed channels," of which the comms board is the primary.
+**The load-bearing constraint is KS independence: agents share *declared* state through fragment-owned
+channels.** In `single`/`loop`, agents don't call each other; `retrieve_board_context` re-reads the
+board into every next prompt. This is the classic KS independence property, and Pathly enforces it for
+the prompt/return path *structurally* (via fragments) rather than by documentation — the strongest
+thing in the architecture. Three caveats keep "board is the *only* memory" from being literally true:
+the result signal travels the `AGENT_DONE`→`fsm_events` channel, not the comms board (§0, item 1);
+under `team` the `spawn-rules` delegation tree adds a parent→child path (§0, item 2); and the **shared
+workspace** (filesystem + Git working tree, `cwd=project_root`) is an ungoverned side-channel between
+stages (§0, only best-effort reconciled). So it's "declared prompt/return state through governed
+channels," of which the comms board is the primary — *not* full workspace isolation.
 
 ---
 
