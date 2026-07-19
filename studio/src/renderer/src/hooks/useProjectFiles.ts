@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useStore } from '../store'
 import { listDir, listDirs } from '../services/pathlyApi'
+import { listAbilities } from '../services/abilities'
 import type { PathlyItem, SectionState, TemplateSubdir } from '../types'
 import type { Section } from '../components/sidebar/types'
 
@@ -111,6 +112,31 @@ async function loadSubdirAwareSection(
   }
 }
 
+// The Library "Abilities" section is the ONE place that shows layer-3 abilities MERGED across
+// scopes — project (pathly/abilities/) overriding global (~/.pathly/abilities/) — via the same
+// /skills/abilities API the compose path and the run-gate pickers read. The sibling MY-LIBRARY
+// sections are plain ~/.pathly dir scans; abilities are dual-scope, so they can't be. Each
+// category becomes a subdir; each ability opens its .md in the editor.
+async function loadAbilitiesSection(
+  projectRoot: string,
+): Promise<{ items: PathlyItem[]; subdirs: TemplateSubdir[] }> {
+  try {
+    const abilities = await listAbilities(projectRoot)
+    const byCategory = new Map<string, PathlyItem[]>()
+    for (const a of abilities) {
+      const files = byCategory.get(a.category) ?? []
+      files.push({ name: `${a.name}.md`, path: a.path, type: 'explore' })
+      byCategory.set(a.category, files)
+    }
+    const subdirs: TemplateSubdir[] = [...byCategory.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([name, files]) => ({ name, open: false, files }))
+    return { items: [], subdirs }
+  } catch {
+    return { items: [], subdirs: [] }
+  }
+}
+
 const KNOWN_PATHLY_DIRS = new Set(['features', 'debugs', 'explorations', 'plans', 'agents', 'skills', 'templates', 'flows', 'lessons', 'pipeline-walkthrough'])
 
 export function useProjectFiles(): {
@@ -195,8 +221,12 @@ export function useProjectFiles(): {
     // User library — global ~/.pathly sections
     if (pathlyUserHome) {
       for (const section of USER_LIBRARY_SECTIONS) {
-        const dir = `${pathlyUserHome}/${section.dir}`
-        const result = await loadSubdirAwareSection(dir, section.type)
+        // Abilities are dual-scope (project overrides global) — load them MERGED via the
+        // /skills/abilities API rather than the plain ~/.pathly dir scan the others use.
+        const result =
+          section.label === 'UserAbilities'
+            ? await loadAbilitiesSection(projectPath)
+            : await loadSubdirAwareSection(`${pathlyUserHome}/${section.dir}`, section.type)
         setSections((prev) => ({
           ...prev,
           [section.label]: { ...prev[section.label], items: result.items, subdirs: result.subdirs ?? undefined },
