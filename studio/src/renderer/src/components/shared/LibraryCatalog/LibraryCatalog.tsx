@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Sparkles, Search, Plus, ChevronsUp } from 'lucide-react'
+import { Library, Search, Plus, ChevronsUp } from 'lucide-react'
 import { useCatalogData } from './useCatalogData'
 import type { CatalogItemData, CatalogGroup } from './useCatalogData'
 import { Tooltip } from '../../ui'
@@ -92,7 +92,7 @@ export default function LibraryCatalog({
     <div className={styles.catalog}>
       <div className={styles.header}>
         <div className={styles.headerRow}>
-          <Sparkles size={15} className={styles.headerIcon} />
+          <Library size={15} className={styles.headerIcon} />
           <span>Catalog</span>
         </div>
         <Tooltip label="Collapse all" placement="bottom">

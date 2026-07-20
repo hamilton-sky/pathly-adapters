@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { GitBranch, Folder, Globe, Plus, LayoutGrid, ChevronDown, Check, X, Sparkles } from 'lucide-react'
+import { GitBranch, Folder, Globe, Plus, LayoutGrid, ChevronDown, Check, X, FolderPlus } from 'lucide-react'
 import type { BoardScope, Preset, SectionDef } from '../types'
 import { SCOPES } from '../constants'
 import { Tooltip, CreatePopover, slugify } from '../../ui'
@@ -185,7 +185,7 @@ export function CommandCenterHeader(p: CommandCenterHeaderProps): JSX.Element {
             {...(showNewFeature ? { 'aria-expanded': 'true' } : { 'aria-expanded': 'false' })}
             onClick={() => setShowNewFeature(true)}
           >
-            <Sparkles size={13} />
+            <FolderPlus size={13} />
           </button>
         </Tooltip>
         {showNewFeature && (

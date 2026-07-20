@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react'
 import {
   Pencil, Check, ChevronUp, ChevronDown, MoreHorizontal,
-  Copy, Diamond, Trash2, RotateCcw, Sparkles, Code, Bold, Italic, Columns, Scissors,
+  Copy, Diamond, Trash2, RotateCcw, SquareDashedMousePointer, Code, Bold, Italic, Columns, Scissors,
 } from 'lucide-react'
 import { Tooltip } from '../../ui'
 import MarkdownRenderer from '../../shared/MarkdownRenderer/MarkdownRenderer'
@@ -285,7 +285,7 @@ export default function BodyCell({
               onMouseDown={e => e.preventDefault()}
             >
               <button type="button" className={styles.selBtn} onClick={handleNewCellFromSelection}>
-                <Sparkles size={12} /><span>New cell from selection</span>
+                <SquareDashedMousePointer size={12} /><span>New cell from selection</span>
               </button>
             </div>
           )}

@@ -1,5 +1,5 @@
 import React from 'react'
-import { Sparkles, ChevronsUp, Plus, Copy, Undo2, PanelRightOpen } from 'lucide-react'
+import { SquareDashedMousePointer, ChevronsUp, Plus, Copy, Undo2, PanelRightOpen } from 'lucide-react'
 import { Tooltip } from '../ui'
 import { useUiStore } from '../../store/uiStore'
 import styles from './MarkdownEditor.module.css'
@@ -81,7 +81,7 @@ export default function MarkdownEditorPanel() {
             <span className={styles.legendItem}><ChevronsUp size={12} /><b>⌘↑/↓</b> to move cells</span>
             <span className={styles.legendItem}><Plus size={12} /><b>Insert</b> a new cell, or drag from the catalog</span>
             <span className={styles.legendItem}><Copy size={12} /><b>⋯ menu</b> — duplicate · convert · delete</span>
-            <span className={styles.legendItem}><Sparkles size={12} /><b>Select text</b> → new cell from selection</span>
+            <span className={styles.legendItem}><SquareDashedMousePointer size={12} /><b>Select text</b> → new cell from selection</span>
             <span className={styles.legendItem}><Undo2 size={12} /><b>Undo / redo</b> — 50 steps</span>
           </div>
         </>

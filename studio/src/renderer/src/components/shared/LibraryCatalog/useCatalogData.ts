@@ -23,7 +23,7 @@ export interface CatalogItemData {
 export interface CatalogGroup {
   label: string
   type: 'agent' | 'fragment' | 'skill' | 'template' | 'flow' | 'ability' | 'system'
-  icon: 'brain' | 'diamond' | 'book-open' | 'layout-grid' | 'git-branch' | 'sparkles' | 'scroll'
+  icon: 'brain' | 'diamond' | 'book-open' | 'layout-grid' | 'git-branch' | 'layers' | 'scroll'
   items: CatalogItemData[]
 }
 
@@ -98,7 +98,7 @@ export function useCatalogData(_pathlyRoot?: string | null, refreshKey?: number)
       // The two USER-owned tables always render (even empty) so their "+ New" create surface is
       // reachable — otherwise you could never create the FIRST ability / system-prompt. (The
       // packaged groups above stay length-gated: they're never empty in a real install.)
-      next.push({ label: 'Abilities', type: 'ability',  icon: 'sparkles',    items: (abilities ?? []).map(a => ({ name: a.name, path: a.path, description: a.label, category: a.category, itemType: 'ability' as const, scope: a.scope })) })
+      next.push({ label: 'Abilities', type: 'ability',  icon: 'layers',    items: (abilities ?? []).map(a => ({ name: a.name, path: a.path, description: a.label, category: a.category, itemType: 'ability' as const, scope: a.scope })) })
       // System = the app-shipped builtins (analyze/split/comment/diagram, read-only) + the user's
       // own prompt FILES — the same union the editor/Sections selections show, now in one place.
       // A user prompt carries a `path`, so it opens/edits in the MD editor like an ability.

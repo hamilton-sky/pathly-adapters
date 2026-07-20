@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import {
-  Sparkles, Plus, Search, Brain, Diamond, BookOpen, LayoutGrid, GripVertical,
+  Library, Plus, Search, Brain, Diamond, BookOpen, LayoutGrid, GripVertical,
 } from 'lucide-react'
 import styles from './EditorCatalog.module.css'
 
@@ -37,7 +37,7 @@ export default function EditorCatalog() {
   return (
     <div className={styles.catalog}>
       <div className={styles.header}>
-        <Sparkles size={15} className={styles.headerIcon} />
+        <Library size={15} className={styles.headerIcon} />
         <span className={styles.headerLabel}>Catalog</span>
         <div className={styles.spacer} />
         <button type="button" className={styles.addCatBtn} aria-label="Add category">
