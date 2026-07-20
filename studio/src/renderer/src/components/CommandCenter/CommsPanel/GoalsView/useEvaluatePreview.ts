@@ -18,10 +18,8 @@ export function useEvaluatePreview(
   enabled: boolean,
   lensText: string,
   extraPrompt: string,
-  abilityIds: string[] = [],
 ): { prompt: string; segments: ComposedSegment[] } {
   const projectPath = useStore((st) => st.projectPath)
-  const abilityKey = abilityIds.join(',')
   const [composed, setComposed] = useState<{
     prompt: string
     segments: ComposedSegment[]
@@ -33,15 +31,13 @@ export function useEvaluatePreview(
       return
     }
     let cancelled = false
-    void composeSkillPrompt(EVAL_SKILL_REL, { projectRoot: projectPath, abilityIds }).then((r) => {
+    void composeSkillPrompt(EVAL_SKILL_REL, { projectRoot: projectPath }).then((r) => {
       if (!cancelled) setComposed(r)
     })
     return () => {
       cancelled = true
     }
-    // abilityKey stands in for the abilityIds array (stable identity across renders).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, projectPath, abilityKey])
+  }, [enabled, projectPath])
 
   const prompt = useMemo(() => {
     const parts: string[] = [

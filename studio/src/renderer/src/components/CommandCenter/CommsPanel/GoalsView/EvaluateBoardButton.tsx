@@ -5,7 +5,6 @@ import { ConfirmModal } from '../../../shared/ConfirmModal/ConfirmModal'
 import { ProgressSelect } from '../../../shared/ProgressSelect/ProgressSelect'
 import { cliLabel } from '../.././../MarkdownEditor/EditorHeader/editorCli'
 import { headingLayers } from '../../../../services/skillCompose'
-import { useStore } from '../../../../store'
 import type { BoardScope } from '../../types'
 import { EvalConfigPopover } from './EvalConfigPopover'
 import { useDecomposePreview } from './useDecomposePreview'
@@ -32,18 +31,16 @@ interface Props {
 // useEvaluateBoardButton; this component is the JSX shell.
 export function EvaluateBoardButton({ boardKey, goals = [], boardScope }: Props): JSX.Element {
   const e = useEvaluateBoardButton(boardKey, boardScope)
-  const projectPath = useStore((st) => st.projectPath)
 
   // Decompose-planner preview (goal target): the REAL composed planner prompt (skill + fragments
-  // + selected abilities + the decompose task directive), so a Sections trim is meaningful and
-  // sent verbatim as prompt_override. Composes only while the gate is open on a goal target.
+  // + the decompose task directive), so a Sections trim is meaningful and sent verbatim as
+  // prompt_override. Abilities + system-prompts are added in that Sections modal now.
   const goalText = goals.find((g) => g.id === e.targetGoalId)?.text ?? ''
   const decompose = useDecomposePreview(
     e.confirmOpen && e.isGoalTarget,
     e.rigorMode,
     goalText,
     e.targetGoalId,
-    e.decomposeAbilities.map((a) => a.id),
   )
 
   return (
@@ -79,11 +76,6 @@ export function EvaluateBoardButton({ boardKey, goals = [], boardScope }: Props)
           targetGoalId={e.targetGoalId}
           isProjectBoard={e.isProjectBoard}
           rigorMode={e.rigorMode}
-          projectRoot={projectPath}
-          decomposeAbilityIds={e.decomposeAbilities.map((a) => a.id)}
-          onDecomposeAbilitiesChange={e.setDecomposeAbilities}
-          evalAbilityIds={e.evalAbilities.map((a) => a.id)}
-          onEvalAbilitiesChange={e.setEvalAbilities}
           onSelectLens={e.pickLens}
           onLensTextChange={e.setLensText}
           onExtraPromptChange={e.setExtraPrompt}

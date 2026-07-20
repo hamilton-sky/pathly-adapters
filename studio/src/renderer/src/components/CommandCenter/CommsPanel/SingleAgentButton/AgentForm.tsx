@@ -12,8 +12,6 @@ import { useMergedPresets } from '../../../shared/PromptActionConfig/useMergedPr
 import { PresetAddRow } from '../../../shared/PromptActionConfig/PresetAddRow'
 import { ENGINES, PROGRESS_LEVELS, SYSTEM_PROMPTS } from './agentFormData'
 import SendPreviewModal from '../../../shared/SendPreviewModal/SendPreviewModal'
-import { AbilityToggles } from '../../../shared/AbilityToggles/AbilityToggles'
-import type { Ability } from '../../../../services/abilities'
 import { composeSkillPrompt, headingLayers, type ComposedSegment } from '../../../../services/skillCompose'
 import s from './SingleAgentButton.module.css'
 
@@ -56,7 +54,6 @@ export function AgentForm({ running, onRun, onClose }: Props): JSX.Element {
   const [progress, setProgress] = useState<string>('normal')
   const [message, setMessage] = useState<string>('')
   const [previewOpen, setPreviewOpen] = useState(false)
-  const [abilities, setAbilities] = useState<Ability[]>([])
   const [composedBody, setComposedBody] = useState<string | null>(null)
   const [composedSegments, setComposedSegments] = useState<ComposedSegment[]>([])
 
@@ -128,8 +125,9 @@ export function AgentForm({ running, onRun, onClose }: Props): JSX.Element {
   // task), or a system prompt (a directive). Any one of the three enables Send.
   const canSend = !running && (message.trim().length > 0 || skill !== '' || sysName !== '')
 
-  // When the gate opens with a skill, compose the REAL skill body (+ abilities) so the Sections
-  // editor operates on the actual prompt and a trim can be sent verbatim as the override.
+  // When the gate opens with a skill, compose the REAL skill body so the Sections editor operates
+  // on the actual prompt and a trim can be sent verbatim as the override. Abilities + system-
+  // prompts are added in that Sections modal now, not composed in here.
   useEffect(() => {
     if (!previewOpen || !skill) {
       setComposedBody(null)
@@ -139,7 +137,6 @@ export function AgentForm({ running, onRun, onClose }: Props): JSX.Element {
     let cancelled = false
     void composeSkillPrompt(skill, {
       adapter: engine,
-      abilityIds: abilities.map((a) => a.id),
       projectRoot: projectPath,
     }).then((r) => {
       if (cancelled) return
@@ -149,7 +146,7 @@ export function AgentForm({ running, onRun, onClose }: Props): JSX.Element {
     return () => {
       cancelled = true
     }
-  }, [previewOpen, skill, engine, abilities, projectPath])
+  }, [previewOpen, skill, engine, projectPath])
 
   // F2 gate preview — the FULL prompt the server will assemble, in the same order
   // (start_board_run): composed skill body (skill + abilities + Pathly fragments), then the
@@ -171,11 +168,10 @@ export function AgentForm({ running, onRun, onClose }: Props): JSX.Element {
     if (message.trim()) parts.push(`# Task\n\n${message.trim()}`)
     if (sysText.trim()) parts.push(`# System prompt\n\n${sysText.trim()}`)
     if (skill) parts.push(`# Skill: \`${skill}\`\n\n_The skill body + Pathly fragments compose at spawn._`)
-    for (const ab of abilities) parts.push(`# Ability: ${ab.label}\n\n${ab.body}`)
     if (agent) parts.push(`# Agent: \`${agent}\`\n\n_The agent persona is applied at spawn._`)
     parts.push('---\n_Board context is retrieved and prepended when the agent runs, so it is not shown verbatim above._')
     return parts.join('\n\n')
-  }, [message, sysText, skill, agent, abilities, composedBody])
+  }, [message, sysText, skill, agent, composedBody])
 
   function send(): void {
     if (!canSend) return
@@ -197,7 +193,6 @@ export function AgentForm({ running, onRun, onClose }: Props): JSX.Element {
       // Progress cadence only applies headless — interactive shows the terminal.
       progress: interactive ? undefined : progress,
       message: message.trim(),
-      abilityIds: abilities.length ? abilities.map((a) => a.id) : undefined,
       promptOverride: override,
     })
     setMessage('')
@@ -242,13 +237,6 @@ export function AgentForm({ running, onRun, onClose }: Props): JSX.Element {
             onOpenMdEditor={() => openMdEditor(skillMdEditorPath)}
           />
         )}
-
-        <label className={s.label}>Abilities <span className={s.optional}>· optional approach / domain packs</span></label>
-        <AbilityToggles
-          projectRoot={projectPath}
-          selectedIds={abilities.map((a) => a.id)}
-          onChange={setAbilities}
-        />
 
         <label className={s.label} htmlFor="sa-sys">System prompt</label>
         <BoardSelect id="sa-sys" ariaLabel="System prompt" value={sysName} options={sysOptions} onChange={pickSys} placeholder={NONE} />
@@ -327,7 +315,6 @@ export function AgentForm({ running, onRun, onClose }: Props): JSX.Element {
           meta={[
             ...(message.trim() ? [{ label: 'Message', value: message.trim().slice(0, 50) }] : []),
             ...(sysName ? [{ label: 'System', value: sysName }] : []),
-            ...(abilities.length ? [{ label: 'Abilities', value: String(abilities.length) }] : []),
           ]}
           submitLabel="Send to agent"
           onSubmit={(finalPrompt, sectionsUsed) => confirmSend(finalPrompt, sectionsUsed)}

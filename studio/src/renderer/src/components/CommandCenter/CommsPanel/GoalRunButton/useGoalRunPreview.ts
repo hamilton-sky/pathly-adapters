@@ -16,11 +16,9 @@ export function useGoalRunPreview(
   executor: string,
   goalText: string,
   taskLine: string,
-  abilityIds: string[] = [],
 ): { prompt: string; segments: ComposedSegment[] } {
   const projectPath = useStore((st) => st.projectPath)
   const skillRel = executorInfo(executor).skillRel
-  const abilityKey = abilityIds.join(',')
   const [composed, setComposed] = useState<{
     prompt: string
     segments: ComposedSegment[]
@@ -32,15 +30,13 @@ export function useGoalRunPreview(
       return
     }
     let cancelled = false
-    void composeSkillPrompt(skillRel, { projectRoot: projectPath, abilityIds }).then((r) => {
+    void composeSkillPrompt(skillRel, { projectRoot: projectPath }).then((r) => {
       if (!cancelled) setComposed(r)
     })
     return () => {
       cancelled = true
     }
-    // abilityKey stands in for the abilityIds array (stable identity across renders).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, skillRel, projectPath, abilityKey])
+  }, [enabled, skillRel, projectPath])
 
   const prompt = useMemo(() => {
     const parts: string[] = [

@@ -8,7 +8,6 @@ import { type EditorCli, loadEditorCli, saveEditorCli } from '../../../../Markdo
 import { useEvaluatePreview } from '../useEvaluatePreview'
 import { EVAL_LENSES } from '../../SingleAgentButton/agentFormData'
 import { DECOMPOSE_TARGET, type FeatureRigor } from '../FeatureDecomposeConfig/FeatureDecomposeConfig'
-import type { Ability } from '../../../../../services/abilities'
 
 // Persistent localStorage key for the evaluate button's engine choice.
 const CLI_KEY_EVAL = 'pathly.comms.cli.eval'
@@ -51,10 +50,6 @@ export function useEvaluateBoardButton(boardKey: string, boardScope?: BoardScope
   const [featureRigor, setFeatureRigor] = useState<FeatureRigor>('light')
   // Per-run board-updates verbosity override; '' = inherit the Settings default.
   const [verbosity, setVerbosity] = useState('')
-  // Layer-3 abilities selected for a per-goal decompose — composed into the planner prompt.
-  const [decomposeAbilities, setDecomposeAbilities] = useState<Ability[]>([])
-  // Layer-3 abilities selected for a whole-board evaluate — composed into the evaluator prompt.
-  const [evalAbilities, setEvalAbilities] = useState<Ability[]>([])
   const gearRef = useRef<HTMLButtonElement>(null)
 
   // Three targets, two run-state homes: a real goal tracks its own decompose state;
@@ -81,7 +76,6 @@ export function useEvaluateBoardButton(boardKey: string, boardScope?: BoardScope
     confirmOpen && !targetGoalId,
     lensText,
     extraPrompt,
-    evalAbilities.map((a) => a.id),
   )
   const previewPrompt = evalPreview.prompt
   const previewSegments = evalPreview.segments
@@ -104,11 +98,10 @@ export function useEvaluateBoardButton(boardKey: string, boardScope?: BoardScope
     if (isGoalTarget) {
       // finalPrompt is already gated on sectionsUsed by confirmWholeBoard — so a plain
       // "Run decompose" sends no override (server composes) while a Sections trim sends the
-      // full planner prompt verbatim. Selected abilities compose in either way.
+      // full planner prompt verbatim (abilities + system-prompts already folded in via Sections).
       decomposeGoal(targetGoalId, rigorMode, {
         adapter,
         progress: verbosity || undefined,
-        abilityIds: decomposeAbilities.length ? decomposeAbilities.map((a) => a.id) : undefined,
         promptOverride: finalPrompt,
       })
     } else if (finalPrompt) {
@@ -116,7 +109,6 @@ export function useEvaluateBoardButton(boardKey: string, boardScope?: BoardScope
         adapter,
         promptOverride: finalPrompt,
         progress: verbosity || undefined,
-        abilityIds: evalAbilities.length ? evalAbilities.map((a) => a.id) : undefined,
       })
     } else {
       runEvaluator(boardKey, {
@@ -124,7 +116,6 @@ export function useEvaluateBoardButton(boardKey: string, boardScope?: BoardScope
         systemPrompt: lensText || undefined,
         instructions: extraPrompt || undefined,
         progress: verbosity || undefined,
-        abilityIds: evalAbilities.length ? evalAbilities.map((a) => a.id) : undefined,
       })
     }
   }
@@ -195,10 +186,6 @@ export function useEvaluateBoardButton(boardKey: string, boardScope?: BoardScope
     configOpen, setConfigOpen, confirmOpen, confirmGoalOpen, confirmFeatureOpen, gearRef,
     // preview
     previewPrompt, previewSegments,
-    // per-goal decompose abilities
-    decomposeAbilities, setDecomposeAbilities,
-    // whole-board evaluate abilities
-    evalAbilities, setEvalAbilities,
     // handlers
     handleCliChange, pickLens, setLensText, setExtraPrompt, setTargetGoalId, setRigorMode, setVerbosity,
     handleReset, handleStop, onPillRun, onConfigRun, dispatch,

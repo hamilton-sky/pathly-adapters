@@ -39,12 +39,16 @@ def comms_goals_run():
         project_root = data.get("project_root", "") or ""
         # "" (unset) lets start_board_run resolve the app-wide default from Settings.
         progress = data.get("progress", "") or ""
-        # Layer-3 abilities compose into the executor's skill (currently the 'single' drain-dag
-        # agent; loop/team are multi-spawn and ignore them). Fail-soft list of strings.
+        # A Sections-assembled prompt (abilities + system-prompts folded in) rides as
+        # prompt_override for the 'single' executor's one drain-dag prompt; loop/team are
+        # multi-spawn and ignore it. (ability_ids kept for back-compat; the client sends override.)
         ability_ids = data.get("ability_ids")
         if not isinstance(ability_ids, list):
             ability_ids = []
         ability_ids = [a for a in ability_ids if isinstance(a, str)]
+        prompt_override = data.get("prompt_override", "") or ""
+        if not isinstance(prompt_override, str):
+            prompt_override = ""
 
         conn = _get_db()
         goal = conn.execute(
@@ -118,6 +122,7 @@ def comms_goals_run():
             model=model,
             progress=progress,
             ability_ids=ability_ids or None,
+            prompt_override=prompt_override,
             broadcast_fn=_broadcast_runner,
             event_broadcast_fn=_broadcast_comms,
             on_start=_on_start,

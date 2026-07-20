@@ -6,14 +6,6 @@
   min-width: 0;
 }
 
-/* Run-gate footer: abilities picker (single executor) stacked above the board-updates select. */
-.gateControls {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-width: 0;
-}
-
 .controls {
   display: flex;
   align-items: center;

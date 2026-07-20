@@ -18,13 +18,6 @@
   background: var(--text-muted);
 }
 
-/* Run-gate footer: abilities picker stacked above the engine select. */
-.gateControls {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-width: 0;
-}
 
 .dot[data-status='pending']     { background: var(--text-muted); }
 .dot[data-status='in_progress'] { background: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }

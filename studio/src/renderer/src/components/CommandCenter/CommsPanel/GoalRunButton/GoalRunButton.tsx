@@ -4,10 +4,7 @@ import { useElapsedProgress } from '../../../shared/RunPill/progress'
 import { RunPill } from '../../../shared/RunPill/RunPill'
 import SendPreviewModal from '../../../shared/SendPreviewModal/SendPreviewModal'
 import { ProgressSelect } from '../../../shared/ProgressSelect/ProgressSelect'
-import { AbilityToggles } from '../../../shared/AbilityToggles/AbilityToggles'
-import type { Ability } from '../../../../services/abilities'
 import { headingLayers } from '../../../../services/skillCompose'
-import { useStore } from '../../../../store'
 import { GoalSelect } from './GoalSelect/GoalSelect'
 import { useGoalRunPreview } from './useGoalRunPreview'
 import { executorInfo } from './executorInfo'
@@ -55,10 +52,6 @@ export function GoalRunButton({ goalId, defaultExecutor = 'single', goalText = '
   const [confirmOpen, setConfirmOpen] = useState(false)
   // Per-run board-updates verbosity override; '' = inherit the Settings default.
   const [verbosity, setVerbosity] = useState('')
-  const projectPath = useStore((st) => st.projectPath)
-  // Layer-3 abilities compose into the 'single' executor's drain-dag skill (loop/team are
-  // multi-spawn and don't take them yet), so the picker + compose only apply for single.
-  const [abilities, setAbilities] = useState<Ability[]>([])
 
   const goalRunState = useCommsStore((st) => st.goalRunState)
   const goalRunStart = useCommsStore((st) => st.goalRunStart)
@@ -81,8 +74,7 @@ export function GoalRunButton({ goalId, defaultExecutor = 'single', goalText = '
   const taskLine = `${total} task${total !== 1 ? 's' : ''} · ${ready} ready`
   const executorLabel = EXECUTOR_OPTIONS.find((o) => o.value === executor)?.label ?? executor
   const info = executorInfo(executor)
-  const abilityIds = executor === 'single' ? abilities.map((a) => a.id) : []
-  const preview = useGoalRunPreview(confirmOpen, executor, goalText, taskLine, abilityIds)
+  const preview = useGoalRunPreview(confirmOpen, executor, goalText, taskLine)
 
   function handleAdapterChange(v: string): void {
     setAdapter(v as EditorCli)
@@ -94,12 +86,15 @@ export function GoalRunButton({ goalId, defaultExecutor = 'single', goalText = '
     setConfirmOpen(true)
   }
 
-  function doRun(): void {
+  // Abilities + system-prompts are added in the Sections modal now. A Sections trim on the
+  // 'single' executor (one drain-dag prompt) rides as prompt_override; loop/team are multi-spawn
+  // (no single prompt), so their Sections output doesn't apply.
+  function doRun(finalPrompt?: string, sectionsUsed?: boolean): void {
     setConfirmOpen(false)
     runGoal(goalId, executor, {
       adapter: adapterApplies && adapter !== 'claude' ? adapter : undefined,
       progress: verbosity || undefined,
-      abilityIds: abilityIds.length ? abilityIds : undefined,
+      promptOverride: executor === 'single' && sectionsUsed ? finalPrompt : undefined,
     })
   }
 
@@ -158,21 +153,16 @@ export function GoalRunButton({ goalId, defaultExecutor = 'single', goalText = '
           ]}
           submitLabel="Run"
           footerSlot={
-            <div className={s.gateControls}>
-              {executor === 'single' && (
-                <AbilityToggles projectRoot={projectPath} selectedIds={abilityIds} onChange={setAbilities} />
-              )}
-              <ProgressSelect
-                value={verbosity}
-                onChange={setVerbosity}
-                allowInherit
-                disabled={isActive}
-                label="Board updates"
-                id="goalrun-progress"
-              />
-            </div>
+            <ProgressSelect
+              value={verbosity}
+              onChange={setVerbosity}
+              allowInherit
+              disabled={isActive}
+              label="Board updates"
+              id="goalrun-progress"
+            />
           }
-          onSubmit={doRun}
+          onSubmit={(finalPrompt, sectionsUsed) => doRun(finalPrompt, sectionsUsed)}
           onCancel={() => setConfirmOpen(false)}
         />
       )}

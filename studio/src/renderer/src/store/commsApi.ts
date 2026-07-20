@@ -818,8 +818,8 @@ export interface RunGoalOpts {
   projectRoot?: string
   /** Per-run board-updates verbosity override; '' / undefined = inherit the Settings default. */
   progress?: string
-  /** Layer-3 abilities to compose into the run (currently the 'single' executor's drain-dag). */
-  abilityIds?: string[]
+  /** A Sections-assembled prompt sent verbatim (the 'single' executor's drain-dag run). */
+  promptOverride?: string
 }
 
 export type DecomposeMode = 'planner' | 'plan' | 'consultation'
@@ -869,7 +869,7 @@ export async function apiRunGoal(
     if (opts.flow) body.flow = opts.flow
     if (opts.projectRoot) body.project_root = opts.projectRoot
     if (opts.progress) body.progress = opts.progress
-    if (opts.abilityIds?.length) body.ability_ids = opts.abilityIds
+    if (opts.promptOverride) body.prompt_override = opts.promptOverride
     const r = await apiFetch('/comms/goals/run', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
