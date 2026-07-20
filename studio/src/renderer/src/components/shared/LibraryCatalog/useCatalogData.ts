@@ -16,6 +16,8 @@ export interface CatalogItemData {
   scope?: 'project' | 'global'
   /** App-shipped builtin (read-only): shown for reference, but not delete/rename/move-able. */
   readOnly?: boolean
+  /** Inline prompt text — carried by read-only builtins so they can be viewed (no file to open). */
+  body?: string
 }
 
 export interface CatalogGroup {

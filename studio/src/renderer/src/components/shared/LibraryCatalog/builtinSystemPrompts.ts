@@ -21,6 +21,7 @@ function toItems(presets: PromptPreset[], category: string): CatalogItemData[] {
     category,
     itemType: 'system' as const,
     readOnly: true,
+    body: p.prompt,
   }))
 }
 

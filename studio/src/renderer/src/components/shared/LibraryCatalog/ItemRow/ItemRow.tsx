@@ -5,6 +5,7 @@ import { PATHLY_DRAG_MIME } from '../../../../types'
 import type { PathlyCanvasDragItem, PathlySection } from '../../../../types'
 import type { CatalogItemData, CatalogGroup } from '../useCatalogData'
 import { GroupIcon, leafName, FIXED_CATEGORIES } from '../utils'
+import { PromptViewModal } from '../PromptViewModal/PromptViewModal'
 import styles from './ItemRow.module.css'
 
 const SECTION_MAP: Record<string, PathlySection> = {
@@ -40,6 +41,7 @@ export function ItemRow({
   const [pickerOpen, setPickerOpen] = useState(false)
   const [renaming, setRenaming]     = useState(false)
   const [renameVal, setRenameVal]   = useState('')
+  const [viewing, setViewing]       = useState(false)
 
   const menuRef   = useRef<HTMLDivElement>(null)
   const rowRef    = useRef<HTMLDivElement>(null)
@@ -115,6 +117,10 @@ export function ItemRow({
   } else {
     if (hasPath) menuItems.push({ label: 'Open', onClick: () => { setMenuOpen(false); onOpenSkill?.(item.path!) } })
   }
+  // A read-only builtin has no file to open — but you can still read what it sends.
+  if (item.readOnly && item.body) {
+    menuItems.push({ label: 'View prompt', onClick: () => { setMenuOpen(false); setViewing(true) } })
+  }
   // App-shipped builtins are reference-only — no rename/move/delete (there's no row to mutate).
   const mutable = !isFragment && !item.readOnly
   // Fixed-category tables (system-prompts, abilities) have a canonical, closed category set and
@@ -131,6 +137,7 @@ export function ItemRow({
   if (mutable && onDeleteItem)   menuItems.push({ label: 'Delete', danger: true, onClick: () => { setMenuOpen(false); onDeleteItem(item, type) } })
 
   return (
+    <>
     <div
       ref={rowRef}
       className={`${styles.item} ${context === 'markdown-editor' ? styles.itemClickable : styles.itemGrabbable}`}
@@ -224,5 +231,9 @@ export function ItemRow({
         </div>
       )}
     </div>
+    {viewing && item.body && (
+      <PromptViewModal title={label} body={item.body} onClose={() => setViewing(false)} />
+    )}
+    </>
   )
 }
