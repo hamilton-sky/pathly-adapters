@@ -3,7 +3,11 @@ import { persist } from 'zustand/middleware'
 import type { CommandCenterState, SectionDef } from '../components/CommandCenter/types'
 import { MAX_SECTIONS } from '../components/CommandCenter/types'
 
-const mkFeature = (fid: string): SectionDef => ({ id: fid, scope: 'feature', featureId: fid })
+// Feature section ids are namespaced `feature:<fid>` so they can NEVER collide with the
+// reserved 'global'/'project' section ids. Without the prefix a feature literally named
+// "global" (or "project") minted a section with id==='global', colliding with GLOBAL_SEC —
+// two sections sharing one React key → duplicate-key warning and a flickering board.
+const mkFeature = (fid: string): SectionDef => ({ id: `feature:${fid}`, scope: 'feature', featureId: fid })
 const GLOBAL_SEC: SectionDef = { id: 'global', scope: 'global' }
 const PROJECT_SEC: SectionDef = { id: 'project', scope: 'project' }
 
@@ -228,9 +232,22 @@ export const useCommandCenterStore = create<CommandCenterStore>()(
     }),
     {
       name: 'pathly-command-center-layout',
-      version: 3,
+      version: 4,
       migrate: (_persistedState, version) => {
         if (version < 3) return { ...INITIAL }
+        if (version < 4) {
+          // v4: namespace persisted feature section ids as `feature:<fid>` (see mkFeature).
+          // A layout saved before this fix can hold a feature section with a bare id that
+          // collides with the reserved 'global'/'project' section — remap it so the
+          // duplicate-key flicker clears on reload. Sizes are keyed by the old ids, so drop them.
+          const st = _persistedState as CommandCenterState
+          const sections = Array.isArray(st.sections)
+            ? st.sections.map((sec) =>
+                sec.scope === 'feature' ? { ...sec, id: `feature:${sec.featureId}` } : sec,
+              )
+            : INITIAL.sections
+          return { ...st, sections, sizes: {} }
+        }
         return _persistedState as CommandCenterState
       },
     },

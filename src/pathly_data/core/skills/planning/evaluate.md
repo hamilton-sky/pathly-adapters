@@ -83,11 +83,16 @@ Post a `type=goal` message first, then one or more `type=task` messages stamped 
 `goal_id`. Tasks must be actionable and specific. The user runs them with the standard board
 controls — no intermediate "options" layer.
 
+> These posts target the board this run is evaluating: the runner fills in the board tier
+> (feature, project, or global) and its scope for you. Do not force a feature-tier post — on a
+> project or global board that spawns a stray feature board named after the scope instead of
+> posting to the board you opened.
+
 **Idempotency guard — skip THIS STEP ONLY (never Step 3) if a DAG already exists for this scope.** Before posting, check:
 
 ```bash
-curl -s "http://127.0.0.1:8765/comms?feature=$FEATURE&scope=$FEATURE&type=goal"
-curl -s "http://127.0.0.1:8765/comms/tasks?feature=$FEATURE"
+curl -s "http://127.0.0.1:8765/comms?feature=<feature>&board=<board>&scope=<feature>&type=goal"
+curl -s "http://127.0.0.1:8765/comms/tasks?feature=<feature>"
 ```
 
 If either response contains any messages, skip this entire step — the board has already been
@@ -99,12 +104,12 @@ seeded. Do not double-post.
 curl -s -X POST http://127.0.0.1:8765/comms/post \
   -H "Content-Type: application/json" \
   -d '{
-    "feature": "$FEATURE",
+    "feature": "<feature>",
     "from": "evaluator",
     "type": "goal",
     "text": "Goal: <one-line synthesis of what the board calls for>",
-    "board": "feature",
-    "scope": "$FEATURE",
+    "board": "<board>",
+    "scope": "<feature>",
     "executor": "single"
   }'
 ```
@@ -124,12 +129,12 @@ Each task must include `"goal_id": "$GOAL_ID"`. Example shape:
 curl -s -X POST http://127.0.0.1:8765/comms/post \
   -H "Content-Type: application/json" \
   -d '{
-    "feature": "$FEATURE",
+    "feature": "<feature>",
     "from": "evaluator",
     "type": "task",
     "text": "<actionable task description>",
-    "board": "feature",
-    "scope": "$FEATURE",
+    "board": "<board>",
+    "scope": "<feature>",
     "stage": "BUILDING",
     "goal_id": "$GOAL_ID",
     "depends_on": []

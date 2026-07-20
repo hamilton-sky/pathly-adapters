@@ -67,6 +67,10 @@ def set_board_scope(
     set_setting(conn, key, json.dumps(scope_dict))
 
 
+# Keep in sync with _PROJECT_WRITERS / _GLOBAL_WRITERS in
+# http_server/blueprints/comms/_helpers.py (the fallback path when no perm_table is passed).
+# 'evaluator' is a project+global writer because it only runs human-initiated on the board the
+# human opened — see the note there.
 _DEFAULT_WRITE_PERMISSIONS: dict[str, list[str]] = {
     "feature": ["*"],
     "project": sorted(
@@ -79,11 +83,12 @@ _DEFAULT_WRITE_PERMISSIONS: dict[str, list[str]] = {
             "planner",
             "designer",
             "research",
+            "evaluator",
             "director",
             "human",
         ]
     ),
-    "global": sorted(["director", "human"]),
+    "global": sorted(["director", "evaluator", "human"]),
 }
 
 

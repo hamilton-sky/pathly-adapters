@@ -160,6 +160,25 @@ def test_comms_write_perm_tester_project_allowed(client):
     ), f"tester→project should be 200, got {r.status_code}: {r.data}"
 
 
+def test_comms_write_perm_evaluator_project_allowed(client):
+    """evaluator can post to 'project' board — returns 200 (scope-leak fix: an evaluate run on
+    the project board posts its goal/tasks there instead of escaping to a feature board)."""
+    r = _post_msg(client, "evaluator", "project", scope="myproject")
+    assert (
+        r.status_code == 200
+    ), f"evaluator→project should be 200, got {r.status_code}: {r.data}"
+
+
+def test_comms_write_perm_evaluator_global_allowed(client):
+    """evaluator can post to 'global' board — returns 200. It only runs human-initiated (the
+    'Suggest tasks' / auto-eval of a board the human opened), so it may write to that board —
+    which is what stops a global evaluate from spawning a feature board named 'global'."""
+    r = _post_msg(client, "evaluator", "global", scope="global")
+    assert (
+        r.status_code == 200
+    ), f"evaluator→global should be 200, got {r.status_code}: {r.data}"
+
+
 def test_comms_write_perm_reviewer_project_allowed(client):
     """reviewer can post to 'project' board — returns 200."""
     r = _post_msg(client, "reviewer", "project", scope="myproject")
@@ -353,6 +372,7 @@ def test_comms_write_perm_project_writers_constant():
         "planner",
         "designer",
         "research",
+        "evaluator",
         "director",
         "human",
     }
@@ -360,10 +380,10 @@ def test_comms_write_perm_project_writers_constant():
 
 
 def test_comms_write_perm_global_writers_constant():
-    """_GLOBAL_WRITERS frozenset contains only director and human."""
+    """_GLOBAL_WRITERS frozenset contains director, human, and the human-initiated evaluator."""
     from pathly_orchestrator.http_server.blueprints.comms import _GLOBAL_WRITERS
 
-    assert _GLOBAL_WRITERS == frozenset({"director", "human"})
+    assert _GLOBAL_WRITERS == frozenset({"director", "evaluator", "human"})
 
 
 # ---------------------------------------------------------------------------

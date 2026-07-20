@@ -8,7 +8,9 @@ import type { CommandCenterState, SectionDef } from '../components/CommandCenter
 // (feature boards are keyed by feature id alone, so a stale tab keeps showing the old
 // project's board). Project/Global sections are project-agnostic and preserved.
 
-const feat = (fid: string): SectionDef => ({ id: fid, scope: 'feature', featureId: fid })
+// Mirror mkFeature: feature section ids are namespaced `feature:<fid>` so they can never
+// collide with the reserved 'global'/'project' section ids (see the collision regression below).
+const feat = (fid: string): SectionDef => ({ id: `feature:${fid}`, scope: 'feature', featureId: fid })
 const GLOBAL: SectionDef = { id: 'global', scope: 'global' }
 const PROJECT: SectionDef = { id: 'project', scope: 'project' }
 
@@ -50,7 +52,7 @@ describe('commandCenterStore.syncToFeatures', () => {
 
     expect(layout().mainFeature).toBe('billing')
     expect(layout().featureTabs).toEqual(['billing']) // planner-hierarchy dropped, billing seeded
-    expect(sectionIds()).toEqual(['billing'])
+    expect(sectionIds()).toEqual(['feature:billing'])
     expect(layout().openFeature).toBe('billing') // stale openFeature re-seeded to the new main
   })
 
@@ -72,7 +74,7 @@ describe('commandCenterStore.syncToFeatures', () => {
     layout().syncToFeatures(['a', 'b', 'c']) // 'c' exists in the project but is not open
 
     expect(layout().featureTabs).toEqual(['a', 'b']) // 'c' not force-added
-    expect(sectionIds()).toEqual(['a', 'b'])
+    expect(sectionIds()).toEqual(['feature:a', 'feature:b'])
     expect(layout().mainFeature).toBe('a')
     // No-op guard: unchanged layout keeps the same array references (no re-render churn).
     expect(layout().featureTabs).toBe(before.featureTabs)
@@ -90,7 +92,7 @@ describe('commandCenterStore.syncToFeatures', () => {
     layout().syncToFeatures(['a']) // 'b' archived/removed
 
     expect(layout().featureTabs).toEqual(['a'])
-    expect(sectionIds()).toEqual(['a'])
+    expect(sectionIds()).toEqual(['feature:a'])
     expect(layout().mainFeature).toBe('a')
     expect(layout().openFeature).toBe('a')
   })
@@ -106,5 +108,23 @@ describe('commandCenterStore.syncToFeatures', () => {
     layout().syncToFeatures(['a', 'b']) // 'a' still valid
 
     expect(layout().openFeature).toBeNull()
+  })
+})
+
+describe('commandCenterStore section-id collision (feature named like a reserved scope)', () => {
+  const sectionIds = (): string[] => useCommandCenterStore.getState().sections.map((sec) => sec.id)
+
+  it('a feature named "global" does not collide with the reserved Global board section', () => {
+    // Regression: mkFeature used the bare feature id, so a feature literally named "global"
+    // (e.g. an evaluate run that leaked the board scope into an unsubstituted <feature>) minted
+    // a section with id==='global' — the same id as the reserved Global board section. Two
+    // sections sharing one React key → duplicate-key warning + a flickering board.
+    useCommandCenterStore.setState({ mainFeature: 'global' })
+    useCommandCenterStore.getState().applyPreset('board') // Global + Project + the "global" feature
+
+    const ids = sectionIds()
+    expect(new Set(ids).size).toBe(ids.length) // every section id unique — no duplicate React key
+    expect(ids).toContain('global') // the reserved Global board section
+    expect(ids).toContain('feature:global') // the feature named "global", namespaced apart
   })
 })

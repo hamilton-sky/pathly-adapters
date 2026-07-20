@@ -8,6 +8,11 @@ _EMBED_TYPES: frozenset[str] = frozenset(
     {"decision", "discovery", "constraint", "warning", "escalation", "artifact"}
 )
 
+# 'evaluator' is included on both non-feature tiers: it only ever runs human-initiated (the
+# "Suggest tasks" / auto-eval of a board the human opened), so letting it post to the board it
+# was launched on matches intent — and is what stops the scope leak where an evaluate run on a
+# project/global board escaped to a feature board named after the scope. Keep this in sync with
+# _DEFAULT_WRITE_PERMISSIONS in db/queries/app_settings.py (the live perm_table is built there).
 _PROJECT_WRITERS: frozenset[str] = frozenset(
     {
         "builder",
@@ -18,11 +23,12 @@ _PROJECT_WRITERS: frozenset[str] = frozenset(
         "planner",
         "designer",
         "research",
+        "evaluator",
         "director",
         "human",
     }
 )
-_GLOBAL_WRITERS: frozenset[str] = frozenset({"director", "human"})
+_GLOBAL_WRITERS: frozenset[str] = frozenset({"director", "evaluator", "human"})
 
 _PATH_RE = re.compile(r"(?:[\w.\-]+[/\\])+[\w.\-]+\.[A-Za-z0-9]{1,8}")
 
