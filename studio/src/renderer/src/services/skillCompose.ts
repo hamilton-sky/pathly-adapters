@@ -113,7 +113,7 @@ export async function composeSkillPrompt(
  *                `## Completion report` makes the run write no AGENT_DONE (it vanishes from
  *                RECENT and goes unbilled); unchecking comms-post silently stops board posts.
  */
-export type PromptLayer = 'skill' | 'ability' | 'fragment'
+export type PromptLayer = 'skill' | 'ability' | 'fragment' | 'system'
 
 /**
  * Map every heading in the composed prompt to the LAYER it came from, so the Sections editor

@@ -170,9 +170,10 @@ export default function SendPreviewModal({ title, engineLabel, fileName, prompt,
         <SkillSplitModal
           rawContent={text}
           title="Configure prompt sections"
-          subtitle="Include or exclude sections for this run — used once. Save reusable prompts in the library instead."
+          subtitle="Include/exclude sections and add abilities or system-prompts for this run. Create reusable ones in the Library."
           confirmLabel="Use these sections"
           hideInsertOne
+          assemble
           headingLayers={headingLayers}
           onConfirm={(cells) => { setText(cellsToMarkdown(cells)); setSectionsUsed(true); setSplitOpen(false) }}
           onInsertOne={() => setSplitOpen(false)}

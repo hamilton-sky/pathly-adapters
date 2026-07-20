@@ -179,6 +179,10 @@
   color: var(--accent);
 }
 
+.layerTab[data-active='true'][data-layer='system'] {
+  color: var(--blue);
+}
+
 .layerTabCount {
   font-size: 9px;
   font-weight: 600;
@@ -190,6 +194,10 @@
   border-color: color-mix(in srgb, var(--accent) 45%, var(--bg-surface1));
 }
 
+.cellCard[data-layer='system'] {
+  border-color: color-mix(in srgb, var(--blue) 45%, var(--bg-surface1));
+}
+
 .cellCard[data-layer='fragment'] {
   border-color: var(--bg-surface1);
   background: color-mix(in srgb, var(--bg-surface1) 40%, var(--bg-surface0));
@@ -198,6 +206,10 @@
 
 .typeBadge[data-layer='ability'] {
   color: var(--accent);
+}
+
+.typeBadge[data-layer='system'] {
+  color: var(--blue);
 }
 
 .typeBadge[data-layer='fragment'] {

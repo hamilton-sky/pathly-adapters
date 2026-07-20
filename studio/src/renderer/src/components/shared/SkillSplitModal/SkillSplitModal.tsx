@@ -1,8 +1,11 @@
 ﻿import React, { useState, useEffect, useMemo } from 'react'
-import { ChevronUp, ChevronDown } from 'lucide-react'
+import { ChevronUp, ChevronDown, ExternalLink } from 'lucide-react'
 import { Tooltip } from '../../ui'
 import MarkdownRenderer from '../MarkdownRenderer/MarkdownRenderer'
 import type { PromptLayer } from '../../../services/skillCompose'
+import { useStore } from '../../../store'
+import { useUiStore } from '../../../store/uiStore'
+import { useLibraryCells } from './useLibraryCells'
 import styles from './SkillSplitModal.module.css'
 
 export interface ProposedCell {
@@ -11,6 +14,10 @@ export interface ProposedCell {
   heading: string
   content: string
   checked: boolean
+  /** Set on library cells (abilities/system-prompts) added from the two tables — their layer
+   *  isn't in headingLayers. `path` (abilities only) backs the open-in-MD-editor button. */
+  layer?: PromptLayer
+  path?: string
 }
 
 /** Serialize the (checked, possibly-reordered) cells back into a markdown prompt — the
@@ -51,6 +58,10 @@ interface Props {
   headingLayers?: Record<string, PromptLayer>
   /** Headings to start UNCHECKED (excluded) — reflects a saved per-stage section selection. */
   initialUnchecked?: string[]
+  /** Assemble mode: also list the ability + system-prompt tables as ADDABLE cells (checked ⇒
+   *  folded into the sent prompt), with open-in-MD-editor. The Sections gate passes this; the
+   *  editor's plain split does not (→ byte-identical). Creation stays in the Library. */
+  assemble?: boolean
   onConfirm: (cells: ProposedCell[]) => void
   onInsertOne: (rawContent: string) => void
   onClose: () => void
@@ -95,7 +106,7 @@ function parseMdToCells(raw: string, depth: 1 | 2 | 3 = 2): ProposedCell[] {
   return cells
 }
 
-export default function SkillSplitModal({ filePath, fileName, rawContent: rawContentProp, title, subtitle, confirmLabel, hideInsertOne, headingLayers, initialUnchecked, onConfirm, onInsertOne, onClose }: Props) {
+export default function SkillSplitModal({ filePath, fileName, rawContent: rawContentProp, title, subtitle, confirmLabel, hideInsertOne, headingLayers, initialUnchecked, assemble, onConfirm, onInsertOne, onClose }: Props) {
   const [rawContent, setRawContent] = useState(rawContentProp ?? '')
   const [cells, setCells] = useState<ProposedCell[]>(() => rawContentProp ? seedUnchecked(parseMdToCells(rawContentProp, 2), initialUnchecked) : [])
   const [splitDepth, setSplitDepth] = useState<1 | 2 | 3>(2)
@@ -116,26 +127,42 @@ export default function SkillSplitModal({ filePath, fileName, rawContent: rawCon
     setCells(seedUnchecked(parseMdToCells(rawContent, splitDepth), initialUnchecked))
   }, [splitDepth, rawContent, initialUnchecked])
 
-  // Every cell belongs to a layer. Pathly's platform fragments (comms-post /
-  // completion-report / progress-logging …) are shown but LOCKED — they're the layer that
-  // makes the agent report back, so they always count as included whatever the checkbox says.
-  const layerOf = (c: ProposedCell): PromptLayer => headingLayers?.[c.heading] ?? 'skill'
+  // Layer-3 abilities + system-prompts a user can ADD to this run — the Sections modal is the
+  // ONE assemble surface (opt-in via `assemble`; the editor's plain split passes nothing →
+  // byte-identical). Checked ⇒ folded into the sent prompt. Creation stays in the Library.
+  const [libraryCells, toggleLibraryCell] = useLibraryCells(!!assemble)
+  const allCells = assemble ? [...cells, ...libraryCells] : cells
+  const setMdEditorPath = useUiStore((st) => st.setMdEditorPath)
+  const setActivePanel = useStore((st) => st.setActivePanel)
+
+  // Every cell belongs to a layer. Pathly's platform fragments (comms-post / completion-report /
+  // progress-logging …) are LOCKED — they make the agent report back, so they always count as
+  // included whatever the checkbox says. Library cells carry their own `layer`.
+  const layerOf = (c: ProposedCell): PromptLayer => c.layer ?? headingLayers?.[c.heading] ?? 'skill'
   const isLocked = (c: ProposedCell): boolean => layerOf(c) === 'fragment'
 
-  const checkedCount = cells.filter(c => c.checked || isLocked(c)).length
-  const checkedCells = cells.filter(c => c.checked || isLocked(c))
+  const checkedCount = allCells.filter(c => c.checked || isLocked(c)).length
+  const checkedCells = allCells.filter(c => c.checked || isLocked(c))
 
   // Layer tabs FILTER the view only — checked state (and the confirm) always spans every cell,
   // so switching tabs can never silently drop a section.
   const [tab, setTab] = useState<'all' | PromptLayer>('all')
   const layerCounts = useMemo(() => {
-    const n = { skill: 0, ability: 0, fragment: 0 }
-    for (const c of cells) n[headingLayers?.[c.heading] ?? 'skill'] += 1
+    const n = { skill: 0, ability: 0, fragment: 0, system: 0 }
+    for (const c of allCells) n[c.layer ?? headingLayers?.[c.heading] ?? 'skill'] += 1
     return n
-  }, [cells, headingLayers])
-  const visibleCells = tab === 'all' ? cells : cells.filter(c => layerOf(c) === tab)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cells, libraryCells, headingLayers])
+  const visibleCells = tab === 'all' ? allCells : allCells.filter(c => layerOf(c) === tab)
+
+  function openInEditor(path: string) {
+    setMdEditorPath(path)
+    setActivePanel('markdown-editor')
+    onClose()
+  }
 
   function toggleCell(id: string) {
+    if (id.startsWith('lib-')) { toggleLibraryCell(id); return }
     setCells(prev => prev.map(c => (c.id === id && !isLocked(c) ? { ...c, checked: !c.checked } : c)))
   }
 
@@ -195,12 +222,13 @@ export default function SkillSplitModal({ filePath, fileName, rawContent: rawCon
               <div className={styles.panelTitle}>PROPOSED CELLS</div>
               <span className={styles.cellCountBadge}>{checkedCount} CELLS</span>
             </div>
-            {headingLayers && (
+            {(headingLayers || assemble) && (
               <div className={styles.layerTabs} role="tablist" aria-label="Prompt layer">
                 {([
-                  ['all', 'All', cells.length],
+                  ['all', 'All', allCells.length],
                   ['skill', 'Skill', layerCounts.skill],
                   ['ability', 'Abilities', layerCounts.ability],
+                  ['system', 'System', layerCounts.system],
                   ['fragment', '🔒 Pathly', layerCounts.fragment],
                 ] as const).map(([key, label, n]) => (
                   <button
@@ -249,40 +277,61 @@ export default function SkillSplitModal({ filePath, fileName, rawContent: rawCon
                           ? 'Pathly platform fragment — always sent, cannot be removed'
                           : layerOf(cell) === 'ability'
                             ? 'Layer-3 ability — your approach pack'
-                            : undefined
+                            : layerOf(cell) === 'system'
+                              ? 'System-prompt from the library'
+                              : undefined
                       }
                     >
                       {isLocked(cell)
                         ? '🔒 PATHLY'
                         : layerOf(cell) === 'ability'
                           ? 'ABILITY'
-                          : cell.type === 'heading'
-                            ? 'HEADING'
-                            : 'BODY'}
+                          : layerOf(cell) === 'system'
+                            ? 'SYSTEM'
+                            : cell.type === 'heading'
+                              ? 'HEADING'
+                              : 'BODY'}
                     </span>
                     <span className={styles.stripDiv} />
-                    <Tooltip label="Move up" placement="top">
-                      <button
-                        type="button"
-                        className={styles.moveBtn}
-                        aria-label="Move up"
-                        disabled={idx === 0}
-                        onClick={e => { e.stopPropagation(); moveUp(cell.id) }}
-                      >
-                        <ChevronUp size={14} />
-                      </button>
-                    </Tooltip>
-                    <Tooltip label="Move down" placement="top">
-                      <button
-                        type="button"
-                        className={styles.moveBtn}
-                        aria-label="Move down"
-                        disabled={idx === cells.length - 1}
-                        onClick={e => { e.stopPropagation(); moveDown(cell.id) }}
-                      >
-                        <ChevronDown size={14} />
-                      </button>
-                    </Tooltip>
+                    {cell.id.startsWith('lib-') ? (
+                      cell.path && (
+                        <Tooltip label="Open in Markdown Editor" placement="top">
+                          <button
+                            type="button"
+                            className={styles.moveBtn}
+                            aria-label="Open in Markdown Editor"
+                            onClick={e => { e.stopPropagation(); openInEditor(cell.path as string) }}
+                          >
+                            <ExternalLink size={13} />
+                          </button>
+                        </Tooltip>
+                      )
+                    ) : (
+                      <>
+                        <Tooltip label="Move up" placement="top">
+                          <button
+                            type="button"
+                            className={styles.moveBtn}
+                            aria-label="Move up"
+                            disabled={idx === 0}
+                            onClick={e => { e.stopPropagation(); moveUp(cell.id) }}
+                          >
+                            <ChevronUp size={14} />
+                          </button>
+                        </Tooltip>
+                        <Tooltip label="Move down" placement="top">
+                          <button
+                            type="button"
+                            className={styles.moveBtn}
+                            aria-label="Move down"
+                            disabled={idx === cells.length - 1}
+                            onClick={e => { e.stopPropagation(); moveDown(cell.id) }}
+                          >
+                            <ChevronDown size={14} />
+                          </button>
+                        </Tooltip>
+                      </>
+                    )}
                   </div>
                   {cell.heading && <div className={styles.cellTitle}>{cell.heading}</div>}
                   {cell.content && (
