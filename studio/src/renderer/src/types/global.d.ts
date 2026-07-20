@@ -198,7 +198,10 @@ declare global {
       watch: {
         start: (projectPath: string, topic: string) => Promise<void>
         onEvent: (cb: (data: { path: string; content: string }) => void) => () => void
+        stopFeature?: (topic: string) => Promise<void>
         watchWorkspace?: (projectPath: string) => Promise<void>
+        pauseWorkspace?: () => Promise<void>
+        resumeWorkspace?: (projectPath?: string) => Promise<void>
         onWorkspaceChanged?: (cb: () => void) => () => void
       }
       terminal: {

@@ -201,8 +201,14 @@ contextBridge.exposeInMainWorld('pathly', {
       ipcRenderer.on('watch:event', listener)
       return () => ipcRenderer.removeListener('watch:event', listener)
     },
+    stopFeature: (topic: string): Promise<void> =>
+      ipcRenderer.invoke('watch:stopFeature', topic),
     watchWorkspace: (projectPath: string): Promise<void> =>
       ipcRenderer.invoke('watch:workspace', projectPath),
+    pauseWorkspace: (): Promise<void> =>
+      ipcRenderer.invoke('watch:pauseWorkspace'),
+    resumeWorkspace: (projectPath?: string): Promise<void> =>
+      ipcRenderer.invoke('watch:resumeWorkspace', projectPath),
     onWorkspaceChanged: (cb: () => void): (() => void) => {
       const listener = (): void => cb()
       ipcRenderer.on('workspace:changed', listener)

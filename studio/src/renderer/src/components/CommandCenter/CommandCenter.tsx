@@ -35,35 +35,56 @@ export function CommandCenter() {
     setCommitSnapshot(false)
     if (!topic || !projectPath) return
 
-    // Detect whether this is a new-style (pathly/<topic>/) or feature-centric (pathly/features/<topic>/) feature.
-    // Mirror the resolveFeaturePath logic: check for .keep sentinel, then STATE.json.
-    const newStyleBase = `${projectPath}/pathly/${topic}`
-    const keep = await window.pathly.fs.read(`${newStyleBase}/.keep`)
-    const stateJson = keep === null ? await window.pathly.fs.read(`${newStyleBase}/STATE.json`) : null
-    const isNewStyle = keep !== null || stateJson !== null
+    const push = useToastStore.getState().push
+    try {
+      // Detect whether this is a new-style (pathly/<topic>/) or feature-centric (pathly/features/<topic>/) feature.
+      // Mirror the resolveFeaturePath logic: check for .keep sentinel, then STATE.json.
+      const newStyleBase = `${projectPath}/pathly/${topic}`
+      const keep = await window.pathly.fs.read(`${newStyleBase}/.keep`)
+      const stateJson = keep === null ? await window.pathly.fs.read(`${newStyleBase}/STATE.json`) : null
+      const isNewStyle = keep !== null || stateJson !== null
 
-    const src = isNewStyle
-      ? `${projectPath}/pathly/${topic}`
-      : `${projectPath}/pathly/features/${topic}`
-    const dest = isNewStyle
-      ? `${projectPath}/pathly/.archive/${topic}`
-      : `${projectPath}/pathly/features/.archive/${topic}`
+      const src = isNewStyle
+        ? `${projectPath}/pathly/${topic}`
+        : `${projectPath}/pathly/features/${topic}`
+      const dest = isNewStyle
+        ? `${projectPath}/pathly/.archive/${topic}`
+        : `${projectPath}/pathly/features/.archive/${topic}`
 
-    await window.pathly.fs.move(src, dest)
-    await store.loadFeatures(projectPath)
+      // Close the feature's board tab/section first, then release the filesystem
+      // watchers that hold handles under the feature folder — on Windows an open
+      // watcher handle anywhere below a directory blocks renaming it (the EPERM that
+      // made archive silently no-op). The workspace watcher is always re-armed in the
+      // finally, even if the move fails.
+      cc.removeFeatureTab(topic)
+      await window.pathly.watch.stopFeature?.(topic)
+      await window.pathly.watch.pauseWorkspace?.()
+      try {
+        await window.pathly.fs.move(src, dest)
+      } finally {
+        await window.pathly.watch.resumeWorkspace?.(projectPath)
+      }
+      await store.loadFeatures(projectPath)
+      push(`Archived ${topic}`, 'success')
 
-    // Evict the feature's tab and section from the board.
-    cc.removeFeatureTab(topic)
-
-    // Opt-in: commit the now-frozen board so it travels with the repo. BOARD.json is
-    // gitignored by default; this force-adds JUST this one file (local commit, no push).
-    if (withSnapshot) {
-      const boardRel = `${dest.slice(projectPath.length).replace(/^[\\/]/, '')}/BOARD.json`.replace(/\\/g, '/')
-      const res = await window.pathly.git.commitBoard(projectPath, boardRel, `board: archive ${topic} snapshot`)
-      const push = useToastStore.getState().push
-      if (res.ok && res.committed) push(`Committed ${topic} board snapshot · ${res.hash}`, 'success')
-      else if (res.ok) push(`Nothing to commit${res.error ? ` — ${res.error}` : ''}`, 'info')
-      else push(`Board commit failed${res.error ? ` — ${res.error}` : ''}`, 'error')
+      // Opt-in: commit the now-frozen board so it travels with the repo. BOARD.json is
+      // gitignored by default; this force-adds JUST this one file (local commit, no push).
+      if (withSnapshot) {
+        const boardRel = `${dest.slice(projectPath.length).replace(/^[\\/]/, '')}/BOARD.json`.replace(/\\/g, '/')
+        const res = await window.pathly.git.commitBoard(projectPath, boardRel, `board: archive ${topic} snapshot`)
+        if (res.ok && res.committed) push(`Committed ${topic} board snapshot · ${res.hash}`, 'success')
+        else if (res.ok) push(`Nothing to commit${res.error ? ` — ${res.error}` : ''}`, 'info')
+        else push(`Board commit failed${res.error ? ` — ${res.error}` : ''}`, 'error')
+      }
+    } catch (err: unknown) {
+      // Without this, a failed move (Windows dir lock on an open descendant file, an
+      // existing archive dest, a permission error) was swallowed as an unhandled
+      // rejection — the modal had already closed and the feature silently stayed in the
+      // sidebar. Surface the real reason so the user can act on it.
+      // eslint-disable-next-line no-console
+      console.error('[archive] failed to archive', topic, err)
+      const msg = err instanceof Error ? err.message : String(err)
+      push(`Couldn't archive ${topic} — ${msg}`, 'error')
     }
   }, [archivePending, commitSnapshot, projectPath, store, cc])
 
