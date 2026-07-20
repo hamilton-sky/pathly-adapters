@@ -30,6 +30,7 @@ import {
   apiDecomposeGoal,
   apiDecomposeFeature,
   apiDecomposeProject,
+  apiStartFlow,
   type RunGoalOpts,
   type DecomposeMode,
 } from './commsApi'
@@ -130,6 +131,8 @@ export interface CommsState {
   decomposeFeature: (key: string, rigor: 'light' | 'full' | 'consultation', opts?: { adapter?: string }) => void
   /** Decompose the whole PROJECT board into sibling features (light/full/consultation rigor). */
   decomposeProject: (key: string, rigor: 'light' | 'full' | 'consultation', opts?: { adapter?: string }) => void
+  /** Run a board-scoped FSM flow (debug/explore/test/team/…) with the board-run pill + timer. */
+  startBoardFlow: (key: string, flow: string, opts?: { interactive?: boolean }) => void
   /** Update a board's run state from a board_run SSE phase (running/done/stopped). */
   markBoardRunPhase: (key: string, phase: string) => void
   stopBoard: (key: string) => void
@@ -696,6 +699,22 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
           if (rigor === 'consultation') _startFsmRunWatch(key, boardParamsForKey(key).scope)
           else _startRunWatch(key, res.run_id)
         } else set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' } }))
+      })
+      .catch(() => { set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' } })) })
+  },
+
+  startBoardFlow: (key, flow, opts = {}) => {
+    // A board-scoped FSM flow (debug/explore/test/team/quick-fix) via /runner/start. It holds NO
+    // board-lock — so, exactly like a consultation run, drive the pill off the board-run state and
+    // clear it via the FSM runner-status watch (not the lock watch, which would false-complete it).
+    const now = Date.now()
+    set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'running' }, boardRunStart: { ...s.boardRunStart, [key]: now } }))
+    if (key !== 'project' && key !== 'global') useProjectStore.getState().setActiveTopic(key)
+    const projectRoot = useProjectStore.getState().projectPath.replace(/\\/g, '/').replace(/\/$/, '')
+    apiStartFlow(key, flow, { projectRoot, interactive: opts.interactive ?? true })
+      .then((res) => {
+        if (res.ok) _startFsmRunWatch(key, boardParamsForKey(key).scope)
+        else set((s) => ({ boardRunState: { ...s.boardRunState, [key]: res.busy ? 'busy' : 'idle' } }))
       })
       .catch(() => { set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' } })) })
   },

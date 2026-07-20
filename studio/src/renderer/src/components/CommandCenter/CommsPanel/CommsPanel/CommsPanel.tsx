@@ -17,7 +17,8 @@ import { useArtifactSummaryTarget } from '../hooks/useArtifactSummaryTarget'
 import { useBoardSummaryNote } from '../hooks/useBoardSummaryNote'
 import { useCommsPanel } from '../hooks/useCommsPanel'
 import { useStore } from '../../../../store'
-import { apiStartFlow, apiDecomposeProject, apiDecomposeFeature, apiPostArtifact, resolveFeaturePath, scopeToParams } from '../../../../store/commsApi'
+import { apiPostArtifact, resolveFeaturePath, scopeToParams } from '../../../../store/commsApi'
+import { useCommsStore } from '../../../../store/commsStore'
 import { isOff } from '../../../../services/aiRouter'
 import { useToastStore } from '../../../../store/toastStore'
 import s from './CommsPanel.module.css'
@@ -77,6 +78,11 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
   // switching to Goals and back keeps the filter; the trigger shows a count badge.
   const [typeFilter, setTypeFilter] = useState<MessageType[]>([])
   const projectPath = useStore((st) => st.projectPath)
+  // Board-run actions that drive the RunPill state + timer (and the FSM completion watch), so a
+  // flow launched from the Run button shows the same live pill as a consultation from Evaluate.
+  const startBoardFlow = useCommsStore((s) => s.startBoardFlow)
+  const decomposeProject = useCommsStore((s) => s.decomposeProject)
+  const decomposeFeature = useCommsStore((s) => s.decomposeFeature)
   // The AI target that summarizes dropped artifacts (app-default, persisted).
   const {
     selection: summarySelection, setSelection: setSummarySelection,
@@ -103,21 +109,21 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
   // Run a board-scoped flow (not tied to a goal/DAG) on this board's topic. The
   // runner spawns each stage as a terminal — same path as the Start button.
   const handleRunFlow = (flow: string, opts: { interactive: boolean }): void => {
-    const projectRoot = projectPath.replace(/\\/g, '/').replace(/\/$/, '')
+    // Route through the store actions (not the raw api* calls) so every flow drives the board-run
+    // pill + timer and clears via the FSM completion watch — the same live pill Evaluate gets.
     // Consultation flows can't go through /runner/start (it rejects the reserved project/global
-    // scopes and needs a feature storage dir) — they dispatch via the decompose endpoints, and
-    // only on the board they belong to.
+    // scopes and needs a feature storage dir) — they dispatch via the decompose endpoints instead.
     const isProject = boardKey === 'project'
     const isGlobal = boardKey === 'global'
     if (flow === 'project-consultation' && isProject) {
-      void apiDecomposeProject(boardKey, 'consultation', { projectRoot })
+      decomposeProject(boardKey, 'consultation')
       return
     }
     if (flow === 'feature-consultation' && !isProject && !isGlobal) {
-      void apiDecomposeFeature(boardKey, 'consultation', { projectRoot })
+      decomposeFeature(boardKey, 'consultation')
       return
     }
-    void apiStartFlow(boardKey, flow, { projectRoot, interactive: opts.interactive })
+    startBoardFlow(boardKey, flow, { interactive: opts.interactive })
   }
 
   // The project root is the spawn cwd for CLI-engine summary targets.
