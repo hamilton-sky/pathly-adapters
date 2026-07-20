@@ -1,4 +1,4 @@
-import { RotateCw } from 'lucide-react'
+import { Sparkles } from 'lucide-react'
 import ActionPill from '../../../../../shared/ActionPill/ActionPill'
 import SendPreviewModal from '../../../../../shared/SendPreviewModal/SendPreviewModal'
 import { cliLabel, type EditorCli } from '../../../../../MarkdownEditor/EditorHeader/editorCli'
@@ -36,7 +36,7 @@ export function ResummarizeButton({ messageId, hasPath = true }: Props): JSX.Ele
         hasPath={hasPath}
         title="Summarize"
         runningVerb="Summarizing"
-        mainIcon={<RotateCw size={13} />}
+        mainIcon={<Sparkles size={13} />}
         idleTip="Re-summarize this artifact"
         runningTip="Running the AI summary…"
         ariaName="Re-summarize"

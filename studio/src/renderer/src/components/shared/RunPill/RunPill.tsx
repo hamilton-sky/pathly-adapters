@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Play, Square } from 'lucide-react'
+import { Sparkles, Square } from 'lucide-react'
 import { Tooltip } from '../../ui'
 import type { ActionProgress } from './progress'
 import { fmtElapsed } from './progress'
@@ -55,7 +55,7 @@ export function RunPill({ idleLabel, state, progress, icon, onRun, onStop, disab
           onClick={onRun}
           aria-label={timer ? `${label} ${timer}` : label}
         >
-          {icon ?? <Play size={iconSize} />}
+          {icon ?? <Sparkles size={iconSize} />}
           <span className={s.label}>{label}</span>
           {timer && <span className={s.timer}>{timer}</span>}
         </button>

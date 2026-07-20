@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react'
-import { MessageSquarePlus } from 'lucide-react'
+import { Sparkles } from 'lucide-react'
 import { COMMENT_VERBS } from '../commentVerbs'
 import styles from './SelectionTooltip.module.css'
 
@@ -36,7 +36,7 @@ export function SelectionTooltip({ x, y, onComment }: Props): JSX.Element {
         onClick={onComment}
         aria-label="Add comment on selection"
       >
-        <MessageSquarePlus size={14} />
+        <Sparkles size={14} />
         {COMMENT_BUTTON_LABEL}
       </button>
     </div>

@@ -4,7 +4,7 @@
 // stop while a run is in flight. Generation lives in useAnalysisGeneration.
 
 import React, { useEffect } from 'react'
-import { X, Plus, FileSearch } from 'lucide-react'
+import { X, Sparkles, FileSearch } from 'lucide-react'
 import {
   useUiStore,
   selectMdEditorAnalysisPath,
@@ -68,7 +68,7 @@ export default function AnalysisGalleryPanel() {
           hasPath={!!mdEditorPath}
           title="New"
           runningVerb="Analyzing"
-          mainIcon={<Plus size={13} />}
+          mainIcon={<Sparkles size={13} />}
           idleTip="Run the selected lens to add a new report"
           runningTip="Analyzing…"
           ariaName="Analyze"

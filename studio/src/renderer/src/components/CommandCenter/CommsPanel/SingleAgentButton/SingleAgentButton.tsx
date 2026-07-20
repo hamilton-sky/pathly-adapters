@@ -1,6 +1,6 @@
 import { useState, MouseEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { Settings, X, Bot, GitBranch } from 'lucide-react'
+import { Settings, X, Bot, GitBranch, Sparkles } from 'lucide-react'
 import { useCommsStore } from '../../../../store/commsStore'
 import { useElapsedProgress } from '../../../shared/RunPill/progress'
 import { RunPill } from '../../../shared/RunPill/RunPill'
@@ -59,7 +59,7 @@ export function SingleAgentButton({ boardKey, onRun, onRunFlow }: Props): JSX.El
           RunPill gives it the same timer + stop as every other board spawn control. */}
       <RunPill
         idleLabel="Run"
-        icon={<Settings size={10} />}
+        icon={<Sparkles size={10} />}
         state={runState}
         progress={progress}
         onRun={() => setOpen(true)}

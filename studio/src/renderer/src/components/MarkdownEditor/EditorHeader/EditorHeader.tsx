@@ -2,9 +2,8 @@ import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { useToastStore } from '../../../store/toastStore'
 import {
   ArrowLeft, Undo2, Redo2, Database, FileCode, BookOpen,
-  ScanText, FileSearch, Scissors, Wand2, GitCompare,
-  // ── Diagram feature ──
-  Network, Image as ImageIcon,
+  Sparkles, FileSearch, Scissors, GitCompare,
+  Image as ImageIcon,
 } from 'lucide-react'
 import { Tooltip } from '../../ui'
 import { useMarkdownEditorStore, BodyCell } from '../../../store/markdownEditorStore'
@@ -407,7 +406,7 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
         hasPath={!!mdEditorPath}
         title={splitTitle}
         runningVerb="Splitting"
-        mainIcon={<Wand2 size={13} />}
+        mainIcon={<Sparkles size={13} />}
         idleTip={`AI restructures the document — “${splitTitle}” — and delivers a diff you review and accept`}
         runningTip="Reorganizing the document…"
         ariaName="AI Split"
@@ -450,7 +449,7 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
         hasPath={!!mdEditorPath}
         title={analyzeTitle}
         runningVerb="Analyzing"
-        mainIcon={<ScanText size={13} />}
+        mainIcon={<Sparkles size={13} />}
         idleTip={`AI will audit “${skillName}” for clarity, gaps, and redundancies — adds a report to the gallery in a side panel`}
         runningTip={`Auditing “${skillName}” for quality issues…`}
         ariaName="AI Analyze"
@@ -495,7 +494,7 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
         hasPath={!!mdEditorPath}
         title={diagramTitle}
         runningVerb="Diagramming"
-        mainIcon={<Network size={13} />}
+        mainIcon={<Sparkles size={13} />}
         idleTip={`AI generates a visual diagram of “${skillName}” — opens a gallery of cards you can view full-screen`}
         runningTip={`Generating a diagram of “${skillName}”…`}
         ariaName="Diagram"

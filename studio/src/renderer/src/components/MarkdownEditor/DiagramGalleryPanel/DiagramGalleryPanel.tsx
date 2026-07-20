@@ -4,7 +4,7 @@
 // is in flight — matching the board's Evaluate pill. Generation lives in useDiagramGeneration.
 
 import React, { useEffect, useState } from 'react'
-import { X, Plus, Image as ImageIcon } from 'lucide-react'
+import { X, Sparkles, Image as ImageIcon } from 'lucide-react'
 import {
   useUiStore,
   selectMdEditorDiagramPath,
@@ -84,7 +84,7 @@ export default function DiagramGalleryPanel({ onNew, onRegenerate, busy }: Props
           hasPath={!!mdEditorPath}
           title="New"
           runningVerb="Diagramming"
-          mainIcon={<Plus size={13} />}
+          mainIcon={<Sparkles size={13} />}
           idleTip="Generate a new diagram with the selected preset"
           runningTip="Generating diagram…"
           ariaName="Diagram"
