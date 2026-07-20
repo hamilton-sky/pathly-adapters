@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useStore } from '../../../store'
 import { listAbilities } from '../../../services/abilities'
 import { listUserPrompts } from '../../../services/promptLibrary'
+import { BUILTIN_SYSTEM_ITEMS } from './builtinSystemPrompts'
 
 export interface CatalogItemData {
   name: string
@@ -9,6 +10,12 @@ export interface CatalogItemData {
   description?: string
   category?: string
   itemType?: 'agent' | 'fragment' | 'skill' | 'template' | 'flow' | 'ability' | 'system'
+  /** prompt_library row id (system-prompts) — backs delete/rename by id. */
+  id?: string
+  /** ability scope (project|global) — backs delete against the right store. */
+  scope?: 'project' | 'global'
+  /** App-shipped builtin (read-only): shown for reference, but not delete/rename/move-able. */
+  readOnly?: boolean
 }
 
 export interface CatalogGroup {
@@ -89,8 +96,13 @@ export function useCatalogData(_pathlyRoot?: string | null, refreshKey?: number)
       // The two USER-owned tables always render (even empty) so their "+ New" create surface is
       // reachable — otherwise you could never create the FIRST ability / system-prompt. (The
       // packaged groups above stay length-gated: they're never empty in a real install.)
-      next.push({ label: 'Abilities', type: 'ability',  icon: 'sparkles',    items: (abilities ?? []).map(a => ({ name: a.name, path: a.path, description: a.label, category: a.category, itemType: 'ability' as const })) })
-      next.push({ label: 'System',    type: 'system',   icon: 'scroll',      items: (sysPrompts ?? []).map(p => ({ name: p.name, description: p.label, category: p.category, itemType: 'system' as const })) })
+      next.push({ label: 'Abilities', type: 'ability',  icon: 'sparkles',    items: (abilities ?? []).map(a => ({ name: a.name, path: a.path, description: a.label, category: a.category, itemType: 'ability' as const, scope: a.scope })) })
+      // System = the app-shipped builtins (analyze/split/comment/diagram, read-only) + the user's
+      // own DB rows — the same union the editor/Sections selections show, now visible in one place.
+      next.push({ label: 'System',    type: 'system',   icon: 'scroll',      items: [
+        ...BUILTIN_SYSTEM_ITEMS,
+        ...(sysPrompts ?? []).map(p => ({ name: p.label || p.name, description: p.label, category: p.category, itemType: 'system' as const, id: p.id })),
+      ] })
       if (data.skills?.length)
         next.push({ label: 'Skills',    type: 'skill',    icon: 'book-open',   items: data.skills.map(r => toItem(r, 'skill')) })
       if (data.templates?.length)

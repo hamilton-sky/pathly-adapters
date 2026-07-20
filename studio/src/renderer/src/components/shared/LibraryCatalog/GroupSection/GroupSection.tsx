@@ -76,6 +76,8 @@ export function GroupSection({
   }
 
   const singularLabel = group.label.toLowerCase().replace(/s$/, '')
+  // Clean noun for the per-category "+ New …" affordance on fixed tables.
+  const newItemNoun = group.type === 'system' ? 'prompt' : group.type === 'ability' ? 'ability' : singularLabel
 
   const categoryNames = supportsCategories
     ? Object.keys(buildCategoryTree(group.items, group.type, fixedCats)).filter(k => k !== '_other').sort()
@@ -195,11 +197,13 @@ export function GroupSection({
             onInsertCell={onInsertCell}
             onAddCells={onAddCells}
             onDeleteItem={onDeleteItem}
-            onRequestDeleteCategory={onDeleteCategory ? onRequestDeleteCategory : undefined}
-            onNewSubcategory={onNewCategory}
+            onRequestDeleteCategory={fixedCats ? undefined : (onDeleteCategory ? onRequestDeleteCategory : undefined)}
+            onNewSubcategory={fixedCats ? undefined : onNewCategory}
             onMoveItem={onMoveItem}
             onRenameItem={onRenameItem}
-            onRenameCategory={onRenameCategory}
+            onRenameCategory={fixedCats ? undefined : onRenameCategory}
+            onNewItem={fixedCats ? onNewItem : undefined}
+            newItemLabel={fixedCats ? newItemNoun : undefined}
           />
         ))}
       </div>

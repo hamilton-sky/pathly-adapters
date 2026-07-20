@@ -11,14 +11,16 @@ const CATEGORIES = FIXED_CATEGORIES.ability
 
 interface Props {
   initialName?: string
+  /** Pre-select the category (e.g. clicking "+ New" inside the BUILD subfolder). */
+  initialCategory?: string
   projectRoot: string
   /** Resolve the host's create Promise so the catalog re-fetches. Called on save AND cancel. */
   onClose: () => void
 }
 
-export function AbilityCreateModal({ initialName = '', projectRoot, onClose }: Props): JSX.Element {
+export function AbilityCreateModal({ initialName = '', initialCategory, projectRoot, onClose }: Props): JSX.Element {
   const [name, setName] = useState(initialName)
-  const [category, setCategory] = useState<string>('build')
+  const [category, setCategory] = useState<string>(initialCategory && CATEGORIES.includes(initialCategory) ? initialCategory : 'build')
   const [scope, setScope] = useState<'project' | 'global'>('project')
   const [body, setBody] = useState('')
   const [saving, setSaving] = useState(false)

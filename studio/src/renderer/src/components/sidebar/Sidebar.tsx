@@ -9,6 +9,8 @@ import LibraryCatalog from '../shared/LibraryCatalog/LibraryCatalog'
 import { SystemPromptModal } from './SystemPromptModal/SystemPromptModal'
 import { AbilityCreateModal } from './AbilityCreateModal/AbilityCreateModal'
 import SkillSplitModal from '../shared/SkillSplitModal/SkillSplitModal'
+import { deleteUserPrompt, updateUserPrompt } from '../../services/promptLibrary'
+import { deleteAbility, saveAbility } from '../../services/abilities'
 import type { CatalogGroup, CatalogItemData } from '../shared/LibraryCatalog/useCatalogData'
 import { useMarkdownEditorStore } from '../../store/markdownEditorStore'
 import { useSidebarResize } from './shell/useSidebarResize'
@@ -118,8 +120,8 @@ export function Sidebar(): JSX.Element | null {
   const [showFlowWizard, setShowFlowWizard]       = useState(false)
   // Library create modals (system-prompts + abilities). resolve() unblocks LibraryCatalog's
   // create Promise on close so its catalog re-fetches the newly-saved row.
-  const [sysPromptCreate, setSysPromptCreate]     = useState<{ name: string; resolve: () => void } | null>(null)
-  const [abilityCreate, setAbilityCreate]         = useState<{ name: string; resolve: () => void } | null>(null)
+  const [sysPromptCreate, setSysPromptCreate]     = useState<{ name: string; category?: string; resolve: () => void } | null>(null)
+  const [abilityCreate, setAbilityCreate]         = useState<{ name: string; category?: string; resolve: () => void } | null>(null)
   const [showNewItemDialog, setShowNewItemDialog] = useState(false)
   const [newItemTarget, setNewItemTarget] = useState<{ type: 'skill' | 'agent' | 'template' | 'debug' | 'explore'; dir: string } | null>(null)
   const [splitModalItem, setSplitModalItem] = useState<{ path?: string; name: string } | null>(null)
@@ -272,11 +274,11 @@ export function Sidebar(): JSX.Element | null {
               // NOT /catalog/*. Awaiting the modal's close resolves this promise so LibraryCatalog
               // re-fetches the new row. Every other catalog-API CRUD path guards both types.
               if (type === 'ability') {
-                await new Promise<void>((resolve) => setAbilityCreate({ name: name ?? '', resolve }))
+                await new Promise<void>((resolve) => setAbilityCreate({ name: name ?? '', category, resolve }))
                 return
               }
               if (type === 'system') {
-                await new Promise<void>((resolve) => setSysPromptCreate({ name: name ?? '', resolve }))
+                await new Promise<void>((resolve) => setSysPromptCreate({ name: name ?? '', category, resolve }))
                 return
               }
               if (type === 'flow') {
@@ -285,9 +287,27 @@ export function Sidebar(): JSX.Element | null {
                 await createNewCatalogItem(type, category, name)
               }
             }}
-            onDeleteItem={async (item, type) => { if (type === 'ability' || type === 'system') return; await deleteItemViaAPI(item, type) }}
+            onDeleteItem={async (item, type) => {
+              // The two user-owned tables delete against their OWN stores (not /catalog/*):
+              // system-prompts by prompt_library id, abilities by "<category>/<name>" + scope.
+              if (type === 'system') { if (item.id) await deleteUserPrompt(item.id, projectPath); return }
+              if (type === 'ability') { await deleteAbility(`${item.category ?? 'build'}/${item.name}`, { scope: item.scope, projectRoot: projectPath }); return }
+              await deleteItemViaAPI(item, type)
+            }}
             onMoveItem={async (item, type, cat) => { if (type === 'ability' || type === 'system') return; await moveCatalogItem(item, type, cat) }}
-            onRenameItem={async (item, type, stem) => { if (type === 'ability' || type === 'system') return; await renameCatalogItem(item, type, stem) }}
+            onRenameItem={async (item, type, stem) => {
+              // system-prompt rename = patch its label (what the Library shows). ability rename =
+              // recreate the .md under the new name, then drop the old (abilities are files).
+              if (type === 'system') { if (item.id) await updateUserPrompt(item.id, { label: stem, projectRoot: projectPath }); return }
+              if (type === 'ability') {
+                const cat = item.category ?? 'build'
+                const body = item.path ? (await window.pathly.fs.read(item.path).catch(() => '')) ?? '' : ''
+                await saveAbility({ category: cat, name: stem, body, scope: item.scope, projectRoot: projectPath })
+                await deleteAbility(`${cat}/${item.name}`, { scope: item.scope, projectRoot: projectPath })
+                return
+              }
+              await renameCatalogItem(item, type, stem)
+            }}
             onRenameCategory={async (type, old, n) => { if (type === 'ability' || type === 'system') return; await renameCatalogCategory(type, old, n) }}
             onNewCategory={async (type, name) => {
               if (type === 'ability' || type === 'system') return
@@ -347,6 +367,7 @@ export function Sidebar(): JSX.Element | null {
       {sysPromptCreate && (
         <SystemPromptModal
           initialName={sysPromptCreate.name}
+          initialCategory={sysPromptCreate.category}
           projectRoot={projectPath}
           onClose={() => { sysPromptCreate.resolve(); setSysPromptCreate(null) }}
         />
@@ -355,6 +376,7 @@ export function Sidebar(): JSX.Element | null {
       {abilityCreate && (
         <AbilityCreateModal
           initialName={abilityCreate.name}
+          initialCategory={abilityCreate.category}
           projectRoot={projectPath}
           onClose={() => { abilityCreate.resolve(); setAbilityCreate(null) }}
         />

@@ -115,15 +115,17 @@ export function ItemRow({
   } else {
     if (hasPath) menuItems.push({ label: 'Open', onClick: () => { setMenuOpen(false); onOpenSkill?.(item.path!) } })
   }
-  if (!isFragment && onRenameItem && !isFlow) {
+  // App-shipped builtins are reference-only — no rename/move/delete (there's no row to mutate).
+  const mutable = !isFragment && !item.readOnly
+  if (mutable && onRenameItem && !isFlow) {
     menuItems.push({ label: 'Rename', onClick: () => {
       setMenuOpen(false)
       setRenameVal(leafName(item).replace(/\.[^.]+$/, ''))
       setRenaming(true)
     }})
   }
-  if (!isFragment && hasMoveTargets) menuItems.push({ label: 'Move to category…', onClick: () => { setPickerOpen(true) } })
-  if (!isFragment && onDeleteItem)   menuItems.push({ label: 'Delete', danger: true, onClick: () => { setMenuOpen(false); onDeleteItem(item, type) } })
+  if (mutable && hasMoveTargets) menuItems.push({ label: 'Move to category…', onClick: () => { setPickerOpen(true) } })
+  if (mutable && onDeleteItem)   menuItems.push({ label: 'Delete', danger: true, onClick: () => { setMenuOpen(false); onDeleteItem(item, type) } })
 
   return (
     <div

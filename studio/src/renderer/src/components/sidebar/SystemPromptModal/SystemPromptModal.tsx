@@ -11,14 +11,16 @@ const CATEGORIES = FIXED_CATEGORIES.system
 
 interface Props {
   initialName?: string
+  /** Pre-select the category (e.g. clicking "+ New" inside the ANALYZE subfolder). */
+  initialCategory?: string
   projectRoot: string
   /** Resolve the host's create Promise so the catalog re-fetches. Called on save AND cancel. */
   onClose: () => void
 }
 
-export function SystemPromptModal({ initialName = '', projectRoot, onClose }: Props): JSX.Element {
+export function SystemPromptModal({ initialName = '', initialCategory, projectRoot, onClose }: Props): JSX.Element {
   const [name, setName] = useState(initialName)
-  const [category, setCategory] = useState<string>('system')
+  const [category, setCategory] = useState<string>(initialCategory && CATEGORIES.includes(initialCategory) ? initialCategory : 'system')
   const [body, setBody] = useState('')
   const [saving, setSaving] = useState(false)
 

@@ -25,12 +25,17 @@ export interface SubGroupProps extends ItemCallbacks {
   onRequestDeleteCategory?: (type: CatalogGroup['type'], label: string) => void
   onNewSubcategory?: (type: CatalogGroup['type'], fullPath: string) => Promise<void>
   onRenameCategory?: (type: CatalogGroup['type'], categoryName: string, newName: string) => Promise<void>
+  /** Create an item straight into THIS category (fixed-category tables: system-prompts, abilities). */
+  onNewItem?: (type: CatalogGroup['type'], category?: string, name?: string) => Promise<void>
+  /** Noun for the "+ New …" action (e.g. "prompt", "ability"). */
+  newItemLabel?: string
 }
 
 export function SubGroup({
   label, items, subCategories, parentCategory, type, groupIcon, context,
   collapseKey, categories, onOpenSkill, onOpenFlow, onInsertCell, onAddCells,
   onDeleteItem, onRequestDeleteCategory, onNewSubcategory, onMoveItem, onRenameItem, onRenameCategory,
+  onNewItem, newItemLabel,
 }: SubGroupProps) {
   const [open, setOpen]                   = useState(false)
   const [subMenuOpen, setSubMenuOpen]     = useState(false)
@@ -74,7 +79,8 @@ export function SubGroup({
   }
 
   const totalCount = items.length + Object.values(subCategories ?? {}).reduce((s, a) => s + a.length, 0)
-  const hasActions = !!(onNewSubcategory || onRequestDeleteCategory || (!isOtherBucket && onRenameCategory))
+  const canNewItem = !!onNewItem && !isOtherBucket
+  const hasActions = !!(canNewItem || onNewSubcategory || onRequestDeleteCategory || (!isOtherBucket && onRenameCategory))
 
   return (
     <div className={styles.subGroup}>
@@ -122,6 +128,16 @@ export function SubGroup({
             </Tooltip>
             {subMenuOpen && (
               <div className={styles.menu}>
+                {canNewItem && (
+                  <button
+                    type="button"
+                    className={styles.menuItem}
+                    onClick={() => { setSubMenuOpen(false); void onNewItem?.(type, parentCategory) }}
+                  >
+                    <Plus size={10} />
+                    New {newItemLabel ?? 'item'}
+                  </button>
+                )}
                 {!isOtherBucket && onRenameCategory && (
                   <button
                     type="button"

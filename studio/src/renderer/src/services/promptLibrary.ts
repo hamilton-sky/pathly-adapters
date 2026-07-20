@@ -78,3 +78,33 @@ export async function saveUserPrompt(p: SaveUserPrompt): Promise<PromptLibraryRo
     return null
   }
 }
+
+/** Delete a library prompt by id. */
+export async function deleteUserPrompt(id: string, projectRoot?: string): Promise<boolean> {
+  try {
+    const params = new URLSearchParams()
+    if (projectRoot) params.set('project_root', projectRoot)
+    const q = params.toString()
+    const r = await apiFetch(`/skills/prompts/${id}${q ? `?${q}` : ''}`, { method: 'DELETE' })
+    return r.ok
+  } catch {
+    return false
+  }
+}
+
+/** Patch a library prompt by id (only label/body here — the server ignores unknown keys). */
+export async function updateUserPrompt(
+  id: string,
+  patch: { label?: string; body?: string; projectRoot?: string },
+): Promise<boolean> {
+  try {
+    const r = await apiFetch(`/skills/prompts/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label: patch.label, body: patch.body, project_root: patch.projectRoot ?? '' }),
+    })
+    return r.ok
+  } catch {
+    return false
+  }
+}
