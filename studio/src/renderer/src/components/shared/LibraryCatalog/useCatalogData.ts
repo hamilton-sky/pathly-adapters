@@ -98,10 +98,11 @@ export function useCatalogData(_pathlyRoot?: string | null, refreshKey?: number)
       // packaged groups above stay length-gated: they're never empty in a real install.)
       next.push({ label: 'Abilities', type: 'ability',  icon: 'sparkles',    items: (abilities ?? []).map(a => ({ name: a.name, path: a.path, description: a.label, category: a.category, itemType: 'ability' as const, scope: a.scope })) })
       // System = the app-shipped builtins (analyze/split/comment/diagram, read-only) + the user's
-      // own DB rows — the same union the editor/Sections selections show, now visible in one place.
+      // own prompt FILES — the same union the editor/Sections selections show, now in one place.
+      // A user prompt carries a `path`, so it opens/edits in the MD editor like an ability.
       next.push({ label: 'System',    type: 'system',   icon: 'scroll',      items: [
         ...BUILTIN_SYSTEM_ITEMS,
-        ...(sysPrompts ?? []).map(p => ({ name: p.label || p.name, description: p.label, category: p.category, itemType: 'system' as const, id: p.id })),
+        ...(sysPrompts ?? []).map(p => ({ name: p.name, path: p.path, description: p.label, category: p.category, itemType: 'system' as const, id: p.id, scope: p.scope })),
       ] })
       if (data.skills?.length)
         next.push({ label: 'Skills',    type: 'skill',    icon: 'book-open',   items: data.skills.map(r => toItem(r, 'skill')) })

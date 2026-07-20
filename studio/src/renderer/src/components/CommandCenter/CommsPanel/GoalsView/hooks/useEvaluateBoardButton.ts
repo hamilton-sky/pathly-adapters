@@ -70,7 +70,9 @@ export function useEvaluateBoardButton(boardKey: string, boardScope?: BoardScope
   const progress = isGoalTarget ? goalProgress : boardProgress
 
   const lensLabel = EVAL_LENSES.find((l) => l.name === selectedLens && l.name)?.label
-  const activeLabel = isDecomposeTarget ? 'Decompose' : (lensLabel ?? 'Evaluate')
+  // Visible label says the OUTCOME, not the internal verb ("Evaluate"): this analyzes the board
+  // and proposes concrete tasks. Internal names (evaluator role, evaluate skill) are unchanged.
+  const activeLabel = isDecomposeTarget ? 'Decompose' : (lensLabel ?? 'Suggest tasks')
 
   const evalPreview = useEvaluatePreview(
     confirmOpen && !targetGoalId,

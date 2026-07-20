@@ -9,7 +9,7 @@ import LibraryCatalog from '../shared/LibraryCatalog/LibraryCatalog'
 import { SystemPromptModal } from './SystemPromptModal/SystemPromptModal'
 import { AbilityCreateModal } from './AbilityCreateModal/AbilityCreateModal'
 import SkillSplitModal from '../shared/SkillSplitModal/SkillSplitModal'
-import { deleteUserPrompt, updateUserPrompt } from '../../services/promptLibrary'
+import { saveUserPrompt, deleteUserPrompt } from '../../services/promptLibrary'
 import { deleteAbility, saveAbility } from '../../services/abilities'
 import type { CatalogGroup, CatalogItemData } from '../shared/LibraryCatalog/useCatalogData'
 import { useMarkdownEditorStore } from '../../store/markdownEditorStore'
@@ -288,18 +288,26 @@ export function Sidebar(): JSX.Element | null {
               }
             }}
             onDeleteItem={async (item, type) => {
-              // The two user-owned tables delete against their OWN stores (not /catalog/*):
-              // system-prompts by prompt_library id, abilities by "<category>/<name>" + scope.
-              if (type === 'system') { if (item.id) await deleteUserPrompt(item.id, projectPath); return }
+              // The two user-owned tables are FILES — delete against their own stores (not /catalog/*),
+              // keyed by "<category>/<name>" + scope.
+              if (type === 'system') { if (item.id) await deleteUserPrompt(item.id, { scope: item.scope, projectRoot: projectPath }); return }
               if (type === 'ability') { await deleteAbility(`${item.category ?? 'build'}/${item.name}`, { scope: item.scope, projectRoot: projectPath }); return }
               await deleteItemViaAPI(item, type)
             }}
             onMoveItem={async (item, type, cat) => { if (type === 'ability' || type === 'system') return; await moveCatalogItem(item, type, cat) }}
             onRenameItem={async (item, type, stem) => {
-              // system-prompt rename = patch its label (what the Library shows). ability rename =
-              // recreate the .md under the new name, then drop the old (abilities are files).
-              if (type === 'system') { if (item.id) await updateUserPrompt(item.id, { label: stem, projectRoot: projectPath }); return }
+              // system-prompts + abilities are both FILES — rename = recreate the .md under the new
+              // stem (reading the current body from its path), then drop the old file.
+              if (type === 'system') {
+                if (stem === item.name) return
+                const cat = item.category ?? 'system'
+                const body = item.path ? (await window.pathly.fs.read(item.path).catch(() => '')) ?? '' : ''
+                await saveUserPrompt({ kind: 'preset', category: cat, name: stem, body, scope: item.scope, projectRoot: projectPath })
+                if (item.id) await deleteUserPrompt(item.id, { scope: item.scope, projectRoot: projectPath })
+                return
+              }
               if (type === 'ability') {
+                if (stem === item.name) return
                 const cat = item.category ?? 'build'
                 const body = item.path ? (await window.pathly.fs.read(item.path).catch(() => '')) ?? '' : ''
                 await saveAbility({ category: cat, name: stem, body, scope: item.scope, projectRoot: projectPath })

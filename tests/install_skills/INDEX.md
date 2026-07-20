@@ -4,7 +4,7 @@
 
 Adapter install/setup, stitch & compose, skill composition / round-trip / export, plugin manifests.
 
-19 test file(s).
+20 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -18,6 +18,7 @@ Adapter install/setup, stitch & compose, skill composition / round-trip / export
 | `test_e2e_install.py` | End-to-end tests for the install_cli install/uninstall flow via subprocess | 6 |
 | `test_evaluator_skill.py` | Tests for the evaluator agent + skill (BLOCK E1 — comms-board) | 9 |
 | `test_manifests.py` | covers manifest required fields; codex plugin version matches distribution version | 2 |
+| `test_prompt_files.py` | System-prompts as .md FILES: scoping, label, CRUD, and the legacy DB→files migration | 8 |
 | `test_prompt_library.py` | prompt_library query layer — CRUD, name-upsert, and global/project merge | 7 |
 | `test_setup.py` | covers detect hosts returns list; host markers cover all supported hosts; host markers cover antigravity; … | 35 |
 | `test_skill_composition.py` | Tests for DB-backed composition overrides (skill_composition + load_effective_manifest) | 6 |

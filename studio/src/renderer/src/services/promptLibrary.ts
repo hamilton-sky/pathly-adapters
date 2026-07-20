@@ -1,8 +1,11 @@
-// promptLibrary — the client seam to the DB-backed prompt library (/skills/prompts).
+// promptLibrary — the client seam to the prompt store (/skills/prompts).
 //
-// The library is the ONE store behind every prompt dropdown + the layer-3 ability packs.
-// kind='preset'  → single-select alternatives (analyze/diagram/eval/system dropdowns)
-// kind='ability' → additive, stackable modifiers (domain/approach packs).
+// The store is the ONE source behind every prompt dropdown.
+// kind='preset'  → single-select alternatives (analyze/split/comment/diagram/system dropdowns).
+//                  These are now FILES (pathly/prompts/<category>/<name>.md + ~/.pathly/prompts/),
+//                  so a row carries a `path` (openable in the MD editor) + `scope`, and its
+//                  `id` is "<category>/<name>". Same JSON shape as before otherwise.
+// kind='ability' → legacy DB rows (real abilities live in services/abilities.ts as files).
 // Every call fails soft (→ [] / null) so a user-added prompt is an enhancement layer,
 // never a hard dependency of the action.
 
@@ -19,6 +22,10 @@ export interface PromptLibraryRow {
   skill_ref: string | null
   source: string
   sort_order: number
+  /** preset files only: 'project' | 'global' — which store the file lives in. */
+  scope?: 'project' | 'global'
+  /** preset files only: absolute path of the .md — open it in the MD editor. */
+  path?: string
 }
 
 export interface PromptLibraryQuery {
@@ -51,10 +58,12 @@ export interface SaveUserPrompt {
   hint?: string
   body: string
   skillRef?: string
+  /** preset files: which store to write ('project' | 'global'). Default 'project'. */
+  scope?: 'project' | 'global'
   projectRoot?: string
 }
 
-/** Create (or upsert on name-within-scope) a library prompt. Returns the stored row or null. */
+/** Create/overwrite a prompt (a preset writes a file). Returns the stored row or null. */
 export async function saveUserPrompt(p: SaveUserPrompt): Promise<PromptLibraryRow | null> {
   try {
     const r = await apiFetch('/skills/prompts', {
@@ -68,6 +77,7 @@ export async function saveUserPrompt(p: SaveUserPrompt): Promise<PromptLibraryRo
         hint: p.hint ?? '',
         body: p.body,
         skill_ref: p.skillRef ?? null,
+        scope: p.scope ?? 'project',
         project_root: p.projectRoot ?? '',
       }),
     })
@@ -79,30 +89,16 @@ export async function saveUserPrompt(p: SaveUserPrompt): Promise<PromptLibraryRo
   }
 }
 
-/** Delete a library prompt by id. */
-export async function deleteUserPrompt(id: string, projectRoot?: string): Promise<boolean> {
-  try {
-    const params = new URLSearchParams()
-    if (projectRoot) params.set('project_root', projectRoot)
-    const q = params.toString()
-    const r = await apiFetch(`/skills/prompts/${id}${q ? `?${q}` : ''}`, { method: 'DELETE' })
-    return r.ok
-  } catch {
-    return false
-  }
-}
-
-/** Patch a library prompt by id (only label/body here — the server ignores unknown keys). */
-export async function updateUserPrompt(
+/** Delete a system-prompt FILE by its "<category>/<name>" id (+ scope). */
+export async function deleteUserPrompt(
   id: string,
-  patch: { label?: string; body?: string; projectRoot?: string },
+  opts: { scope?: 'project' | 'global'; projectRoot?: string } = {},
 ): Promise<boolean> {
   try {
-    const r = await apiFetch(`/skills/prompts/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ label: patch.label, body: patch.body, project_root: patch.projectRoot ?? '' }),
-    })
+    const params = new URLSearchParams({ scope: opts.scope ?? 'project' })
+    if (opts.projectRoot) params.set('project_root', opts.projectRoot)
+    // `id` is "<category>/<name>" — its slash IS the path separator, so it is NOT encoded.
+    const r = await apiFetch(`/skills/prompts/${id}?${params.toString()}`, { method: 'DELETE' })
     return r.ok
   } catch {
     return false

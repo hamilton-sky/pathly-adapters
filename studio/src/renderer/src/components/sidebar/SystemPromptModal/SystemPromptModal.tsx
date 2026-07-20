@@ -4,9 +4,10 @@ import { saveUserPrompt } from '../../../services/promptLibrary'
 import { FIXED_CATEGORIES } from '../../shared/LibraryCatalog/utils'
 import s from './SystemPromptModal.module.css'
 
-// The Library's create surface for a system-prompt (a prompt_library preset row). Name +
-// category + body → POST /skills/prompts. Once saved it appears in the Library's System group
-// AND the Sections modal's System tab (both read the same table). Creation lives ONLY here.
+// The Library's create surface for a system-prompt (a markdown FILE). Name + category + scope
+// + body → POST /skills/prompts. Once saved it appears in the Library's System group (openable
+// in the MD editor) AND the Sections modal's System tab (both read the same store). Creation
+// lives ONLY here.
 const CATEGORIES = FIXED_CATEGORIES.system
 
 interface Props {
@@ -21,6 +22,7 @@ interface Props {
 export function SystemPromptModal({ initialName = '', initialCategory, projectRoot, onClose }: Props): JSX.Element {
   const [name, setName] = useState(initialName)
   const [category, setCategory] = useState<string>(initialCategory && CATEGORIES.includes(initialCategory) ? initialCategory : 'system')
+  const [scope, setScope] = useState<'project' | 'global'>('project')
   const [body, setBody] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -34,6 +36,7 @@ export function SystemPromptModal({ initialName = '', initialCategory, projectRo
       category: category.trim() || 'system',
       name: name.trim(),
       body,
+      scope,
       projectRoot,
     })
     setSaving(false)
@@ -54,7 +57,7 @@ export function SystemPromptModal({ initialName = '', initialCategory, projectRo
           <div className={s.row}>
             <input
               className={s.input}
-              placeholder="Name…"
+              placeholder="Name… (letters, digits, - and _)"
               value={name}
               autoFocus
               onChange={(e) => setName(e.currentTarget.value)}
@@ -63,6 +66,10 @@ export function SystemPromptModal({ initialName = '', initialCategory, projectRo
               {CATEGORIES.map((c) => (
                 <option key={c} value={c}>{c}</option>
               ))}
+            </select>
+            <select className={s.select} value={scope} aria-label="Scope" onChange={(e) => setScope(e.currentTarget.value as 'project' | 'global')}>
+              <option value="project">Project</option>
+              <option value="global">Global</option>
             </select>
           </div>
           <textarea

@@ -55,6 +55,7 @@ export function useLibraryCells(enabled: boolean): [ProposedCell[], (id: string)
           content: p.body,
           checked: false,
           layer: 'system' as const,
+          path: p.path,
         })),
       ])
     })

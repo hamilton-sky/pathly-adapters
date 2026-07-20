@@ -53,10 +53,10 @@ export function EvaluateBoardButton({ boardKey, goals = [], boardScope }: Props)
         runningVerb={e.targetGoalId ? 'Planning' : e.activeLabel}
         mainIcon={<Sparkles size={13} />}
         idleTip={e.lensLabel
-          ? `Evaluate board — ${e.lensLabel}`
-          : 'Evaluate board — analyze everything and propose concrete tasks'}
+          ? `Suggest tasks — ${e.lensLabel}`
+          : 'Suggest tasks — analyze the whole board and propose concrete tasks'}
         runningTip={e.targetGoalId ? 'Planning goal…' : 'Analyzing the board…'}
-        ariaName="Evaluate"
+        ariaName="Suggest tasks"
         onRun={e.onPillRun}
         onStop={e.handleStop}
         configTip="Configure evaluator"
@@ -102,7 +102,7 @@ export function EvaluateBoardButton({ boardKey, goals = [], boardScope }: Props)
           meta={e.isGoalTarget
             ? [{ label: 'Rigor', value: e.rigorMode }]
             : [{ label: 'Lens', value: e.lensLabel ?? 'Built-in evaluator' }]}
-          submitLabel={e.isGoalTarget ? 'Run decompose' : 'Run Evaluate'}
+          submitLabel={e.isGoalTarget ? 'Run decompose' : 'Suggest tasks'}
           footerSlot={<ProgressSelect value={e.verbosity} onChange={e.setVerbosity} allowInherit label="Board updates" id="eval-progress" />}
           onSubmit={(finalPrompt, sectionsUsed) => e.confirmWholeBoard(finalPrompt, sectionsUsed)}
           onCancel={e.cancelWholeBoard}
