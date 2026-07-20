@@ -22,11 +22,23 @@ export interface CatNode {
   children: Record<string, CatalogItemData[]>
 }
 
+// The user-owned tables have a FIXED, canonical category set — the same buckets the app
+// CONSUMES them from (an 'analyze' system-prompt feeds the Analyze config; a 'build' ability
+// feeds a build stage). So their subfolders are these categories, always shown (even empty) and
+// never user-extendable — you add items INTO the set, you don't invent new folders.
+export const FIXED_CATEGORIES: Record<string, string[]> = {
+  ability: ['plan', 'build', 'review', 'test'],
+  system: ['system', 'analyze', 'split', 'comment', 'diagram'],
+}
+
 export function buildCategoryTree(
   groupItems: CatalogItemData[],
   groupType: string,
+  fixedCategories?: string[],
 ): Record<string, CatNode> {
   const tree: Record<string, CatNode> = {}
+  // Seed the fixed categories so they render as subfolders even before any item lands in them.
+  for (const cat of fixedCategories ?? []) tree[cat] = { items: [], children: {} }
   for (const item of groupItems) {
     const raw = item.category || '_other'
     const slash = raw.indexOf('/')

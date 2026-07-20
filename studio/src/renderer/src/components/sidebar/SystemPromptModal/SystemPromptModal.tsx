@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { X, Check } from 'lucide-react'
 import { saveUserPrompt } from '../../../services/promptLibrary'
+import { FIXED_CATEGORIES } from '../../shared/LibraryCatalog/utils'
 import s from './SystemPromptModal.module.css'
 
 // The Library's create surface for a system-prompt (a prompt_library preset row). Name +
 // category + body → POST /skills/prompts. Once saved it appears in the Library's System group
 // AND the Sections modal's System tab (both read the same table). Creation lives ONLY here.
-const CATEGORIES = ['system', 'analyze', 'split', 'comment', 'diagram'] as const
+const CATEGORIES = FIXED_CATEGORIES.system
 
 interface Props {
   initialName?: string

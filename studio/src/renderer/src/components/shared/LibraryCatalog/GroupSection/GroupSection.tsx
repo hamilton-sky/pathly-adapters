@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { ChevronRight, MoreHorizontal, Plus, LayoutGrid } from 'lucide-react'
 import { Tooltip } from '../../../ui'
 import type { CatalogItemData, CatalogGroup } from '../useCatalogData'
-import { GroupIcon, buildCategoryTree } from '../utils'
+import { GroupIcon, buildCategoryTree, FIXED_CATEGORIES } from '../utils'
 import { ItemRow } from '../ItemRow/ItemRow'
 import type { ItemRowProps } from '../ItemRow/ItemRow'
 import { SubGroup } from '../SubGroup/SubGroup'
@@ -51,9 +51,13 @@ export function GroupSection({
   const supportsCategories = group.type === 'skill' || group.type === 'agent'
     || group.type === 'template' || group.type === 'fragment' || group.type === 'ability'
     || group.type === 'system'
+  // Fixed-category tables (abilities, system-prompts): categories are canonical, so ALWAYS show
+  // them as subfolders (even empty) and never offer "New category" — you add into the fixed set.
+  const fixedCats = FIXED_CATEGORIES[group.type]
+  const canCreateCategory = supportsCategories && !fixedCats
 
-  const useSubcategories = supportsCategories &&
-    group.items.some(i => i.category && i.category !== group.type)
+  const useSubcategories = !!fixedCats || (supportsCategories &&
+    group.items.some(i => i.category && i.category !== group.type))
 
   async function handleCreateCategory() {
     const trimmed = catName.trim()
@@ -74,7 +78,7 @@ export function GroupSection({
   const singularLabel = group.label.toLowerCase().replace(/s$/, '')
 
   const categoryNames = supportsCategories
-    ? Object.keys(buildCategoryTree(group.items, group.type)).filter(k => k !== '_other').sort()
+    ? Object.keys(buildCategoryTree(group.items, group.type, fixedCats)).filter(k => k !== '_other').sort()
     : []
 
   const groupHeader = (
@@ -112,7 +116,7 @@ export function GroupSection({
               <Plus size={11} />
               New {singularLabel}
             </button>
-            {supportsCategories && (
+            {canCreateCategory && (
               <button
                 type="button"
                 className={styles.menuItem}
@@ -167,7 +171,7 @@ export function GroupSection({
   )
 
   if (useSubcategories) {
-    const tree = buildCategoryTree(group.items, group.type)
+    const tree = buildCategoryTree(group.items, group.type, fixedCats)
     const treeCategories = Object.keys(tree).sort()
     return (
       <div className={styles.root}>

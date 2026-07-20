@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { X, Check } from 'lucide-react'
 import { saveAbility } from '../../../services/abilities'
+import { FIXED_CATEGORIES } from '../../shared/LibraryCatalog/utils'
 import s from './AbilityCreateModal.module.css'
 
 // The Library's create surface for a layer-3 ability (a markdown FILE). Category + name + scope
 // + body → POST /skills/abilities. Once saved it appears in the Library's Abilities group AND
 // the Sections modal's Abilities tab (both read the merged ability files). Creation lives ONLY here.
-const CATEGORIES = ['plan', 'build', 'review', 'test'] as const
+const CATEGORIES = FIXED_CATEGORIES.ability
 
 interface Props {
   initialName?: string
