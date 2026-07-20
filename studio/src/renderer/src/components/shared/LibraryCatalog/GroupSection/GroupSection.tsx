@@ -10,7 +10,7 @@ import styles from './GroupSection.module.css'
 
 type ItemCallbacks = Pick<ItemRowProps,
   'onOpenSkill' | 'onOpenFlow' | 'onInsertCell' | 'onAddCells' |
-  'onDeleteItem' | 'onMoveItem' | 'onRenameItem'
+  'onDeleteItem' | 'onMoveItem' | 'onRenameItem' | 'onDuplicateItem'
 >
 
 export interface GroupSectionProps extends ItemCallbacks {
@@ -27,7 +27,7 @@ export interface GroupSectionProps extends ItemCallbacks {
 export function GroupSection({
   group, context, collapseKey, onOpenSkill, onOpenFlow, onInsertCell, onAddCells,
   onNewItem, onDeleteItem, onDeleteCategory, onRequestDeleteCategory, onNewCategory,
-  onMoveItem, onRenameItem, onRenameCategory,
+  onMoveItem, onRenameItem, onRenameCategory, onDuplicateItem,
 }: GroupSectionProps) {
   const [open, setOpen]                   = useState(false)
   const [groupMenuOpen, setGroupMenuOpen] = useState(false)
@@ -210,6 +210,7 @@ export function GroupSection({
             onRenameCategory={fixedCats ? undefined : onRenameCategory}
             onNewItem={fixedCats ? onNewItem : undefined}
             newItemLabel={fixedCats ? newItemNoun : undefined}
+            onDuplicateItem={onDuplicateItem}
           />
         ))}
       </div>
@@ -236,6 +237,7 @@ export function GroupSection({
           onDeleteItem={onDeleteItem}
           onMoveItem={onMoveItem}
           onRenameItem={onRenameItem}
+          onDuplicateItem={onDuplicateItem}
         />
       ))}
     </div>

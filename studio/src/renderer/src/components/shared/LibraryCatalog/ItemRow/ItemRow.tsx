@@ -26,11 +26,13 @@ export interface ItemRowProps {
   onDeleteItem?: (item: CatalogItemData, type: CatalogGroup['type']) => void
   onMoveItem?: (item: CatalogItemData, type: CatalogGroup['type'], newCategory: string) => Promise<void>
   onRenameItem?: (item: CatalogItemData, type: CatalogGroup['type'], newStem: string) => Promise<void>
+  /** Copy a read-only builtin into an editable user prompt (its own file). */
+  onDuplicateItem?: (item: CatalogItemData, type: CatalogGroup['type']) => Promise<void>
 }
 
 export function ItemRow({
   item, type, groupIcon, context, displayName, categories,
-  onOpenSkill, onOpenFlow, onInsertCell, onAddCells, onDeleteItem, onMoveItem, onRenameItem,
+  onOpenSkill, onOpenFlow, onInsertCell, onAddCells, onDeleteItem, onMoveItem, onRenameItem, onDuplicateItem,
 }: ItemRowProps) {
   const isFlow     = type === 'flow'
   const isFragment = type === 'fragment'
@@ -117,9 +119,11 @@ export function ItemRow({
   } else {
     if (hasPath) menuItems.push({ label: 'Open', onClick: () => { setMenuOpen(false); onOpenSkill?.(item.path!) } })
   }
-  // A read-only builtin has no file to open — but you can still read what it sends.
+  // A read-only builtin has no file to open — but you can still read what it sends,
+  // or copy it into an editable prompt of your own.
   if (item.readOnly && item.body) {
     menuItems.push({ label: 'View prompt', onClick: () => { setMenuOpen(false); setViewing(true) } })
+    if (onDuplicateItem) menuItems.push({ label: 'Duplicate to my prompts', onClick: () => { setMenuOpen(false); void onDuplicateItem(item, type) } })
   }
   // App-shipped builtins are reference-only — no rename/move/delete (there's no row to mutate).
   const mutable = !isFragment && !item.readOnly

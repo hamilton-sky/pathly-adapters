@@ -287,6 +287,14 @@ export function Sidebar(): JSX.Element | null {
                 await createNewCatalogItem(type, category, name)
               }
             }}
+            onDuplicateItem={async (item) => {
+              // Copy a read-only builtin (analyze/split/comment/diagram preset) into an editable
+              // user prompt FILE at project scope. The builtin's display name may contain spaces,
+              // so slugify it to a filesystem-safe stem; the new file then opens in the MD editor.
+              if (!item.body) return
+              const slug = (item.name || 'prompt').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'prompt'
+              await saveUserPrompt({ kind: 'preset', category: item.category ?? 'system', name: slug, body: item.body, scope: 'project', projectRoot: projectPath })
+            }}
             onDeleteItem={async (item, type) => {
               // The two user-owned tables are FILES — delete against their own stores (not /catalog/*),
               // keyed by "<category>/<name>" + scope.

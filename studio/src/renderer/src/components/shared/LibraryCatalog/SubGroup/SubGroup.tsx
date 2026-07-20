@@ -9,7 +9,7 @@ import styles from './SubGroup.module.css'
 
 type ItemCallbacks = Pick<ItemRowProps,
   'onOpenSkill' | 'onOpenFlow' | 'onInsertCell' | 'onAddCells' |
-  'onDeleteItem' | 'onMoveItem' | 'onRenameItem'
+  'onDeleteItem' | 'onMoveItem' | 'onRenameItem' | 'onDuplicateItem'
 >
 
 export interface SubGroupProps extends ItemCallbacks {
@@ -35,7 +35,7 @@ export function SubGroup({
   label, items, subCategories, parentCategory, type, groupIcon, context,
   collapseKey, categories, onOpenSkill, onOpenFlow, onInsertCell, onAddCells,
   onDeleteItem, onRequestDeleteCategory, onNewSubcategory, onMoveItem, onRenameItem, onRenameCategory,
-  onNewItem, newItemLabel,
+  onNewItem, newItemLabel, onDuplicateItem,
 }: SubGroupProps) {
   const [open, setOpen]                   = useState(false)
   const [subMenuOpen, setSubMenuOpen]     = useState(false)
@@ -209,6 +209,7 @@ export function SubGroup({
               onDeleteItem={onDeleteItem}
               onMoveItem={onMoveItem}
               onRenameItem={onRenameItem}
+              onDuplicateItem={onDuplicateItem}
             />
           ))}
           {subCategories && Object.keys(subCategories).sort().map(subName => (
@@ -231,6 +232,7 @@ export function SubGroup({
               onMoveItem={onMoveItem}
               onRenameItem={onRenameItem}
               onRenameCategory={onRenameCategory}
+              onDuplicateItem={onDuplicateItem}
             />
           ))}
         </>

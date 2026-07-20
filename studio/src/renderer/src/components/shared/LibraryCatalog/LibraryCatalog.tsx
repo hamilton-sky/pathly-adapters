@@ -21,6 +21,7 @@ interface Props {
   onMoveItem?: (item: CatalogItemData, type: CatalogGroup['type'], newCategory: string) => Promise<void>
   onRenameItem?: (item: CatalogItemData, type: CatalogGroup['type'], newStem: string) => Promise<void>
   onRenameCategory?: (type: CatalogGroup['type'], oldName: string, newName: string) => Promise<void>
+  onDuplicateItem?: (item: CatalogItemData, type: CatalogGroup['type']) => Promise<void>
 }
 
 const CAT_TYPES: { value: CatalogGroup['type']; label: string }[] = [
@@ -33,6 +34,7 @@ const CAT_TYPES: { value: CatalogGroup['type']; label: string }[] = [
 export default function LibraryCatalog({
   context, pathlyRoot, onOpenSkill, onOpenFlow, onInsertCell, onAddCells,
   onNewItem, onDeleteItem, onDeleteCategory, onNewCategory, onMoveItem, onRenameItem, onRenameCategory,
+  onDuplicateItem,
 }: Props) {
   const [refreshKey, setRefreshKey]         = useState(0)
   const allGroups                           = useCatalogData(pathlyRoot, refreshKey)
@@ -128,6 +130,7 @@ export default function LibraryCatalog({
             onInsertCell={onInsertCell}
             onAddCells={onAddCells}
             onNewItem={onNewItem ? withRefresh(async (type, category, name) => { await onNewItem(type, category, name) }) : undefined}
+            onDuplicateItem={onDuplicateItem ? withRefresh(async (item, type) => { await onDuplicateItem(item, type) }) : undefined}
             onDeleteItem={onDeleteItem ? requestDelete : undefined}
             onDeleteCategory={onDeleteCategory}
             onRequestDeleteCategory={onDeleteCategory ? requestDeleteCategory : undefined}
