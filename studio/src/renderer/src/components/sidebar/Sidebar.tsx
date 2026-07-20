@@ -7,6 +7,7 @@ import { apiFetch } from '../../lib/config'
 import { WorkspaceTree } from './workspace-tree/WorkspaceTree'
 import LibraryCatalog from '../shared/LibraryCatalog/LibraryCatalog'
 import { SystemPromptModal } from './SystemPromptModal/SystemPromptModal'
+import { AbilityCreateModal } from './AbilityCreateModal/AbilityCreateModal'
 import SkillSplitModal from '../shared/SkillSplitModal/SkillSplitModal'
 import type { CatalogGroup, CatalogItemData } from '../shared/LibraryCatalog/useCatalogData'
 import { useMarkdownEditorStore } from '../../store/markdownEditorStore'
@@ -115,9 +116,10 @@ export function Sidebar(): JSX.Element | null {
 
   const libraryOpen = sidebarTab === 'library'
   const [showFlowWizard, setShowFlowWizard]       = useState(false)
-  // Library "New system prompt" create modal. resolve() unblocks LibraryCatalog's create Promise
-  // on close so its catalog re-fetches the newly-saved row.
+  // Library create modals (system-prompts + abilities). resolve() unblocks LibraryCatalog's
+  // create Promise on close so its catalog re-fetches the newly-saved row.
   const [sysPromptCreate, setSysPromptCreate]     = useState<{ name: string; resolve: () => void } | null>(null)
+  const [abilityCreate, setAbilityCreate]         = useState<{ name: string; resolve: () => void } | null>(null)
   const [showNewItemDialog, setShowNewItemDialog] = useState(false)
   const [newItemTarget, setNewItemTarget] = useState<{ type: 'skill' | 'agent' | 'template' | 'debug' | 'explore'; dir: string } | null>(null)
   const [splitModalItem, setSplitModalItem] = useState<{ path?: string; name: string } | null>(null)
@@ -266,11 +268,13 @@ export function Sidebar(): JSX.Element | null {
             }}
             onAddCells={(item) => setSplitModalItem(item)}
             onNewItem={async (type, category, name) => {
-              // Abilities are browse+open only in the Library (own /skills/abilities store).
-              // System-prompts create via the modal (prompt_library, NOT /catalog/*); awaiting the
-              // modal's close resolves this promise so LibraryCatalog re-fetches the new row.
-              // Every other catalog-API CRUD path guards both so the new types never hit /catalog/*.
-              if (type === 'ability') return
+              // Abilities (files) + system-prompts (prompt_library) create via their own modals,
+              // NOT /catalog/*. Awaiting the modal's close resolves this promise so LibraryCatalog
+              // re-fetches the new row. Every other catalog-API CRUD path guards both types.
+              if (type === 'ability') {
+                await new Promise<void>((resolve) => setAbilityCreate({ name: name ?? '', resolve }))
+                return
+              }
               if (type === 'system') {
                 await new Promise<void>((resolve) => setSysPromptCreate({ name: name ?? '', resolve }))
                 return
@@ -345,6 +349,14 @@ export function Sidebar(): JSX.Element | null {
           initialName={sysPromptCreate.name}
           projectRoot={projectPath}
           onClose={() => { sysPromptCreate.resolve(); setSysPromptCreate(null) }}
+        />
+      )}
+
+      {abilityCreate && (
+        <AbilityCreateModal
+          initialName={abilityCreate.name}
+          projectRoot={projectPath}
+          onClose={() => { abilityCreate.resolve(); setAbilityCreate(null) }}
         />
       )}
 
