@@ -4,7 +4,7 @@ import { Tooltip } from '../../../ui'
 import { PATHLY_DRAG_MIME } from '../../../../types'
 import type { PathlyCanvasDragItem, PathlySection } from '../../../../types'
 import type { CatalogItemData, CatalogGroup } from '../useCatalogData'
-import { GroupIcon, leafName } from '../utils'
+import { GroupIcon, leafName, FIXED_CATEGORIES } from '../utils'
 import styles from './ItemRow.module.css'
 
 const SECTION_MAP: Record<string, PathlySection> = {
@@ -117,6 +117,9 @@ export function ItemRow({
   }
   // App-shipped builtins are reference-only — no rename/move/delete (there's no row to mutate).
   const mutable = !isFragment && !item.readOnly
+  // Fixed-category tables (system-prompts, abilities) have a canonical, closed category set and
+  // no server-side re-file path — so "Move to category…" doesn't apply to them.
+  const movableType = !FIXED_CATEGORIES[type]
   if (mutable && onRenameItem && !isFlow) {
     menuItems.push({ label: 'Rename', onClick: () => {
       setMenuOpen(false)
@@ -124,7 +127,7 @@ export function ItemRow({
       setRenaming(true)
     }})
   }
-  if (mutable && hasMoveTargets) menuItems.push({ label: 'Move to category…', onClick: () => { setPickerOpen(true) } })
+  if (mutable && movableType && hasMoveTargets) menuItems.push({ label: 'Move to category…', onClick: () => { setPickerOpen(true) } })
   if (mutable && onDeleteItem)   menuItems.push({ label: 'Delete', danger: true, onClick: () => { setMenuOpen(false); onDeleteItem(item, type) } })
 
   return (

@@ -113,10 +113,16 @@ export function GroupSection({
             <button
               type="button"
               className={styles.menuItem}
-              onClick={() => { setGroupMenuOpen(false); setOpen(true); setShowItemForm(true) }}
+              onClick={() => {
+                setGroupMenuOpen(false)
+                // Fixed-category tables open their create modal directly (it collects name +
+                // category); only free-form tables need the inline name box first.
+                if (fixedCats) { void onNewItem?.(group.type) }
+                else { setOpen(true); setShowItemForm(true) }
+              }}
             >
               <Plus size={11} />
-              New {singularLabel}
+              New {newItemNoun}
             </button>
             {canCreateCategory && (
               <button
