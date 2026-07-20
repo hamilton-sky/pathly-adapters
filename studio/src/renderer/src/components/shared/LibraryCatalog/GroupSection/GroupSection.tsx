@@ -50,6 +50,7 @@ export function GroupSection({
 
   const supportsCategories = group.type === 'skill' || group.type === 'agent'
     || group.type === 'template' || group.type === 'fragment' || group.type === 'ability'
+    || group.type === 'system'
 
   const useSubcategories = supportsCategories &&
     group.items.some(i => i.category && i.category !== group.type)

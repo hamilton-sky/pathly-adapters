@@ -6,6 +6,7 @@ import { listDir, listDirs, readFile } from '../../services/pathlyApi'
 import { apiFetch } from '../../lib/config'
 import { WorkspaceTree } from './workspace-tree/WorkspaceTree'
 import LibraryCatalog from '../shared/LibraryCatalog/LibraryCatalog'
+import { SystemPromptModal } from './SystemPromptModal/SystemPromptModal'
 import SkillSplitModal from '../shared/SkillSplitModal/SkillSplitModal'
 import type { CatalogGroup, CatalogItemData } from '../shared/LibraryCatalog/useCatalogData'
 import { useMarkdownEditorStore } from '../../store/markdownEditorStore'
@@ -114,6 +115,9 @@ export function Sidebar(): JSX.Element | null {
 
   const libraryOpen = sidebarTab === 'library'
   const [showFlowWizard, setShowFlowWizard]       = useState(false)
+  // Library "New system prompt" create modal. resolve() unblocks LibraryCatalog's create Promise
+  // on close so its catalog re-fetches the newly-saved row.
+  const [sysPromptCreate, setSysPromptCreate]     = useState<{ name: string; resolve: () => void } | null>(null)
   const [showNewItemDialog, setShowNewItemDialog] = useState(false)
   const [newItemTarget, setNewItemTarget] = useState<{ type: 'skill' | 'agent' | 'template' | 'debug' | 'explore'; dir: string } | null>(null)
   const [splitModalItem, setSplitModalItem] = useState<{ path?: string; name: string } | null>(null)
@@ -262,22 +266,27 @@ export function Sidebar(): JSX.Element | null {
             }}
             onAddCells={(item) => setSplitModalItem(item)}
             onNewItem={async (type, category, name) => {
-              // Abilities browse+open only in the Library (own /skills/abilities store + the
-              // ＋Ability run-gate picker); every catalog-API CRUD path guards 'ability' so the
-              // new type never hits /catalog/* (which doesn't know it).
+              // Abilities are browse+open only in the Library (own /skills/abilities store).
+              // System-prompts create via the modal (prompt_library, NOT /catalog/*); awaiting the
+              // modal's close resolves this promise so LibraryCatalog re-fetches the new row.
+              // Every other catalog-API CRUD path guards both so the new types never hit /catalog/*.
               if (type === 'ability') return
+              if (type === 'system') {
+                await new Promise<void>((resolve) => setSysPromptCreate({ name: name ?? '', resolve }))
+                return
+              }
               if (type === 'flow') {
                 setShowFlowWizard(true)
               } else {
                 await createNewCatalogItem(type, category, name)
               }
             }}
-            onDeleteItem={async (item, type) => { if (type === 'ability') return; await deleteItemViaAPI(item, type) }}
-            onMoveItem={async (item, type, cat) => { if (type === 'ability') return; await moveCatalogItem(item, type, cat) }}
-            onRenameItem={async (item, type, stem) => { if (type === 'ability') return; await renameCatalogItem(item, type, stem) }}
-            onRenameCategory={async (type, old, n) => { if (type === 'ability') return; await renameCatalogCategory(type, old, n) }}
+            onDeleteItem={async (item, type) => { if (type === 'ability' || type === 'system') return; await deleteItemViaAPI(item, type) }}
+            onMoveItem={async (item, type, cat) => { if (type === 'ability' || type === 'system') return; await moveCatalogItem(item, type, cat) }}
+            onRenameItem={async (item, type, stem) => { if (type === 'ability' || type === 'system') return; await renameCatalogItem(item, type, stem) }}
+            onRenameCategory={async (type, old, n) => { if (type === 'ability' || type === 'system') return; await renameCatalogCategory(type, old, n) }}
             onNewCategory={async (type, name) => {
-              if (type === 'ability') return
+              if (type === 'ability' || type === 'system') return
               await apiFetch('/catalog/category/new', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -285,7 +294,7 @@ export function Sidebar(): JSX.Element | null {
               })
             }}
             onDeleteCategory={async (type, category) => {
-              if (type === 'ability') return
+              if (type === 'ability' || type === 'system') return
               await apiFetch(`/catalog/category?type=${type}&name=${encodeURIComponent(category)}`, { method: 'DELETE' })
             }}
           />
@@ -330,6 +339,14 @@ export function Sidebar(): JSX.Element | null {
         onNewItemDialogClose={() => setShowNewItemDialog(false)}
         onNewItemDialogCreated={(item) => { setShowNewItemDialog(false); setSelectedItem(item); setActivePanel('editor') }}
       />
+
+      {sysPromptCreate && (
+        <SystemPromptModal
+          initialName={sysPromptCreate.name}
+          projectRoot={projectPath}
+          onClose={() => { sysPromptCreate.resolve(); setSysPromptCreate(null) }}
+        />
+      )}
 
       {splitModalItem?.path && (
         <SkillSplitModal
