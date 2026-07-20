@@ -1,4 +1,5 @@
 import { X } from 'lucide-react'
+import MarkdownRenderer from '../../MarkdownRenderer/MarkdownRenderer'
 import s from './PromptViewModal.module.css'
 
 interface Props {
@@ -27,7 +28,9 @@ export function PromptViewModal({ title, body, onClose }: Props): JSX.Element {
             <X size={15} />
           </button>
         </div>
-        <pre className={s.body}>{body}</pre>
+        <div className={s.body}>
+          <MarkdownRenderer content={body} />
+        </div>
       </div>
     </div>
   )

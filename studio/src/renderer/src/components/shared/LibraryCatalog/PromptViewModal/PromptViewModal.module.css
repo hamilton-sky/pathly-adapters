@@ -68,14 +68,7 @@
 }
 
 .body {
-  margin: 0;
-  padding: 14px 16px;
+  padding: 6px 20px 20px;
   overflow: auto;
   min-height: 0;
-  font-family: var(--font-family-mono);
-  font-size: 12px;
-  line-height: 1.55;
-  color: var(--text-secondary);
-  white-space: pre-wrap;
-  word-break: break-word;
 }
