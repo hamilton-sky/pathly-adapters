@@ -34,9 +34,15 @@ pathly/plans/**/EVENTS.jsonl
 pathly/**/BOARD.json
 # Transient per-file AI capture artifacts (file-based result capture, read into the DB then dead):
 #   AI Summary (.summary) · AI Split (.draft) · AI Analyze (.analysis)
+#   MD-editor gallery sidecars (accumulate one entry per run): .analyses.json / .diagrams.json /
+#   .comments.json, plus the AI-Split working draft (.split.draft) — all per-user editor scratch.
 *.summary
 *.md.draft
 *.md.analysis
+*.md.analyses.json
+*.md.diagrams.json
+*.md.comments.json
+*.md.split.draft
 # Board artifact copies — duplicates of plan diagrams, written on "Add to board"
 pathly/board-artifacts/
 
