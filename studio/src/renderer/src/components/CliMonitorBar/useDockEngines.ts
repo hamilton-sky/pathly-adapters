@@ -54,8 +54,11 @@ export function useDockEngines(): DockEngine[] {
     return () => window.clearInterval(id)
   }, [engines.length])
 
-  return useMemo(
-    () => [
+  return useMemo(() => {
+    // A tab briefly sits in BOTH maps as it starts; the running row wins so one tab never yields
+    // two rows with the same id (React duplicate-key warning → rows duplicated/dropped in the dock).
+    const runningIds = new Set(engines.map((e) => e.tabId))
+    return [
       ...engines.map((e) => ({
         ...baseRow(e),
         status: 'running' as const,
@@ -65,13 +68,14 @@ export function useDockEngines(): DockEngine[] {
           tabs.find((t) => t.id === e.tabId)?.prompt?.slice(0, 80) ??
           '…',
       })),
-      ...queued.map((e) => ({
-        ...baseRow(e),
-        status: 'queued' as const,
-        elapsed: '-',
-        sub: 'queued · waiting for a slot',
-      })),
-    ],
-    [engines, queued, scrollbackByTabId, tabs, now],
-  )
+      ...queued
+        .filter((e) => !runningIds.has(e.tabId))
+        .map((e) => ({
+          ...baseRow(e),
+          status: 'queued' as const,
+          elapsed: '-',
+          sub: 'queued · waiting for a slot',
+        })),
+    ]
+  }, [engines, queued, scrollbackByTabId, tabs, now])
 }

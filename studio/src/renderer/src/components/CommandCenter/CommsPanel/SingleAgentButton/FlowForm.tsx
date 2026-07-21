@@ -27,9 +27,28 @@ const KNOWN = new Map(BOARD_FLOWS.map((f) => [f.key, f]))
 // Cached so switching to the Flow tab (which re-mounts this form) doesn't re-fetch and flicker.
 let _flowsCache: string[] | null = null
 
+// Known flows first (curated BOARD_FLOWS order), then any others alphabetically — the ONE ordering
+// used by both the initial selection and the live-loaded list, so they can never disagree.
+function orderFlowNames(names: string[]): string[] {
+  const knownFirst = BOARD_FLOWS.map((f) => f.key).filter((k) => names.includes(k))
+  const others = names.filter((n) => !KNOWN.has(n)).sort()
+  return [...knownFirst, ...others]
+}
+// Default pick for a board: the project board's own consultation, else the first ordered flow.
+function defaultFlowKey(names: string[], boardKey: string): string {
+  const ordered = orderFlowNames(names)
+  if (boardKey === 'project' && ordered.includes('project-consultation')) return 'project-consultation'
+  return ordered[0] ?? ''
+}
+
 export function FlowForm({ boardKey, running, onOpenGate, onClose }: Props): JSX.Element {
   const [serverNames, setServerNames] = useState<string[]>(_flowsCache ?? [])
-  const [flowKey, setFlowKey] = useState<string>('')
+  // Seed the selection SYNCHRONOUSLY (from the cache, or the built-in catalog) so the very first
+  // paint already has a known flow and the FlowDiagram renders immediately. Starting at '' rendered
+  // the terse "unknown flow" note for one frame before an effect set the key — the tab-switch flicker.
+  const [flowKey, setFlowKey] = useState<string>(
+    () => defaultFlowKey(_flowsCache ?? BOARD_FLOWS.map((f) => f.key), boardKey),
+  )
   const [interactive, setInteractive] = useState(true)
 
   useEffect(() => {
@@ -57,21 +76,16 @@ export function FlowForm({ boardKey, running, onOpenGate, onClose }: Props): JSX
   // flows first (curated order), then the rest alphabetically. handleRunFlow routes each to the
   // right endpoint (project-consultation → project-decompose); flows that need a feature storage
   // dir only /runner/start-run on a feature board until the backend scope guard is relaxed.
-  const orderedNames = useMemo(() => {
-    const names = serverNames.length ? serverNames : BOARD_FLOWS.map((f) => f.key)
-    const knownFirst = BOARD_FLOWS.map((f) => f.key).filter((k) => names.includes(k))
-    const others = names.filter((n) => !KNOWN.has(n)).sort()
-    return [...knownFirst, ...others]
-  }, [serverNames])
+  const orderedNames = useMemo(
+    () => orderFlowNames(serverNames.length ? serverNames : BOARD_FLOWS.map((f) => f.key)),
+    [serverNames],
+  )
 
-  // Keep the selection valid as the list loads; default the project board to its own flow.
+  // Safety net: re-default only if the live list drops the current pick (the initializer already
+  // seeded a valid one, so this is a no-op on the common path — no flicker).
   useEffect(() => {
     if (!orderedNames.length || orderedNames.includes(flowKey)) return
-    const preferred =
-      boardKey === 'project' && orderedNames.includes('project-consultation')
-        ? 'project-consultation'
-        : orderedNames[0]
-    setFlowKey(preferred)
+    setFlowKey(defaultFlowKey(orderedNames, boardKey))
   }, [orderedNames, flowKey, boardKey])
 
   const options: BoardSelectOption[] = orderedNames.map((name) => {

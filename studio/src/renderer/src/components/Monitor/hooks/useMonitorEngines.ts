@@ -46,10 +46,16 @@ export function useMonitorEngines(feature: string | null): MonitorEngine[] {
   return useMemo(() => {
     const currentStage = (fsmState?.current ?? '').toUpperCase()
     const rows: MonitorEngine[] = []
+    // Dedupe by tabId: as a run starts it briefly appears in BOTH the running and queued maps,
+    // and one tab must never yield two rows — that collides React keys in EngineSection (cards
+    // duplicated or dropped). Running is walked first, so it wins over a stale queued twin.
+    const seen = new Set<string>()
     for (const e of engines) {
       // Feature-scoped panel: only this feature's engines. Untagged one-shots (editor/AI actions
       // on '(project)') belong to the global CLI monitor, not this pipeline.
       if (feature && e.feature !== feature) continue
+      if (seen.has(e.tabId)) continue
+      seen.add(e.tabId)
       const category = (e.category ?? 'single') as EngineCategory
       const snippet =
         lastNLines(scrollbackByTabId[e.tabId] ?? [], 1)[0] ??
@@ -75,6 +81,8 @@ export function useMonitorEngines(feature: string | null): MonitorEngine[] {
     for (const e of queued) {
       // Same feature scoping — a queued flow stage for this feature shows; global one-shots don't.
       if (feature && e.feature !== feature) continue
+      if (seen.has(e.tabId)) continue
+      seen.add(e.tabId)
       const category = (e.category ?? 'single') as EngineCategory
       rows.push({
         id: e.tabId,
