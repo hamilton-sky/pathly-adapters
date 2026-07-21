@@ -1,0 +1,28 @@
+.dots {
+  display: flex;
+  gap: 5px;
+  margin: 14px 0;
+}
+
+.compact {
+  gap: 4px;
+  margin: 0;
+}
+
+.compact .segment {
+  height: 6px;
+}
+
+.segment {
+  flex: var(--seg-flex, 1);
+  height: 7px;
+  border-radius: 99px;
+  background: var(--state-color, var(--text-muted));
+}
+
+.segment[data-state='PLANNING'] { --state-color: var(--state-planning); }
+.segment[data-state='BUILDING'] { --state-color: var(--state-building); }
+.segment[data-state='REVIEWING'] { --state-color: var(--state-reviewing); }
+.segment[data-state='TESTING'] { --state-color: var(--state-testing); }
+.segment[data-state='RETRO'] { --state-color: var(--state-retro); }
+.segment[data-state='DONE'] { --state-color: var(--state-done); }

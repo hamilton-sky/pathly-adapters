@@ -1,0 +1,75 @@
+.stack {
+  padding: 0 28px 28px;
+  display: flex;
+  flex-direction: column;
+}
+
+.header,
+.row {
+  display: grid;
+  grid-template-columns: 190px 1fr 70px 104px 116px 78px 116px;
+  gap: 12px;
+  align-items: center;
+}
+
+.header {
+  padding: 0 14px 8px;
+  border-bottom: var(--border);
+}
+
+.h {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.r {
+  text-align: right;
+}
+
+.row {
+  padding: 10px 14px;
+  border: none;
+  border-bottom: var(--border-subtle);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--transition-fast);
+}
+
+.row:hover {
+  background: var(--bg-surface0);
+}
+
+.name {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dots {
+  display: flex;
+  align-items: center;
+}
+
+.num {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-base);
+  color: var(--text-secondary);
+  text-align: right;
+}
+
+.cost {
+  color: var(--green);
+}
+
+.state {
+  display: flex;
+  justify-content: flex-end;
+}

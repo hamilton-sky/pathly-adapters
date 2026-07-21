@@ -1,0 +1,138 @@
+.panel {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--bg-base);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 24px 28px 18px;
+}
+
+.titleGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.subtitle {
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btnB {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 11px;
+  border-radius: var(--radius-md);
+  border: var(--border);
+  background: var(--bg-mantle);
+  color: var(--text-secondary);
+  font: var(--font-weight-medium) var(--font-size-sm) / 1 var(--font-family-base);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.btnB:hover {
+  background: var(--btn-b-hover-bg);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.viewToggle {
+  display: flex;
+  border: var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.toggleBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 28px;
+  background: var(--bg-mantle);
+  border: none;
+  color: var(--text-muted);
+  font-size: 15px;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.toggleBtn:hover {
+  background: var(--bg-surface0);
+  color: var(--text-primary);
+}
+
+.toggleBtnActive,
+.toggleBtnActive:hover {
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+.chartSection {
+  padding: 0 28px 18px;
+}
+
+/* Chart + metric row. The layout switch swaps the grid template (B default). */
+.chartRow {
+  display: grid;
+  gap: 14px;
+  align-items: stretch;
+  grid-template-columns: 1fr 1fr;
+}
+
+.chartRow { min-width: 0; }
+.chartRow[data-layout='C'] { grid-template-columns: 1fr; }
+
+@media (max-width: 720px) {
+  .chartRow { grid-template-columns: 1fr; }
+}
+
+.divider {
+  width: 1px;
+  height: 22px;
+  background: var(--border-color);
+  margin: 0 2px;
+}
+
+.layoutLabel {
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-disabled);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 14px;
+  padding: 0 28px 28px;
+}
+
+.loading {
+  padding: 2rem 28px;
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+}

@@ -1,0 +1,28 @@
+.group {
+  display: flex;
+  border: var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.btn {
+  appearance: none;
+  border: none;
+  cursor: pointer;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-family-mono);
+  font-size: 11px;
+  font-weight: var(--font-weight-semibold);
+  padding: 5px 12px;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.btn:hover {
+  color: var(--text-secondary);
+}
+
+.btn[data-active] {
+  background: var(--accent-bg);
+  color: var(--accent);
+}

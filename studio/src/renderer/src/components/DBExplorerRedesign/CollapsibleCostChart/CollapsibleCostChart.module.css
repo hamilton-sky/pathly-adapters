@@ -1,0 +1,255 @@
+.card {
+  background: var(--bg-surface0);
+  border: var(--border);
+  border-radius: var(--radius-lg);
+  padding: 22px 26px 18px;
+  min-width: 0;
+}
+
+.loadingTag {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-disabled);
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 2px;
+}
+
+.head[data-open] {
+  margin-bottom: 22px;
+}
+
+.left {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.chevron {
+  display: inline-block;
+  color: var(--text-muted);
+  transition: transform var(--transition-base);
+}
+
+.chevron[data-open] {
+  transform: rotate(90deg);
+}
+
+.title {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.stats {
+  display: flex;
+  gap: 26px;
+}
+
+.summary {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.summaryValue {
+  font-family: var(--font-family-mono);
+  font-size: 22px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  line-height: 1.1;
+}
+
+.summaryValue[data-tone='green'] { color: var(--green); }
+.summaryValue[data-tone='teal'] { color: var(--runtime); }
+
+.summaryLabel {
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-disabled);
+}
+
+.toggles {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+/* ── Plot ─────────────────────────────────────────────── */
+.plot {
+  display: flex;
+  gap: 12px;
+}
+
+.yAxis {
+  position: relative;
+  width: 52px;
+  height: 210px;
+  flex: none;
+}
+
+.yLabel {
+  position: absolute;
+  right: 8px;
+  bottom: var(--pos, 0%);
+  transform: translateY(50%);
+  font-family: var(--font-family-mono);
+  font-size: 10px;
+  color: var(--text-disabled);
+  white-space: nowrap;
+}
+
+.body {
+  flex: 1;
+}
+
+.canvas {
+  position: relative;
+  height: 210px;
+}
+
+.gridLine {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: var(--pos, 0%);
+  border-top: 1px dashed color-mix(in srgb, var(--text-disabled) 45%, transparent);
+  pointer-events: none;
+}
+
+.gridLine[data-base] {
+  border-top: var(--border);
+}
+
+.bars {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+}
+
+.col {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  position: relative;
+}
+
+.bar {
+  width: 100%;
+  max-width: 22px;
+  height: var(--bar-h, 0%);
+  min-height: 3px;
+  border-radius: 4px 4px 2px 2px;
+  transform-origin: bottom;
+  background: linear-gradient(180deg, #8fb8ff 0%, #5a82d8 100%);
+  animation: riseIn 0.5s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+  animation-delay: var(--bar-delay, 0s);
+}
+
+.bar[data-peak] {
+  background: linear-gradient(180deg, #8fe0e6 0%, #4fb6bd 100%);
+}
+
+.bar[data-zero] {
+  min-height: 0;
+  background: transparent;
+  border-top: 2px dotted var(--text-disabled);
+  border-radius: 0;
+}
+
+.peakTag {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-family-mono);
+  font-size: 10px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--runtime);
+  white-space: nowrap;
+}
+
+.xAxis {
+  display: flex;
+  gap: 3px;
+  margin-top: 9px;
+  border-top: var(--border);
+  padding-top: 8px;
+}
+
+.xCell {
+  flex: 1;
+  text-align: center;
+}
+
+.xLabel {
+  font-family: var(--font-family-mono);
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+
+.bar[data-hover] {
+  filter: brightness(1.15);
+}
+
+.tooltip {
+  position: absolute;
+  left: var(--left, 50%);
+  top: 0;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 4px 9px;
+  background: var(--bg-surface1);
+  border: var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 5;
+}
+
+.tipDay {
+  font-family: var(--font-family-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.tipCost {
+  font-family: var(--font-family-mono);
+  font-size: 13px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+@keyframes riseIn {
+  from { transform: scaleY(0.2); opacity: 0; }
+  to { transform: scaleY(1); opacity: 1; }
+}

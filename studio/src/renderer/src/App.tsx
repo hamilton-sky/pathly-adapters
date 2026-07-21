@@ -15,7 +15,7 @@ import { Monitor } from './components/Monitor'
 import { PlanBoard } from './components/PlanBoard'
 import { Settings } from './components/Settings'
 import MarkdownEditorPanel from './components/MarkdownEditor/MarkdownEditor'
-import { DBExplorer } from './components/DBExplorer/DBExplorer'
+import { DBExplorerRedesign } from './components/DBExplorerRedesign'
 import { SkillComposition } from './components/SkillComposition/SkillComposition'
 import { Terminal } from './components/Terminal'
 import { PopoutTerminal } from './components/Terminal/PopoutTerminal'
@@ -61,7 +61,7 @@ function MainPanel(): JSX.Element {
   if (activePanel === 'monitor') return <Monitor />
   if (activePanel === 'settings') return <Settings />
   if (activePanel === 'markdown-editor') return <MarkdownEditorPanel />
-  if (activePanel === 'db-explorer') return <DBExplorer />
+  if (activePanel === 'db-explorer') return <DBExplorerRedesign />
   if (activePanel === 'skill-composition') return <SkillComposition />
   if (activePanel === 'command-center') return <CommandCenter />
   return (

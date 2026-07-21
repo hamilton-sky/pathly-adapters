@@ -1,0 +1,1 @@
+export { FeatureDetailPage } from './FeatureDetailPage'

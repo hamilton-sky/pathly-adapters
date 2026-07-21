@@ -1,0 +1,145 @@
+.wrap {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 14px;
+  padding: 0 28px 28px;
+}
+
+.empty {
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 20px;
+  border: var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface0);
+}
+
+.head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.sub {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+}
+
+.totals {
+  display: flex;
+  gap: 26px;
+  flex-wrap: wrap;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.statN {
+  font-family: var(--font-family-mono);
+  font-size: 20px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  line-height: 1.1;
+}
+
+.statL {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.table {
+  display: flex;
+  flex-direction: column;
+}
+
+.thead,
+.trow {
+  display: grid;
+  grid-template-columns: 1fr 70px 90px 120px;
+  gap: 8px;
+  align-items: center;
+}
+
+.thead {
+  padding: 6px 4px;
+  border-bottom: var(--border);
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+}
+
+.trow {
+  padding: 7px 4px;
+  border-bottom: var(--border-subtle);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+}
+
+.r {
+  text-align: right;
+}
+
+.tier {
+  display: inline-block;
+  padding: 1px 9px;
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  text-transform: capitalize;
+}
+
+.tier[data-tier='feature'] { color: var(--accent); background: color-mix(in srgb, var(--accent) 15%, transparent); }
+.tier[data-tier='project'] { color: var(--green); background: color-mix(in srgb, var(--green) 15%, transparent); }
+.tier[data-tier='global'] { color: var(--purple); background: color-mix(in srgb, var(--purple) 15%, transparent); }
+
+.projList {
+  list-style: none;
+  margin: 2px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.projRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.projName {
+  flex: 1;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.projCost {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  color: var(--green);
+}

@@ -1,0 +1,123 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: color-mix(in srgb, var(--bg-mantle) 55%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-base);
+}
+
+.overlay[data-open] {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.card {
+  width: 460px;
+  max-width: calc(100vw - 40px);
+  background: var(--bg-surface0);
+  border: var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  padding: 20px 22px 22px;
+  animation: fadeUp 0.18s ease both;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.name {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+  flex: 1;
+}
+
+.close {
+  width: 26px;
+  height: 26px;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 15px;
+}
+
+.close:hover { color: var(--text-primary); }
+
+.sub {
+  display: block;
+  margin-top: 6px;
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.sk {
+  font-size: 10px;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.sv {
+  font-family: var(--font-family-mono);
+  font-size: 16px;
+  margin-top: 4px;
+  color: var(--text-primary);
+}
+
+.sv.cost { color: var(--green); }
+
+.actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.primary {
+  flex: 1;
+  padding: 9px 14px;
+  border-radius: var(--radius-md);
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font: var(--font-weight-semibold) var(--font-size-sm) / 1 var(--font-family-base);
+  cursor: pointer;
+  transition: filter var(--transition-fast);
+}
+
+.primary:hover { filter: brightness(1.08); }
+
+.secondary {
+  padding: 9px 14px;
+  border-radius: var(--radius-md);
+  border: var(--border);
+  background: var(--bg-mantle);
+  color: var(--text-secondary);
+  font: var(--font-weight-medium) var(--font-size-sm) / 1 var(--font-family-base);
+  cursor: pointer;
+}
+
+.secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
