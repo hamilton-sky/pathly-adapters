@@ -188,6 +188,7 @@ export function TaskCard({ task: t, siblings }: Props): JSX.Element {
         prompt={preview.prompt}
         readOnly
         headingLayers={headingLayers(preview.segments)}
+        costCtx={{ engine: adapter, role: 'builder' }}
         meta={[
           { label: 'Action', value: 'Build just this task' },
           { label: 'Skill', value: 'development/build' },

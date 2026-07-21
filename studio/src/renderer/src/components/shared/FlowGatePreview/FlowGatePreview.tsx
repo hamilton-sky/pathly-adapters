@@ -7,6 +7,8 @@ import { headingLayers } from '../../../services/skillCompose'
 import { FlowGateStepper } from './FlowGateStepper/FlowGateStepper'
 import { useFlowGateStages } from './useFlowGateStages'
 import { useFlowGateState } from './useFlowGateState'
+import { PromptCostMeter } from '../PromptCostMeter/PromptCostMeter'
+import { estimateInputCost, estimateTokens } from '../PromptCostMeter/promptCost'
 import styles from './FlowGatePreview.module.css'
 
 interface Props {
@@ -51,6 +53,17 @@ export function FlowGatePreview({ flow, boardKey, interactive, onConfirm, onCanc
   const selected = gate.selectedState
   const selectedStage = stageOf(selected)
   const selectedText = gate.text[selected] ?? ''
+
+  // Estimated input cost of the WHOLE flow — every stage's effective (possibly-trimmed) prompt,
+  // each priced at its own role's model rate. Recomputed each render off gate.text so trims/edits
+  // update it live. Cheap (sum of char lengths over a handful of stages) → no memo needed.
+  let flowTokens = 0
+  let flowCost = 0
+  for (const step of steps) {
+    const t = gate.text[step.state] ?? ''
+    flowTokens += estimateTokens(t)
+    flowCost += estimateInputCost(t, { role: step.role })
+  }
 
   return createPortal(
     <div className={styles.backdrop} onClick={onCancel}>
@@ -102,6 +115,9 @@ export function FlowGatePreview({ flow, boardKey, interactive, onConfirm, onCanc
 
         {footerSlot && <div className={styles.footerSlot}>{footerSlot}</div>}
         <div className={styles.footer}>
+          {!loading && steps.length > 0 && (
+            <PromptCostMeter tokens={flowTokens} cost={flowCost} prefix="flow" />
+          )}
           <button
             type="button"
             className={styles.quietBtn}
@@ -126,6 +142,7 @@ export function FlowGatePreview({ flow, boardKey, interactive, onConfirm, onCanc
           confirmLabel="Use these sections"
           hideInsertOne
           assemble
+          costCtx={{ role: selectedStage.role }}
           headingLayers={headingLayers(selectedStage.segments)}
           onConfirm={(cells) => { gate.applySections(selected, cellsToMarkdown(cells)); setSplitOpen(false) }}
           onInsertOne={() => setSplitOpen(false)}

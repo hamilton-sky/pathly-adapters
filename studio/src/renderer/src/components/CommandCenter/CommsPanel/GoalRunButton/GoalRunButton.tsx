@@ -165,6 +165,7 @@ export function GoalRunButton({ goalId, defaultExecutor = 'single', goalText = '
           prompt={preview.prompt}
           readOnly
           headingLayers={headingLayers(preview.segments)}
+          costCtx={{ engine: adapter, role: info.agent }}
           meta={[
             { label: 'Executor', value: executorLabel },
             { label: 'Agent', value: info.agent },

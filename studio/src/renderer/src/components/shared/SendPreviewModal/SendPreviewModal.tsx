@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { SendHorizonal, X, Check, Rows3 } from 'lucide-react'
 import { PromptBanner } from '../PromptPreview/PromptPreview'
 import SkillSplitModal, { cellsToMarkdown } from '../SkillSplitModal/SkillSplitModal'
+import { PromptCostMeter } from '../PromptCostMeter/PromptCostMeter'
+import { estimateInputCost, estimateTokens, type PriceCtx } from '../PromptCostMeter/promptCost'
 import type { PromptLayer } from '../../../services/skillCompose'
 import styles from './SendPreviewModal.module.css'
 
@@ -44,6 +46,9 @@ interface Props {
   headingLayers?: Record<string, PromptLayer>
   /** Optional controls rendered in the footer, left of the buttons (e.g. a per-run progress selector). */
   footerSlot?: ReactNode
+  /** When set, show an input token+cost meter in the footer for the prompt being sent, priced at
+   *  this engine/role's model. Omitted → no meter (editor one-shots that don't opt in). */
+  costCtx?: PriceCtx
   /** Receives the (possibly edited) prompt — that exact text is what gets sent. `sectionsUsed`
    *  is true only when the user actually confirmed a Sections cell-config: server-composed
    *  gates must ONLY send a prompt_override in that case, never on a plain submit. */
@@ -54,7 +59,7 @@ interface Props {
 // Confirm-before-send: a compact gate showing the target engine + summary, an optional
 // per-item selection list (comments), and the prompt in a collapsible banner (eye = preview ·
 // pencil = edit). Whatever the banner holds on submit is the exact text dispatched.
-export default function SendPreviewModal({ title, engineLabel, fileName, prompt, meta = [], items, itemsLabel = 'Include', onToggleItem, submitLabel = 'Send', readOnly = false, headingLayers, footerSlot, onSubmit, onCancel }: Props) {
+export default function SendPreviewModal({ title, engineLabel, fileName, prompt, meta = [], items, itemsLabel = 'Include', onToggleItem, submitLabel = 'Send', readOnly = false, headingLayers, footerSlot, costCtx, onSubmit, onCancel }: Props) {
   const submitRef = useRef<HTMLButtonElement>(null)
   const [text, setText] = useState(prompt)
   const [splitOpen, setSplitOpen] = useState(false)
@@ -149,6 +154,7 @@ export default function SendPreviewModal({ title, engineLabel, fileName, prompt,
         {footerSlot && <div className={styles.footerSlot}>{footerSlot}</div>}
 
         <div className={styles.footer}>
+          {costCtx && <PromptCostMeter tokens={estimateTokens(text)} cost={estimateInputCost(text, costCtx)} />}
           <button type="button" className={styles.cancelBtn} onClick={() => setSplitOpen(true)} title="Include or exclude prompt sections for this run">
             <Rows3 size={13} /> Sections
           </button>
@@ -174,6 +180,7 @@ export default function SendPreviewModal({ title, engineLabel, fileName, prompt,
           confirmLabel="Use these sections"
           hideInsertOne
           assemble
+          costCtx={costCtx}
           headingLayers={headingLayers}
           onConfirm={(cells) => { setText(cellsToMarkdown(cells)); setSectionsUsed(true); setSplitOpen(false) }}
           onInsertOne={() => setSplitOpen(false)}

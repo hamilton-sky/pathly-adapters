@@ -6,6 +6,8 @@ import type { PromptLayer } from '../../../services/skillCompose'
 import { useStore } from '../../../store'
 import { useUiStore } from '../../../store/uiStore'
 import { useLibraryCells } from './useLibraryCells'
+import { PromptCostMeter } from '../PromptCostMeter/PromptCostMeter'
+import { estimateInputCost, estimateTokens, type PriceCtx } from '../PromptCostMeter/promptCost'
 import styles from './SkillSplitModal.module.css'
 
 export interface ProposedCell {
@@ -62,6 +64,9 @@ interface Props {
    *  folded into the sent prompt), with open-in-MD-editor. The Sections gate passes this; the
    *  editor's plain split does not (→ byte-identical). Creation stays in the Library. */
   assemble?: boolean
+  /** When set (run/flow gate), show an input token+cost meter in the footer for the
+   *  currently-assembled prompt, priced at this engine/role's model. Omitted elsewhere → no meter. */
+  costCtx?: PriceCtx
   onConfirm: (cells: ProposedCell[]) => void
   onInsertOne: (rawContent: string) => void
   onClose: () => void
@@ -106,7 +111,7 @@ function parseMdToCells(raw: string, depth: 1 | 2 | 3 = 2): ProposedCell[] {
   return cells
 }
 
-export default function SkillSplitModal({ filePath, fileName, rawContent: rawContentProp, title, subtitle, confirmLabel, hideInsertOne, headingLayers, initialUnchecked, assemble, onConfirm, onInsertOne, onClose }: Props) {
+export default function SkillSplitModal({ filePath, fileName, rawContent: rawContentProp, title, subtitle, confirmLabel, hideInsertOne, headingLayers, initialUnchecked, assemble, costCtx, onConfirm, onInsertOne, onClose }: Props) {
   const [rawContent, setRawContent] = useState(rawContentProp ?? '')
   const [cells, setCells] = useState<ProposedCell[]>(() => rawContentProp ? seedUnchecked(parseMdToCells(rawContentProp, 2), initialUnchecked) : [])
   const [splitDepth, setSplitDepth] = useState<1 | 2 | 3>(2)
@@ -143,6 +148,11 @@ export default function SkillSplitModal({ filePath, fileName, rawContent: rawCon
 
   const checkedCount = allCells.filter(c => c.checked || isLocked(c)).length
   const checkedCells = allCells.filter(c => c.checked || isLocked(c))
+
+  // Input token+cost estimate of the currently-assembled prompt — gate use only (needs a pricing
+  // context). Recomputed as cells toggle so the meter tracks include/exclude live.
+  const showCost = !!(assemble && costCtx)
+  const assembledPrompt = showCost ? cellsToMarkdown(checkedCells) : ''
 
   // Layer tabs FILTER the view only — checked state (and the confirm) always spans every cell,
   // so switching tabs can never silently drop a section.
@@ -362,6 +372,12 @@ export default function SkillSplitModal({ filePath, fileName, rawContent: rawCon
         </div>
 
         <div className={styles.footer}>
+          {showCost && (
+            <PromptCostMeter
+              tokens={estimateTokens(assembledPrompt)}
+              cost={estimateInputCost(assembledPrompt, costCtx)}
+            />
+          )}
           {!hideInsertOne && (
             <button type="button" className={styles.btnSecondary} onClick={() => onInsertOne(rawContent)}>
               Insert as one cell

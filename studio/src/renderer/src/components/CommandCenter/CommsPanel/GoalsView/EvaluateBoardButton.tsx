@@ -99,6 +99,7 @@ export function EvaluateBoardButton({ boardKey, goals = [], boardScope }: Props)
           prompt={e.isGoalTarget ? decompose.prompt : e.previewPrompt}
           readOnly
           headingLayers={headingLayers(e.isGoalTarget ? decompose.segments : e.previewSegments)}
+          costCtx={{ engine: e.selectedCli, role: e.isGoalTarget ? 'planner' : 'evaluator' }}
           meta={e.isGoalTarget
             ? [{ label: 'Rigor', value: e.rigorMode }]
             : [{ label: 'Lens', value: e.lensLabel ?? 'Built-in evaluator' }]}

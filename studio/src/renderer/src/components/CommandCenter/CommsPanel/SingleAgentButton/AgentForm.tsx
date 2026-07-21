@@ -312,6 +312,7 @@ export function AgentForm({ running, onRun, onClose }: Props): JSX.Element {
           prompt={previewPrompt}
           readOnly
           headingLayers={headingLayers(composedSegments)}
+          costCtx={{ engine, role: agent }}
           meta={[
             ...(message.trim() ? [{ label: 'Message', value: message.trim().slice(0, 50) }] : []),
             ...(sysName ? [{ label: 'System', value: sysName }] : []),
