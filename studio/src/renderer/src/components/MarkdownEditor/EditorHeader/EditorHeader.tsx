@@ -79,7 +79,7 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
   const [diagramCli,    setDiagramCli]    = useState<EditorCli>(() => loadEditorCli(CLI_KEY_DIAGRAM))
   const [diagramPreset, setDiagramPreset] = useState<string>(() => loadPreset(PRESET_KEY_DIAGRAM))
   // Confirm-before-send: holds the action + previewed prompt while the modal is open.
-  const [pendingRun, setPendingRun] = useState<{ kind: 'split' | 'analyze' | 'diagram'; prompt: string; engine: string; action: string } | null>(null)
+  const [pendingRun, setPendingRun] = useState<{ kind: 'split' | 'analyze' | 'diagram'; prompt: string; engine: string; engineSlug: string; action: string } | null>(null)
 
   const handleSplitCli   = (next: EditorCli) => { setSplitCli(next);   saveEditorCli(CLI_KEY_SPLIT, next) }
   const handleAnalyzeCli = (next: EditorCli) => { setAnalyzeCli(next); saveEditorCli(CLI_KEY_ANALYZE, next) }
@@ -158,21 +158,21 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
   const openSplitPreview = () => {
     if (!mdEditorPath) return
     const prompt = splitOncePrompt ?? getEffectivePrompt(buildSplitPrompt, STORAGE_KEY_SPLIT, mdEditorPath)
-    setPendingRun({ kind: 'split', prompt, engine: cliLabel(splitCli), action: splitTitle })
+    setPendingRun({ kind: 'split', prompt, engine: cliLabel(splitCli), engineSlug: splitCli, action: splitTitle })
   }
   const openAnalyzePreview = () => {
     if (!mdEditorPath) return
     const norm = mdEditorPath.replace(/\\/g, '/')
     const vars = { FILE: norm, SIDECAR: analysisSidecarPathFor(norm) }
     const prompt = analyzeOncePrompt ? resolvePrompt(analyzeOncePrompt, vars) : buildAnalyzePreviewPrompt(mdEditorPath)
-    setPendingRun({ kind: 'analyze', prompt, engine: cliLabel(analyzeCli), action: analyzeTitle })
+    setPendingRun({ kind: 'analyze', prompt, engine: cliLabel(analyzeCli), engineSlug: analyzeCli, action: analyzeTitle })
   }
   const openDiagramPreview = () => {
     if (!mdEditorPath) return
     const norm = mdEditorPath.replace(/\\/g, '/')
     const vars = { FILE: norm, SIDECAR: sidecarPathFor(norm) }
     const prompt = diagramOncePrompt ? resolvePrompt(diagramOncePrompt, vars) : buildDiagramPreviewPrompt(mdEditorPath)
-    setPendingRun({ kind: 'diagram', prompt, engine: cliLabel(diagramCli), action: diagramTitle })
+    setPendingRun({ kind: 'diagram', prompt, engine: cliLabel(diagramCli), engineSlug: diagramCli, action: diagramTitle })
   }
   const submitPendingRun = (prompt: string) => {
     const run = pendingRun
@@ -602,6 +602,7 @@ export default function EditorHeader({ viewMode, onToggleViewMode }: Props) {
           engineLabel={pendingRun.engine}
           fileName={skillName + '.md'}
           prompt={pendingRun.prompt}
+          costCtx={{ engine: pendingRun.engineSlug }}
           submitLabel={
             pendingRun.kind === 'split' ? 'Run Split'
             : pendingRun.kind === 'analyze' ? 'Run Analyze'

@@ -355,6 +355,7 @@ export function CommentsPanel({
           engineLabel={cliLabel(pendingSend.cli)}
           fileName={filePath.split(/[\\/]/).pop() ?? 'file'}
           prompt={sendPrompt}
+          costCtx={{ engine: pendingSend.cli }}
           itemsLabel="Comments to send"
           items={unresolved.map((c, i) => ({
             id: c.id,

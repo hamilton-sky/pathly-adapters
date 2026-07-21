@@ -65,6 +65,7 @@ export function ResummarizeButton({ messageId, hasPath = true }: Props): JSX.Ele
           fileName={r.preview.fileName}
           prompt={r.preview.prompt}
           readOnly
+          costCtx={{ engine: r.selection.type === 'engine' ? String(r.selection.id) : 'claude' }}
           meta={[{ label: 'Depth', value: STYLE_LABEL[r.style] ?? r.style }]}
           submitLabel="Run summary"
           onSubmit={() => { r.setConfirmOpen(false); r.run() }}
