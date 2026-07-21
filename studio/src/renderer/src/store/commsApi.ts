@@ -756,6 +756,9 @@ export interface StartFlowOpts {
   maxIterations?: number
   maxCostUsd?: number
   model?: string
+  /** Transient, per-run, per-stage prompt overrides from the flow gate (FlowGatePreview),
+   *  keyed by FSM state. Sent as `stage_overrides` only when non-empty. */
+  stageOverrides?: Record<string, string>
 }
 
 /**
@@ -781,6 +784,9 @@ export async function apiStartFlow(
         max_cost_usd: opts.maxCostUsd ?? 10,
         interactive: opts.interactive ?? true,
         ...(opts.model ? { model: opts.model } : {}),
+        ...(opts.stageOverrides && Object.keys(opts.stageOverrides).length
+          ? { stage_overrides: opts.stageOverrides }
+          : {}),
       }),
     })
     if (r.status === 409) return { ok: false, busy: true }
@@ -820,6 +826,10 @@ export interface RunGoalOpts {
   progress?: string
   /** A Sections-assembled prompt sent verbatim (the 'single' executor's drain-dag run). */
   promptOverride?: string
+  /** Transient, per-run, per-stage prompt overrides from the flow gate (FlowGatePreview) —
+   *  the 'team' executor's FSM flow, keyed by FSM state. Sent as `stage_overrides` only when
+   *  non-empty; single/loop ignore it (they use promptOverride). */
+  stageOverrides?: Record<string, string>
 }
 
 export type DecomposeMode = 'planner' | 'plan' | 'consultation'
@@ -832,7 +842,7 @@ export type DecomposeMode = 'planner' | 'plan' | 'consultation'
 export async function apiDecomposeGoal(
   goal_id: string,
   mode: DecomposeMode,
-  opts: { adapter?: string; projectRoot?: string; model?: string; progress?: string; abilityIds?: string[]; promptOverride?: string } = {},
+  opts: { adapter?: string; projectRoot?: string; model?: string; progress?: string; abilityIds?: string[]; promptOverride?: string; stageOverrides?: Record<string, string> } = {},
 ): Promise<{ ok: boolean; reason?: string } | null> {
   try {
     const body: Record<string, unknown> = { goal_id, mode }
@@ -843,6 +853,10 @@ export async function apiDecomposeGoal(
     // Layer-3 abilities compose into the planner prompt; a Sections trim is sent verbatim.
     if (opts.abilityIds?.length) body.ability_ids = opts.abilityIds
     if (opts.promptOverride) body.prompt_override = opts.promptOverride
+    // Transient per-stage trims from the flow gate (FlowGatePreview) — mode='consultation' only.
+    if (opts.stageOverrides && Object.keys(opts.stageOverrides).length) {
+      body.stage_overrides = opts.stageOverrides
+    }
     const r = await apiFetch('/comms/goals/decompose', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -870,6 +884,9 @@ export async function apiRunGoal(
     if (opts.projectRoot) body.project_root = opts.projectRoot
     if (opts.progress) body.progress = opts.progress
     if (opts.promptOverride) body.prompt_override = opts.promptOverride
+    if (opts.stageOverrides && Object.keys(opts.stageOverrides).length) {
+      body.stage_overrides = opts.stageOverrides
+    }
     const r = await apiFetch('/comms/goals/run', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -916,12 +933,16 @@ export async function apiRunTask(
 export async function apiDecomposeFeature(
   feature: string,
   rigor: 'light' | 'full' | 'consultation',
-  opts: { projectRoot?: string; adapter?: string } = {},
+  opts: { projectRoot?: string; adapter?: string; stageOverrides?: Record<string, string> } = {},
 ): Promise<{ ok: boolean; reason?: string; run_id?: string } | null> {
   try {
     const body: Record<string, unknown> = { feature, rigor }
     if (opts.projectRoot) body.project_root = opts.projectRoot
     if (opts.adapter) body.adapter = opts.adapter
+    // Transient per-stage trims from the flow gate (FlowGatePreview) — rigor='consultation' only.
+    if (opts.stageOverrides && Object.keys(opts.stageOverrides).length) {
+      body.stage_overrides = opts.stageOverrides
+    }
     const r = await apiFetch('/comms/features/decompose', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -938,12 +959,16 @@ export async function apiDecomposeFeature(
 export async function apiDecomposeProject(
   project: string,
   rigor: 'light' | 'full' | 'consultation',
-  opts: { projectRoot?: string; adapter?: string } = {},
+  opts: { projectRoot?: string; adapter?: string; stageOverrides?: Record<string, string> } = {},
 ): Promise<{ ok: boolean; reason?: string; run_id?: string } | null> {
   try {
     const body: Record<string, unknown> = { project, rigor }
     if (opts.projectRoot) body.project_root = opts.projectRoot
     if (opts.adapter) body.adapter = opts.adapter
+    // Transient per-stage trims from the flow gate (FlowGatePreview) — rigor='consultation' only.
+    if (opts.stageOverrides && Object.keys(opts.stageOverrides).length) {
+      body.stage_overrides = opts.stageOverrides
+    }
     const r = await apiFetch('/comms/project/decompose', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

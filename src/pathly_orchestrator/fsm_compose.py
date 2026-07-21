@@ -255,6 +255,7 @@ def build_prompt(
     goal_id: str = "",
     ability_ids: list | None = None,
     excluded_sections: list | None = None,
+    stage_override: str = "",
 ) -> str:
     agent = flow_config["agent_map"][state_name]
     feature = storage_path.name
@@ -308,7 +309,19 @@ def build_prompt(
         else (agent.split("/")[-1] if "/" in agent else agent)
     )
 
-    if "/" in agent:
+    # ONE predicate for "an override is in effect", used both to swap the body (below) and to
+    # skip the persistent stage-selection (R4). A whitespace-only override counts as absent for
+    # BOTH — so it composes normally AND still applies the stage's saved selection (no silent drop).
+    _has_override = bool(stage_override and stage_override.strip())
+    if _has_override:
+        # Flow-gate-preview (P2): a transient, per-run, per-stage prompt trim/edit from the
+        # gate — verbatim in place of the composed body ONLY (mirrors board_run's
+        # prompt_override). Skips compose entirely AND _apply_stage_selection below (never
+        # double-trim — the human already saw/edited the final text at the gate; DESIGN.md
+        # R4). The runner-contract/history/board/code tail further down still applies,
+        # exactly like a composed stage.
+        agent_text = stage_override
+    elif "/" in agent:
         from pathly_orchestrator.compose import (
             build_adapter_caps,
             compose_skill,
@@ -355,8 +368,10 @@ def build_prompt(
     # excluded sections) to the freshly-composed body. Guarded — a stage with no selection
     # is byte-identical. A single post-compose transform on agent_text, so the delicate
     # compose branches above stay untouched; composing fresh here (never storing trimmed
-    # text) is what keeps an upstream skill edit from stale-seeding the run.
-    if ability_ids or excluded_sections:
+    # text) is what keeps an upstream skill edit from stale-seeding the run. Skipped when
+    # stage_override is set (R4) — the override already IS the final text; re-applying the
+    # persistent selection on top of it would double-trim.
+    if not _has_override and (ability_ids or excluded_sections):
         agent_text = _apply_stage_selection(
             agent_text, ability_ids, excluded_sections, project_root
         )

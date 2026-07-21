@@ -1,7 +1,7 @@
 import { Sparkles } from 'lucide-react'
 import ActionPill from '../../../shared/ActionPill/ActionPill'
 import SendPreviewModal from '../../../shared/SendPreviewModal/SendPreviewModal'
-import { ConfirmModal } from '../../../shared/ConfirmModal/ConfirmModal'
+import { FlowGatePreview } from '../../../shared/FlowGatePreview/FlowGatePreview'
 import { ProgressSelect } from '../../../shared/ProgressSelect/ProgressSelect'
 import { cliLabel } from '../.././../MarkdownEditor/EditorHeader/editorCli'
 import { headingLayers } from '../../../../services/skillCompose'
@@ -110,10 +110,10 @@ export function EvaluateBoardButton({ boardKey, goals = [], boardScope }: Props)
       )}
 
       {e.confirmGoalOpen && e.isGoalTarget && (
-        <ConfirmModal
-          title="Run a full consultation?"
-          message="Consultation decomposes this goal with the full team (PO → architect → research → design → planner). It spawns several agents and can take a while before the task DAG appears."
-          confirmLabel="Run consultation"
+        <FlowGatePreview
+          flow="consultation"
+          boardKey={boardKey}
+          interactive={false}
           footerSlot={<ProgressSelect value={e.verbosity} onChange={e.setVerbosity} allowInherit label="Board updates" id="consult-progress" />}
           onConfirm={e.confirmGoal}
           onCancel={e.cancelGoal}
@@ -121,12 +121,11 @@ export function EvaluateBoardButton({ boardKey, goals = [], boardScope }: Props)
       )}
 
       {e.confirmFeatureOpen && e.isDecomposeTarget && (
-        <ConfirmModal
-          title="Run a full consultation?"
-          message={e.isProjectBoard
-            ? 'Consultation decomposes this whole board into sibling features with the full team (PO → architect → research → design → planner). It spawns several agents and can take a while before the features appear.'
-            : 'Consultation decomposes this whole board into sibling goals with the full team (PO → architect → research → design → planner). It spawns several agents and can take a while before the goals appear.'}
-          confirmLabel="Run consultation"
+        <FlowGatePreview
+          flow={e.isProjectBoard ? 'project-consultation' : 'feature-consultation'}
+          boardKey={boardKey}
+          interactive={false}
+          footerSlot={<ProgressSelect value={e.verbosity} onChange={e.setVerbosity} allowInherit label="Board updates" id="feature-consult-progress" />}
           onConfirm={e.confirmFeature}
           onCancel={e.cancelFeature}
         />

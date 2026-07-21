@@ -23,6 +23,7 @@ def start_run(
     interactive: bool = True,
     goal_id: str = "",
     on_done: Optional[Callable] = None,
+    stage_overrides: Optional[dict] = None,
 ) -> RunnerState:
     """Start a new supervised run for *topic*.  Raises ValueError if already active.
 
@@ -32,6 +33,9 @@ def start_run(
         terminal status (done/error/aborted). ``result`` carries ``status`` and, on
         failure, ``error`` — so a caller (e.g. the decompose lifecycle poster) can clear
         a "running" UI indicator that would otherwise hang forever when _loop errors out.
+    stage_overrides: transient, per-run {state: prompt} map from the flow gate preview
+        (already validated by the caller). Lives only on the returned RunnerState — never
+        persisted. See fsm_compose.build_prompt(stage_override=...).
     """
     import uuid as _uuid
 
@@ -55,6 +59,7 @@ def start_run(
             _broadcast_fn=broadcast_fn,
             interactive=interactive,
             goal_id=goal_id,
+            stage_overrides=stage_overrides or {},
         )
         state.trace_id = secrets.token_hex(16)
         _registry[topic] = state

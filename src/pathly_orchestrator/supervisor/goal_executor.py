@@ -92,6 +92,7 @@ def start_goal_run(
     progress: str = "",
     ability_ids: Optional[list] = None,
     prompt_override: str = "",
+    stage_overrides: Optional[dict] = None,
     broadcast_fn: Optional[Callable] = None,
     event_broadcast_fn: Optional[Callable] = None,
     on_start: Optional[Callable] = None,
@@ -105,6 +106,8 @@ def start_goal_run(
     Returns a dict with `ok` and, on failure, a `reason` the HTTP layer maps to a
     status code (not_found→404, not_goal→400, board_busy→409, not_implemented→501).
     executor_override wins over the goal's stored executor and is persisted back.
+    ``stage_overrides`` (the flow gate's transient {state: prompt} map) applies only to
+    the 'team' executor's FSM flow — single/loop ignore it (they use prompt_override).
     """
     from pathly_orchestrator.db.connection import get_db
     from pathly_orchestrator.db.queries.comms import set_goal_executor
@@ -231,6 +234,7 @@ def start_goal_run(
                 on_start=on_start,
                 on_done=_on_done_release,
                 start_fn=start_fn,
+                stage_overrides=stage_overrides,
             )
     except Exception:
         _release_project()
@@ -437,6 +441,7 @@ def _run_team(
     on_start,
     on_done,
     start_fn,
+    stage_overrides: Optional[dict] = None,
 ) -> dict:
     """Run an FSM flow (default team-build) on the goal's scope via start_run."""
     from pathly_orchestrator.supervisor import board_lock
@@ -522,6 +527,7 @@ def _run_team(
             # the goal-run indicator clears even when the FSM flow ends in error.
             goal_id=goal_id,
             on_done=on_done,
+            stage_overrides=stage_overrides,
         )
     except ValueError as exc:
         return {"ok": False, "reason": "board_busy", "error": str(exc)}

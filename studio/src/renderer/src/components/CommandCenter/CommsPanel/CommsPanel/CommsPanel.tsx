@@ -108,22 +108,24 @@ export function CommsPanel({ scope, mainFeature }: { scope: BoardScope; mainFeat
 
   // Run a board-scoped flow (not tied to a goal/DAG) on this board's topic. The
   // runner spawns each stage as a terminal — same path as the Start button.
-  const handleRunFlow = (flow: string, opts: { interactive: boolean }): void => {
+  const handleRunFlow = (flow: string, opts: { interactive: boolean; stageOverrides?: Record<string, string> }): void => {
     // Route through the store actions (not the raw api* calls) so every flow drives the board-run
     // pill + timer and clears via the FSM completion watch — the same live pill Evaluate gets.
     // Consultation flows can't go through /runner/start (it rejects the reserved project/global
     // scopes and needs a feature storage dir) — they dispatch via the decompose endpoints instead.
+    // All three branches honor the gate's stageOverrides now (P3 wired the decompose endpoints to
+    // the same transient per-stage channel), so a Flow-tab gate trim applies whichever route runs.
     const isProject = boardKey === 'project'
     const isGlobal = boardKey === 'global'
     if (flow === 'project-consultation' && isProject) {
-      decomposeProject(boardKey, 'consultation')
+      decomposeProject(boardKey, 'consultation', { stageOverrides: opts.stageOverrides })
       return
     }
     if (flow === 'feature-consultation' && !isProject && !isGlobal) {
-      decomposeFeature(boardKey, 'consultation')
+      decomposeFeature(boardKey, 'consultation', { stageOverrides: opts.stageOverrides })
       return
     }
-    startBoardFlow(boardKey, flow, { interactive: opts.interactive })
+    startBoardFlow(boardKey, flow, { interactive: opts.interactive, stageOverrides: opts.stageOverrides })
   }
 
   // The project root is the spawn cwd for CLI-engine summary targets.

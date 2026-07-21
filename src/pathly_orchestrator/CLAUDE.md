@@ -53,6 +53,39 @@ GET  /events/runner?topic=<topic>    ← SSE stream of runner events for Studio
 POST /shutdown                       ← graceful server shutdown (health blueprint; used by Electron on restart)
 ```
 
+**`stage_overrides` — transient per-run, per-stage prompt override (flow-gate-preview).**
+`POST /runner/start` accepts an optional `stage_overrides: {<STATE>: <prompt_text>}` body field
+— the flow analogue of `board_run.start_board_run(prompt_override=…)`, sourced from Studio's
+`FlowGatePreview` gate (a stage's Sections trim, "use once"). `blueprints/runner/_runner_bp.py`'s
+`_validate_stage_overrides` sanitizes it (dict[str,str], keys coerced to the flow's own declared
+states when the flow loads — else fail-open, per-value/total size capped at 64 KB/256 KB, blanks
+dropped; malformed input degrades to `{}`, never a 400) before `runner_start` passes it to
+`supervisor.start_run(stage_overrides=…)`, which stores it on `RunnerState.stage_overrides` —
+**in-memory, per-run only, never persisted** (contrast: the PERSISTENT
+`stage_configs.{ability_ids,excluded_sections}` selection edited in the flow-phase-inspector /
+`ConfigurePhaseModal`, which `stage_overrides` never touches or shows up in). `_loop` forwards the
+map to `/next_action` only when non-empty; `fsm_ops.next_action` picks the entry keyed by the
+CURRENT state and passes it to `fsm_compose.build_prompt(..., stage_override=…)`, which — when set
+— uses it **verbatim** in place of the composed `agent_text` for that state only (skipping compose
+AND `_apply_stage_selection`, so a gate override is never double-trimmed), while
+`_inject_prompt_vars` and the context/history/board/code tail still apply exactly as for a
+composed stage.
+
+The channel has four callers, all reusing the SAME `RunnerState.stage_overrides` → `build_prompt`
+plumbing above (no second channel): `POST /runner/start` (board Run→Flow, any flow); `POST
+/comms/goals/run` (goal-executor `team`, flow `team-build` — `blueprints/comms/goals.py` validates
+against `"team-build"` and threads it through `goal_executor.start_goal_run` → `_run_team` →
+`start_run(stage_overrides=…)`; single/loop executors ignore it, they use `prompt_override`
+instead); and the three consultation decomposers — `POST /comms/goals/decompose` (flow
+`consultation`, only when `mode=='consultation'`; planner/plan ignore it),
+`POST /comms/features/decompose` (flow `feature-consultation`), `POST /comms/project/decompose`
+(flow `project-consultation`) — each validating with the SAME `_validate_stage_overrides` helper
+before threading through `goal_decomposer.start_goal_decompose` → `_decompose_consultation` (goal
+case) or directly (feature/project case) into their own `start_run(stage_overrides=…)` call. A
+consultation override needs no "seed THIS goal" directive baked in — the supervisor appends
+`_decompose_directive` after `build_prompt` regardless of whether a stage composed or was
+overridden.
+
 ### Comms board endpoints (multi-agent message board)
 
 The comms blueprint package (`blueprints/comms/`) backs the Studio comms board — agents and

@@ -3,6 +3,7 @@ import { useCommsStore } from '../../../../store/commsStore'
 import { useElapsedProgress } from '../../../shared/RunPill/progress'
 import { RunPill } from '../../../shared/RunPill/RunPill'
 import SendPreviewModal from '../../../shared/SendPreviewModal/SendPreviewModal'
+import { FlowGatePreview } from '../../../shared/FlowGatePreview/FlowGatePreview'
 import { ProgressSelect } from '../../../shared/ProgressSelect/ProgressSelect'
 import { headingLayers } from '../../../../services/skillCompose'
 import { GoalSelect } from './GoalSelect/GoalSelect'
@@ -50,6 +51,10 @@ export function GoalRunButton({ goalId, defaultExecutor = 'single', goalText = '
   const [executor, setExecutor] = useState(defaultExecutor)
   const [adapter, setAdapter] = useState<EditorCli>(() => loadEditorCli(CLI_KEY_GOAL))
   const [confirmOpen, setConfirmOpen] = useState(false)
+  // The 'team' executor gates through the flow-specific FlowGatePreview (per-stage stepper +
+  // banner + Sections) instead of the single-prompt SendPreviewModal — team runs a multi-stage
+  // FSM flow with no single prompt to preview.
+  const [teamGateOpen, setTeamGateOpen] = useState(false)
   // Per-run board-updates verbosity override; '' = inherit the Settings default.
   const [verbosity, setVerbosity] = useState('')
 
@@ -57,6 +62,9 @@ export function GoalRunButton({ goalId, defaultExecutor = 'single', goalText = '
   const goalRunStart = useCommsStore((st) => st.goalRunStart)
   const runGoal = useCommsStore((st) => st.runGoal)
   const stopGoal = useCommsStore((st) => st.stopGoal)
+  const boards = useCommsStore((st) => st.boards)
+  // Display-only: which board key this goal lives on, for the gate's header meta row.
+  const boardKey = Object.keys(boards).find((k) => boards[k].some((m) => m.id === goalId)) ?? ''
 
   const runState: RunState = (goalRunState[goalId] as RunState | undefined) ?? 'idle'
   const isActive = runState === 'running' || runState === 'busy'
@@ -81,8 +89,10 @@ export function GoalRunButton({ goalId, defaultExecutor = 'single', goalText = '
     saveEditorCli(CLI_KEY_GOAL, v as EditorCli)
   }
 
-  // Run is preview-gated: the pill opens the modal; confirming dispatches the run.
+  // Run is preview-gated: the pill opens a modal; confirming dispatches the run. 'team' opens
+  // the flow-specific gate (per-stage stepper); single/loop keep the single-prompt preview.
   function handleRun(): void {
+    if (executor === 'team') { setTeamGateOpen(true); return }
     setConfirmOpen(true)
   }
 
@@ -95,6 +105,16 @@ export function GoalRunButton({ goalId, defaultExecutor = 'single', goalText = '
       adapter: adapterApplies && adapter !== 'claude' ? adapter : undefined,
       progress: verbosity || undefined,
       promptOverride: executor === 'single' && sectionsUsed ? finalPrompt : undefined,
+    })
+  }
+
+  // team-build's per-stage trims from the flow gate — sent verbatim per FSM state, distinct
+  // from the single/loop promptOverride channel above.
+  function doTeamRun(stageOverrides: Record<string, string>): void {
+    setTeamGateOpen(false)
+    runGoal(goalId, executor, {
+      progress: verbosity || undefined,
+      stageOverrides,
     })
   }
 
@@ -164,6 +184,16 @@ export function GoalRunButton({ goalId, defaultExecutor = 'single', goalText = '
           }
           onSubmit={(finalPrompt, sectionsUsed) => doRun(finalPrompt, sectionsUsed)}
           onCancel={() => setConfirmOpen(false)}
+        />
+      )}
+
+      {teamGateOpen && (
+        <FlowGatePreview
+          flow="team-build"
+          boardKey={boardKey}
+          interactive={false}
+          onConfirm={doTeamRun}
+          onCancel={() => setTeamGateOpen(false)}
         />
       )}
     </div>

@@ -291,6 +291,12 @@ def next_action(args: dict) -> dict:
     if state_info["current_state"] == "DONE":
         return {"done": True}
 
+    # Flow-gate-preview (P2): a transient, per-run, per-stage prompt override for THIS
+    # state, if the gate collected one (DESIGN.md ss2). "" when absent/not this state.
+    _stage_override = (args.get("stage_overrides") or {}).get(
+        state_info["current_state"]
+    ) or ""
+
     instructions = build_prompt(
         flow_config,
         state_info["current_state"],
@@ -298,6 +304,7 @@ def next_action(args: dict) -> dict:
         goal_id,
         ability_ids=_stage_ability_ids,
         excluded_sections=_stage_excluded,
+        stage_override=_stage_override,
     )
     agent = flow_config["agent_map"][state_info["current_state"]]
     menu = build_menu_payload(flow_config, state_info["current_state"], storage_path)

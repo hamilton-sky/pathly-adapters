@@ -37,7 +37,7 @@ export function useEvaluateBoardButton(boardKey: string, boardScope?: BoardScope
   const [extraPrompt, setExtraPrompt] = useState('')
   const [selectedCli, setSelectedCli] = useState<EditorCli>(() => loadEditorCli(CLI_KEY_EVAL))
   const [configOpen, setConfigOpen] = useState(false)
-  // Whole-board preview gate (SendPreviewModal) vs goal/feature consultation gates (ConfirmModal).
+  // Whole-board preview gate (SendPreviewModal) vs goal/feature consultation gates (FlowGatePreview).
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [confirmGoalOpen, setConfirmGoalOpen] = useState(false)
   const [confirmFeatureOpen, setConfirmFeatureOpen] = useState(false)
@@ -125,10 +125,12 @@ export function useEvaluateBoardButton(boardKey: string, boardScope?: BoardScope
   // Whole-board "Decompose into goals/features" — ungated dispatch, called after any
   // consultation gate has been passed. The project board decomposes into sibling
   // FEATURES one altitude up; every other board decomposes into sibling goals.
-  function dispatchFeatureDecompose(): void {
+  // stageOverrides (the flow gate's per-stage trim map) is set only when called from the
+  // consultation gate (confirmFeature) — the light/full path calls this with no argument.
+  function dispatchFeatureDecompose(stageOverrides?: Record<string, string>): void {
     const adapter = selectedCli !== 'claude' ? selectedCli : undefined
-    if (isProjectBoard) decomposeProject(boardKey, featureRigor, { adapter })
-    else decomposeFeature(boardKey, featureRigor, { adapter })
+    if (isProjectBoard) decomposeProject(boardKey, featureRigor, { adapter, stageOverrides })
+    else decomposeFeature(boardKey, featureRigor, { adapter, stageOverrides })
   }
 
   // Feature decompose is gated for the heavy consultation tier (full team run), mirroring
@@ -199,9 +201,25 @@ export function useEvaluateBoardButton(boardKey: string, boardScope?: BoardScope
       dispatch(sectionsUsed ? finalPrompt : undefined)
     },
     cancelWholeBoard: () => setConfirmOpen(false),
-    confirmGoal: () => { setConfirmGoalOpen(false); dispatch() },
+    // Consultation gate (FlowGatePreview) confirms: stageOverrides is the gate's per-stage
+    // {state: prompt} trim map — distinct from dispatch()'s single-prompt promptOverride, so
+    // these bypass dispatch() and call the decompose actions directly. No "seed THIS goal"
+    // directive is needed on the override — the supervisor appends _decompose_directive
+    // after build_prompt regardless (DESIGN.md P3 note).
+    confirmGoal: (stageOverrides: Record<string, string>) => {
+      setConfirmGoalOpen(false)
+      const adapter = selectedCli !== 'claude' ? selectedCli : undefined
+      decomposeGoal(targetGoalId, rigorMode, {
+        adapter,
+        progress: verbosity || undefined,
+        stageOverrides,
+      })
+    },
     cancelGoal: () => setConfirmGoalOpen(false),
-    confirmFeature: () => { setConfirmFeatureOpen(false); dispatchFeatureDecompose() },
+    confirmFeature: (stageOverrides: Record<string, string>) => {
+      setConfirmFeatureOpen(false)
+      dispatchFeatureDecompose(stageOverrides)
+    },
     cancelFeature: () => setConfirmFeatureOpen(false),
   }
 }

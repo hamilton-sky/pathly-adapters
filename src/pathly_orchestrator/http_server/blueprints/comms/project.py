@@ -18,6 +18,7 @@ scope) so agent posts land where the board reads them. Storage is the fixed
 from __future__ import annotations
 
 import logging
+from typing import Optional
 
 from flask import Blueprint, jsonify, request
 
@@ -86,6 +87,15 @@ def comms_project_decompose():
         adapter = (data.get("adapter") or "claude").strip()
         model = (data.get("model") or "").strip()
 
+        # Flow-gate-preview (P3): transient per-stage prompt overrides for the consultation
+        # FSM flow only — the light/full single-agent dispatch below uses prompt_override,
+        # never stage_overrides.
+        from ..runner._runner_bp import _validate_stage_overrides
+
+        stage_overrides = _validate_stage_overrides(
+            data.get("stage_overrides"), "project-consultation", project_root
+        )
+
         board = "project"
         # Canonical scope = normalized project_root (Studio + comms_context injection
         # agree on this). An explicit `project` overrides; "project" is the no-root
@@ -110,6 +120,7 @@ def comms_project_decompose():
             scope=scope,
             project_root=project_root,
             model=model,
+            stage_overrides=stage_overrides,
         )
 
     except Exception as exc:
@@ -254,6 +265,7 @@ def _dispatch_consultation(
     scope: str,
     project_root: str,
     model: str,
+    stage_overrides: Optional[dict] = None,
 ) -> tuple:
     """Dispatch a project-consultation FSM flow for the project."""
     from pathly_orchestrator.db.connection import get_db as _get_db
@@ -366,6 +378,7 @@ def _dispatch_consultation(
             broadcast_fn=_broadcast_runner,
             interactive=False,
             on_done=_on_done,
+            stage_overrides=stage_overrides,
         )
     except ValueError as exc:
         return (

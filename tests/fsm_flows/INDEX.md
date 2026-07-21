@@ -4,7 +4,7 @@
 
 FSM engine, gates, transitions, flow definitions, feedback protocol & fix-routing.
 
-16 test file(s).
+17 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -20,6 +20,7 @@ FSM engine, gates, transitions, flow definitions, feedback protocol & fix-routin
 | `test_hooks.py` | End-to-end tests for hook scripts via subprocess | 11 |
 | `test_orchestrator.py` | Tests for Conv 2: STATE.json schema validation, state/transition enforcement, concurrency | 17 |
 | `test_rollback.py` | covers no orphans after mid install failure; failed install leaves no manifest; uninstall without manifest returns empty; … | 4 |
+| `test_stage_override.py` | flow-gate-preview (P2) — the transient per-run, per-stage prompt override channel | 5 |
 | `test_stage_selection_apply.py` | flow-phase-inspector (#5) apply-at-spawn: build_prompt applies a stage's saved selection | 7 |
 | `test_team_build_per_task.py` | team-build per-task loop + goal-DAG completeness gate | 9 |
 | `test_transition_actions.py` | Tests for get_transition_actions() and validate_flow_cli() in state.py | 21 |

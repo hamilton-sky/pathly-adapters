@@ -127,12 +127,17 @@ export interface CommsState {
    *  `systemPrompt` carries the optional evaluation lens; `instructions` carries
    *  the optional extra-instructions box. */
   runEvaluator: (key: string, opts?: { adapter?: string; systemPrompt?: string; instructions?: string; progress?: string; promptOverride?: string; abilityIds?: string[] }) => void
-  /** Decompose a whole FEATURE board into sibling goals (light/full/consultation rigor). */
-  decomposeFeature: (key: string, rigor: 'light' | 'full' | 'consultation', opts?: { adapter?: string }) => void
-  /** Decompose the whole PROJECT board into sibling features (light/full/consultation rigor). */
-  decomposeProject: (key: string, rigor: 'light' | 'full' | 'consultation', opts?: { adapter?: string }) => void
-  /** Run a board-scoped FSM flow (debug/explore/test/team/…) with the board-run pill + timer. */
-  startBoardFlow: (key: string, flow: string, opts?: { interactive?: boolean }) => void
+  /** Decompose a whole FEATURE board into sibling goals (light/full/consultation rigor).
+   *  `stageOverrides` — the flow gate's transient {state: prompt} trims (FlowGatePreview),
+   *  applied only when rigor='consultation'. */
+  decomposeFeature: (key: string, rigor: 'light' | 'full' | 'consultation', opts?: { adapter?: string; stageOverrides?: Record<string, string> }) => void
+  /** Decompose the whole PROJECT board into sibling features (light/full/consultation rigor).
+   *  `stageOverrides` — the flow gate's transient {state: prompt} trims (FlowGatePreview),
+   *  applied only when rigor='consultation'. */
+  decomposeProject: (key: string, rigor: 'light' | 'full' | 'consultation', opts?: { adapter?: string; stageOverrides?: Record<string, string> }) => void
+  /** Run a board-scoped FSM flow (debug/explore/test/team/…) with the board-run pill + timer.
+   *  `stageOverrides` — the flow gate's transient {state: prompt} trims (FlowGatePreview). */
+  startBoardFlow: (key: string, flow: string, opts?: { interactive?: boolean; stageOverrides?: Record<string, string> }) => void
   /** Update a board's run state from a board_run SSE phase (running/done/stopped). */
   markBoardRunPhase: (key: string, phase: string) => void
   stopBoard: (key: string) => void
@@ -148,8 +153,10 @@ export interface CommsState {
   stopTask: (taskId: string) => void
   /** Epoch ms when a per-task run started — drives the task pill's elapsed timer. */
   taskRunStart: Record<string, number>
-  /** Decompose a goal into a task DAG (planner = fast, consultation = deep). */
-  decomposeGoal: (goal_id: string, mode: DecomposeMode, opts?: { adapter?: string; model?: string; progress?: string; abilityIds?: string[]; promptOverride?: string }) => void
+  /** Decompose a goal into a task DAG (planner = fast, consultation = deep). `stageOverrides` —
+   *  the flow gate's transient {state: prompt} trims (FlowGatePreview), applied only when
+   *  mode='consultation'. */
+  decomposeGoal: (goal_id: string, mode: DecomposeMode, opts?: { adapter?: string; model?: string; progress?: string; abilityIds?: string[]; promptOverride?: string; stageOverrides?: Record<string, string> }) => void
   /** Update a goal's run state from a goal_run/goal_decompose SSE phase. */
   markGoalRunPhase: (goal_id: string, phase: string) => void
   stopGoal: (goal_id: string) => void
@@ -667,7 +674,7 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
     set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'running' }, boardRunStart: { ...s.boardRunStart, [key]: now } }))
     if (key !== 'project' && key !== 'global') useProjectStore.getState().setActiveTopic(key)
     const projectRoot = useProjectStore.getState().projectPath.replace(/\\/g, '/').replace(/\/$/, '')
-    apiDecomposeFeature(key, rigor, { projectRoot, adapter: opts.adapter })
+    apiDecomposeFeature(key, rigor, { projectRoot, adapter: opts.adapter, stageOverrides: opts.stageOverrides })
       .then((res) => {
         if (res === null) { set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' } })); return }
         if (!res.ok && res.reason === 'board_busy') { set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'busy' } })); return }
@@ -689,7 +696,7 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
     const now = Date.now()
     set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'running' }, boardRunStart: { ...s.boardRunStart, [key]: now } }))
     const projectRoot = useProjectStore.getState().projectPath.replace(/\\/g, '/').replace(/\/$/, '')
-    apiDecomposeProject(key, rigor, { projectRoot, adapter: opts.adapter })
+    apiDecomposeProject(key, rigor, { projectRoot, adapter: opts.adapter, stageOverrides: opts.stageOverrides })
       .then((res) => {
         if (res === null) { set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' } })); return }
         if (!res.ok && res.reason === 'board_busy') { set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'busy' } })); return }
@@ -711,7 +718,11 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
     set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'running' }, boardRunStart: { ...s.boardRunStart, [key]: now } }))
     if (key !== 'project' && key !== 'global') useProjectStore.getState().setActiveTopic(key)
     const projectRoot = useProjectStore.getState().projectPath.replace(/\\/g, '/').replace(/\/$/, '')
-    apiStartFlow(key, flow, { projectRoot, interactive: opts.interactive ?? true })
+    apiStartFlow(key, flow, {
+      projectRoot,
+      interactive: opts.interactive ?? true,
+      stageOverrides: opts.stageOverrides,
+    })
       .then((res) => {
         if (res.ok) _startFsmRunWatch(key, boardParamsForKey(key).scope)
         else set((s) => ({ boardRunState: { ...s.boardRunState, [key]: res.busy ? 'busy' : 'idle' } }))

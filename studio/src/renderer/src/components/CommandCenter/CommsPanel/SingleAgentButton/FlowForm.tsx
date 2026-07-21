@@ -11,7 +11,10 @@ interface Props {
   /** Board key: a feature id, or 'project'. Scopes which flows are offered + how they run. */
   boardKey: string
   running: boolean
-  onRunFlow: (flow: string, opts: { interactive: boolean }) => void
+  /** Open the flow gate preview for the picked flow. The PARENT closes this run dialog and shows
+   *  the gate as the sole modal — so the gate appears INSTEAD of this modal, not stacked under it
+   *  (the run modal sits at a high z-index; a gate rendered inside it would render beneath it). */
+  onOpenGate: (flow: string, interactive: boolean) => void
   onClose: () => void
 }
 
@@ -24,7 +27,7 @@ const KNOWN = new Map(BOARD_FLOWS.map((f) => [f.key, f]))
 // Cached so switching to the Flow tab (which re-mounts this form) doesn't re-fetch and flicker.
 let _flowsCache: string[] | null = null
 
-export function FlowForm({ boardKey, running, onRunFlow, onClose }: Props): JSX.Element {
+export function FlowForm({ boardKey, running, onOpenGate, onClose }: Props): JSX.Element {
   const [serverNames, setServerNames] = useState<string[]>(_flowsCache ?? [])
   const [flowKey, setFlowKey] = useState<string>('')
   const [interactive, setInteractive] = useState(true)
@@ -77,10 +80,12 @@ export function FlowForm({ boardKey, running, onRunFlow, onClose }: Props): JSX.
   })
   const knownFlow = KNOWN.get(flowKey)
 
-  function run(): void {
+  // "Run flow" no longer runs immediately — it opens the flow-specific gate preview
+  // (stepper + per-stage banner + Sections) so the human can see/trim each stage's
+  // composed prompt before any agent spawns. Confirming the gate is what actually runs.
+  function openGate(): void {
     if (running || !flowKey) return
-    onRunFlow(flowKey, { interactive })
-    onClose()
+    onOpenGate(flowKey, interactive)
   }
 
   return (
@@ -142,7 +147,7 @@ export function FlowForm({ boardKey, running, onRunFlow, onClose }: Props): JSX.
         <button
           type="button"
           className={s.btnRun}
-          onClick={run}
+          onClick={openGate}
           disabled={running || !flowKey}
           title={running ? 'A run is already active on this board' : undefined}
         >

@@ -162,6 +162,34 @@ The header pills spawn one-shot CLI agents against the open file. There are two 
 
 ---
 
+## Flow gate preview (`components/shared/FlowGatePreview/`)
+
+The board's Run modal (`CommsPanel/SingleAgentButton/`) → Flow tab no longer starts a flow
+immediately: "Run flow" opens `FlowGatePreview`, a run-agnostic gate modeled on the
+single-agent gate (`SendPreviewModal`) but with a vertical stage stepper (`FlowGateStepper`,
+built on the same pure `deriveFlowSteps` the Pipeline-panel `FlowStepsPanel` dock uses) on
+top of a per-stage `PromptBanner` + `Sections` (`SkillSplitModal`, assemble mode). Every
+stage is pre-composed up front via `composeSkillPrompt` (`useFlowGateStages`); clicking a
+step swaps the banner/Sections to that stage. Confirming collects a `{state: prompt}` map
+from ONLY the Sections-confirmed stages (`useFlowGateState.buildOverrides`) and threads it as
+`stageOverrides` through `FlowForm.onRunFlow` → `CommsPanel.handleRunFlow` →
+`commsStore.startBoardFlow` → `commsApi.apiStartFlow` (body `stage_overrides`, sent only when
+non-empty). It is a **transient, per-run** override — see
+`src/pathly_orchestrator/CLAUDE.md`'s `stage_overrides` entry for the server side.
+
+The same gate + channel is now reused from two more entry points (no new channel):
+- **Team goal Run** — `GoalRunButton` opens `FlowGatePreview(flow='team-build', interactive=false)`
+  only when the goal's executor is `team` (single/loop run unchanged, ungated); confirming calls
+  `runGoal(goalId, executor, { stageOverrides })` → `apiRunGoal` → `POST /comms/goals/run`.
+- **Consultation-in-Evaluate** — `EvaluateBoardButton`'s two consultation confirms (goal-target
+  and whole-board decompose) now render `FlowGatePreview` instead of `ConfirmModal`: goal target
+  → flow `consultation`; whole-board → `feature-consultation` or `project-consultation` (board
+  scope). `useEvaluateBoardButton`'s `confirmGoal`/`confirmFeature`/`dispatchFeatureDecompose`
+  thread `stageOverrides` into `decomposeGoal`/`decomposeFeature`/`decomposeProject` → the matching
+  `/comms/*/decompose` route. The whole-board EVALUATE path (`SendPreviewModal`) is unchanged.
+
+---
+
 ## UI coding rules — non-negotiable
 
 ### Responsive to container — always

@@ -7,7 +7,7 @@ import logging
 from flask import jsonify, request
 
 from ...sse import _broadcast_runner
-from ._runner_bp import _topic_from_body, bp
+from ._runner_bp import _topic_from_body, _validate_stage_overrides, bp
 
 
 def _write_stage_telemetry(
@@ -122,6 +122,12 @@ def runner_start():
         if not isinstance(interactive, bool):
             interactive = bool(interactive)
 
+        # Flow-gate-preview (P2): transient per-stage prompt overrides — zero-cost when
+        # absent (the common case; the gate only sends the key when non-empty).
+        stage_overrides = _validate_stage_overrides(
+            data.get("stage_overrides"), data.get("flow", ""), data.get("project_root", "")
+        )
+
         # Reject up-front if a headless run routes any stage to an adapter with no headless
         # mode (copilot/antigravity today), so it fails fast with a clear message instead of
         # dying opaquely mid-pipeline when resolve_command raises. Interactive runs are exempt
@@ -161,6 +167,7 @@ def runner_start():
             autonomy=autonomy,
             broadcast_fn=_broadcast_runner,
             interactive=interactive,
+            stage_overrides=stage_overrides,
         )
         try:
             import time as _time

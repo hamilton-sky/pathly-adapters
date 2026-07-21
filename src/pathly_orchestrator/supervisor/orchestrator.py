@@ -130,14 +130,19 @@ def _loop(state: RunnerState, broadcast_fn: Optional[Callable]) -> None:
 
             # ── Call FSM next_action ──────────────────────────────────────────
             try:
-                response = fhc.next_action(
-                    {
-                        "flow": flow,
-                        "topic": topic,
-                        "project_root": project_root,
-                        "goal_id": state.goal_id or None,
-                    }
-                )
+                _next_action_args = {
+                    "flow": flow,
+                    "topic": topic,
+                    "project_root": project_root,
+                    "goal_id": state.goal_id or None,
+                }
+                # Flow-gate-preview (P2): forward the transient per-stage override map only
+                # when non-empty — zero-cost on the wire for the common (plain-submit) run.
+                # Immutable after start_run (no route mutates it mid-run), so no lock needed
+                # here, same as flow/topic/project_root/model above.
+                if state.stage_overrides:
+                    _next_action_args["stage_overrides"] = state.stage_overrides
+                response = fhc.next_action(_next_action_args)
             except Exception as exc:
                 # Belt-and-suspenders: ANY next_action failure (unreachable, socket timeout, or a
                 # malformed response) fails the run with a nameable reason instead of bubbling to the

@@ -1,0 +1,135 @@
+.stepper {
+  list-style: none;
+  margin: 0;
+  padding: 4px 6px;
+}
+
+.empty {
+  color: var(--text-muted);
+  font-size: 12px;
+  padding: 16px 12px;
+  text-align: center;
+}
+
+/* ── One step: decorative rail (dot + connector) + a clickable label column ── */
+.row {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+  background: transparent;
+  border: 2px solid var(--border);
+  color: #fff;
+}
+
+.dot[data-active] {
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--bg-accent, rgba(55, 138, 221, 0.16));
+}
+
+.connector {
+  width: 2px;
+  flex: 1;
+  min-height: 12px;
+  background: var(--border);
+  margin: 2px 0;
+}
+
+/* ── Label column: state name + role, click → select this stage's preview ── */
+.stepBtn {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 0 0 10px 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+}
+
+.state {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stepBtn:hover .state {
+  text-decoration: underline;
+}
+
+.stepBtn[data-active] .state {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.role {
+  font-size: 10px;
+  color: var(--text-muted);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Horizontal layout: steps flow left→right (dot + connector rail on top, label below),
+   scrolling sideways when a flow has many stages. Keyed off data-orientation. ── */
+.stepper[data-orientation='horizontal'] {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  overflow-x: auto;
+  padding: 8px 8px 4px;
+}
+
+.stepper[data-orientation='horizontal'] .row {
+  flex-direction: column;
+  align-items: stretch;
+  flex: 1 0 auto;
+  min-width: 92px;
+  gap: 4px;
+}
+
+.stepper[data-orientation='horizontal'] .rail {
+  flex-direction: row;
+  align-items: center;
+  width: 100%;
+  height: 16px;
+}
+
+.stepper[data-orientation='horizontal'] .connector {
+  width: auto;
+  height: 2px;
+  min-height: 0;
+  min-width: 12px;
+  flex: 1;
+  margin: 0 0 0 4px;
+}
+
+.stepper[data-orientation='horizontal'] .stepBtn {
+  flex: none;
+  padding: 2px 8px 2px 0;
+}

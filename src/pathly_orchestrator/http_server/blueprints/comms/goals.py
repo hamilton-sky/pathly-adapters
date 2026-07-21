@@ -50,6 +50,15 @@ def comms_goals_run():
         if not isinstance(prompt_override, str):
             prompt_override = ""
 
+        # Flow-gate-preview (P3): transient per-stage prompt overrides for the 'team'
+        # executor's FSM flow only — single/loop have no per-stage flow and use
+        # prompt_override instead.
+        from ..runner._runner_bp import _validate_stage_overrides
+
+        stage_overrides = _validate_stage_overrides(
+            data.get("stage_overrides"), "team-build", project_root
+        )
+
         conn = _get_db()
         goal = conn.execute(
             "SELECT board, scope FROM comms_messages WHERE id=? AND deleted_at IS NULL",
@@ -123,6 +132,7 @@ def comms_goals_run():
             progress=progress,
             ability_ids=ability_ids or None,
             prompt_override=prompt_override,
+            stage_overrides=stage_overrides,
             broadcast_fn=_broadcast_runner,
             event_broadcast_fn=_broadcast_comms,
             on_start=_on_start,
@@ -301,6 +311,15 @@ def comms_goals_decompose():
         if not isinstance(prompt_override, str):
             prompt_override = ""
 
+        # Flow-gate-preview (P3): transient per-stage prompt overrides for the
+        # mode='consultation' FSM flow only — planner/plan ignore this (see
+        # start_goal_decompose), which is why validation is unconditional here.
+        from ..runner._runner_bp import _validate_stage_overrides
+
+        stage_overrides = _validate_stage_overrides(
+            data.get("stage_overrides"), "consultation", project_root
+        )
+
         conn = _get_db()
         goal = conn.execute(
             "SELECT board, scope FROM comms_messages WHERE id=? AND deleted_at IS NULL",
@@ -369,6 +388,7 @@ def comms_goals_decompose():
             progress=progress,
             ability_ids=ability_ids or None,
             prompt_override=prompt_override,
+            stage_overrides=stage_overrides,
             broadcast_fn=_broadcast_runner,
             on_start=_on_start,
             on_done=_on_done,

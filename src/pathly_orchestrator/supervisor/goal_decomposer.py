@@ -64,6 +64,7 @@ def start_goal_decompose(
     progress: str = "",
     ability_ids: Optional[list] = None,
     prompt_override: str = "",
+    stage_overrides: Optional[dict] = None,
     broadcast_fn: Optional[Callable] = None,
     on_start: Optional[Callable] = None,
     on_done: Optional[Callable] = None,
@@ -80,6 +81,9 @@ def start_goal_decompose(
     ``ability_ids`` (layer-3 packs composed after the planner skill's fragments) and
     ``prompt_override`` (a gate "use once" Sections trim, sent verbatim) apply only to the
     single-agent planner/plan decomposers — consultation is an FSM flow with no single prompt.
+    ``stage_overrides`` (the flow gate's transient {state: prompt} map) is the consultation
+    analogue — it applies only to mode='consultation' (passed to _decompose_consultation);
+    the planner/plan branches ignore it.
     """
     from pathly_orchestrator.db.connection import get_db
 
@@ -165,6 +169,7 @@ def start_goal_decompose(
             on_start=on_start,
             on_done=on_done,
             start_fn=start_fn,
+            stage_overrides=stage_overrides,
         )
     return {
         "ok": False,
@@ -345,6 +350,7 @@ def _decompose_consultation(
     on_start,
     on_done,
     start_fn,
+    stage_overrides: Optional[dict] = None,
 ) -> dict:
     """Heavy decomposer: run the consultation FSM flow (PO→architect→…→planner)."""
     from pathly_orchestrator.supervisor import board_lock
@@ -414,6 +420,7 @@ def _decompose_consultation(
             # indicator clears even when the consultation flow ends in error.
             goal_id=goal_id,
             on_done=on_done,
+            stage_overrides=stage_overrides,
         )
     except ValueError as exc:
         return {"ok": False, "reason": "board_busy", "error": str(exc)}

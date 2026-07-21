@@ -96,6 +96,12 @@ class RunnerState:
     # told to seed THIS existing goal's DAG instead of finding-or-creating its own.
     goal_id: str = ""
 
+    # Flow-gate-preview (P2): transient, per-run, per-stage prompt overrides from the gate
+    # ({state: prompt}), keyed by FSM state. In-memory ONLY — never written to public_dict()
+    # / the runner_state DB mirror, so it dies with the run and never shows up as a "saved"
+    # config (contrast: the PERSISTENT stage_configs.{ability_ids,excluded_sections} selection).
+    stage_overrides: dict = field(default_factory=dict, repr=False, compare=False)
+
     # Resolved on-disk storage dir for this run. Goal-tier is board-scoped and nested:
     # pathly/features/<feature>/goals/<slug> (feature) or pathly/project/goals/<slug>
     # (project/global) — see goal_decomposer._goal_storage_dir. Never the flat pathly/goals/.

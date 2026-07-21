@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Optional
 
 from flask import Blueprint, jsonify, request
 
@@ -50,6 +51,15 @@ def comms_features_decompose():
         adapter = (data.get("adapter") or "claude").strip()
         model = (data.get("model") or "").strip()
 
+        # Flow-gate-preview (P3): transient per-stage prompt overrides for the consultation
+        # FSM flow only — the light/full single-agent dispatch below uses prompt_override,
+        # never stage_overrides.
+        from ..runner._runner_bp import _validate_stage_overrides
+
+        stage_overrides = _validate_stage_overrides(
+            data.get("stage_overrides"), "feature-consultation", project_root
+        )
+
         board = "feature"
         scope = feature
 
@@ -69,6 +79,7 @@ def comms_features_decompose():
             scope=scope,
             project_root=project_root,
             model=model,
+            stage_overrides=stage_overrides,
         )
 
     except Exception as exc:
@@ -199,6 +210,7 @@ def _dispatch_consultation(
     scope: str,
     project_root: str,
     model: str,
+    stage_overrides: Optional[dict] = None,
 ) -> tuple:
     """Dispatch a feature-consultation FSM flow for the feature."""
     from pathly_orchestrator.db.connection import get_db as _get_db
@@ -307,6 +319,7 @@ def _dispatch_consultation(
             broadcast_fn=_broadcast_runner,
             interactive=False,
             on_done=_on_done,
+            stage_overrides=stage_overrides,
         )
     except ValueError as exc:
         return (
