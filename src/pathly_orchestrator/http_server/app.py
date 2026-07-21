@@ -23,6 +23,7 @@ from .blueprints.runner.streams import bp as streams_bp
 from .blueprints.flows.defs import bp as flow_defs_bp
 from .blueprints.flows.stage_configs import bp as stage_configs_bp
 from .blueprints.catalog.items import bp as catalog_bp
+from .blueprints.catalog.registry import bp as registry_bp
 from .blueprints.skills.editor import bp as skills_bp
 from .blueprints.comms import all_blueprints as comms_blueprints
 from .blueprints.ops.telemetry import bp as telemetry_bp
@@ -45,6 +46,7 @@ app.register_blueprint(telemetry_bp)
 app.register_blueprint(skills_bp)
 app.register_blueprint(flow_defs_bp)
 app.register_blueprint(catalog_bp)
+app.register_blueprint(registry_bp)
 app.register_blueprint(stage_configs_bp)
 app.register_blueprint(menu_bp)
 app.register_blueprint(chat_bp)
