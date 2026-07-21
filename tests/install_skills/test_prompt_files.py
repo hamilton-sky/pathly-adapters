@@ -61,7 +61,10 @@ def test_write_rejects_bad_input(tmp_path):
     assert write_prompt_file("analyze", "bad name", "x", project_root=proj) is None
     assert write_prompt_file("../etc", "x", "y", project_root=proj) is None
     assert write_prompt_file("system", "empty", "   ", project_root=proj) is None
-    assert write_prompt_file("system", "x", "y", scope="project", project_root=None) is None
+    assert (
+        write_prompt_file("system", "x", "y", scope="project", project_root=None)
+        is None
+    )
 
 
 def test_delete_prompt_file(tmp_path):
@@ -77,20 +80,40 @@ def test_migrate_db_presets_to_files_global_and_project(tmp_path):
     proj = str(tmp_path / "proj")
     conn = get_db()
     # label == name (the modal's default) → no synthetic heading is prepended on migration.
-    create_prompt(conn, kind="preset", category="analyze", name="g", label="g",
-                  body="global body")
-    create_prompt(conn, kind="preset", category="split", name="p", label="p",
-                  body="project body", project_root=proj)
+    create_prompt(
+        conn, kind="preset", category="analyze", name="g", label="g", body="global body"
+    )
+    create_prompt(
+        conn,
+        kind="preset",
+        category="split",
+        name="p",
+        label="p",
+        body="project body",
+        project_root=proj,
+    )
     # An ability-kind row must be LEFT ALONE by the preset migration.
-    create_prompt(conn, kind="ability", category="build", name="keep", label="Keep",
-                  body="stay in db")
+    create_prompt(
+        conn,
+        kind="ability",
+        category="build",
+        name="keep",
+        label="Keep",
+        body="stay in db",
+    )
 
     migrated = migrate_db_presets_to_files(conn, proj)
     assert migrated == 2
 
     files = {r["id"]: r for r in list_prompt_files(proj)}
-    assert files["analyze/g"]["scope"] == "global" and files["analyze/g"]["body"].strip() == "global body"
-    assert files["split/p"]["scope"] == "project" and files["split/p"]["body"].strip() == "project body"
+    assert (
+        files["analyze/g"]["scope"] == "global"
+        and files["analyze/g"]["body"].strip() == "global body"
+    )
+    assert (
+        files["split/p"]["scope"] == "project"
+        and files["split/p"]["body"].strip() == "project body"
+    )
 
     # Preset DB rows are gone; the ability row survives; a second run is a no-op.
     assert list_prompts(conn, kind="preset", project_root=proj) == []
@@ -102,8 +125,15 @@ def test_migrate_preserves_custom_label(tmp_path):
     """A DB label the body wouldn't reproduce is kept as a leading heading on migration."""
     proj = str(tmp_path / "proj")
     conn = get_db()
-    create_prompt(conn, kind="preset", category="system", name="terse",
-                  label="Very terse", body="No headings here.", project_root=proj)
+    create_prompt(
+        conn,
+        kind="preset",
+        category="system",
+        name="terse",
+        label="Very terse",
+        body="No headings here.",
+        project_root=proj,
+    )
     assert migrate_db_presets_to_files(conn, proj) == 1
     row = read_prompt_file("system/terse", proj)
     assert row is not None and row["label"] == "Very terse"

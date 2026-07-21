@@ -189,7 +189,9 @@ def test_runner_start_validates_stage_overrides(client, tmp_path):
 
     assert r.status_code == 200
     call_kwargs = mock_start.call_args.kwargs
-    assert call_kwargs["stage_overrides"] == {"BUILDING": "Custom trimmed build prompt."}
+    assert call_kwargs["stage_overrides"] == {
+        "BUILDING": "Custom trimmed build prompt."
+    }
 
 
 def test_runner_start_omits_stage_overrides_defaults_to_empty(client, tmp_path):

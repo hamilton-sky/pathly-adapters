@@ -125,7 +125,9 @@ def runner_start():
         # Flow-gate-preview (P2): transient per-stage prompt overrides — zero-cost when
         # absent (the common case; the gate only sends the key when non-empty).
         stage_overrides = _validate_stage_overrides(
-            data.get("stage_overrides"), data.get("flow", ""), data.get("project_root", "")
+            data.get("stage_overrides"),
+            data.get("flow", ""),
+            data.get("project_root", ""),
         )
 
         # Reject up-front if a headless run routes any stage to an adapter with no headless

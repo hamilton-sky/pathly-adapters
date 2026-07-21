@@ -203,7 +203,8 @@ def _drop_sections(text: str, excluded: set[str]) -> str:
     use-once Sections trim). A block runs from its ``## `` line to the next ``## ``/``# ``
     heading or EOF; ``### `` and body lines inside it go too. Only H2 sections are ever
     trimmable — the gate never lists H1 (the skill title) or locked fragment sections for
-    exclusion, so this can never drop platform glue (board CRUD / progress / completion)."""
+    exclusion, so this can never drop platform glue (board CRUD / progress / completion).
+    """
     if not excluded:
         return text
     out: list[str] = []
@@ -229,7 +230,8 @@ def _apply_stage_selection(
     """Apply a per-stage flow-phase-inspector selection to the freshly-composed stage body
     (#5): drop excluded ``##`` sections, then append the selected layer-3 abilities AFTER the
     body — mirroring ``compose_skill_segments(extra_segments=…)`` on the board-run path. Pure
-    and guarded (called only when a selection exists), so a stage with none is byte-identical."""
+    and guarded (called only when a selection exists), so a stage with none is byte-identical.
+    """
     text = agent_text
     if excluded_sections:
         text = _drop_sections(

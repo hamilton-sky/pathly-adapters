@@ -36,7 +36,9 @@ def _validate_stage_overrides(raw, flow_name: str, project_root: str) -> dict:
     try:
         from pathly_orchestrator.fsm_ops import _load_flow
 
-        states = set((_load_flow(flow_name, project_root or None) or {}).get("states") or [])
+        states = set(
+            (_load_flow(flow_name, project_root or None) or {}).get("states") or []
+        )
     except Exception:
         states = set()
 

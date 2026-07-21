@@ -30,7 +30,9 @@ def test_build_prompt_stage_override_verbatim_and_tail_appended(tmp_path, monkey
     context/history/board tail still appends, exactly like a composed stage."""
     import pathly_orchestrator.fsm_compose as fsm_compose
 
-    mock_load_agent_text = MagicMock(return_value="SHOULD NOT APPEAR — compose was skipped")
+    mock_load_agent_text = MagicMock(
+        return_value="SHOULD NOT APPEAR — compose was skipped"
+    )
     monkeypatch.setattr(fsm_compose, "_load_agent_text", mock_load_agent_text)
 
     storage_path = _storage(tmp_path)

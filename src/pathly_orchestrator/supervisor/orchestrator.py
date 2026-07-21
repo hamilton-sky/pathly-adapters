@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import secrets
 import time
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 from .interactions import _await_agent_question
 from .orchestrator_stage import _resolve_stage_supervised  # noqa: F401
@@ -130,7 +130,7 @@ def _loop(state: RunnerState, broadcast_fn: Optional[Callable]) -> None:
 
             # ── Call FSM next_action ──────────────────────────────────────────
             try:
-                _next_action_args = {
+                _next_action_args: dict[str, Any] = {
                     "flow": flow,
                     "topic": topic,
                     "project_root": project_root,

@@ -64,7 +64,9 @@ describe('aiRouter.runJob', () => {
     )
     // onExit must be subscribed before spawn (lifecycle invariant).
     expect(onExit).toHaveBeenCalledTimes(1)
-    expect(buildArgvMock).toHaveBeenCalledWith('claude', 'summarize this', { streamJson: true })
+    // A summarize job writes a sibling .summary file, so it spawns in json mode (not stream-json)
+    // — see runEngineCancellable's fileWrite branch.
+    expect(buildArgvMock).toHaveBeenCalledWith('claude', 'summarize this', { jsonOutput: true })
     expect(spawn).toHaveBeenCalledTimes(1)
     const [tabId, cwd, command, argv] = spawn.mock.calls[0]
     expect(typeof tabId).toBe('string')

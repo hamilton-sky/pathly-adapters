@@ -98,7 +98,8 @@ def list_prompt_files(
     project_root: str | None = None, *, category: str | None = None
 ) -> list[dict]:
     """Every user prompt, global + project merged — a project prompt overrides a global one
-    on the same ``<category>/<name>``. Optionally filtered by ``category``. Sorted by id."""
+    on the same ``<category>/<name>``. Optionally filtered by ``category``. Sorted by id.
+    """
     merged = _scan(_global_root(), "global")
     merged.update(_scan(_project_root_dir(project_root), "project"))
     rows = [merged[k] for k in sorted(merged)]
@@ -206,9 +207,12 @@ def migrate_db_presets_to_files(conn, project_root: str | None = None) -> int:
         existing = root / category / f"{name}.md"
         try:
             if not existing.is_file():
-                if write_prompt_file(
-                    category, name, body, project_root=project_root, scope=scope
-                ) is None:
+                if (
+                    write_prompt_file(
+                        category, name, body, project_root=project_root, scope=scope
+                    )
+                    is None
+                ):
                     continue
             delete_prompt(conn, r["id"])
             migrated += 1
