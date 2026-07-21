@@ -138,6 +138,7 @@ skills:
   # carries it). start_board_run injects the <fsm_feature>/<feature_path> placeholders it needs.
   planning/evaluate:
     fragments:
+      - code-query
       - comms-post
       - completion-report
 

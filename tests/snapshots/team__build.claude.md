@@ -277,6 +277,15 @@ When you need to understand code **structure** — where a symbol is defined, wh
 blast radius of a change — ask Pathly's code-knowledge graph first. It is precise and fast, and each
 query is logged to the board as shared context for other agents.
 
+**Reach it whichever way your tools allow — check your own tool list, don't assume:**
+- If you have the **MCP code-tools** (`mcp__codebase-memory-mcp__{search_graph,query_graph,trace_path,
+  get_architecture}` and/or `mcp__serena__{find_symbol,get_symbols_overview,find_referencing_symbols}`),
+  **call them directly** — they ARE the graph + LSP the `op`s below describe (`symbol` → `find_symbol`;
+  `callers`/`impact` → `query_graph`/`trace_path`; whole-file/arch structure → `get_symbols_overview`/
+  `get_architecture`). No Bash needed — this is how the no-Bash roles reach the graph.
+- If you have **Bash**, use the HTTP proxy + CLI fallback below.
+- A few roles have **both** — prefer the MCP tools for one symbol, the proxy for a broad pattern sweep.
+
 ```bash
 curl -s -X POST http://127.0.0.1:8765/code/query -H "Content-Type: application/json" -d '{
   "op": "symbol",
