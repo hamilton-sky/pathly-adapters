@@ -89,6 +89,10 @@ export function CollapsibleCostChart({
 
   const max = Math.max(...series, 0.001)
   const n = series.length
+  const hoverH = hover !== null ? barHeight(series[hover], max, scale) : 0
+  // Clamp the tooltip's horizontal centre so the edge bars (esp. the peak) don't
+  // render half-off the plot.
+  const tipLeft = hover !== null ? Math.min(94, Math.max(6, ((hover + 0.5) / n) * 100)) : 50
 
   return (
     <div className={styles.card}>
@@ -165,7 +169,7 @@ export function CollapsibleCostChart({
               {hover !== null && (
                 <div
                   className={styles.tooltip}
-                  style={{ ['--left' as string]: `${((hover + 0.5) / n) * 100}%` } as React.CSSProperties}
+                  style={{ ['--left' as string]: `${tipLeft}%`, ['--bottom' as string]: `${hoverH}%` } as React.CSSProperties}
                 >
                   <span className={styles.tipDay}>{fmtDay(dateAt(startDate, hover))}</span>
                   <span className={styles.tipCost}>${series[hover].toFixed(2)}</span>

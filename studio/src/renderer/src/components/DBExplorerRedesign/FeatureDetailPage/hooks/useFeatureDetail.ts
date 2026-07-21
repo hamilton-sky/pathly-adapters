@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import type { FeatureData } from '../../types'
 import type { TransitionData } from '../../../DBExplorer/dbExplorerData'
 import { fetchPricingTable, type PricingTable } from '../../../DBExplorer/costUtils'
@@ -56,23 +56,40 @@ export function useFeatureDetail(feature: FeatureData | null): UseFeatureDetail 
   const [loading, setLoading] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
   const [pricingTable, setPricingTable] = useState<PricingTable | null>(null)
+  // Tracks whether this feature has loaded once, so background refreshes don't
+  // flash the full-page "Loading…" state (which caused a 2–4s flicker).
+  const hasDataRef = useRef(false)
 
   useEffect(() => {
     fetchPricingTable().then(setPricingTable)
   }, [])
 
+  // Reset the first-load flag when the viewed feature changes (declared before
+  // the fetch effect so it runs first on a feature switch).
+  useEffect(() => { hasDataRef.current = false }, [feature?.name])
+
   useEffect(() => {
     if (!feature) { setData(EMPTY); return }
-    setLoading(true)
+    let cancelled = false
+    // Only show the full-page loading state on the FIRST load of a feature;
+    // the 4s live-refresh poll swaps data in silently.
+    if (!hasDataRef.current) setLoading(true)
     Promise.all([
       window.pathly.db.events(feature.name),
       window.pathly.db.otel(feature.name).catch(() => [] as DbOtelSpan[]),
     ])
       .then(([rawEvents, otelSpans]) => {
+        if (cancelled) return
         setData({ transitions: eventsToTransitions(rawEvents), rawEvents, otelSpans })
+        hasDataRef.current = true
       })
-      .catch(() => setData(EMPTY))
-      .finally(() => setLoading(false))
+      .catch(() => {
+        // Keep the last good data on a transient background-poll failure; only
+        // clear when we never had data (initial load failed).
+        if (!cancelled && !hasDataRef.current) setData(EMPTY)
+      })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
   }, [feature?.name, refreshKey])
 
   // Live-refresh while the run is active so late BILLING_UPDATE / AGENT_DONE
