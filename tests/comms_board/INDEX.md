@@ -46,6 +46,6 @@ Comms board / message-board subsystem — messages, tasks, artifacts, goals, con
 | `test_comms_task_run.py` | POST /comms/tasks/run — ad-hoc single-task execution from the Goals & Tasks view | 9 |
 | `test_comms_tasks_claim_fail.py` | Tests for POST /comms/tasks/claim and POST /comms/tasks/fail (DAG scheduler routes) | 13 |
 | `test_comms_tasks_status.py` | Guaranteed per-task progress for the SINGLE executor (route-level status posts) | 5 |
-| `test_comms_write_perm.py` | Tests for Phase 13 — role-based write permissions | 31 |
+| `test_comms_write_perm.py` | Tests for Phase 13 — role-based write permissions | 33 |
 | `test_phase_board_post.py` | unified-ai-routing Conv 6 — /record_phase mirrors phase boundaries onto the board | 3 |
 | `test_post_artifact_indexing.py` | Regression (unified-ai-routing review): /comms/post must call index_artifact_async | 1 |

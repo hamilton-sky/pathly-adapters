@@ -156,6 +156,72 @@ def test_runner_start_launches_run(client, tmp_path):
     assert call_kwargs["max_cost_usd"] == 2.0
 
 
+def test_runner_start_validates_stage_overrides(client, tmp_path):
+    """stage_overrides is validated + forwarded to start_run (flow-gate-preview P2): an
+    unknown state key and a blank value are dropped; a real 'team' flow state's value
+    survives verbatim."""
+    c, _ = client
+    topic = "ep-start-stage-overrides"
+    _make_runner_dir(tmp_path, topic)
+
+    mock_state = MagicMock()
+    mock_state.run_id = "test-run-id-ovr"
+    mock_state.public_dict.return_value = {"status": "running", "topic": topic}
+
+    with patch(
+        "pathly_orchestrator.supervisor.start_run", return_value=mock_state
+    ) as mock_start:
+        r = c.post(
+            "/runner/start",
+            json={
+                "topic": topic,
+                "flow": "team",
+                "project_root": str(tmp_path),
+                "max_iterations": 5,
+                "max_cost_usd": 2.0,
+                "stage_overrides": {
+                    "BUILDING": "Custom trimmed build prompt.",
+                    "NOT_A_REAL_STATE": "should be dropped",
+                    "PLANNING": "",
+                },
+            },
+        )
+
+    assert r.status_code == 200
+    call_kwargs = mock_start.call_args.kwargs
+    assert call_kwargs["stage_overrides"] == {"BUILDING": "Custom trimmed build prompt."}
+
+
+def test_runner_start_omits_stage_overrides_defaults_to_empty(client, tmp_path):
+    """A plain-submit body (no stage_overrides key) forwards {} — behavior-identical to
+    before this feature (zero-cost common path)."""
+    c, _ = client
+    topic = "ep-start-no-overrides"
+    _make_runner_dir(tmp_path, topic)
+
+    mock_state = MagicMock()
+    mock_state.run_id = "test-run-id-none"
+    mock_state.public_dict.return_value = {"status": "running", "topic": topic}
+
+    with patch(
+        "pathly_orchestrator.supervisor.start_run", return_value=mock_state
+    ) as mock_start:
+        r = c.post(
+            "/runner/start",
+            json={
+                "topic": topic,
+                "flow": "team",
+                "project_root": str(tmp_path),
+                "max_iterations": 5,
+                "max_cost_usd": 2.0,
+            },
+        )
+
+    assert r.status_code == 200
+    call_kwargs = mock_start.call_args.kwargs
+    assert call_kwargs["stage_overrides"] == {}
+
+
 def test_runner_start_409_when_already_active(client, tmp_path):
     """start_run raises ValueError → endpoint must return 409."""
     c, _ = client

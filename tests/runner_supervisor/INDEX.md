@@ -12,7 +12,7 @@ Runner control loop, supervisor, spawn channel, lane/worktree isolation, file-cl
 | `test_isolation.py` | Tests for supervisor/isolation.py — LaneIsolation workspace seam | 11 |
 | `test_runner.py` | Unit tests for pathly_orchestrator.runner | 20 |
 | `test_runner_contract.py` | The runner contract injected by build_prompt — headless agents must never self-drive the FSM | 2 |
-| `test_runner_endpoints.py` | Tests for /runner/* control endpoints and /events/runner SSE (Conv 3 — Phases 8-10) | 36 |
+| `test_runner_endpoints.py` | Tests for /runner/* control endpoints and /events/runner SSE (Conv 3 — Phases 8-10) | 38 |
 | `test_runner_fsm_integration.py` | Integration tests: the REAL FSM driven through the REAL driver loops | 5 |
 | `test_services.py` | Tests for the services layer. No fixture declarations needed — conftest._isolate_db is autouse | 10 |
 | `test_spawn_channel.py` | The topic-independent terminal spawn channel | 4 |
