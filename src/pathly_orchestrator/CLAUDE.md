@@ -9,7 +9,18 @@ Features advance through: `STORMING -> PLANNING -> DESIGNING -> BUILDING -> REVI
 Each transition is driven by events written to the central SQLite DB (`~/.pathly/pathly.db`).
 
 **State & flow storage — the DB is authoritative:**
-- **FSM state** lives in the `fsm_state` table (source of truth). `STATE.json` directly in the feature dir (`pathly/features/<feature>/`; legacy `pathly/plans/<feature>/`, still resolved) is a **synchronized mirror** written after every transition (`eventlog.write_state` writes the DB first, then the file atomically). `next_action`/`complete_stage` read the DB and only fall back to `STATE.json` when the DB has no row. The file is still read *directly* by the scope gate (`build_baseline`), Studio feature-discovery, and the CLI — a mirror, not redundant; removing it would need a migration, not a delete.
+- **FSM state** lives in the `fsm_state` table (source of truth). `STATE.json` directly in the feature dir (`pathly/features/<feature>/`; legacy `pathly/plans/<feature>/`, still resolved) is a **DB→disk EXPORT** written after every transition (`eventlog.write_state` writes the DB first, then the file atomically). `next_action`/`complete_stage` read the DB and only fall back to `STATE.json` when the DB has no row. The only remaining direct readers are allow-listed DB-first fallbacks (scope gate `build_baseline`, FSM recovery, feedback-routing retry counts) and the human CLI (`pathly-back`/`-log`/discovery globs) — Studio reads `/db/features` instead (state-one-authority; enforced by `scripts/check_no_mirror_reads.py`).
+
+**Disk-file classification (state-one-authority):** *the SQLite DB is the single runtime authority; every per-feature disk file is a SEED (read once into the DB) or an EXPORT (written DB→disk) — never round-tripped for a runtime decision.*
+
+| File | Class | Direction | DB authority |
+|---|---|---|---|
+| `STATE.json` | EXPORT (git-trackable) | DB→disk, atomic, every transition | `fsm_state` |
+| `BOARD.json` | EXPORT (gitignored) | DB→disk, debounced (`board_mirror.py`) | `comms_*` |
+| `EVENTS.jsonl` | EXPORT (gitignored; rewritten from the DB on every server start) | DB→disk, debounced (`event_mirror.py`) | `fsm_events` |
+| `ARTIFACTS.jsonl` | **DROPPED** — artifact metadata lives in `BOARD.json`; reconcile attaches the stage's declared `<out_path>` directly | — | `comms_artifacts` |
+| `*.flow.yaml` | SEED | disk→DB on server start (`_refresh_flows`) | `flow_nodes`/`flow_yaml` |
+| `abilities/*.md`, `prompts/*.md` | SEED (file *is* authority) | disk→compose | n/a |
 - **Flows** load **DB-first at runtime** (`_load_flow`): `flow_nodes`/`flow_edges` → `flow_yaml` blob → packaged `.flow.yaml`. The `core/flows/*.flow.yaml` files are the **version-controlled seed**, re-synced into the DB on every server start (`_refresh_flows`). The filesystem read is a seed + resilience fallback (DB-unavailable / `project_root=None` CLI), not live config.
 
 ## HTTP endpoints
@@ -333,7 +344,7 @@ Two sanitization sites:
 and then any remaining leading horizontal-rule lines, so the sanitized prompt is guaranteed
 not to start with `-` regardless of source.
 
-## Result split — stdout vs EVENTS.jsonl
+## Result split — stdout vs central DB
 
 When a PTY stage exits, the supervisor merges two sources:
 

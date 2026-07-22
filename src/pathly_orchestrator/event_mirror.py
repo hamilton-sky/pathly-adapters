@@ -52,9 +52,7 @@ def event_mirror_path(feature_dir: "str | Path | None") -> Path | None:
     return Path(feature_dir) / "EVENTS.jsonl"
 
 
-def serialize_events(
-    conn: sqlite3.Connection, project_root: str, feature: str
-) -> str:
+def serialize_events(conn: sqlite3.Connection, project_root: str, feature: str) -> str:
     """The EVENTS.jsonl body for (project_root, feature): every fsm_events row in seq order,
     one compact JSON object per line (exactly what ``read_events`` returns — the canonical
     event reader — including its ``seq`` ordering key).
@@ -158,7 +156,8 @@ _flusher_started = False
 def flush_dirty(conn: sqlite3.Connection) -> int:
     """Drain the dirty set and rewrite each feature's EVENTS.jsonl. Synchronous and
     best-effort — the unit the background thread AND tests call. Returns the count written
-    (a no-op change-guard hit still counts as written/True; a no-events feature does not)."""
+    (a no-op change-guard hit still counts as written/True; a no-events feature does not).
+    """
     with _dirty_lock:
         pending = list(_dirty)
         _dirty.clear()
@@ -194,7 +193,8 @@ def mark_event_dirty(
     feature_dir: "str | Path", project_root: str, feature: str
 ) -> None:
     """Queue a feature's event log for a debounced EVENTS.jsonl rewrite, lazily starting the
-    flusher thread. Best-effort — never raises into the caller (``eventlog.append_event``)."""
+    flusher thread. Best-effort — never raises into the caller (``eventlog.append_event``).
+    """
     global _flusher_started
     try:
         key = (str(feature_dir), str(project_root), str(feature))

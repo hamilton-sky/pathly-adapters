@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useStore } from '../../store'
-import { fsmPing, readFile, listDir } from '../../services/pathlyApi'
+import { fsmPing, listDir } from '../../services/pathlyApi'
+import { fetchDbFeatureMap } from '../../store/commsApi'
 import { Tooltip } from '../ui/Tooltip/Tooltip'
 import styles from './Monitor.module.css'
 
@@ -32,28 +33,18 @@ async function runHealthChecks(projectPath: string, topic: string | null): Promi
     return items
   }
 
-  // 2. STATE.json presence
-  const roots = [
-    `${projectPath}/pathly/features/${topic}`,
-    `${projectPath}/pathly/debugs/${topic}`,
-    `${projectPath}/pathly/explorations/${topic}`,
-  ]
-
-  let stateFound = false
-  for (const root of roots) {
-    try {
-      const content = await readFile(`${root}/STATE.json`)
-      if (content) {
-        let current = '—'
-        try { current = (JSON.parse(content) as { current?: string }).current ?? '—' } catch { /* ok */ }
-        items.push({ label: 'STATE.json', status: 'pass', detail: `state: ${current}` })
-        stateFound = true
-        break
-      }
-    } catch { /* try next root */ }
-  }
-  if (!stateFound) {
-    items.push({ label: 'STATE.json', status: 'warn', detail: 'not found in any root' })
+  // 2. Feature state — DB-first /db/features row (state-one-authority: no STATE.json
+  // mirror probe; the row covers features/debugs/explorations + the server-side
+  // filesystem fallback for never-run features).
+  let row: DbFeature | undefined
+  try {
+    row = (await fetchDbFeatureMap(projectPath, { fresh: true })).get(topic)
+  } catch { /* row stays undefined */ }
+  if (row) {
+    const current = row.state !== 'UNKNOWN' ? row.state : '—'
+    items.push({ label: 'Feature state', status: 'pass', detail: `state: ${current}` })
+  } else {
+    items.push({ label: 'Feature state', status: 'warn', detail: 'no feature row found' })
   }
 
   // 3. Open feedback files
@@ -71,18 +62,14 @@ async function runHealthChecks(projectPath: string, topic: string | null): Promi
     items.push({ label: 'Feedback files', status: 'pass', detail: 'none' })
   }
 
-  // 4. Event log existence
-  try {
-    const content = await readFile(`${projectPath}/pathly/features/${topic}/EVENTS.jsonl`)
-    const lines = content ? content.trim().split('\n').filter(Boolean).length : 0
-    items.push({
-      label: 'Event log',
-      status: lines > 0 ? 'pass' : 'warn',
-      detail: lines > 0 ? `${lines} events` : 'empty',
-    })
-  } catch {
-    items.push({ label: 'Event log', status: 'warn', detail: 'not found' })
-  }
+  // 4. Event log — the same DB row's event count (state-one-authority: no
+  // EVENTS.jsonl mirror read).
+  const eventCount = row?.events ?? 0
+  items.push({
+    label: 'Event log',
+    status: eventCount > 0 ? 'pass' : 'warn',
+    detail: eventCount > 0 ? `${eventCount} events` : row ? 'empty' : 'not found',
+  })
 
   return items
 }
@@ -131,7 +118,7 @@ export function HealthCheck(): JSX.Element {
     setRunning(true)
     setChecks([
       { label: 'FSM server',     status: 'loading', detail: '…' },
-      { label: 'STATE.json',     status: 'loading', detail: '…' },
+      { label: 'Feature state',  status: 'loading', detail: '…' },
       { label: 'Feedback files', status: 'loading', detail: '…' },
       { label: 'Event log',      status: 'loading', detail: '…' },
     ])

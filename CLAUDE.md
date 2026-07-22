@@ -44,7 +44,7 @@ Studio → Start button          FlowControlBar → POST /runner/start
                                claude: ['claude', '-p', '{prompt}', '--model', '{model}', '--output-format', 'json', '--dangerously-skip-permissions']
                                codex:  ['codex', 'exec', '--sandbox', 'workspace-write', '--model', '{model}', '--', '{prompt}']
        → PTY exits             POST /runner/terminal/result → FSM continues
-     → EVENTS.jsonl         Claude writes AGENT_DONE with `summary` mid-run; supervisor reads it after PTY exits as the authoritative semantic result (stdout only used for session_id + cost_usd)
+     → fsm_events (DB)      Claude writes AGENT_DONE with `summary` mid-run to the central DB; supervisor reads it after PTY exits as the authoritative semantic result (stdout only used for session_id + cost_usd); EVENTS.jsonl is a downstream DB→disk export
 ```
 
 **Adapter install step:** `pathly-setup <host> --apply` stitches `core/agents/` and `core/skills/` with adapter-specific `_meta/*.yaml` files and writes deployable files to the host's install directory. Four adapters: `claude` → `~/.claude/`, `codex` → `~/.codex/` + `~/.agents/`, `copilot` → `~/.vscode/extensions/pathly/`, `antigravity` → `~/.gemini/antigravity-cli/`.
@@ -65,7 +65,7 @@ In runner mode Pathly is the single source of truth for skill content. The CLI r
 **FSM response contract (`agent_hint`):** Every `/next_action` response includes:
 - `agent_hint.role` — `"worker"` or `"explorer"` (host-neutral delegation signal)
 - `agent_hint.instructions` — full prompt for the next agent (Pathly role, phase, artifacts, limits)
-- `AGENT_DONE.summary` in EVENTS.jsonl — authoritative semantic result text (not truncated by PTY buffer); `--output-format=json` stdout is only used for `session_id` and `cost_usd`
+- `AGENT_DONE.summary` in the central DB (`fsm_events`) — authoritative semantic result text (not truncated by PTY buffer); `--output-format=json` stdout is only used for `session_id` and `cost_usd`
 - `AGENT_DONE.outcome` — `"success"` or `"failed"` (+ `error`); the authoritative pass/fail signal the supervisor's loop executor reads via `_outcome_is_failure`. A clean process exit that self-reports `outcome:"failed"` still fails the task (silent-failure guard #2)
 - `decision` — `"continue"` / `"block"` / `"escalate"` (automation gate)
 - `codex_subagent` — legacy compat field with frozen keys; new adapters should read `agent_hint`
@@ -110,9 +110,9 @@ Design + phases: [pathly/features/storage-restructure/SPEC.md](pathly/features/s
 
 ```
 pathly/features/<name>/            FEATURE scope — team pipeline files live DIRECTLY here
-  STATE.json                       current FSM state
-  BOARD.json                       comms board mirror (git-trackable; DB stays authoritative)
-  EVENTS.jsonl                     append-only event log
+  STATE.json                       current FSM state (DB→disk export; git-trackable)
+  BOARD.json                       comms board export (gitignored; DB stays authoritative)
+  EVENTS.jsonl                     event-log export (gitignored; DB→disk via event_mirror)
   USER_STORIES.md                  acceptance criteria
   IMPLEMENTATION_PLAN.md           phase-by-phase plan; each phase → one board task (build work-list = board DAG)
   feedback/                        REVIEW_FAILURES.md, TEST_FAILURES.md
@@ -127,6 +127,23 @@ pathly/pipeline-walkthrough/<slug>/  point-in-time pipeline records (never sync 
 
 # Legacy, still resolved for back-compat: pathly/plans/<name>/
 ```
+
+### Disk-file classification (state-one-authority)
+
+*The SQLite DB is the single runtime authority. Every per-feature disk file is a SEED read
+once into the DB or an EXPORT written DB→disk for git/audit — never round-tripped for a
+runtime decision. Runtime code reads the DB (or a DB-first, allow-listed fallback), never
+the mirror.* Enforced by `scripts/check_no_mirror_reads.py` (+ `scripts/mirror_reads_allowlist.txt`)
+in the lint `consistency` job.
+
+| File | Scope | Class | Direction | DB authority |
+|---|---|---|---|---|
+| `STATE.json` | feature | EXPORT (git-trackable) | DB→disk (atomic) | `fsm_state` |
+| `BOARD.json` | feature/project/global | EXPORT (gitignored) | DB→disk (debounced) | `comms_*` |
+| `EVENTS.jsonl` | feature | EXPORT (gitignored, like `BOARD.json` — the exporter rewrites it on every server start) | DB→disk (debounced) | `fsm_events` |
+| `ARTIFACTS.jsonl` | feature | **DROPPED** (metadata lives in `BOARD.json`; also gitignored) | — | `comms_artifacts` |
+| `*.flow.yaml` | core (packaged) | SEED | disk→DB on server start | `flow_nodes`/`flow_yaml` |
+| `abilities/*.md`, `prompts/*.md` | project/global | SEED (file *is* authority) | disk→compose | n/a |
 
 ---
 

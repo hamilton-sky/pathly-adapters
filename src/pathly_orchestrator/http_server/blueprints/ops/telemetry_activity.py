@@ -38,7 +38,10 @@ def _append_agent_done_event(
     trace_id: str = "",
     span_id: str = "",
 ) -> None:
-    """Append an AGENT_DONE event to the feature's EVENTS.jsonl so SSE subscribers see it."""
+    """Append an AGENT_DONE event to the DB via the shared event-append path (eventlog).
+
+    EVENTS.jsonl is a downstream DB->disk export, not this function's target; SSE
+    subscribers are notified through the same append path."""
     try:
         from pathly_orchestrator.fsm_ops import _resolve_storage_path
 

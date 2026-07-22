@@ -67,7 +67,8 @@ def pricing_endpoint():
 
 @bp.route("/record_phase", methods=["POST"])
 def record_phase_endpoint():
-    """Append a PHASE_START or PHASE_DONE event to the feature's EVENTS.jsonl."""
+    """Append a PHASE_START or PHASE_DONE event to the DB via the shared event-append
+    path (eventlog); EVENTS.jsonl is a downstream DB->disk export, not the target."""
     try:
         data = request.get_json()
         if not data:

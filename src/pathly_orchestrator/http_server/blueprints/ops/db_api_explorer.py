@@ -46,13 +46,16 @@ def _scan_filesystem_features(project_root: str) -> list[dict]:
     if not pathly_dir.is_dir():
         return results
 
+    # pathly:allow-mirror-read: never-run-feature fallback — features with no DB row yet
     state_files = list((pathly_dir / "plans").glob("*/STATE.json"))
     # Current layout: the three roots Studio's HomeScreen scans. Without these a
     # never-run feature (STATE.json on disk, no DB row) would vanish from /db/features.
     for container in ("features", "debugs", "explorations"):
+        # pathly:allow-mirror-read: never-run-feature fallback (feature-centric roots)
         state_files += list((pathly_dir / container).glob("*/STATE.json"))
     state_files += [
         sf
+        # pathly:allow-mirror-read: never-run-feature fallback (legacy top-level root)
         for sf in pathly_dir.glob("*/STATE.json")
         if sf.parent.name not in _RESERVED_PATHLY_SUBDIRS
     ]

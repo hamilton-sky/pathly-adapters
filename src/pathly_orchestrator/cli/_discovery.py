@@ -65,12 +65,15 @@ def iter_state_files(cwd: Path) -> Iterator[tuple[Path, str, str]]:
     # feature-centric nested (legacy):  pathly/features/<name>/plans/STATE.json  → topic = <name>
     features = cwd / "pathly" / "features"
     if features.is_dir():
+        # pathly:allow-mirror-read: human CLI feature discovery — globs state snapshots in DB-less cwd
         for sf in features.glob("*/STATE.json"):
             triples.append((sf, "team", sf.parent.name))
+        # pathly:allow-mirror-read: human CLI feature discovery (legacy nested layout)
         for sf in features.glob("*/plans/STATE.json"):
             triples.append((sf, "team", sf.parent.parent.name))
         # board-scoped nested runs: features/<f>/<kind>/<slug>/STATE.json → topic = <slug>
         for kind, flow in _KIND_FLOW:
+            # pathly:allow-mirror-read: human CLI feature discovery (board-scoped nested runs)
             for sf in features.glob(f"*/{kind}/*/STATE.json"):
                 triples.append((sf, flow, sf.parent.name))
 
@@ -78,6 +81,7 @@ def iter_state_files(cwd: Path) -> Iterator[tuple[Path, str, str]]:
     project = cwd / "pathly" / "project"
     if project.is_dir():
         for kind, flow in _KIND_FLOW:
+            # pathly:allow-mirror-read: human CLI feature discovery (project-board runs)
             for sf in (project / kind).glob("*/STATE.json"):
                 triples.append((sf, flow, sf.parent.name))
 
@@ -85,12 +89,14 @@ def iter_state_files(cwd: Path) -> Iterator[tuple[Path, str, str]]:
     for root_rel, flow in SCAN_ROOTS:
         root = cwd / root_rel
         if root.is_dir():
+            # pathly:allow-mirror-read: human CLI feature discovery (legacy type-nested roots)
             for sf in root.glob("*/STATE.json"):
                 triples.append((sf, flow, sf.parent.name))
 
     # legacy flat: pathly/<name>/STATE.json  → topic = parent.name
     pathly = cwd / "pathly"
     if pathly.is_dir():
+        # pathly:allow-mirror-read: human CLI feature discovery (legacy flat root)
         for sf in pathly.glob("*/STATE.json"):
             if sf.parent.name not in _RESERVED:
                 triples.append((sf, "team", sf.parent.name))

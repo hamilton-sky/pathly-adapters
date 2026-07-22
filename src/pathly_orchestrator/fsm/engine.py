@@ -3,7 +3,7 @@
 Import directly from the domain modules for new code:
   engine_recover     — _DEFAULT_LIMITS, recover_state
   engine_transitions — evaluate_transition_rules, route_feedback, escalation helpers
-  engine_actions     — run_transition_actions, run_gates, write_state, append_event
+  engine_actions     — run_transition_actions, run_gates, append_event
 """
 
 from .engine_recover import _DEFAULT_LIMITS, recover_state  # noqa: F401
@@ -24,5 +24,4 @@ from .engine_actions import (  # noqa: F401
     append_event,
     run_gates,
     run_transition_actions,
-    write_state,
 )

@@ -415,6 +415,7 @@ def run_gates(
             except Exception:
                 build_baseline = None
             if build_baseline is None:
+                # pathly:allow-mirror-read: DB-first build_baseline fallback — disk snapshot only when DB has no row
                 state_file = storage_path / "STATE.json"
                 if state_file.exists():
                     try:
@@ -463,19 +464,6 @@ def run_gates(
         else:
             raise RuntimeError(f"Unknown gate type: {gtype!r}")
     return None
-
-
-def write_state(storage_path: Path, next_state: str, prior_state: dict) -> None:
-    """Write STATE.json atomically (write to .tmp then rename)."""
-    storage_path.mkdir(parents=True, exist_ok=True)
-    new_state = dict(prior_state)
-    new_state["current"] = next_state
-
-    state_file = storage_path / "STATE.json"
-    tmp_file = storage_path / "STATE.json.tmp"
-
-    tmp_file.write_text(json.dumps(new_state, indent=2) + "\n", encoding="utf-8")
-    tmp_file.replace(state_file)
 
 
 def append_event(storage_path: Path, event: dict, flow: dict | None = None) -> None:

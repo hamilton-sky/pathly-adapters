@@ -47,6 +47,9 @@ jobs:
       - name: Entry point modules exist
         run: python scripts/check_entry_points.py
 
+      - name: No un-sanctioned mirror reads (state-one-authority)
+        run: python scripts/check_no_mirror_reads.py
+
   security:
     runs-on: ubuntu-latest
     steps:

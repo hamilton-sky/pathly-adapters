@@ -269,6 +269,7 @@ def _read_retry_counts(storage_path: Path) -> dict[str, int]:
     """{FILENAME.md: max retry count} from STATE.json retry_count_by_key. Best-effort."""
     out: dict[str, int] = {}
     try:
+        # pathly:allow-mirror-read: best-effort retry_count_by_key read from the state snapshot
         raw = json.loads((storage_path / "STATE.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return out

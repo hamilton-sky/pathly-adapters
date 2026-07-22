@@ -10,7 +10,6 @@ from pathly_orchestrator.fsm.engine import (
     _write_gate_feedback,
     _scope_clean,
     run_gates,
-    write_state,
     append_event,
 )
 
@@ -24,6 +23,5 @@ __all__ = [
     "_write_gate_feedback",
     "_scope_clean",
     "run_gates",
-    "write_state",
     "append_event",
 ]

@@ -100,6 +100,7 @@ def main() -> None:
             sys.exit(1)
         storage_path, topic, flow = found
 
+    # pathly:allow-mirror-read: human CLI log display reads the exported log directly (DB-less cwd)
     events_file = storage_path / "EVENTS.jsonl"
     if not events_file.exists():
         print("No events recorded.")

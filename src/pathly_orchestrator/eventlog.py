@@ -1,16 +1,20 @@
 """
-EventLog — read/write EVENTS.jsonl and STATE.json.
+EventLog — DB-first event/state access for a feature (state-one-authority).
 
-The LLM writes these files directly using its Write/Bash tools.
+The central SQLite DB (fsm_events / fsm_state) is the single runtime authority.
+The per-feature disk files are one-way DB->disk EXPORTs, never read back here:
+STATE.json is written as a snapshot by write_state, EVENTS.jsonl by event_mirror
+(debounced, queued from append_event).
+
 This module provides:
-  - append_event(storage_path, event_dict, flow=None)  — append one line to EVENTS.jsonl
-  - write_state(storage_path, state_dict, flow=None)   — overwrite STATE.json
-  - read_events(storage_path)                          — return list of event dicts
+  - append_event(storage_path, event_dict, flow=None)  — insert into fsm_events (+ queue the EVENTS.jsonl export)
+  - write_state(storage_path, state_dict, flow=None)   — write fsm_state (+ STATE.json snapshot)
+  - read_events(storage_path) / read_state(storage_path) — read from the DB
   - summary(storage_path)                              — print token/cost table (Bash-callable)
 
 CLI usage (called by LLM via Bash or by the retro skill):
-  python -m pathly_orchestrator.eventlog summary pathly/plans/security-fixes
-  python -m pathly_orchestrator.eventlog events pathly/plans/security-fixes
+  python -m pathly_orchestrator.eventlog summary pathly/features/security-fixes
+  python -m pathly_orchestrator.eventlog events pathly/features/security-fixes
 """
 
 from __future__ import annotations

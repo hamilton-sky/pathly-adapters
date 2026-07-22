@@ -40,6 +40,7 @@ def hydrate_board(conn: sqlite3.Connection, board: str, scope: str, path: Path) 
             return False
         if not path.exists():
             return False
+        # pathly:allow-mirror-read: fresh-clone SEED import — BOARD.json snapshot into an empty DB board
         snapshot = json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         logger.debug("hydrate_board failed to read %s", path, exc_info=True)

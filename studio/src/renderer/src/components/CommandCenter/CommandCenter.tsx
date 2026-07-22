@@ -5,6 +5,7 @@ import { useCommsStore, type GlobalSearchHit } from '../../store/commsStore'
 import { useCommandCenterStore } from '../../store/commandCenterStore'
 import { useProjectStore } from '../../store/projectStore'
 import { apiHydrateBoards } from '../../store/commsApi'
+import { listDirs } from '../../services/pathlyApi'
 import { useToastStore } from '../../store/toastStore'
 import { useSectionResize } from './hooks/useSectionResize'
 import { CommandCenterHeader } from './CommandCenterHeader/CommandCenterHeader'
@@ -37,12 +38,12 @@ export function CommandCenter() {
 
     const push = useToastStore.getState().push
     try {
-      // Detect whether this is a new-style (pathly/<topic>/) or feature-centric (pathly/features/<topic>/) feature.
-      // Mirror the resolveFeaturePath logic: check for .keep sentinel, then STATE.json.
-      const newStyleBase = `${projectPath}/pathly/${topic}`
-      const keep = await window.pathly.fs.read(`${newStyleBase}/.keep`)
-      const stateJson = keep === null ? await window.pathly.fs.read(`${newStyleBase}/STATE.json`) : null
-      const isNewStyle = keep !== null || stateJson !== null
+      // Detect whether this is a new-style (pathly/<topic>/) or feature-centric (pathly/features/<topic>/)
+      // feature via container listings — never a STATE.json mirror probe (state-one-authority).
+      // Feature-centric wins when both dirs exist, matching resolveFeaturePath's precedence.
+      const featureNames = await listDirs(`${projectPath}/pathly/features`).catch(() => [] as string[])
+      const topLevelNames = await listDirs(`${projectPath}/pathly`).catch(() => [] as string[])
+      const isNewStyle = !featureNames.includes(topic) && topLevelNames.includes(topic)
 
       const src = isNewStyle
         ? `${projectPath}/pathly/${topic}`

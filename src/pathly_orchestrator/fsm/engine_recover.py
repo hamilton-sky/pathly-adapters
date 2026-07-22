@@ -24,6 +24,7 @@ def recover_state(
         current_state = state_doc.get("current", flow["states"][0])
         conv = state_doc.get("current_conversation", 0)
     else:
+        # pathly:allow-mirror-read: DB-first recovery fallback — disk snapshot only when no DB state_doc
         state_file = storage_path / "STATE.json"
         if state_file.exists():
             try:

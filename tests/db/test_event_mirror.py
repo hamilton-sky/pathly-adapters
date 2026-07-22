@@ -59,7 +59,10 @@ def test_serialize_events_matches_db_rows_in_seq_order(tmp_path):
     root = str(tmp_path / "proj")
     db_append_event(conn, root, "feat-ser", {"type": "FSM_INIT", "state": "PLANNING"})
     db_append_event(
-        conn, root, "feat-ser", {"type": "STATE_TRANSITION", "from": "PLANNING", "to": "BUILDING"}
+        conn,
+        root,
+        "feat-ser",
+        {"type": "STATE_TRANSITION", "from": "PLANNING", "to": "BUILDING"},
     )
 
     body = serialize_events(conn, root, "feat-ser")
@@ -89,7 +92,9 @@ def test_write_event_mirror_writes_file_matching_db(tmp_path):
     assert write_event_mirror(conn, fdir, root, "feat-write") is True
     path = fdir / "EVENTS.jsonl"
     assert path.exists()
-    assert path.read_text(encoding="utf-8") == serialize_events(conn, root, "feat-write")
+    assert path.read_text(encoding="utf-8") == serialize_events(
+        conn, root, "feat-write"
+    )
 
 
 def test_write_event_mirror_change_guard_skips_identical(tmp_path):
@@ -145,9 +150,14 @@ def test_backfill_writes_events_for_feature_with_db_history_no_file(tmp_path):
     conn = get_db()
     root = str(tmp_path / "proj")
     fdir = _feature_dir(tmp_path, "feat-backfill")  # dir exists, no EVENTS.jsonl yet
-    db_append_event(conn, root, "feat-backfill", {"type": "FSM_INIT", "state": "PLANNING"})
     db_append_event(
-        conn, root, "feat-backfill", {"type": "STATE_TRANSITION", "from": "PLANNING", "to": "BUILDING"}
+        conn, root, "feat-backfill", {"type": "FSM_INIT", "state": "PLANNING"}
+    )
+    db_append_event(
+        conn,
+        root,
+        "feat-backfill",
+        {"type": "STATE_TRANSITION", "from": "PLANNING", "to": "BUILDING"},
     )
     path = fdir / "EVENTS.jsonl"
     assert not path.exists()
@@ -155,16 +165,22 @@ def test_backfill_writes_events_for_feature_with_db_history_no_file(tmp_path):
     backfill_event_mirrors(conn)
 
     assert path.exists()
-    assert path.read_text(encoding="utf-8") == serialize_events(conn, root, "feat-backfill")
+    assert path.read_text(encoding="utf-8") == serialize_events(
+        conn, root, "feat-backfill"
+    )
 
 
 def test_backfill_skips_feature_without_dir_on_disk(tmp_path):
     conn = get_db()
     root = str(tmp_path / "proj")
     # DB history but NO on-disk dir -> flat-dir resolution finds nothing, no crash, no file.
-    db_append_event(conn, root, "ghost-feature", {"type": "FSM_INIT", "state": "PLANNING"})
+    db_append_event(
+        conn, root, "ghost-feature", {"type": "FSM_INIT", "state": "PLANNING"}
+    )
     backfill_event_mirrors(conn)  # must not raise
-    assert not (Path(root) / "pathly" / "features" / "ghost-feature" / "EVENTS.jsonl").exists()
+    assert not (
+        Path(root) / "pathly" / "features" / "ghost-feature" / "EVENTS.jsonl"
+    ).exists()
 
 
 # ── live wire-in: eventlog.append_event enqueues + exports (additive) ───────────
@@ -183,7 +199,9 @@ def test_eventlog_append_event_exports_via_mirror(tmp_path):
     assert path.exists()
     # Content is the DB projection — the export, not an agent-side append.
     project_root = eventlog._project_root_of(fdir.resolve())
-    assert path.read_text(encoding="utf-8") == serialize_events(conn, project_root, "feat-live")
+    assert path.read_text(encoding="utf-8") == serialize_events(
+        conn, project_root, "feat-live"
+    )
     body = json.loads(path.read_text(encoding="utf-8").splitlines()[0])
     assert body["type"] == "FSM_INIT"
     _reset_dirty()

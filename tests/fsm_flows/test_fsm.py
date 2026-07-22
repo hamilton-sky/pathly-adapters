@@ -11,13 +11,13 @@ from unittest.mock import MagicMock, call, patch
 import pytest
 import yaml
 
+from pathly_orchestrator import eventlog
 from pathly_orchestrator.fsm import (
     append_event,
     evaluate_transition_rules,
     recover_state,
     route_feedback,
     run_transition_actions,
-    write_state,
 )
 
 
@@ -459,29 +459,39 @@ def test_run_transition_actions_wildcard(tmp_path):
     assert mock_run.called
 
 
-# ── write_state ───────────────────────────────────────────────────────────────
+# ── write_state (eventlog — DB-first, STATE.json written as the export) ───────
 
 
 def test_write_state_creates_file(tmp_path):
-    write_state(tmp_path, "BUILDING", {"feature": "x"})
+    eventlog.write_state(str(tmp_path), {"current": "BUILDING", "feature": "x"})
     state_file = tmp_path / "STATE.json"
     assert state_file.exists()
     data = json.loads(state_file.read_text(encoding="utf-8"))
     assert data["current"] == "BUILDING"
     assert data["feature"] == "x"
+    # DB is the authority — the row must exist and agree with the export.
+    db_state = eventlog.read_state(str(tmp_path))
+    assert db_state is not None
+    assert db_state["current"] == "BUILDING"
 
 
 def test_write_state_preserves_prior_fields(tmp_path):
-    write_state(tmp_path, "REVIEWING", {"current_conversation": 2, "extra": "keep"})
+    eventlog.write_state(
+        str(tmp_path),
+        {"current": "REVIEWING", "current_conversation": 2, "extra": "keep"},
+    )
     data = json.loads((tmp_path / "STATE.json").read_text(encoding="utf-8"))
     assert data["current"] == "REVIEWING"
     assert data["current_conversation"] == 2
     assert data["extra"] == "keep"
+    db_state = eventlog.read_state(str(tmp_path))
+    assert db_state is not None
+    assert db_state["extra"] == "keep"
 
 
 def test_write_state_creates_dir(tmp_path):
     nested = tmp_path / "nested" / "dir"
-    write_state(nested, "BUILDING", {})
+    eventlog.write_state(str(nested), {"current": "BUILDING"})
     assert (nested / "STATE.json").exists()
 
 
