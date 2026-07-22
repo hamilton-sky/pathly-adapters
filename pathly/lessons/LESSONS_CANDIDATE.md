@@ -595,3 +595,31 @@ Doc-sync violations for skill registration are predictable and mechanical. Movin
 
 ### Source
 planner-hierarchy retro (g1-feature-planner-decompose), 2026-07-06
+
+## [state-one-authority] Agents audit, gates enforce — ship the checker WITH the audit
+
+### Pattern
+An agent-written audit (AUDIT_MIRROR_READS.md) found ~75% of the real mirror-read sites; the
+deterministic CI gate built at the END of the feature (check_no_mirror_reads.py) immediately
+found the rest — 2 unaudited Studio readers + 2 human-CLI readers. Separately, a false audit
+claim ("the filesystem fallback already covers never-run features") propagated unchecked
+through architect → planner → task prompt, and was only caught by the builder's per-task
+grounding step, mid-build.
+
+### Rule
+When a feature's premise is "no code does X" (or "all code does Y"), MUST write the
+deterministic checker FIRST — red — and let the migration tasks turn it green. The audit
+designs the work; the gate defines done. Never treat an agent-written inventory as
+exhaustive, and never let a plan inherit an audit claim without re-running its load-bearing
+greps against HEAD at plan time.
+
+### Injection
+- Architecture stage: for any "remove/forbid all X" feature, the first task in the DAG is
+  the checker script + allow-list (failing), not the first migration.
+- Plan pre-flight (extends L-001/L-002): re-execute the audit's key greps/globs against the
+  live tree before task prompts are written; a claim that can be re-derived cheaply must be.
+- Per-goal verification must include the CI lint surface (black --check / tsc), not only
+  pytest — two G1 files landed unformatted and would have failed CI.
+
+### Sources
+state-one-authority | Stage: architecture/build
