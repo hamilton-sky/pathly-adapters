@@ -1,4 +1,8 @@
-"""DB explorer endpoints: stats, features, per-feature sub-resources, trends."""
+"""DB explorer endpoints: stats, features list, trends, recent spawns.
+
+Per-feature detail routes (/db/features/<feature>/{events,agents,otel,runs}) live in
+db_api_feature_detail.py (SRP 400-line split).
+"""
 
 from __future__ import annotations
 
@@ -22,6 +26,7 @@ def _parse_json_file(path: Path) -> dict:
 # Direct children of pathly/ that are containers, not features.
 _RESERVED_PATHLY_SUBDIRS = {
     "plans",
+    "features",
     "debugs",
     "explorations",
     "goals",
@@ -31,8 +36,10 @@ _RESERVED_PATHLY_SUBDIRS = {
 
 
 def _scan_filesystem_features(project_root: str) -> list[dict]:
-    """Scan for features not yet in the DB — the legacy ``pathly/plans/<feature>/`` root
-    AND the new top-level ``pathly/<feature>/`` root (reserved container dirs skipped).
+    """Scan for features not yet in the DB — the feature-centric roots Studio lists
+    (``pathly/features|debugs|explorations/<name>/``), the legacy
+    ``pathly/plans/<feature>/`` root, AND the older top-level ``pathly/<feature>/``
+    root (reserved container dirs skipped).
     """
     results: list[dict] = []
     pathly_dir = Path(project_root) / "pathly"
@@ -40,6 +47,10 @@ def _scan_filesystem_features(project_root: str) -> list[dict]:
         return results
 
     state_files = list((pathly_dir / "plans").glob("*/STATE.json"))
+    # Current layout: the three roots Studio's HomeScreen scans. Without these a
+    # never-run feature (STATE.json on disk, no DB row) would vanish from /db/features.
+    for container in ("features", "debugs", "explorations"):
+        state_files += list((pathly_dir / container).glob("*/STATE.json"))
     state_files += [
         sf
         for sf in pathly_dir.glob("*/STATE.json")
@@ -80,6 +91,10 @@ def _scan_filesystem_features(project_root: str) -> list[dict]:
                 "total_tokens": 0,
                 "cost_usd": cost_usd,
                 "updated_at": updated_at,
+                # Never-run feature: no DB events, so no last_summary; flow comes
+                # from the same parsed STATE.json when present (parity with DB rows).
+                "last_summary": "",
+                "flow": str(state.get("flow") or ""),
                 "source": "filesystem",
             }
         )
@@ -204,6 +219,10 @@ def db_features():
             ).fetchall()
         inv_stats = {(r["project_root"], r["feature"]): dict(r) for r in inv_rows}
 
+        # state-one-authority: last_summary + flow let Studio read these off the DB row
+        # instead of scanning EVENTS.jsonl / STATE.json mirrors directly.
+        from pathly_orchestrator.db.queries.fsm_events import read_last_agent_done
+
         all_keys = set(states)
         results = []
         for pr, feat in sorted(all_keys, key=lambda x: x[1]):
@@ -212,6 +231,9 @@ def db_features():
             state_val = state_obj.get("current_state") or state_obj.get(
                 "current", "UNKNOWN"
             )
+            # Same (pr, feat) key the row is built from — so a goal-run feature
+            # (keyed by its run slug) resolves its own AGENT_DONE, not the board scope's.
+            last_done = read_last_agent_done(conn, pr, feat) or {}
             results.append(
                 {
                     "project_root": pr,
@@ -222,6 +244,8 @@ def db_features():
                     "total_tokens": int(inv.get("total_tokens", 0)),
                     "cost_usd": round(float(inv.get("total_cost", 0.0)), 4),
                     "updated_at": state_obj.get("updated_at", ""),
+                    "last_summary": str(last_done.get("summary") or ""),
+                    "flow": str(state_obj.get("flow") or ""),
                     "source": "db",
                 }
             )
@@ -235,116 +259,6 @@ def db_features():
         return jsonify(sorted(results, key=lambda x: x["feature"]))
     except Exception as e:
         logger.exception("db_features error")
-        return jsonify({"error": str(e)}), 500
-
-
-@bp.route("/db/features/<feature>/events", methods=["GET"])
-def db_feature_events(feature: str):
-    """Events for a specific feature."""
-    try:
-        conn = _get_db()
-        pr = _project_root_param()
-        query = "SELECT seq, ts, event_type, payload FROM fsm_events WHERE feature=?"
-        params: list = [feature]
-        if pr:
-            query += " AND project_root=?"
-            params.append(pr)
-        query += " ORDER BY seq DESC LIMIT 200"
-        rows = conn.execute(query, params).fetchall()
-        results = []
-        for r in rows:
-            try:
-                payload = json.loads(r["payload"])
-            except (json.JSONDecodeError, TypeError):
-                payload = {}
-            results.append(
-                {
-                    "seq": r["seq"],
-                    "ts": r["ts"],
-                    "event_type": r["event_type"],
-                    "payload": payload,
-                }
-            )
-        return jsonify(results)
-    except Exception as e:
-        logger.exception("db_feature_events error")
-        return jsonify({"error": str(e)}), 500
-
-
-@bp.route("/db/features/<feature>/agents", methods=["GET"])
-def db_feature_agents(feature: str):
-    """Agent invocations for a specific feature."""
-    try:
-        conn = _get_db()
-        pr = _project_root_param()
-        query = (
-            "SELECT id, run_id, stage, agent_role, started_at, finished_at, "
-            "tokens_in, tokens_out, cost_usd, session_id, summary, scope_tier "
-            "FROM agent_invocations WHERE feature=?"
-        )
-        params: list = [feature]
-        if pr:
-            query += " AND project_root=?"
-            params.append(pr)
-        query += " ORDER BY id DESC"
-        rows = conn.execute(query, params).fetchall()
-        return jsonify([dict(r) for r in rows])
-    except Exception as e:
-        logger.exception("db_feature_agents error")
-        return jsonify({"error": str(e)}), 500
-
-
-@bp.route("/db/features/<feature>/otel", methods=["GET"])
-def db_feature_otel(feature: str):
-    """OTel spans for a specific feature."""
-    try:
-        conn = _get_db()
-        pr = _project_root_param()
-        query = (
-            "SELECT id, trace_id, span_id, parent_span_id, name, "
-            "start_time, end_time, attributes, scope_tier "
-            "FROM otel_spans WHERE feature=?"
-        )
-        params: list = [feature]
-        if pr:
-            query += " AND project_root=?"
-            params.append(pr)
-        query += " ORDER BY id DESC LIMIT 200"
-        rows = conn.execute(query, params).fetchall()
-        results = []
-        for r in rows:
-            d = dict(r)
-            try:
-                d["attributes"] = json.loads(d["attributes"] or "{}")
-            except (json.JSONDecodeError, TypeError):
-                d["attributes"] = {}
-            results.append(d)
-        return jsonify(results)
-    except Exception as e:
-        logger.exception("db_feature_otel error")
-        return jsonify({"error": str(e)}), 500
-
-
-@bp.route("/db/features/<feature>/runs", methods=["GET"])
-def db_feature_runs(feature: str):
-    """Run history for a specific feature."""
-    try:
-        conn = _get_db()
-        pr = _project_root_param()
-        query = (
-            "SELECT id, run_id, status, started_at, finished_at, "
-            "stage_count, total_tokens, cost_usd, adapter "
-            "FROM run_history WHERE feature=?"
-        )
-        params: list = [feature]
-        if pr:
-            query += " AND project_root=?"
-            params.append(pr)
-        query += " ORDER BY id DESC"
-        rows = conn.execute(query, params).fetchall()
-        return jsonify([dict(r) for r in rows])
-    except Exception as e:
-        logger.exception("db_feature_runs error")
         return jsonify({"error": str(e)}), 500
 
 

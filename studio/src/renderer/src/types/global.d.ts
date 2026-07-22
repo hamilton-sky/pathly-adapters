@@ -59,6 +59,8 @@ declare global {
     total_tokens: number
     cost_usd: number
     updated_at: string
+    last_summary: string
+    flow: string
     source?: string
   }
 

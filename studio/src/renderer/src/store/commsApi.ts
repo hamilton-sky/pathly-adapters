@@ -1,5 +1,5 @@
 import type { Message, Feature, FeatureStatus, BoardScope, MessageType, Stage, QuestionOption, AgentId } from '../components/CommandCenter/types'
-import { readFile, listDir } from '../services/pathlyApi'
+import { listDir, listDirs } from '../services/pathlyApi'
 
 import { apiFetch } from '../lib/config'
 
@@ -994,7 +994,7 @@ export async function apiStopTask(taskId: string): Promise<boolean> {
   }
 }
 
-// ── Feature list + per-feature enrichment from STATE.json ─────────────
+// ── Feature list + per-feature enrichment (DB-first /db/features rows) ─
 
 interface FeatureState {
   current?: string
@@ -1032,35 +1032,53 @@ const BLOCKER_FILES = new Set([
   'HUMAN_QUESTIONS.md', 'IMPL_QUESTIONS.md', 'DESIGN_QUESTIONS.md',
 ])
 
+// ── DB-first feature map (state-one-authority) ────────────────────────
+// One /db/features fetch per burst — replaces the per-feature STATE.json /
+// EVENTS.jsonl mirror reads. The short TTL dedupes loadFeatures' Promise.all
+// fan-out into a single HTTP call; pass { fresh: true } to bypass it.
+let dbFeatureMapCache: { root: string; at: number; map: Promise<Map<string, DbFeature>> } | null = null
+const DB_FEATURE_MAP_TTL_MS = 2000
+
+export function fetchDbFeatureMap(
+  projectRoot: string,
+  opts?: { fresh?: boolean },
+): Promise<Map<string, DbFeature>> {
+  const now = Date.now()
+  if (
+    !opts?.fresh &&
+    dbFeatureMapCache &&
+    dbFeatureMapCache.root === projectRoot &&
+    now - dbFeatureMapCache.at < DB_FEATURE_MAP_TTL_MS
+  ) {
+    return dbFeatureMapCache.map
+  }
+  const map = window.pathly.db
+    .features(projectRoot)
+    .then((rows) => new Map((rows ?? []).map((r) => [r.feature, r])))
+    .catch(() => new Map<string, DbFeature>())
+  dbFeatureMapCache = { root: projectRoot, at: now, map }
+  return map
+}
+
 /** Resolve the storage path for a feature. Mirrors _resolve_storage_path in fsm_ops.py:
- *  the feature-centric home pathly/features/<id>/ wins, then new-style pathly/<id>/. */
+ *  the feature-centric home pathly/features/<id>/ wins, then new-style pathly/<id>/.
+ *  Existence is probed via container listings — never a STATE.json mirror read
+ *  (state-one-authority: runtime state lives in the DB). */
 export async function resolveFeaturePath(projectPath: string, featureId: string): Promise<string> {
-  // Feature-centric layout (storage-restructure): pathly/features/<id>/ holds STATE.json + plan files.
   const featureDir = `${projectPath}/pathly/features/${featureId}`
-  if (await readFile(`${featureDir}/STATE.json`) !== null) return featureDir
-  const newStyle = `${projectPath}/pathly/${featureId}`
-  // listDir on the dir itself returns [] when the dir doesn't exist, but we need to know
-  // if the dir exists. Writing a .keep file ensures the new-style dir exists, so we check
-  // for that sentinel. If absent, fall through to the legacy path.
-  const sentinel = await readFile(`${newStyle}/.keep`)
-  if (sentinel !== null) return newStyle
-  // Also accept new-style dirs that have any files already (e.g. STATE.json written by FSM)
-  const anyFile = await readFile(`${newStyle}/STATE.json`)
-  if (anyFile !== null) return newStyle
+  const featureNames = await listDirs(`${projectPath}/pathly/features`).catch(() => [] as string[])
+  if (featureNames.includes(featureId)) return featureDir
+  const topLevelNames = await listDirs(`${projectPath}/pathly`).catch(() => [] as string[])
+  if (topLevelNames.includes(featureId)) return `${projectPath}/pathly/${featureId}`
   // Default to the feature-centric home (legacy pathly/plans/<id>/ fallback removed post-migration).
   return featureDir
 }
 
-/** Read a feature's STATE.json (filesystem) — current stage + conversation count. */
+/** A feature's current stage — from its DB-first /db/features row (state-one-authority). */
 export async function fetchFeatureState(projectPath: string, featureId: string): Promise<FeatureState | null> {
-  try {
-    const base = await resolveFeaturePath(projectPath, featureId)
-    const raw = await readFile(`${base}/STATE.json`)
-    if (!raw) return null
-    return JSON.parse(raw) as FeatureState
-  } catch {
-    return null
-  }
+  const row = (await fetchDbFeatureMap(projectPath)).get(featureId)
+  if (!row) return null
+  return { current: row.state !== 'UNKNOWN' ? row.state : undefined }
 }
 
 /** A feature is blocked when its feedback/ folder holds an open failure/question file. */
@@ -1074,41 +1092,18 @@ export async function featureBlocked(projectPath: string, featureId: string): Pr
   }
 }
 
-interface AgentDoneEvent {
-  type?: string
-  agent?: string
-  summary?: string
-}
-
 function summarize(agent: string | undefined, summary: string): string {
   const clean = summary.replace(/\s+/g, ' ').trim()
   const text = clean.length > 160 ? `${clean.slice(0, 159)}…` : clean
   return agent ? `${agent}: ${text}` : text
 }
 
-/** Latest AGENT_DONE summary from a feature's EVENTS.jsonl — the card's "last activity" line. */
+/** Latest AGENT_DONE summary — from the DB row's last_summary (state-one-authority);
+ *  the card's "last activity" line. */
 export async function fetchLastSummary(projectPath: string, featureId: string): Promise<string> {
-  try {
-    const base = await resolveFeaturePath(projectPath, featureId)
-    const raw = await readFile(`${base}/EVENTS.jsonl`)
-    if (!raw) return ''
-    const lines = raw.split('\n')
-    for (let i = lines.length - 1; i >= 0; i--) {
-      const line = lines[i].trim()
-      if (!line) continue
-      try {
-        const ev = JSON.parse(line) as AgentDoneEvent
-        if (ev.type === 'AGENT_DONE' && ev.summary && ev.summary.trim()) {
-          return summarize(ev.agent, ev.summary)
-        }
-      } catch {
-        // skip a malformed line and keep scanning backwards
-      }
-    }
-    return ''
-  } catch {
-    return ''
-  }
+  const row = (await fetchDbFeatureMap(projectPath)).get(featureId)
+  if (!row?.last_summary?.trim()) return ''
+  return summarize(undefined, row.last_summary)
 }
 
 export function buildFeature(

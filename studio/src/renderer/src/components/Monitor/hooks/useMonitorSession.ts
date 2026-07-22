@@ -2,8 +2,9 @@ import { useCallback, useEffect, useRef } from 'react'
 import { useStore } from '../../../store'
 import { usePlanFiles } from '../../../hooks/usePlanFiles'
 import { watchStart, readFile, onWatchEvent, fetchFlowGraph } from '../../../services/pathlyApi'
+import { fetchDbFeatureMap } from '../../../store/commsApi'
 import { getFlowYamlName, extractTopic, mergeBillingUpdate, parseFlowStages, parseFlowGraph } from '../utils'
-import type { FsmEvent } from '../../../types/index'
+import type { FsmEvent, FsmState } from '../../../types/index'
 
 export function useMonitorSession(): { effectiveTopic: string | null; showTabBar: boolean; refresh: () => void } {
   const {
@@ -50,23 +51,19 @@ export function useMonitorSession(): { effectiveTopic: string | null; showTabBar
     setEvents([])
   }, [projectPath, setActiveFlowSessions, setActiveMonitorTab, setFsmState, setEvents])
 
-  // Proactive scan: read STATE.json for every plan folder and register any non-terminal flow as a session.
+  // Proactive scan: look up every plan folder's DB-first feature row and register any
+  // non-terminal flow as a session (state-one-authority — no STATE.json mirror read).
   useEffect(() => {
     if (!projectPath || planFolders.length === 0) return
-    void Promise.all(
-      planFolders.map(async (folder) => {
-        try {
-          const content = await readFile(`${folder.path}/STATE.json`)
-          if (!content) return null
-          const state = JSON.parse(content) as Record<string, unknown>
-          const current = state.current as string | undefined
-          if (current === 'DONE' || current === 'IDLE' || !current) return null
-          const flowType = (state.flow as string | undefined) ?? 'team'
-          return { key: `${flowType}/${folder.name}`, flowType, topic: folder.name }
-        } catch { return null }
+    void fetchDbFeatureMap(projectPath).then((dbFeatures) => {
+      const active = planFolders.flatMap((folder) => {
+        const row = dbFeatures.get(folder.name)
+        if (!row) return []
+        const current = row.state
+        if (!current || current === 'UNKNOWN' || current === 'DONE' || current === 'IDLE') return []
+        const flowType = row.flow || 'team'
+        return [{ key: `${flowType}/${folder.name}`, flowType, topic: folder.name }]
       })
-    ).then((results) => {
-      const active = results.filter((r): r is NonNullable<typeof r> => r !== null)
       if (active.length === 0) return
       setActiveFlowSessions((prev) => {
         const next = { ...prev }
@@ -104,90 +101,81 @@ export function useMonitorSession(): { effectiveTopic: string | null; showTabBar
       return
     }
 
-    const roots = [
-      `${projectPath}/pathly/features/${effectiveTopic}`,
-      `${projectPath}/pathly/debugs/${effectiveTopic}`,
-      `${projectPath}/pathly/explorations/${effectiveTopic}`,
-    ]
+    // DB-first (state-one-authority): the /db/features row replaces the per-root
+    // STATE.json probes — one call covers features/debugs/explorations plus the
+    // server-side filesystem fallback for never-run features.
+    fetchDbFeatureMap(projectPath).then((dbFeatures) => {
+      const row = dbFeatures.get(effectiveTopic)
+      if (!row) return
+      const parsedState: FsmState = {
+        current: row.state !== 'UNKNOWN' ? row.state : '',
+        flow: row.flow || 'team',
+        feature: row.feature,
+        updated_at: row.updated_at,
+      }
+      setFsmState(parsedState)
 
-    Promise.any(
-      roots.map((r) => readFile(`${r}/STATE.json`).then((c) => ({ base: r, content: c })))
-    ).then(({ base, content }) => {
-      if (!content) return
-      try {
-        const parsedState = JSON.parse(content)
-        if (!parsedState.flow) {
-          if (base.includes('/pathly/debugs/')) parsedState.flow = 'debug'
-          else if (base.includes('/pathly/explorations/')) parsedState.flow = 'explore'
-          else parsedState.flow = 'team'
-        }
-        if (!parsedState.feature && effectiveTopic) {
-          parsedState.feature = effectiveTopic
-        }
-        setFsmState(parsedState)
-
-        if (effectiveTopic) {
-          const flowType = (parsedState.flow as string | undefined) ?? 'team'
-          const sessionKey = `${flowType}/${effectiveTopic}`
-          const isDone = parsedState.current === 'DONE' || parsedState.current === 'IDLE'
-          if (isDone) {
-            setActiveFlowSessions((prev) => {
-              if (!(sessionKey in prev)) return prev
-              const next = { ...prev }
-              delete next[sessionKey]
-              return next
-            })
-            if (activeMonitorTabRef.current === sessionKey) setActiveMonitorTab(null)
-          } else {
-            setActiveFlowSessions((prev) => ({
-              ...prev,
-              [sessionKey]: {
-                flowKey: `${flowType}.flow.yaml`,
-                topic: effectiveTopic,
-                isRunning: true,
-                isPaused: false,
-                isCli: false as const
-              }
-            }))
-          }
-        }
-
-        const flowName = parsedState.flow as string | undefined
-        if (!flowName) return
-
-        // Flows are DB-first at runtime (the FSM runs the DB copy; core/flows/*.yaml are
-        // only a boot-time seed). Read the LIVE graph so user-created and user-edited flows
-        // resolve their real per-stage roles/skills; fall back to the seed file only when
-        // the server/DB is unavailable.
-        fetchFlowGraph(flowName)
-          .then((res) => {
-            const dbParsed = res?.graph ? parseFlowGraph(res.graph) : null
-            if (dbParsed) {
-              setPipelineStates(dbParsed.states)
-              setStageRoles(dbParsed.roles)
-              setStageSkills(dbParsed.skills)
-              return
-            }
-            return readFile(`${projectPath}/src/pathly_data/core/flows/${getFlowYamlName(flowName)}`)
-              .then((yaml) => {
-                if (!yaml) return
-                const parsed = parseFlowStages(yaml.replace(/\r/g, ''))
-                if (!parsed) return
-                setPipelineStates(parsed.states)
-                setStageRoles(parsed.roles)
-                setStageSkills(parsed.skills)
-              })
+      if (effectiveTopic) {
+        const flowType = parsedState.flow ?? 'team'
+        const sessionKey = `${flowType}/${effectiveTopic}`
+        const isDone = parsedState.current === 'DONE' || parsedState.current === 'IDLE'
+        if (isDone) {
+          setActiveFlowSessions((prev) => {
+            if (!(sessionKey in prev)) return prev
+            const next = { ...prev }
+            delete next[sessionKey]
+            return next
           })
-          .catch(() => { /* neither DB nor seed available — FsmView uses default pipeline */ })
+          if (activeMonitorTabRef.current === sessionKey) setActiveMonitorTab(null)
+        } else {
+          setActiveFlowSessions((prev) => ({
+            ...prev,
+            [sessionKey]: {
+              flowKey: `${flowType}.flow.yaml`,
+              topic: effectiveTopic,
+              isRunning: true,
+              isPaused: false,
+              isCli: false as const
+            }
+          }))
+        }
+      }
 
-        const port = 8765
-        const histParams = new URLSearchParams({ topic: effectiveTopic, project_root: projectPath })
-        fetch(`http://127.0.0.1:${port}/events/history?${histParams}`)
-          .then((r) => r.ok ? r.json() : [])
-          .then((data: FsmEvent[]) => { if (data.length > 0) setEvents(data) })
-          .catch(() => { /* server not yet running — SSE will stream events when it starts */ })
-      } catch { /* ignore malformed */ }
-    }).catch(() => { /* topic not found in any root */ })
+      const flowName = parsedState.flow
+      if (!flowName) return
+
+      // Flows are DB-first at runtime (the FSM runs the DB copy; core/flows/*.yaml are
+      // only a boot-time seed). Read the LIVE graph so user-created and user-edited flows
+      // resolve their real per-stage roles/skills; fall back to the seed file only when
+      // the server/DB is unavailable.
+      fetchFlowGraph(flowName)
+        .then((res) => {
+          const dbParsed = res?.graph ? parseFlowGraph(res.graph) : null
+          if (dbParsed) {
+            setPipelineStates(dbParsed.states)
+            setStageRoles(dbParsed.roles)
+            setStageSkills(dbParsed.skills)
+            return
+          }
+          return readFile(`${projectPath}/src/pathly_data/core/flows/${getFlowYamlName(flowName)}`)
+            .then((yaml) => {
+              if (!yaml) return
+              const parsed = parseFlowStages(yaml.replace(/\r/g, ''))
+              if (!parsed) return
+              setPipelineStates(parsed.states)
+              setStageRoles(parsed.roles)
+              setStageSkills(parsed.skills)
+            })
+        })
+        .catch(() => { /* neither DB nor seed available — FsmView uses default pipeline */ })
+
+      const port = 8765
+      const histParams = new URLSearchParams({ topic: effectiveTopic, project_root: projectPath })
+      fetch(`http://127.0.0.1:${port}/events/history?${histParams}`)
+        .then((r) => r.ok ? r.json() : [])
+        .then((data: FsmEvent[]) => { if (data.length > 0) setEvents(data) })
+        .catch(() => { /* server not yet running — SSE will stream events when it starts */ })
+    })
 
     watchStart(projectPath, effectiveTopic)
     const removeListener = onWatchEvent((data) => {
@@ -251,17 +239,17 @@ export function useMonitorSession(): { effectiveTopic: string | null; showTabBar
     const path = projectPathRef.current
     if (!topic || !path) return
 
-    const roots = [
-      `${path}/pathly/features/${topic}`,
-      `${path}/pathly/debugs/${topic}`,
-      `${path}/pathly/explorations/${topic}`,
-    ]
-    Promise.any(roots.map((r) => readFile(`${r}/STATE.json`).then((c) => ({ content: c }))))
-      .then(({ content }) => {
-        if (!content) return
-        try { setFsmState(JSON.parse(content)) } catch { /* ignore */ }
+    // DB-first (state-one-authority): fresh /db/features lookup, no STATE.json read.
+    fetchDbFeatureMap(path, { fresh: true }).then((dbFeatures) => {
+      const row = dbFeatures.get(topic)
+      if (!row) return
+      setFsmState({
+        current: row.state !== 'UNKNOWN' ? row.state : '',
+        flow: row.flow || 'team',
+        feature: row.feature,
+        updated_at: row.updated_at,
       })
-      .catch(() => { /* topic not found */ })
+    })
 
     const port = 8765
     const histParams = new URLSearchParams({ topic, project_root: path })

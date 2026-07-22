@@ -4,12 +4,13 @@
 
 HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, prompt-event contract.
 
-5 test file(s).
+6 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
 | `test_api.py` | Tests for the HTTP routes Blueprint (api/__init__.py). Uses Flask test client | 15 |
 | `test_chat_agent.py` | covers pathly studio chat is plan aware; generic chat remains unchanged | 2 |
 | `test_config.py` | Tests for Settings.from_env() — specifically bind-host validation | 8 |
+| `test_db_features_fields.py` | Tests for the state-one-authority /db/features extension (split-db-api-explorer) | 5 |
 | `test_event_prompt_timestamps.py` | covers prompt json event examples include timestamps | 1 |
 | `test_http_server.py` | Integration tests for the HTTP server endpoints | 26 |

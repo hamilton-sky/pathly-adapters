@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useStore } from '../../store'
 import { readFile } from '../../services/pathlyApi'
+import { fetchDbFeatureMap } from '../../store/commsApi'
 import type { ConvRow } from '../../types'
 import { parseProgressMd } from '../../hooks/usePlanConversations'
 import { formatRelative } from '../../utils/timestamp'
@@ -144,10 +145,12 @@ export function PlanBoard(): JSX.Element {
 
     const base = `${projectPath}/pathly/features/${activeTopic}`
 
+    // DB-first (state-one-authority): stage comes from the /db/features row, not STATE.json.
+    // fresh:true because loadAll is watcher-triggered — the DB is already ahead of the disk
+    // export when the workspace-change event fires.
     try {
-      const raw = await readFile(`${base}/STATE.json`)
-      const parsed = JSON.parse(raw ?? '{}') as { current?: string }
-      setFsmState(parsed.current ?? '')
+      const row = (await fetchDbFeatureMap(projectPath, { fresh: true })).get(activeTopic)
+      setFsmState(row && row.state !== 'UNKNOWN' ? row.state : '')
     } catch {
       setFsmState('')
     }
@@ -162,14 +165,14 @@ export function PlanBoard(): JSX.Element {
       setNoProgress(true)
     }
 
+    // DB-first (state-one-authority): events come from the /db/features/<feature>/events
+    // IPC, not EVENTS.jsonl. The route returns newest-first; reverse to the chronological
+    // order the cards expect. Each row's payload IS the event dict the jsonl lines held.
     try {
-      const raw = await readFile(`${base}/EVENTS.jsonl`)
-      const parsed: EventEntry[] = []
-      for (const line of (raw ?? '').split('\n')) {
-        const trimmed = line.trim()
-        if (!trimmed) continue
-        try { parsed.push(JSON.parse(trimmed) as EventEntry) } catch { /* skip malformed */ }
-      }
+      const rows = await window.pathly.db.events(activeTopic, projectPath)
+      const parsed = (rows ?? [])
+        .map((r) => ({ ts: r.ts, type: r.event_type, ...(r.payload as Partial<EventEntry>) }) as EventEntry)
+        .reverse()
       setEvents(parsed)
     } catch {
       setEvents([])
