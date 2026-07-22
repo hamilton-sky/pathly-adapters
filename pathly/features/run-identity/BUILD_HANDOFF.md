@@ -71,7 +71,35 @@ supervise). If in-session, replicate the fragment cadence per task:
 | 5 | `projection-stamps-board-scope` | `db623fd2-ee78-49d2-abe5-41a6477e7e1f` | [3] |
 | 6 | `consumers-pivot-run-id` | `dee9ed97-75df-4ddd-8d26-26a3bae3a05e` | [4, 5] |
 
-The board task text is the authoritative prompt for each. Non-negotiables baked into them:
+The board task text is the authoritative prompt for each (fetch it — Files + Done-when are
+inside). Inline summary so this file stands alone if the server is down:
+
+| # | Files (primary) |
+|---|---|
+| 1 | `src/pathly_orchestrator/db/migrations.py` · `src/pathly_orchestrator/db/queries/fsm_events.py` |
+| 2 | `src/pathly_data/core/skills/fragments/completion-report.md` · `src/pathly_data/core/skills/utilities/log-agent-done.md` (**core fragments** — regen + snapshots, see below) |
+| 3 | `src/pathly_orchestrator/supervisor/terminal.py` · `src/pathly_orchestrator/runner/events.py` · `supervisor/board_run.py` (verify-only) |
+| 4 | `db/migrations.py` · `db/queries/run_history.py` · supervisor write sites (ground) · `src/pathly_orchestrator/CLAUDE.md` |
+| 5 | `db/migrations.py` · `db/queries/invocation_projection.py` |
+| 6 | `http_server/blueprints/ops/db_api_rollup.py` · `http_server/blueprints/ops/db_api_feature_detail.py` · `src/pathly_orchestrator/CLAUDE.md` |
+
+**Fragment/skill facts for task 2** (learned in state-one-authority G1, same two files):
+- `completion-report` is composed into MANY skills; `log-agent-done` is composed by
+  `team/retro`. Editing them changed exactly these 7 golden snapshots last time — expect the
+  same set again: `tests/snapshots/{development__build, planning__plan, team__build,
+  team__design, team__retro, team__review, team__test}.claude.md`.
+- `composition.yaml` needs NO change — the fragments are already in the manifest; only their
+  CONTENT changes.
+- Regen order: edit core files → `PYTHONPATH=src pathly-setup claude --apply --repair` →
+  `PYTHONPATH=src python -m build` (both exit 0) → rerun
+  `tests/install_skills/test_compose.py`, eyeball each snapshot diff is ONLY the added
+  `board_scope` field, write the new compose output back to the snapshot files.
+- The `<feature>` / `<fsm_feature>` / `<run_id>` placeholders are substituted by
+  `fsm_compose._inject_prompt_vars` (flow runs) and `board_run._inject_board_prompt_vars`
+  (board runs; `<run_id>` handled downstream in `_run_stage_via_terminal`) — task 2 only ADDS
+  a field that uses an EXISTING placeholder; it must not invent new placeholders.
+
+Non-negotiables baked into the task prompts:
 - Migrations idempotent (try/except ALTER TABLE pattern in `db/migrations.py`); legacy NULL
   rows keep their current heuristic fallbacks everywhere — behavior-neutral for old data.
 - Stamping is COALESCE-style: fill only when absent, NEVER overwrite an agent-provided value.
