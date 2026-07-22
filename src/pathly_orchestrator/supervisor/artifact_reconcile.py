@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 from pathlib import Path
 
@@ -16,16 +15,19 @@ def reconcile_artifacts(
     goal_id: str | None = None,
     board: str = "feature",
     broadcast_fn=None,
+    out_path: str | None = None,
 ) -> int:
     """Ensure a stage's/goal's outputs + feedback files are attached to the board.
 
     Two sources, both best-effort and non-fatal (never raises); returns the count attached:
-      1. ``<storage_path>/ARTIFACTS.jsonl`` — the ledger written by the artifact-register
-         fragment (a stage's declared ``<out_path>`` outputs); closes the gap when the agent's
-         advisory board POST was skipped (server down).
+      1. ``out_path`` (optional) — the calling stage's declared primary output, resolved from
+         the FSM's own composition manifest (``fsm_compose.resolve_stage_out_path``) and attached
+         directly. Closes the server-down gap when the agent's advisory board POST was skipped —
+         WITHOUT a disk ledger (state-one-authority: the ``ARTIFACTS.jsonl`` ledger is dropped, its
+         artifact metadata already lives in ``BOARD.json``). Skipped when None or the file is absent.
       2. ``<storage_path>/feedback/*.md`` — agent/system feedback files (HUMAN_QUESTIONS.md,
          REVIEW_FAILURES.md, TEST_FAILURES.md, …). These are never a stage ``<out_path>`` so they
-         never reach the ledger, yet they are exactly what a human needs to see — surface them as
+         never reach source 1, yet they are exactly what a human needs to see — surface them as
          board artifacts. ``ensure_attached`` is idempotent on ``(scope, path)`` so re-scans
          (this runs after every stage/goal) never duplicate.
     """
@@ -43,43 +45,28 @@ def reconcile_artifacts(
 
     n = 0
 
-    # 1) Declared artifacts from the ledger.
-    ledger = Path(storage_path) / "ARTIFACTS.jsonl"
-    if ledger.exists():
+    # 1) The stage's declared output — attached from the FSM's own record (no disk ledger).
+    if out_path:
         try:
-            for line in ledger.read_text(encoding="utf-8").splitlines():
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    rec = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                path = rec.get("path")
-                if not path:
-                    continue
-                try:
-                    ensure_attached(
-                        conn,
-                        scope,
-                        path,
-                        board=board,
-                        goal_id=goal_id,
-                        role=rec.get("role"),
-                        title=rec.get("title"),
-                        summary=rec.get("summary"),
-                        type=rec.get("type", "md"),
-                        broadcast_fn=broadcast_fn,
-                    )
-                    n += 1
-                except Exception as exc:
-                    logger.warning(
-                        "reconcile_artifacts: attach failed for %s: %s", path, exc
-                    )
+            p = Path(out_path)
+            if p.exists():
+                ensure_attached(
+                    conn,
+                    scope,
+                    out_path,
+                    board=board,
+                    goal_id=goal_id,
+                    title=p.stem.replace("_", " ").title(),
+                    type="md",
+                    broadcast_fn=broadcast_fn,
+                )
+                n += 1
         except Exception as exc:
-            logger.warning("reconcile_artifacts: ledger read failed: %s", exc)
+            logger.warning(
+                "reconcile_artifacts: out_path attach failed for %s: %s", out_path, exc
+            )
 
-    # 2) Feedback files — agent/system output the human must see, but never in the ledger.
+    # 2) Feedback files — agent/system output the human must see, but never a stage <out_path>.
     try:
         fb_dir = Path(storage_path) / "feedback"
         if fb_dir.is_dir():

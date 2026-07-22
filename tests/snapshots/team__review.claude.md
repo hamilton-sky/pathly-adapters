@@ -345,22 +345,10 @@ FSM transition. The supervisor advances the flow once your artifact exists.
 **1. Write your output file.** Write your stage's primary artifact to exactly `<out_path>`
 (the runner injected this path — do not choose your own). This is the file the gate checks.
 
-**2. Append one line to the artifact ledger.** Append a single JSON line to
-`<feature_path>/ARTIFACTS.jsonl` (create the file if absent, append-only — never rewrite it):
-```bash
-python3 -c '
-import json, os, sys, time
-rec = {"role": "<agent>", "path": "<out_path>", "type": "md",
-       "title": "<short title>", "summary": "<one-line gloss>", "ts": time.time()}
-p = "<feature_path>/ARTIFACTS.jsonl"
-with open(p, "a", encoding="utf-8") as f:
-    f.write(json.dumps(rec) + "\n")
-'
-```
-
-**3. Advisory board POST (skip-if-down).** Mirror the artifact to the board so other agents
+**2. Advisory board POST (skip-if-down).** Mirror the artifact to the board so other agents
 see it without opening the file. If the server is unreachable (connection refused / non-200),
-skip silently — `ARTIFACTS.jsonl` and the file are the source of truth.
+skip silently — the on-disk `<out_path>` file is the source of truth, and the supervisor's
+artifact reconciliation attaches it to the board from the FSM's own record after the stage.
 ```bash
 curl -s -X POST http://127.0.0.1:8765/comms/post \
   -H "Content-Type: application/json" \
@@ -485,24 +473,16 @@ try:
 except Exception:
     pass  # server unreachable — fall through to local fallback
 
-# Fallback: write via eventlog (DB-primary, EVENTS.jsonl secondary)
+# Fallback: write via eventlog (DB-primary; EVENTS.jsonl is a DB->disk export now, not an agent write)
 if not _written:
     try:
         from pathly_orchestrator.eventlog import append_event as _ae
         _ae('<feature_path>', event)
         print('AGENT_DONE written to DB (fallback)')
     except Exception as _exc:
-        path = pathlib.Path('<feature_path>/EVENTS.jsonl')
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with open(path, 'a', encoding='utf-8') as _f:
-            _f.write(json.dumps(event) + chr(10))
-        print(f'AGENT_DONE written to EVENTS.jsonl (last resort: {_exc})')
-
-# Always dual-write to EVENTS.jsonl as backup
-path = pathlib.Path('<feature_path>/EVENTS.jsonl')
-path.parent.mkdir(parents=True, exist_ok=True)
-with open(path, 'a', encoding='utf-8') as _f:
-    _f.write(json.dumps(event) + chr(10))
+        # Soft failure only - the DB is the single authority and event_mirror.py exports
+        # EVENTS.jsonl DB->disk, so an agent must NOT append to EVENTS.jsonl directly.
+        print(f'AGENT_DONE could not be written to the DB (soft-fail, not mirrored to disk): {_exc}')
 "
 ```
 

@@ -615,11 +615,29 @@ def _run_stage_via_terminal(
                             if broadcast_fn
                             else None
                         )
+                        # Resolve the just-completed stage's declared <out_path> from the FSM's own
+                        # composition manifest so reconcile can attach it directly (state-one-authority:
+                        # replaces the retired ARTIFACTS.jsonl ledger — no disk mirror). Best-effort.
+                        _out_path = None
+                        try:
+                            from pathly_orchestrator.fsm_compose import (
+                                resolve_stage_out_path,
+                            )
+                            from pathly_orchestrator.fsm_ops import _load_flow
+
+                            _out_path = resolve_stage_out_path(
+                                _load_flow(state.flow or "team"),
+                                state.current_state,
+                                storage_path,
+                            )
+                        except Exception:
+                            _out_path = None
                         reconcile_artifacts(
                             storage_path,
                             state.topic,
                             goal_id=(state.goal_id or None),
                             broadcast_fn=_bfn,
+                            out_path=_out_path,
                         )
                     except Exception as exc:
                         logger.warning(

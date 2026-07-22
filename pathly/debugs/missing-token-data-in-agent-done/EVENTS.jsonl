@@ -1,5 +1,0 @@
-{"type": "FSM_START", "flow": "debug", "topic": "missing-token-data-in-agent-done", "rigor": "lite", "autoFlow": true}
-{"type": "STATE_TRANSITION", "to": "ROOT_CAUSE_FOUND"}
-{"type": "STATE_TRANSITION", "to": "FIXING"}
-{"type": "STATE_TRANSITION", "to": "VERIFYING"}
-{"type": "STATE_TRANSITION", "to": "DONE"}

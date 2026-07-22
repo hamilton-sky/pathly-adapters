@@ -255,11 +255,19 @@ def complete_stage(args: dict) -> dict:
     result["limits"] = state_info["limits"]
     result["next_state"] = next_state
     try:
+        from pathly_orchestrator.fsm_compose import resolve_stage_out_path
         from pathly_orchestrator.supervisor.artifact_reconcile import (
             reconcile_artifacts,
         )
 
-        reconcile_artifacts(storage_path, scope, goal_id=goal_id, board=board)
+        # Attach the just-completed stage's declared <out_path> from the FSM's own record
+        # (state-one-authority: no ARTIFACTS.jsonl ledger). Best-effort; optional if unresolvable.
+        _out_path = resolve_stage_out_path(
+            flow_config, state_info["current_state"], storage_path
+        )
+        reconcile_artifacts(
+            storage_path, scope, goal_id=goal_id, board=board, out_path=_out_path
+        )
     except Exception:
-        pass  # best-effort; the ledger + files remain authoritative
+        pass  # best-effort; the on-disk <out_path> file + board POST remain authoritative
     return result

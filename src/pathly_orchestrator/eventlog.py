@@ -127,6 +127,17 @@ def append_event(
     # New optional fields (cost_source, cache_read_tokens, cache_write_tokens) pass through transparently.
     _db.append_event(conn, project_root, feature, event)
 
+    # DB -> disk EXPORT hook (state-one-authority): queue this feature's EVENTS.jsonl for a
+    # debounced rewrite from the DB. Best-effort — a mirror-export failure must never break
+    # event logging. event_mirror reads events via db.queries directly (never imports eventlog),
+    # and is keyed by the already-resolved feature_dir so debug/explore/goal runs export correctly.
+    try:
+        from pathly_orchestrator import event_mirror
+
+        event_mirror.mark_event_dirty(feature_dir, project_root, feature)
+    except Exception:
+        pass  # export hook is best-effort — never crash event logging
+
     try:
         from pathly_orchestrator.event_bus import _bus
 

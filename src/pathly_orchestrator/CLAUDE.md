@@ -257,7 +257,9 @@ pathly_orchestrator/
                            #   at most one worker per lane; goal_id= scopes the frontier to one goal's tasks
     isolation.py           # lane / serial isolation strategies for the frontier loop
     file_claims.py         # per-file claim tracking so parallel tasks don't collide on writes
-    artifact_reconcile.py  # after a stage/goal run: attach ARTIFACTS.jsonl outputs AND
+    artifact_reconcile.py  # after a stage/goal run: attach the stage's declared <out_path>
+                           #   (resolved from the FSM's own manifest via fsm_compose.resolve_stage_out_path,
+                           #   passed as out_path — state-one-authority: NO ARTIFACTS.jsonl ledger) AND
                            #   <storage>/feedback/*.md (HUMAN_QUESTIONS/REVIEW/TEST_FAILURES)
                            #   to the board (idempotent). A headless human checkpoint also posts
                            #   a type='escalation' board message (orchestrator_stage.py) so it's

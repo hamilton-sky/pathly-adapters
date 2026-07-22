@@ -409,3 +409,13 @@ END;
         backfill_board_mirrors(conn)
     except Exception:
         pass
+    # state-one-authority: idempotent startup pass that exports each feature's fsm_events
+    # log to EVENTS.jsonl on disk (pure DB->disk export; never mutates the DB). Same
+    # lazy-import + best-effort pattern as the board-mirror backfill above — a mirror-write
+    # failure must never block DB startup.
+    try:
+        from pathly_orchestrator.event_mirror import backfill_event_mirrors
+
+        backfill_event_mirrors(conn)
+    except Exception:
+        pass

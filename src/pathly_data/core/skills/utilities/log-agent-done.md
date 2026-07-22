@@ -1,8 +1,9 @@
 # log-agent-done
 
 Internal utility — writes an AGENT_DONE event to the central DB via eventlog and POSTs telemetry
-to the Pathly HTTP backend. Falls back to EVENTS.jsonl in offline/codex mode. Call this once per
-completed stage instead of manually recording AGENT_DONE and calling record-cost separately.
+to the Pathly HTTP backend. Falls back to a direct DB write via eventlog in offline/codex mode
+(EVENTS.jsonl is a DB->disk export written by event_mirror.py, never an agent-side append). Call
+this once per completed stage instead of manually recording AGENT_DONE and calling record-cost separately.
 
 Provider-agnostic: supports Claude, OpenAI, Google Gemini, and any other model.
 Pass `cost_usd` directly if the API response included it. Otherwise cost is computed
@@ -51,7 +52,7 @@ Set `tokens_in` and `tokens_out`:
 - If `input_tokens` / `output_tokens` provided: use directly
 - Else: both 0
 
-## Step 3 — Write AGENT_DONE via HTTP endpoint (primary) with DB/EVENTS.jsonl fallback
+## Step 3 — Write AGENT_DONE via HTTP endpoint (primary) with DB fallback
 
 Build the event dict first:
 
@@ -107,25 +108,16 @@ try:
 except Exception:
     pass
 
-# Fallback: write via eventlog (DB-primary, EVENTS.jsonl secondary)
+# Fallback: write via eventlog (DB-primary; EVENTS.jsonl is a DB->disk export now, not an agent write)
 if not _written:
     try:
         from pathly_orchestrator.eventlog import append_event as _ae
         _ae('pathly/features/<feature>', event)
         print('AGENT_DONE written to DB (fallback)')
     except Exception as _exc:
-        # Last resort: write directly to EVENTS.jsonl
-        path = pathlib.Path('pathly/features/<feature>/EVENTS.jsonl')
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with open(path, 'a', encoding='utf-8') as _f:
-            _f.write(json.dumps(event) + chr(10))
-        print(f'AGENT_DONE written to EVENTS.jsonl (last resort: {_exc})')
-
-# AC2.5 dual-write: always append to EVENTS.jsonl as backup
-path = pathlib.Path('pathly/features/<feature>/EVENTS.jsonl')
-path.parent.mkdir(parents=True, exist_ok=True)
-with open(path, 'a', encoding='utf-8') as _f:
-    _f.write(json.dumps(event) + chr(10))
+        # Soft failure only - the DB is the single authority and event_mirror.py exports
+        # EVENTS.jsonl DB->disk, so an agent must NOT append to EVENTS.jsonl directly.
+        print(f'AGENT_DONE could not be written to the DB (soft-fail, not mirrored to disk): {_exc}')
 "
 ```
 

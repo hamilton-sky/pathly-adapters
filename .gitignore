@@ -24,8 +24,22 @@ pathly/plans/**/*.db-wal
 pathly/plans/**/*.db-shm
 *.db-wal
 *.db-shm
-# EVENTS.jsonl — events go to central DB; per-feature files are transient fallbacks only
-pathly/plans/**/EVENTS.jsonl
+# EVENTS.jsonl — per-feature disk mirror of the DB-authoritative fsm_events log (event
+# disk-mirror, state-one-authority). The central DB is the runtime source of record; the
+# exporter (event_mirror.py) rewrites this file DB->disk on every server start + event append,
+# so tracking it churns. Same treatment as BOARD.json below. To ship a FINISHED feature's
+# event log with the repo (frozen → no churn), force-add it:
+#   git add -f pathly/features/<name>/EVENTS.jsonl
+pathly/**/EVENTS.jsonl
+# Safety net: a repo-root EVENTS.jsonl is never a legitimate tracked file (production event
+# logs always live under pathly/); only a project-root-as-storage-path edge case emits one.
+/EVENTS.jsonl
+# ARTIFACTS.jsonl — DROPPED (state-one-authority). Was an agent-written import ledger for a
+# stage's declared outputs; that metadata already lives in BOARD.json, and reconcile now attaches
+# a stage's <out_path> from the FSM's own record (no ledger). Nothing writes or reads it anymore,
+# so any straggler on disk is a dead file — never tracked.
+pathly/**/ARTIFACTS.jsonl
+/ARTIFACTS.jsonl
 # BOARD.json — per-board disk mirror of the DB-authoritative comms board (board disk-mirror).
 # Rewritten on every board write, so tracking it churns; the DB is the source and P2 hydration
 # rebuilds boards from these files LOCALLY (DB-loss recovery), not just on fresh clones. To ship

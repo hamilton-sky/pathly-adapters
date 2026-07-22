@@ -153,6 +153,34 @@ def _inject_prompt_vars(
     return text
 
 
+def resolve_stage_out_path(
+    flow_config: dict, state_name: str, storage_path: Path
+) -> str | None:
+    """The on-disk ``<out_path>`` a stage declares (its primary artifact), resolved from the
+    composition manifest via the SAME (agent_role, skill) -> ``manifest_role_file`` path
+    ``build_prompt`` uses to substitute ``<out_path>`` into the prompt.
+
+    Returns None when the state maps to no composed skill (bare-role stage) or the role has no
+    manifest entry. Used by artifact reconciliation to attach a stage's declared output to the
+    board directly from the FSM's own record (state-one-authority: replaces the retired
+    ARTIFACTS.jsonl ledger scan — no disk mirror)."""
+    try:
+        agent = (flow_config.get("agent_map") or {}).get(state_name)
+        if not agent or "/" not in agent:
+            return None
+        _role = _SKILL_AGENT_ROLE.get(agent)
+        agent_role = _role if _role is not None else agent.split("/")[-1]
+        from pathly_orchestrator.compose import manifest_role_file
+
+        entry = manifest_role_file(agent_role, agent)
+        if entry is None:
+            return None
+        feature_path = Path(storage_path).as_posix().rstrip("/")
+        return f"{feature_path}/{entry[0]}"
+    except Exception:
+        return None
+
+
 def _changed_files(project_root: str, limit: int = 3) -> list[str]:
     """Return up to ``limit`` code files changed in the working tree — the task's
     file scope for the code-structure channel — or ``[]`` on any failure.
