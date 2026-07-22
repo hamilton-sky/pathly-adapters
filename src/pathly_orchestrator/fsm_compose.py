@@ -278,24 +278,18 @@ def _apply_stage_selection(
     return text
 
 
-def build_prompt(
-    flow_config: dict,
-    state_name: str,
-    storage_path: Path,
-    goal_id: str = "",
-    ability_ids: list | None = None,
-    excluded_sections: list | None = None,
-    stage_override: str = "",
-) -> str:
-    agent = flow_config["agent_map"][state_name]
-    feature = storage_path.name
-    project_root = _project_root_from_storage(storage_path)
-    # Board scope the stage posts to / retrieves context from. A plain feature
-    # pipeline: this IS the feature (the storage dir name). A goal-decompose run
-    # (the consultation FSM): the on-disk topic is the goal slug for run isolation,
-    # but board writes must target the parent feature/project board the goal lives
-    # on — else the PO/architect/… artifacts orphan onto a throwaway slug-scoped
-    # board instead of the board the consultation was spawned from (the bug fix).
+def resolve_board_scope(feature: str, project_root: str, goal_id: str = "") -> str:
+    """Board scope a run posts to / retrieves context from — its PARENT identity.
+
+    A plain feature pipeline: this IS the feature (the storage dir name). A
+    goal-decompose run (the consultation FSM): the on-disk topic is the goal slug
+    for run isolation, but board writes must target the parent feature/project
+    board the goal lives on — else the PO/architect/… artifacts orphan onto a
+    throwaway slug-scoped board instead of the board the consultation was spawned
+    from (the bug fix). Extracted from build_prompt so the supervisor can stamp
+    the SAME value into telemetry events at spawn (run-identity) — one derivation,
+    so the prompt's ``<feature>`` and the stamped ``board_scope`` never drift.
+    """
     board_scope = feature
     if feature == "project":
         # A PROJECT-scoped run (storage pathly/project/ → basename 'project') posts to / reads
@@ -327,6 +321,22 @@ def build_prompt(
                 board_scope = _bs[1]
         except Exception:
             board_scope = feature
+    return board_scope
+
+
+def build_prompt(
+    flow_config: dict,
+    state_name: str,
+    storage_path: Path,
+    goal_id: str = "",
+    ability_ids: list | None = None,
+    excluded_sections: list | None = None,
+    stage_override: str = "",
+) -> str:
+    agent = flow_config["agent_map"][state_name]
+    feature = storage_path.name
+    project_root = _project_root_from_storage(storage_path)
+    board_scope = resolve_board_scope(feature, project_root, goal_id)
     # Board tier for the <board> prompt var → the comms-post fragment posts artifacts to the
     # RIGHT channel. Only a project run (storage basename 'project') targets the project board;
     # every other run stays 'feature' — also the value /comms/post coerces any unknown board to,

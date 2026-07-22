@@ -10,10 +10,10 @@ Tests are grouped into domain folders that mirror the app's architecture layers.
 | [`comms_board/`](comms_board/INDEX.md) | Comms board / message-board subsystem — messages, tasks, artifacts, goals, context retrieval & relevance, board mirror & hydration. | 41 |
 | [`consistency/`](consistency/INDEX.md) |  | 1 |
 | [`dag_goals/`](dag_goals/INDEX.md) | Goal/DAG decomposition & scheduling — feature/flow/project decompose, goals read-model, PRD import. | 8 |
-| [`db/`](db/INDEX.md) | Database layer — schema/queries, connection isolation, write guard. | 5 |
+| [`db/`](db/INDEX.md) | Database layer — schema/queries, connection isolation, write guard. | 7 |
 | [`fsm_flows/`](fsm_flows/INDEX.md) | FSM engine, gates, transitions, flow definitions, feedback protocol & fix-routing. | 17 |
 | [`http_api/`](http_api/INDEX.md) | HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, prompt-event contract. | 6 |
 | [`install_skills/`](install_skills/INDEX.md) | Adapter install/setup, stitch & compose, skill composition / round-trip / export, plugin manifests. | 20 |
-| [`runner_supervisor/`](runner_supervisor/INDEX.md) | Runner control loop, supervisor, spawn channel, lane/worktree isolation, file-claim registry, services facade. | 9 |
+| [`runner_supervisor/`](runner_supervisor/INDEX.md) | Runner control loop, supervisor, spawn channel, lane/worktree isolation, file-claim registry, services facade. | 10 |
 | [`storage_paths/`](storage_paths/INDEX.md) | Feature/goal storage layout, slugs, canonical artifact paths, storage migrations. | 9 |
-| [`telemetry/`](telemetry/INDEX.md) | Cost/token telemetry — invocation projection, pricing, OTel export, observability, log formatting. | 13 |
+| [`telemetry/`](telemetry/INDEX.md) | Cost/token telemetry — invocation projection, pricing, OTel export, observability, log formatting. | 15 |

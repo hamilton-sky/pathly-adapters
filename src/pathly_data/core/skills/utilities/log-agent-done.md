@@ -64,6 +64,7 @@ event = {
     'type': 'AGENT_DONE',
     'agent': '<agent>',
     'model': '<model>',
+    'board_scope': '<feature>',
     'conversation': <conversation>,
     'result': '<result>',
     'outcome': '<outcome>',

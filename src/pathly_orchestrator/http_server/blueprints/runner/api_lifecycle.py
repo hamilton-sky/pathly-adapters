@@ -178,11 +178,22 @@ def runner_start():
                 upsert_run as _upsert_run,
             )
 
+            # run-identity: key by the run SLUG (storage-dir basename), not the raw
+            # topic (a board-scoped flow's topic can be the nested path). board_scope
+            # is NOT guessed here — the spawn chokepoint (_record_spawn_identity)
+            # issues it with full context and upsert_run COALESCE-fills the NULL.
+            _feature = topic
+            try:
+                from pathly_orchestrator.fsm_ops import _resolve_storage_path
+
+                _feature = _resolve_storage_path(None, data["project_root"], topic).name
+            except Exception:
+                pass
             _now = _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime())
             _upsert_run(
                 _get_db(),
                 project_root=data["project_root"],
-                feature=topic,
+                feature=_feature,
                 run_id=state.run_id,
                 status="running",
                 started_at=_now,

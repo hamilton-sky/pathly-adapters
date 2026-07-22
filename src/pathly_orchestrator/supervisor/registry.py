@@ -183,22 +183,41 @@ def _set_status(
     if status in {"done", "aborted", "error"}:
         try:
             import time as _time
+            from pathlib import Path as _Path
+
             from pathly_orchestrator.db.connection import get_db as _get_db
             from pathly_orchestrator.db.queries.run_history import (
                 upsert_run as _upsert_run,
             )
+            from pathly_orchestrator.fsm_compose import resolve_board_scope
+            from pathly_orchestrator.fsm_ops import _resolve_storage_path
 
+            # run-identity: key the row by the run SLUG (storage-dir basename), not the
+            # topic — a goal run's topic is the nested features/<f>/goals/<slug> path
+            # (the retired keying-by-full-topic-path residual). Carry board_scope too
+            # (issued at spawn; COALESCE in upsert_run keeps an earlier value).
+            _storage = (
+                _Path(state.storage_path)
+                if state.storage_path
+                else _resolve_storage_path(None, state.project_root, state.topic)
+            )
+            _slug = _storage.name
+            _scope = getattr(state, "board_scope", "") or resolve_board_scope(
+                _slug, state.project_root, state.goal_id or ""
+            )
             _now = _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime())
             _upsert_run(
                 _get_db(),
                 project_root=state.project_root,
-                feature=state.topic,
+                feature=_slug,
                 run_id=state.run_id,
                 status=status,
                 finished_at=_now,
                 stage_count=state.iterations,
                 total_tokens=0,
                 cost_usd=state.cost_usd_so_far,
+                adapter=state.current_adapter or None,
+                board_scope=_scope or None,
             )
         except Exception:
             logger.debug("run_history upsert (finish) error", exc_info=True)

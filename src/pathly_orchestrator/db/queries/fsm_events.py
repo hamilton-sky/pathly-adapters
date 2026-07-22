@@ -23,19 +23,36 @@ def _norm(project_root: str) -> str:
     return s
 
 
+def _board_scope_of(event_dict: dict) -> str | None:
+    """Extract the run-identity board scope from an event dict (absent → NULL).
+
+    Guarded like the projection's ``category``: an unsubstituted ``<feature>``
+    placeholder (a raw/interactive skill that skipped injection) lands as NULL,
+    never as a junk identity. The raw value stays in the payload blob regardless.
+    """
+    v = event_dict.get("board_scope")
+    if not isinstance(v, str):
+        return None
+    v = v.strip()
+    if not v or v.startswith("<"):
+        return None
+    return v
+
+
 def append_event(
     conn: sqlite3.Connection, project_root: str, feature: str, event_dict: dict
 ) -> int:
     """Insert *event_dict* into fsm_events. Returns the new seq (lastrowid)."""
     event_type = event_dict.get("type", event_dict.get("event_type", ""))
     ts = event_dict.get("ts", "")
+    board_scope = _board_scope_of(event_dict)
     payload = json.dumps(event_dict)
     norm_pr = _norm(project_root)
     with _get_write_lock(conn):
         cur = conn.execute(
-            "INSERT INTO fsm_events (project_root, feature, ts, event_type, payload) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (norm_pr, feature, ts, event_type, payload),
+            "INSERT INTO fsm_events (project_root, feature, ts, event_type, payload, board_scope) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (norm_pr, feature, ts, event_type, payload, board_scope),
         )
         conn.commit()
         seq = cur.lastrowid or 0

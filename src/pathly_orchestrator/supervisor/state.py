@@ -96,6 +96,12 @@ class RunnerState:
     # told to seed THIS existing goal's DAG instead of finding-or-creating its own.
     goal_id: str = ""
 
+    # run-identity: the board scope ISSUED at spawn — the parent feature/project this run
+    # belongs to (what the prompt's <feature> placeholder resolves to). Board/loop executors
+    # stamp it directly (they know the scope); "" = not issued, and the telemetry stamping
+    # paths fall back to fsm_compose.resolve_board_scope over the storage dir + goal_id.
+    board_scope: str = ""
+
     # Flow-gate-preview (P2): transient, per-run, per-stage prompt overrides from the gate
     # ({state: prompt}), keyed by FSM state. In-memory ONLY — never written to public_dict()
     # / the runner_state DB mirror, so it dies with the run and never shows up as a "saved"

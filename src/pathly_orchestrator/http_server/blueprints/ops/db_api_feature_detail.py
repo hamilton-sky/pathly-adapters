@@ -51,12 +51,16 @@ def db_feature_agents(feature: str):
     try:
         conn = _get_db()
         pr = _project_root_param()
+        # run-identity: match the slug OR the spawn-issued board_scope, so a goal
+        # run's invocations surface under its parent feature too. Legacy rows (NULL
+        # board_scope) behave exactly as before.
         query = (
             "SELECT id, run_id, stage, agent_role, started_at, finished_at, "
-            "tokens_in, tokens_out, cost_usd, session_id, summary, scope_tier "
-            "FROM agent_invocations WHERE feature=?"
+            "tokens_in, tokens_out, cost_usd, session_id, summary, scope_tier, "
+            "board_scope "
+            "FROM agent_invocations WHERE (feature=? OR board_scope=?)"
         )
-        params: list = [feature]
+        params: list = [feature, feature]
         if pr:
             query += " AND project_root=?"
             params.append(pr)
@@ -105,12 +109,16 @@ def db_feature_runs(feature: str):
     try:
         conn = _get_db()
         pr = _project_root_param()
+        # run-identity: slug OR board_scope (goal runs under their parent feature),
+        # plus the legacy basename shim (rows written before the slug keying fix hold
+        # the full topic path — matched by '/'-suffix, never rewritten).
         query = (
             "SELECT id, run_id, status, started_at, finished_at, "
-            "stage_count, total_tokens, cost_usd, adapter "
-            "FROM run_history WHERE feature=?"
+            "stage_count, total_tokens, cost_usd, adapter, board_scope "
+            "FROM run_history "
+            "WHERE (feature=? OR board_scope=? OR feature LIKE '%/' || ?)"
         )
-        params: list = [feature]
+        params: list = [feature, feature, feature]
         if pr:
             query += " AND project_root=?"
             params.append(pr)

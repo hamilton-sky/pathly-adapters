@@ -108,8 +108,13 @@ def db_rollup():
         result = {"project": project_block, "global": global_block}
 
         if feature:
-            params: list = [feature]
-            where = "WHERE feature=?"
+            # run-identity: a goal run's rows key `feature` by the run SLUG while
+            # `board_scope` carries the parent feature — match EITHER so the goal's
+            # cost is visible under its parent feature without guessing. Legacy rows
+            # (NULL board_scope) keep the exact old feature-key behavior. Union of the
+            # same fact rows — a row matching both predicates still counts once.
+            params: list = [feature, feature]
+            where = "WHERE (feature=? OR board_scope=?)"
             if pr:
                 where += " AND project_root=?"
                 params.append(pr)

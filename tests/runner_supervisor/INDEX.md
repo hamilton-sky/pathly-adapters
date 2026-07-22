@@ -4,12 +4,13 @@
 
 Runner control loop, supervisor, spawn channel, lane/worktree isolation, file-claim registry, services facade.
 
-9 test file(s).
+10 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
 | `test_file_claims.py` | Unit tests for the cross-feature file-claim overlap registry | 6 |
 | `test_isolation.py` | Tests for supervisor/isolation.py — LaneIsolation workspace seam | 11 |
+| `test_run_identity_stamps.py` | run-identity: server-side run_id + board_scope stamping (supervisor guarantee) | 6 |
 | `test_runner.py` | Unit tests for pathly_orchestrator.runner | 20 |
 | `test_runner_contract.py` | The runner contract injected by build_prompt — headless agents must never self-drive the FSM | 2 |
 | `test_runner_endpoints.py` | Tests for /runner/* control endpoints and /events/runner SSE (Conv 3 — Phases 8-10) | 38 |

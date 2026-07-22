@@ -22,11 +22,17 @@ def _patch_last_agent_done(
     tool_uses: int = 0,
     model: str = "",
     run_id: str = "",
+    board_scope: str = "",
 ) -> None:
     """Append a BILLING_UPDATE event with real cost/token data to DB.
 
     The events table is append-only — we do not mutate the original AGENT_DONE row.
     Instead we emit BILLING_UPDATE which supersedes it for cost/token display.
+
+    ``board_scope`` (run-identity) rides along like ``model``/``run_id`` — the spawner
+    knows it, the agent may not have reported it. The projection folds it onto the
+    anchor AGENT_DONE **only when the anchor lacks one** (COALESCE — an agent-provided
+    value is never overwritten).
     """
     # --- find last AGENT_DONE for agent/conv identification ---
     patched_agent: str | None = None
@@ -57,6 +63,7 @@ def _patch_last_agent_done(
         "tool_uses": tool_uses,
         "model": model or None,
         "run_id": run_id or None,
+        "board_scope": board_scope or None,
         "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "schema_version": 1,
     }

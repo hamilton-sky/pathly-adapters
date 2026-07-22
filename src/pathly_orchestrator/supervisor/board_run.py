@@ -98,6 +98,9 @@ def _default_spawn(
         current_state=(agent or mode or "board-run"),
         current_adapter=adapter,
         interactive=interactive,
+        # run-identity: a board run's scope IS its board scope — issue it at spawn so the
+        # telemetry stamps (synthetic AGENT_DONE / BILLING_UPDATE) never re-derive it.
+        board_scope=scope,
     )
     # telemetry-three-tier: a board/single run registers no topic RunnerState, so
     # api_lifecycle won't record it — the executor owns the projection. One agent

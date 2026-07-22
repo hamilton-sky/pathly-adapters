@@ -4,10 +4,11 @@
 
 Cost/token telemetry — invocation projection, pricing, OTel export, observability, log formatting.
 
-13 test file(s).
+15 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
+| `test_consumers_board_scope_pivot.py` | run-identity: consumers pivot onto issued identity (board_scope / run_id join) | 4 |
 | `test_extract_tokens.py` | Token counting is Strategy A — one per-adapter registry (`extract_tokens`) | 9 |
 | `test_goal_telemetry_key.py` | Goal-run telemetry-key unification | 5 |
 | `test_invocation_billing_reconcile.py` | Executor invocations must reconcile the real CLI billing (cost/tokens) after early-advance | 3 |
@@ -19,5 +20,6 @@ Cost/token telemetry — invocation projection, pricing, OTel export, observabil
 | `test_output_parse_recovery.py` | Truncation-recovery for large claude ``--output-format=json`` envelopes (``output.parse_result``) | 4 |
 | `test_parse_result_model_usage.py` | parse_result must capture the adapter's per-model usage breakdown (`modelUsage`) | 4 |
 | `test_pricing_registry.py` | Unit tests for PricingRegistry.compute() | 10 |
+| `test_projection_board_scope.py` | run-identity: the invocation projection stamps board_scope from the event stream | 4 |
 | `test_telemetry_cost_fix.py` | Tests for the telemetry-cost-fix plan (FIX B + FIX C) | 3 |
 | `test_telemetry_three_tier.py` | Tests for the three-tier telemetry feature (telemetry-three-tier) | 8 |

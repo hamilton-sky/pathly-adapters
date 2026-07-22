@@ -35,6 +35,7 @@ import logging
 import sqlite3
 
 from ..connection import _get_write_lock
+from .fsm_events import _board_scope_of
 
 _log = logging.getLogger("pathly.telemetry")
 
@@ -117,6 +118,9 @@ def _agent_done_rec(payload: dict) -> dict:
         "agent_role": payload.get("agent") or "agent",
         "conversation": payload.get("conversation"),
         "category": cat,
+        # run-identity: the spawn-issued board scope, guarded like category (an
+        # unsubstituted <feature> placeholder lands as NULL, never a junk identity).
+        "board_scope": _board_scope_of(payload),
         "cost_usd": _num(payload.get("cost_usd")),
         # AGENT_DONE only ever carries total_tokens (never an in/out split); park the
         # total in tokens_in so SUM(tokens_in+tokens_out) is the true total. A later
@@ -159,8 +163,8 @@ def _upsert_projected(
             "INSERT INTO agent_invocations "
             "(project_root, feature, run_id, stage, agent_role, started_at, finished_at, "
             " tokens_in, tokens_out, cost_usd, session_id, summary, scope_tier, "
-            " provider, cost_source, source_seq, category) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            " provider, cost_source, source_seq, category, board_scope) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 project_root,
                 feature,
@@ -179,6 +183,7 @@ def _upsert_projected(
                 cost_source,
                 source_seq,
                 rec.get("category"),
+                rec.get("board_scope"),
             ),
         )
         conn.commit()
@@ -204,6 +209,11 @@ def _fold_billing(rec: dict, payload: dict) -> None:
             rec["tokens_in"] = b_total
     if payload.get("tool_uses") is not None:
         rec["tool_uses"] = int(_num(payload.get("tool_uses")))
+    # run-identity: billing may carry the spawn-issued board_scope the agent omitted.
+    # Fill ONLY when the anchor lacks one — never overwrite an agent-provided value.
+    b_scope = _board_scope_of(payload)
+    if b_scope and not rec.get("board_scope"):
+        rec["board_scope"] = b_scope
 
 
 # ─── One-time / on-startup backfill ──────────────────────────────────────────────
@@ -382,6 +392,9 @@ def on_event_appended(
                 "WHERE project_root=? AND feature=? AND source_seq=?",
                 (project_root, feature, anchor_seq),
             ).fetchone()
+            # run-identity: billing may carry the spawn-issued board scope; COALESCE in
+            # the UPDATE below fills it only when the row lacks one (never overwrites).
+            b_scope = _board_scope_of(event_dict)
             rec = {
                 "cost_usd": _num(row[0]) if row else 0.0,
                 "tokens_in": int(row[1]) if row and row[1] else 0,
@@ -405,7 +418,8 @@ def on_event_appended(
             with _get_write_lock(conn):
                 conn.execute(
                     "UPDATE agent_invocations SET cost_usd=?, tokens_in=?, tokens_out=?, "
-                    "cost_source=?, provider=COALESCE(?,provider), run_id=COALESCE(?,run_id) "
+                    "cost_source=?, provider=COALESCE(?,provider), run_id=COALESCE(?,run_id), "
+                    "board_scope=COALESCE(board_scope,?) "
                     "WHERE project_root=? AND feature=? AND source_seq=?",
                     (
                         cost,
@@ -414,6 +428,7 @@ def on_event_appended(
                         cost_source,
                         model,
                         run_id,
+                        b_scope,
                         project_root,
                         feature,
                         anchor_seq,

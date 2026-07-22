@@ -362,6 +362,9 @@ def _run_loop(
         # argv that omits the task prompt, so the spawned CLI exited nonzero with no AGENT_DONE.
         # Every other goal executor is headless (_run_team, _decompose_consultation).
         interactive=False,
+        # run-identity: the goal's board scope, ISSUED at spawn (topic is the goal slug, so
+        # the telemetry stamps must not re-derive identity from it).
+        board_scope=scope,
     )
     # telemetry-three-tier: the loop owns its telemetry (no registry RunnerState →
     # api_lifecycle won't write it). Tag every task with the board's scope_tier and

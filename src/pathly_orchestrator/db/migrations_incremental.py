@@ -67,6 +67,16 @@ def _add_additive_migrations(conn: sqlite3.Connection) -> None:
         # can't express it, so the Monitor's RECENT list mis-bucketed board/single runs as
         # 'flow'. Stamped into the AGENT_DONE event (<run_category>) so it survives the backfill.
         ("agent_invocations", "category", "TEXT"),
+        # run-identity: board scope (the parent feature/project a run belongs to) stamped
+        # at spawn into the event row, so consumers stop re-deriving it from storage
+        # location. NULL = legacy row; every reader keeps its current heuristic for NULL.
+        ("fsm_events", "board_scope", "TEXT"),
+        # run-identity: the same spawn-issued board scope on the projected invocation row
+        # (copied from the AGENT_DONE payload; a BILLING_UPDATE fills it only when the
+        # anchor lacks one) and on the run_history identity map (run_id → project_root,
+        # feature slug, board_scope). NULL = legacy — never guessed, never backfilled.
+        ("agent_invocations", "board_scope", "TEXT"),
+        ("run_history", "board_scope", "TEXT"),
         # flow-nodes-edges-migration: normalized storage for flow graph
         ("flow_nodes", "agent", "TEXT"),
         ("flow_nodes", "role", "TEXT"),

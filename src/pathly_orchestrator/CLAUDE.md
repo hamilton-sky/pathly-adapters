@@ -359,25 +359,42 @@ If `summary` is absent (e.g. legacy agent), stdout `result` is used as a fallbac
 
 The runner→FSM result dict `_run_stage_via_terminal` returns also relays the agent's self-reported `outcome` (`success`/`failed`) + `error` from `AGENT_DONE`, so the loop executor's `_outcome_is_failure` (`supervisor/scheduler.py`) fails a task that exited cleanly but reported failure (silent-failure guard #2); a `_pty_return()` helper merges the CLI `exit_code` into the same returned dict for that check.
 
-## Telemetry feature key — `<fsm_feature>` vs `<feature>` (goal runs)
+## Run identity — ISSUED at spawn (run-identity)
 
-Every `fsm_events` row is keyed by a `feature` string. There are **two** distinct identities in a
-prompt, and telemetry must use the right one or the goal panel shows `$0`:
+Telemetry identity is **issued where truth is known — at spawn — never derived from storage
+location downstream.** Every run carries three identity facts as first-class columns, so no
+consumer has to guess which identity a `feature` key holds:
 
-| Placeholder | Resolves to | Substituted in | Used for |
-|---|---|---|---|
-| `<feature>` | **board scope** — the parent feature/project the goal lives on (e.g. `planner-hierarchy`) | `fsm_compose._inject_prompt_vars` (= `board_scope`) | board writes (`/comms/*`), record-activity — so artifacts don't orphan onto a throwaway slug board |
-| `<fsm_feature>` | **run slug** — the storage-dir basename (e.g. `g3-…`) | `fsm_compose._inject_prompt_vars` (= `storage_path.name`) | telemetry: the `AGENT_DONE` POST in the `completion-report` fragment |
+| Fact | Meaning | Lives in |
+|---|---|---|
+| `run_id` (**primary**) | one id per spawn — per-stage `topic-N-ts` for FSM stages, `sched-<task_id>` per loop task, uuid per board run | `agent_invocations.run_id`, `run_history.run_id`, event payloads |
+| run slug (`<fsm_feature>`) | the storage-dir basename — the canonical event-log key (`fsm_state`, `STATE_TRANSITION`, `eventlog.append_event`, billing reconciliation, early-advance watcher) | the `feature` column everywhere (incl. `run_history` new rows) |
+| `board_scope` (`<feature>`) | the parent feature/project board the run belongs to | `fsm_events.board_scope`, `agent_invocations.board_scope`, `run_history.board_scope` |
 
-The slug is the canonical event-log key: `fsm_state`, `STATE_TRANSITION`, every
-`eventlog.append_event(<path>)` (keys by `feature_dir.name`, `eventlog.py`), the supervisor
-billing reconciliation (`_patch_last_agent_done(events_path.parent, …)`), the early-advance
-watcher (`terminal.py` keys by `feature_dir.name`), and the DB-explorer goal panel
-(`/db/features/<feature>/{events,agents}`) all use it. For a **plain feature run** the board
-scope and the slug are identical, so `<feature> == <fsm_feature>` and nothing changes. For a
-**goal team run** they differ — so `completion-report` posts `AGENT_DONE` under `<fsm_feature>`
-(not `<feature>`); otherwise the cost lands on the feature/board scope and the goal detail shows
-`$0` / "No AGENT_DONE events yet". `team/retro` records its stage via `log-agent-done`, which is
-also passed `<fsm_feature>` so the retro slice keys by the slug like every other stage.
-(Residual: `PHASE_SUMMARY`/`run_history`/OTel spans still key by the full `state.topic` path — a
-non-cost display nuance, not yet unified.)
+For a **plain feature run** slug == board scope; for goal/debug/nested runs they differ — and
+both now land as columns instead of being re-derived. The pieces:
+
+- **One derivation** — `fsm_compose.resolve_board_scope` (plain feature → the slug; `project` →
+  normalized `project_root`; goal → the goal's parent board scope). `build_prompt` uses it for
+  the `<feature>` substitution and the supervisor uses the SAME helper for stamping
+  (`terminal._run_board_scope`), so prompt and telemetry can never drift. Board/loop executors
+  issue `RunnerState.board_scope` directly at spawn.
+- **Agent side** — `completion-report` / `utilities/log-agent-done` write
+  `board_scope: <feature>` into the `AGENT_DONE` body; the event's feature key stays
+  `<fsm_feature>` (goal cost keys by the slug, so the goal panel never shows `$0`).
+- **Server guarantee** — `_synthesize_agent_done_if_missing` and the BILLING_UPDATE
+  (`_patch_last_agent_done`) stamp `run_id` + `board_scope` when the agent omitted them.
+  COALESCE-style everywhere: an agent-provided value is never overwritten; `append_event`
+  extracts the column (an unsubstituted `<placeholder>` lands as NULL, never junk).
+- **`run_history` is the identity map** — `_record_spawn_identity` writes
+  `{run_id, project_root, feature=slug, board_scope}` at the spawn chokepoint
+  (`_run_stage_via_terminal`) and `_settle_spawn_identity` closes the row (done/error);
+  the registry finish-upsert and `/runner/start` insert also key by the slug. Legacy
+  full-path rows are never rewritten — read helpers match them via a basename shim.
+- **Consumers pivot** — `/db/rollup`'s feature block and `/db/features/<f>/{agents,runs}`
+  match `feature=? OR board_scope=?`, so a goal run's cost is visible under BOTH its slug and
+  its parent feature. The Monitor's RECENT bucketing already pivots on the stamped
+  `category` column and needs nothing further. Legacy rows (NULL `board_scope` / NULL
+  `run_id`) keep the exact old feature-key behavior — a fallback, not a guess.
+- (Residual: `PHASE_SUMMARY`/OTel spans still key by the full `state.topic` path — a non-cost
+  display nuance, explicitly out of run-identity's gate.)

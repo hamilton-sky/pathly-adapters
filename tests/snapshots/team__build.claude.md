@@ -426,6 +426,7 @@ event = {
   'model': 'MODEL_ID',
   'run_id': '<run_id>',
   'category': '<run_category>',
+  'board_scope': '<feature>',
   'conversation': CONV_N,
   'result': 'DONE',
   'outcome': 'OUTCOME',
