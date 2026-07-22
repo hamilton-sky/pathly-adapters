@@ -25,9 +25,10 @@ export const WORKSPACE_USER_SECTIONS: Section[] = [
   { label: 'My Flows',     type: 'flow',     dir: 'pathly/flows'     },
 ]
 
+// board-scoped-storage P3: the shared buckets (pathly/debugs, pathly/explorations,
+// pathly/fixes) are retired — runs nest under their board; Project replaces them.
 export const WORKSPACE_FILE_SECTIONS: Section[] = [
-  { label: 'Debugs',               type: 'debug',   dir: 'pathly/debugs'               },
-  { label: 'Explorations',         type: 'explore', dir: 'pathly/explorations'         },
+  { label: 'Project',              type: 'explore', dir: 'pathly/project'              },
   { label: 'Lessons',              type: 'explore', dir: 'pathly/lessons'              },
   { label: 'Pipeline-walkthrough', type: 'explore', dir: 'pathly/pipeline-walkthrough' },
 ]

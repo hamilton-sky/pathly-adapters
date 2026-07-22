@@ -27,8 +27,10 @@ def _parse_json_file(path: Path) -> dict:
 _RESERVED_PATHLY_SUBDIRS = {
     "plans",
     "features",
+    "project",
     "debugs",
     "explorations",
+    "fixes",
     "goals",
     ".archive",
     "pipeline-walkthrough",
@@ -48,11 +50,11 @@ def _scan_filesystem_features(project_root: str) -> list[dict]:
 
     # pathly:allow-mirror-read: never-run-feature fallback — features with no DB row yet
     state_files = list((pathly_dir / "plans").glob("*/STATE.json"))
-    # Current layout: the three roots Studio's HomeScreen scans. Without these a
-    # never-run feature (STATE.json on disk, no DB row) would vanish from /db/features.
-    for container in ("features", "debugs", "explorations"):
-        # pathly:allow-mirror-read: never-run-feature fallback (feature-centric roots)
-        state_files += list((pathly_dir / container).glob("*/STATE.json"))
+    # Current layout (board-scoped-storage P3): the retired debugs/explorations buckets
+    # are no longer scanned — runs nest under their board. Without this glob a never-run
+    # feature (STATE.json on disk, no DB row) would vanish from /db/features.
+    # pathly:allow-mirror-read: never-run-feature fallback (feature-centric root)
+    state_files += list((pathly_dir / "features").glob("*/STATE.json"))
     state_files += [
         sf
         # pathly:allow-mirror-read: never-run-feature fallback (legacy top-level root)

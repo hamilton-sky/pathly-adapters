@@ -15,5 +15,5 @@ Tests are grouped into domain folders that mirror the app's architecture layers.
 | [`http_api/`](http_api/INDEX.md) | HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, prompt-event contract. | 6 |
 | [`install_skills/`](install_skills/INDEX.md) | Adapter install/setup, stitch & compose, skill composition / round-trip / export, plugin manifests. | 20 |
 | [`runner_supervisor/`](runner_supervisor/INDEX.md) | Runner control loop, supervisor, spawn channel, lane/worktree isolation, file-claim registry, services facade. | 10 |
-| [`storage_paths/`](storage_paths/INDEX.md) | Feature/goal storage layout, slugs, canonical artifact paths, storage migrations. | 9 |
+| [`storage_paths/`](storage_paths/INDEX.md) | Feature/goal storage layout, slugs, canonical artifact paths, storage migrations. | 10 |
 | [`telemetry/`](telemetry/INDEX.md) | Cost/token telemetry — invocation projection, pricing, OTel export, observability, log formatting. | 15 |

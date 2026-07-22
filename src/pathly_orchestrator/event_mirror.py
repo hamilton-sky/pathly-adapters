@@ -9,8 +9,8 @@ feature's event stream next to the feature on disk — the same DB -> disk expor
 
 Unlike ``board_mirror`` (keyed by ``(board, scope)``), this exporter is keyed by the
 already-resolved ``feature_dir`` — the same ``Path`` ``eventlog.append_event`` computes for
-the DB write — so debug/explore/goal runs (which live under ``pathly/debugs``,
-``pathly/explorations``, ``.../goals/<slug>``) export to their real on-disk home, not a
+the DB write — so debug/explore/goal runs (board-scoped: ``features/<f>/<kind>/<slug>``
+or ``project/<kind>/<slug>``) export to their real on-disk home, not a
 reconstructed ``pathly/features/<name>`` guess. This is the one deliberate design divergence
 from ``board_mirror``.
 

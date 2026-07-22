@@ -11,9 +11,11 @@ const PATHLY_SECTIONS = [
   { label: 'Templates', type: 'template' as const, dir: 'src/pathly_data/core/templates' },
 ]
 
+// board-scoped-storage P3: the shared buckets (pathly/debugs, pathly/explorations,
+// pathly/fixes) are retired — runs nest under their board (features/<f>/<kind>/<slug>
+// or project/<kind>/<slug>), so the Project section replaces the bucket sections.
 const WORKSPACE_SECTIONS = [
-  { label: 'Debugs',               type: 'debug'   as const, dir: 'pathly/debugs'               },
-  { label: 'Explorations',         type: 'explore' as const, dir: 'pathly/explorations'         },
+  { label: 'Project',              type: 'explore' as const, dir: 'pathly/project'              },
   { label: 'Lessons',              type: 'explore' as const, dir: 'pathly/lessons'              },
   { label: 'Pipeline-walkthrough', type: 'explore' as const, dir: 'pathly/pipeline-walkthrough' },
 ]
@@ -37,8 +39,7 @@ const INITIAL_SECTIONS: Record<string, SectionState> = {
   Skills:       { items: [], open: false },
   Agents:       { items: [], open: false },
   Templates:    { items: [], open: true  },
-  Debugs:                 { items: [], open: false },
-  Explorations:           { items: [], open: false },
+  Project:                { items: [], open: false },
   Lessons:                { items: [], open: false },
   'Pipeline-walkthrough': { items: [], open: false },
   UserAgents:    { items: [], open: false },
@@ -109,7 +110,10 @@ async function loadSubdirAwareSection(
   }
 }
 
-const KNOWN_PATHLY_DIRS = new Set(['features', 'debugs', 'explorations', 'plans', 'agents', 'skills', 'templates', 'flows', 'lessons', 'pipeline-walkthrough'])
+// board-scoped-storage P3: 'project' is a known dir (its own section above); the retired
+// buckets ('debugs'/'explorations') are dropped so a stray reappearance surfaces visibly
+// as a custom section instead of silently loading into a dead bucket view.
+const KNOWN_PATHLY_DIRS = new Set(['features', 'project', 'plans', 'agents', 'skills', 'templates', 'flows', 'lessons', 'pipeline-walkthrough'])
 
 export function useProjectFiles(): {
   sections: Record<string, SectionState>

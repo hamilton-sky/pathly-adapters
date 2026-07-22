@@ -118,11 +118,15 @@ pathly/features/<name>/            FEATURE scope — team pipeline files live DI
   feedback/                        REVIEW_FAILURES.md, TEST_FAILURES.md
   goals/<slug>/                    per-goal decompose (planner/plan)
 pathly/features/.archive/<name>/   completed features (mirrors the shape above)
-pathly/project/                    PROJECT scope: artifacts/, SEQUENCING.md, BOARD.json (board mirror)
+pathly/project/                    PROJECT scope: artifacts/, SEQUENCING.md, BOARD.json (board mirror),
+                                   and PROJECT-board runs under <kind>/<slug>/ (kind ∈ goals|debugs|explorations|fixes)
 pathly/board-artifacts/            cross-feature board artifacts (e.g. BOARD_EVAL.md)
 pathly/lessons/                    promoted lessons (cross-feature)
-pathly/debugs/<slug>/  pathly/explorations/<slug>/   standalone (non-feature) investigations
 pathly/pipeline-walkthrough/<slug>/  point-in-time pipeline records (never sync these)
+
+# Retired (board-scoped-storage P2+P3): the shared top-level buckets pathly/debugs/,
+# pathly/explorations/, pathly/fixes/ — runs now nest under their board
+# (features/<f>/<kind>/<slug> or project/<kind>/<slug>); discovery no longer scans the old roots.
 ~/.pathly/                         GLOBAL scope (cross-project): pathly.db, lessons/, global/BOARD.json
 
 # Legacy, still resolved for back-compat: pathly/plans/<name>/

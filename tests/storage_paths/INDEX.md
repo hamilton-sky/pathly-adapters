@@ -4,7 +4,7 @@
 
 Feature/goal storage layout, slugs, canonical artifact paths, storage migrations.
 
-9 test file(s).
+10 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -12,6 +12,7 @@ Feature/goal storage layout, slugs, canonical artifact paths, storage migrations
 | `test_goal_slug.py` | Tests for supervisor/slug.py — _slugify and ensure_goal_slug | 7 |
 | `test_goal_slug_readable.py` | Goal slugs must be short + human-readable — goals/backend-api-<id>/, not | 4 |
 | `test_migrations_slug.py` | covers slug column exists; slug unique index exists; slug unique constraint enforced; … | 5 |
+| `test_p3_bucket_retirement.py` | board-scoped-storage P3: shared buckets retired from discovery; nested kinds resolve | 4 |
 | `test_resolve_storage_path.py` | Tests for _resolve_storage_path with the 3-tier probe order (P1) | 6 |
 | `test_storage.py` | covers activity rotates at 5mb | 1 |
 | `test_storage_layout_invariant.py` | Layout invariant: EVERY subsystem locates a feature at its ONE canonical home | 11 |

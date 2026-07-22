@@ -19,15 +19,13 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Iterator
 
-# (relative root, flow label) for the legacy type-nested layout. debugs/explorations stay here for
-# back-compat DISCOVERY of runs still sitting in the old top-level buckets; they get retired only
-# once board-scoped-storage P2 MOVES those runs under their board (retiring the root before the move
-# would make the still-present runs invisible — the P2<->P3 coupling). New/moved runs are found by
-# the board-scoped globs in iter_state_files below.
+# (relative root, flow label) for the legacy type-nested layout. board-scoped-storage P2 moved
+# every bucket run under its board (features/<f>/<kind>/<slug> or project/<kind>/<slug>), so the
+# retired pathly/debugs + pathly/explorations roots are no longer scanned (P3) — the board-scoped
+# globs in iter_state_files find all current runs. Only the legacy pathly/plans root remains
+# (back-compat; its DB refs are the separate S2 migration).
 SCAN_ROOTS = [
     ("pathly/plans", "team"),
-    ("pathly/debugs", "debug"),
-    ("pathly/explorations", "explore"),
 ]
 
 # Run kinds and their flow label, for board-scoped nested discovery
@@ -141,8 +139,19 @@ def find_topic_dir(cwd: Path, topic: str) -> tuple[Path, str] | None:
     # board-scoped project runs: pathly/project/<kind>/<topic>/STATE.json
     for kind, flow in _KIND_FLOW:
         cand = cwd / "pathly" / "project" / kind / topic
+        # pathly:allow-mirror-read: human CLI feature discovery (project-board nested runs)
         if (cand / "STATE.json").exists():
             return cand, flow
+    # board-scoped feature runs: pathly/features/<f>/<kind>/<topic>/STATE.json — without
+    # this a feature-board debug/explore run is discoverable by iter_state_files but not
+    # addressable by name (reads and writes must land in the same place).
+    features = cwd / "pathly" / "features"
+    if features.is_dir():
+        for kind, flow in _KIND_FLOW:
+            for cand in features.glob(f"*/{kind}/{topic}"):
+                # pathly:allow-mirror-read: human CLI feature discovery (feature-board nested runs)
+                if (cand / "STATE.json").exists():
+                    return cand, flow
     for root_rel, flow in SCAN_ROOTS:
         candidate = cwd / root_rel / topic
         if (candidate / "STATE.json").exists():
