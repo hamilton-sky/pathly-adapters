@@ -1,0 +1,9 @@
+.grid { display: grid; grid-template-columns: 288px 1fr; gap: 16px; align-items: start; }
+.rightCol {
+  height: 600px;
+  display: flex; flex-direction: column;
+  background: var(--bg-surface0);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+}

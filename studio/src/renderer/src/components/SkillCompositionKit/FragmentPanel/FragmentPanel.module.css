@@ -1,0 +1,48 @@
+.panel { max-width: 1080px; margin: 0 auto; padding: 20px 28px 60px; }
+
+.head { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.skillName { font-family: 'Geist Mono', monospace; font-size: 20px; font-weight: 600; letter-spacing: -0.01em; color: var(--text-primary); }
+.spacer { flex: 1; }
+.status { font-size: 11px; color: var(--text-muted); font-family: 'Geist Mono', monospace; }
+
+.overPill {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--orange);
+  padding: 3px 9px; border-radius: 999px;
+  background: color-mix(in srgb, var(--orange) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--orange) 35%, transparent);
+}
+.overDot { width: 5px; height: 5px; border-radius: 50%; background: var(--orange); }
+
+.resetBtn {
+  font-size: 12px; font-weight: 500;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: color 120ms ease-out, border-color 120ms ease-out;
+}
+.resetBtn:hover:not(:disabled) { border-color: var(--accent-border); color: var(--accent); }
+.resetBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+.resetBtn:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+
+.toolbar {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 18px; padding-bottom: 14px;
+  border-bottom: 1px solid var(--border-subtle-color);
+}
+.tabs { display: inline-flex; gap: 2px; padding: 3px; background: var(--bg-surface0); border: 1px solid var(--border-color); border-radius: 7px; }
+.tab {
+  font-size: 13px; font-weight: 500;
+  padding: 5px 14px; border: none; border-radius: 5px;
+  background: transparent; color: var(--text-secondary);
+  cursor: pointer; transition: background 120ms ease-out, color 120ms ease-out;
+}
+.tab:hover { color: var(--accent); }
+.tab[data-active='true'] { background: var(--accent); color: #08121c; }
+.tab:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+
+.meta { font-family: 'Geist Mono', monospace; font-size: 12px; color: var(--text-muted); }

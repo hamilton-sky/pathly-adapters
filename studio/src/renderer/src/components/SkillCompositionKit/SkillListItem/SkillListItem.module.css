@@ -1,0 +1,41 @@
+.item {
+  position: relative;
+  width: 100%;
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 10px 6px 12px;
+  margin-bottom: 1px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background 120ms ease-out;
+}
+.item:hover { background: var(--bg-surface0); }
+.item:focus-visible { outline: var(--focus-ring); outline-offset: -2px; }
+.item[data-selected='true'] { background: var(--accent-bg); }
+
+.bar {
+  position: absolute; left: 0; top: 5px; bottom: 5px;
+  width: 3px; border-radius: 2px; background: transparent;
+}
+.item[data-selected='true'] .bar { background: var(--accent); }
+
+.label {
+  flex: 1;
+  font-family: 'Geist Mono', monospace;
+  font-size: 13px; font-weight: 400;
+  color: var(--text-secondary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.item[data-selected='true'] .label { color: var(--accent); font-weight: 600; }
+
+.badge {
+  flex-shrink: 0;
+  font-size: 9px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--orange);
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--orange) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--orange) 35%, transparent);
+}

@@ -1,0 +1,58 @@
+.root {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: 'Geist', system-ui, sans-serif;
+}
+
+.header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 20px 13px;
+  background: var(--bg-mantle);
+  border-bottom: 1px solid var(--border-color);
+}
+.mark {
+  width: 26px; height: 26px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  background: var(--brand-gradient);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 15px; color: #fff;
+}
+.headText { display: flex; flex-direction: column; gap: 2px; }
+.title { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -0.01em; color: var(--text-primary); }
+.subtitle { font-size: 12px; color: var(--text-muted); }
+.spacer { flex: 1; }
+.live {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--text-muted);
+}
+.liveDot { width: 7px; height: 7px; border-radius: 50%; background: var(--runtime); box-shadow: 0 0 6px var(--runtime); }
+
+.body { flex: 1; display: flex; min-height: 0; }
+
+.rightPane {
+  flex: 1; min-width: 0;
+  overflow-y: auto;
+  background: var(--bg-base);
+}
+
+.error, .empty {
+  margin: 24px;
+  padding: 16px 18px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-surface0);
+  font-size: 13px;
+}
+.error { color: var(--red); border-color: var(--red-border); background: var(--red-bg); }
+.empty { color: var(--text-muted); }

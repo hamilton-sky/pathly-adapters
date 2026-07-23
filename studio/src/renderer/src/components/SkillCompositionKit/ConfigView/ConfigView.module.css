@@ -1,0 +1,14 @@
+.head { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+.label { font-size: 11px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-muted); }
+.spacer { flex: 1; }
+.layoutLabel { font-size: 11px; color: var(--text-disabled); }
+.seg { display: inline-flex; gap: 2px; padding: 3px; background: var(--bg-surface0); border: 1px solid var(--border-color); border-radius: 7px; }
+.segBtn {
+  font-size: 11px; font-weight: 600;
+  padding: 4px 11px; border: none; border-radius: 5px;
+  background: transparent; color: var(--text-muted); cursor: pointer;
+  transition: background 120ms ease-out, color 120ms ease-out;
+}
+.segBtn:hover { color: var(--accent); }
+.segBtn[data-active='true'] { background: var(--accent); color: #08121c; }
+.segBtn:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
