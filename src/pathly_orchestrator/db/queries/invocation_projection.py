@@ -255,7 +255,10 @@ def backfill_invocations_from_events(
             continue
         key = (pr, feat, payload.get("agent"), payload.get("conversation"))
         rid = payload.get("run_id")
-        rid_key = (pr, feat, rid) if rid else None
+        # run-identity: run_id is unique per spawn, so the billing→anchor match is
+        # PROJECT-wide (no feature in the key) — a mis-keyed agent (AGENT_DONE under
+        # the parent feature, billing under the slug) still folds instead of orphaning.
+        rid_key = (pr, rid) if rid else None
         if etype == "AGENT_DONE":
             rec = _agent_done_rec(payload)
             rec["_pr"], rec["_feat"] = pr, feat
@@ -270,6 +273,10 @@ def backfill_invocations_from_events(
                 anchor = last_ad.get(key)
             if anchor is not None:
                 _fold_billing(records[anchor], payload)
+                # A cross-feature fold (mis-keyed agent) leaves the billing's own feature
+                # slice with a stale orphan row from earlier projections — mark it touched
+                # so the rebuild deletes it (the fold lives on the anchor's feature).
+                touched.add((pr, feat))
                 # Billing carries the model/run_id the AGENT_DONE may lack — stamp them so the
                 # folded row can be priced (codex/agy) and keyed to its run.
                 if payload.get("model") and not records[anchor].get("provider"):
@@ -348,13 +355,21 @@ def on_event_appended(
             # (no model → unpriced), which is the empty-cost cards in the Monitor.
             b_run_id = event_dict.get("run_id")
             anchor = None
+            anchor_feature = feature
             if b_run_id:
-                anchor = conn.execute(
-                    "SELECT seq FROM fsm_events WHERE project_root=? AND feature=? "
+                # run-identity: run_id is unique per spawn, so the anchor match is
+                # PROJECT-wide — a mis-keyed agent (AGENT_DONE under the parent feature
+                # while the gate bills under the slug) still folds onto its anchor
+                # instead of orphaning into a duplicate same-run_id row.
+                row_a = conn.execute(
+                    "SELECT seq, feature FROM fsm_events WHERE project_root=? "
                     "AND event_type='AGENT_DONE' AND json_extract(payload,'$.run_id')=? "
                     "AND seq<? ORDER BY seq DESC LIMIT 1",
-                    (project_root, feature, b_run_id, seq),
+                    (project_root, b_run_id, seq),
                 ).fetchone()
+                if row_a is not None:
+                    anchor = (row_a[0],)
+                    anchor_feature = row_a[1]
             if anchor is None:
                 anchor = conn.execute(
                     "SELECT seq FROM fsm_events WHERE project_root=? AND feature=? "
@@ -390,7 +405,7 @@ def on_event_appended(
                 "SELECT cost_usd, tokens_in, tokens_out, provider, run_id "
                 "FROM agent_invocations "
                 "WHERE project_root=? AND feature=? AND source_seq=?",
-                (project_root, feature, anchor_seq),
+                (project_root, anchor_feature, anchor_seq),
             ).fetchone()
             # run-identity: billing may carry the spawn-issued board scope; COALESCE in
             # the UPDATE below fills it only when the row lacks one (never overwrites).
@@ -430,7 +445,7 @@ def on_event_appended(
                         run_id,
                         b_scope,
                         project_root,
-                        feature,
+                        anchor_feature,
                         anchor_seq,
                     ),
                 )

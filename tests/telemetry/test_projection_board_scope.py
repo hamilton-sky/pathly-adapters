@@ -105,3 +105,29 @@ def test_backfill_stamps_board_scope_and_is_idempotent(tmp_path):
     assert first == second, "backfill must be idempotent"
     scopes = sorted((r[1] or "-") for r in second)
     assert scopes == ["-", "parent-feat"], scopes
+
+
+def test_billing_folds_onto_anchor_across_features(tmp_path):
+    """A mis-keyed run (AGENT_DONE under the parent feature, gate billing under the
+    slug) must fold onto the anchor by run_id PROJECT-wide — one invocation row, the
+    real cost, no orphan duplicate sharing the run_id (the Monitor's duplicate-key bug).
+    """
+    rid = "features/parent/goals/g1-slug-1-1784748338467"
+    conn = get_db()
+    # Live path: agent posts under the PARENT feature; the gate bills under the SLUG.
+    append_event(conn, PR, "parent-feat", _ad(agent="builder", run_id=rid, cost=0.4))
+    append_event(conn, PR, "g1-slug", _billing(agent=None, run_id=rid, cost=1.07))
+
+    parent = _rows(conn, "parent-feat")
+    slug = _rows(conn, "g1-slug")
+    assert len(parent) == 1 and float(parent[0]["cost_usd"]) == 1.07
+    assert (
+        slug == []
+    ), f"billing must not orphan into a duplicate row: {[tuple(r) for r in slug]}"
+
+    # Backfill agrees (and cleans a stale orphan if one existed): same single row.
+    backfill_invocations_from_events(conn, PR)
+    parent = _rows(conn, "parent-feat")
+    slug = _rows(conn, "g1-slug")
+    assert len(parent) == 1 and float(parent[0]["cost_usd"]) == 1.07
+    assert slug == []

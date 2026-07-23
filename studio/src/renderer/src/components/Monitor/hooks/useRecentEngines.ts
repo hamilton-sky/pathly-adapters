@@ -48,7 +48,19 @@ export function useRecentEngines(): MonitorEngine[] {
     return () => { cancelled = true; window.clearInterval(id) }
   }, [projectPath])
 
-  return db.map((r) => {
+  // Dedupe by card id (run_id): a legacy mis-keyed run could project TWO invocation rows
+  // with the same run_id (AGENT_DONE under the parent feature + orphaned billing under the
+  // slug) — rendering both would duplicate React keys. Newest-first order means the first
+  // occurrence wins (the billed row, which carries the real cost).
+  const seen = new Set<string>()
+  const rows = db.filter((r) => {
+    const id = r.run_id || `${r.feature}-${r.started_at}`
+    if (seen.has(id)) return false
+    seen.add(id)
+    return true
+  })
+
+  return rows.map((r) => {
     // Prefer the stamped run TYPE (flow/single/loop) so a finished board/single run buckets the
     // same way its live card did; fall back to the scope_tier heuristic for rows written before
     // the category stamp (and editor one-shots, which are project-scoped 'single').
