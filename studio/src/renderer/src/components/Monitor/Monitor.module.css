@@ -183,6 +183,15 @@
   font-size: 8px;
 }
 
+@media (prefers-reduced-motion: no-preference) {
+  .tabDot { animation: tabDotPulse 1.8s ease-in-out infinite; }
+}
+
+@keyframes tabDotPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
 /* ── HealthCheck ──────────────────────────────────────────────── */
 .healthRoot {
   flex-shrink: 0;

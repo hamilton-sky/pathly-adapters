@@ -19,7 +19,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 4px;
+  margin-bottom: 14px;
 }
 
 .title {
@@ -88,12 +88,6 @@
 
 @keyframes blink {
   50% { opacity: 0.4; }
-}
-
-.lede {
-  font-size: 12px;
-  color: var(--text-muted);
-  margin: 0 0 18px;
 }
 
 .empty {

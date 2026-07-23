@@ -105,10 +105,6 @@ export function MonitorBoard({ engines, recent, onAction }: Props): JSX.Element 
             <span className={s.liveDot} />SSE live
           </span>
         </header>
-        <p className={s.lede}>
-          Every CLI engine is a card. Group by how it runs — single one-shot, loop cycle,
-          or full flow — the way the board groups messages by scope.
-        </p>
 
         <CategoryFilterBar
           category={category}

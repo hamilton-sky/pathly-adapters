@@ -1,7 +1,7 @@
 .stepper {
   list-style: none;
   margin: 0;
-  padding: 4px 6px;
+  padding: 10px 8px;
 }
 
 .empty {
@@ -11,11 +11,30 @@
   text-align: center;
 }
 
-/* ── One step: decorative rail (dot + connector) + a clickable label column ── */
+/* ── One step: decorative rail (dot + connector) + a clickable label column ──
+   Each row is a soft card; the active stage gets an accent-tinted card so the
+   current phase reads at a glance, without breaking the continuous rail. */
 .row {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   min-width: 0;
+  padding: 4px 6px 0;
+  border-radius: var(--radius-md);
+  transition: background 140ms ease-out;
+}
+
+.row:hover {
+  background: var(--bg-surface0);
+}
+
+.row[data-status='active'],
+.row[data-status='active-retry'] {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--accent) 12%, transparent),
+    color-mix(in srgb, var(--accent) 3%, transparent) 70%,
+    transparent
+  );
 }
 
 .rail {
@@ -23,22 +42,24 @@
   flex-direction: column;
   align-items: center;
   flex-shrink: 0;
+  width: 22px;
 }
 
 .dot {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   flex-shrink: 0;
   background: var(--bg-surface1);
   color: var(--text-muted);
+  transition: background 140ms ease-out, color 140ms ease-out;
 }
 
 .dot[data-status='completed'] {
-  background: #1d9e75;
+  background: linear-gradient(135deg, #27b98a, #1d9e75);
   color: #fff;
 }
 
@@ -46,52 +67,82 @@
 .dot[data-status='active-retry'] {
   background: var(--accent);
   color: #fff;
-  box-shadow: 0 0 0 3px var(--bg-accent, rgba(55, 138, 221, 0.16));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.dot[data-status='active-retry'] {
+  background: var(--orange, #f97316);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--orange, #f97316) 22%, transparent);
 }
 
 .dot[data-status='pending'] {
   background: transparent;
-  border: 2px solid var(--border);
+  border: 1.5px dashed var(--border-color);
+}
+
+/* Pending steps show their 1-based stage number — the path ahead is countable. */
+.num {
+  font: 600 10px/1 var(--font-family-mono);
+  color: var(--text-muted);
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .dot[data-status='active'],
-  .dot[data-status='active-retry'] {
+  .dot[data-status='active'] {
     animation: flowDotPulse 1.6s ease-in-out infinite;
+  }
+  .dot[data-status='active-retry'] {
+    animation: flowDotPulseRetry 1.6s ease-in-out infinite;
   }
 }
 
 @keyframes flowDotPulse {
   0%,
   100% {
-    box-shadow: 0 0 0 3px var(--bg-accent, rgba(55, 138, 221, 0.18));
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 26%, transparent);
   }
   50% {
-    box-shadow: 0 0 0 6px var(--bg-accent, rgba(55, 138, 221, 0.05));
+    box-shadow: 0 0 0 7px color-mix(in srgb, var(--accent) 6%, transparent);
   }
 }
 
+@keyframes flowDotPulseRetry {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--orange, #f97316) 26%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 7px color-mix(in srgb, var(--orange, #f97316) 6%, transparent);
+  }
+}
+
+/* Continuous rail: solid green behind completed steps, dashed ahead of the active one. */
 .connector {
   width: 2px;
   flex: 1;
-  min-height: 14px;
-  background: var(--border);
-  margin: 2px 0;
+  min-height: 16px;
+  margin: 3px 0;
+  border-radius: 1px;
+  background: repeating-linear-gradient(
+    180deg,
+    var(--border-color) 0 3px,
+    transparent 3px 7px
+  );
 }
 
 .connector[data-done] {
-  background: #5dcaa5;
+  background: linear-gradient(180deg, #27b98a, #1d9e75);
 }
 
-/* ── Label column: state name + role, click → Configure-phase modal ── */
+/* ── Label column: state name + role chip, click → Configure-phase modal ── */
 .stepBtn {
   flex: 1;
   min-width: 0;
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 1px;
-  padding: 0 0 12px 0;
+  gap: 3px;
+  padding: 2px 18px 14px 0;
   background: transparent;
   border: none;
   cursor: pointer;
@@ -99,17 +150,15 @@
 }
 
 .state {
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
   color: var(--text-primary);
+  font-family: var(--font-family-mono);
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.stepBtn:hover .state {
-  text-decoration: underline;
 }
 
 .state[data-status='active'],
@@ -117,9 +166,13 @@
   color: var(--accent);
 }
 
+.state[data-status='active-retry'] {
+  color: var(--orange, #f97316);
+}
+
 .state[data-status='pending'] {
   color: var(--text-secondary);
-  font-weight: 400;
+  font-weight: 500;
 }
 
 .meta {
@@ -129,16 +182,52 @@
   min-width: 0;
 }
 
+/* Role as a small pill — the agent that owns the stage. */
 .role {
-  font-size: 10px;
+  font: 500 9.5px/1.6 var(--font-family-mono);
   color: var(--text-muted);
+  background: var(--bg-surface1);
+  border-radius: var(--radius-full);
+  padding: 0 7px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.role[data-status='active'],
+.role[data-status='active-retry'] {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.role[data-status='active-retry'] {
+  color: var(--orange, #f97316);
+  background: color-mix(in srgb, var(--orange, #f97316) 14%, transparent);
 }
 
 .retry {
   font-size: 10px;
   color: var(--orange, #f97316);
   flex-shrink: 0;
+}
+
+/* Configure affordance: gear fades in on hover/focus of the row. */
+.gear {
+  position: absolute;
+  top: 4px;
+  right: 2px;
+  color: var(--text-muted);
+  opacity: 0;
+  transition: opacity 140ms ease-out;
+}
+
+.row:hover .gear,
+.stepBtn:focus-visible .gear {
+  opacity: 1;
+}
+
+.stepBtn:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+  border-radius: var(--radius-sm);
 }

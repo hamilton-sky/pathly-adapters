@@ -12,7 +12,15 @@ interface Props {
 }
 
 export function TabBar({ sessions, activeTab, onTabSelect }: Props): JSX.Element {
-  const keys = useMemo(() => Object.keys(sessions), [sessions])
+  // Running flows first — with several parallel runs plus idle (open-but-not-running)
+  // features, the live ones must sit on page 1 of the pager.
+  const keys = useMemo(() => {
+    const all = Object.keys(sessions)
+    return [
+      ...all.filter((k) => sessions[k].isRunning),
+      ...all.filter((k) => !sessions[k].isRunning),
+    ]
+  }, [sessions])
   const [page, setPage] = useState(0)
   const totalPages = Math.ceil(keys.length / PAGE_SIZE)
   const tablistRef = useRef<HTMLDivElement>(null)

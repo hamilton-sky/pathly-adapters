@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import * as jsYaml from 'js-yaml'
-import type { FsmEvent, FlowYaml } from '../../types/index'
+import type { FsmEvent, FlowSession, FlowYaml } from '../../types/index'
 
 export function useInjectCSS(css: string): void {
   const injectedRef = useRef(false)
@@ -77,6 +77,37 @@ export function truncate(s: string, max: number): string {
 export function extractTopic(sessionKey: string): string {
   const slash = sessionKey.indexOf('/')
   return slash === -1 ? sessionKey : sessionKey.slice(slash + 1)
+}
+
+/**
+ * Upsert a flow session keyed `<flow>/<topic>`, dropping any OTHER key for the same topic —
+ * the flow name can be guessed before the DB row exists (e.g. `team/<slug>` registered at
+ * spawn, corrected to `team-build/<slug>` once the row hydrates), and one topic must never
+ * hold two tabs. Returns `prev` unchanged when the upsert is a no-op, so Zustand skips the
+ * re-render.
+ */
+export function upsertSessionByTopic(
+  prev: Record<string, FlowSession>,
+  key: string,
+  session: FlowSession,
+): Record<string, FlowSession> {
+  const topic = extractTopic(key)
+  const dupes = Object.keys(prev).filter((k) => k !== key && extractTopic(k) === topic)
+  const existing = prev[key]
+  if (
+    existing &&
+    dupes.length === 0 &&
+    existing.isRunning === session.isRunning &&
+    existing.flowKey === session.flowKey
+  ) {
+    return prev
+  }
+  const next: Record<string, FlowSession> = {}
+  for (const [k, v] of Object.entries(prev)) {
+    if (k !== key && !dupes.includes(k)) next[k] = v
+  }
+  next[key] = existing ? { ...existing, ...session } : session
+  return next
 }
 
 export function flowTypeLabel(flowKey: string): string {

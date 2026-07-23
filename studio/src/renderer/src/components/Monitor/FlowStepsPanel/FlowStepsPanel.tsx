@@ -3,6 +3,7 @@ import { useStore } from '../../../store'
 import { TabBar } from '../TabBar'
 import { FlowControlBar } from '../../HQ/FlowControlBar/FlowControlBar'
 import { FlowStepper } from './FlowStepper/FlowStepper'
+import { RunCostBadge } from '../RunCostBadge/RunCostBadge'
 import { useFlowDock } from './hooks/useFlowDock'
 import styles from './FlowStepsPanel.module.css'
 
@@ -14,9 +15,12 @@ interface FlowStepsPanelProps {
 
 /**
  * The collapsible right-side flow dock — replaces the fixed top pipeline bar. Shows whichever
- * flow the user has selected (via the flow tabs) as a vertical stepper, with the runner controls
- * beneath it. Collapses to a thin rail (persisted). When several flows run, the tabs toggle which
- * run the dock steps through (they drive `effectiveTopic` in useMonitorSession → the stepper data).
+ * flow the user has selected (via the flow tabs) as a vertical stepper, with the selected run's
+ * settled cost (RunCostBadge, re-homed from the removed panel header) above it and the runner
+ * controls beneath. Collapses to a thin rail (persisted). When several flows run in parallel,
+ * the tabs toggle which run the dock steps through (they drive `effectiveTopic` in
+ * useMonitorSession → the stepper data); live runs register their own tabs via
+ * useLiveFlowSessions, so the dock always shows the flow the user just spawned.
  */
 export function FlowStepsPanel({
   effectiveTopic,
@@ -80,6 +84,10 @@ export function FlowStepsPanel({
           />
         </div>
       )}
+
+      <div className={styles.costWrap}>
+        <RunCostBadge feature={effectiveTopic} />
+      </div>
 
       <div className={styles.stepperWrap}>
         {effectiveTopic ? (

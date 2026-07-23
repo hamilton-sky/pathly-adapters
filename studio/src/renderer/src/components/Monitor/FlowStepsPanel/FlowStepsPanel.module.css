@@ -1,6 +1,6 @@
 /* ── Expanded dock ── */
 .dock {
-  width: 216px;
+  width: 236px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -105,6 +105,16 @@
   overflow-x: auto;
   overflow-y: hidden;
   border-bottom: 1px solid var(--bg-surface1);
+}
+
+/* ── Selected run's settled cost (RunCostBadge renders null until a priced run exists) ── */
+.costWrap {
+  flex-shrink: 0;
+  padding: 8px 8px 0;
+}
+
+.costWrap:empty {
+  display: none;
 }
 
 /* ── Stepper (scrolls) ── */

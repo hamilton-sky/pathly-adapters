@@ -3,7 +3,8 @@ import { useStore } from '../../../store'
 import { usePlanFiles } from '../../../hooks/usePlanFiles'
 import { watchStart, readFile, onWatchEvent, fetchFlowGraph } from '../../../services/pathlyApi'
 import { fetchDbFeatureMap } from '../../../store/commsApi'
-import { getFlowYamlName, extractTopic, mergeBillingUpdate, parseFlowStages, parseFlowGraph } from '../utils'
+import { getFlowYamlName, extractTopic, mergeBillingUpdate, parseFlowStages, parseFlowGraph, upsertSessionByTopic } from '../utils'
+import { useLiveFlowSessions } from './useLiveFlowSessions'
 import type { FsmEvent, FsmState } from '../../../types/index'
 
 export function useMonitorSession(): { effectiveTopic: string | null; showTabBar: boolean; refresh: () => void } {
@@ -25,6 +26,10 @@ export function useMonitorSession(): { effectiveTopic: string | null; showTabBar
   } = useStore()
 
   const { planFolders } = usePlanFiles()
+
+  // Live spawn-gate engines → sessions/tabs: every running flow (goal team runs included)
+  // registers its tab and fronts it at spawn — the dock tracks what the user actually started.
+  useLiveFlowSessions()
 
   const eventsRef = useRef(events)
   eventsRef.current = events
@@ -53,6 +58,8 @@ export function useMonitorSession(): { effectiveTopic: string | null; showTabBar
 
   // Proactive scan: look up every plan folder's DB-first feature row and register any
   // non-terminal flow as a session (state-one-authority — no STATE.json mirror read).
+  // These are OPEN flows, not necessarily running ones — isRunning stays false until the
+  // spawn gate reports a live engine for the topic (useLiveFlowSessions owns that bit).
   useEffect(() => {
     if (!projectPath || planFolders.length === 0) return
     void fetchDbFeatureMap(projectPath).then((dbFeatures) => {
@@ -69,7 +76,7 @@ export function useMonitorSession(): { effectiveTopic: string | null; showTabBar
         const next = { ...prev }
         for (const item of active) {
           if (!(item.key in next)) {
-            next[item.key] = { flowKey: `${item.flowType}.flow.yaml`, topic: item.topic, isRunning: true, isPaused: false, isCli: false }
+            next[item.key] = { flowKey: `${item.flowType}.flow.yaml`, topic: item.topic, isRunning: false, isPaused: false, isCli: false }
           }
         }
         return next
@@ -128,16 +135,28 @@ export function useMonitorSession(): { effectiveTopic: string | null; showTabBar
           })
           if (activeMonitorTabRef.current === sessionKey) setActiveMonitorTab(null)
         } else {
-          setActiveFlowSessions((prev) => ({
-            ...prev,
-            [sessionKey]: {
+          // Upsert under the DB row's REAL flow name, dropping any same-topic session that was
+          // registered under a guessed flow (spawn-time 'team' default). isRunning is preserved
+          // from whichever session held the topic — engine liveness is owned by the gate hook.
+          setActiveFlowSessions((prev) => {
+            const wasRunning = Object.entries(prev).some(
+              ([k, s]) => extractTopic(k) === effectiveTopic && s.isRunning,
+            )
+            return upsertSessionByTopic(prev, sessionKey, {
               flowKey: `${flowType}.flow.yaml`,
               topic: effectiveTopic,
-              isRunning: true,
+              isRunning: wasRunning,
               isPaused: false,
-              isCli: false as const
-            }
-          }))
+              isCli: false,
+            })
+          })
+          if (
+            activeMonitorTabRef.current &&
+            activeMonitorTabRef.current !== sessionKey &&
+            extractTopic(activeMonitorTabRef.current) === effectiveTopic
+          ) {
+            setActiveMonitorTab(sessionKey)
+          }
         }
       }
 

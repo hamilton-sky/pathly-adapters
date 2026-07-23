@@ -35,6 +35,7 @@ export function FlowStepper({ onStageClick }: FlowStepperProps): JSX.Element {
         <StepRow
           key={step.state}
           step={step}
+          index={i}
           isLast={i === steps.length - 1}
           onClick={onStageClick}
         />

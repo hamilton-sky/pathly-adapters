@@ -4,11 +4,8 @@ import { useTerminalStore } from '../../store/terminalStore'
 import { useMonitorSession } from './hooks/useMonitorSession'
 import { useMonitorEngines } from './hooks/useMonitorEngines'
 import { useRecentEngines } from './hooks/useRecentEngines'
-import { HeaderBar } from './HeaderBar'
-import { HealthCheck } from './HealthCheck'
 import { OutputBanner } from './output/OutputBanner/OutputBanner'
 import { MonitorBoard } from './EngineBoard'
-import { RunCostBadge } from './RunCostBadge/RunCostBadge'
 import { ConfigurePhaseModal } from './ConfigurePhaseModal/ConfigurePhaseModal'
 import { FlowStepsPanel } from './FlowStepsPanel/FlowStepsPanel'
 import styles from './Monitor.module.css'
@@ -16,14 +13,15 @@ import styles from './Monitor.module.css'
 // The Pipeline panel, laid out as a row: the GLOBAL live engine board is the MAIN content (left) —
 // every running CLI engine (headless or interactive, any feature or a project one-shot), in parity
 // with the Engines dock; deliberately NOT feature-scoped and NOT gated behind a feature selection.
-// The feature's stage timeline + runner controls used to sit as a fixed bar on TOP; they now live
-// in FlowStepsPanel, a collapsible RIGHT dock that renders whichever flow is selected as a vertical
-// stepper (click a stage to configure its agent/skill/host) with the runner controls beneath it —
-// reclaiming the vertical space the board needs. HeaderBar / cost / health / output stay above the
-// board in the main column.
+// The old feature-scoped header stack (HeaderBar / RunCostBadge / HealthCheck) is unmounted — a
+// feature title above a global board was incongruous chrome; the run cost re-homed into the flow
+// dock. Only the conditional OutputBanner (output → modal) remains above the board. The stage
+// timeline + runner controls live in FlowStepsPanel, a collapsible RIGHT dock that renders
+// whichever running flow is selected as a vertical stepper (click a stage to configure its
+// agent/skill/host) with the runner controls beneath it.
 export function Monitor(): JSX.Element {
-  const { activeTopic, fsmState } = useStore()
-  const { effectiveTopic, showTabBar, refresh } = useMonitorSession()
+  const fsmState = useStore((s) => s.fsmState)
+  const { effectiveTopic, showTabBar } = useMonitorSession()
   const [configStage, setConfigStage] = useState<string | null>(null)
   const engines = useMonitorEngines(null) // GLOBAL — every live engine, matching the dock
   const recent = useRecentEngines() // DB-backed history (finished spawns)
@@ -60,26 +58,17 @@ export function Monitor(): JSX.Element {
     <div className={styles.panel}>
       <div className={styles.body}>
         <div className={styles.main}>
-          {activeTopic ? (
-            <>
-              <HeaderBar effectiveTopic={effectiveTopic} onRefresh={refresh} />
-              <RunCostBadge feature={effectiveTopic} />
-              <HealthCheck />
-              <OutputBanner />
-            </>
-          ) : (
-            engines.length === 0 && recent.length === 0 && (
-              <span className={styles.placeholder}>
-                Select a feature to see its pipeline — or spawn a CLI engine to see it below
-              </span>
-            )
-          )}
+          <OutputBanner />
 
           {/* Global engine board — every live CLI + recent history, in parity with the Engines
               dock. It's the main content of the panel now that the stage timeline moved to the
-              right dock. */}
-          {(engines.length > 0 || recent.length > 0) && (
+              right dock and the old feature header stack is gone. */}
+          {engines.length > 0 || recent.length > 0 ? (
             <MonitorBoard engines={engines} recent={recent} onAction={handleEngineAction} />
+          ) : (
+            <span className={styles.placeholder}>
+              No CLI engines yet — run a flow, goal, or task from the board to see it here
+            </span>
           )}
         </div>
 
