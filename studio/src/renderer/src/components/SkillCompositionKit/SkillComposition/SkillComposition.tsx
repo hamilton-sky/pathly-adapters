@@ -15,7 +15,6 @@ export function SkillComposition(): JSX.Element {
   return (
     <div className={styles.root}>
       <div className={styles.header}>
-        <div className={styles.mark}>P</div>
         <div className={styles.headText}>
           <h2 className={styles.title}>Skill Composition</h2>
           <span className={styles.subtitle}>Per-project fragment overrides — live composed-prompt preview</span>
