@@ -45,7 +45,6 @@ Composed components:
 - onApply(newContent): called with the reconstructed result
 - onClose(): dismiss the modal
 - onDiscard(): permanently delete the draft (after in-modal confirm)
-- pushToast(message, kind): optional toast hook for the no-changes notice
 
 View mode is internal (useViewMode) and persisted; no prop needed. Lift it to a
 prop if a host wants to control it.
@@ -61,6 +60,10 @@ prop if a host wants to control it.
   the toggles and wins on Apply ("Apply edited result"); "Reset to reconstructed"
   drops the edit and follows the toggles again. Editing is the escape hatch for
   changes no per-section toggle can express.
+- No changes: when the draft is identical to the original (no changed sections),
+  the modal shows a "No changes to review" state with Discard / Close — it does not
+  auto-close (that read as a flicker-and-vanish). Discard removes the stale draft so
+  the host's Diff pill stops mis-lighting.
 - Icon-only toggle; choice persisted in localStorage (pathly.diffViewMode).
 - Word-level diff highlights changed words (red strikethrough = removed, green =
   added). DiffCodeBlock mode line gives the classic line diff for code.
@@ -70,7 +73,6 @@ prop if a host wants to control it.
 - window.pathly.fs.read (useDraftDiff.ts): Electron preload bridge, global in Studio
 - MarkdownRenderer: local minimal renderer; swap for your shared one in-app
 - icons/Icons.tsx: inline SVGs; swap for lucide-react in-app if preferred
-- pushToast (prop): optional; decoupled from the toast store
 
 All styling resolves from the global Pathly tokens (tokens.css), so the modal
 re-themes automatically with any data-theme palette.

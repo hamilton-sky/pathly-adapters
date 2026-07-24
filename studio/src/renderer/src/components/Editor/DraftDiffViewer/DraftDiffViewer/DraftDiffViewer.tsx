@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useDraftDiff } from '../useDraftDiff'
 import type { DiffComment } from '../useDraftDiff'
 import { useViewMode } from '../useViewMode'
@@ -22,8 +22,6 @@ export interface DraftDiffViewerProps {
   onApply: (newContent: string) => void
   onClose: () => void
   onDiscard: () => void
-  /** Optional toast hook, e.g. pushToast={useToastStore((s) => s.push)} */
-  pushToast?: (message: string, kind?: 'info' | 'success' | 'error') => void
 }
 
 function diffTitle(source?: 'split' | 'comments'): string {
@@ -38,18 +36,11 @@ function filename(path: string): string {
 
 type ContentProps = DraftDiffViewerProps & { view: ViewMode; onRetry: () => void }
 
-function DiffContent({ originalPath, draftPath, comments, onApply, onClose, onDiscard, pushToast, view, onRetry }: ContentProps) {
+function DiffContent({ originalPath, draftPath, comments, onApply, onClose, onDiscard, view, onRetry }: ContentProps) {
   const diff = useDraftDiff(originalPath, draftPath, comments)
   // null = follow the per-section accept/reject choices; a string = the user's
   // manual edit of the result, which then wins on Apply.
   const [edited, setEdited] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (!diff.loading && !diff.error && diff.totalChanged === 0) {
-      pushToast?.('No changes detected — draft is identical to the original', 'info')
-      onClose()
-    }
-  }, [diff.loading, diff.error, diff.totalChanged, onClose, pushToast])
 
   if (diff.loading) {
     return <div className={styles.state}>Loading diff…</div>
@@ -71,7 +62,26 @@ function DiffContent({ originalPath, draftPath, comments, onApply, onClose, onDi
     )
   }
 
-  if (diff.totalChanged === 0) return null
+  // No changed sections — the draft is identical to the original (a common no-op AI Split).
+  // Show it plainly instead of silently closing (which read as a flicker-and-vanish), and offer
+  // to discard the useless draft so the Diff pill stops mis-lighting on every open.
+  if (diff.totalChanged === 0) {
+    return (
+      <div className={styles.state}>
+        <div className={styles.stateText}>
+          No changes to review — this draft is identical to the original.
+        </div>
+        <div className={styles.stateActions}>
+          <button type="button" className={styles.btnPrimary} onClick={onDiscard}>
+            Discard draft
+          </button>
+          <button type="button" className={styles.btnCancel} onClick={onClose}>
+            Close
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   const result = diff.reconstruct()
 

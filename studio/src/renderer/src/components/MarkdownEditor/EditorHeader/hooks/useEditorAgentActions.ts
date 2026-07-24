@@ -120,14 +120,27 @@ export function useEditorAgentActions(
       // and clears the slot synchronously — this exit was already handled. No-op.
       const live = useUiStore.getState().mdEditorActions[forFile]?.split
       if (!live || live.tabId !== tabId) return
-      void pollForFile(draftPath).then((content) => {
+      void pollForFile(draftPath).then(async (content) => {
         if (content != null && !isErrorResult(content)) {
-          setMdEditorSplitDraftPath(draftPath, forFile)
-          if (useUiStore.getState().mdEditorPath === forFile) setMdEditorViewMode('editor')
+          // A draft that byte-matches the source is a no-op split — the agent rewrote the file
+          // unchanged. Registering it would light the Diff pill onto an empty diff that opens and
+          // instantly closes (nothing to review — the "flicker and vanish"); instead delete the
+          // stale draft, leave the pill dark, and report the no-op honestly.
+          const original = await window.pathly.fs.read(forFile)
+          const noChanges = original != null && original === content
           useTerminalStore.getState().updateTabStatus(tabId, 'done')
           useTerminalStore.getState().closeTab(tabId)
-          setMdEditorAction(forFile, 'split', { status: 'success', tabId, stopping: false })
-          toast(`AI Split ready · ${fileName} — review the diff`, 'success', 'agent_done')
+          if (noChanges) {
+            void window.pathly.fs.delete(draftPath)
+            setMdEditorSplitDraftPath(null, forFile)
+            setMdEditorAction(forFile, 'split', { status: 'success', tabId, stopping: false })
+            toast(`AI Split made no changes · ${fileName}`, 'info', 'agent_done')
+          } else {
+            setMdEditorSplitDraftPath(draftPath, forFile)
+            if (useUiStore.getState().mdEditorPath === forFile) setMdEditorViewMode('editor')
+            setMdEditorAction(forFile, 'split', { status: 'success', tabId, stopping: false })
+            toast(`AI Split ready · ${fileName} — review the diff`, 'success', 'agent_done')
+          }
           setTimeout(() => clearIfStill(forFile, tabId), 3000)
         } else {
           useTerminalStore.getState().updateTabStatus(tabId, 'error')
