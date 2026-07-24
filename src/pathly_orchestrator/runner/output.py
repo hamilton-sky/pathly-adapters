@@ -339,4 +339,12 @@ def parse_result(adapter: str, raw_output: str) -> dict[str, Any]:
         "tokens_out": tokens_out,
         "tool_uses": tool_uses,
         "model_usage": model_usage,
+        # Failure signal from the CLI's own result envelope. Surfaced so the downstream
+        # silent-failure guards can actually read it: a claude run that fails but exits 0
+        # sets is_error=true (subtype may still say "success"); the guards in
+        # scheduler._outcome_is_failure and /comms/tasks/run branch on exactly these keys but
+        # never received them, so a clean-exit-over-failed-work slipped through as done.
+        "is_error": bool(payload.get("is_error")),
+        "subtype": payload.get("subtype"),
+        "api_error_status": payload.get("api_error_status"),
     }

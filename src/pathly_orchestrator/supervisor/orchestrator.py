@@ -53,6 +53,7 @@ def _loop(state: RunnerState, broadcast_fn: Optional[Callable]) -> None:
     from pathly_orchestrator import fsm_http_client as fhc
     from pathly_orchestrator.adapters import resolve_command
     import pathly_orchestrator.supervisor as _sup
+    from pathly_orchestrator.supervisor.scheduler import _outcome_is_failure
 
     _run_stage_via_terminal = _sup._run_stage_via_terminal
 
@@ -299,6 +300,41 @@ def _loop(state: RunnerState, broadcast_fn: Optional[Callable]) -> None:
             # ── Update cost + session from invoke result ───────────────────────
             new_cost = (invoke_result or {}).get("cost_usd", 0.0) or 0.0
             new_session_id = (invoke_result or {}).get("session_id")
+
+            # Silent-failure guard #2, FSM/team arm: a stage can exit cleanly yet self-report
+            # failure — an AGENT_DONE outcome:"failed" (relayed by terminal.py) or the CLI's own
+            # is_error/api_error_status (now surfaced by parse_result). The single/loop executors
+            # already fail a task on this signal; the FSM loop historically read only cost/session
+            # and advanced regardless, making a failed stage SILENT until (if ever) a downstream
+            # REVIEW/TEST stage caught it. Surface it as a non-fatal RUNNER_WARNING so it is visible
+            # on the board and in telemetry. Advancement is intentionally unchanged: downstream
+            # review is the pipeline's real gate, and halting here would change semantics for
+            # standard/strict rigor. (Halting for no-review rigors — nano/lite — is an open product
+            # decision, see pathly/features/unified-control-plane/SPEC.md §4 P-1.)
+            if _outcome_is_failure(invoke_result):
+                _stage = (response or {}).get("current_state") or ""
+                _reason = (
+                    (invoke_result or {}).get("error")
+                    or (invoke_result or {}).get("outcome")
+                    or "self-reported failure"
+                )
+                logger.warning(
+                    "stage %s for topic %s self-reported failure (%s) but exited cleanly; "
+                    "advancing — downstream review is the gate",
+                    _stage or "?",
+                    topic,
+                    _reason,
+                )
+                _broadcast(
+                    {
+                        "type": "RUNNER_WARNING",
+                        "topic": topic,
+                        "message": (
+                            f"Stage {_stage or '?'} reported failure ({_reason}) but exited "
+                            f"cleanly; continuing to the next stage."
+                        ),
+                    }
+                )
 
             with _lock:
                 state.iterations += 1

@@ -18,8 +18,8 @@ Cost/token telemetry — invocation projection, pricing, OTel export, observabil
 | `test_otel_export.py` | covers no op when env unset; span payload structure; span status ok; … | 9 |
 | `test_otel_export_cli.py` | covers cli missing db; cli dry run; cli exports spans; … | 6 |
 | `test_output_parse_recovery.py` | Truncation-recovery for large claude ``--output-format=json`` envelopes (``output.parse_result``) | 4 |
-| `test_parse_result_model_usage.py` | parse_result must capture the adapter's per-model usage breakdown (`modelUsage`) | 4 |
+| `test_parse_result_model_usage.py` | parse_result must capture the adapter's per-model usage breakdown (`modelUsage`) | 6 |
 | `test_pricing_registry.py` | Unit tests for PricingRegistry.compute() | 10 |
-| `test_projection_board_scope.py` | run-identity: the invocation projection stamps board_scope from the event stream | 4 |
+| `test_projection_board_scope.py` | run-identity: the invocation projection stamps board_scope from the event stream | 5 |
 | `test_telemetry_cost_fix.py` | Tests for the telemetry-cost-fix plan (FIX B + FIX C) | 3 |
 | `test_telemetry_three_tier.py` | Tests for the three-tier telemetry feature (telemetry-three-tier) | 8 |

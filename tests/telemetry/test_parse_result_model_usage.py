@@ -81,3 +81,42 @@ def test_lump_cost_wins_when_present():
 def test_no_model_usage_yields_empty_map():
     r = parse_result("claude", json.dumps({"total_cost_usd": 0.5}))
     assert r["model_usage"] == {}
+
+
+def test_surfaces_cli_error_signal_for_failure_guards():
+    """A claude run that fails but exits 0 sets is_error=true (subtype may still read a
+    success-ish value). parse_result must surface is_error/api_error_status so
+    scheduler._outcome_is_failure and /comms/tasks/run — which branch on exactly these keys —
+    can fail the run instead of marking clean-exit-over-failed-work as done (silent-failure
+    guard #2). Before the fix these keys were dropped from the return dict, so the guards'
+    branches were unreachable."""
+    from pathly_orchestrator.supervisor.scheduler import _outcome_is_failure
+
+    payload = json.dumps(
+        {
+            "is_error": True,
+            "subtype": "error_during_execution",
+            "api_error_status": 404,
+            "total_cost_usd": 0.0,
+            "result": "model not found",
+        }
+    )
+    r = parse_result("claude", payload)
+    assert r["is_error"] is True
+    assert r["api_error_status"] == 404
+    assert r["subtype"] == "error_during_execution"
+    # The whole point of the fix: the guard can now actually see the failure.
+    assert _outcome_is_failure(r) is True
+
+
+def test_clean_success_is_not_flagged_as_failure():
+    """A normal success (is_error=false) must NOT trip the failure guard — surfacing the field
+    on every result is inert for the success path."""
+    from pathly_orchestrator.supervisor.scheduler import _outcome_is_failure
+
+    r = parse_result(
+        "claude",
+        json.dumps({"is_error": False, "subtype": "success", "total_cost_usd": 0.1}),
+    )
+    assert r["is_error"] is False
+    assert _outcome_is_failure(r) is False
