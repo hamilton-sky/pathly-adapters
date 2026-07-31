@@ -4,7 +4,7 @@
 
 Database layer — schema/queries, connection isolation, write guard.
 
-7 test file(s).
+8 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -14,4 +14,5 @@ Database layer — schema/queries, connection isolation, write guard.
 | `test_db_write_guard.py` | Regression: a write that raises inside `_get_write_lock` must roll back and | 3 |
 | `test_event_mirror.py` | EventMirror — DB -> disk export for EVENTS.jsonl (state-one-authority, additive P1a) | 11 |
 | `test_run_history_identity.py` | run-identity: run_history as the identity map run_id -> (project_root, slug, board_scope) | 6 |
+| `test_run_log.py` | run_log store — per-spawn Complete Run Record (unified-control-plane P0, ARCHITECTURE §8.1) | 5 |
 | `test_stage_configs.py` | stage_configs query helpers — flow-phase-inspector (#5) per-stage selection persistence | 5 |

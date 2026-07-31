@@ -234,6 +234,23 @@ CREATE TABLE IF NOT EXISTS run_history (
     UNIQUE(run_id)
 );
 
+-- unified-control-plane P0: per-spawn Complete Run Record — the prompt sent to the CLI,
+-- the injected board context, stdin, and the full (untruncated) PTY stdout tail. One row
+-- per spawn (run_id is effectively unique per spawn; retries mint -q{n}/-fb{n} variants).
+-- A debug/display SINK — billing stays authoritative in agent_invocations. Not UNIQUE(run_id)
+-- so the write path stays INSERT + WHERE-run_id UPDATE; a stray dup degrades to "newest wins".
+CREATE TABLE IF NOT EXISTS run_log (
+    id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id                 TEXT NOT NULL,
+    stage                  TEXT,
+    prompt_sent            TEXT,
+    board_context_injected TEXT,
+    stdin                  TEXT,
+    stdout                 TEXT,
+    ts                     TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_run_log_run_id ON run_log(run_id);
+
 CREATE TABLE IF NOT EXISTS app_settings (
     key        TEXT PRIMARY KEY,
     value      TEXT NOT NULL,

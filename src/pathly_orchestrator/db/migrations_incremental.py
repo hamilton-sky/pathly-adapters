@@ -142,6 +142,10 @@ def _add_additive_migrations(conn: sqlite3.Connection) -> None:
         # summary-note: per-artifact free-text "special request" appended to the summary
         # prompt (e.g. "focus on security"). Nullable → no extra instruction.
         ("comms_artifacts", "summary_note", "TEXT"),
+        # unified-control-plane P0: correlate a board post to the run that made it. Nullable +
+        # un-backfilled — legacy/human/non-poster posts legitimately carry NULL. RunDetail's Board
+        # tab joins run_id-when-present, time-window-when-NULL (P1 threads it into make_board_posters).
+        ("comms_messages", "run_id", "TEXT"),
     ]:
         try:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {ctype}")
