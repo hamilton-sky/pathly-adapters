@@ -4,7 +4,7 @@
 
 HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, prompt-event contract.
 
-6 test file(s).
+7 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -14,3 +14,4 @@ HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, 
 | `test_db_features_fields.py` | Tests for the state-one-authority /db/features extension (split-db-api-explorer) | 5 |
 | `test_event_prompt_timestamps.py` | covers prompt json event examples include timestamps | 1 |
 | `test_http_server.py` | Integration tests for the HTTP server endpoints | 26 |
+| `test_runs_read.py` | Control-plane run read API — GET /runs, GET /runs/<run_id> (unified-control-plane P0, | 6 |
