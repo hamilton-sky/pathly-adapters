@@ -427,6 +427,25 @@ def _run_stage_via_terminal(
     # run-identity: one identity row per spawn (FSM stages, loop tasks, board runs all
     # pass through here with their own run_id); settled done/error in the finally below.
     _spawn_identity = _record_spawn_identity(state, run_id, adapter)
+    # unified-control-plane P0: persist this spawn's prompt for the Complete Run Record.
+    # Best-effort — MUST NOT raise into the spawn path (this is what keeps the P0
+    # "pure-additive, zero-behavior-change" claim true; mirrors the _record_spawn_identity
+    # guard just above). The injected board context is embedded in `instructions` in P0
+    # (board_context_injected becomes discrete in P1 — see ARCHITECTURE §2.3).
+    try:
+        from pathly_orchestrator.db.connection import get_db as _rl_db
+        from pathly_orchestrator.db.queries.run_log import write_run_log_spawn
+
+        write_run_log_spawn(
+            _rl_db(),
+            run_id,
+            stage=state.current_state or state.status or "stage",
+            prompt_sent=instructions,
+            board_context_injected=None,
+            stdin=None,
+        )
+    except Exception:
+        logger.debug("run_log spawn write skipped", exc_info=True)
     use_interactive = state.interactive
     if use_interactive and not feature_flags.early_advance:
         msg = "Interactive mode requires PATHLY_RUNNER_EARLY_ADVANCE=1"

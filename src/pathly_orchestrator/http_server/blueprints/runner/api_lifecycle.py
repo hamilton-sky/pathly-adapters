@@ -393,6 +393,20 @@ def runner_terminal_result():
             except Exception:
                 logging.debug("user_initiated tab-kill abort failed", exc_info=True)
 
+        # unified-control-plane P0: persist the PTY stdout tail (full, untruncated — human
+        # answer 2026-07-24) for the Complete Run Record, where it is otherwise dropped after
+        # the billing parse. Best-effort; the billing parse above is unchanged and the result
+        # callback is NOT gated on this (AC-6).
+        try:
+            from pathly_orchestrator.db.connection import get_db as _rl_db
+            from pathly_orchestrator.db.queries.run_log import update_run_log_stdout
+
+            update_run_log_stdout(_rl_db(), run_id, data.get("stdout_tail", ""))
+        except Exception:
+            logging.getLogger("pathly.http").debug(
+                "run_log stdout write skipped", exc_info=True
+            )
+
         return jsonify({"ok": True}), 200
     except Exception as exc:
         logging.exception("runner_terminal_result error")

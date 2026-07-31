@@ -58,7 +58,7 @@ POST /runner/retry                   ← retry blocked stage
 POST /runner/abort                   ← abort run completely
 POST /runner/event                   ← inject an arbitrary runner event
 GET  /runner/status                  ← current runner state snapshot
-POST /runner/terminal/result         ← PTY exit callback: { run_id, topic, exit_code, stdout_tail, wall_seconds, user_initiated } — enriched with AGENT_DONE.summary from central DB; stdout used only for session_id + cost_usd
+POST /runner/terminal/result         ← PTY exit callback: { run_id, topic, exit_code, stdout_tail, wall_seconds, user_initiated } — enriched with AGENT_DONE.summary from central DB; stdout used for session_id + cost_usd (+ persisted verbatim to run_log — unified-control-plane P0 Complete Run Record display sink)
 POST /runner/terminal/started        ← PTY started confirmation: { run_id, topic, tab_id }
 GET  /events/runner?topic=<topic>    ← SSE stream of runner events for Studio
 POST /shutdown                       ← graceful server shutdown (health blueprint; used by Electron on restart)
