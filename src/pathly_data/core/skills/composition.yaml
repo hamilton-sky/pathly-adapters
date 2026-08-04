@@ -162,6 +162,14 @@ skills:
     fragments:
       - board-init
 
+  # Interactive on-ramp: post an artifact/decision/discovery/question from a chat session to a
+  # chosen feature board. feature-select owns the "which board?" picker (and routes to
+  # create-feature for a new board); the post mechanics are inline in the body (board-native).
+  planning/post:
+    no_defaults: true
+    fragments:
+      - feature-select
+
   planning/plan:
     fragments:
       - code-query

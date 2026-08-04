@@ -21,6 +21,15 @@ Split `$ARGUMENTS` into:
 | `help` | `h`, `?` | → **help** |
 | `meet` | — | → **pathly-meet** skill directly |
 
+### Board on-ramps (Tier-1 — always exposed)
+
+These two are the interactive entry points from a Claude/Codex chat into the board.
+
+| subcommand | aliases | behavior |
+|---|---|---|
+| `create-feature` | `new-feature`, `cf` | → **pathly-create-feature** skill directly |
+| `post` | `share` | → **pathly-post** skill directly |
+
 ### Specialized commands (direct to skill — no director routing)
 
 | subcommand | aliases | behavior |
@@ -221,6 +230,9 @@ Reply with 1–4, or describe what you want:
 **Step 3 — Full command reference (shown on "See all commands")**
 
 ```
+── Board on-ramps ────────────────────────
+  /pathly create-feature   /pathly post
+
 ── Core ──────────────────────────────────
   /pathly start   /pathly go      /pathly storm
   /pathly build   /pathly pause   /pathly meet
