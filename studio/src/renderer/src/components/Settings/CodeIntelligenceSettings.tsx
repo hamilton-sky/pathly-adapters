@@ -13,6 +13,12 @@ export function CodeIntelligenceSettings(): JSX.Element {
       <div className={s.subLabel}>Backend</div>
       <div className={ss.radioGroup}>
         <RadioCard
+          active={backend === 'auto'}
+          label="Auto"
+          description="Use whichever backend is installed (recommended)"
+          onClick={() => setBackend('auto')}
+        />
+        <RadioCard
           active={backend === 'off'}
           label="Off"
           description="No code graph"
@@ -20,9 +26,21 @@ export function CodeIntelligenceSettings(): JSX.Element {
         />
         <RadioCard
           active={backend === 'cli'}
-          label="On"
-          description="CLI-backed code graph"
+          label="Graph"
+          description="Whole-repo graph (codebase-memory-mcp)"
           onClick={() => setBackend('cli')}
+        />
+        <RadioCard
+          active={backend === 'lsp'}
+          label="LSP"
+          description="Live symbols via Serena (uvx)"
+          onClick={() => setBackend('lsp')}
+        />
+        <RadioCard
+          active={backend === 'both'}
+          label="Both"
+          description="Graph + LSP"
+          onClick={() => setBackend('both')}
         />
       </div>
 

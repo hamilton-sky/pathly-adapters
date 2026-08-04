@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { apiFetch } from '../../../lib/config'
 import { useToastStore } from '../../../store/toastStore'
 
-export type CodeContextBackend = 'off' | 'cli'
+export type CodeContextBackend = 'auto' | 'off' | 'cli' | 'lsp' | 'both'
 export type CodeContextReindex = 'off' | 'stage' | 'auto'
 export type CodeContextTool = 'codebase-memory-mcp'
 
@@ -10,12 +10,14 @@ const KEY_BACKEND = 'code_context.backend'
 const KEY_REINDEX = 'code_context.reindex'
 const KEY_TOOL    = 'code_context.tool'
 
-const DEFAULT_BACKEND: CodeContextBackend = 'off'
+const DEFAULT_BACKEND: CodeContextBackend = 'auto'
 const DEFAULT_REINDEX: CodeContextReindex = 'auto'
 const DEFAULT_TOOL: CodeContextTool       = 'codebase-memory-mcp'
 
 function parseBackend(v: string | undefined): CodeContextBackend {
-  return v === 'cli' ? 'cli' : DEFAULT_BACKEND
+  return v === 'off' || v === 'cli' || v === 'lsp' || v === 'both' || v === 'auto'
+    ? v
+    : DEFAULT_BACKEND
 }
 
 function parseReindex(v: string | undefined): CodeContextReindex {
