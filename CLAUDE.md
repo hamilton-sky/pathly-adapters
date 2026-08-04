@@ -192,7 +192,8 @@ is a shim, but the HTTP form passes `project_root`, which the proxy needs to res
 relative targets.)
 
 Two backends sit behind the one proxy — pick per request with `"engine": "graph" | "lsp" | "both"`
-(omit → the `code_context.backend` setting decides: `off` | `cli` | `lsp` | `both`):
+(omit → the `code_context.backend` setting decides — default `auto` (detect the installed
+backend), else `off` | `cli` | `lsp` | `both`):
 
 | Engine | Backend | Strength | Freshness | Cost | Use for |
 |---|---|---|---|---|---|
