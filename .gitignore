@@ -63,3 +63,6 @@ pathly/board-artifacts/
 # code-intel (codebase-memory-mcp) + serena local index + project cache
 .serena/
 .codebase-memory-mcp/
+
+# Python virtualenv — local, machine-specific (~1.1 GB); never commit
+.venv/
