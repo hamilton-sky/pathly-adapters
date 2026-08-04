@@ -207,6 +207,23 @@ change / exit. Serena is ALSO wired as a direct agent MCP tool via
 `src/pathly_data/adapters/*/_mcp/serena.json` (independent of the proxy). Fallback when the FSM
 server isn't running: query the graph directly (`codebase-memory-mcp cli <tool> …`).
 
+**`codebase-memory-mcp` — new-machine setup (EXTERNAL binary, NOT in this repo).** The `graph`
+backend (`runner/code_context_cli.py::CliProvider`, resolved via
+`shutil.which("codebase-memory-mcp")`) is a standalone binary from **GitHub →
+[`DeusData/codebase-memory-mcp`](https://github.com/DeusData/codebase-memory-mcp)** — OS-native
+builds shipped via GitHub Releases, **NOT pip/npm** (the Windows build on the primary machine is a
+~269 MB self-contained `…/Python313/Scripts/codebase-memory-mcp.exe`, v0.8.1, that dir being on
+PATH). It is **optional**: `CliProvider` returns `""` (safe no-op) when the binary is absent, so
+`/code/query` and every caller degrade to Grep/Read (the `lsp`/Serena backend is wired separately
+via `adapters/*/_mcp/serena.json`). Per-project graph indexes cache in
+`~/.cache/codebase-memory-mcp/<project>.db` — **per-machine, not git-tracked**, so a fresh machine
+re-indexes. To set up on a new machine (e.g. macOS): **(1)** download the OS-native build from
+`https://github.com/DeusData/codebase-memory-mcp/releases/latest` (variant `standard` or `ui`) onto
+PATH — or run the binary's own `codebase-memory-mcp update`; **(2)** `codebase-memory-mcp install`
+self-registers it into Claude Code (+ Codex/Gemini/Zed/…); **(3)** `codebase-memory-mcp cli
+index_repository '{…}'` builds the graph (or let Pathly's `maybe_reindex` / the tool's `auto_index`
+do it). Skipping it entirely is fine — Pathly and Claude Code both work without it.
+
 ---
 
 ## Code architecture — SOLID rules
