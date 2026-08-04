@@ -35,11 +35,20 @@ export function CliMonitorBar(): JSX.Element | null {
 
   if (!open) return null
 
+  // Open a row: a LIVE engine reveals its terminal tab; a finished RECENT row (its terminal is
+  // gone, so openTab would be a silent no-op) jumps to the full Monitor panel, where the run is
+  // listed with its detail. Never a dead click. (The deep per-run RunDetailPage is P0(e).)
+  function openEngine(id: string): void {
+    const term = useTerminalStore.getState()
+    if (term.tabs.some((t) => t.id === id)) term.openTab(id)
+    else setActivePanel('monitor')
+  }
+
   function handleAction(engineId: string, actionId: string): void {
     const term = useTerminalStore.getState()
     switch (actionId) {
       case 'open':
-        term.openTab(engineId)
+        openEngine(engineId)
         break
       case 'stop':
         // Mirror the panel board: kill releases the gate slot (dropping the row from the
@@ -77,7 +86,7 @@ export function CliMonitorBar(): JSX.Element | null {
           onCollapse={() => setExpanded(false)}
           onClose={toggleCliMonitor}
           onOpenMonitor={() => setActivePanel('monitor')}
-          onOpenEngine={(id) => useTerminalStore.getState().openTab(id)}
+          onOpenEngine={openEngine}
           onAction={handleAction}
           onPauseAll={pauseAll}
           onManageQueue={() => setQueueOpen((v) => !v)}
