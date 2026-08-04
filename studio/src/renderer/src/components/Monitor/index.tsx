@@ -69,16 +69,11 @@ export function Monitor(): JSX.Element {
         <div className={styles.main}>
           <OutputBanner />
 
-          {/* Global engine board — every live CLI + recent history, in parity with the Engines
-              dock. It's the main content of the panel now that the stage timeline moved to the
-              right dock and the old feature header stack is gone. */}
-          {engines.length > 0 || recent.length > 0 ? (
-            <MonitorBoard engines={engines} recent={recent} onAction={handleEngineAction} onOpenRun={setDetailRunId} />
-          ) : (
-            <span className={styles.placeholder}>
-              No CLI engines yet — run a flow, goal, or task from the board to see it here
-            </span>
-          )}
+          {/* Global engine board — every live CLI + recent history + the folded Runs list (mode
+              toggle in its header). Always mounted, even with nothing live, so the Live/Runs
+              toggle stays reachable and each mode owns its own empty state (a run can exist in
+              /runs with no live engine — exactly what Runs mode surfaces). */}
+          <MonitorBoard engines={engines} recent={recent} onAction={handleEngineAction} onOpenRun={setDetailRunId} />
         </div>
 
         {/* Collapsible right-side flow dock: the selected flow's vertical stepper + the runner

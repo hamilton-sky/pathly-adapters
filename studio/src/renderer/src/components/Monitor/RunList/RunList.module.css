@@ -1,0 +1,12 @@
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.state {
+  padding: 40px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-muted);
+}

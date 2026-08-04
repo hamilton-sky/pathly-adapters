@@ -1,11 +1,14 @@
-import React, { useMemo, useState } from 'react'
-import { LayoutGrid, Rows3 } from 'lucide-react'
+import { useMemo, useState } from 'react'
 import type { EngineAdapter, MonitorEngine } from '../types'
 import { CATEGORY_META } from '../constants'
 import { CategoryFilterBar, type CategoryFilter } from '../CategoryFilterBar/CategoryFilterBar'
 import { ScopeFilter } from '../ScopeFilter/ScopeFilter'
 import { EngineSection } from '../EngineSection/EngineSection'
 import { EngineDetailModal } from '../EngineDetailModal/EngineDetailModal'
+import { MonitorBoardHeader, type BoardMode } from './MonitorBoardHeader/MonitorBoardHeader'
+import { RunList } from '../../RunList/RunList'
+import { useRuns } from '../../RunList/hooks/useRuns'
+import { adapterFromProvider } from '../../../RunDetailPage/runAdapter'
 import s from './MonitorBoard.module.css'
 
 interface Props {
@@ -15,58 +18,69 @@ interface Props {
   recent?: MonitorEngine[]
   /** Fired when a control button in the detail modal is pressed. */
   onAction?: (engineId: string, actionId: string) => void
-  /** Open the full RunDetailPage for a run (threaded to the detail modal's "Open run →"). */
+  /** Open the full RunDetailPage for a run (detail modal's "Open run →" + a Runs-mode row). */
   onOpenRun?: (runId: string) => void
 }
 
-// The Monitor board: a CLI-engine board that groups engines by how they run
-// (Flow / Loop / Single), the same mechanism the Command Center uses to group
-// messages by scope. Clicking a card opens its detail modal.
+// The Monitor board has two modes (MonitorBoardHeader toggle): LIVE — the per-spawn engine board
+// grouped by category (Flow/Loop/Single) + a Recent history section; and RUNS — the folded
+// one-row-per-top-level-run list from GET /runs (a flow's stage spawns collapse to one row).
+// Category / adapter / scope filters and their counts apply to whichever mode is active.
 export function MonitorBoard({ engines, recent, onAction, onOpenRun }: Props): JSX.Element {
+  const [mode, setMode] = useState<BoardMode>('live')
   const [category, setCategory] = useState<CategoryFilter>('all')
   const [adapter, setAdapter] = useState<EngineAdapter | null>(null)
   const [scope, setScope] = useState<string | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
   const [view, setView] = useState<'grid' | 'banner'>('grid')
 
-  const counts = useMemo(() => {
-    // Count live engines AND the recent-history cards, so the tabs reflect what is
-    // actually on screen. Counting only `engines` showed Flow/Loop/Single = 0 whenever
-    // nothing was live even though the Recent list was full of finished flow cards.
-    const all = [...engines, ...(recent ?? [])]
-    const c: Record<string, number> = { all: all.length }
-    for (const e of all) c[e.category] = (c[e.category] ?? 0) + 1
-    return c
-  }, [engines, recent])
-
-  const scopes = useMemo(
-    () => Array.from(new Set(engines.map((e) => e.feature))).sort(),
-    [engines],
-  )
-
-  const filtered = useMemo(
-    () =>
-      engines.filter(
-        (e) =>
-          (adapter === null || e.adapter === adapter) &&
-          (scope === null || e.feature === scope),
-      ),
-    [engines, adapter, scope],
-  )
+  // Lazy: the /runs poll only runs while Runs mode is open (the Live board is the default).
+  const { runs, loading: runsLoading } = useRuns(mode === 'runs')
 
   const running = useMemo(() => engines.filter((e) => e.status === 'running').length, [engines])
   const queued = useMemo(() => engines.filter((e) => e.status === 'queued').length, [engines])
 
+  // Counts + scopes derive from the ACTIVE mode's source array, so the filter tabs never mismatch
+  // the rows shown (a "Flow (4)" chip over 2 visible rows reads as a bug).
+  const counts = useMemo(() => {
+    const c: Record<string, number> = {}
+    if (mode === 'runs') {
+      c.all = runs.length
+      for (const r of runs) c[r.kind] = (c[r.kind] ?? 0) + 1
+    } else {
+      const all = [...engines, ...(recent ?? [])]
+      c.all = all.length
+      for (const e of all) c[e.category] = (c[e.category] ?? 0) + 1
+    }
+    return c
+  }, [mode, runs, engines, recent])
+
+  const scopes = useMemo(() => {
+    const src = mode === 'runs' ? runs.map((r) => r.feature) : engines.map((e) => e.feature)
+    return Array.from(new Set(src)).sort()
+  }, [mode, runs, engines])
+
+  // Live-mode derivations
+  const filtered = engines.filter(
+    (e) => (adapter === null || e.adapter === adapter) && (scope === null || e.feature === scope),
+  )
   const sections = CATEGORY_META
     .filter((m) => category === 'all' || category === m.key)
     .map((m) => ({ meta: m, engines: filtered.filter((e) => e.category === m.key) }))
     .filter((sec) => sec.engines.length > 0)
-
   const recentFiltered = (recent ?? []).filter(
     (e) =>
       (category === 'all' || category === e.category) &&
       (adapter === null || e.adapter === adapter) &&
       (scope === null || e.feature === scope),
+  )
+
+  // Runs-mode derivation (kind==='decompose' has no chip → only visible under "All", accepted gap)
+  const filteredRuns = runs.filter(
+    (r) =>
+      (category === 'all' || r.kind === category) &&
+      (adapter === null || adapterFromProvider(r.adapter) === adapter) &&
+      (scope === null || r.feature === scope),
   )
 
   const open = openId
@@ -76,37 +90,14 @@ export function MonitorBoard({ engines, recent, onAction, onOpenRun }: Props): J
   return (
     <div className={s.root}>
       <div className={s.inner}>
-        <header className={s.head}>
-          <span className={s.title}>Monitor</span>
-          <span className={s.summary}>{running} live · {queued} queued</span>
-          <div className={s.viewToggle} role="group" aria-label="Card layout">
-            <button
-              type="button"
-              className={s.viewBtn}
-              data-active={view === 'grid'}
-              onClick={() => setView('grid')}
-              title="Grid of cards"
-              aria-label="Grid view"
-              {...(view === 'grid' ? { 'aria-pressed': 'true' } : { 'aria-pressed': 'false' })}
-            >
-              <LayoutGrid size={14} />
-            </button>
-            <button
-              type="button"
-              className={s.viewBtn}
-              data-active={view === 'banner'}
-              onClick={() => setView('banner')}
-              title="Banner rows"
-              aria-label="Banner view"
-              {...(view === 'banner' ? { 'aria-pressed': 'true' } : { 'aria-pressed': 'false' })}
-            >
-              <Rows3 size={14} />
-            </button>
-          </div>
-          <span className={s.live}>
-            <span className={s.liveDot} />SSE live
-          </span>
-        </header>
+        <MonitorBoardHeader
+          running={running}
+          queued={queued}
+          mode={mode}
+          onMode={setMode}
+          view={view}
+          onView={setView}
+        />
 
         <CategoryFilterBar
           category={category}
@@ -115,33 +106,41 @@ export function MonitorBoard({ engines, recent, onAction, onOpenRun }: Props): J
           onAdapter={setAdapter}
           counts={counts}
         />
-
         <ScopeFilter scopes={scopes} value={scope} onChange={setScope} />
 
-        {sections.map((sec) => (
-          <EngineSection
-            key={sec.meta.key}
-            meta={sec.meta}
-            engines={sec.engines}
-            view={view}
-            onOpen={setOpenId}
-            onAction={onAction}
-          />
-        ))}
-
-        {recentFiltered.length > 0 && (
-          <EngineSection
-            key="recent"
-            meta={{ key: 'single', label: 'Recent', blurb: 'finished · from history', color: 'var(--text-muted)' }}
-            engines={recentFiltered}
-            view={view}
-            onOpen={setOpenId}
-            onAction={onAction}
-          />
-        )}
-
-        {sections.length === 0 && recentFiltered.length === 0 && (
-          <p className={s.empty}>No engines in this view</p>
+        {mode === 'runs' ? (
+          <>
+            {queued > 0 && (
+              <p className={s.note}>{queued} queued — view on the Live board (the run list can’t show the gate queue).</p>
+            )}
+            <RunList runs={filteredRuns} loading={runsLoading} hasAny={runs.length > 0} onOpenRun={onOpenRun} />
+          </>
+        ) : (
+          <>
+            {sections.map((sec) => (
+              <EngineSection
+                key={sec.meta.key}
+                meta={sec.meta}
+                engines={sec.engines}
+                view={view}
+                onOpen={setOpenId}
+                onAction={onAction}
+              />
+            ))}
+            {recentFiltered.length > 0 && (
+              <EngineSection
+                key="recent"
+                meta={{ key: 'single', label: 'Recent', blurb: 'finished · from history', color: 'var(--text-muted)' }}
+                engines={recentFiltered}
+                view={view}
+                onOpen={setOpenId}
+                onAction={onAction}
+              />
+            )}
+            {sections.length === 0 && recentFiltered.length === 0 && (
+              <p className={s.empty}>No engines in this view</p>
+            )}
+          </>
         )}
       </div>
 

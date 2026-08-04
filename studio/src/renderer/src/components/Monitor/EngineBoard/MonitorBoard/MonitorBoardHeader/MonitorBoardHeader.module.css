@@ -1,0 +1,88 @@
+.head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.title {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.summary {
+  font: 400 11px/1 var(--font-family-mono);
+  color: var(--text-muted);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full);
+  padding: 2px 8px;
+}
+
+/* First right-aligned element — pushes the mode toggle, view toggle, and pill to the right. */
+.modeToggle { margin-left: auto; display: inline-flex; }
+
+.viewToggle {
+  display: inline-flex;
+  gap: 2px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 2px;
+}
+
+.viewBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 22px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 120ms ease-out, color 120ms ease-out;
+}
+
+.viewBtn:hover { color: var(--text-primary); }
+.viewBtn[data-active='true'] { background: var(--bg-surface1); color: var(--text-primary); }
+.viewBtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.live,
+.poll {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  border-radius: var(--radius-full);
+  padding: 3px 10px;
+}
+
+/* Live board = real SSE. Runs list = DB-on-mount + 8s poll — a neutral pill, never a live dot. */
+.live {
+  color: var(--runtime);
+  border: 1px solid color-mix(in srgb, var(--runtime) 35%, transparent);
+  background: color-mix(in srgb, var(--runtime) 12%, transparent);
+}
+
+.poll {
+  color: var(--text-muted);
+  border: 1px solid var(--border-color);
+  background: var(--bg-surface1);
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .live .dot { animation: blink 1.4s ease-in-out infinite; }
+}
+
+@keyframes blink {
+  50% { opacity: 0.4; }
+}

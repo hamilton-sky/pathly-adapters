@@ -1,0 +1,63 @@
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface0);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 120ms ease-out;
+}
+
+.row:hover { border-color: var(--accent); }
+.row:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* feature is the flexible middle — it shrinks and ellipsizes; everything else holds its size. */
+.feature {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+}
+
+.sub {
+  flex: none;
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.spacer { flex: 1; min-width: 4px; }
+
+.cost {
+  flex: none;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  color: var(--green);
+  white-space: nowrap;
+}
+
+.cost[data-zero] { color: var(--text-muted); }
+
+.time {
+  flex: none;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
