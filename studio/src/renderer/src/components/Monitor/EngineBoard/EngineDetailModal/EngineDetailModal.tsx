@@ -14,6 +14,8 @@ interface Props {
   engine: MonitorEngine
   onClose: () => void
   onAction?: (engineId: string, actionId: string) => void
+  /** Open the full RunDetailPage for this run (entrance #1). Absent → the button is hidden. */
+  onOpenRun?: (runId: string) => void
 }
 
 interface LogLine { text: string; tone: 'muted' | 'secondary' | 'accent' | 'green' }
@@ -32,7 +34,7 @@ function buildLog(e: MonitorEngine): LogLine[] {
 // Full detail view for one engine. Header (category / adapter / role / status) →
 // feature + stage → metric tiles → live output → contextual controls. The controls
 // live *here* rather than on every card, keeping the board scannable.
-export function EngineDetailModal({ engine: e, onClose, onAction }: Props): JSX.Element {
+export function EngineDetailModal({ engine: e, onClose, onAction, onOpenRun }: Props): JSX.Element {
   const boxRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -100,6 +102,14 @@ export function EngineDetailModal({ engine: e, onClose, onAction }: Props): JSX.
             category={e.category}
             onAction={(actionId) => onAction?.(e.id, actionId)}
           />
+          {onOpenRun && e.status !== 'queued' && (
+            <>
+              <span className={s.footSpacer} />
+              <button type="button" className={s.openRun} onClick={() => onOpenRun(e.id)}>
+                Open run →
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>,

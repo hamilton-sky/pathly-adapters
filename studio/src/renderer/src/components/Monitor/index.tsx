@@ -8,6 +8,7 @@ import { OutputBanner } from './output/OutputBanner/OutputBanner'
 import { MonitorBoard } from './EngineBoard'
 import { ConfigurePhaseModal } from './ConfigurePhaseModal/ConfigurePhaseModal'
 import { FlowStepsPanel } from './FlowStepsPanel/FlowStepsPanel'
+import { RunDetailPage } from '../RunDetailPage'
 import styles from './Monitor.module.css'
 
 // The Pipeline panel, laid out as a row: the GLOBAL live engine board is the MAIN content (left) —
@@ -23,6 +24,9 @@ export function Monitor(): JSX.Element {
   const fsmState = useStore((s) => s.fsmState)
   const { effectiveTopic, showTabBar } = useMonitorSession()
   const [configStage, setConfigStage] = useState<string | null>(null)
+  // Entrance #1 to the shared RunDetailPage: a run_id set here swaps the panel body to the run
+  // detail (the app shell stays), mirroring DBExplorerRedesign's FeatureDetailPage swap.
+  const [detailRunId, setDetailRunId] = useState<string | null>(null)
   const engines = useMonitorEngines(null) // GLOBAL — every live engine, matching the dock
   const recent = useRecentEngines() // DB-backed history (finished spawns)
 
@@ -54,6 +58,11 @@ export function Monitor(): JSX.Element {
     }
   }
 
+  // Full-panel run detail swaps in over the board while the app shell stays.
+  if (detailRunId) {
+    return <RunDetailPage runId={detailRunId} onBack={() => setDetailRunId(null)} backLabel="Monitor" />
+  }
+
   return (
     <div className={styles.panel}>
       <div className={styles.body}>
@@ -64,7 +73,7 @@ export function Monitor(): JSX.Element {
               dock. It's the main content of the panel now that the stage timeline moved to the
               right dock and the old feature header stack is gone. */}
           {engines.length > 0 || recent.length > 0 ? (
-            <MonitorBoard engines={engines} recent={recent} onAction={handleEngineAction} />
+            <MonitorBoard engines={engines} recent={recent} onAction={handleEngineAction} onOpenRun={setDetailRunId} />
           ) : (
             <span className={styles.placeholder}>
               No CLI engines yet — run a flow, goal, or task from the board to see it here

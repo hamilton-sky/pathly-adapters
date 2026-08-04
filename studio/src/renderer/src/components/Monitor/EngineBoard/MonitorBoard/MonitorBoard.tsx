@@ -15,12 +15,14 @@ interface Props {
   recent?: MonitorEngine[]
   /** Fired when a control button in the detail modal is pressed. */
   onAction?: (engineId: string, actionId: string) => void
+  /** Open the full RunDetailPage for a run (threaded to the detail modal's "Open run →"). */
+  onOpenRun?: (runId: string) => void
 }
 
 // The Monitor board: a CLI-engine board that groups engines by how they run
 // (Flow / Loop / Single), the same mechanism the Command Center uses to group
 // messages by scope. Clicking a card opens its detail modal.
-export function MonitorBoard({ engines, recent, onAction }: Props): JSX.Element {
+export function MonitorBoard({ engines, recent, onAction, onOpenRun }: Props): JSX.Element {
   const [category, setCategory] = useState<CategoryFilter>('all')
   const [adapter, setAdapter] = useState<EngineAdapter | null>(null)
   const [scope, setScope] = useState<string | null>(null)
@@ -148,6 +150,7 @@ export function MonitorBoard({ engines, recent, onAction }: Props): JSX.Element 
           engine={open}
           onClose={() => setOpenId(null)}
           onAction={onAction}
+          onOpenRun={onOpenRun ? (id) => { setOpenId(null); onOpenRun(id) } : undefined}
         />
       )}
     </div>

@@ -1,0 +1,57 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.readout {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.big {
+  font-family: var(--font-family-mono);
+  font-size: 28px;
+  font-weight: var(--font-weight-medium);
+  color: var(--green);
+}
+
+.sub {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+}
+
+/* Wide content scrolls inside its own container — the panel body never scrolls sideways. */
+.tableWrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+}
+
+.table th {
+  text-align: left;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-muted);
+  padding: 6px 10px;
+  border-bottom: var(--border);
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 8px 10px;
+  border-bottom: var(--border);
+  color: var(--text-secondary);
+}
+
+.num {
+  text-align: right;
+  font-family: var(--font-family-mono);
+  white-space: nowrap;
+}

@@ -1,0 +1,20 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  font: 600 10px/1 var(--font-family-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 3px 7px;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  background: var(--bg-surface1);
+}
+
+.badge[data-status='running']  { color: var(--runtime); background: color-mix(in srgb, var(--runtime) 15%, transparent); }
+.badge[data-status='done']     { color: var(--green);   background: color-mix(in srgb, var(--green) 15%, transparent); }
+.badge[data-status='error'],
+.badge[data-status='failed']   { color: var(--red);     background: color-mix(in srgb, var(--red) 15%, transparent); }
+.badge[data-status='aborted'],
+.badge[data-status='canceled'] { color: var(--orange);  background: color-mix(in srgb, var(--orange) 15%, transparent); }
+.badge[data-status='paused']   { color: var(--yellow);  background: color-mix(in srgb, var(--yellow) 15%, transparent); }
