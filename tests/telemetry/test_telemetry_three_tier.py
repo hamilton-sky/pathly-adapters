@@ -399,3 +399,76 @@ def test_db_invocation_run_record_write_is_best_effort(client, monkeypatch):
     # the projector still ran despite the run-record seam raising
     invs = read_agent_invocations(get_db(), pr, "editor-ai")
     assert len(invs) == 1
+
+
+def test_post_db_invocation_codex_one_shot_appears_in_runs(client):
+    """The run-record seam is adapter-agnostic: a codex one-shot (reports tokens but NO dollar
+    cost — the server estimates it) also lands in GET /runs. Its list cost reconciles from
+    agent_invocations (the estimated value), NOT from the run_history row (which carried $0).
+    """
+    c, tmp_path = client
+    pr = str(tmp_path / "proj-codex-run").replace("\\", "/")
+    run_id = "airouter-codex-abc-1"
+
+    resp = c.post(
+        "/db/invocation",
+        json={
+            "project_root": pr,
+            "feature": "(project)",
+            "scope_tier": "project",
+            "run_id": run_id,
+            "label": "ai-summary",
+            "agent_role": "ai-router",
+            "adapter": "codex",
+            "cost_usd": 0,  # codex never reports a dollar cost
+            "tokens_in": 1200,
+            "tokens_out": 340,
+            "wall_seconds": 2.0,
+        },
+        content_type="application/json",
+    )
+    assert resp.status_code == 200
+
+    runs = c.get(f"/runs?project_root={pr}").get_json()
+    row = next((r for r in runs if r["run_id"] == run_id), None)
+    assert row is not None, "codex one-shot must appear in GET /runs"
+    assert row["kind"] == "single"
+    assert row["adapter"] == "codex"
+    assert row["tokens_total"] == 1540
+    # estimated from tokens (db/pricing.estimate_cost_for by adapter slug), read back via
+    # agent_invocations — so a codex run is never a misleading $0 in the run list.
+    assert row["cost_usd"] > 0
+
+
+def test_post_db_invocation_agy_one_shot_appears_in_runs(client):
+    """agy emits no usage at all — a token-less one-shot is still recorded to the run record
+    (kind 'single', adapter 'agy') so it is visible in GET /runs rather than silently absent;
+    its cost is an honest 0 (marked 'unavailable' upstream), not a fabricated value."""
+    c, tmp_path = client
+    pr = str(tmp_path / "proj-agy-run").replace("\\", "/")
+    run_id = "airouter-agy-def-2"
+
+    resp = c.post(
+        "/db/invocation",
+        json={
+            "project_root": pr,
+            "feature": "(project)",
+            "scope_tier": "project",
+            "run_id": run_id,
+            "label": "ai-summary",
+            "agent_role": "ai-router",
+            "adapter": "agy",
+            "cost_usd": 0,
+            "tokens_in": 0,
+            "tokens_out": 0,
+            "wall_seconds": 1.0,
+        },
+        content_type="application/json",
+    )
+    assert resp.status_code == 200
+
+    runs = c.get(f"/runs?project_root={pr}").get_json()
+    row = next((r for r in runs if r["run_id"] == run_id), None)
+    assert row is not None, "agy one-shot must appear in GET /runs"
+    assert row["kind"] == "single"
+    assert row["adapter"] == "agy"
