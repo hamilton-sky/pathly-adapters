@@ -4,10 +4,11 @@
 
 Code-intelligence query proxy — graph reindex, path resolve, LSP session, query gate & logging.
 
-5 test file(s).
+6 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
+| `test_code_context_backend.py` | Default code-context backend resolution — `auto` (code-intel-auto-default) | 3 |
 | `test_code_context_lsp.py` | The ``lsp`` backend (Serena) behind /code/query, and its dispatch wiring | 17 |
 | `test_code_context_pathresolve.py` | CliProvider path resolution — relative targets anchor to project_root, not CWD | 5 |
 | `test_code_context_reindex.py` | maybe_reindex freshness bridge | 5 |

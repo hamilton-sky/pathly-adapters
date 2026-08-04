@@ -169,12 +169,39 @@ def _get_setting(key: str, default: str) -> str:
 def _resolve_backend() -> str:
     """Return the active backend from the ``code_context.backend`` setting.
 
-    Values: ``off`` (default, safe-off → ``none``), ``cli`` (graph), ``lsp``
-    (Serena), or ``both``. Persisted in ``~/.pathly`` via app_settings and read
-    at call time, so flipping it takes effect without a server restart.
+    Values: ``auto`` (**default** — detect an installed backend, see
+    :func:`_auto_backend`), ``off`` (safe-off → ``none``), ``cli`` (graph), ``lsp``
+    (Serena), or ``both``. Persisted in ``~/.pathly`` via app_settings and read at
+    call time, so flipping it takes effect without a server restart.
+
+    The default is ``auto`` (not ``off``) so code-intelligence just-works wherever
+    its external tools are installed — with no manual toggle, and no misleading
+    "on but silently dead" state on a machine that has neither (``auto`` → ``none``
+    there, which safely degrades to Grep/Read).
     """
-    key = _get_setting("code_context.backend", "off").strip().lower()
+    key = _get_setting("code_context.backend", "auto").strip().lower()
+    if key == "auto":
+        return _auto_backend()
     return key if key in ("cli", "lsp", "both") else "none"
+
+
+def _auto_backend() -> str:
+    """Resolve ``auto`` by probing which external code-intel tool is installed:
+    prefer the graph (``cli`` / codebase-memory-mcp) for headless breadth, else
+    fall back to ``lsp`` (Serena, launched via ``uvx``), else ``none``.
+
+    A pure PATH probe (:func:`shutil.which`) — never raises. The backends are NOT
+    pip deps, so a machine with neither cleanly resolves to ``none`` (Grep/Read
+    fallback) instead of a config that claims to be on while doing nothing.
+    """
+    try:
+        if shutil.which(_resolve_tool()):
+            return "cli"
+        if shutil.which("uvx"):
+            return "lsp"
+    except Exception:
+        pass
+    return "none"
 
 
 def _resolve_tool() -> str:
