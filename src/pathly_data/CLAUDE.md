@@ -84,6 +84,49 @@ Four adapters derive from `core/`:
 
 Each adapter's `_meta/` directory holds per-agent and per-skill YAML files that supply host-specific metadata (model name, tool list, `can_spawn` flag, install destination). `pathly-setup <host> --apply` stitches `core/` content with `_meta/` and writes deployable files.
 
+## Skill exposure — Tier-1 default + export-on-demand
+
+Not every skill installs to a host. By default `pathly-setup <host> --apply` writes only the
+**Tier-1** skills — the interactive board on-ramps plus the dispatcher/help that surface them:
+
+| Tier-1 (always installed) | Role |
+|---|---|
+| `create-feature`, `post` | the two interactive board on-ramps (chat session → board) |
+| `pathly`, `help` | the dispatcher + help that make them discoverable |
+
+Every other skill (the pipeline — `plan`/`design`/`build`/`review`/`test`/`retro` — plus
+`goalize`/`debug`/`explore`/`storm` and the control/utility skills) is **export-on-demand**. This
+is safe because in **runner mode the app injects each skill's prompt** (the CLI never reads a skill
+file — see the root [CLAUDE.md](../../CLAUDE.md) "Skill delivery — two modes" table), so pipeline
+skills don't need to be installed to *function* in the app; installing all ~60 would only clutter
+the host's slash-command namespace with app-driven commands.
+
+**The lever** is `DEFAULT_EXPOSED_SKILLS` — a frozenset keyed by the `skill:` field, in
+`src/install_cli/orchestrate.py`; `_run_host` skips any skill not in that set unless it is requested.
+
+```bash
+pathly-setup claude --apply                          # Tier-1 only (default)
+pathly-setup claude --export build --export review   # Tier-1 + these (repeatable)
+pathly-setup claude --all-skills                     # every skill (the pre-tier behavior)
+```
+
+**Export is declarative — `--repair` reconciles.** An apply with `--repair` writes exactly
+{Tier-1 ∪ requested} and **removes** any previously-exported skill no longer requested. So:
+- **export** a skill → `--export <skill>` installs it;
+- **unexport** a skill → re-apply with `--repair` and the skill omitted; repair prunes it as an
+  obsolete owned file (see `tests/install_skills/test_setup.py::test_materialize_repair_removes_obsolete_owned_files`).
+
+**Studio surface:** Settings → **Export** (`studio/src/renderer/src/components/Settings/ExportSettings.tsx`
++ `ExportSkillPicker.tsx`) drives this via `POST /ops/export` (`{adapters, repair, skills, all_skills}`)
+and `GET /ops/export/skills` — which lists each skill flagged `{default, installed}` so the picker
+pre-checks what's live (check to export, uncheck to unexport). Route:
+`src/pathly_orchestrator/http_server/blueprints/ops/export.py`.
+
+**Adding a skill:** a new Tier-1 skill = add its `skill:` name to `DEFAULT_EXPOSED_SKILLS`; any other
+new skill installs only via `--export`/`--all-skills`. Either way it still needs an
+`_meta/*_skill.yaml` in every adapter (sync rule below) and a `_SKILL_GROUPS` entry (in
+`orchestrate.py`) to resolve its core file.
+
 ## Skill composition
 
 `src/pathly_orchestrator/skills/compose.py` assembles stage skills from reusable fragments. One resolver serves both skill-delivery modes — runtime (runner builds the prompt in Python) and build-time (`pathly-setup` writes installed skills to disk).
