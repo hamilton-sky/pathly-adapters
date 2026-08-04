@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { apiFetch } from '../../lib/config'
+import { ExportSkillPicker } from './ExportSkillPicker'
 import ss from './Settings.module.css'
 import s from './ExportSettings.module.css'
 
@@ -28,6 +29,7 @@ export function ExportSettings(): JSX.Element {
   const [running, setRunning] = useState(false)
   const [results, setResults] = useState<ExportResult[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [skillSelection, setSkillSelection] = useState<Set<string>>(new Set())
 
   function toggleAdapter(id: string): void {
     setSelected((prev) => {
@@ -59,7 +61,7 @@ export function ExportSettings(): JSX.Element {
       const res = await apiFetch('/ops/export', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ adapters, repair }),
+        body: JSON.stringify({ adapters, repair, skills: [...skillSelection] }),
       })
       if (!res.ok && res.status !== 200) {
         const text = await res.text()
@@ -77,6 +79,7 @@ export function ExportSettings(): JSX.Element {
 
   const allSelected = selected.size === ADAPTERS.length
   const noneSelected = selected.size === 0
+  const pickerAdapter = [...selected][0] ?? 'claude'
 
   return (
     <div className={ss.section}>
@@ -108,6 +111,14 @@ export function ExportSettings(): JSX.Element {
           </label>
         ))}
       </div>
+
+      <div className={ss.sectionTitle}>Extra skills to expose</div>
+      <div className={ss.hint}>
+        The two board on-ramps always install. Check a pipeline skill to expose it as a{' '}
+        <code>/pathly</code> command; uncheck to remove it on the next Export (needs Repair
+        on). Reflects <strong>{pickerAdapter}</strong>.
+      </div>
+      <ExportSkillPicker adapter={pickerAdapter} onChange={setSkillSelection} />
 
       <label className={s.repairRow}>
         <input

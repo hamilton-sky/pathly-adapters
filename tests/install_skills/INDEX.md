@@ -15,7 +15,7 @@ Adapter install/setup, stitch & compose, skill composition / round-trip / export
 | `test_cli_discovery.py` | Dual-root feature discovery for the pathly-* CLI shortcuts (storage-restructure) | 6 |
 | `test_codex_plugin_config.py` | covers install codex plugin writes real marketplace and config; install codex plugin is idempotent; install codex plugin refreshes marketplace with codex cli; … | 8 |
 | `test_compose.py` | Tests for the skill-fragment composition resolver + validator | 62 |
-| `test_e2e_install.py` | End-to-end tests for the install_cli install/uninstall flow via subprocess | 6 |
+| `test_e2e_install.py` | End-to-end tests for the install_cli install/uninstall flow via subprocess | 9 |
 | `test_evaluator_skill.py` | Tests for the evaluator agent + skill (BLOCK E1 — comms-board) | 9 |
 | `test_manifests.py` | covers manifest required fields; codex plugin version matches distribution version | 2 |
 | `test_prompt_files.py` | System-prompts as .md FILES: scoping, label, CRUD, and the legacy DB→files migration | 8 |
