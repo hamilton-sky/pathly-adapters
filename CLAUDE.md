@@ -207,22 +207,29 @@ change / exit. Serena is ALSO wired as a direct agent MCP tool via
 `src/pathly_data/adapters/*/_mcp/serena.json` (independent of the proxy). Fallback when the FSM
 server isn't running: query the graph directly (`codebase-memory-mcp cli <tool> …`).
 
-**`codebase-memory-mcp` — new-machine setup (EXTERNAL binary, NOT in this repo).** The `graph`
-backend (`runner/code_context_cli.py::CliProvider`, resolved via
-`shutil.which("codebase-memory-mcp")`) is a standalone binary from **GitHub →
-[`DeusData/codebase-memory-mcp`](https://github.com/DeusData/codebase-memory-mcp)** — OS-native
-builds shipped via GitHub Releases, **NOT pip/npm** (the Windows build on the primary machine is a
-~269 MB self-contained `…/Python313/Scripts/codebase-memory-mcp.exe`, v0.8.1, that dir being on
-PATH). It is **optional**: `CliProvider` returns `""` (safe no-op) when the binary is absent, so
-`/code/query` and every caller degrade to Grep/Read (the `lsp`/Serena backend is wired separately
-via `adapters/*/_mcp/serena.json`). Per-project graph indexes cache in
-`~/.cache/codebase-memory-mcp/<project>.db` — **per-machine, not git-tracked**, so a fresh machine
-re-indexes. To set up on a new machine (e.g. macOS): **(1)** download the OS-native build from
-`https://github.com/DeusData/codebase-memory-mcp/releases/latest` (variant `standard` or `ui`) onto
-PATH — or run the binary's own `codebase-memory-mcp update`; **(2)** `codebase-memory-mcp install`
-self-registers it into Claude Code (+ Codex/Gemini/Zed/…); **(3)** `codebase-memory-mcp cli
-index_repository '{…}'` builds the graph (or let Pathly's `maybe_reindex` / the tool's `auto_index`
-do it). Skipping it entirely is fine — Pathly and Claude Code both work without it.
+**Code-intelligence setup on a new machine.** Both `/code/query` backends are **external tools —
+NOT in this repo and NOT pip/npm deps** — but code-intel **defaults to `auto`** (`_resolve_backend`):
+it probes `shutil.which` and turns on whichever backend is installed (`codebase-memory-mcp` on PATH
+→ `graph`; else `uvx` → `lsp`; else `none`). So on a fresh machine it just-works once a backend is
+present — **no manual toggle**. It stays **optional**: with neither tool, every caller safely
+degrades to Grep/Read. Per-project graph indexes cache in `~/.cache/codebase-memory-mcp/<project>.db`
+(**per-machine, not git-tracked** → a fresh machine re-indexes).
+
+- **`graph` — `codebase-memory-mcp`** (`runner/code_context_cli.py::CliProvider`, found via
+  `shutil.which`): a standalone binary from **GitHub → [`DeusData/codebase-memory-mcp`](https://github.com/DeusData/codebase-memory-mcp)**
+  (OS-native GitHub Releases; the Windows build here is a ~269 MB self-contained
+  `…/Python313/Scripts/codebase-memory-mcp.exe`, v0.8.1). Setup: download the OS-native build from
+  `…/releases/latest` onto PATH (or run its own `codebase-memory-mcp update`) → `codebase-memory-mcp
+  install` (self-registers into Claude Code + Codex/Gemini/Zed/…) → `codebase-memory-mcp cli
+  index_repository '{"repo_path":"<repo>"}'` (or let `maybe_reindex` / `auto_index` build it).
+- **`lsp` — Serena** (`runner/code_context_lsp.py`; also a direct agent MCP tool via
+  `adapters/*/_mcp/serena.json`): launched via **`uvx --from git+https://github.com/oraios/serena
+  serena start-mcp-server …`**, so the only prerequisite is **`uv`/`uvx`**
+  (`curl -LsSf https://astral.sh/uv/install.sh | sh`) — `uvx` auto-fetches Serena, **no binary
+  download, no index** (always fresh; ~1-min cold warm-up per project).
+- **Override the `auto` default** per project via app_settings (DB, **per-machine**):
+  `PUT /db/settings {"code_context.backend":"off|cli|lsp|both"}` (or Studio → Settings → Code
+  Intelligence). The **code default is `auto`** so it travels via git; the DB setting does not.
 
 ---
 
