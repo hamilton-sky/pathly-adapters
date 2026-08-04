@@ -19,6 +19,13 @@ interface QueueAction {
   dir?: 'up' | 'down'
   caps?: Partial<SpawnCaps>
 }
+interface EnginePreflight {
+  engine: string
+  adapter: string
+  available: boolean
+  resolvedPath: string | null
+  installHint: string
+}
 
 interface DbStats {
   features: number
@@ -244,6 +251,8 @@ contextBridge.exposeInMainWorld('pathly', {
     },
     queueControl: (action: QueueAction): Promise<void> =>
       ipcRenderer.invoke('terminal:queue-control', action),
+    preflight: (force?: boolean): Promise<EnginePreflight[]> =>
+      ipcRenderer.invoke('terminal:preflight', force),
     registerRunner: (tabId: string, topic: string, runId: string, label?: string, category?: 'flow' | 'loop' | 'single'): Promise<void> =>
       ipcRenderer.invoke('terminal:register-runner', tabId, topic, runId, label, category),
     onStageResult: (cb: (tabId: string, data: Record<string, unknown>) => void): (() => void) => {

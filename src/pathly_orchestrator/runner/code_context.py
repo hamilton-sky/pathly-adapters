@@ -214,6 +214,62 @@ def _resolve_tool() -> str:
     return "codebase-memory-mcp"
 
 
+# --- Backend dependency probing ----------------------------------------------
+# Each real backend needs an external launcher, and each already degrades to "" when
+# it is absent (``CliProvider.build_block`` → ``shutil.which(self.tool)``;
+# ``SerenaSession.start`` → ``shutil.which(argv[0])``). That is the correct RUNTIME
+# behavior — never raise, let the agent fall back to Grep — but at the API boundary it
+# erased the difference between "the launcher is not installed" and "the backend ran
+# and found nothing": ``/code/query`` returned ``{"ok": true, "result": null,
+# "backend": "cli"}`` for both, and a non-``none`` ``backend`` value reads as though a
+# backend actually ran. These helpers name the gap so a caller can report a fixable
+# setup problem instead of silently degrading forever.
+
+# backend -> (launcher binary, how to install it)
+_BACKEND_DEPS: dict[str, tuple[str, str]] = {
+    "cli": (
+        "codebase-memory-mcp",
+        "install the codebase-memory-mcp binary and put it on PATH",
+    ),
+    "lsp": ("uvx", "install uv (provides uvx) — https://docs.astral.sh/uv/"),
+}
+
+
+def missing_dependencies(backend: str) -> list[dict[str, str]]:
+    """Launchers the effective ``backend`` needs but that are not on PATH.
+
+    Returns ``[]`` when everything the backend needs is present (and for ``none``,
+    which needs nothing). Never raises — a probe failure reports "nothing missing"
+    so this can only ever ADD information to a response, never break one.
+    """
+    import shutil
+
+    key = (backend or "none").strip().lower()
+    if key == "off":
+        key = "none"
+    wanted = ["cli", "lsp"] if key == "both" else [key]
+    out: list[dict[str, str]] = []
+    for name in wanted:
+        dep = _BACKEND_DEPS.get(name)
+        if dep is None:
+            continue
+        binary, hint = dep
+        if name == "lsp":
+            # Honor a PATHLY_SERENA_ARGV override rather than assuming uvx.
+            try:
+                from .serena_session import serena_argv
+
+                binary = serena_argv()[0] or binary
+            except Exception:
+                logger.debug("code_context: serena_argv probe failed", exc_info=True)
+        try:
+            if shutil.which(binary) is None:
+                out.append({"backend": name, "binary": binary, "install": hint})
+        except Exception:
+            logger.debug("code_context: which(%r) failed", binary, exc_info=True)
+    return out
+
+
 def _resolve_reindex() -> str:
     """Return the ``code_context.reindex`` setting: ``off | stage | auto``.
 

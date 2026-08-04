@@ -17,7 +17,12 @@ codex:
   # --json: codex exec --json prints events to stdout as JSONL (verified against
   # codex-cli 0.142.0). codex emits NO dollar cost — output.py._codex_usage scans the
   # stream for a token-usage event and db/pricing.py estimates cost from tokens downstream.
-  headless: [codex, exec, "--json", "--sandbox", "workspace-write", "--model", "{model}", "--", "{prompt}"]
+  # --skip-git-repo-check: codex exec refuses to run ("Not inside a trusted directory")
+  # when cwd is not a git repo. This flag was present in the Studio one-shot builder
+  # (cliEngine.ts buildHeadlessArgv) but MISSING here, so the same engine in the same
+  # folder worked as an editor one-shot and failed as a pipeline stage whenever the
+  # project root was not itself a git repo. Keep the two shapes in sync.
+  headless: [codex, exec, "--skip-git-repo-check", "--json", "--sandbox", "workspace-write", "--model", "{model}", "--", "{prompt}"]
   autonomy_flag: null
   resume: {mode: flag, flag: "--continue"}
   parse: codex_json

@@ -34,8 +34,14 @@ export function decode(value: string): AiSelection {
   return { type: type === 'engine' ? 'engine' : 'model', id: rest.join(':') }
 }
 
-/** Build the grouped option model. `allowOff` prepends a single "Off" group. */
-export function buildGroups(allowOff: boolean): AiOptionGroup[] {
+/** Build the grouped option model. `allowOff` prepends a single "Off" group.
+ *  `preflight` (optional, keyed by adapter id) greys out engines that are not installed
+ *  on this machine — without it every engine reads as usable and picking a missing one
+ *  fails only at spawn time. Omitting it preserves the previous behavior exactly. */
+export function buildGroups(
+  allowOff: boolean,
+  preflight?: Record<string, EnginePreflight>,
+): AiOptionGroup[] {
   const groups: AiOptionGroup[] = []
   if (allowOff) {
     groups.push({ heading: '', options: [{ value: OFF_VALUE, label: 'Off' }] })
@@ -49,12 +55,19 @@ export function buildGroups(allowOff: boolean): AiOptionGroup[] {
   })
   groups.push({
     heading: 'CLI Engines',
-    options: ADAPTER_META.map((m) => ({
-      value: `engine:${m.id}`,
-      label: m.label,
-      // noHeadless engines are listed but greyed with their reason (DESIGN.md).
-      disabledReason: m.noHeadless,
-    })),
+    options: ADAPTER_META.map((m) => {
+      const row = preflight?.[m.id]
+      const notInstalled = row && !row.available
+        ? row.installHint ? `Not installed — ${row.installHint}` : 'Not installed'
+        : undefined
+      return {
+        value: `engine:${m.id}`,
+        label: m.label,
+        // noHeadless engines are listed but greyed with their reason (DESIGN.md).
+        // A missing binary wins over noHeadless — it is the more actionable blocker.
+        disabledReason: notInstalled ?? m.noHeadless,
+      }
+    }),
   })
   return groups
 }

@@ -1,13 +1,15 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { type AiSelection } from '../../../services/aiRouter'
+import { useEnginePreflight } from '../../../hooks/useEnginePreflight'
 import { buildGroups, encode, decode, labelForValue } from './options'
 import s from './AiTargetSelector.module.css'
 
 // Custom dropdown (button trigger + panel) emitting an AiSelection — a local model
 // or a CLI engine. Replaces the old native <select>; matches Studio's house dropdown
 // style (HQ/ModelSelector): outside-click + Escape to close, chevron, grouped
-// Models / CLI-Engines headers, greyed-out noHeadless engines with their reason, and
+// Models / CLI-Engines headers, greyed-out engines with their reason (noHeadless, or
+// not-installed-on-this-machine with the install command — see useEnginePreflight), and
 // an optional Off row. Public props/value/onChange API and the AI_SELECTION_OFF
 // encoding are unchanged so ArtifactsView + Settings keep working. Lives in shared/.
 
@@ -36,7 +38,10 @@ export function AiTargetSelector({
   const triggerRef = useRef<HTMLButtonElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
 
-  const groups = buildGroups(allowOff)
+  // Engines that are not installed on this machine are greyed with their install command,
+  // reusing the same disabledReason channel as noHeadless rather than a parallel mechanism.
+  const { byAdapter } = useEnginePreflight()
+  const groups = buildGroups(allowOff, byAdapter)
   const current = encode(value)
   const triggerLabel = current === '' ? 'Select AI target…' : labelForValue(current, groups)
 

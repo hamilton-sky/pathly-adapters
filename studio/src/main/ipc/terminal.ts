@@ -40,6 +40,59 @@ function tailMeaningfulOutput(chunks: string[]): string {
   const lines = text.split('\n').map((l) => l.trim()).filter(Boolean)
   return lines.slice(-6).join(' | ').slice(-600)
 }
+/** Strip ANSI so pattern matching works on the rendered text, not the escape soup. */
+function stripAnsi(s: string): string {
+  return s
+    .replace(/\x1b\[[\x30-\x3f]*[\x20-\x2f]*[\x40-\x7e]/g, '')
+    .replace(/\x1b\][\s\S]*?(?:\x07|\x1b\\)/g, '')
+}
+
+// Interactive gates an engine can raise at startup. Each one BLOCKS the process until
+// answered — which is fatal for a headless one-shot: the PTY never exits, no result is
+// ever POSTed, and the stage hangs instead of failing. Two distinct screens:
+//
+//   • FOLDER TRUST — claude asks once per never-before-seen directory ("Do you trust the
+//     files in this folder?") and records the answer in ~/.claude.json. It is NOT the same
+//     screen as the bypass-permissions warning and is NOT waived by
+//     --dangerously-skip-permissions, so every first run in a fresh project hit it.
+//   • BYPASS PERMISSIONS — the --dangerously-skip-permissions confirmation.
+//
+// Answering these automatically is the intended behavior here: Pathly is a headless
+// orchestrator (no human in the per-step loop), the run already carries an explicit
+// autonomy flag, and cwd is validated under $HOME before spawn. We log every auto-answer
+// so it stays auditable rather than silent.
+const TRUST_PROMPT_RE = /Do you trust the files in this (?:folder|directory)|trust the files in|folder is not trusted/i
+const BYPASS_PROMPT_RE = /Bypass Permissions mode/i
+
+/** Watch a HEADLESS engine PTY for a startup gate and answer it, so a first-run trust
+ *  prompt fails-open into a real run instead of hanging the stage forever. Interactive
+ *  tabs handle their own gates inline (they must also inject a prompt afterwards). */
+function attachHeadlessGateDismisser(p: import('node-pty').IPty, tabId: string): void {
+  let buf = ''
+  let trustDone = false
+  let bypassDone = false
+  const sub = p.onData((chunk: string) => {
+    if (trustDone && bypassDone) { sub.dispose(); return }
+    buf = (buf + stripAnsi(chunk)).slice(-4000)
+    if (!bypassDone && BYPASS_PROMPT_RE.test(buf)) {
+      bypassDone = true
+      slog('gate', tabId, 'auto-answered bypass-permissions screen')
+      p.write('\r')
+      buf = ''
+      return
+    }
+    if (!trustDone && TRUST_PROMPT_RE.test(buf)) {
+      trustDone = true
+      slog('gate', tabId, 'auto-answered folder-trust prompt')
+      p.write('\r')
+      buf = ''
+    }
+  })
+  // Startup gates only appear in the first seconds; stop watching so a long run's output
+  // can never trip these patterns mid-flight (e.g. an agent echoing the prompt text).
+  setTimeout(() => sub.dispose(), 30000)
+}
+
 // Maps tabId → runner metadata registered before spawn
 const runnerTabMeta = new Map<string, { run_id: string; topic: string; spawnedAt: number; label: string; category?: 'flow' | 'loop' | 'single' }>()
 // Tracks tabs killed by the user (not by the runner exiting naturally)
@@ -69,7 +122,8 @@ function isValidCwd(dir: string): boolean {
 // runner spawns the bare name mid-swap, PowerShell throws CommandNotFound and the flow stage
 // dies. Resolving an absolute launcher per spawn (and briefly waiting one out if it's mid-swap)
 // keeps in-flight stages alive across an update.
-const RESOLVABLE_ENGINES = new Set(['claude', 'codex', 'agy'])
+const RESOLVABLE_ENGINES_LIST = ['claude', 'codex', 'agy'] as const
+const RESOLVABLE_ENGINES = new Set<string>(RESOLVABLE_ENGINES_LIST)
 
 const delay = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
@@ -101,17 +155,69 @@ function resolveEnginePath(engine: string): string {
       if (c && fs.existsSync(c)) return c
     }
   } else {
-    const home = os.homedir()
-    for (const c of [
-      join(home, '.local', 'bin', engine),
-      join(home, '.npm-global', 'bin', engine),
-      `/opt/homebrew/bin/${engine}`,
-      `/usr/local/bin/${engine}`,
-    ]) {
+    for (const c of posixEngineCandidates(engine)) {
       try { if (fs.existsSync(c)) return c } catch { /* ignore */ }
     }
   }
   return engine // rely on PATH on non-Windows or if known paths don't exist
+}
+
+/** Generic POSIX bin dirs any engine may be installed into (engine-independent).
+ *  The old fixed list had only the four "conventional" entries and missed every
+ *  version-manager global bin — an `npm i -g` under nvm lands in
+ *  `~/.nvm/versions/node/<ver>/bin`, which a fixed list can never name. */
+function posixBinDirs(): string[] {
+  const home = os.homedir()
+  const out = [
+    join(home, '.local', 'bin'),
+    join(home, '.npm-global', 'bin'),
+    join(home, '.bun', 'bin'),
+    join(home, 'Library', 'pnpm'),
+    join(home, '.volta', 'bin'),
+    '/opt/homebrew/bin',
+    '/usr/local/bin',
+  ]
+  // Version-manager node installs — enumerate versions rather than guessing one.
+  for (const mgr of [join(home, '.nvm', 'versions', 'node'), join(home, '.fnm', 'node-versions')]) {
+    try {
+      for (const ver of fs.readdirSync(mgr)) {
+        out.push(join(mgr, ver, 'bin'), join(mgr, ver, 'installation', 'bin'))
+      }
+    } catch { /* manager not installed */ }
+  }
+  return out
+}
+
+/** Dirs a specific engine's NATIVE installer uses — `~/.claude/local/claude` is Claude
+ *  Code's default macOS install and was the most consequential omission from the old
+ *  list (it is not on PATH for a Finder-launched app). */
+function posixNativeDirs(engine: string): string[] {
+  const home = os.homedir()
+  return [join(home, `.${engine}`, 'local'), join(home, `.${engine}`, 'bin')]
+}
+
+/** Every place a POSIX install can put this engine's launcher, most-specific first. */
+function posixEngineCandidates(engine: string): string[] {
+  return [...posixNativeDirs(engine), ...posixBinDirs()].map((d) => join(d, engine))
+}
+
+/** PATH for spawned engines, widened with the dirs an engine can install into.
+ *  A GUI-launched Electron app on macOS inherits launchd's minimal PATH
+ *  (/usr/bin:/bin:/usr/sbin:/sbin) — NOT the user's zsh PATH — so a bare-name spawn,
+ *  or a child process the engine itself shells out to (git, node), can fail to resolve
+ *  even though the same command works in the user's terminal. Prepending the known
+ *  install dirs makes a spawn behave identically whether the app was started from a
+ *  terminal or from Finder. Existing PATH entries keep their order after the extras. */
+function enrichedPath(): string {
+  const existing = (process.env.PATH ?? '').split(path.delimiter).filter(Boolean)
+  if (process.platform === 'win32') return existing.join(path.delimiter)
+  const extras = Array.from(new Set([
+    ...RESOLVABLE_ENGINES_LIST.flatMap(posixNativeDirs),
+    ...posixBinDirs(),
+  ])).filter((d) => {
+    try { return fs.existsSync(d) } catch { return false }
+  })
+  return Array.from(new Set([...extras, ...existing])).join(path.delimiter)
 }
 
 /** True if `engine` resolves on PATH right now (one cheap `where`/`which` probe). */
@@ -119,7 +225,8 @@ function isOnPath(engine: string): Promise<boolean> {
   return new Promise((resolve) => {
     const probe = process.platform === 'win32' ? 'where' : 'which'
     try {
-      execFile(probe, [engine], { timeout: 3000, windowsHide: true }, (err, stdout) => {
+      const env = { ...process.env, PATH: enrichedPath() }
+      execFile(probe, [engine], { timeout: 3000, windowsHide: true, env }, (err, stdout) => {
         resolve(!err && typeof stdout === 'string' && stdout.trim().length > 0)
       })
     } catch {
@@ -146,6 +253,60 @@ async function resolveEngineLauncher(engine: string): Promise<string> {
   return engine
 }
 
+// ── Engine preflight ─────────────────────────────────────────────────────────
+// Nothing used to check that an engine was actually INSTALLED. ADAPTER_META is derived
+// statically from adapters.yaml, so every engine always rendered as available and a
+// missing binary surfaced only as a `pty.spawn FAILED` line in the main-process console
+// — no UI signal, no remedy. This probes the real filesystem/PATH so the renderer can
+// grey out what isn't there and show the command that installs it.
+
+/** Mirrored in preload/index.ts and renderer types/global.d.ts — keep in sync. */
+export interface EnginePreflight {
+  engine: string
+  /** CliAdapter id the UI keys off ('claude' | 'codex' | 'antigravity'). */
+  adapter: string
+  available: boolean
+  /** Absolute launcher, the bare name if only PATH resolved it, else null. */
+  resolvedPath: string | null
+  /** Shell command that installs it — shown verbatim in the UI. */
+  installHint: string
+}
+
+const ENGINE_INSTALL_HINTS: Record<string, string> = {
+  claude: 'npm install -g @anthropic-ai/claude-code',
+  codex: 'npm install -g @openai/codex',
+  agy: 'npm install -g @google/antigravity-cli',
+}
+
+async function preflightEngine(engine: string): Promise<EnginePreflight> {
+  const abs = resolveEnginePath(engine)
+  // resolveEnginePath returns the bare name when no known location matched — fall back to
+  // an actual PATH probe rather than reporting "missing" for an install we don't enumerate.
+  const found = abs !== engine ? abs : (await isOnPath(engine)) ? engine : null
+  return {
+    engine,
+    adapter: adapterIdFromLauncher(engine),
+    available: found !== null,
+    resolvedPath: found,
+    installHint: ENGINE_INSTALL_HINTS[engine] ?? '',
+  }
+}
+
+// Probing hits the filesystem + spawns `which`, so cache briefly — the selectors that
+// consume this re-render often. `force` bypasses it after the user installs something.
+let preflightCache: { at: number; data: EnginePreflight[] } | null = null
+const PREFLIGHT_TTL_MS = 30000
+
+async function preflightEngines(force: boolean): Promise<EnginePreflight[]> {
+  if (!force && preflightCache && Date.now() - preflightCache.at < PREFLIGHT_TTL_MS) {
+    return preflightCache.data
+  }
+  const data = await Promise.all(RESOLVABLE_ENGINES_LIST.map(preflightEngine))
+  preflightCache = { at: Date.now(), data }
+  slog('preflight', data.map((d) => `${d.engine}=${d.available ? d.resolvedPath : 'MISSING'}`).join(' '))
+  return data
+}
+
 // Windows PowerShell 5.1 reads AND writes files with the legacy ANSI code page (cp1252) by default,
 // so a Get-Content|Set-Content round-trip over a UTF-8 file mojibakes multi-byte chars
 // (em-dash — = E2 80 94 → misread as cp1252 "â€"" → re-saved as UTF-8). This preamble makes
@@ -162,10 +323,20 @@ const PS_UTF8_INLINE = PS_UTF8_PREAMBLE.join('; ')
 
 function resolveShell(command: string | undefined): { shell: string; args: string[] } {
   if (process.platform !== 'win32') {
-    if (command === 'claude' || command === 'codex' || command === 'agy') {
-      return { shell: 'bash', args: ['-c', `exec ${command}`] }
+    if (RESOLVABLE_ENGINES.has(command ?? '')) {
+      // Resolve to an absolute launcher — this path previously spawned the BARE name via
+      // `bash -c "exec claude"`, so a manual engine tab got none of the resolution the runner
+      // path does. A non-login, non-interactive bash sources no ~/.zshrc or ~/.zprofile, so a
+      // native (~/.claude/local) or nvm-global install was simply invisible and the tab died
+      // with "command not found". We deliberately do NOT switch to a login shell to fix that:
+      // an rc banner containing "> " would trip the prompt-ready matcher in the initialInput
+      // injector below and submit a prompt early. Absolute path + enrichedPath() covers it
+      // without letting user rc output into the stream.
+      const exe = resolveEnginePath(command as string)
+      const shell = process.env.SHELL || 'zsh'
+      return { shell, args: ['-c', `exec '${exe.replace(/'/g, "'\\''")}'`] }
     }
-    return { shell: command ?? 'bash', args: [] }
+    return { shell: command ?? process.env.SHELL ?? 'zsh', args: [] }
   }
   if (command === 'claude' || command === 'codex' || command === 'agy') {
     // Absolute launcher (falls back to the bare name) so manual tabs survive a self-update too.
@@ -634,6 +805,10 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
         // (no runner tab) carries no marker, so the hook still bills it (its only cost source).
         env: {
           ...process.env,
+          // Widened PATH — a Finder-launched Electron app inherits launchd's minimal PATH,
+          // not the user's shell PATH, so without this an engine (or a tool the engine
+          // shells out to) can be unresolvable even though it works in the user's terminal.
+          PATH: enrichedPath(),
           PATHLY_PROJECT_ROOT: cwd,
           ...(runnerTabMeta.has(tabId) ? { PATHLY_GATE_BILLED: '1' } : {}),
         } as Record<string, string>,
@@ -641,6 +816,16 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
     } catch (e) {
       console.error('[spawn] pty.spawn FAILED', tabId, 'shell=' + shell, 'args=' + JSON.stringify(shellArgs).slice(0, 200), '→', (e as Error).message)
       if (headlessEngine || interactiveEngine) releaseEngineSlot(tabId)
+      // A missing engine binary is by far the most common spawn failure, and a bare
+      // ENOENT tells the user nothing. Name the engine and the command that installs it.
+      const wanted = runnerArgv?.[0] ?? command
+      const bare = wanted ? path.basename(wanted).replace(/\.(ps1|cmd|exe)$/, '') : ''
+      if (RESOLVABLE_ENGINES.has(bare) && /ENOENT|not found|cannot find/i.test((e as Error).message)) {
+        throw new Error(
+          `'${bare}' is not installed, or is not visible to Pathly. ` +
+          `Install it with: ${ENGINE_INSTALL_HINTS[bare] ?? `install ${bare}`}`,
+        )
+      }
       throw e
     }
     const ptyStartedAt = Date.now()
@@ -675,6 +860,7 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
     if (initialInput) {
       let injected = false
       let bypassDismissed = false
+      let trustDismissed = false
       let strippedBuf = ''
 
       const doInject = (): void => {
@@ -716,14 +902,24 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
       const unsubscribe = ptyProcess.onData((data: string) => {
         if (injected) return
         // Strip ANSI escape sequences so pattern matching works reliably
-        strippedBuf += data
-          .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '')
-          .replace(/\x1b\][\s\S]*?(?:\x07|\x1b\\)/g, '')
+        strippedBuf += stripAnsi(data)
 
-        // Phase 1: auto-dismiss the bypass-permissions confirmation screen
-        if (!bypassDismissed && strippedBuf.includes('Bypass Permissions mode')) {
+        // Phase 1: auto-dismiss either startup gate. Both are cleared the same way (Enter
+        // accepts the default). Reset the buffer after answering — the dismissed screen's
+        // own text can contain "> ", which would otherwise read as "readline is ready" in
+        // phase 2 and inject the prompt into a UI that isn't listening yet.
+        if (!bypassDismissed && BYPASS_PROMPT_RE.test(strippedBuf)) {
           bypassDismissed = true
+          slog('gate', tabId, 'auto-answered bypass-permissions screen')
           ptyProcess.write('\r')
+          strippedBuf = ''
+          return
+        }
+        if (!trustDismissed && TRUST_PROMPT_RE.test(strippedBuf)) {
+          trustDismissed = true
+          slog('gate', tabId, 'auto-answered folder-trust prompt')
+          ptyProcess.write('\r')
+          strippedBuf = ''
           return
         }
 
@@ -732,6 +928,10 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
           doInject()
         }
       })
+    } else if (headlessEngine) {
+      // A headless one-shot has no injector, so before this it had NO path at all for a
+      // startup gate — a first run in an untrusted folder simply hung until killed.
+      attachHeadlessGateDismisser(ptyProcess, tabId)
     }
 
     // Stream-json one-shots (editor / chat) asked claude for an event stream so the gate can
@@ -928,6 +1128,8 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
         break
     }
   })
+
+  ipcMain.handle('terminal:preflight', async (_event, force?: boolean) => preflightEngines(force === true))
 
   ipcMain.handle('terminal:register-runner', (_event, tabId: string, topic: string, runId: string, label?: string, category?: 'flow' | 'loop' | 'single') => {
     runnerTabMeta.set(tabId, { run_id: runId, topic, spawnedAt: Date.now(), label: label ?? tabId, category })

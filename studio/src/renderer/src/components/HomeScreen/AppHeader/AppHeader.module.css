@@ -9,11 +9,21 @@
   z-index: 9999;
   display: flex;
   align-items: center;
-  padding-right: 155px;
+  padding-right: 155px; /* Win/Linux: clear the native min/max/close controls (theme toggle sits left of them) */
   box-sizing: border-box;
 }
 
+/* macOS has no right-side native controls, so the theme toggle can sit near the edge. */
+:global(html[data-platform='mac']) .header {
+  padding-right: 12px;
+}
+
+/* Center the nav on the window's horizontal midline so it clears BOTH the macOS traffic
+   lights (top-left) and the Windows min/max/close controls (top-right). */
 .tabs {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   align-items: center;
   height: 100%;

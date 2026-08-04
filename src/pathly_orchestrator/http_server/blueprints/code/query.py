@@ -279,19 +279,26 @@ def code_query():
             # re-logged — the board already carries the prior entry.
             _log_query(scope, op.strip(), target.strip(), role, backend, bool(result))
 
-        return (
-            jsonify(
-                {
-                    "ok": True,
-                    "op": op.strip(),
-                    "target": target.strip(),
-                    "result": result,
-                    "backend": backend,
-                    "cached": cached,
-                }
-            ),
-            200,
-        )
+        payload = {
+            "ok": True,
+            "op": op.strip(),
+            "target": target.strip(),
+            "result": result,
+            "backend": backend,
+            "cached": cached,
+        }
+        # A null result has two very different causes: the backend ran and found
+        # nothing, or the backend's launcher isn't installed at all. Both used to
+        # look identical (`backend: "cli", result: null`), which reads as though a
+        # backend ran — so a broken setup degraded to Grep silently and forever.
+        # Name the second case; the safe-null contract is unchanged (still ok:true,
+        # still 200, still result:null) — this only ADDS a diagnosis.
+        if result is None:
+            missing = _cc.missing_dependencies(effective)
+            if missing:
+                payload["reason"] = "backend-unavailable"
+                payload["missing"] = missing
+        return jsonify(payload), 200
     except Exception as exc:
         # Never surface a 500 to the agent on a backend miss — degrade to
         # safe-null so the caller falls back to Grep. (Malformed requests already

@@ -5,7 +5,7 @@
   align-items: center;
   gap: 12px;
   padding: 0 16px;
-  padding-right: 154px; /* reserve space for native Win11 min/max/close overlay (3×46px + margin) */
+  padding-right: 154px; /* Win/Linux: reserve space for native min/max/close overlay (3×46px + margin) */
   height: 36px;
   min-width: 480px;
   background: var(--bg-mantle);
@@ -13,6 +13,14 @@
   flex-shrink: 0;
   overflow: hidden;
   -webkit-app-region: drag;
+}
+
+/* macOS keeps its traffic-light window controls at the top-LEFT (titleBarStyle:'hidden').
+   Reserve room on the left so the logo/home button isn't hidden beneath them, and drop the
+   right reservation — macOS has no right-side native controls, so 154px there is dead space. */
+:global(html[data-platform='mac']) .bar {
+  padding-left: 80px;
+  padding-right: 16px;
 }
 
 /* Every interactive element inside the bar must opt out of dragging */

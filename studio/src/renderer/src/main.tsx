@@ -11,6 +11,15 @@ import { registerElementResolver } from './lib/elementResolver'
 
 registerElementResolver()
 
+// Tag the OS so the title bar can reserve space for the native window controls:
+// macOS draws its traffic-light buttons over the top-LEFT corner (titleBarStyle:'hidden'),
+// while Windows/Linux put min/max/close on the top-RIGHT. TopBar.module.css keys its insets
+// off this attribute so the logo/home button never hides beneath the traffic lights.
+const isMac =
+  navigator.userAgent.includes('Macintosh') ||
+  navigator.platform.toLowerCase().startsWith('mac')
+document.documentElement.dataset.platform = isMac ? 'mac' : 'other'
+
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
     <App />

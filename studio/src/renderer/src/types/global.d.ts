@@ -20,6 +20,18 @@ declare global {
     /** When the engine finished — set only on RECENT/history entries. */
     finishedAt?: number
   }
+  /** Whether a CLI engine is actually installed and visible to Pathly. Probed in the
+   *  main process (filesystem + PATH), not derived from adapters.yaml — which only says
+   *  an engine EXISTS as a config, never that it is installed on this machine. */
+  interface EnginePreflight {
+    engine: string
+    /** CliAdapter id the UI keys off ('claude' | 'codex' | 'antigravity'). */
+    adapter: string
+    available: boolean
+    resolvedPath: string | null
+    /** Shell command that installs it — shown verbatim in the UI. */
+    installHint: string
+  }
   interface SpawnState {
     running: number
     interactive: number
@@ -216,6 +228,7 @@ declare global {
         onExit: (cb: (tabId: string, exitCode?: number, tail?: string) => void) => () => void
         onSpawnState: (cb: (s: SpawnState) => void) => () => void
         queueControl: (action: QueueAction) => Promise<void>
+        preflight: (force?: boolean) => Promise<EnginePreflight[]>
         registerRunner: (tabId: string, topic: string, runId: string, label?: string, category?: 'flow' | 'loop' | 'single') => Promise<void>
         onStageResult: (cb: (tabId: string, data: Record<string, unknown>) => void) => () => void
       }

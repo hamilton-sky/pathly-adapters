@@ -21,7 +21,7 @@ Studio spawns the engine as a PTY (`node-pty`). The engine's `headless` argv tem
 
 ```
 claude: ['claude', '-p', '{prompt}', '--model', '{model}', '--output-format', 'json', '--dangerously-skip-permissions']
-codex:  ['codex', 'exec', '--json', '--sandbox', 'workspace-write', '--model', '{model}', '--', '{prompt}']
+codex:  ['codex', 'exec', '--skip-git-repo-check', '--json', '--sandbox', 'workspace-write', '--model', '{model}', '--', '{prompt}']
 agy:    ['agy', '-p', '{prompt}']
 ```
 

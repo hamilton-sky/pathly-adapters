@@ -1,7 +1,7 @@
 {
   "name": "pathly-studio",
   "version": "2.23.0",
-  "description": "Pathly Studio \u00e2\u20ac\u201d desktop app for configuring and monitoring the Pathly pipeline",
+  "description": "Pathly Studio â€” desktop app for configuring and monitoring the Pathly pipeline",
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
@@ -61,5 +61,15 @@
     "typescript": "^5.3.3",
     "vite": "^5.0.0",
     "vitest": "^1.0.0"
+  },
+  "allowScripts": {
+    "electron@33.4.11": true,
+    "esbuild@0.21.5": true,
+    "fsevents@2.3.3": true,
+    "fsevents@2.3.2": true,
+    "node-llama-cpp@3.18.1": true,
+    "node-pty@1.1.0": true,
+    "protobufjs@6.11.6": true,
+    "sharp@0.32.6": true
   }
 }

@@ -42,7 +42,7 @@ Studio → Start button          FlowControlBar → POST /runner/start
        → TERMINAL_SPAWN SSE    Studio opens a PTY tab (node-pty) per pipeline stage
        → terminal:spawn IPC    argv injected from adapters.yaml headless template, e.g.
                                claude: ['claude', '-p', '{prompt}', '--model', '{model}', '--output-format', 'json', '--dangerously-skip-permissions']
-                               codex:  ['codex', 'exec', '--sandbox', 'workspace-write', '--model', '{model}', '--', '{prompt}']
+                               codex:  ['codex', 'exec', '--skip-git-repo-check', '--json', '--sandbox', 'workspace-write', '--model', '{model}', '--', '{prompt}']
        → PTY exits             POST /runner/terminal/result → FSM continues
      → fsm_events (DB)      Claude writes AGENT_DONE with `summary` mid-run to the central DB; supervisor reads it after PTY exits as the authoritative semantic result (stdout only used for session_id + cost_usd); EVENTS.jsonl is a downstream DB→disk export
 ```

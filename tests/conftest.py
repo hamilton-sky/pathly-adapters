@@ -18,12 +18,23 @@ import _paths  # noqa: E402  (depends on the sys.path insert above)
 
 @pytest.fixture
 def tmp_path():
-    """Workspace-safe replacement for pytest's default temp path fixture."""
+    """Workspace-safe replacement for pytest's default temp path fixture.
+
+    The root is RESOLVED (symlinks followed) before any test sees it. On macOS
+    ``tempfile.gettempdir()`` returns ``/var/folders/…``, and ``/var`` is a symlink to
+    ``/private/var`` — so a test that WRITES through production code (which resolves
+    real paths) and then READS with the raw fixture path is comparing
+    ``/private/var/…`` against ``/var/…`` and silently misses. That mismatch failed 19
+    tests across fsm_flows, runner_supervisor, http_api and storage_paths on macOS
+    while passing on Windows, where ``C:\\tmp`` is not a symlink. Resolving here fixes
+    every one of them at the source instead of sprinkling ``.resolve()`` through the
+    assertions.
+    """
     default_root = r"C:\tmp" if os.name == "nt" else tempfile.gettempdir()
-    tmp_root = Path(os.environ.get("PYTEST_TMPDIR", default_root))
+    tmp_root = Path(os.environ.get("PYTEST_TMPDIR", default_root)).resolve()
     tmp_root = tmp_root / "pathly-tests"
     tmp_root.mkdir(parents=True, exist_ok=True)
-    path = Path(tempfile.mkdtemp(dir=tmp_root))
+    path = Path(tempfile.mkdtemp(dir=tmp_root)).resolve()
     try:
         yield path
     finally:
