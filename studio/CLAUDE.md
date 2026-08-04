@@ -18,10 +18,10 @@ Always run from the **repo root**, not from `studio/`:
 
 ```bash
 # Renderer (React)
-node_modules/.bin/tsc --noEmit -p studio/tsconfig.web.json
+studio/node_modules/.bin/tsc --noEmit -p studio/tsconfig.web.json
 
 # Main process
-node_modules/.bin/tsc --noEmit -p studio/tsconfig.node.json
+studio/node_modules/.bin/tsc --noEmit -p studio/tsconfig.node.json
 
 # Renderer only (npm script — runs tsconfig.web.json)
 npm run typecheck
