@@ -1,34 +1,45 @@
 import { useState } from 'react'
 import { useStore } from '../../store'
 import { useTerminalStore } from '../../store/terminalStore'
-import { useMonitorSession } from './hooks/useMonitorSession'
+import { useRunnerStore } from '../../store/runnerStore'
 import { useMonitorEngines } from './hooks/useMonitorEngines'
 import { useRecentEngines } from './hooks/useRecentEngines'
 import { OutputBanner } from './output/OutputBanner/OutputBanner'
 import { MonitorBoard } from './EngineBoard'
 import { ConfigurePhaseModal } from './ConfigurePhaseModal/ConfigurePhaseModal'
-import { FlowStepsPanel } from './FlowStepsPanel/FlowStepsPanel'
+import { FlowControlBar } from '../HQ/FlowControlBar/FlowControlBar'
 import { RunDetailPage } from '../RunDetailPage'
 import styles from './Monitor.module.css'
 
-// The Pipeline panel, laid out as a row: the GLOBAL live engine board is the MAIN content (left) —
-// every running CLI engine (headless or interactive, any feature or a project one-shot), in parity
-// with the Engines dock; deliberately NOT feature-scoped and NOT gated behind a feature selection.
-// The old feature-scoped header stack (HeaderBar / RunCostBadge / HealthCheck) is unmounted — a
-// feature title above a global board was incongruous chrome; the run cost re-homed into the flow
-// dock. Only the conditional OutputBanner (output → modal) remains above the board. The stage
-// timeline + runner controls live in FlowStepsPanel, a collapsible RIGHT dock that renders
-// whichever running flow is selected as a vertical stepper (click a stage to configure its
-// agent/skill/host) with the runner controls beneath it.
+// The Pipeline ("Monitor") panel — a single full-width column: the GLOBAL engine board with its
+// Live/Runs mode toggle (every running CLI + recent history + the folded /runs list), the
+// conditional OutputBanner above it, and — only while a run is active — the global runner controls
+// (FlowControlBar) as a slim top bar.
+//
+// The old right-side FlowStepsPanel dock (stage stepper + flow tabs + per-stage configure) is gone:
+// its stepper's job is now the RunDetailPage "Stages" tab, per-stage config is a flow-AUTHORING
+// concern (belongs with the flow editor, not a run monitor), and the runner controls — which act on
+// the single active FSM run, NOT a run_id — live here at the panel level (a run_id-keyed page is the
+// wrong home for a global singleton control). Clicking a run opens the shared RunDetailPage
+// (entrance #1 from a live card's "Open run →", entrance #2 from a Runs-mode row). The
+// ConfigurePhaseModal still opens from an engine card's "configure" action.
 export function Monitor(): JSX.Element {
   const fsmState = useStore((s) => s.fsmState)
-  const { effectiveTopic, showTabBar } = useMonitorSession()
+  const runnerStatus = useRunnerStore((s) => s.status)
   const [configStage, setConfigStage] = useState<string | null>(null)
-  // Entrance #1 to the shared RunDetailPage: a run_id set here swaps the panel body to the run
-  // detail (the app shell stays), mirroring DBExplorerRedesign's FeatureDetailPage swap.
+  // Entrance to the shared RunDetailPage: a run_id set here swaps the panel body to the run detail
+  // (the app shell stays), mirroring DBExplorerRedesign's FeatureDetailPage swap.
   const [detailRunId, setDetailRunId] = useState<string | null>(null)
   const engines = useMonitorEngines(null) // GLOBAL — every live engine, matching the dock
   const recent = useRecentEngines() // DB-backed history (finished spawns)
+
+  // Runner controls (pause/resume/advance/reroute/retry/abort) only make sense mid-run, so the bar
+  // shows ONLY while a run is active — runs are STARTED from the board's goal/task Run controls.
+  const runnerActive =
+    runnerStatus === 'running' ||
+    runnerStatus === 'paused' ||
+    runnerStatus === 'blocked' ||
+    runnerStatus === 'finalizing'
 
   function handleEngineAction(engineId: string, actionId: string): void {
     const term = useTerminalStore.getState()
@@ -69,21 +80,17 @@ export function Monitor(): JSX.Element {
         <div className={styles.main}>
           <OutputBanner />
 
-          {/* Global engine board — every live CLI + recent history + the folded Runs list (mode
-              toggle in its header). Always mounted, even with nothing live, so the Live/Runs
-              toggle stays reachable and each mode owns its own empty state (a run can exist in
-              /runs with no live engine — exactly what Runs mode surfaces). */}
+          {runnerActive && (
+            <div className={styles.runnerBar}>
+              <FlowControlBar />
+            </div>
+          )}
+
+          {/* Global engine board — Live (per-spawn) or Runs (folded /runs), toggled in its header.
+              Always mounted so the toggle is reachable with nothing live; each mode owns its empty
+              state (a run can exist in /runs with no live engine — what Runs mode surfaces). */}
           <MonitorBoard engines={engines} recent={recent} onAction={handleEngineAction} onOpenRun={setDetailRunId} />
         </div>
-
-        {/* Collapsible right-side flow dock: the selected flow's vertical stepper + the runner
-            controls (pause / resume / advance / reroute / retry / abort). The flow tabs inside it
-            toggle which running flow the dock steps through. Replaces the old fixed top bar. */}
-        <FlowStepsPanel
-          effectiveTopic={effectiveTopic}
-          showTabBar={showTabBar}
-          onStageClick={(stage) => setConfigStage(stage)}
-        />
       </div>
 
       {configStage && (

@@ -8,22 +8,27 @@
   overflow: hidden;
 }
 
-/* Row: main content (left) + the collapsible flow dock (right). */
+/* Single full-width column (the right-side flow dock was removed). */
 .body {
   flex: 1;
   min-width: 0;
   display: flex;
-  flex-direction: row;
   overflow: hidden;
 }
 
-/* Main column: header / cost / health / output, then the global engine board. */
+/* Main column: output banner + (mid-run only) the runner control bar, then the global engine board. */
 .main {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+/* Slim runner-control bar, shown only while a run is active. Never shrinks; divides from the board. */
+.runnerBar {
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--bg-surface1);
 }
 
 .placeholder {
