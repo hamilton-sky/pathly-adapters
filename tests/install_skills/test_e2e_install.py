@@ -69,7 +69,8 @@ def test_dry_run_exits_0(tmp_path):
 
 @pytest.mark.slow
 def test_apply_creates_expected_files(tmp_path):
-    result = _run_install_cli(["claude", "--apply"], tmp_path)
+    # --all-skills so the Tier-2 pathly-fix skill installs (fsm-call assertion below).
+    result = _run_install_cli(["claude", "--apply", "--all-skills"], tmp_path)
     assert (
         result.returncode == 0
     ), f"Expected exit 0 for apply.\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
@@ -99,6 +100,43 @@ def test_apply_creates_expected_files(tmp_path):
     )
     assert "pathly_orchestrator.http_server" in orchestrator
     assert "fsm-call" in fix_skill
+
+
+# ---------------------------------------------------------------------------
+# skill tiers — default install set vs --export vs --all-skills
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.slow
+def test_apply_installs_only_tier1_by_default(tmp_path):
+    result = _run_install_cli(["claude", "--apply"], tmp_path)
+    assert result.returncode == 0, result.stderr
+    skills = tmp_path / ".claude" / "skills"
+    # Tier-1: the two board on-ramps + dispatcher/help are always exposed.
+    for s in ("pathly-create-feature", "pathly-post", "pathly", "pathly-help"):
+        assert (skills / s / "SKILL.md").exists(), f"{s} should install by default"
+    # Tier-2 pipeline skills are export-only — absent from a default apply.
+    for s in ("pathly-build", "pathly-goalize", "pathly-review"):
+        assert not (skills / s).exists(), f"{s} should be export-only, not default"
+
+
+@pytest.mark.slow
+def test_export_installs_named_skill_plus_defaults(tmp_path):
+    result = _run_install_cli(["claude", "--export", "build"], tmp_path)
+    assert result.returncode == 0, result.stderr
+    skills = tmp_path / ".claude" / "skills"
+    assert (skills / "pathly-build" / "SKILL.md").exists()  # requested
+    assert (skills / "pathly-post" / "SKILL.md").exists()  # default set still installed
+    assert not (skills / "pathly-review").exists()  # not requested
+
+
+@pytest.mark.slow
+def test_all_skills_installs_everything(tmp_path):
+    result = _run_install_cli(["claude", "--apply", "--all-skills"], tmp_path)
+    assert result.returncode == 0, result.stderr
+    skills = tmp_path / ".claude" / "skills"
+    for s in ("pathly-build", "pathly-review", "pathly-goalize", "pathly-post"):
+        assert (skills / s / "SKILL.md").exists(), f"{s} should install with --all-skills"
 
 
 # ---------------------------------------------------------------------------

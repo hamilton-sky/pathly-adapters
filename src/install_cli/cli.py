@@ -43,6 +43,19 @@ def main() -> None:
         help="Overwrite all files, even those not owned by Pathly.",
     )
     parser.add_argument(
+        "--export",
+        action="append",
+        metavar="SKILL",
+        default=None,
+        help="Also install a non-default skill to the host (repeatable), "
+        "e.g. --export build --export review.",
+    )
+    parser.add_argument(
+        "--all-skills",
+        action="store_true",
+        help="Install every skill, not just the default board on-ramps.",
+    )
+    parser.add_argument(
         "--uninstall",
         action="store_true",
         help="Remove all Pathly-owned files from host config locations.",
@@ -71,14 +84,27 @@ def main() -> None:
                 print(f"[{host}] Error: {e}", file=sys.stderr)
         return
 
-    if not args.dry_run and not args.apply:
+    if (
+        not args.dry_run
+        and not args.apply
+        and not args.export
+        and not args.all_skills
+    ):
         _interactive_menu(hosts, repair=args.repair, force=args.force)
         return
 
+    export_skills = set(args.export or [])
     failed = False
     for host in hosts:
         try:
-            _run_host(host, dry_run=args.dry_run, repair=args.repair, force=args.force)
+            _run_host(
+                host,
+                dry_run=args.dry_run,
+                repair=args.repair,
+                force=args.force,
+                export_skills=export_skills,
+                all_skills=args.all_skills,
+            )
         except Exception as e:
             print(f"[{host}] Error: {e}", file=sys.stderr)
             failed = True

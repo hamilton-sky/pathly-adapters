@@ -25,6 +25,12 @@ from .materialize import (
 # must appear here, or auto-detected installs will fail with a confusing error.
 ALLOWED_HOSTS = {"claude", "codex", "copilot", "antigravity"}
 
+# Tier-1 — the only skills installed by default (`--apply`). These are the interactive board
+# on-ramps (create-feature, post) plus the dispatcher/help that make them discoverable. Every
+# other skill is export-on-demand: `pathly-setup <host> --export <skill>` (or `--all-skills`
+# for the lot). Keyed by the core skill name (the `skill:` field of each *_skill.yaml meta).
+DEFAULT_EXPOSED_SKILLS = frozenset({"pathly", "help", "create-feature", "post"})
+
 # Substring that identifies a hook command as Pathly-owned.
 _PATHLY_HOOK_MARKER = "pathly_hooks"
 
@@ -284,7 +290,15 @@ def _load_install_yaml(host: str) -> dict:
         return yaml.safe_load(f)
 
 
-def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
+def _run_host(
+    host: str,
+    dry_run: bool,
+    repair: bool,
+    force: bool,
+    *,
+    export_skills: frozenset[str] | set[str] | None = None,
+    all_skills: bool = False,
+) -> None:
     install_cfg = _load_install_yaml(host)
     dest = Path(install_cfg["destination"]).expanduser()
 
@@ -338,9 +352,18 @@ def _run_host(host: str, dry_run: bool, repair: bool, force: bool) -> None:
                     f"No skill host instructions for {host!r}: {instructions_path}"
                 )
             host_instructions = instructions_path.read_text(encoding="utf-8")
+        _requested = export_skills or frozenset()
         for meta_file in sorted(meta_dir.glob("*_skill.yaml")):
             skill_name = meta_file.stem.removesuffix("_skill")
             skill_meta = yaml.safe_load(meta_file.read_text(encoding="utf-8"))
+            # Tier gate: install only the Tier-1 on-ramps by default; other skills install
+            # only when explicitly requested (--export <skill>) or with --all-skills.
+            if (
+                not all_skills
+                and skill_meta["skill"] not in DEFAULT_EXPOSED_SKILLS
+                and skill_meta["skill"] not in _requested
+            ):
+                continue
             core_file = _grouped_core_file(
                 core_skills_dir, skill_meta["skill"], _SKILL_GROUPS
             )

@@ -164,21 +164,42 @@ def test_dry_run_calls_run_host_with_dry_run_true():
         with patch("install_cli.cli.detect_hosts", return_value=["claude"]):
             with patch("install_cli.cli._run_host") as mock_run:
                 main()
-    mock_run.assert_called_once_with("claude", dry_run=True, repair=False, force=False)
+    mock_run.assert_called_once_with(
+        "claude",
+        dry_run=True,
+        repair=False,
+        force=False,
+        export_skills=set(),
+        all_skills=False,
+    )
 
 
 def test_host_argument_limits_to_that_host():
     with patch.object(sys, "argv", ["pathly-setup", "claude", "--dry-run"]):
         with patch("install_cli.cli._run_host") as mock_run:
             main()
-    mock_run.assert_called_once_with("claude", dry_run=True, repair=False, force=False)
+    mock_run.assert_called_once_with(
+        "claude",
+        dry_run=True,
+        repair=False,
+        force=False,
+        export_skills=set(),
+        all_skills=False,
+    )
 
 
 def test_apply_calls_run_host_without_dry_run():
     with patch.object(sys, "argv", ["pathly-setup", "claude", "--apply"]):
         with patch("install_cli.cli._run_host") as mock_run:
             main()
-    mock_run.assert_called_once_with("claude", dry_run=False, repair=False, force=False)
+    mock_run.assert_called_once_with(
+        "claude",
+        dry_run=False,
+        repair=False,
+        force=False,
+        export_skills=set(),
+        all_skills=False,
+    )
 
 
 def test_no_detected_hosts_exits():
@@ -230,7 +251,8 @@ def test_codex_install_injects_execution_contract_into_skills(monkeypatch):
 
     monkeypatch.setattr("install_cli.orchestrate.install_codex_plugin", capture_plugin)
 
-    _run_host("codex", dry_run=False, repair=True, force=False)
+    # all_skills=True so the Tier-2 pathly-build skill is emitted for this codex-contract check.
+    _run_host("codex", dry_run=False, repair=True, force=False, all_skills=True)
 
     build_skill = captured_plugin_files["skills/pathly-build/SKILL.md"]
     assert "## Codex Execution Contract" in build_skill
