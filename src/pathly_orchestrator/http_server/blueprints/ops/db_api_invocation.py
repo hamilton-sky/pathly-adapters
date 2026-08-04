@@ -1,9 +1,12 @@
 """DB invocation ingestion endpoint: POST /db/invocation.
 
 Accepts client-side one-shot telemetry from Studio (renderer-driven CLI actions
-such as editor AI actions and HQ chat summaries) that never pass through the
+such as editor AI actions and HQ/artifact summaries) that never pass through the
 Python supervisor.  Calls the universal projector `project_agent_done` so these
-runs appear in /db/rollup alongside supervisor-driven runs.
+runs appear in /db/rollup alongside supervisor-driven runs, AND records them into
+the unified Complete Run Record (`run_history` + `run_log`) so they also appear in
+`GET /runs` — this endpoint is the ONLY Python seam these one-shots cross, so it is
+where the run-record write for them has to live.
 
 Best-effort: the handler never returns 5xx — on any exception it logs and
 returns {"ok": False} with HTTP 200.  Only a missing/empty project_root returns
@@ -116,6 +119,58 @@ def db_invocation():
             trace_id=trace_id,
             wall_seconds=wall_seconds,
         )
+
+        # unified-control-plane: also record this one-shot into the Complete Run Record
+        # (run_history + run_log) so renderer-driven CLI runs — editor AI actions, HQ/artifact
+        # summaries (ai-router) — appear in GET /runs alongside supervisor-driven runs. This is
+        # the fix for "all runs through one place": these one-shots NEVER pass the supervisor
+        # spawn chokepoint (their only Python seam is THIS endpoint), so without this they landed
+        # in agent_invocations (→ /db/recent) but never in run_history (→ /runs). Best-effort +
+        # guarded exactly like the api_lifecycle result seam: a raising write MUST NOT fail
+        # ingestion (AC-6), and an empty run_id is skipped — its ON CONFLICT(run_id) key would
+        # collapse every keyless one-shot onto a single row.
+        if run_id:
+            try:
+                from datetime import datetime, timedelta, timezone
+
+                from pathly_orchestrator.db.connection import get_db as _rr_db
+                from pathly_orchestrator.db.queries.run_history import upsert_run
+                from pathly_orchestrator.db.queries.run_log import (
+                    update_run_log_stdout,
+                    write_run_log_spawn,
+                )
+
+                _conn = _rr_db()
+                _now = datetime.now(timezone.utc)
+                # ISO 'T' format matches run_history_read._now_iso so window-join comparisons
+                # elsewhere stay chronological; started_at is back-dated by the wall time.
+                _started = (
+                    _now - timedelta(seconds=max(0.0, wall_seconds))
+                ).isoformat()
+                upsert_run(
+                    _conn,
+                    project_root=project_root,
+                    feature=feature,
+                    run_id=run_id,
+                    status="done",
+                    started_at=_started,
+                    finished_at=_now.isoformat(),
+                    stage_count=1,
+                    total_tokens=tokens_in + tokens_out,
+                    cost_usd=cost_usd,
+                    adapter=adapter or None,
+                )
+                # Detail-view Logs: a one-shot has no composed-prompt seam here (the gate sends
+                # only stdout), so prompt_sent stays NULL (like board_context in P0) and stdout
+                # carries the captured tail. Skip the run_log write when there's no tail.
+                if stdout_tail:
+                    write_run_log_spawn(
+                        _conn, run_id, stage=label or None, prompt_sent=None
+                    )
+                    update_run_log_stdout(_conn, run_id, stdout_tail)
+            except Exception:
+                logger.debug("db_invocation: run record write skipped", exc_info=True)
+
         return jsonify({"ok": True}), 200
     except Exception as exc:
         logging.exception("db_invocation error")

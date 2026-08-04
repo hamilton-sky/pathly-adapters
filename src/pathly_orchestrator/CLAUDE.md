@@ -392,6 +392,11 @@ both now land as columns instead of being re-derived. The pieces:
   (`_run_stage_via_terminal`) and `_settle_spawn_identity` closes the row (done/error);
   the registry finish-upsert and `/runner/start` insert also key by the slug. Legacy
   full-path rows are never rewritten — read helpers match them via a basename shim.
+  Renderer-driven one-shots (editor AI actions, ai-router artifact/HQ summaries) never
+  cross the supervisor, so their ONLY Python seam — `POST /db/invocation`
+  (`blueprints/ops/db_api_invocation.py`) — writes their own `done` `run_history` row (+
+  `run_log` stdout), best-effort, so they surface in `GET /runs` alongside supervisor runs
+  instead of living only in `agent_invocations`/`/db/recent`.
 - **Consumers pivot** — `/db/rollup`'s feature block and `/db/features/<f>/{agents,runs}`
   match `feature=? OR board_scope=?`, so a goal run's cost is visible under BOTH its slug and
   its parent feature. The Monitor's RECENT bucketing already pivots on the stamped

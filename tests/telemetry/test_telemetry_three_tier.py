@@ -308,3 +308,94 @@ def test_post_db_invocation_parses_stdout_tail_server_side(client):
     assert (invs[0]["tokens_in"] + invs[0]["tokens_out"]) == (
         29 + 1916016 + 69871 + 17290
     )
+
+
+# ── T7 — one-shot ALSO lands in the unified run record (GET /runs) ────────────
+
+
+def test_post_db_invocation_appears_in_runs_list(client):
+    """unified-control-plane: a renderer one-shot posted to /db/invocation is recorded into
+    run_history/run_log too, so it surfaces in GET /runs (kind 'single'), not only in
+    /db/recent. This is the "all runs through one place" seam for the client-driven spawn
+    facade (ai-router summaries + editor AI actions), which never crosses the supervisor.
+    """
+    c, tmp_path = client
+    pr = str(tmp_path / "proj-runrec").replace("\\", "/")
+    run_id = "airouter-claude-abc123-xy"
+
+    resp = c.post(
+        "/db/invocation",
+        json={
+            "project_root": pr,
+            "feature": "(project)",
+            "scope_tier": "project",
+            "run_id": run_id,
+            "label": "ai-summary",
+            "agent_role": "ai-router",
+            "adapter": "claude",
+            "cost_usd": 0.3018575,
+            "tokens_in": 100000,
+            "tokens_out": 71400,
+            "stdout_tail": "the summary output",
+            "wall_seconds": 38.0,
+        },
+        content_type="application/json",
+    )
+    assert resp.status_code == 200
+
+    runs = c.get(f"/runs?project_root={pr}").get_json()
+    row = next((r for r in runs if r["run_id"] == run_id), None)
+    assert row is not None, "one-shot must appear in GET /runs"
+    assert row["kind"] == "single"
+    assert row["status"] == "done"
+    # cost/tokens reconcile from agent_invocations (SUM WHERE run_id=?), not run_history
+    assert abs(row["cost_usd"] - 0.3018575) < 1e-9
+    assert row["tokens_total"] == 171400
+
+    # RunDetail Logs carry the stdout tail (prompt_sent NULL — no compose seam on this path)
+    detail = c.get(f"/runs/{run_id}").get_json()
+    assert detail["run"]["run_id"] == run_id
+    assert any(
+        (lg.get("stdout") or "") == "the summary output" for lg in detail["logs"]
+    )
+
+
+def test_db_invocation_run_record_write_is_best_effort(client, monkeypatch):
+    """AC-6: if the run_history write raises, /db/invocation still returns 200 and the
+    agent_invocation (the pre-existing behavior) is still written — the run-record seam is
+    additive and never gates ingestion."""
+    c, tmp_path = client
+    from unittest.mock import MagicMock
+
+    import pathly_orchestrator.db.queries.run_history as run_history_mod
+    from pathly_orchestrator.db.connection import get_db
+    from pathly_orchestrator.db.queries.invocations import read_agent_invocations
+
+    monkeypatch.setattr(
+        run_history_mod,
+        "upsert_run",
+        MagicMock(side_effect=RuntimeError("run_history write blew up")),
+    )
+
+    pr = str(tmp_path / "proj-besteffort").replace("\\", "/")
+    resp = c.post(
+        "/db/invocation",
+        json={
+            "project_root": pr,
+            "feature": "editor-ai",
+            "scope_tier": "project",
+            "run_id": "diagram-zzz",
+            "label": "diagram",
+            "agent_role": "diagrammer",
+            "adapter": "claude",
+            "cost_usd": 0.01,
+            "tokens_in": 10,
+            "tokens_out": 5,
+        },
+        content_type="application/json",
+    )
+    assert resp.status_code == 200
+    assert resp.get_json()["ok"] is True
+    # the projector still ran despite the run-record seam raising
+    invs = read_agent_invocations(get_db(), pr, "editor-ai")
+    assert len(invs) == 1
