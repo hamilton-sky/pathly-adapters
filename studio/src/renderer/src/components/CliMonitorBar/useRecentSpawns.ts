@@ -28,14 +28,18 @@ function adapterFromProvider(p: string): EngineAdapter {
 }
 
 // DB-backed persistent spawn history — the last N agent_invocations (survives app restarts, covers
-// every run type). Polled every 8s while the dock is mounted. The gate's in-memory recent ring is
-// an instant fallback before the first fetch (or when the FSM server is unreachable).
-export function useRecentSpawns(): DockEngine[] {
+// every run type, incl. renderer one-shots like ai-router summaries once they land in /db/recent).
+// Polled every 8s while `enabled` (the dock is open) — the dock is always mounted (App.tsx) and
+// returns null when closed, so gating on `enabled` stops a needless poll for a hidden dock. The
+// gate's in-memory recent ring is an instant fallback before the first fetch (or when the FSM
+// server is unreachable).
+export function useRecentSpawns(enabled = true): DockEngine[] {
   const projectPath = useStore((s) => s.projectPath)
   const inMemory = useTerminalStore((s) => s.spawnQueue.recentEngines ?? EMPTY)
   const [db, setDb] = useState<DbRecent[]>([])
 
   useEffect(() => {
+    if (!enabled) return
     let cancelled = false
     const load = (): void => {
       const q = projectPath
@@ -49,7 +53,7 @@ export function useRecentSpawns(): DockEngine[] {
     load()
     const id = window.setInterval(load, 8000)
     return () => { cancelled = true; window.clearInterval(id) }
-  }, [projectPath])
+  }, [projectPath, enabled])
 
   if (db.length > 0) {
     return db.map((r) => {

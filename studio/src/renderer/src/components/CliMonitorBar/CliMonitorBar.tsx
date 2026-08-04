@@ -4,6 +4,7 @@ import { useUiStore } from '../../store/uiStore'
 import { useStore } from '../../store'
 import { useTerminalStore } from '../../store/terminalStore'
 import { useDockEngines } from './useDockEngines'
+import { useRecentSpawns } from './useRecentSpawns'
 import { useDockDrag } from './useDockDrag'
 import { DockCollapsed } from './DockCollapsed/DockCollapsed'
 import { DockExpanded } from './DockExpanded/DockExpanded'
@@ -23,6 +24,10 @@ export function CliMonitorBar(): JSX.Element | null {
   const setActivePanel = useStore((st) => st.setActivePanel)
   const spawnQueue = useTerminalStore((st) => st.spawnQueue)
   const engines = useDockEngines()
+  // DB-backed finished runs (incl. renderer one-shots: ai-router summaries, editor actions) so a
+  // run that has exited is still visible in the dock as history — not only while its engine is live.
+  // Polled only while the dock is open.
+  const recent = useRecentSpawns(open)
   const [expanded, setExpanded] = useState(true)
   const [queueOpen, setQueueOpen] = useState(false)
   const anchorRef = useRef<HTMLDivElement>(null)
@@ -66,6 +71,7 @@ export function CliMonitorBar(): JSX.Element | null {
       {expanded ? (
         <DockExpanded
           engines={engines}
+          recent={recent}
           queuedCount={spawnQueue.queuedEngines.length}
           queueSlot={queueOpen ? <SpawnQueuePanel spawnQueue={spawnQueue} /> : null}
           onCollapse={() => setExpanded(false)}

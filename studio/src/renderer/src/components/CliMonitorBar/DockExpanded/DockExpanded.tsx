@@ -8,6 +8,8 @@ import s from './DockExpanded.module.css'
 
 interface Props {
   engines: DockEngine[]
+  /** DB-backed finished runs (history) — rendered as a 'Recent' section below the live rows. */
+  recent?: DockEngine[]
   onCollapse: () => void
   onClose: () => void
   /** Promote to the full Monitor panel. */
@@ -29,20 +31,38 @@ interface Props {
 // scrollable engine rows, an optional queue slot (SpawnQueuePanel), and a queue footer. No global
 // control bar — each row carries its own contextual controls.
 export function DockExpanded({
-  engines, onCollapse, onClose, onOpenMonitor, onOpenEngine, onAction,
+  engines, recent, onCollapse, onClose, onOpenMonitor, onOpenEngine, onAction,
   onPauseAll, onManageQueue, paused, onGripPointerDown, queuedCount, queueSlot,
 }: Props): JSX.Element {
   const [filter, setFilter] = useState<DockCategoryFilter>('all')
 
+  // History rows for runs that are no longer live. Drop any whose id is still in the live list
+  // (a run briefly sits in both as its engine exits) AND any duplicate run_id (useRecentSpawns
+  // doesn't dedupe like the Monitor's useRecentEngines does) so a row never renders — or keys —
+  // twice.
+  const recentRows = useMemo(() => {
+    const liveIds = new Set(engines.map((e) => e.id))
+    const seen = new Set<string>()
+    return (recent ?? []).filter((e) => {
+      if (liveIds.has(e.id) || seen.has(e.id)) return false
+      seen.add(e.id)
+      return true
+    })
+  }, [engines, recent])
+
   const counts = useMemo(() => {
-    const c: Record<string, number> = { all: engines.length }
-    for (const e of engines) c[e.category] = (c[e.category] ?? 0) + 1
+    // Count live AND recent rows so the filter tabs reflect everything on screen (parity with
+    // the full Monitor board, which counts [...engines, ...recent]).
+    const all = [...engines, ...recentRows]
+    const c: Record<string, number> = { all: all.length }
+    for (const e of all) c[e.category] = (c[e.category] ?? 0) + 1
     return c
-  }, [engines])
+  }, [engines, recentRows])
 
   const running = engines.filter((e) => e.status === 'running').length
   const queued = queuedCount ?? engines.filter((e) => e.status === 'queued').length
   const rows = engines.filter((e) => filter === 'all' || e.category === filter)
+  const recentFiltered = recentRows.filter((e) => filter === 'all' || e.category === filter)
 
   return (
     <div className={s.dock}>
@@ -73,7 +93,13 @@ export function DockExpanded({
         {rows.map((e) => (
           <EngineRow key={e.id} engine={e} onOpen={onOpenEngine} onAction={onAction} />
         ))}
-        {rows.length === 0 && <div className={s.empty}>No engines in this view</div>}
+        {recentFiltered.length > 0 && <div className={s.recentLabel}>Recent</div>}
+        {recentFiltered.map((e) => (
+          <EngineRow key={e.id} engine={e} onOpen={onOpenEngine} onAction={onAction} />
+        ))}
+        {rows.length === 0 && recentFiltered.length === 0 && (
+          <div className={s.empty}>No engines in this view</div>
+        )}
       </div>
 
       {queueSlot}
