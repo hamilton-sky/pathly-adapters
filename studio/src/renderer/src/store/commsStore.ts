@@ -38,6 +38,7 @@ import { listDirs } from '../services/pathlyApi'
 import { useRunnerStore } from './runnerStore'
 import { useProjectStore } from './projectStore'
 import { useToastStore } from './toastStore'
+import { useRunRegistryStore, goalTarget, boardTarget, flowTarget } from './runRegistryStore'
 
 function isPending(m: Message): boolean {
   return (m.type === 'question' && m.status === 'pending')
@@ -169,6 +170,13 @@ export interface CommsState {
     status: 'summarizing' | 'ready' | 'failed',
     error?: string,
   ) => void
+
+  /** On mount, rehydrate the board/goal/flow run pills for a project from the PERSISTED run
+   *  registry: re-verify each entry against the authoritative backend (board-lock holder /
+   *  FSM runner status) and either repopulate the pill (running + original start + watcher) or
+   *  clear the stale entry — so a run still alive after a full reload reappears, and one that
+   *  finished while the app was closed does not falsely show. */
+  rehydrateActiveRuns: (projectRoot: string) => Promise<void>
 }
 
 // ── Board-run completion watchers ─────────────────────────────────────
@@ -263,9 +271,11 @@ function _goalBoardParams(goalId: string): { board: string; scope: string } | nu
   return null
 }
 
-function _startGoalWatch(goalId: string, runId?: string): void {
+function _startGoalWatch(goalId: string, runId?: string, paramsIn?: { board: string; scope: string }): void {
   _stopGoalWatch(goalId)
-  const params = _goalBoardParams(goalId)
+  // Rehydration passes the persisted {board, scope} so the watch can restart before the
+  // goal's board is (re)loaded; the normal live path derives it from the loaded board.
+  const params = paramsIn ?? _goalBoardParams(goalId)
   if (!params) return
   const id = window.setInterval(() => {
     void (async () => {
@@ -284,6 +294,42 @@ function _startGoalWatch(goalId: string, runId?: string): void {
     })()
   }, 4000)
   _goalWatchers.set(goalId, id)
+}
+
+// ── Run registry wiring ───────────────────────────────────────────────
+// Mirror every board/goal/flow run-start into the PERSISTED run registry (the run_id
+// spine) and clear it on completion, so a still-running run's pill rehydrates after a
+// full reload (rehydrateActiveRuns) instead of vanishing with the in-memory pill maps.
+function _projectRoot(): string {
+  return useProjectStore.getState().projectPath.replace(/\\/g, '/').replace(/\/$/, '')
+}
+
+function _regBoard(key: string, kind: 'board' | 'flow', runId: string | undefined, startedAt: number): void {
+  const p = boardParamsForKey(key)
+  useRunRegistryStore.getState().registerRun({
+    target: kind === 'flow' ? flowTarget(key) : boardTarget(key),
+    runId: runId || '', kind, startedAt, projectRoot: _projectRoot(), board: p.board, scope: p.scope,
+  })
+}
+
+function _regGoal(goalId: string, runId: string | undefined, startedAt: number): void {
+  const p = _goalBoardParams(goalId)
+  if (!p) return
+  useRunRegistryStore.getState().registerRun({
+    target: goalTarget(goalId),
+    runId: runId || '', kind: 'goal', startedAt, projectRoot: _projectRoot(), board: p.board, scope: p.scope,
+  })
+}
+
+// A board key can host either a board-run or a board-scoped flow — clear both targets so a
+// completion never strands the other in the registry.
+function _clearBoardReg(key: string): void {
+  useRunRegistryStore.getState().clearRun(boardTarget(key))
+  useRunRegistryStore.getState().clearRun(flowTarget(key))
+}
+
+function _clearGoalReg(goalId: string): void {
+  useRunRegistryStore.getState().clearRun(goalTarget(goalId))
 }
 
 export const useCommsStore = create<CommsState>()((set, get) => ({
@@ -631,7 +677,7 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
         // The pill clears when the board_run 'done' phase arrives over the comms SSE →
         // markBoardRunPhase — or, if that's missed (navigated away / SSE stalled), via
         // this store-owned completion watch, which polls the board-lock and survives unmount.
-        if (res.ok) _startRunWatch(key, res.run_id)
+        if (res.ok) { _startRunWatch(key, res.run_id); _regBoard(key, 'board', res.run_id, now) }
       })
       .catch(() => {
         set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' } }))
@@ -659,7 +705,7 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
         }
         // Stays 'running' until board_run 'done' arrives via SSE, or the store-owned
         // completion watch (board-lock poll) clears it if that SSE event is missed.
-        if (res.ok) _startRunWatch(key, res.run_id)
+        if (res.ok) { _startRunWatch(key, res.run_id); _regBoard(key, 'board', res.run_id, now) }
       })
       .catch(() => {
         set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' } }))
@@ -681,8 +727,8 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
         if (res.ok) {
           // 'consultation' is an FSM-flow run (holds no board-lock) → watch the runner status
           // for the board's topic; light/full are single-agent board runs (board-lock watch).
-          if (rigor === 'consultation') _startFsmRunWatch(key, boardParamsForKey(key).scope)
-          else _startRunWatch(key, res.run_id)
+          if (rigor === 'consultation') { _startFsmRunWatch(key, boardParamsForKey(key).scope); _regBoard(key, 'flow', res.run_id, now) }
+          else { _startRunWatch(key, res.run_id); _regBoard(key, 'board', res.run_id, now) }
         } else set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' } }))
       })
       .catch(() => { set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' } })) })
@@ -703,8 +749,8 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
         if (res.ok) {
           // 'consultation' is an FSM-flow run (holds no board-lock) → watch the runner status
           // for the board's topic; light/full are single-agent board runs (board-lock watch).
-          if (rigor === 'consultation') _startFsmRunWatch(key, boardParamsForKey(key).scope)
-          else _startRunWatch(key, res.run_id)
+          if (rigor === 'consultation') { _startFsmRunWatch(key, boardParamsForKey(key).scope); _regBoard(key, 'flow', res.run_id, now) }
+          else { _startRunWatch(key, res.run_id); _regBoard(key, 'board', res.run_id, now) }
         } else set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' } }))
       })
       .catch(() => { set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' } })) })
@@ -724,7 +770,7 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
       stageOverrides: opts.stageOverrides,
     })
       .then((res) => {
-        if (res.ok) _startFsmRunWatch(key, boardParamsForKey(key).scope)
+        if (res.ok) { _startFsmRunWatch(key, boardParamsForKey(key).scope); _regBoard(key, 'flow', undefined, now) }
         else set((s) => ({ boardRunState: { ...s.boardRunState, [key]: res.busy ? 'busy' : 'idle' } }))
       })
       .catch(() => { set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' } })) })
@@ -740,6 +786,7 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
       }))
     } else if (phase === 'done' || phase === 'stopped') {
       _stopRunWatch(key)
+      _clearBoardReg(key)
       useToastStore.getState().push(
         phase === 'done' ? 'Agent done' : 'Agent stopped',
         phase === 'done' ? 'success' : 'info',
@@ -754,6 +801,7 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
 
   stopBoard: (key) => {
     _stopRunWatch(key)
+    _clearBoardReg(key)
     const params = boardParamsForKey(key)
     set((s) => ({ boardRunState: { ...s.boardRunState, [key]: 'idle' } }))
     void apiStopBoard(params.board, params.scope)
@@ -791,7 +839,7 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
         // store-owned board-lock completion watch. loop/team run through the scheduler / FSM and
         // don't hold the board lock across the run — a board-lock poll there would false-complete,
         // so they rely on the SSE alone.
-        if (res.ok && executor === 'single') _startGoalWatch(goal_id, res.run_id)
+        if (res.ok && executor === 'single') { _startGoalWatch(goal_id, res.run_id); _regGoal(goal_id, res.run_id, now) }
       })
       .catch(() => {
         set((s) => ({ goalRunState: { ...s.goalRunState, [goal_id]: 'idle' } }))
@@ -807,6 +855,7 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
       }))
     } else if (phase === 'done' || phase === 'stopped') {
       _stopGoalWatch(goal_id)
+      _clearGoalReg(goal_id)
       useToastStore.getState().push(
         phase === 'done' ? 'Goal run complete' : 'Goal run stopped',
         phase === 'done' ? 'success' : 'info',
@@ -821,6 +870,7 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
       // clock runs forever (the reported bug: it kept counting after the run died). Reset
       // the pill to idle and zero the start time so useElapsedProgress stops.
       _stopGoalWatch(goal_id)
+      _clearGoalReg(goal_id)
       useToastStore.getState().push('Goal run failed', 'error', { category: 'runner_state' })
       set((s) => ({
         goalRunState: { ...s.goalRunState, [goal_id]: 'idle' },
@@ -831,6 +881,7 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
 
   stopGoal: (goal_id) => {
     _stopGoalWatch(goal_id)
+    _clearGoalReg(goal_id)
     set((s) => ({ goalRunState: { ...s.goalRunState, [goal_id]: 'idle' } }))
     apiStopGoal(goal_id).catch(() => undefined)
   },
@@ -878,6 +929,47 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
     }
   },
 
+  rehydrateActiveRuns: async (projectRoot) => {
+    const reg = useRunRegistryStore.getState()
+    for (const e of reg.entriesForProject(projectRoot)) {
+      // Board-family only (board-lock / runner-status verified). Editor/summary one-shots are
+      // reconciled against the live gate-engine list by their own surface, not here.
+      if (e.kind !== 'board' && e.kind !== 'goal' && e.kind !== 'flow') continue
+      // Re-verify against the authoritative backend before showing a pill — never trust the
+      // persisted entry alone (the run may have finished while the app was closed). Distinguish
+      // "definitely finished" (clear) from "server unreachable" (keep, retry next mount) so a
+      // momentary hiccup on boot never false-clears a run that is actually still alive.
+      if (e.kind === 'flow') {
+        const st = await apiRunnerStatus(e.scope)
+        if (st === null) continue // unreachable — keep the entry
+        if (!['running', 'paused', 'awaiting_decision', 'finalizing'].includes(st)) { reg.clearRun(e.target); continue }
+      } else {
+        const status = await apiBoardRunStatus(e.board, e.scope)
+        if (!status) continue // unreachable — keep the entry
+        // Alive while the lock is held by our run (or by anyone, if we never captured the id).
+        const aliveNow = status.running && (!e.runId || !status.holder || status.holder === e.runId)
+        if (!aliveNow) { reg.clearRun(e.target); continue }
+      }
+
+      if (e.kind === 'goal') {
+        const goalId = e.target.slice('goal:'.length)
+        set((s) => ({
+          goalRunState: { ...s.goalRunState, [goalId]: 'running' },
+          goalRunStart: { ...s.goalRunStart, [goalId]: e.startedAt },
+        }))
+        _startGoalWatch(goalId, e.runId || undefined, { board: e.board, scope: e.scope })
+      } else {
+        const key = e.target.slice(e.target.indexOf(':') + 1)
+        set((s) => ({
+          boardRunState: { ...s.boardRunState, [key]: 'running' },
+          boardRunStart: { ...s.boardRunStart, [key]: e.startedAt },
+        }))
+        if (e.kind === 'flow') _startFsmRunWatch(key, e.scope)
+        else _startRunWatch(key, e.runId || undefined)
+      }
+    }
+  },
+
   decomposeGoal: (goal_id, mode, opts = {}) => {
     const now = Date.now()
     // Stamp the start time immediately so the ActionPill timer ticks at t0 (mirrors runGoal /
@@ -917,7 +1009,7 @@ export const useCommsStore = create<CommsState>()((set, get) => ({
         // store-owned board-lock completion watch as an SSE backstop. consultation runs the FSM
         // flow (no board lock) — a board-lock poll would false-complete it — so it relies on the
         // SSE alone.
-        if (mode === 'planner' || mode === 'plan') _startGoalWatch(goal_id)
+        if (mode === 'planner' || mode === 'plan') { _startGoalWatch(goal_id); _regGoal(goal_id, undefined, now) }
       })
       .catch(() => {
         set((s) => ({ goalRunState: { ...s.goalRunState, [goal_id]: 'idle' }, goalRunStart: { ...s.goalRunStart, [goal_id]: 0 } }))

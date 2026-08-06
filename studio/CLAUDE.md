@@ -159,6 +159,7 @@ The header pills spawn one-shot CLI agents against the open file. There are two 
 | `runnerStore` | `store/runnerStore.ts` | pipeline status, stage, adapter, cost, error — driven by SSE |
 | `terminalStore` | `store/terminalStore.ts` | terminal tabs registry; `addTab` registers, `openTab` reveals panel; also holds `spawnQueue: SpawnState` pushed from main via `spawn:state` IPC |
 | `markdownEditorStore` | `store/markdownEditorStore.ts` | cells, dirty state, and load/save logic for the Markdown Editor panel |
+| `runRegistryStore` | `store/runRegistryStore.ts` | **PERSISTED** (`localStorage` `pathly:active-runs`) run_id spine for the board's RunPills — target (`goal:`/`board:`/`flow:`) → `{runId, kind, startedAt, projectRoot, board, scope}`. `commsStore` registers at every board/goal/flow run-start and clears on completion; `commsStore.rehydrateActiveRuns(projectRoot)` (called on `CommandCenter` mount) re-verifies each entry against the backend (board-lock holder / FSM runner status; hiccup-safe — a null status keeps the entry, never false-clears) and repopulates the pill or clears it, so a run still alive after a full renderer reload reappears with its original elapsed clock. The `editor`/`summary` kinds are reserved for the MD-editor one-shots + summarizer (NOT yet wired — those still live in `uiStore.mdEditorActions` / `commsStore.summaryStatus` and survive navigation but not reload). |
 
 `RunnerStatus` union: `'idle' | 'running' | 'paused' | 'blocked' | 'error' | 'done' | 'aborted' | 'finalizing'`
 

@@ -129,12 +129,16 @@ export function CommandCenter() {
     // it's safe once per project open; boards pick up hydrated rows on their next poll.
     void apiHydrateBoards(projectPath.replace(/\\/g, '/').replace(/\/$/, ''))
     void store.loadFeatures(projectPath)
+    // Rehydrate any still-running board/goal/flow run pills for this project from the
+    // PERSISTED run registry (each re-verified against the backend), so a run in flight
+    // before a reload reappears instead of vanishing with the in-memory pill maps. Once on mount.
+    void store.rehydrateActiveRuns(projectPath.replace(/\\/g, '/').replace(/\/$/, ''))
     // The features list (stages, blocked status, newly-created features) has no live
     // push channel — refresh it periodically so the sidebar/cards don't go stale
     // until a manual action or remount.
     const id = window.setInterval(() => { void store.loadFeatures(projectPath) }, 10000)
     return () => window.clearInterval(id)
-  }, [projectPath, store.loadFeatures])
+  }, [projectPath, store.loadFeatures, store.rehydrateActiveRuns])
 
   // Reconcile the open board layout whenever the active project's feature set
   // changes — critically on a project switch, so feature tabs/sections from the
