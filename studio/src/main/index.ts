@@ -308,6 +308,10 @@ function registerIpcHandlers(win: BrowserWindow): void {
   })
 
   ipcMain.handle('window:setTitleBarOverlay', (_e, opts: { color: string; symbolColor: string }) => {
+    // setTitleBarOverlay is Windows/Linux-only — on macOS the method doesn't exist and
+    // calling it throws "is not a function" (an unhandled rejection on every theme change /
+    // reload). No-op where unsupported; the titlebar tint is a Win/Linux cosmetic anyway.
+    if (typeof win.setTitleBarOverlay !== 'function') return
     win.setTitleBarOverlay({ ...opts, height: 36 })
   })
 
