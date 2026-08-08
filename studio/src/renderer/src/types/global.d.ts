@@ -229,6 +229,7 @@ declare global {
         onSpawnState: (cb: (s: SpawnState) => void) => () => void
         queueControl: (action: QueueAction) => Promise<void>
         preflight: (force?: boolean) => Promise<EnginePreflight[]>
+        getEngines: () => Promise<RunningEngine[]>
         registerRunner: (tabId: string, topic: string, runId: string, label?: string, category?: 'flow' | 'loop' | 'single') => Promise<void>
         onStageResult: (cb: (tabId: string, data: Record<string, unknown>) => void) => () => void
       }

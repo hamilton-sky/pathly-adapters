@@ -6,7 +6,8 @@
 // setMdEditorAction action union, setMdEditorDiagramPath(path, forFile),
 // mdEditorDiagramPanelOpen, and selectMdEditorDiagram.
 
-import { useCallback, useEffect } from 'react'
+import { useCallback } from 'react'
+import { useOneShotReconcile } from './useOneShotReconcile'
 import { useTerminalStore } from '../../../../store/terminalStore'
 import { useUiStore } from '../../../../store/uiStore'
 import type { TerminalTab } from '../../../../store/terminalStore'
@@ -69,16 +70,9 @@ export function useEditorDiagramAction(
   const openTab = useTerminalStore((s) => s.openTab)
   const setMdEditorAction = useUiStore((s) => s.setMdEditorAction)
   const setMdEditorDiagramPath = useUiStore((s) => s.setMdEditorDiagramPath)
-  const tabs = useTerminalStore((s) => s.tabs)
-
-  // Stale-run reconciliation — reset a 'running' slot whose terminal tab has vanished.
-  useEffect(() => {
-    if (!mdEditorPath) return
-    const slot = useUiStore.getState().mdEditorActions[mdEditorPath]?.diagram
-    if (slot?.status === 'running' && slot.tabId && !tabs.some((t) => t.id === slot.tabId)) {
-      setMdEditorAction(mdEditorPath, 'diagram', null)
-    }
-  }, [mdEditorPath, tabs, setMdEditorAction])
+  // Reload-resilient liveness reconcile — re-verify a persisted 'running' diagram slot against
+  // the live gate engines (which survive a reload, unlike terminalStore.tabs) and clear if gone.
+  useOneShotReconcile(mdEditorPath, 'diagram')
 
   const clearIfStill = useCallback(
     (forFile: string, tabId: string) => {

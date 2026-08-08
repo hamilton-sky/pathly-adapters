@@ -1,4 +1,5 @@
-import { useCallback, useEffect } from 'react'
+import { useCallback } from 'react'
+import { useOneShotReconcile } from './useOneShotReconcile'
 import { useTerminalStore } from '../../../../store/terminalStore'
 import { useUiStore } from '../../../../store/uiStore'
 import type { TerminalTab } from '../../../../store/terminalStore'
@@ -66,20 +67,11 @@ export function useEditorAgentActions(
   const setMdEditorSplitDraftPath = useUiStore((s) => s.setMdEditorSplitDraftPath)
   const setMdEditorViewMode      = useUiStore((s) => s.setMdEditorViewMode)
   const setMdEditorAction        = useUiStore((s) => s.setMdEditorAction)
-  // Subscribe to the tab list so the reconciliation effect below re-runs on add/remove.
-  const tabs = useTerminalStore((s) => s.tabs)
-
-  // Stale-run reconciliation: if the visible file has a split slot still marked 'running' but
-  // its terminal tab has vanished (closed manually, or a backend exit we never received), reset
-  // it so the pill can't spin forever. Zero false positives — a healthy run keeps its tab in the
-  // store until onExit closes it, and completed runs are status 'success'/'error', not 'running'.
-  useEffect(() => {
-    if (!mdEditorPath) return
-    const slot = useUiStore.getState().mdEditorActions[mdEditorPath]?.split
-    if (slot?.status === 'running' && slot.tabId && !tabs.some((t) => t.id === slot.tabId)) {
-      setMdEditorAction(mdEditorPath, 'split', null)
-    }
-  }, [mdEditorPath, tabs, setMdEditorAction])
+  // Reload-resilient liveness reconcile (useOneShotReconcile): re-verify a persisted 'running'
+  // split slot against the LIVE gate engines (which survive a full reload, unlike
+  // terminalStore.tabs) and clear it if the run is no longer alive — the pill now survives a
+  // reload but still can't spin forever.
+  useOneShotReconcile(mdEditorPath, 'split')
 
   // Clear a slot back to idle, but only if it still holds the transient state we set —
   // never clobber a newer run that started on the same file in the meantime.

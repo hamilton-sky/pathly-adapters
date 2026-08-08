@@ -1131,6 +1131,12 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
 
   ipcMain.handle('terminal:preflight', async (_event, force?: boolean) => preflightEngines(force === true))
 
+  // Synchronous snapshot of the LIVE gate engines (main-process-owned, so it survives a
+  // renderer reload). Lets a renderer that reloaded mid-run re-verify a one-shot's liveness
+  // authoritatively on mount — unlike the async `spawn:state` push, which can arrive empty
+  // first and race a reconcile into false-clearing a run that is actually still alive.
+  ipcMain.handle('terminal:get-engines', () => Array.from(activeEngines.values()))
+
   ipcMain.handle('terminal:register-runner', (_event, tabId: string, topic: string, runId: string, label?: string, category?: 'flow' | 'loop' | 'single') => {
     runnerTabMeta.set(tabId, { run_id: runId, topic, spawnedAt: Date.now(), label: label ?? tabId, category })
   })

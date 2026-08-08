@@ -6,7 +6,8 @@
 // longer overwrites a single `.analysis` file and no longer routes through composeClientSkill
 // — the lens presets (ANALYZE_LENSES) carry the full append-contract prompt.
 
-import { useCallback, useEffect } from 'react'
+import { useCallback } from 'react'
+import { useOneShotReconcile } from './useOneShotReconcile'
 import { useTerminalStore } from '../../../../store/terminalStore'
 import { useUiStore } from '../../../../store/uiStore'
 import type { TerminalTab } from '../../../../store/terminalStore'
@@ -70,16 +71,9 @@ export function useEditorAnalysisAction(
   const openTab = useTerminalStore((s) => s.openTab)
   const setMdEditorAction = useUiStore((s) => s.setMdEditorAction)
   const setMdEditorAnalysisPath = useUiStore((s) => s.setMdEditorAnalysisPath)
-  const tabs = useTerminalStore((s) => s.tabs)
-
-  // Stale-run reconciliation — reset a 'running' slot whose terminal tab has vanished.
-  useEffect(() => {
-    if (!mdEditorPath) return
-    const slot = useUiStore.getState().mdEditorActions[mdEditorPath]?.analyze
-    if (slot?.status === 'running' && slot.tabId && !tabs.some((t) => t.id === slot.tabId)) {
-      setMdEditorAction(mdEditorPath, 'analyze', null)
-    }
-  }, [mdEditorPath, tabs, setMdEditorAction])
+  // Reload-resilient liveness reconcile — re-verify a persisted 'running' analyze slot against
+  // the live gate engines (which survive a reload, unlike terminalStore.tabs) and clear if gone.
+  useOneShotReconcile(mdEditorPath, 'analyze')
 
   const clearIfStill = useCallback(
     (forFile: string, tabId: string) => {

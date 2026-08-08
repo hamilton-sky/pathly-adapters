@@ -51,6 +51,24 @@ export interface MdEditorActionRecord {
 /** Editor one-shot action keys (widened from 'split' | 'analyze' for the Diagram feature). */
 export type MdEditorAction = 'split' | 'analyze' | 'diagram'
 
+// Persist ONLY 'running' slots. success/error/idle are transient (they auto-clear a few seconds
+// after a run) and must not restore stale after a reload; the surviving 'running' slots are then
+// re-verified against the live gate engines by useOneShotReconcile and cleared if no longer alive.
+export function pickRunningActions(
+  map: Record<string, MdEditorActionRecord>,
+): Record<string, MdEditorActionRecord> {
+  const out: Record<string, MdEditorActionRecord> = {}
+  for (const [file, rec] of Object.entries(map)) {
+    const running: MdEditorActionRecord = {}
+    for (const action of ['split', 'analyze', 'diagram'] as const) {
+      const slot = rec[action]
+      if (slot?.status === 'running') running[action] = slot
+    }
+    if (Object.keys(running).length) out[file] = running
+  }
+  return out
+}
+
 export interface UiState {
   sidebarCollapsed: boolean
   /** Which tab the expanded sidebar shows — persisted to localStorage 'pathly:sidebarTab' */
@@ -283,7 +301,7 @@ export const useUiStore = create<UiState>()(
     }),
     {
       name: 'pathly-studio-ui',
-      partialize: (s) => ({ sidebarCollapsed: s.sidebarCollapsed, theme: s.theme, preferredDark: s.preferredDark, preferredLight: s.preferredLight, mdEditorPreviewOpen: s.mdEditorPreviewOpen }),
+      partialize: (s) => ({ sidebarCollapsed: s.sidebarCollapsed, theme: s.theme, preferredDark: s.preferredDark, preferredLight: s.preferredLight, mdEditorPreviewOpen: s.mdEditorPreviewOpen, mdEditorActions: pickRunningActions(s.mdEditorActions) }),
     }
   )
 )
