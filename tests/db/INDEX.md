@@ -4,7 +4,7 @@
 
 Database layer — schema/queries, connection isolation, write guard.
 
-9 test file(s).
+10 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -16,4 +16,5 @@ Database layer — schema/queries, connection isolation, write guard.
 | `test_run_history_identity.py` | run-identity: run_history as the identity map run_id -> (project_root, slug, board_scope) | 6 |
 | `test_run_history_read.py` | Unified run read-model — _classify_kind / list_runs / get_run_detail / overlay_live_status | 9 |
 | `test_run_log.py` | run_log store — per-spawn Complete Run Record (unified-control-plane P0, ARCHITECTURE §8.1) | 5 |
+| `test_spawn_policy.py` | spawn-policy P0 — per-agent model + logging config (db/queries/app_settings) | 7 |
 | `test_stage_configs.py` | stage_configs query helpers — flow-phase-inspector (#5) per-stage selection persistence | 5 |

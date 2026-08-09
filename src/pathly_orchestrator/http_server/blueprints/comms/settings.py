@@ -231,6 +231,92 @@ def comms_set_default_progress():
         return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
 
 
+# ── spawn-policy P1 — per-agent model + logging config API ─────────────
+# Mirrors the /comms/default-progress pair. The one editable surface behind the Settings UI;
+# both this and the Python resolver read the SAME DB rows (db/queries/app_settings), so nothing
+# re-fragments. The always-on cost/monitor spine is NOT exposed here — by design it can't be
+# toggled off (see get_logging_config / the spawn-policy SPEC §0 invariant).
+
+
+@bp.route("/comms/model-policy", methods=["GET"])
+def comms_get_model_policy():
+    """Return {default: {adapter,model}|null, roles: {<role>: {adapter,model}}} for the UI."""
+    try:
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.queries.app_settings import get_model_policy
+
+        return jsonify(get_model_policy(_get_db())), 200
+    except Exception as exc:
+        logging.exception("comms_get_model_policy error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
+@bp.route("/comms/model-policy", methods=["POST"])
+def comms_set_model_policy():
+    """Set the global default (role null/'default') or a per-role override, or clear one.
+
+    Body: {role?: str|null, adapter: str, model?: str}  — set; `model` '' ⇒ engine default.
+          {role: str, clear: true}                       — remove that override.
+    """
+    try:
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.queries.app_settings import (
+            clear_agent_model,
+            set_agent_model,
+        )
+
+        data = request.get_json(silent=True) or {}
+        role = data.get("role")
+        if data.get("clear") is True:
+            clear_agent_model(_get_db(), role)
+            return jsonify({"ok": True, "cleared": role or "default"}), 200
+        adapter = data.get("adapter")
+        model = data.get("model", "")
+        if not isinstance(adapter, str) or not adapter.strip():
+            return jsonify({"error": "Field 'adapter' must be a non-empty string"}), 400
+        try:
+            set_agent_model(_get_db(), role, adapter, model if isinstance(model, str) else "")
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        return jsonify({"ok": True, "role": role or "default", "adapter": adapter, "model": model}), 200
+    except Exception as exc:
+        logging.exception("comms_set_model_policy error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
+@bp.route("/comms/logging-config", methods=["GET"])
+def comms_get_logging_config():
+    """Return {board: bool, verbosity: 'quiet'|'normal'|'verbose'} — the AGENT-narration sinks.
+
+    The cost/monitor spine is intentionally absent (always on)."""
+    try:
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.queries.app_settings import get_logging_config
+
+        return jsonify(get_logging_config(_get_db())), 200
+    except Exception as exc:
+        logging.exception("comms_get_logging_config error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
+@bp.route("/comms/logging-config", methods=["POST"])
+def comms_set_logging_config():
+    """Turn agent BOARD narration on/off. Body: {board: bool}. Never touches the monitor spine."""
+    try:
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.queries.app_settings import set_logging_board_enabled
+
+        data = request.get_json(silent=True) or {}
+        board = data.get("board")
+        if not isinstance(board, bool):
+            return jsonify({"error": "Field 'board' must be a boolean"}), 400
+        set_logging_board_enabled(_get_db(), board)
+        return jsonify({"ok": True, "board": board}), 200
+    except Exception as exc:
+        logging.exception("comms_set_logging_config error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
 @bp.route("/comms/agent-context", methods=["POST"])
 def comms_agent_context():
     """Return board context in BOARD-INFO mode."""

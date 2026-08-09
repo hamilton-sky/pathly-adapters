@@ -4,7 +4,7 @@
 
 HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, prompt-event contract.
 
-8 test file(s).
+9 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -16,3 +16,4 @@ HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, 
 | `test_http_server.py` | Integration tests for the HTTP server endpoints | 26 |
 | `test_ops_export.py` | POST /ops/export skill selection + GET /ops/export/skills tier listing | 4 |
 | `test_runs_read.py` | Control-plane run read API — GET /runs, GET /runs/<run_id> (unified-control-plane P0, | 6 |
+| `test_spawn_policy_routes.py` | spawn-policy P1 — /comms/model-policy + /comms/logging-config routes | 4 |
