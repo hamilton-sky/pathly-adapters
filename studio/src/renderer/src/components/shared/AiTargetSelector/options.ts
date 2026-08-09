@@ -37,22 +37,29 @@ export function decode(value: string): AiSelection {
 /** Build the grouped option model. `allowOff` prepends a single "Off" group.
  *  `preflight` (optional, keyed by adapter id) greys out engines that are not installed
  *  on this machine — without it every engine reads as usable and picking a missing one
- *  fails only at spawn time. Omitting it preserves the previous behavior exactly. */
+ *  fails only at spawn time. Omitting it preserves the previous behavior exactly.
+ *  `allowLocalModels` (default false) shows the local-model group. Local models are a SEPARATE
+ *  system (chat uses them via modelStore); the summary target — the only user of this selector —
+ *  is CLI-engine-only, so every summary spawn goes through the one gate (run_id + cost + policy).
+ *  A caller opts into local models explicitly. */
 export function buildGroups(
   allowOff: boolean,
   preflight?: Record<string, EnginePreflight>,
+  allowLocalModels = false,
 ): AiOptionGroup[] {
   const groups: AiOptionGroup[] = []
   if (allowOff) {
     groups.push({ heading: '', options: [{ value: OFF_VALUE, label: 'Off' }] })
   }
-  groups.push({
-    heading: 'Models',
-    options: [
-      ...MODEL_CATALOG.map((m) => ({ value: `model:${m.id}`, label: m.name })),
-      { value: `model:${BRIGHTSKY_ID}`, label: 'Brightsky' },
-    ],
-  })
+  if (allowLocalModels) {
+    groups.push({
+      heading: 'Models',
+      options: [
+        ...MODEL_CATALOG.map((m) => ({ value: `model:${m.id}`, label: m.name })),
+        { value: `model:${BRIGHTSKY_ID}`, label: 'Brightsky' },
+      ],
+    })
+  }
   groups.push({
     heading: 'CLI Engines',
     options: ADAPTER_META.map((m) => {

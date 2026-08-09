@@ -91,6 +91,10 @@ export async function summarizeArtifactById(
   note?: string,
 ): Promise<boolean> {
   if (isOff(selection)) return false
+  // Local models are a separate system (chat only). A summary must run on a CLI agent so it goes
+  // through the ONE gate (run_id + cost + policy) — the selector no longer offers local models for
+  // summaries, and any stale stored local-model target is coerced to the default CLI adapter here.
+  if (selection.type === 'model') selection = { type: 'engine', id: 'claude' }
   const name = artifactPath.split(/[/\\]/).pop() ?? artifactPath
   if (!isSummarizable(undefined, name)) return false
 

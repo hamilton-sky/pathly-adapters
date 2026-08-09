@@ -77,10 +77,15 @@ export function useResummarize(messageId: string): ResummarizeHook {
       if (!row) return
       if (row.summary_style) setStyleState(row.summary_style)
       if (row.summary_note) { setNoteState(row.summary_note); noteRef.current = row.summary_note }
+      // Local models are a separate system (chat only) — a summary always runs on a CLI agent so it
+      // goes through the gate. Coerce any stored local-model target to the default CLI adapter
+      // (Off is preserved). New picks are already CLI-only (the selector no longer lists locals).
+      const cliOnly = (sel: AiSelection): AiSelection =>
+        sel.type === 'model' && !isOff(sel) ? { type: 'engine', id: 'claude' } : sel
       const saved = parseSelection(row.summary_selection)
-      if (saved) { setSelectionState(saved); return }
+      if (saved) { setSelectionState(cliOnly(saved)); return }
       const def = await apiGetDefaultSelection()
-      if (alive && def) setSelectionState(def)
+      if (alive && def) setSelectionState(cliOnly(def))
     })
     return () => { alive = false }
   }, [messageId])

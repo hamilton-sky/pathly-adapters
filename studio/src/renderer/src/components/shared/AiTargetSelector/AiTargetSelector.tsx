@@ -18,6 +18,9 @@ interface Props {
   onChange: (sel: AiSelection) => void
   /** When true, adds an "Off" row that emits AI_SELECTION_OFF (consumers skip the run). */
   allowOff?: boolean
+  /** When true, also lists LOCAL models (a separate system used by chat). Default false: this
+   *  selector (the summary target) is CLI-engine-only so every summary spawn goes through the gate. */
+  allowLocalModels?: boolean
   id?: string
   ariaLabel?: string
   /** Disable the whole control (e.g. while a run is in flight). */
@@ -28,6 +31,7 @@ export function AiTargetSelector({
   value,
   onChange,
   allowOff = false,
+  allowLocalModels = false,
   id,
   ariaLabel = 'AI target',
   disabled = false,
@@ -41,7 +45,7 @@ export function AiTargetSelector({
   // Engines that are not installed on this machine are greyed with their install command,
   // reusing the same disabledReason channel as noHeadless rather than a parallel mechanism.
   const { byAdapter } = useEnginePreflight()
-  const groups = buildGroups(allowOff, byAdapter)
+  const groups = buildGroups(allowOff, byAdapter, allowLocalModels)
   const current = encode(value)
   const triggerLabel = current === '' ? 'Select AI target…' : labelForValue(current, groups)
 
