@@ -318,6 +318,7 @@ def _run_loop(
     """Supervisor owns the frontier via scheduler_loop (SerialIsolation), scoped to goal."""
     from pathly_orchestrator.supervisor import board_lock
     from pathly_orchestrator.supervisor.isolation import SerialIsolation
+    from pathly_orchestrator.supervisor.registry import _record_run_history
     from pathly_orchestrator.supervisor.scheduler import scheduler_loop
     from pathly_orchestrator.supervisor.state import RunnerState
 
@@ -389,12 +390,21 @@ def _run_loop(
         scope_tier=state.scope_tier,
         executor="loop",
     )
+    # Early run_history PARENT row (adapter="goal-loop" via state.flow) so the loop shows as ONE
+    # run in GET /runs while it runs — its per-task sched-* rows fold under it (run_history_read).
+    # _run_loop builds its own RunnerState (never start_run), so nothing else writes this row.
+    _record_run_history(state, "running")
     isolation = SerialIsolation()
 
     def _abort_check() -> bool:
         return board_lock.holder(board, scope) != run_id
 
     def _work() -> dict:
+        import time as _t
+
+        def _iso_now() -> str:
+            return _t.strftime("%Y-%m-%dT%H:%M:%SZ", _t.gmtime())
+
         try:
             _safe_call(on_start, run_id)
             kwargs: dict = dict(
@@ -412,7 +422,11 @@ def _run_loop(
             res["goal_id"] = goal_id
             res["run_id"] = run_id
             _safe_call(on_done, run_id, res)
+            _record_run_history(state, "done", finished_at=_iso_now())
             return res
+        except Exception:
+            _record_run_history(state, "error", finished_at=_iso_now())
+            raise
         finally:
             board_lock.release(board, scope, run_id)
 

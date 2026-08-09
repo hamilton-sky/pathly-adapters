@@ -401,7 +401,11 @@ both now land as columns instead of being re-derived. The pieces:
   `start_run`'s **early `running` row**) writes `state.flow` there — fixing (1) completed flows
   reclassifying to `single`/$0, and (2) `team`/consultation/feature/project runs (which call
   `start_run` directly, bypassing `/runner/start`) being invisible in `GET /runs` until they
-  finished.
+  finished. The goal **`loop`** executor is the same shape: `_run_loop` writes its own PARENT row
+  (`adapter="goal-loop"` via `state.flow`) — the read-model classifies a `goal-loop` bare-uuid as
+  a **loop parent** (`_is_parent`) that windows its per-task `sched-*` rows (folded out of
+  `list_runs`, folded INTO its RunDetail as stages), so a loop shows as ONE run with real cost
+  instead of N task rows + a 404-ing parent uuid. A legacy parent-less loop still lists its tasks.
   Renderer-driven one-shots (editor AI actions, ai-router artifact/HQ summaries) never
   cross the supervisor, so their ONLY Python seam — `POST /db/invocation`
   (`blueprints/ops/db_api_invocation.py`) — writes their own `done` `run_history` row (+

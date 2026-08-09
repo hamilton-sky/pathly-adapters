@@ -58,16 +58,34 @@ def _classify_kind(run_id: str, adapter: str | None) -> str:
     """Classify a run by run_id shape + adapter (ARCHITECTURE §1).
 
     Returns ``'loop'`` | ``'stage'`` | ``'flow'`` | ``'single'``. ``'stage'`` is a CHILD of a
-    flow — excluded from ``list_runs`` and folded into the parent's RunDetail.
+    flow — excluded from ``list_runs`` and folded into the parent's RunDetail. ``'loop'`` covers
+    BOTH a loop's per-task ``sched-*`` rows (children) AND its bare-uuid PARENT (adapter
+    ``goal-loop``); the two are told apart by run_id shape (``_is_parent``), so the parent windows
+    its ``sched-*`` tasks like a flow windows its stages.
     """
     rid = run_id or ""
     if rid.startswith("sched-"):
         return "loop"
     if _STAGE_RE.search(rid):
         return "stage"
-    if (adapter or "") in FLOW_NAMES:
+    a = adapter or ""
+    if a in FLOW_NAMES:
         return "flow"
+    if a == "goal-loop":  # goal `loop` executor PARENT (supervisor/goal_executor._run_loop)
+        return "loop"
     return "single"
+
+
+def _is_parent(run_id: str, adapter: str | None) -> bool:
+    """A windowed PARENT run: its children are separate run_history rows folded into its detail
+    and out of ``list_runs``, and its cost is summed over the child time-window (not its own
+    run_id, which carries no invocations). True for flow/decompose and for a loop PARENT
+    (``goal-loop`` adapter on a bare uuid — a loop TASK is ``sched-*`` and is a child, not a
+    parent)."""
+    kind = _classify_kind(run_id, adapter)
+    if kind in ("flow", "decompose"):
+        return True
+    return kind == "loop" and not (run_id or "").startswith("sched-")
 
 
 def _run_cost(
@@ -77,12 +95,13 @@ def _run_cost(
     ``agent_invocations`` — the SAME fact table the Monitor RECENT cards read, so the
     figures reconcile (§1.1).
 
-    single / loop / stage → exact SUM over ``run_id``. flow / decompose → SUM over the stage
-    time-window (``project_root`` + ``feature`` + ``board_scope``, ``started_at`` within the
-    parent's lifespan) — the PO-sanctioned window join (approximate under back-to-back
-    same-board runs; made exact in P1 by stamping the parent run_id onto stage rows).
+    single / loop-task / stage → exact SUM over ``run_id``. PARENT runs (flow / decompose /
+    loop parent, ``_is_parent``) → SUM over the child time-window (``project_root`` + ``feature``
+    + ``board_scope``, ``started_at`` within the parent's lifespan) — the PO-sanctioned window
+    join (approximate under back-to-back same-board runs; made exact in P1 by stamping the parent
+    run_id onto child rows).
     """
-    if kind in ("flow", "decompose"):
+    if _is_parent(row["run_id"], row["adapter"]):
         upper = row["finished_at"] or _now_iso()
         agg = conn.execute(
             "SELECT COALESCE(SUM(cost_usd), 0.0) c, "
@@ -113,10 +132,11 @@ def list_runs(
 ) -> list[dict]:
     """One row per TOP-LEVEL run for ``project_root`` (ARCHITECTURE §4.1).
 
-    Stage rows are folded out; running rows appear (status from ``run_history``). Newest
-    first (by ``finished_at`` else ``started_at``), capped at ``limit``. Each row:
-    ``{run_id, kind, feature, board_scope, status, adapter, started_at, finished_at,
-    stage_count, cost_usd, tokens_total}``.
+    Stage rows are folded out; a loop's per-task ``sched-*`` rows fold under their loop parent
+    (so a loop shows as ONE row, not parent + N tasks — a legacy parent-less loop still shows its
+    tasks); running rows appear (status from ``run_history``). Newest first (by ``finished_at``
+    else ``started_at``), capped at ``limit``. Each row: ``{run_id, kind, feature, board_scope,
+    status, adapter, started_at, finished_at, stage_count, cost_usd, tokens_total}``.
     """
     pr = _norm(project_root or "")
     if not pr:
@@ -126,11 +146,31 @@ def list_runs(
         "ORDER BY COALESCE(finished_at, started_at) DESC",
         (pr,),
     ).fetchall()
+    # Loop parents in this set — their sched-* task rows fold under them (like stages under a
+    # flow). A parent-less (legacy) loop has nothing covering its tasks, so those still show.
+    loop_parents = [
+        r
+        for r in rows
+        if not (r["run_id"] or "").startswith("sched-")
+        and _classify_kind(r["run_id"], r["adapter"]) == "loop"
+    ]
+
+    def _folded_loop_task(r: sqlite3.Row) -> bool:
+        if not (r["run_id"] or "").startswith("sched-"):
+            return False
+        st = r["started_at"] or ""
+        return any(
+            p["feature"] == r["feature"]
+            and (p["board_scope"] or p["feature"]) == (r["board_scope"] or r["feature"])
+            and (p["started_at"] or "") <= st <= (p["finished_at"] or _now_iso())
+            for p in loop_parents
+        )
+
     out: list[dict] = []
     cap = max(1, limit)
     for r in rows:
         kind = _classify_kind(r["run_id"], r["adapter"])
-        if kind == "stage":
+        if kind == "stage" or _folded_loop_task(r):
             continue
         cost_usd, tokens_total = _run_cost(conn, r, kind)[:2]
         stage_count = r["stage_count"] or (1 if kind in ("single", "loop") else 0)
@@ -154,13 +194,14 @@ def list_runs(
     return out
 
 
-def _window_stage_rows(
+def _child_rows(
     conn: sqlite3.Connection, parent: sqlite3.Row
 ) -> list[sqlite3.Row]:
-    """Child stage ``run_history`` rows within the parent flow's lifespan (§1.1 window
-    join), excluding the parent itself and any non-stage-shaped row that happens to fall in
-    the window (a back-to-back sibling flow-parent is a bare uuid → not ``stage`` → dropped).
-    """
+    """Child ``run_history`` rows folded into a PARENT run's detail (§1.1 window join), within
+    the parent's lifespan (``project_root`` + ``feature`` + ``board_scope`` + timespan), excluding
+    the parent itself. For a flow/decompose parent the children are stage-shaped rows; for a loop
+    parent they are the per-task ``sched-*`` rows. A back-to-back sibling PARENT (a bare uuid) is
+    neither stage- nor sched-shaped → dropped."""
     upper = parent["finished_at"] or _now_iso()
     rows = conn.execute(
         "SELECT * FROM run_history "
@@ -174,12 +215,18 @@ def _window_stage_rows(
             upper,
         ),
     ).fetchall()
-    return [
-        r
-        for r in rows
-        if r["run_id"] != parent["run_id"]
-        and _classify_kind(r["run_id"], r["adapter"]) == "stage"
-    ]
+    is_loop = _classify_kind(parent["run_id"], parent["adapter"]) == "loop"
+    out: list[sqlite3.Row] = []
+    for r in rows:
+        if r["run_id"] == parent["run_id"]:
+            continue
+        rid = r["run_id"] or ""
+        if is_loop:
+            if rid.startswith("sched-"):
+                out.append(r)
+        elif _classify_kind(rid, r["adapter"]) == "stage":
+            out.append(r)
+    return out
 
 
 def _enrich_stage(conn: sqlite3.Connection, r: sqlite3.Row) -> dict:
@@ -271,8 +318,8 @@ def get_run_detail(conn: sqlite3.Connection, run_id: str) -> dict:
         }
 
     kind = _classify_kind(row["run_id"], row["adapter"])
-    if kind in ("flow", "decompose"):
-        stage_rows: list[sqlite3.Row] = _window_stage_rows(conn, row)
+    if _is_parent(row["run_id"], row["adapter"]):
+        stage_rows: list[sqlite3.Row] = _child_rows(conn, row)
     else:
         stage_rows = [row]
     stages = [_enrich_stage(conn, sr) for sr in stage_rows]

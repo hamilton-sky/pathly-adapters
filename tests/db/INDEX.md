@@ -14,7 +14,7 @@ Database layer — schema/queries, connection isolation, write guard.
 | `test_db_isolation.py` | covers project root isolation; get db reopens connection when db path changes | 2 |
 | `test_db_write_guard.py` | Regression: a write that raises inside `_get_write_lock` must roll back and | 3 |
 | `test_event_mirror.py` | EventMirror — DB -> disk export for EVENTS.jsonl (state-one-authority, additive P1a) | 11 |
-| `test_run_history_flow_kind.py` | FSM-flow parent-row identity in the run read-model (unified-control-plane spawn-tracking) | 3 |
+| `test_run_history_flow_kind.py` | FSM-flow parent-row identity in the run read-model (unified-control-plane spawn-tracking) | 6 |
 | `test_run_history_identity.py` | run-identity: run_history as the identity map run_id -> (project_root, slug, board_scope) | 6 |
 | `test_run_history_read.py` | Unified run read-model — _classify_kind / list_runs / get_run_detail / overlay_live_status | 9 |
 | `test_run_log.py` | run_log store — per-spawn Complete Run Record (unified-control-plane P0, ARCHITECTURE §8.1) | 5 |

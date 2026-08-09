@@ -21,14 +21,22 @@ import pytest
 
 from pathly_orchestrator.db import get_db
 from pathly_orchestrator.db.queries.run_history import upsert_run
-from pathly_orchestrator.db.queries.run_history_read import list_runs
+from pathly_orchestrator.db.queries.run_history_read import (
+    _classify_kind,
+    get_run_detail,
+    list_runs,
+)
 
 PR = "C:/tmp/flowkindproj"
 FEAT = "flowfeat"
 PARENT = "ababcdef-1234-5678-9abc-def012345678"  # bare hex uuid (letter-tailed → not stage-shaped)
+LOOP_PARENT = "beadfeed-1111-2222-3333-abcdef012345"  # bare uuid + adapter goal-loop → loop parent
+TASK1 = "sched-task-aaa"  # loop task (sched-* → child, folds under the loop parent)
+TASK2 = "sched-task-bbb"
 ST1 = "flowfeat-1-1784800000000"  # {topic}-{N}-{ts} -> stage-shaped
 T0 = "2026-07-30T10:00:00+00:00"
 S1 = "2026-07-30T10:00:05+00:00"
+S2 = "2026-07-30T10:00:10+00:00"
 TF = "2026-07-30T10:05:00Z"
 
 _AI = (
@@ -115,3 +123,44 @@ def test_finishing_with_cli_adapter_would_regress_to_single_zero() -> None:
     done = {r["run_id"]: r for r in list_runs(conn, PR)}
     assert done[PARENT]["kind"] == "single"  # misclassified
     assert done[PARENT]["cost_usd"] == 0.0  # cost lost
+
+
+# --- GAP 3: goal `loop` parent row --------------------------------------------------------
+def test_classify_goal_loop_parent() -> None:
+    assert _classify_kind(LOOP_PARENT, "goal-loop") == "loop"  # bare uuid + goal-loop → parent
+    assert _classify_kind("sched-x", "claude") == "loop"  # a task is also 'loop' (a child)
+
+
+def test_loop_parent_folds_tasks_one_row_windowed_cost() -> None:
+    """The loop shows as ONE run (the parent); its sched-* task rows fold under it with
+    window-summed cost (the parent uuid carries no invocation of its own → would be $0)."""
+    conn = get_db()
+    upsert_run(conn, PR, FEAT, LOOP_PARENT, "running", started_at=T0,
+               adapter="goal-loop", board_scope=FEAT)
+    upsert_run(conn, PR, FEAT, TASK1, "done", started_at=S1, finished_at=S1,
+               adapter="claude", board_scope=FEAT)
+    upsert_run(conn, PR, FEAT, TASK2, "done", started_at=S2, finished_at=S2,
+               adapter="claude", board_scope=FEAT)
+    _ins(conn, _AI, (PR, FEAT, TASK1, "task", S1, 500, 500, 0.40, FEAT))
+    _ins(conn, _AI, (PR, FEAT, TASK2, "task", S2, 500, 500, 0.60, FEAT))
+
+    byid = {r["run_id"]: r for r in list_runs(conn, PR)}
+    assert LOOP_PARENT in byid  # ONE row for the loop
+    assert TASK1 not in byid and TASK2 not in byid  # tasks folded (no double-count)
+    assert byid[LOOP_PARENT]["kind"] == "loop"
+    assert byid[LOOP_PARENT]["cost_usd"] == pytest.approx(1.00)  # window sum, not the parent's $0
+
+    detail = get_run_detail(conn, LOOP_PARENT)  # resolves (no 404 for the RunPill)
+    assert detail["run"] and detail["run"]["kind"] == "loop"
+    assert detail["cost"]["cost_usd"] == pytest.approx(1.00)
+    assert {s["run_id"] for s in detail["stages"]} == {TASK1, TASK2}  # tasks folded as stages
+
+
+def test_legacy_parentless_loop_still_shows_tasks() -> None:
+    """Backward-safe: a loop with NO parent row (pre-fix / historical) still surfaces its
+    sched-* task rows in list_runs — nothing folds them."""
+    conn = get_db()
+    upsert_run(conn, PR, FEAT, TASK1, "done", started_at=S1, finished_at=S1,
+               adapter="claude", board_scope=FEAT)
+    byid = {r["run_id"]: r for r in list_runs(conn, PR)}
+    assert TASK1 in byid and byid[TASK1]["kind"] == "loop"
