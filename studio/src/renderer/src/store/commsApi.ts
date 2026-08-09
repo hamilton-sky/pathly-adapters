@@ -399,32 +399,6 @@ export async function apiGetDefaultStyle(): Promise<SummaryStyle | null> {
   }
 }
 
-/** Fetch the app-default board-updates verbosity ('quiet'|'normal'|'verbose'), or null. */
-export async function apiGetDefaultProgress(): Promise<string | null> {
-  try {
-    const r = await apiFetch('/comms/default-progress')
-    if (!r.ok) return null
-    const json = (await r.json()) as { progress?: string | null }
-    return json.progress ?? null
-  } catch {
-    return null
-  }
-}
-
-/** Persist the app-default board-updates verbosity. Returns true on 2xx. */
-export async function apiSetDefaultProgress(progress: string): Promise<boolean> {
-  try {
-    const r = await apiFetch('/comms/default-progress', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ progress }),
-    })
-    return r.ok
-  } catch {
-    return false
-  }
-}
-
 /** Persist the app-default summary depth style. Returns true on 2xx. */
 export async function apiSetDefaultStyle(style: SummaryStyle): Promise<boolean> {
   try {

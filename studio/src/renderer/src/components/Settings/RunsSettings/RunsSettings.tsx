@@ -1,9 +1,7 @@
 import { useState } from 'react'
 import { useRunnerStore } from '../../../store/runnerStore'
 import { RadioCard } from '../RadioCard'
-import { ProgressSelect } from '../../shared/ProgressSelect/ProgressSelect'
 import { SpawnLimitsSection } from '../SpawnLimitsSection/SpawnLimitsSection'
-import { useDefaultProgress } from '../hooks/useDefaultProgress'
 import s from '../Settings.module.css'
 
 export function RunsSettings(): JSX.Element {
@@ -15,7 +13,6 @@ export function RunsSettings(): JSX.Element {
 
   const [costInput, setCostInput] = useState(String(maxCostUsd))
   const [iterInput, setIterInput] = useState(String(maxIterations))
-  const { progress: defaultProgress, setProgress: setDefaultProgress } = useDefaultProgress()
 
   function saveRunConfig(): void {
     const cost = parseFloat(costInput)
@@ -80,17 +77,6 @@ export function RunsSettings(): JSX.Element {
           <button data-testid="settings-runner-save-btn" type="button" className={s.saveBtn} onClick={saveRunConfig}>
             Save
           </button>
-        </div>
-      </div>
-
-      <div className={s.section}>
-        <div className={s.sectionTitle}>Board updates</div>
-        <div className={s.hint}>
-          How chatty a headless agent is on the board — the default for every board run
-          (single agent, Evaluate, decompose). Each run can still override it.
-        </div>
-        <div className={s.summaryTarget}>
-          <ProgressSelect value={defaultProgress} onChange={setDefaultProgress} />
         </div>
       </div>
 
