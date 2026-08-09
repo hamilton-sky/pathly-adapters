@@ -152,6 +152,28 @@ The header pills spawn one-shot CLI agents against the open file. There are two 
 
 **Prompt library (`PromptActionConfig`).** Every prompt-config surface renders one shared component — `shared/PromptActionConfig/` — behind the preset dropdown. Its presets **merge** the host's built-ins with the user's saved prompts via `useMergedPresets(builtins, {kind:'preset', category, projectRoot})` → `services/promptLibrary.ts` → `GET /skills/prompts`. Those `kind='preset'` prompts are now FILES (`pathly/prompts/<category>/<name>.md` + `~/.pathly/prompts/`, mirroring abilities — so they open in the MD editor and carry a `path`), not DB rows; the client contract is unchanged. a `PresetAddRow` "＋ Save current as prompt" (`onAddPreset`) persists the current text back (`POST /skills/prompts`). Wired categories: `diagram` / `analyze` / `split` (via `PromptPeekModal`'s `library` prop — the merged array drives both the dropdown and selection, and the modal spawns the editable text) and `comment` (`CommentConfigButton` + `CommentModal`; the send resolves the picked verb from the merged list in `Editor/index.tsx`). Fail-soft: an unreachable server → just the built-ins, behavior-identical.
 
+## Settings panel (`components/Settings/`)
+
+`SettingsPanel` is a left nav rail (`SettingsNav`, ARIA vertical tabs) + a content panel that swaps
+on the active group. Groups: **Appearance · Runs · Agents · Intelligence · System**. Each group is
+a component that renders one or more `Settings.module.css` `.section` blocks and owns its own
+state/hooks — the panel only tracks the active group. Add a group by extending the `SettingsGroup`
+union + `ITEMS` (`SettingsNav`) and the `PANELS` map (`SettingsPanel`).
+
+**Agents** (`AgentsSettings/` → `ModelsSettings/` + `LoggingSettings/`) is the **spawn-policy**
+control plane (feature: `pathly/features/spawn-policy/`) — DB-backed config read by BOTH the
+renderer gate and the Python resolver, so every spawn obeys one policy:
+- *Models* — global default + grouped per-agent overrides (Pipeline + Editor roles). Each `ModelRow`
+  = a company picker (`ADAPTER_META`, headless-only) + a `ModelPicker` (a `GET /telemetry/pricing`
+  dropdown with `$in/$out per MTok` hints + a "Custom model…" free-text escape hatch). Empty company
+  = inherit/unset. Hooks `ModelsSettings/hooks/{useModelPolicy,usePricing}.ts` → `apiGet/Set/Clear
+  ModelPolicy` + `apiGetPricing` (`store/commsApi.ts`) → `GET/POST /comms/model-policy`.
+- *Logging* — board-narration on/off + verbosity (reuses `ProgressSelect` + `useDefaultProgress`,
+  the same `board:default_progress` key as Runs → Board updates) + a LOCKED "Monitor + Cost —
+  always on" row (the cost/monitor spine is the control plane itself, never a toggle). Hook
+  `LoggingSettings/hooks/useLoggingConfig.ts` → `GET/POST /comms/logging-config`. Everything is
+  fail-safe: an older FSM server (pre-P1 routes) 404s → empty policy / no pricing / board-default-ON.
+
 ## Key Zustand stores
 
 | Store | File | Purpose |

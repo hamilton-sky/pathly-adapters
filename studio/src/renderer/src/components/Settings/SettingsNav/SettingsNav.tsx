@@ -1,12 +1,13 @@
 import { type KeyboardEvent } from 'react'
-import { Palette, Rocket, BrainCircuit, SlidersHorizontal, type LucideIcon } from 'lucide-react'
+import { Palette, Rocket, Bot, BrainCircuit, SlidersHorizontal, type LucideIcon } from 'lucide-react'
 import s from './SettingsNav.module.css'
 
-export type SettingsGroup = 'appearance' | 'runs' | 'intelligence' | 'system'
+export type SettingsGroup = 'appearance' | 'runs' | 'agents' | 'intelligence' | 'system'
 
 const ITEMS: { id: SettingsGroup; label: string; Icon: LucideIcon }[] = [
   { id: 'appearance', label: 'Appearance', Icon: Palette },
   { id: 'runs', label: 'Runs', Icon: Rocket },
+  { id: 'agents', label: 'Agents', Icon: Bot },
   { id: 'intelligence', label: 'Intelligence', Icon: BrainCircuit },
   { id: 'system', label: 'System', Icon: SlidersHorizontal },
 ]

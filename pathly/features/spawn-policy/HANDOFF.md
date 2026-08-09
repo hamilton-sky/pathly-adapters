@@ -51,36 +51,46 @@ The cost/monitor spine (`run_history`, `agent_invocations`, `completion-report`,
 - **Board posts carry run_id:** `db/queries/comms_messages.py::post_message(run_id=…)` writes the
   (already-existing) `comms_messages.run_id` column; `blueprints/comms/runs.py` posters stamp it.
   The read-model already JOINs on run_id → the RunDetail **Board tab can be exact**.
+- **Settings UI (Task 1 — DONE):** new **Agents** section in Settings
+  (`SettingsNav` `'agents'` / `Bot` icon + `SettingsPanel`), rendering
+  `AgentsSettings/` → `ModelsSettings/` + `LoggingSettings/`.
+  - *Models:* global default + grouped per-agent overrides (Pipeline + Editor roles). Each row =
+    company picker (`ADAPTER_META`, headless-only — claude/codex/antigravity) + `ModelPicker/`
+    (PRICING dropdown via `GET /telemetry/pricing` with `$in/$out per MTok` hints + a "Custom
+    model…" free-text escape hatch). An empty company = inherit/unset (clears the override). Hooks:
+    `ModelsSettings/hooks/{useModelPolicy,usePricing}.ts`.
+  - *Logging:* board-narration on/off toggle + verbosity (reuses `ProgressSelect` +
+    `useDefaultProgress`, disabled when off) + a LOCKED "Monitor + Cost — always on" row (§0
+    invariant, made visible). Hook: `LoggingSettings/hooks/useLoggingConfig.ts`.
+  - API layer added to `store/commsApi.ts`: `apiGet/Set/ClearModelPolicy`, `apiGetPricing`,
+    `apiGet/SetLoggingConfig` (+ `ModelSel`/`ModelPolicy`/`PricingByProvider`/`LoggingConfig` types).
+  - Renderer + main typecheck clean; 12/12 spawn-policy route+db tests pass. Everything fail-safe:
+    a server started before the P1 routes returns 404 for `/comms/model-policy` +
+    `/comms/logging-config` until Studio restarts it — the UI degrades to empty policy / no pricing
+    / board-default-ON, never blocks.
 
-**Model config takes effect for:** board runs ✅ · FSM stages ✅ · FSM feedback ✅.
+**Model config takes effect for:** board runs ✅ · FSM stages ✅ · FSM feedback ✅
+(editor/summary one-shots = Task 2 below).
 
 ---
 
 ## NEXT TASKS (in order)
 
-### 1. Settings UI (frontend — the visible payoff; typecheck-only, verify in-app)
-In `studio/src/renderer/src/components/Settings/` (mirror `IntelligenceSettings`/`RunsSettings`,
-add to `SettingsNav` + `SettingsPanel`), a new section with:
-- **Models:** a global default (company + model) + grouped per-agent overrides —
-  *Pipeline:* architect·planner·builder·reviewer·tester·scout·designer·director·evaluator;
-  *Editor:* split·analyze·diagram·comment·summarize. Companies from `services/cliEngine`
-  `ADAPTER_META`. Model = a free-text input (custom-model escape hatch) — or add a GET endpoint
-  returning `db/pricing.py::PRICING` models per provider for a dropdown + cost display.
-  Wire to GET/POST `/comms/model-policy` via a new hook (mirror `Settings/hooks/useDefaultProgress.ts`
-  / `useDefaultSummaryTarget.ts`; use `lib/config::apiFetch`, never bare fetch).
-- **Logging:** board on/off toggle + verbosity (reuse `ProgressSelect` + `useDefaultProgress`) +
-  a LOCKED "Monitor + Cost — always on" row. Wire to GET/POST `/comms/logging-config`.
-- Surface the precedence in the UI: per-run override → per-role → global default → engine default.
+> **Task 1 (Settings UI) is DONE** — see "Already shipped" above. Start here:
 
-### 2. make_board_posters tail (backend)
+### 1. make_board_posters tail (backend)
 Thread `run_id` through `goals.py` + `tasks.py` posters (same pattern as `runs.py` — the
 `_on_start(_run_id)`/`_on_done(_run_id)` callbacks already receive it); add `run_id` to the
 `/comms/post` route + the `comms-post` fragment (agents post it — the fragment already has
 `<run_id>` substituted). Optional SOLID dedup: `blueprints/control/_lifecycle.make_board_posters`.
 
-### 3. Editor/summary renderer config (last "takes effect" piece)
+### 2. Editor/summary renderer config (last "takes effect" piece)
 Editor one-shots + summaries spawn from the renderer (`services/cliEngine`); have them read
-`/comms/model-policy` and apply the configured model before spawning (mirror `effective_model`'s rule).
+`/comms/model-policy` (client already has `apiGetModelPolicy` in `store/commsApi.ts`) and apply the
+configured model before spawning (mirror `effective_model`'s rule — apply a configured model only
+when there's no explicit model AND the config's adapter == the spawn's adapter). The Settings UI
+that WRITES this policy is live; this is the renderer READ side that makes the editor/summarize
+rows in it take effect.
 
 ---
 
@@ -104,4 +114,5 @@ Studio runs under electron-vite dev (HMR live); FSM server on `127.0.0.1:8765`.
 - **Everything is fail-safe:** unconfigured → behaves exactly as before.
 - **Doc-sync:** update the matching `CLAUDE.md` / `SPEC.md` in the same commit.
 
-Start by reading [SPEC.md](SPEC.md), then do **Task 1 (Settings UI)**.
+Start by reading [SPEC.md](SPEC.md), then do **Task 1 (make_board_posters tail)** — the Settings
+UI (former Task 1) is shipped.

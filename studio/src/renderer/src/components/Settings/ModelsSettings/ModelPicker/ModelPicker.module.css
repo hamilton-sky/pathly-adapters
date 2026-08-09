@@ -1,0 +1,41 @@
+.customRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.customInput {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  box-sizing: border-box;
+  background: var(--theme-bg-mantle);
+  border: 1px solid var(--theme-bg-surface0);
+  border-radius: 6px;
+  color: var(--theme-text-primary);
+  font-family: monospace;
+  font-size: 12.5px;
+  padding: 0 10px;
+  outline: none;
+}
+
+.customInput:focus {
+  border-color: var(--theme-accent);
+}
+
+.link {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--theme-text-muted);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 2px 4px;
+  white-space: nowrap;
+}
+
+.link:hover {
+  color: var(--theme-accent);
+  text-decoration: underline;
+}

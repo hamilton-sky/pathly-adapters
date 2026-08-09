@@ -2,6 +2,7 @@ import { useState, type ComponentType } from 'react'
 import { SettingsNav, type SettingsGroup } from '../SettingsNav/SettingsNav'
 import { AppearanceSettings } from '../AppearanceSettings/AppearanceSettings'
 import { RunsSettings } from '../RunsSettings/RunsSettings'
+import { AgentsSettings } from '../AgentsSettings/AgentsSettings'
 import { IntelligenceSettings } from '../IntelligenceSettings/IntelligenceSettings'
 import { SystemSettings } from '../SystemSettings/SystemSettings'
 import s from './SettingsPanel.module.css'
@@ -11,6 +12,7 @@ import s from './SettingsPanel.module.css'
 const PANELS: Record<SettingsGroup, ComponentType> = {
   appearance: AppearanceSettings,
   runs: RunsSettings,
+  agents: AgentsSettings,
   intelligence: IntelligenceSettings,
   system: SystemSettings,
 }
