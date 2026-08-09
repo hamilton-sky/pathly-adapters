@@ -10,6 +10,7 @@
 
 import { runModel } from './modelManager'
 import { buildHeadlessArgv, type CliAdapter } from './cliEngine'
+import { effectiveModel } from './spawnPolicy'
 import { useProjectStore } from '../store/projectStore'
 import { useTerminalStore, type TerminalTab } from '../store/terminalStore'
 
@@ -66,7 +67,17 @@ function runEngineCancellable(
   // and recorded $0 / 0 tokens. json mode honors --dangerously-skip-permissions for the write and
   // the gate bills it reliably via parseClaudeJsonResult (same treatment as editor Split/Analyze).
   // Streaming jobs (chat / generic) keep stream-json for live token-by-token prose.
-  const argv = buildHeadlessArgv(adapter, prompt, fileWrite ? { jsonOutput: true } : { streamJson: true })
+  // Summaries (fileWrite) honor the Settings model policy for the 'summarize' role, within the
+  // chosen company; chat/generic (streamJson) is a separate system and is left untouched. The
+  // model is added only when configured, so the no-policy path is byte-identical to before.
+  const summaryModel = fileWrite ? effectiveModel('summarize', adapter) : ''
+  const argv = buildHeadlessArgv(
+    adapter,
+    prompt,
+    fileWrite
+      ? { jsonOutput: true, ...(summaryModel ? { model: summaryModel } : {}) }
+      : { streamJson: true },
+  )
   const tabId = `airouter-${adapter}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
   const term = useTerminalStore.getState()
   term.addTab(tabId, `Summary · ${adapter}`, 'left', adapter as TerminalTab['kind'], undefined, undefined, prompt)

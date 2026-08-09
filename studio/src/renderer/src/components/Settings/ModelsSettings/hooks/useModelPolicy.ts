@@ -5,6 +5,7 @@ import {
   apiSetModelPolicy,
   type ModelPolicy,
 } from '../../../../store/commsApi'
+import { warmModelPolicy } from '../../../../services/spawnPolicy'
 
 // Loads + persists the per-agent model policy — the single DB-backed source of truth for which
 // company + model each spawn uses (read by BOTH the renderer gate and the Python resolver). Seeds
@@ -30,19 +31,21 @@ export function useModelPolicy(): {
     }
   }, [])
 
+  // Each setter writes back, then re-warms the shared spawn-policy cache (services/spawnPolicy)
+  // AFTER the POST resolves so renderer one-shots pick up the change on their next spawn.
   function setDefault(adapter: string, model: string): void {
     setPolicy((p) => ({ ...p, default: { adapter, model } }))
-    void apiSetModelPolicy(null, adapter, model)
+    void apiSetModelPolicy(null, adapter, model).then(() => warmModelPolicy())
   }
 
   function clearDefault(): void {
     setPolicy((p) => ({ ...p, default: null }))
-    void apiClearModelPolicy(null)
+    void apiClearModelPolicy(null).then(() => warmModelPolicy())
   }
 
   function setRole(role: string, adapter: string, model: string): void {
     setPolicy((p) => ({ ...p, roles: { ...p.roles, [role]: { adapter, model } } }))
-    void apiSetModelPolicy(role, adapter, model)
+    void apiSetModelPolicy(role, adapter, model).then(() => warmModelPolicy())
   }
 
   function clearRole(role: string): void {
@@ -51,7 +54,7 @@ export function useModelPolicy(): {
       delete roles[role]
       return { ...p, roles }
     })
-    void apiClearModelPolicy(role)
+    void apiClearModelPolicy(role).then(() => warmModelPolicy())
   }
 
   return { policy, setDefault, clearDefault, setRole, clearRole }

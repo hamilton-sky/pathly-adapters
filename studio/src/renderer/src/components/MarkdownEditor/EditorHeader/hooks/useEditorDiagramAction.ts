@@ -15,6 +15,7 @@ import { useToastStore } from '../../../../store/toastStore'
 import { getSpawnCwd, describeAgentFailure } from '../../../Editor/commentUtils'
 import { resolvePrompt } from '../../../shared/PromptActionConfig/presetTypes'
 import { buildCliArgv, cliLabel, type EditorCli } from '../editorCli'
+import { effectiveModel } from '../../../../services/spawnPolicy'
 import { DIAGRAM_PRESETS, STORAGE_KEY_DIAGRAM } from '../diagramPresets'
 import { sidecarPathFor } from '../../diagramTypes'
 import { readSidecar } from '../../DiagramGalleryPanel/diagramSidecar'
@@ -130,7 +131,7 @@ export function useEditorDiagramAction(
       )
 
       try {
-        await window.pathly.terminal.spawn(tabId, getSpawnCwd(forFile), undefined, buildCliArgv(diagramCli, prompt), undefined, {
+        await window.pathly.terminal.spawn(tabId, getSpawnCwd(forFile), undefined, buildCliArgv(diagramCli, prompt, effectiveModel('diagram', diagramCli)), undefined, {
           telemetry: { scopeTier: 'project', label: 'ai-diagram', role: 'diagrammer' },
         })
         onDiagramOnceUsed()

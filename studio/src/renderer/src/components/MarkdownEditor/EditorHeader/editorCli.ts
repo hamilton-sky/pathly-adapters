@@ -67,8 +67,8 @@ export function saveEditorCli(key: string, cli: CliAdapter): void {
  *  captures cost/tokens reliably from the final result envelope. Trade-off: the terminal buffers
  *  instead of streaming token-by-token; the result still lands in the gallery + progress toasts.
  *  Codex is unaffected (it uses `--json` unconditionally). */
-export function buildCliArgv(cli: CliAdapter, prompt: string): string[] {
-  return buildHeadlessArgv(cli, prompt, { jsonOutput: true })
+export function buildCliArgv(cli: CliAdapter, prompt: string, model = ''): string[] {
+  return buildHeadlessArgv(cli, prompt, { jsonOutput: true, ...(model ? { model } : {}) })
 }
 
 /** Human-friendly engine name for toasts/labels. */

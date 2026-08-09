@@ -6,6 +6,7 @@ import type { TerminalTab } from '../../../../store/terminalStore'
 import { useToastStore } from '../../../../store/toastStore'
 import { buildSplitPrompt, getSpawnCwd, STORAGE_KEY_SPLIT, describeAgentFailure } from '../../../Editor/commentUtils'
 import { buildCliArgv, cliLabel, EditorCli } from '../editorCli'
+import { effectiveModel } from '../../../../services/spawnPolicy'
 import { composeClientSkill } from '../../../../services/skillCompose'
 import { attachProgress } from '../editorProgress'
 
@@ -148,7 +149,7 @@ export function useEditorAgentActions(
       })
     })
     try {
-      await window.pathly.terminal.spawn(tabId, getSpawnCwd(forFile), undefined, buildCliArgv(splitCli, prompt), undefined, {
+      await window.pathly.terminal.spawn(tabId, getSpawnCwd(forFile), undefined, buildCliArgv(splitCli, prompt, effectiveModel('split', splitCli)), undefined, {
         telemetry: { scopeTier: 'project', label: 'ai-split', role: 'splitter' },
       })
       onSplitOnceUsed()

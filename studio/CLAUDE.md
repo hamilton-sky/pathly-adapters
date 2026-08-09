@@ -174,6 +174,16 @@ hints + a "Custom model…" free-text escape hatch). Empty company = inherit/uns
 `apiGetPricing` + `apiGetAgents` (`store/commsApi.ts`) → `GET/POST /comms/model-policy`. Fail-safe:
 an older FSM server 404s → empty policy / no pricing / built-in agent fallback.
 
+**The policy TAKES EFFECT for renderer one-shots** via `services/spawnPolicy.ts::effectiveModel(role,
+adapter)` — a client mirror of the Python `supervisor/spawn_policy.effective_model` (explicit model
+wins; else the per-role → global-default model applies only WITHIN the same company). It reads a
+cached policy (`warmModelPolicy`, warmed on module load + re-warmed by `useModelPolicy`'s setters so
+resolution is synchronous at spawn). Threaded into all five one-shot spawn sites: editor **Split**
+(`useEditorAgentActions`, role `split`), **Analyze** (`analyze`), **Diagram** (`diagram`), **Comment**
+(`CommentsPanel`, `comment`) via `editorCli.buildCliArgv(cli, prompt, model)`, and artifact
+**summaries** (`aiRouter` engine path, role `summarize`). No policy → no `--model` (engine default),
+byte-identical to before. (These roles match the Models UI "Editor / one-shot" group.)
+
 **Logging is deliberately NOT a setting.** Per the unified-control-plane separation of concerns:
 the **Pipeline** section is the operational plane (observe + control every run — logs, cost,
 tokens, `run_id` — for EVERY agent spawn anywhere in the app); the **board** is context governance

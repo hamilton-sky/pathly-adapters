@@ -16,6 +16,7 @@ import {
   cliLabel,
   type EditorCli,
 } from '../../MarkdownEditor/EditorHeader/editorCli'
+import { effectiveModel } from '../../../services/spawnPolicy'
 import { COMMENT_VERBS } from '../commentVerbs'
 import { attachProgress, fmtElapsed, useElapsedProgress } from '../../shared/RunPill/progress'
 import { CommentItem } from './CommentItem/CommentItem'
@@ -183,7 +184,7 @@ export function CommentsPanel({
     })
 
     try {
-      await window.pathly.terminal.spawn(tabId, cwd, undefined, buildCliArgv(cli, prompt), undefined, {
+      await window.pathly.terminal.spawn(tabId, cwd, undefined, buildCliArgv(cli, prompt, effectiveModel('comment', cli)), undefined, {
         telemetry: { scopeTier: 'project', label: 'ai-comment', role: 'commenter' },
       })
     } catch (e) {
