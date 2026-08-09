@@ -35,15 +35,20 @@ def post_message(
     context_refs: list[dict] | None = None,
     files: list[str] | None = None,
     slug: str | None = None,
+    run_id: str | None = None,
 ) -> str:
-    """Insert a new message into comms_messages. Returns the new message_id."""
+    """Insert a new message into comms_messages. Returns the new message_id.
+
+    ``run_id`` (unified-control-plane) correlates this post to the run that made it, so the
+    control plane's RunDetail Board tab shows a run's *exact* posts instead of a time-window guess.
+    """
     message_id = str(uuid.uuid4())
     task_status = "pending" if type == "task" else None
     with _get_write_lock(conn):
         conn.execute(
             "INSERT INTO comms_messages "
-            "(id, board, scope, from_agent, to_agent, type, text, options, reply_to, stage, conv, ts, depends_on, task_status, artifact_path, artifact_type, goal_id, executor, context_refs, files, slug) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "(id, board, scope, from_agent, to_agent, type, text, options, reply_to, stage, conv, ts, depends_on, task_status, artifact_path, artifact_type, goal_id, executor, context_refs, files, slug, run_id) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 message_id,
                 board,
@@ -66,6 +71,7 @@ def post_message(
                 json.dumps(context_refs) if context_refs is not None else None,
                 json.dumps(files) if files is not None else None,
                 slug,
+                run_id,
             ),
         )
         conn.commit()

@@ -58,7 +58,7 @@ def comms_run():
         from pathly_orchestrator.db.connection import get_db as _get_db
         from pathly_orchestrator.db.queries.comms import post_message as _post_message
 
-        def _board_post(text: str, phase: str | None = None) -> None:
+        def _board_post(text: str, phase: str | None = None, run_id: str | None = None) -> None:
             try:
                 conn = _get_db()
                 mid = _post_message(
@@ -68,6 +68,7 @@ def comms_run():
                     from_agent="system",
                     type="status",
                     text=text,
+                    run_id=run_id,
                 )
                 payload = {
                     "type": "COMMS_UPDATE",
@@ -86,7 +87,7 @@ def comms_run():
 
         def _on_start(_run_id: str) -> None:
             _board_post(
-                f"{label} started on this board… (via {adapter})", phase="running"
+                f"{label} started on this board… (via {adapter})", phase="running", run_id=_run_id
             )
 
         def _on_done(_run_id: str, res) -> None:
@@ -94,7 +95,7 @@ def comms_run():
             if isinstance(res, dict):
                 summary = str(res.get("result") or res.get("summary") or "done")
             _board_post(
-                f"{label} finished via {adapter} — {summary[:280]}", phase="done"
+                f"{label} finished via {adapter} — {summary[:280]}", phase="done", run_id=_run_id
             )
             # Backstop for evaluate.md Step 3: an evaluator run MUST post a BOARD_EVAL analysis
             # artifact. If it finished cleanly WITHOUT one (agent answered as free-form text /
