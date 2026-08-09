@@ -7,7 +7,7 @@ import threading
 from typing import Callable, Optional
 
 from .state import RunnerState, logger
-from .registry import _lock, _registry, _write_mirror
+from .registry import _lock, _record_run_history, _registry, _write_mirror
 
 
 def start_run(
@@ -65,6 +65,13 @@ def start_run(
         _registry[topic] = state
         state.status = "running"
         _write_mirror(state)
+
+    # Early run_history parent row so this FSM flow is visible in GET /runs WHILE it runs —
+    # not only after it finishes. The team executor + consultation/feature/project decomposes
+    # call start_run directly (bypassing POST /runner/start, which writes its own early row),
+    # so without this they were invisible in the Pipeline until completion (adapter=flow name
+    # → classified as a flow, per _record_run_history). Outside the registry lock (own DB lock).
+    _record_run_history(state, "running")
 
     if broadcast_fn:
         try:

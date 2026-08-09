@@ -167,6 +167,59 @@ def _write_mirror(state: RunnerState) -> None:
         )
 
 
+def _record_run_history(
+    state: RunnerState, status: str, *, finished_at: Optional[str] = None
+) -> None:
+    """Write/refresh this supervised run's run_history PARENT row (the run-identity map).
+
+    The parent row's ``adapter`` column carries the FLOW NAME (``state.flow``), NOT the last
+    stage's CLI adapter: the read-model (``run_history_read._classify_kind``) keys a bare-uuid
+    run's kind off this column, so a flow name in ``FLOW_NAMES`` ({team, team-build,
+    consultation, …}) classifies as ``flow`` (cost summed over the stage time-window) — whereas a
+    real adapter like "claude" mis-reads as ``single`` with $0 (no invocation carries the parent
+    uuid). Writing ``state.current_adapter`` here was exactly that clobber.
+
+    Shared by ``start_run`` (early ``running`` row → the run is visible in GET /runs while it
+    runs) and ``_set_status`` (terminal row). Keyed by the run SLUG (storage-dir basename), not
+    the topic (a goal run's topic is the nested features/<f>/goals/<slug> path). Best-effort:
+    telemetry must never break a run.
+    """
+    try:
+        from pathlib import Path as _Path
+
+        from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.queries.run_history import (
+            upsert_run as _upsert_run,
+        )
+        from pathly_orchestrator.fsm_compose import resolve_board_scope
+        from pathly_orchestrator.fsm_ops import _resolve_storage_path
+
+        _storage = (
+            _Path(state.storage_path)
+            if state.storage_path
+            else _resolve_storage_path(None, state.project_root, state.topic)
+        )
+        _slug = _storage.name
+        _scope = getattr(state, "board_scope", "") or resolve_board_scope(
+            _slug, state.project_root, state.goal_id or ""
+        )
+        _upsert_run(
+            _get_db(),
+            project_root=state.project_root,
+            feature=_slug,
+            run_id=state.run_id,
+            status=status,
+            finished_at=finished_at,
+            stage_count=state.iterations,
+            total_tokens=0,
+            cost_usd=state.cost_usd_so_far,
+            adapter=state.flow or None,
+            board_scope=_scope or None,
+        )
+    except Exception:
+        logger.debug("run_history upsert (%s) error", status, exc_info=True)
+
+
 def _set_status(
     state: RunnerState, status: str, broadcast_fn: Optional[Callable]
 ) -> None:
@@ -181,46 +234,13 @@ def _set_status(
         except Exception as exc:
             logger.warning("broadcast_fn error: %s", exc)
     if status in {"done", "aborted", "error"}:
-        try:
-            import time as _time
-            from pathlib import Path as _Path
+        import time as _time
 
-            from pathly_orchestrator.db.connection import get_db as _get_db
-            from pathly_orchestrator.db.queries.run_history import (
-                upsert_run as _upsert_run,
-            )
-            from pathly_orchestrator.fsm_compose import resolve_board_scope
-            from pathly_orchestrator.fsm_ops import _resolve_storage_path
-
-            # run-identity: key the row by the run SLUG (storage-dir basename), not the
-            # topic — a goal run's topic is the nested features/<f>/goals/<slug> path
-            # (the retired keying-by-full-topic-path residual). Carry board_scope too
-            # (issued at spawn; COALESCE in upsert_run keeps an earlier value).
-            _storage = (
-                _Path(state.storage_path)
-                if state.storage_path
-                else _resolve_storage_path(None, state.project_root, state.topic)
-            )
-            _slug = _storage.name
-            _scope = getattr(state, "board_scope", "") or resolve_board_scope(
-                _slug, state.project_root, state.goal_id or ""
-            )
-            _now = _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime())
-            _upsert_run(
-                _get_db(),
-                project_root=state.project_root,
-                feature=_slug,
-                run_id=state.run_id,
-                status=status,
-                finished_at=_now,
-                stage_count=state.iterations,
-                total_tokens=0,
-                cost_usd=state.cost_usd_so_far,
-                adapter=state.current_adapter or None,
-                board_scope=_scope or None,
-            )
-        except Exception:
-            logger.debug("run_history upsert (finish) error", exc_info=True)
+        _record_run_history(
+            state,
+            status,
+            finished_at=_time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime()),
+        )
 
 
 def _cleanup_run_id(run_id: str) -> None:

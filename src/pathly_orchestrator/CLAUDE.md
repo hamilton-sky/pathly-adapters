@@ -392,6 +392,16 @@ both now land as columns instead of being re-derived. The pieces:
   (`_run_stage_via_terminal`) and `_settle_spawn_identity` closes the row (done/error);
   the registry finish-upsert and `/runner/start` insert also key by the slug. Legacy
   full-path rows are never rewritten — read helpers match them via a basename shim.
+- **FSM-flow PARENT row carries the FLOW NAME as `adapter`** (spawn-tracking) — the
+  bare-uuid parent run's `adapter` column is the flow name (`team`/`team-build`/`consultation`/…),
+  NOT the last stage's CLI adapter, because the read-model (`run_history_read._classify_kind`)
+  keys a bare-uuid run's kind off that column: a flow name in `FLOW_NAMES` → `flow` (cost summed
+  over the stage time-window), a real adapter → `single` with $0 (no invocation carries the parent
+  uuid). `supervisor/registry._record_run_history` (shared by `_set_status`'s terminal write AND
+  `start_run`'s **early `running` row**) writes `state.flow` there — fixing (1) completed flows
+  reclassifying to `single`/$0, and (2) `team`/consultation/feature/project runs (which call
+  `start_run` directly, bypassing `/runner/start`) being invisible in `GET /runs` until they
+  finished.
   Renderer-driven one-shots (editor AI actions, ai-router artifact/HQ summaries) never
   cross the supervisor, so their ONLY Python seam — `POST /db/invocation`
   (`blueprints/ops/db_api_invocation.py`) — writes their own `done` `run_history` row (+
