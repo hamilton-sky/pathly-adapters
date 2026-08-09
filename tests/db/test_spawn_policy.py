@@ -81,3 +81,20 @@ def test_logging_config_never_exposes_the_monitor_spine() -> None:
     cfg = get_logging_config(conn)
     assert set(cfg.keys()) == {"board", "verbosity"}
     assert "monitor" not in cfg and "cost" not in cfg
+
+
+def test_effective_model_takes_effect_fail_safe() -> None:
+    """P1b: the resolver that makes the model choice take effect at a board spawn."""
+    from pathly_orchestrator.supervisor.spawn_policy import effective_model
+
+    conn = get_db()
+    set_agent_model(conn, "builder", "claude", "claude-opus-4-1")
+    # An explicit model always wins (a per-run choice is never overridden).
+    assert effective_model("builder", "claude", "claude-sonnet-5") == "claude-sonnet-5"
+    # No explicit model + the run's company matches the config → the configured model applies.
+    assert effective_model("builder", "claude", "") == "claude-opus-4-1"
+    # Different company than configured → respect the run's company, don't override it.
+    assert effective_model("builder", "codex", "") == ""
+    # No agent, or an unconfigured role → unchanged (fail-safe: behaves exactly as before).
+    assert effective_model("", "claude", "") == ""
+    assert effective_model("scout", "claude", "") == ""

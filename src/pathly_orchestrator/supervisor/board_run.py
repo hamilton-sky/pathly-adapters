@@ -110,6 +110,12 @@ def _default_spawn(
     state.executor_owned_telemetry = True
     state.scope_tier = scope_tier_for(board)
     state.goal_trace_id = new_trace_id()
+    # spawn-policy P1b: apply the DB-configured model for this agent's role — fail-safe (only when
+    # the run picked no explicit model AND the config is for this run's company). This is where the
+    # Settings model choice takes effect for board runs (single-agent / evaluator / goal-single).
+    from pathly_orchestrator.supervisor.spawn_policy import effective_model
+
+    model = effective_model(agent, adapter, model)
     # Interactive: spawn the bare REPL and let terminal.ts inject the prompt once the
     # '> ' readline prompt is ready (it stays open for further instructions).
     # Headless: the prompt is delivered via -p argv and the agent exits when done.
