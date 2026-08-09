@@ -182,6 +182,13 @@ def _loop(state: RunnerState, broadcast_fn: Optional[Callable]) -> None:
             # _stage_model_for): a flow's adapter_map can route a stage to a different engine
             # than the run-level model belongs to, which otherwise hard-crashes the loop.
             stage_model = _stage_model_for(preferred_adapter, model)
+            # spawn-policy: apply the DB-configured model for THIS stage's agent role — fail-safe
+            # (only when no explicit run/stage model AND the config is for this stage's company).
+            # This is where the Settings model choice takes effect for the FSM pipeline agents
+            # (architect / planner / builder / reviewer / tester / …).
+            from .spawn_policy import effective_model
+
+            stage_model = effective_model(response.get("agent", ""), preferred_adapter, stage_model)
 
             # ── Session continuity ────────────────────────────────────────────
             with _lock:

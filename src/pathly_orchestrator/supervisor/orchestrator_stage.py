@@ -186,12 +186,18 @@ def _resolve_stage_supervised(
                 autonomy_for_adapter = state.autonomy.get(state.current_adapter, True)
 
             fb_run_id = f"{topic}-fb{feedback_rounds}-{int(time.time() * 1000)}"
+            # spawn-policy: the feedback-resolving agent (target_agent) honors the configured model
+            # too — fail-safe, same rule as the main stage spawn.
+            from pathly_orchestrator.supervisor.spawn_policy import effective_model
+
+            fb_adapter = state.current_adapter or "claude"
+            fb_model = effective_model(target, fb_adapter, model)
             try:
                 _run_stage_via_terminal(
                     state,
                     fb_instructions,
-                    state.current_adapter or "claude",
-                    model,
+                    fb_adapter,
+                    fb_model,
                     fb_run_id,
                     broadcast_fn,
                     session=None,
