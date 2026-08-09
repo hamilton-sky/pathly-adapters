@@ -554,37 +554,6 @@ export async function apiGetPricing(): Promise<PricingByProvider> {
   }
 }
 
-/** Agent board-narration logging config. The cost/monitor spine is always on (not represented). */
-export interface LoggingConfig {
-  board: boolean
-  verbosity: string
-}
-
-/** Fetch the logging config, or null on error. */
-export async function apiGetLoggingConfig(): Promise<LoggingConfig | null> {
-  try {
-    const r = await apiFetch('/comms/logging-config')
-    if (!r.ok) return null
-    return (await r.json()) as LoggingConfig
-  } catch {
-    return null
-  }
-}
-
-/** Turn agent board narration on/off. Never touches the always-on monitor spine. Returns true on 2xx. */
-export async function apiSetLoggingConfig(board: boolean): Promise<boolean> {
-  try {
-    const r = await apiFetch('/comms/logging-config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ board }),
-    })
-    return r.ok
-  } catch {
-    return false
-  }
-}
-
 export async function apiAnswer(
   questionId: string,
   answer: string,
