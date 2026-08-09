@@ -163,11 +163,16 @@ union + `ITEMS` (`SettingsNav`) and the `PANELS` map (`SettingsPanel`).
 **Agents** (`AgentsSettings/` → `ModelsSettings/` + `LoggingSettings/`) is the **spawn-policy**
 control plane (feature: `pathly/features/spawn-policy/`) — DB-backed config read by BOTH the
 renderer gate and the Python resolver, so every spawn obeys one policy:
-- *Models* — global default + grouped per-agent overrides (Pipeline + Editor roles). Each `ModelRow`
-  = a company picker (`ADAPTER_META`, headless-only) + a `ModelPicker` (a `GET /telemetry/pricing`
+- *Models* — global default + grouped per-agent overrides. The **Agents** group is registry-driven
+  (`useAgents` → `GET /db/agents`, seeded from `core/agents/`) so a newly-created agent appears
+  automatically; **Editor / one-shot** is a fixed group (split/analyze/diagram/comment/summarize —
+  app actions, not agents); **Custom** shows any other configured key plus an `AddRoleRow` "+ Add
+  override" that accepts ANY role string (the resolver keys by arbitrary string). Each `ModelRow` =
+  a company picker (`ADAPTER_META`, headless-only) + a `ModelPicker` (a `GET /telemetry/pricing`
   dropdown with `$in/$out per MTok` hints + a "Custom model…" free-text escape hatch). Empty company
-  = inherit/unset. Hooks `ModelsSettings/hooks/{useModelPolicy,usePricing}.ts` → `apiGet/Set/Clear
-  ModelPolicy` + `apiGetPricing` (`store/commsApi.ts`) → `GET/POST /comms/model-policy`.
+  = inherit/unset. Hooks `ModelsSettings/hooks/{useModelPolicy,usePricing,useAgents}.ts` →
+  `apiGet/Set/ClearModelPolicy` + `apiGetPricing` + `apiGetAgents` (`store/commsApi.ts`) →
+  `GET/POST /comms/model-policy`.
 - *Logging* — board-narration on/off + verbosity (reuses `ProgressSelect` + `useDefaultProgress`,
   the same `board:default_progress` key as Runs → Board updates) + a LOCKED "Monitor + Cost —
   always on" row (the cost/monitor spine is the control plane itself, never a toggle). Hook

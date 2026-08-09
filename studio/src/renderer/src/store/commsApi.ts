@@ -502,6 +502,27 @@ export async function apiClearModelPolicy(role: string | null): Promise<boolean>
   }
 }
 
+/** One agent role from the registry (seeded from core/agents/), for the model-policy UI. */
+export interface AgentDef {
+  role: string
+  name: string
+  model: string
+  description: string
+}
+
+/** Fetch the known agent roles from the registry, or [] on error (UI falls back to built-ins). */
+export async function apiGetAgents(projectRoot?: string): Promise<AgentDef[]> {
+  try {
+    const q = projectRoot ? `?project_root=${encodeURIComponent(projectRoot)}` : ''
+    const r = await apiFetch(`/db/agents${q}`)
+    if (!r.ok) return []
+    const j = (await r.json()) as { agents?: AgentDef[] }
+    return Array.isArray(j.agents) ? j.agents : []
+  } catch {
+    return []
+  }
+}
+
 /** A priced model row (one model + its $/MTok rates), for the model dropdowns. */
 export interface PricingModel {
   model: string
