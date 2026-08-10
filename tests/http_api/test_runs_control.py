@@ -216,3 +216,165 @@ def test_action_retry_missing_fields_is_400(client):
     finally:
         with _lock:
             _registry.pop("t-retry", None)
+
+
+# ---------------------------------------------------------------------------
+# POST /runs (create) — thin RunSpec routed to the matching EXISTING facade
+# ---------------------------------------------------------------------------
+
+
+def test_create_run_missing_kind_is_400(client):
+    resp = client.post("/runs", json={})
+    assert resp.status_code == 400
+
+
+def test_create_run_bad_kind_is_400(client):
+    resp = client.post("/runs", json={"kind": "not-a-kind"})
+    assert resp.status_code == 400
+
+
+def test_create_run_flow_routes_to_start_run(client, monkeypatch):
+    import types
+
+    import pathly_orchestrator.supervisor.api as _api
+
+    captured = {}
+
+    def fake_start_run(**kw):
+        captured.update(kw)
+        return types.SimpleNamespace(run_id="run-flow-launch")
+
+    monkeypatch.setattr(_api, "start_run", fake_start_run)
+
+    resp = client.post(
+        "/runs",
+        json={
+            "kind": "flow",
+            "scope": "my-topic",
+            "flow": "team",
+            "project_root": "/tmp/proj",
+        },
+    )
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    assert resp.get_json() == {"ok": True, "run_id": "run-flow-launch", "kind": "flow"}
+    assert captured["topic"] == "my-topic"
+    assert captured["flow"] == "team"
+    assert captured["project_root"] == "/tmp/proj"
+    assert callable(captured["broadcast_fn"])
+
+
+def test_create_run_flow_missing_project_root_is_400(client):
+    resp = client.post("/runs", json={"kind": "flow", "scope": "s", "flow": "team"})
+    assert resp.status_code == 400
+
+
+def test_create_run_flow_already_active_is_409(client, monkeypatch):
+    import pathly_orchestrator.supervisor.api as _api
+
+    def fake_start_run(**kw):
+        raise ValueError("already active")
+
+    monkeypatch.setattr(_api, "start_run", fake_start_run)
+
+    resp = client.post(
+        "/runs",
+        json={"kind": "flow", "scope": "s", "flow": "team", "project_root": "/p"},
+    )
+    assert resp.status_code == 409
+
+
+def test_create_run_single_routes_to_start_board_run(client, monkeypatch):
+    import pathly_orchestrator.supervisor.board_run as _br
+
+    captured = {}
+
+    def fake_start_board_run(board, scope, mode, **kw):
+        captured["board"] = board
+        captured["scope"] = scope
+        captured["mode"] = mode
+        return {"ok": True, "run_id": "run-board-launch", "mode": mode, "status": "started"}
+
+    monkeypatch.setattr(_br, "start_board_run", fake_start_board_run)
+
+    resp = client.post(
+        "/runs", json={"kind": "single", "board": "feature", "scope": "sc-launch"}
+    )
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    assert resp.get_json() == {"ok": True, "run_id": "run-board-launch", "kind": "single"}
+    assert captured["board"] == "feature"
+    assert captured["scope"] == "sc-launch"
+    assert captured["mode"] == "single-agent"
+
+
+def test_create_run_evaluator_maps_to_evaluator_mode(client, monkeypatch):
+    import pathly_orchestrator.supervisor.board_run as _br
+
+    captured = {}
+
+    def fake_start_board_run(board, scope, mode, **kw):
+        captured["mode"] = mode
+        return {"ok": True, "run_id": "run-eval-launch", "mode": mode, "status": "started"}
+
+    monkeypatch.setattr(_br, "start_board_run", fake_start_board_run)
+
+    resp = client.post(
+        "/runs", json={"kind": "evaluator", "board": "feature", "scope": "sc-eval"}
+    )
+    assert resp.status_code == 200
+    assert resp.get_json()["kind"] == "evaluator"
+    assert captured["mode"] == "evaluator"
+
+
+def test_create_run_board_busy_is_409(client, monkeypatch):
+    import pathly_orchestrator.supervisor.board_run as _br
+
+    monkeypatch.setattr(
+        _br,
+        "start_board_run",
+        lambda *a, **k: {"ok": False, "error": "board_busy", "holder": "someone"},
+    )
+
+    resp = client.post("/runs", json={"kind": "single", "scope": "sc-busy"})
+    assert resp.status_code == 409
+    assert resp.get_json()["ok"] is False
+
+
+def test_create_run_missing_scope_is_400(client):
+    resp = client.post("/runs", json={"kind": "single"})
+    assert resp.status_code == 400
+
+
+def test_create_run_goal_routes_to_start_goal_run(client, monkeypatch):
+    import pathly_orchestrator.supervisor.goal_executor as _ge
+
+    captured = {}
+
+    def fake_start_goal_run(goal_id, **kw):
+        captured["goal_id"] = goal_id
+        captured.update(kw)
+        return {"ok": True, "run_id": "run-goal-launch", "executor": "single"}
+
+    monkeypatch.setattr(_ge, "start_goal_run", fake_start_goal_run)
+
+    resp = client.post("/runs", json={"kind": "goal", "goal_id": "g-123"})
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    assert resp.get_json() == {"ok": True, "run_id": "run-goal-launch", "kind": "goal"}
+    assert captured["goal_id"] == "g-123"
+
+
+def test_create_run_goal_missing_goal_id_is_400(client):
+    resp = client.post("/runs", json={"kind": "goal"})
+    assert resp.status_code == 400
+
+
+def test_create_run_goal_not_found_propagates_404(client, monkeypatch):
+    import pathly_orchestrator.supervisor.goal_executor as _ge
+
+    monkeypatch.setattr(
+        _ge,
+        "start_goal_run",
+        lambda goal_id, **kw: {"ok": False, "reason": "not_found", "error": "nope"},
+    )
+
+    resp = client.post("/runs", json={"kind": "goal", "goal_id": "ghost"})
+    assert resp.status_code == 404

@@ -295,14 +295,20 @@ pathly_orchestrator/
       ops/                 # telemetry*.py (/record_activity, /record_phase*, /telemetry/*); menu.py (/menu, /metrics); db_api*.py (/db/* read API); chat.py (/chat); export.py
       code/                # query.py (POST /code/query — codebase-intelligence)
       control/             # runs_read.py (GET /runs, /runs/<run_id> — unified run read API; P0);
-                           # runs_control.py (POST /runs/<run_id>/stop AND
+                           # runs_control.py (POST /runs — the unified launcher: a thin RunSpec
+                           # {kind, board, scope, flow?, goal_id?, adapter?, model?} validated
+                           # then routed to the matching EXISTING facade — kind=flow →
+                           # supervisor.api.start_run, kind=single|evaluator →
+                           # supervisor.board_run.start_board_run, kind=goal →
+                           # supervisor.goal_executor.start_goal_run; route only, never
+                           # reimplements a runner; POST /runs/<run_id>/stop AND
                            # POST /runs/<run_id>/<action> for action in
                            # pause|resume|advance|reroute|retry|abort — run_id-addressed control:
                            # resolves run_id → abort_run/pause_run/resume_run/reroute_run/start_run
                            # (FSM registry) or board-lock stop (board/goal; board-lock runs support
                            # ONLY abort, else {ok:false,reason:unsupported_for_kind}), else
                            # {ok:false,reason:not_active}; board_lock.find_by_holder reverse-lookup;
-                           # _helpers.py holds the shared resolution/abort/retry bodies)
+                           # _helpers.py holds the shared resolution/abort/retry + create-run bodies)
 ```
 
 **Layer rules:**

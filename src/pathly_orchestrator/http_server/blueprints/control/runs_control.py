@@ -1,9 +1,13 @@
-"""Run write API (unified-control-plane) — POST /runs/<run_id>/stop, /runs/<run_id>/<action>.
+"""Run write API (unified-control-plane) — POST /runs (create), /runs/<run_id>/stop,
+/runs/<run_id>/<action>.
 
-The run_id-addressed control surface: resolves a run_id to its live control mechanism so the
-Pipeline can act on ANY run from one place, instead of needing the topic / goal_id / board+scope
-key. Delegates to the exact functions the existing ``/runner/*`` control routes call
-(``pause_run``/``resume_run``/``abort_run``/``reroute_run``/``start_run`` in
+``POST /runs`` is the unified launcher: a thin RunSpec in, a dispatch to the matching EXISTING
+facade out (``start_run``/``start_board_run``/``start_goal_run``) — see ``_helpers.create_run``.
+
+The run_id-addressed control surface (the other two routes) resolves a run_id to its live
+control mechanism so the Pipeline can act on ANY run from one place, instead of needing the
+topic / goal_id / board+scope key. Delegates to the exact functions the existing ``/runner/*``
+control routes call (``pause_run``/``resume_run``/``abort_run``/``reroute_run``/``start_run`` in
 ``supervisor/api.py``) — never reinventing the control logic. Resolution + the shared
 abort/stop + retry bodies live in ``_helpers.py`` so this file stays under the 400-line cap.
 
@@ -28,6 +32,20 @@ from flask import Blueprint, jsonify, request
 bp = Blueprint("control_runs_control", __name__)
 
 _ALLOWED_ACTIONS = frozenset({"pause", "resume", "advance", "reroute", "retry", "abort"})
+
+
+@bp.route("/runs", methods=["POST"])
+def create_run_route():
+    """Start any run kind from one place: a thin RunSpec routed to the matching facade."""
+    try:
+        from ._helpers import create_run
+
+        body = request.get_json(silent=True) or {}
+        payload, status = create_run(body)
+        return jsonify(payload), status
+    except Exception as exc:
+        logging.exception("control create_run error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
 
 
 @bp.route("/runs/<run_id>/stop", methods=["POST"])
