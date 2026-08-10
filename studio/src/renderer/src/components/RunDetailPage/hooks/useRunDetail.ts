@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { apiFetch } from '../../../lib/config'
+import { apiFetch, PATHLY_API_BASE } from '../../../lib/config'
 import type { RunDetail } from '../types'
 
 const EMPTY: RunDetail = {
@@ -52,6 +52,32 @@ export function useRunDetail(runId: string): UseRunDetail {
     const id = window.setInterval(load, 8000)
     return () => { cancelled = true; window.clearInterval(id) }
   }, [runId, tick])
+
+  // Live feed: GET /events/runs?run_id=<id> (unified-control-plane T3) — any runner/comms event
+  // tagged with this run_id triggers an immediate refresh instead of waiting out the 8s poll,
+  // which keeps running as a fallback if the stream errors, closes, or is unavailable. No auth
+  // header is sent: the server's secret middleware exempts every /events/* path, so this mirrors
+  // the localhost-open EventSource pattern already used by useMonitorSession, useCommsPanel, and
+  // pathlyContext.subscribeToMenuUpdates. A separate effect (keyed only on runId, not tick) keeps
+  // the connection alive across poll-driven refreshes instead of reconnecting every 8s.
+  useEffect(() => {
+    if (!runId) return
+    let es: EventSource | null = null
+    try {
+      es = new EventSource(`${PATHLY_API_BASE}/events/runs?run_id=${encodeURIComponent(runId)}`)
+      es.onmessage = (e: MessageEvent) => {
+        try {
+          const data = JSON.parse(e.data as string) as { type?: string }
+          if (data.type === 'connected') return
+        } catch { /* malformed payload — refresh anyway, the poll will settle it */ }
+        refresh()
+      }
+      es.onerror = () => { /* EventSource auto-reconnects; the 8s poll covers any gap */ }
+    } catch {
+      // EventSource not available (e.g. unit test env) — the 8s poll still covers it
+    }
+    return () => { es?.close() }
+  }, [runId, refresh])
 
   return { detail, loading, notFound, refresh }
 }
