@@ -14,6 +14,7 @@ import { buildSummarizePrompt, parseStructuredSummary } from '../../../../servic
 import { composeClientSkill } from '../../../../services/skillCompose'
 import { readFile, deleteFile } from '../../../../services/pathlyApi'
 import { resolveArtifactPath } from '../artifactPath'
+import { featureFromPath } from '../../../../utils/featureFromPath'
 import { useToastStore } from '../../../../store/toastStore'
 import {
   fetchArtifacts,
@@ -100,6 +101,8 @@ export async function summarizeArtifactById(
 
   try {
     const abs = resolveArtifactPath(artifactPath, cwd)
+    // Attribute the summary run to the artifact's feature board (Pipeline), not '(project)'.
+    const feature = featureFromPath(artifactPath)
     const text = await readFile(abs)
     if (!text || !text.trim()) return false
 
@@ -123,7 +126,7 @@ export async function summarizeArtifactById(
         { projectRoot: cwd },
       )
       if (composed) {
-        await runJob({ kind: 'summarize', prompt: composed + noteSuffix, cwd }, selection)
+        await runJob({ kind: 'summarize', prompt: composed + noteSuffix, cwd, feature }, selection)
         const fileText = await pollSummaryFile(outAbs)
         void deleteFile(outAbs).catch(() => {})
         if (fileText == null) return false
@@ -136,7 +139,7 @@ export async function summarizeArtifactById(
     // MODEL target, or engine fallback when compose is unreachable: bare prompt + returned text.
     if (raw == null) {
       const result = await runJob(
-        { kind: 'summarize', prompt: buildSummarizePrompt(text, style) + noteSuffix, cwd },
+        { kind: 'summarize', prompt: buildSummarizePrompt(text, style) + noteSuffix, cwd, feature },
         selection,
       )
       raw = (result.text ?? '').trim()

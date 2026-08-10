@@ -7,6 +7,7 @@ import { useToastStore } from '../../../../store/toastStore'
 import { buildSplitPrompt, getSpawnCwd, STORAGE_KEY_SPLIT, describeAgentFailure } from '../../../Editor/commentUtils'
 import { buildCliArgv, cliLabel, EditorCli } from '../editorCli'
 import { effectiveModel } from '../../../../services/spawnPolicy'
+import { featureFromPath } from '../../../../utils/featureFromPath'
 import { composeClientSkill } from '../../../../services/skillCompose'
 import { attachProgress } from '../editorProgress'
 
@@ -149,8 +150,9 @@ export function useEditorAgentActions(
       })
     })
     try {
+      const feature = featureFromPath(forFile)
       await window.pathly.terminal.spawn(tabId, getSpawnCwd(forFile), undefined, buildCliArgv(splitCli, prompt, effectiveModel('split', splitCli)), undefined, {
-        telemetry: { scopeTier: 'project', label: 'ai-split', role: 'splitter' },
+        telemetry: { scopeTier: feature ? 'feature' : 'project', label: 'ai-split', role: 'splitter', ...(feature ? { feature } : {}) },
       })
       onSplitOnceUsed()
     } catch (e) {

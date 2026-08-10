@@ -17,6 +17,7 @@ import { STORAGE_KEY_ANALYZE } from '../../../Editor/commentUtils'
 import { resolvePrompt } from '../../../shared/PromptActionConfig/presetTypes'
 import { buildCliArgv, cliLabel, type EditorCli } from '../editorCli'
 import { effectiveModel } from '../../../../services/spawnPolicy'
+import { featureFromPath } from '../../../../utils/featureFromPath'
 import { ANALYZE_LENSES } from '../actionPresets'
 import { analysisSidecarPathFor } from '../../analysisTypes'
 import { readSidecar } from '../../AnalysisGalleryPanel/analysisSidecar'
@@ -131,8 +132,9 @@ export function useEditorAnalysisAction(
       )
 
       try {
+        const feature = featureFromPath(forFile)
         await window.pathly.terminal.spawn(tabId, getSpawnCwd(forFile), undefined, buildCliArgv(analyzeCli, prompt, effectiveModel('analyze', analyzeCli)), undefined, {
-          telemetry: { scopeTier: 'project', label: 'ai-analyze', role: 'analyzer' },
+          telemetry: { scopeTier: feature ? 'feature' : 'project', label: 'ai-analyze', role: 'analyzer', ...(feature ? { feature } : {}) },
         })
         onAnalyzeOnceUsed()
       } catch (e) {

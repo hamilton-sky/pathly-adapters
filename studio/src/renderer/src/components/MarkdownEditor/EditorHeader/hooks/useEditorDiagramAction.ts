@@ -16,6 +16,7 @@ import { getSpawnCwd, describeAgentFailure } from '../../../Editor/commentUtils'
 import { resolvePrompt } from '../../../shared/PromptActionConfig/presetTypes'
 import { buildCliArgv, cliLabel, type EditorCli } from '../editorCli'
 import { effectiveModel } from '../../../../services/spawnPolicy'
+import { featureFromPath } from '../../../../utils/featureFromPath'
 import { DIAGRAM_PRESETS, STORAGE_KEY_DIAGRAM } from '../diagramPresets'
 import { sidecarPathFor } from '../../diagramTypes'
 import { readSidecar } from '../../DiagramGalleryPanel/diagramSidecar'
@@ -131,8 +132,9 @@ export function useEditorDiagramAction(
       )
 
       try {
+        const feature = featureFromPath(forFile)
         await window.pathly.terminal.spawn(tabId, getSpawnCwd(forFile), undefined, buildCliArgv(diagramCli, prompt, effectiveModel('diagram', diagramCli)), undefined, {
-          telemetry: { scopeTier: 'project', label: 'ai-diagram', role: 'diagrammer' },
+          telemetry: { scopeTier: feature ? 'feature' : 'project', label: 'ai-diagram', role: 'diagrammer', ...(feature ? { feature } : {}) },
         })
         onDiagramOnceUsed()
       } catch (e) {

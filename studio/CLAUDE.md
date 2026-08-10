@@ -182,7 +182,12 @@ resolution is synchronous at spawn). Threaded into all five one-shot spawn sites
 (`useEditorAgentActions`, role `split`), **Analyze** (`analyze`), **Diagram** (`diagram`), **Comment**
 (`CommentsPanel`, `comment`) via `editorCli.buildCliArgv(cli, prompt, model)`, and artifact
 **summaries** (`aiRouter` engine path, role `summarize`). No policy → no `--model` (engine default),
-byte-identical to before. (These roles match the Models UI "Editor / one-shot" group.)
+byte-identical to before. (These roles match the Models UI "Editor / one-shot" group.) Each site
+also stamps `telemetry.feature = featureFromPath(<file>)` (`utils/featureFromPath` → the slug under
+`pathly/features/<slug>/`) so the one-shot **attributes to its feature board** in the Pipeline
+(`GET /runs`) instead of the generic `(project)`; a non-feature file stays `(project)`. The
+`telemetry.feature` → `/db/invocation` plumbing already existed (`terminal.ts`); the callers just
+never set it. (summaries thread it via `AiJob.feature` → `runEngine`.)
 
 **Logging is deliberately NOT a setting.** Per the unified-control-plane separation of concerns:
 the **Pipeline** section is the operational plane (observe + control every run — logs, cost,

@@ -17,6 +17,7 @@ import {
   type EditorCli,
 } from '../../MarkdownEditor/EditorHeader/editorCli'
 import { effectiveModel } from '../../../services/spawnPolicy'
+import { featureFromPath } from '../../../utils/featureFromPath'
 import { COMMENT_VERBS } from '../commentVerbs'
 import { attachProgress, fmtElapsed, useElapsedProgress } from '../../shared/RunPill/progress'
 import { CommentItem } from './CommentItem/CommentItem'
@@ -184,8 +185,9 @@ export function CommentsPanel({
     })
 
     try {
+      const feature = featureFromPath(filePath)
       await window.pathly.terminal.spawn(tabId, cwd, undefined, buildCliArgv(cli, prompt, effectiveModel('comment', cli)), undefined, {
-        telemetry: { scopeTier: 'project', label: 'ai-comment', role: 'commenter' },
+        telemetry: { scopeTier: feature ? 'feature' : 'project', label: 'ai-comment', role: 'commenter', ...(feature ? { feature } : {}) },
       })
     } catch (e) {
       // Spawn rejected (e.g. queue cancel / over cap) — onExit will never fire, so clean up here.

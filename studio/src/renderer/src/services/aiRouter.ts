@@ -19,6 +19,8 @@ export interface AiJob {
   kind: 'summarize' | 'generic'
   prompt: string
   cwd?: string
+  /** Feature/board this one-shot acts on — attributes the run in the Pipeline (else '(project)'). */
+  feature?: string
 }
 export interface AiResult {
   text: string
@@ -60,6 +62,7 @@ function runEngineCancellable(
   prompt: string,
   cwd: string,
   fileWrite = false,
+  feature = '',
 ): { promise: Promise<AiResult>; abort: () => void } {
   // File-writing jobs (summarize writes a sibling `.summary` file) MUST use json mode, not
   // stream-json: stream-json's headless permission loop blocks the write (claude asks for
@@ -110,7 +113,7 @@ function runEngineCancellable(
       },
     )
     window.pathly.terminal.spawn(tabId, cwd, undefined, argv, undefined, {
-      telemetry: { scopeTier: 'project', label: 'ai-summary', role: 'ai-router' },
+      telemetry: { scopeTier: feature ? 'feature' : 'project', label: 'ai-summary', role: 'ai-router', ...(feature ? { feature } : {}) },
     }).catch((e: unknown) => {
       if (settled) return
       settled = true
@@ -132,8 +135,8 @@ function runEngineCancellable(
   return { promise, abort }
 }
 
-function runEngine(adapter: CliAdapter, prompt: string, cwd: string, fileWrite = false): Promise<AiResult> {
-  return runEngineCancellable(adapter, prompt, cwd, fileWrite).promise
+function runEngine(adapter: CliAdapter, prompt: string, cwd: string, fileWrite = false, feature = ''): Promise<AiResult> {
+  return runEngineCancellable(adapter, prompt, cwd, fileWrite, feature).promise
 }
 
 /** Dispatch a job to either a local model or a CLI engine, per the selection. */
@@ -144,7 +147,7 @@ export async function runJob(job: AiJob, selection: AiSelection): Promise<AiResu
   if (selection.type === 'model') {
     return runModel(selection.id, job.prompt)
   }
-  return runEngine(selection.id as CliAdapter, job.prompt, job.cwd ?? defaultCwd(), job.kind === 'summarize')
+  return runEngine(selection.id as CliAdapter, job.prompt, job.cwd ?? defaultCwd(), job.kind === 'summarize', job.feature ?? '')
 }
 
 /**
@@ -167,5 +170,5 @@ export function runJobWithAbort(
     })
     return { promise, abort: () => { aborted = true } }
   }
-  return runEngineCancellable(selection.id as CliAdapter, job.prompt, job.cwd ?? defaultCwd(), job.kind === 'summarize')
+  return runEngineCancellable(selection.id as CliAdapter, job.prompt, job.cwd ?? defaultCwd(), job.kind === 'summarize', job.feature ?? '')
 }
