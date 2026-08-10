@@ -52,8 +52,11 @@ beforeEach(() => {
 })
 
 describe('summarizeArtifact', () => {
-  it('reads the file, runs the chosen target, and writes description + summary back', async () => {
+  it('coerces a stale local-model target to the CLI default, runs it, and writes back', async () => {
+    // Summaries are CLI-only: a stale stored local-model target is coerced to {engine, claude}
+    // (summarizeArtifact.ts). So the run + the persisted selection use the coerced target.
     const selection = { type: 'model' as const, id: 'phi-4-mini' }
+    const coerced = { type: 'engine' as const, id: 'claude' }
     const ok = await summarizeArtifact({
       messageId: 'msg-1', path: '/p/DOC.md', atype: 'md', selection, cwd: 'C:/proj',
     })
@@ -63,9 +66,9 @@ describe('summarizeArtifact', () => {
     const [job, sel] = runJob.mock.calls[0]
     expect(job.kind).toBe('summarize')
     expect(job.cwd).toBe('C:/proj')
-    expect(sel).toEqual(selection)
+    expect(sel).toEqual(coerced)
     expect(apiEditMessage).toHaveBeenCalledWith('msg-1', 'What it is. Why it matters.')
-    expect(apiSetArtifactSummary).toHaveBeenCalledWith('art-1', '- Storage\n- API', selection)
+    expect(apiSetArtifactSummary).toHaveBeenCalledWith('art-1', '- Storage\n- API', coerced)
   })
 
   it('engine target composes the depth skill and reads the file-captured summary', async () => {
