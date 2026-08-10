@@ -84,6 +84,21 @@ def read_run_history(
     return [dict(r) for r in rows]
 
 
+def latest_running_run_id_for_feature(
+    conn: sqlite3.Connection, feature: str
+) -> str | None:
+    """The run_id of the most-recent RUNNING run for *feature* (slug or legacy path-suffix), or
+    None. Phase-boundary board posts (``_phase_board.post_phase_to_board``) use it to stamp the
+    live run's run_id so they stream to that run's RunDetail via the T3 per-run SSE feed instead
+    of waiting on the 8s poll — the record_phase call carries no run_id of its own."""
+    row = conn.execute(
+        "SELECT run_id FROM run_history "  # nosec B608 - _SLUG_MATCH is a module constant; values bound
+        f"WHERE {_SLUG_MATCH} AND status='running' ORDER BY id DESC LIMIT 1",
+        (feature, feature),
+    ).fetchone()
+    return row["run_id"] if row else None
+
+
 def latest_project_root_for_feature(
     conn: sqlite3.Connection, feature: str
 ) -> str | None:

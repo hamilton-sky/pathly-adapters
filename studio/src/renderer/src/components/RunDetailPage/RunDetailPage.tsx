@@ -6,12 +6,13 @@ import { StagesTab } from './StagesTab/StagesTab'
 import { LogsTab } from './LogsTab/LogsTab'
 import { BoardTab } from './BoardTab/BoardTab'
 import { CostTab } from './CostTab/CostTab'
+import { PhasesTab } from './PhasesTab/PhasesTab'
 import { useRunDetail } from './hooks/useRunDetail'
 import { adapterFromProvider } from './runAdapter'
 import { RunControls } from './RunControls/RunControls'
 import s from './RunDetailPage.module.css'
 
-type TabId = 'stages' | 'logs' | 'board' | 'cost'
+type TabId = 'stages' | 'phases' | 'logs' | 'board' | 'cost'
 
 interface Props {
   runId: string
@@ -57,10 +58,15 @@ export function RunDetailPage({ runId, onBack, backLabel = 'Monitor' }: Props): 
   }
 
   const adapter = run ? adapterFromProvider(run.adapter) : null
+  // PHASE_START/DONE markers (type='phase') get their own timeline tab; the Board tab shows the
+  // rest (decisions/discoveries/artifacts) so phase noise doesn't drown the real findings.
+  const phasePosts = detail.board.filter((p) => p.type === 'phase')
+  const boardPosts = detail.board.filter((p) => p.type !== 'phase')
   const tabs: { id: TabId; label: string; count?: number }[] = [
     { id: 'stages', label: 'Stages', count: detail.stages.length || undefined },
+    { id: 'phases', label: 'Phases', count: phasePosts.length || undefined },
     { id: 'logs', label: 'Logs', count: detail.logs.length || undefined },
-    { id: 'board', label: 'Board', count: detail.board.length || undefined },
+    { id: 'board', label: 'Board', count: boardPosts.length || undefined },
     { id: 'cost', label: 'Cost' },
   ]
 
@@ -108,8 +114,9 @@ export function RunDetailPage({ runId, onBack, backLabel = 'Monitor' }: Props): 
         ) : (
           <>
             {tab === 'stages' && <StagesTab stages={detail.stages} onOpenStage={() => setTab('logs')} />}
+            {tab === 'phases' && <PhasesTab phases={phasePosts} />}
             {tab === 'logs' && <LogsTab logs={detail.logs} />}
-            {tab === 'board' && <BoardTab board={detail.board} artifacts={detail.artifacts} />}
+            {tab === 'board' && <BoardTab board={boardPosts} artifacts={detail.artifacts} />}
             {tab === 'cost' && <CostTab cost={detail.cost} stages={detail.stages} />}
           </>
         )}

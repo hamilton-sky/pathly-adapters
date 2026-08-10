@@ -28,11 +28,18 @@ def post_phase_to_board(
     try:
         from pathly_orchestrator.db.connection import get_db
         from pathly_orchestrator.db.queries.comms import post_message
+        from pathly_orchestrator.db.queries.run_history import (
+            latest_running_run_id_for_feature,
+        )
         from pathly_orchestrator.http_server.sse import _broadcast_comms
 
+        conn = get_db()
+        # Correlate to the live run so this phase marker streams to that run's RunDetail Board/Phases
+        # via the T3 per-run feed (record_phase carries no run_id). None → the time-window fallback.
+        run_id = latest_running_run_id_for_feature(conn, feature)
         verb = "started" if event_type == "PHASE_START" else "done"
         message_id = post_message(
-            get_db(),
+            conn,
             board="feature",
             scope=feature,
             from_agent=agent or "system",
@@ -41,6 +48,7 @@ def post_phase_to_board(
             text=f"{phase} {verb}",
             stage=phase,
             conv=conv,
+            run_id=run_id,
         )
         _broadcast_comms(
             feature,
@@ -50,6 +58,8 @@ def post_phase_to_board(
                 "scope": feature,
                 "msg_type": "phase",
                 "message_id": message_id,
+                # run_id → sse._broadcast_comms tees this onto /events/runs?run_id=… (live push).
+                "run_id": run_id,
             },
         )
     except Exception:
