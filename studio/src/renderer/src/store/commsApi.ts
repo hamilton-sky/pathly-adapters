@@ -801,6 +801,20 @@ export async function apiStopBoard(board: string, scope: string): Promise<boolea
   }
 }
 
+/**
+ * Stop a run by run_id (unified-control-plane control) — POST /runs/<run_id>/stop resolves it to
+ * the right stop path server-side (FSM abort for a flow/team/consultation, board-lock stop for a
+ * board single/evaluator or goal single/loop). Idempotent; returns true on 2xx.
+ */
+export async function apiStopRun(runId: string): Promise<boolean> {
+  try {
+    const r = await apiFetch(`/runs/${encodeURIComponent(runId)}/stop`, { method: 'POST' })
+    return r.ok
+  } catch {
+    return false
+  }
+}
+
 /** Stop the executor running for a goal (single, loop, or team). */
 export async function apiStopGoal(goalId: string): Promise<boolean> {
   try {

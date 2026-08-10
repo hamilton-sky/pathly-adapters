@@ -8,7 +8,10 @@ import { BoardTab } from './BoardTab/BoardTab'
 import { CostTab } from './CostTab/CostTab'
 import { useRunDetail } from './hooks/useRunDetail'
 import { adapterFromProvider } from './runAdapter'
+import { apiStopRun } from '../../store/commsApi'
 import s from './RunDetailPage.module.css'
+
+const ACTIVE_STATUS = new Set(['running', 'paused', 'awaiting_decision'])
 
 type TabId = 'stages' | 'logs' | 'board' | 'cost'
 
@@ -37,8 +40,17 @@ const fmtDur = (a: string | null, b: string | null): string => {
 // tab bar · body. Data via useRunDetail → GET /runs/<id>.
 export function RunDetailPage({ runId, onBack, backLabel = 'Monitor' }: Props): JSX.Element {
   const [tab, setTab] = useState<TabId>('stages')
+  const [stopping, setStopping] = useState(false)
   const { detail, loading, notFound, refresh } = useRunDetail(runId)
   const run = detail.run
+  const isActive = run ? ACTIVE_STATUS.has(run.status) : false
+
+  async function handleStop(): Promise<void> {
+    setStopping(true)
+    await apiStopRun(runId)
+    setStopping(false)
+    refresh() // pull the new status/cost after the stop lands
+  }
 
   if (notFound || (!loading && !run)) {
     return (
@@ -73,6 +85,16 @@ export function RunDetailPage({ runId, onBack, backLabel = 'Monitor' }: Props): 
           {adapter && <AdapterBadge adapter={adapter} />}
           {run && <StatusBadge status={run.status} />}
           <div className={s.spacer} />
+          {isActive && (
+            <button
+              type="button"
+              className={`${s.action} ${s.stop}`}
+              disabled={stopping}
+              onClick={handleStop}
+            >
+              {stopping ? '…' : '■ Stop'}
+            </button>
+          )}
           <button type="button" className={s.action} onClick={refresh}>↻ Refresh</button>
         </div>
         <div className={s.runId}>{runId}</div>

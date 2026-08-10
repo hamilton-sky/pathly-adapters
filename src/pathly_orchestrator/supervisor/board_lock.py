@@ -68,3 +68,19 @@ def holder(board: str, scope: str) -> str | None:
     """Return the run_id holding the board, or None."""
     with _lock:
         return _held.get(board_key(board, scope))
+
+
+def find_by_holder(run_id: str) -> tuple[str, str] | None:
+    """Reverse lookup: the (board, scope) currently held by ``run_id``, or None.
+
+    The run_id-addressed stop (POST /runs/<run_id>/stop) uses this — a board single/evaluator
+    or a goal single/loop run holds its board here keyed by run_id, so the stop route can find
+    which board to release without being told the board/scope.
+    """
+    if not run_id:
+        return None
+    with _lock:
+        for key, held_id in _held.items():
+            if held_id == run_id:
+                return key
+    return None

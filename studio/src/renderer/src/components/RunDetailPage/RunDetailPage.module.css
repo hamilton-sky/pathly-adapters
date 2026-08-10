@@ -58,6 +58,11 @@
 
 .action:hover { border-color: var(--accent); color: var(--accent); }
 
+/* Stop — danger accent; only shown while the run is active. */
+.stop { color: var(--red); }
+.stop:hover:not(:disabled) { border-color: var(--red); color: var(--red); }
+.stop:disabled { opacity: 0.5; cursor: default; }
+
 .runId {
   margin-top: 8px;
   font-family: var(--font-family-mono);

@@ -268,7 +268,7 @@ blueprints/
   comms/      messages, tasks, artifacts, runs, goals, settings, context (board subsystems)
   ops/        telemetry, menu, db_api, chat, export (operational/infra)
   code/       query (codebase-intelligence query)
-  control/    runs_read (unified run read API: GET /runs, /runs/<id>)
+  control/    runs_read (unified run read API: GET /runs, /runs/<id>) · runs_control (POST /runs/<id>/stop — run_id-addressed stop)
 ```
 A new endpoint goes into the matching domain file. If no domain matches, create a new domain file — do not add it to an unrelated file.
 

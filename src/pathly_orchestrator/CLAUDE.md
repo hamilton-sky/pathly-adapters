@@ -294,7 +294,10 @@ pathly_orchestrator/
       comms/               # board + goals/DAG, split by domain: messages*.py, tasks.py, artifacts*.py, runs.py, goals.py, goals_read.py (GET /comms/goals rollup), settings.py, context.py, features.py (/comms/features/decompose), project.py (/comms/project/decompose) (+ _helpers.py); see "Comms board endpoints" above
       ops/                 # telemetry*.py (/record_activity, /record_phase*, /telemetry/*); menu.py (/menu, /metrics); db_api*.py (/db/* read API); chat.py (/chat); export.py
       code/                # query.py (POST /code/query — codebase-intelligence)
-      control/             # runs_read.py (GET /runs, /runs/<run_id> — unified run read API; unified-control-plane P0)
+      control/             # runs_read.py (GET /runs, /runs/<run_id> — unified run read API; P0);
+                           # runs_control.py (POST /runs/<run_id>/stop — run_id-addressed stop:
+                           # resolves run_id → abort_run (FSM registry) or board-lock stop
+                           # (board/goal), else not_active; board_lock.find_by_holder reverse-lookup)
 ```
 
 **Layer rules:**
