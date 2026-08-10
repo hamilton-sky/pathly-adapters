@@ -841,6 +841,55 @@ export async function apiRunAction(
   }
 }
 
+/**
+ * Thin RunSpec for the unified launcher (unified-control-plane T5/T6) — mirrors the server's
+ * ``POST /runs`` body. ``board``/``scope`` apply to kind 'single'|'evaluator' (and 'flow',
+ * which only reads 'scope'); 'goal' only reads ``goalId``. Sending the unused fields anyway is
+ * harmless — the server ignores whatever a given kind doesn't need.
+ */
+export interface RunSpec {
+  kind: 'flow' | 'single' | 'evaluator' | 'goal'
+  board?: 'feature' | 'project' | 'global'
+  scope?: string
+  flow?: string
+  goalId?: string
+  adapter?: string
+  model?: string
+  projectRoot?: string
+}
+
+/**
+ * Launch any run kind from one place — POST /runs (unified-control-plane T5/T6 launcher). The
+ * server routes the RunSpec to the matching existing facade (start_run / start_board_run /
+ * start_goal_run) and replies { ok, run_id, kind } on success, or an error body ({ error } on a
+ * 400, { ok:false, error } on a 409 busy) — both still parsed and returned, not treated as a
+ * transport failure. Returns null only when the request itself couldn't be sent.
+ */
+export async function apiCreateRun(
+  spec: RunSpec,
+): Promise<{ ok: boolean; run_id?: string; kind?: string; error?: string } | null> {
+  try {
+    const r = await apiFetch('/runs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        kind: spec.kind,
+        board: spec.board,
+        scope: spec.scope,
+        ...(spec.flow ? { flow: spec.flow } : {}),
+        ...(spec.goalId ? { goal_id: spec.goalId } : {}),
+        ...(spec.adapter ? { adapter: spec.adapter } : {}),
+        ...(spec.model ? { model: spec.model } : {}),
+        project_root: spec.projectRoot ?? '',
+      }),
+    })
+    const j = (await r.json()) as { ok?: boolean; run_id?: string; kind?: string; error?: string }
+    return { ok: j.ok ?? r.ok, run_id: j.run_id, kind: j.kind, error: j.error }
+  } catch {
+    return null
+  }
+}
+
 /** Stop the executor running for a goal (single, loop, or team). */
 export async function apiStopGoal(goalId: string): Promise<boolean> {
   try {

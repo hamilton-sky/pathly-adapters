@@ -8,6 +8,7 @@ import { EngineDetailModal } from '../EngineDetailModal/EngineDetailModal'
 import { MonitorBoardHeader, type BoardMode } from './MonitorBoardHeader/MonitorBoardHeader'
 import { RunList } from '../../RunList/RunList'
 import { useRuns } from '../../RunList/hooks/useRuns'
+import { NewRunButton } from '../../RunList/NewRunButton/NewRunButton'
 import { adapterFromProvider } from '../../../RunDetailPage/runAdapter'
 import s from './MonitorBoard.module.css'
 
@@ -35,7 +36,7 @@ export function MonitorBoard({ engines, recent, onAction, onOpenRun }: Props): J
   const [view, setView] = useState<'grid' | 'banner'>('grid')
 
   // Lazy: the /runs poll only runs while Runs mode is open (the Live board is the default).
-  const { runs, loading: runsLoading } = useRuns(mode === 'runs')
+  const { runs, loading: runsLoading, refetch: refetchRuns } = useRuns(mode === 'runs')
 
   const running = useMemo(() => engines.filter((e) => e.status === 'running').length, [engines])
   const queued = useMemo(() => engines.filter((e) => e.status === 'queued').length, [engines])
@@ -110,6 +111,9 @@ export function MonitorBoard({ engines, recent, onAction, onOpenRun }: Props): J
 
         {mode === 'runs' ? (
           <>
+            <div className={s.runsToolbar}>
+              <NewRunButton onCreated={refetchRuns} />
+            </div>
             {queued > 0 && (
               <p className={s.note}>{queued} queued — view on the Live board (the run list can’t show the gate queue).</p>
             )}

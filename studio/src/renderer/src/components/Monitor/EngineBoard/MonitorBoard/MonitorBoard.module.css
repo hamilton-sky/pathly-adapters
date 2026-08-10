@@ -29,3 +29,10 @@
   font-size: 13px;
   padding: 40px 0;
 }
+
+/* Runs-mode toolbar — right-aligned launcher trigger above the run list. */
+.runsToolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
