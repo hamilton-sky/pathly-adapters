@@ -73,6 +73,15 @@ _SPAWN_EVENT_TYPES = frozenset({"TERMINAL_SPAWN", "TERMINAL_KILL", "TERMINAL_SIG
 _comms_clients: dict[str, list[queue.Queue]] = {}
 _comms_lock = threading.Lock()
 
+# Unified per-run SSE client registry (unified-control-plane T3). Keyed by run_id; each
+# value is a list of per-client queues. Lets a single subscription watch ONE run
+# end-to-end regardless of which topic (/events/runner) or scope (/events/comms) it lives
+# under — _broadcast_runner/_broadcast_comms tee any payload that carries a run_id onto
+# this sink. Unlike topic/scope (reused across runs), run_id is unique per run, so the
+# /events/runs endpoint pops the dict entry once its last client disconnects.
+_run_clients: dict[str, list[queue.Queue]] = {}
+_run_lock = threading.Lock()
+
 # Pushed-menu TTL timer
 _push_timer: threading.Timer | None = None
 _push_timer_lock = threading.Lock()
@@ -183,12 +192,38 @@ def _broadcast_spawn(payload: dict) -> None:
                 pass
 
 
+def _broadcast_run_event(run_id: str, payload: dict) -> None:
+    """Broadcast a single event to all /events/runs clients subscribed to *run_id*.
+
+    The unified per-run feed (unified-control-plane T3): a single subscription that
+    watches ONE run end-to-end regardless of which topic (/events/runner) or scope
+    (/events/comms) it lives under. This has no call sites of its own — it is teed from
+    _broadcast_runner / _broadcast_comms whenever a payload carries a run_id, mirroring
+    the _SPAWN_EVENT_TYPES tee below (same pattern, filtered by run_id membership in the
+    payload instead of event type).
+    """
+    if not run_id:
+        return
+    raw = json.dumps(payload)
+    with _run_lock:
+        clients = _run_clients.get(run_id, [])
+        dead = [q for q in clients if q.full()]
+        for q in dead:
+            clients.remove(q)
+        for q in clients:
+            try:
+                q.put_nowait(raw)
+            except queue.Full:
+                pass
+
+
 def _broadcast_runner(topic: str, payload: dict) -> None:
     """Broadcast a runner event to all /events/runner clients subscribed to *topic*.
 
     Terminal-lifecycle events (open/kill) are ALSO mirrored to the topic-independent
     /events/spawn channel, so the PTY opens/closes even when the run's topic is not
-    the board the user is currently viewing.
+    the board the user is currently viewing. Any event whose payload carries a run_id
+    is ALSO mirrored to the run-scoped /events/runs channel (unified-control-plane T3).
     """
     raw = json.dumps(payload)
     with _runner_lock:
@@ -203,10 +238,17 @@ def _broadcast_runner(topic: str, payload: dict) -> None:
                 pass
     if payload.get("type") in _SPAWN_EVENT_TYPES:
         _broadcast_spawn(payload)
+    run_id = payload.get("run_id")
+    if run_id:
+        _broadcast_run_event(run_id, payload)
 
 
 def _broadcast_comms(scope: str, payload: dict) -> None:
-    """Broadcast a COMMS_UPDATE event to all /events/comms clients subscribed to *scope*."""
+    """Broadcast a COMMS_UPDATE event to all /events/comms clients subscribed to *scope*.
+
+    Any event whose payload carries a run_id is ALSO mirrored to the run-scoped
+    /events/runs channel (unified-control-plane T3).
+    """
     try:
         raw = json.dumps(payload)
         with _comms_lock:
@@ -219,6 +261,9 @@ def _broadcast_comms(scope: str, payload: dict) -> None:
                     q.put_nowait(raw)
                 except queue.Full:
                     pass
+        run_id = payload.get("run_id")
+        if run_id:
+            _broadcast_run_event(run_id, payload)
     except Exception:
         pass
     # board-disk-mirror P1: this is the single choke point every board write calls, so

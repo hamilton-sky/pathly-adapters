@@ -152,6 +152,13 @@ GET  /events/comms          ← SSE stream of comms board updates (streams bluep
 
 > Pipeline completion is **not** a distinct SSE event — it is a `RUNNER_STATUS` carrying a terminal `status` (`done`/`aborted`/`error`). PTY-started confirmation is the `POST /runner/terminal/started` HTTP callback, not an SSE event.
 
+**`GET /events/runs?run_id=<run_id>`** (unified-control-plane T3, `control/run_streams.py`) — a
+unified per-run feed: any event above, or a `/events/comms` `COMMS_UPDATE`, whose payload carries
+a `run_id` is ALSO mirrored onto this run-scoped channel by `sse._broadcast_run_event`, teed from
+`_broadcast_runner`/`_broadcast_comms` (mirrors the `_SPAWN_EVENT_TYPES` tee pattern above, but
+keyed by run_id presence in the payload instead of event type). Lets a single subscription watch
+ONE run end-to-end regardless of which topic/board/scope it lives under.
+
 ## `/next_action` response contract
 
 Every `/next_action` response includes the following top-level fields:
@@ -308,7 +315,12 @@ pathly_orchestrator/
                            # (FSM registry) or board-lock stop (board/goal; board-lock runs support
                            # ONLY abort, else {ok:false,reason:unsupported_for_kind}), else
                            # {ok:false,reason:not_active}; board_lock.find_by_holder reverse-lookup;
-                           # _helpers.py holds the shared resolution/abort/retry + create-run bodies)
+                           # _helpers.py holds the shared resolution/abort/retry + create-run bodies);
+                           # run_streams.py (GET /events/runs?run_id=<run_id> — unified per-run SSE
+                           # feed, T3: mirrors the /events/runner shape incl. the
+                           # pathly_sse_clients_active gauge bookkeeping; fed by
+                           # sse._broadcast_run_event, teed from _broadcast_runner/_broadcast_comms
+                           # whenever a payload carries a run_id)
 ```
 
 **Layer rules:**
