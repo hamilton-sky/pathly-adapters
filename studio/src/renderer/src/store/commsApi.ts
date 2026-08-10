@@ -815,6 +815,32 @@ export async function apiStopRun(runId: string): Promise<boolean> {
   }
 }
 
+/**
+ * Run_id-addressed control action (unified-control-plane T2) — POST /runs/<run_id>/<action>.
+ * Only meaningful against an ACTIVE FSM-registry run (pause/resume/advance/reroute) or a
+ * FINISHED one (retry); a board-lock run (single/loop/evaluator) only supports 'abort', which
+ * `apiStopRun` already covers. The server responds 200 even for a semantic no-op (e.g.
+ * {ok:false, reason:'unsupported_for_kind'|'not_active'}) — this helper reports transport
+ * success only, so callers gate which buttons appear (RunControls) rather than branch on the
+ * response body.
+ */
+export async function apiRunAction(
+  runId: string,
+  action: 'pause' | 'resume' | 'advance' | 'reroute' | 'retry' | 'abort',
+  body?: Record<string, unknown>,
+): Promise<boolean> {
+  try {
+    const r = await apiFetch(`/runs/${encodeURIComponent(runId)}/${action}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body ?? {}),
+    })
+    return r.ok
+  } catch {
+    return false
+  }
+}
+
 /** Stop the executor running for a goal (single, loop, or team). */
 export async function apiStopGoal(goalId: string): Promise<boolean> {
   try {
