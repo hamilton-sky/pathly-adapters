@@ -329,9 +329,14 @@ curl -s -X POST http://127.0.0.1:8765/comms/post \
     "type": "<type>",
     "text": "<one self-contained paragraph — what you found and why it matters>",
     "board": "<board>",
+    "run_id": "<run_id>",
     "stage": "<CURRENT_STATE>"
   }'
 ```
+
+> Always include `"run_id": "<run_id>"` — it correlates your post to THIS run so it shows on the
+> run's Pipeline **Board** tab and streams there **live** (the server tees run_id-tagged posts onto
+> the per-run event feed) instead of the tab waiting on its poll.
 
 **Server availability — skip-if-down (advisory):**
 If the call fails or the server is not reachable (connection refused / non-200), skip silently and
@@ -353,6 +358,7 @@ start the server or retry in a loop just to post.
   ```bash
   curl -s -X POST http://127.0.0.1:8765/comms/post -H "Content-Type: application/json" -d '{
     "feature": "<feature>", "from": "<your-role>", "type": "artifact", "board": "<board>",
+    "run_id": "<run_id>",
     "text": "<1-2 sentence description>", "summary": "<topic map, one line per section>",
     "artifact_path": "<path to the file>", "artifact_type": "md"}'
   ```
@@ -392,6 +398,7 @@ curl -s -X POST http://127.0.0.1:8765/comms/post \
       {"id": "b", "label": "<option B>", "description": "<short consequence>"}
     ],
     "board": "<board>",
+    "run_id": "<run_id>",
     "stage": "<CURRENT_STATE>"
   }'
 ```
