@@ -295,9 +295,14 @@ pathly_orchestrator/
       ops/                 # telemetry*.py (/record_activity, /record_phase*, /telemetry/*); menu.py (/menu, /metrics); db_api*.py (/db/* read API); chat.py (/chat); export.py
       code/                # query.py (POST /code/query — codebase-intelligence)
       control/             # runs_read.py (GET /runs, /runs/<run_id> — unified run read API; P0);
-                           # runs_control.py (POST /runs/<run_id>/stop — run_id-addressed stop:
-                           # resolves run_id → abort_run (FSM registry) or board-lock stop
-                           # (board/goal), else not_active; board_lock.find_by_holder reverse-lookup)
+                           # runs_control.py (POST /runs/<run_id>/stop AND
+                           # POST /runs/<run_id>/<action> for action in
+                           # pause|resume|advance|reroute|retry|abort — run_id-addressed control:
+                           # resolves run_id → abort_run/pause_run/resume_run/reroute_run/start_run
+                           # (FSM registry) or board-lock stop (board/goal; board-lock runs support
+                           # ONLY abort, else {ok:false,reason:unsupported_for_kind}), else
+                           # {ok:false,reason:not_active}; board_lock.find_by_holder reverse-lookup;
+                           # _helpers.py holds the shared resolution/abort/retry bodies)
 ```
 
 **Layer rules:**
