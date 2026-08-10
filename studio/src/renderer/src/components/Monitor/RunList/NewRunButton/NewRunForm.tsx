@@ -1,5 +1,6 @@
 import { BoardSelect, type BoardSelectOption } from '../../../shared/BoardSelect/BoardSelect'
 import { useNewRunForm, type RunKind, type RunBoard } from './hooks/useNewRunForm'
+import { useProjectFeatures } from './hooks/useProjectFeatures'
 import s from './NewRunButton.module.css'
 
 interface Props {
@@ -28,6 +29,7 @@ const BOARD_OPTIONS: BoardSelectOption[] = [
 export function NewRunForm({ projectRoot, defaultScope, onCancel, onSuccess }: Props): JSX.Element {
   const { form, setKind, setBoard, setScope, setFlow, setGoalId, submitting, error, canSubmit, submit } =
     useNewRunForm(projectRoot, defaultScope)
+  const features = useProjectFeatures(projectRoot)
 
   async function handleSubmit(): Promise<void> {
     if (await submit()) onSuccess()
@@ -55,14 +57,27 @@ export function NewRunForm({ projectRoot, defaultScope, onCancel, onSuccess }: P
         />
 
         <label className={s.label} htmlFor="new-run-scope">Scope</label>
-        <input
-          id="new-run-scope"
-          className={s.input}
-          type="text"
-          placeholder="feature slug / board scope"
-          value={form.scope}
-          onChange={(e) => setScope(e.currentTarget.value)}
-        />
+        {form.board === 'feature' && features.length > 0 ? (
+          // Pick an existing feature (GET /db/features) instead of typing a slug.
+          <BoardSelect
+            id="new-run-scope"
+            ariaLabel="Scope (feature)"
+            value={form.scope}
+            options={features.map((f) => ({ value: f, label: f }))}
+            onChange={setScope}
+            placeholder="select a feature…"
+          />
+        ) : (
+          // project/global board, or a project with no features yet → free-text fallback.
+          <input
+            id="new-run-scope"
+            className={s.input}
+            type="text"
+            placeholder="feature slug / board scope"
+            value={form.scope}
+            onChange={(e) => setScope(e.currentTarget.value)}
+          />
+        )}
 
         {form.kind === 'flow' && (
           <>
