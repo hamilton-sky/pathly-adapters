@@ -10,6 +10,8 @@ interface TooltipProps {
   children: ReactNode
   placement?: 'top' | 'bottom' | 'left' | 'right'
   delay?: number
+  /** Let a long label wrap to multiple lines at a capped width (default: one nowrap line). */
+  wrap?: boolean
 }
 
 export function Tooltip({
@@ -19,6 +21,7 @@ export function Tooltip({
   children,
   placement = 'top',
   delay = 400,
+  wrap = false,
 }: TooltipProps): JSX.Element {
   const [visible, setVisible] = useState(false)
   const [rawPos, setRawPos] = useState({ top: 0, left: 0 })
@@ -109,7 +112,7 @@ export function Tooltip({
         <div
           ref={tooltipRef}
           role="tooltip"
-          className={clsx(styles.tooltip, description && styles.multiline)}
+          className={clsx(styles.tooltip, description && styles.multiline, wrap && styles.wrap)}
           style={{ top: pos.top, left: pos.left, transform }}
         >
           <span className={styles.labelRow}>

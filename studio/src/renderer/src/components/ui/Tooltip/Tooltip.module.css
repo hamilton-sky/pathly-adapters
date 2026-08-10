@@ -27,6 +27,18 @@
   max-width: 220px;
 }
 
+/* wrap=true — a long label (e.g. a task's full text) wraps to a capped, readable width instead
+   of one screen-wide line. Also releases the .labelRow nowrap so the label itself can break. */
+.tooltip.wrap {
+  white-space: normal;
+  max-width: min(380px, calc(100vw - 32px));
+  overflow-wrap: anywhere;
+}
+
+.tooltip.wrap .labelRow {
+  white-space: normal;
+}
+
 .labelRow {
   display: flex;
   align-items: center;

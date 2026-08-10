@@ -258,7 +258,7 @@ export function TaskDagView({ tasks, order, orient, comments, onCommentsChange, 
           </svg>
 
           {nodes.map((n) => (
-            <Tooltip key={n.id} label={firstLine(n.task.text)} placement="top">
+            <Tooltip key={n.id} label={firstLine(n.task.text)} placement="top" wrap>
               <button
                 type="button"
                 className={s.node}
