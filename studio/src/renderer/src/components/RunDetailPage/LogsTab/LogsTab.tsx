@@ -31,13 +31,20 @@ export function LogsTab({ logs }: Props): JSX.Element {
             </div>
           )}
 
-          <div className={s.stdoutLabel}>
-            stdout <span className={s.hint}>PTY tail — may be truncated</span>
-          </div>
           {lg.stdout && lg.stdout.trim() ? (
-            <pre className={s.pre}>{lg.stdout}</pre>
+            <details className={s.block}>
+              <summary className={s.summary}>
+                stdout <span className={s.hint}>PTY tail — may be truncated</span>
+              </summary>
+              <pre className={s.pre}>{lg.stdout}</pre>
+            </details>
           ) : (
-            <div className={s.note}>No stdout captured for this stage.</div>
+            <>
+              <div className={s.stdoutLabel}>
+                stdout <span className={s.hint}>PTY tail — may be truncated</span>
+              </div>
+              <div className={s.note}>No stdout captured for this stage.</div>
+            </>
           )}
         </div>
       ))}
