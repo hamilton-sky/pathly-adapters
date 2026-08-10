@@ -124,6 +124,12 @@ def comms_post():
         depends_on = data.get("depends_on")
         goal_id = data.get("goal_id")
         executor = data.get("executor")
+        # run_id correlates this post to a run so RunDetail's Board tab shows it exactly (and — via
+        # the COMMS_UPDATE broadcast below carrying it — so the T3 /events/runs tee pushes it LIVE
+        # instead of the tab waiting on its 8s poll). Agents send it from the comms-post fragment's
+        # <run_id>; absent → None (the run_id-vs-time-window read-model fallback still applies).
+        run_id = data.get("run_id")
+        run_id = run_id if isinstance(run_id, str) and run_id.strip() else None
         # Filesystem slug on a feature/goal card (e.g. project-decompose's sibling features).
         # Persisted so slug-keyed lookups work; the slug also lives inside `text` for display.
         slug = data.get("slug")
@@ -270,6 +276,7 @@ def comms_post():
             artifact_type=artifact_type if isinstance(artifact_type, str) else None,
             goal_id=goal_id,
             executor=executor,
+            run_id=run_id,
             context_refs=context_refs,
             slug=slug if isinstance(slug, str) and slug.strip() else None,
         )
@@ -341,6 +348,9 @@ def comms_post():
                 "board": board,
                 "scope": scope,
                 "msg_type": msg_type,
+                # Carry run_id so sse._broadcast_comms tees this onto the T3 per-run feed
+                # (/events/runs?run_id=…) → RunDetail's Board tab live-updates. None → not teed.
+                "run_id": run_id,
             },
         )
 
