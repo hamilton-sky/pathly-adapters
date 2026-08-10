@@ -4,6 +4,13 @@
   gap: 6px;
 }
 
+/* 'grid' layout — responsive cards (mirrors the Live board's RECENT card grid). */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 10px;
+}
+
 .state {
   padding: 40px 0;
   text-align: center;

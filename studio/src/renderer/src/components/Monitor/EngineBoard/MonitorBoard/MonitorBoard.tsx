@@ -117,7 +117,7 @@ export function MonitorBoard({ engines, recent, onAction, onOpenRun }: Props): J
             {queued > 0 && (
               <p className={s.note}>{queued} queued — view on the Live board (the run list can’t show the gate queue).</p>
             )}
-            <RunList runs={filteredRuns} loading={runsLoading} hasAny={runs.length > 0} onOpenRun={onOpenRun} />
+            <RunList runs={filteredRuns} loading={runsLoading} hasAny={runs.length > 0} view={view} onOpenRun={onOpenRun} />
           </>
         ) : (
           <>
