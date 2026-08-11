@@ -160,34 +160,24 @@ def _codex_usage(raw_output: str) -> tuple[int, int]:
                 usage = obj
         if not isinstance(usage, dict):
             continue
+        # Codex/OpenAI report cached tokens INSIDE input_tokens and reasoning INSIDE output_tokens
+        # (unlike Claude, which reports them as separate additive fields). Confirmed against live
+        # codex: the `turn.completed` usage has cached_input_tokens < input_tokens, and the session
+        # rollout `total_token_usage` satisfies total_tokens == input_tokens + output_tokens (so
+        # reasoning_output_tokens is a subset of output_tokens). Adding either double-counts.
+        # cache_write_input_tokens exists too, but is a pricing concern (billed downstream), not a
+        # token to sum into the input total here.
         u_in = int(
-            (
-                usage.get("input_tokens")
-                or usage.get("prompt_tokens")
-                or usage.get("inputTokens")
-                or 0
-            )
-            + (
-                usage.get("cached_input_tokens")
-                or usage.get("cache_read_input_tokens")
-                or 0
-            )
+            usage.get("input_tokens")
+            or usage.get("prompt_tokens")
+            or usage.get("inputTokens")
+            or 0
         )
         u_out = int(
-            (
-                usage.get("output_tokens")
-                or usage.get("completion_tokens")
-                or usage.get("outputTokens")
-                or 0
-            )
-            # Reasoning tokens ARE billed as output (o-series / gpt-5 with reasoning). The real
-            # codex `turn.completed` usage carries them separately as reasoning_output_tokens —
-            # add them or a reasoning-heavy run undercounts (verified against live codex output).
-            + (
-                usage.get("reasoning_output_tokens")
-                or usage.get("reasoning_tokens")
-                or 0
-            )
+            usage.get("output_tokens")
+            or usage.get("completion_tokens")
+            or usage.get("outputTokens")
+            or 0
         )
         if u_in or u_out:
             tokens_in, tokens_out = u_in, u_out

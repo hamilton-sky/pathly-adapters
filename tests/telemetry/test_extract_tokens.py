@@ -44,6 +44,9 @@ def test_claude_falls_back_to_model_usage_when_lump_absent():
 def test_codex_reads_tokens_from_jsonl_stream():
     # codex `exec --json` emits JSONL; a token-usage event carries the running total. The
     # claude envelope parser can't read this — codex needs its own strategy.
+    # Codex/OpenAI report cached tokens INSIDE input_tokens and reasoning INSIDE output_tokens
+    # (confirmed against live codex: total_tokens == input_tokens + output_tokens), so neither is
+    # summed on top — doing so double-counts.
     stream = "\n".join(
         [
             json.dumps({"type": "item.started", "text": "working"}),
@@ -53,13 +56,14 @@ def test_codex_reads_tokens_from_jsonl_stream():
                     "input_tokens": 1200,
                     "cached_input_tokens": 300,
                     "output_tokens": 450,
+                    "reasoning_output_tokens": 50,
                 }
             ),
         ]
     )
     tin, tout = extract_tokens("codex", {}, stream)
-    assert tin == 1200 + 300
-    assert tout == 450
+    assert tin == 1200  # cached_input_tokens (300) already inside input_tokens — not added
+    assert tout == 450  # reasoning_output_tokens (50) already inside output_tokens — not added
 
 
 def test_agy_estimates_output_tokens_from_text():

@@ -290,13 +290,16 @@ def test_parse_result_codex_captures_nested_usage_field():
 
 
 def test_parse_result_codex_captures_info_total_token_usage():
+    # Real-world session-rollout shape: cached is INSIDE input and reasoning is INSIDE output
+    # (total_tokens == input_tokens + output_tokens), so neither is summed on top.
     raw = (
         '{"info": {"total_token_usage": {"input_tokens": 2000, '
-        '"cached_input_tokens": 300, "output_tokens": 150}}}'
+        '"cached_input_tokens": 300, "output_tokens": 150, '
+        '"reasoning_output_tokens": 40}}}'
     )
     result = parse_result("codex", raw)
-    assert result["tokens_in"] == 2300  # input + cached folded into tokens_in
-    assert result["tokens_out"] == 150
+    assert result["tokens_in"] == 2000  # cached_input_tokens (300) already inside input_tokens
+    assert result["tokens_out"] == 150  # reasoning_output_tokens (40) already inside output_tokens
 
 
 def test_parse_result_codex_keeps_last_nonzero_usage_event():

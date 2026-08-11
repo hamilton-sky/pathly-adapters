@@ -38,14 +38,11 @@ function usageFromEvent(obj: Obj): { in: number; out: number } | null {
   }
   if (!isObj(usage)) return null
   // `||` (not `??`) so a 0 falls through to the next alias — mirrors the Python `or` chain.
-  const uin =
-    (num(usage.input_tokens) || num(usage.prompt_tokens) || num(usage.inputTokens)) +
-    (num(usage.cached_input_tokens) || num(usage.cache_read_input_tokens))
-  // Reasoning tokens ARE billed as output (o-series / gpt-5 reasoning) — the real codex
-  // `turn.completed` usage carries them as reasoning_output_tokens. Mirror the Python fix.
-  const uout =
-    (num(usage.output_tokens) || num(usage.completion_tokens) || num(usage.outputTokens)) +
-    (num(usage.reasoning_output_tokens) || num(usage.reasoning_tokens))
+  // Codex/OpenAI report cached tokens INSIDE input_tokens and reasoning INSIDE output_tokens
+  // (confirmed against live codex: total_tokens == input_tokens + output_tokens), so neither is
+  // added on top — doing so double-counts. Mirrors the Python `_codex_usage`.
+  const uin = num(usage.input_tokens) || num(usage.prompt_tokens) || num(usage.inputTokens)
+  const uout = num(usage.output_tokens) || num(usage.completion_tokens) || num(usage.outputTokens)
   if (uin || uout) return { in: uin, out: uout }
   return null
 }
