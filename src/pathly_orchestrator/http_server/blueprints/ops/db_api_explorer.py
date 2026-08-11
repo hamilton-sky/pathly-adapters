@@ -184,15 +184,22 @@ def db_features():
                 states[(r["project_root"], r["feature"])] = json.loads(r["state_json"])
             except (json.JSONDecodeError, TypeError):
                 states[(r["project_root"], r["feature"])] = {}
+        # board-scope pivot (parity with /db/rollup + the /db/features/<f> detail views):
+        # a goal run logs under feature=<run slug> with board_scope=<parent feature>, so
+        # attribute its telemetry to the parent by COALESCE(board_scope, feature). Legacy
+        # rows (NULL/'' board_scope) fall back to feature — unchanged behavior.
         if pr_filter:
             event_count_rows = conn.execute(
-                "SELECT project_root, feature, COUNT(*) as cnt FROM fsm_events"
-                " WHERE project_root=? GROUP BY project_root, feature",
+                "SELECT project_root, COALESCE(NULLIF(board_scope,''), feature) AS feature,"
+                " COUNT(*) as cnt FROM fsm_events"
+                " WHERE project_root=? GROUP BY project_root, COALESCE(NULLIF(board_scope,''), feature)",
                 [pr_filter],
             ).fetchall()
         else:
             event_count_rows = conn.execute(
-                "SELECT project_root, feature, COUNT(*) as cnt FROM fsm_events GROUP BY project_root, feature"
+                "SELECT project_root, COALESCE(NULLIF(board_scope,''), feature) AS feature,"
+                " COUNT(*) as cnt FROM fsm_events"
+                " GROUP BY project_root, COALESCE(NULLIF(board_scope,''), feature)"
             ).fetchall()
         event_counts = {
             (r["project_root"], r["feature"]): r["cnt"] for r in event_count_rows
@@ -205,22 +212,24 @@ def db_features():
         # so the loop below is untouched.
         if pr_filter:
             inv_rows = conn.execute(
-                "SELECT project_root, feature, "
+                "SELECT project_root, "
+                "  COALESCE(NULLIF(board_scope,''), feature) AS feature, "
                 "  COUNT(*) as inv, "
                 "  COALESCE(SUM(tokens_in + tokens_out),0) as total_tokens, "
                 "  COALESCE(SUM(cost_usd),0) as total_cost "
                 "FROM agent_invocations WHERE project_root=? "
-                "GROUP BY project_root, feature",
+                "GROUP BY project_root, COALESCE(NULLIF(board_scope,''), feature)",
                 [pr_filter],
             ).fetchall()
         else:
             inv_rows = conn.execute(
-                "SELECT project_root, feature, "
+                "SELECT project_root, "
+                "  COALESCE(NULLIF(board_scope,''), feature) AS feature, "
                 "  COUNT(*) as inv, "
                 "  COALESCE(SUM(tokens_in + tokens_out),0) as total_tokens, "
                 "  COALESCE(SUM(cost_usd),0) as total_cost "
                 "FROM agent_invocations "
-                "GROUP BY project_root, feature"
+                "GROUP BY project_root, COALESCE(NULLIF(board_scope,''), feature)"
             ).fetchall()
         inv_stats = {(r["project_root"], r["feature"]): dict(r) for r in inv_rows}
 
@@ -259,6 +268,17 @@ def db_features():
         if project_root:
             for fs_feat in _scan_filesystem_features(project_root):
                 if fs_feat["feature"] not in db_feature_names:
+                    # A never-run feature (STATE.json only, no fsm_state row) still owns
+                    # the telemetry its goal runs logged under board_scope=<this feature>.
+                    # Attach it from the same board-scope-pivoted maps the DB rows use, so
+                    # the card shows real cost/tokens/events instead of a hardcoded zero.
+                    key = (project_root, fs_feat["feature"])
+                    inv = inv_stats.get(key)
+                    if inv:
+                        fs_feat["invocations"] = inv.get("inv", 0)
+                        fs_feat["total_tokens"] = int(inv.get("total_tokens", 0))
+                        fs_feat["cost_usd"] = round(float(inv.get("total_cost", 0.0)), 4)
+                    fs_feat["events"] = event_counts.get(key, fs_feat.get("events", 0))
                     results.append(fs_feat)
 
         return jsonify(sorted(results, key=lambda x: x["feature"]))

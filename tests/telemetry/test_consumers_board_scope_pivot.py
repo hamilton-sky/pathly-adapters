@@ -8,6 +8,8 @@ before — the feature-key heuristic survives as the fallback, not a guess.
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from pathly_orchestrator.db.connection import get_db
@@ -141,3 +143,43 @@ def test_feature_runs_matches_slug_scope_and_legacy_path(client):
     r = c.get(f"/db/features/parent-feat/runs?project_root={pr}")
     ids = {row["run_id"] for row in r.get_json()}
     assert "run-new" in ids
+
+
+def test_db_features_list_pivots_goal_cost_onto_parent_card(client):
+    """The /db/features LIST (feature cards) must pivot goal telemetry onto the parent
+    feature via board_scope — parity with /db/rollup and the /db/features/<f> detail
+    views — so a card's cost matches the click-through, not a hardcoded zero. Regression
+    for goal-driven features whose cost previously vanished from their card."""
+    c, tmp_path = client
+    pr = str(tmp_path).replace("\\", "/")
+    # goal run: telemetry keyed by run slug, board_scope = parent feature
+    append_event(
+        get_db(),
+        pr,
+        "g9-goal-slug",
+        {
+            "type": "AGENT_DONE",
+            "agent": "builder",
+            "conversation": 0,
+            "run_id": "sched-card",
+            "board_scope": "parent-feat",
+            "cost_usd": 2.0,
+            "total_tokens": 1000,
+            "ts": "2026-07-22T12:00:00Z",
+        },
+    )
+    # parent feature exists on disk only (never-run: STATE.json, no fsm_state row)
+    feat_dir = tmp_path / "pathly" / "features" / "parent-feat"
+    feat_dir.mkdir(parents=True)
+    (feat_dir / "STATE.json").write_text(
+        json.dumps({"current": "DONE", "flow": "team", "updated_at": "2026-07-22"}),
+        encoding="utf-8",
+    )
+
+    rows = c.get(f"/db/features?project_root={pr}").get_json()
+    by_feat = {r["feature"]: r for r in rows}
+    assert "parent-feat" in by_feat
+    card = by_feat["parent-feat"]
+    assert card["cost_usd"] == 2.0  # goal cost surfaced on the parent card
+    assert card["invocations"] == 1
+    assert card["source"] == "filesystem"  # never-run, but no longer $0
