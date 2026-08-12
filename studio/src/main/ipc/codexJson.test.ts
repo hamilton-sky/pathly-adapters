@@ -31,11 +31,13 @@ describe('parseCodexResult', () => {
     expect(r?.tokens_out).toBe(90)
   })
 
-  it('folds cached input into tokens_in from info.total_token_usage', () => {
+  it('reads input_tokens as-is from info.total_token_usage (cached is already inside it)', () => {
+    // Codex/OpenAI report cached_input_tokens INSIDE input_tokens, so it must NOT be added on
+    // top (that double-counts). Mirrors the Python _codex_usage fix in tests/telemetry/test_extract_tokens.py.
     const raw =
       '{"info":{"total_token_usage":{"input_tokens":2000,"cached_input_tokens":300,"output_tokens":150}}}'
     const r = parseCodexResult(raw)
-    expect(r?.tokens_in).toBe(2300)
+    expect(r?.tokens_in).toBe(2000)
     expect(r?.tokens_out).toBe(150)
   })
 
