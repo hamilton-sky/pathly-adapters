@@ -12,6 +12,18 @@
 
 Typing `/pathly` commands into a single CLI by hand is a **secondary** mode — handy, but not the design center. **New here? Read [docs/WHAT_IS_PATHLY.md](docs/WHAT_IS_PATHLY.md) first** — it explains the board concept and how a headless run works, with diagrams.
 
+## Why Pathly?
+
+Pathly exists to make multi-agent coding **supervised, not babysat** — and **auditable, not a black box**. Instead of hand-feeding one CLI prompt after another and watching context evaporate between steps, you set a goal on the board and let the app run the agents for you.
+
+- **You supervise; the app runs the loop.** Set goals, answer questions, adjudicate decisions — the app spawns each agent headlessly, one step at a time, with no human in the per-step loop. Come back to a finished stage, not a blinking cursor.
+- **The board is shared, durable memory.** Goals, decisions, discoveries, and artifacts live on a board and are read back into *every* agent prompt. Agents inherit context instead of rediscovering it; decisions become governance, not guesswork.
+- **One pipeline, any engine.** Drive Claude Code, Codex, Copilot, and Antigravity through the same governed flow — and pick the best engine per stage. No lock-in to a single vendor's agent.
+- **Quality is built into the flow.** PLAN → DESIGN → BUILD → REVIEW → TEST → RETRO, with adversarial review and acceptance testing as first-class stages — not one hopeful one-shot.
+- **You see what it did and what it cost.** Every spawn is billed through one chokepoint: per-feature and per-flow cost/token rollups, OpenTelemetry traces, and a live engine board. No surprise bills, no mystery work.
+- **Parallel without collisions.** Goals decompose into a task-DAG; a scheduler runs independent tasks concurrently with per-file claims so parallel agents never clobber each other's writes.
+- **Resilient by design.** The SQLite board is the single source of truth; state survives restarts and can be rebuilt deterministically from the event log.
+
 This repository (`pathly-adapters`) is two things in one package: the **installer/stitcher** that deploys agent + skill files into your AI host tools, *and* the **local orchestration engine** (FSM HTTP server + SQLite board) that the Pathly Studio desktop app drives.
 
 ## Architecture at a glance
@@ -270,7 +282,7 @@ see [github.com/hamilton-sky/pathly](https://github.com/hamilton-sky/pathly) —
 
 ## Release Status
 
-Current version: **2.22.0**. Four adapters ship: Claude Code, Codex, Copilot,
+Current version: **2.24.0**. Four adapters ship: Claude Code, Codex, Copilot,
 and Antigravity. Core install path (`--dry-run`, `--apply`, `--uninstall`) is
 verified with full rollback on failure. Copilot destination paths follow the VS
 Code Copilot agent spec and may require `--repair` after a VS Code update.
