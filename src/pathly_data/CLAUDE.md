@@ -27,7 +27,7 @@ core/
                   utilities/    archive, archive-artifacts, log, log-phase, log-agent-done,
                                 lessons, meet, verify-state, fsm-call, scout-path, reflect,
                                 dispatch, help
-                  fix/          fix (blocked-feedback quick fix)
+                  fix/          build (blocked-feedback quick fix)
                   custom/       user-defined custom skills
                   debug/        debug-specific skills (build, verify)
                   fragments/    reusable prompt fragments

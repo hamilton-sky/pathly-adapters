@@ -142,7 +142,7 @@ Two traps this dissolves:
   (crossing, relevance-gated, is the feature).
 
 A fuller blackboard-lens critique + the open invariants this implies live in
-[`pathly/explorations/blackboard-architecture-assessment/ASSESSMENT.md`](../pathly/explorations/blackboard-architecture-assessment/ASSESSMENT.md).
+[`pathly/project/explorations/blackboard-architecture-assessment/ASSESSMENT.md`](../pathly/project/explorations/blackboard-architecture-assessment/ASSESSMENT.md).
 
 ---
 

@@ -365,7 +365,7 @@ Two sanitization sites:
 | Site | Function | Trigger |
 |---|---|---|
 | `adapters.py` `resolve_command` | `_dash_safe_prompt(prompt)` | every headless argv build |
-| `skills/compose.py` (in `compose_skill` / `compose_block`) | `_strip_leading_frontmatter(text)` | composed/skill path |
+| `skills/compose.py` (in `compose_skill` / `compose_skill_with_block`) | `_strip_leading_frontmatter(text)` | composed/skill path |
 
 `_dash_safe_prompt` (in `adapters.py`): strips a leading YAML-frontmatter block (`---…---`)
 and then any remaining leading horizontal-rule lines, so the sanitized prompt is guaranteed

@@ -3,7 +3,7 @@
 ## What this repo is
 
 `pathly-adapters` is the monorepo for the **Pathly AI development framework**:
-- Python package (`pathly-adapters` v2.19.x) — FSM orchestrator, telemetry, install CLI
+- Python package (`pathly-adapters` v2.24.x) — FSM orchestrator, telemetry, install CLI
 - Electron app (`studio/`) — the supervisory **board / Command Center** through which a human drives *headless* multi-agent runs (the visual flow builder + AI chat panel are surfaces within it)
 - Agent/skill source (`src/pathly_data/`) — canonical role contracts, skill markdown, adapter configs
 

@@ -57,7 +57,7 @@ export function useRunDetail(runId: string): UseRunDetail {
   // tagged with this run_id triggers an immediate refresh instead of waiting out the 8s poll,
   // which keeps running as a fallback if the stream errors, closes, or is unavailable. No auth
   // header is sent: the server's secret middleware exempts every /events/* path, so this mirrors
-  // the localhost-open EventSource pattern already used by useMonitorSession, useCommsPanel, and
+  // the localhost-open EventSource pattern already used by useCommsPanel and
   // pathlyContext.subscribeToMenuUpdates. A separate effect (keyed only on runId, not tick) keeps
   // the connection alive across poll-driven refreshes instead of reconnecting every 8s.
   useEffect(() => {
