@@ -229,13 +229,10 @@ version: 1
 flow: {name}
 storage_path: "pathly/features/{{topic}}/"
 states:
-  - STORMING
   - PLANNING
   - BUILDING
   - DONE
 transitions:
-  STORMING:
-    - PLANNING
   PLANNING:
     - BUILDING
   BUILDING:

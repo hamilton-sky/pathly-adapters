@@ -251,7 +251,7 @@ Flows are fully user-definable. `src/pathly_data/core/flows/` ships nine referen
 
 | Flow | File | States | Used for |
 |---|---|---|---|
-| `team` | `team.flow.yaml` | STORMING → PLANNING → DESIGNING → BUILDING → REVIEWING → TESTING → RETRO → DONE | Full feature pipeline |
+| `team` | `team.flow.yaml` | PLANNING → DESIGNING → BUILDING → REVIEWING → TESTING → RETRO → DONE | Full feature pipeline |
 | `team-build` | `team-build.flow.yaml` | BUILDING → REVIEWING → TESTING → RETRO → DONE | Trimmed team flow used by the goal `team` executor |
 | `debug` | `debug.flow.yaml` | INVESTIGATING → REPRODUCING → ROOT_CAUSE_FOUND → FIXING → VERIFYING → DONE | Bug investigation |
 | `explore` | `explore.flow.yaml` | FRAMING → ANALYZING → TRACING → CONCLUDING → DONE | Codebase exploration |

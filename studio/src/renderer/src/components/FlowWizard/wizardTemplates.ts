@@ -9,8 +9,8 @@ export const WIZARD_TEMPLATES: WizardTemplate[] = [
   {
     id: 'standard-pipeline',
     name: 'Standard pipeline',
-    description: 'STORMING → PLANNING → BUILDING → REVIEWING → TESTING → DONE',
-    states: ['STORMING', 'PLANNING', 'BUILDING', 'REVIEWING', 'TESTING', 'DONE']
+    description: 'PLANNING → BUILDING → REVIEWING → TESTING → DONE',
+    states: ['PLANNING', 'BUILDING', 'REVIEWING', 'TESTING', 'DONE']
   },
   {
     id: 'review-loop',

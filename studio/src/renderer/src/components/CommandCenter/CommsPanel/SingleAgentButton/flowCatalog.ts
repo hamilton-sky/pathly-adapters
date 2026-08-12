@@ -91,9 +91,8 @@ export const BOARD_FLOWS: FlowDef[] = [
   {
     key: 'test',
     label: 'Test — build & test pipeline',
-    blurb: 'Storm → plan → build → review → test. Like team, without design or retro.',
+    blurb: 'Plan → build → review → test. Like team, without design or retro.',
     nodes: [
-      { state: 'STORMING', role: 'discoverer', agent: 'team/discover' },
       { state: 'PLANNING', role: 'planner', agent: 'team/plan' },
       { state: 'BUILDING', role: 'builder', agent: 'team/build' },
       { state: 'REVIEWING', role: 'reviewer', agent: 'team/review' },
@@ -110,9 +109,8 @@ export const BOARD_FLOWS: FlowDef[] = [
   {
     key: 'team',
     label: 'Team — full feature pipeline',
-    blurb: 'The complete pipeline: storm → plan → design → build → review → test → retro.',
+    blurb: 'The complete pipeline: plan → design → build → review → test → retro.',
     nodes: [
-      { state: 'STORMING', role: 'discoverer', agent: 'team/discover' },
       { state: 'PLANNING', role: 'planner', agent: 'team/plan' },
       { state: 'DESIGNING', role: 'designer', agent: 'team/design' },
       { state: 'BUILDING', role: 'builder', agent: 'team/build' },

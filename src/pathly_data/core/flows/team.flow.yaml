@@ -2,7 +2,6 @@ version: 1
 flow: team
 storage_path: pathly/features/{topic}/
 states:
-  - STORMING
   - PLANNING
   - DESIGNING
   - BUILDING
@@ -11,8 +10,6 @@ states:
   - RETRO
   - DONE
 transitions:
-  STORMING:
-    - PLANNING
   PLANNING:
     - DESIGNING
     - PLANNING
@@ -31,7 +28,6 @@ transitions:
     - DONE
   DONE: []
 agent_map:
-  STORMING: team/discover
   PLANNING: team/plan
   DESIGNING: team/design
   BUILDING: team/build
@@ -39,7 +35,6 @@ agent_map:
   TESTING: team/test
   RETRO: team/retro
 role_map:
-  STORMING: discoverer
   PLANNING: planner
   DESIGNING: designer
   BUILDING: builder

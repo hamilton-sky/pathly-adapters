@@ -71,16 +71,16 @@ def test_next_action_initial_state(tmp_path):
             "project_root": str(tmp_path),
         }
     )
-    assert result["current_state"] == "STORMING"
-    assert result["agent"] == "team/discover"
+    assert result["current_state"] == "PLANNING"
+    assert result["agent"] == "team/plan"
     assert result["schema_version"] == "1"
     assert result["decision"] == "continue"
-    assert result["role"] == "team/discover"
+    assert result["role"] == "team/plan"
     assert "agent" in result["agent_hint"]
     assert "role" in result["agent_hint"]
     assert "codex_role" in result["codex_subagent"]
     assert "pathly_agent" in result["codex_subagent"]
-    assert result["stage_brief"]["state"] == "STORMING"
+    assert result["stage_brief"]["state"] == "PLANNING"
     assert "open_feedback" in result["stage_brief"]
     assert "warnings" in result
     assert "storage_path" in result
@@ -725,10 +725,10 @@ def test_build_prompt_uses_parent_board_scope_for_goal(tmp_path):
 @pytest.mark.parametrize(
     "flow_name,expected_first_state",
     [
-        ("team", "STORMING"),
+        ("team", "PLANNING"),
         ("debug", "INVESTIGATING"),
         ("explore", "FRAMING"),
-        ("test", "STORMING"),
+        ("test", "PLANNING"),
         ("quick-fix", "SCOPING"),
     ],
 )

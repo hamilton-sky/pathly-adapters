@@ -4,7 +4,7 @@ Python package that implements the Pathly finite-state machine. Runs as both an 
 
 ## State machine
 
-Features advance through: `STORMING -> PLANNING -> DESIGNING -> BUILDING -> REVIEWING -> TESTING -> RETRO -> DONE` (the literal state identifiers in `core/flows/team.flow.yaml`; the `-ING` suffix matters — `current_state` is e.g. `"BUILDING"`, not `"BUILD"`).
+Features advance through: `PLANNING -> DESIGNING -> BUILDING -> REVIEWING -> TESTING -> RETRO -> DONE` (the literal state identifiers in `core/flows/team.flow.yaml`; the `-ING` suffix matters — `current_state` is e.g. `"BUILDING"`, not `"BUILD"`). PLANNING is `states[0]` — the seed a new feature starts at. (STORMING was dropped as the team seed — it was headless ceremony for spec-driven work; genuine brainstorming lives in the interactive `/pathly storm` on-ramp and the consultation flows. STORMING still exists as a state in `test.flow.yaml` and maps to `/pathly storm`.)
 
 Each transition is driven by events written to the central SQLite DB (`~/.pathly/pathly.db`).
 

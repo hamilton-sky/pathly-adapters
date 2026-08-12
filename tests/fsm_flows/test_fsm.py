@@ -32,7 +32,7 @@ def _load_team_flow() -> dict:
 def test_recover_state_no_state_json(tmp_path):
     flow = _load_team_flow()
     result = recover_state(tmp_path, flow)
-    assert result["current_state"] == "STORMING"
+    assert result["current_state"] == "PLANNING"
     assert result["conv"] == 0
     assert result["open_feedback_files"] == []
 
@@ -46,6 +46,23 @@ def test_recover_state_with_state_json(tmp_path):
     result = recover_state(tmp_path, flow)
     assert result["current_state"] == "BUILDING"
     assert result["conv"] == 2
+
+
+def test_recover_state_foreign_state_resets_to_seed(tmp_path):
+    """A persisted state the flow no longer declares (e.g. legacy STORMING under the team
+    flow after STORMING was dropped) recovers to the seed state (states[0]) instead of
+    surfacing a foreign state that would KeyError on the downstream agent_map lookup."""
+    flow = _load_team_flow()
+    assert "STORMING" not in flow["states"]  # precondition: team no longer declares STORMING
+    # DB path (state_doc provided)
+    via_db = recover_state(tmp_path, flow, state_doc={"current": "STORMING"})
+    assert via_db["current_state"] == flow["states"][0] == "PLANNING"
+    # Disk path (STATE.json)
+    (tmp_path / "STATE.json").write_text(
+        json.dumps({"current": "STORMING"}), encoding="utf-8"
+    )
+    via_disk = recover_state(tmp_path, flow)
+    assert via_disk["current_state"] == "PLANNING"
 
 
 def test_recover_state_open_feedback_files(tmp_path):
@@ -214,8 +231,10 @@ def test_evaluate_fallback_default(tmp_path):
 
 def test_evaluate_no_rules_uses_transitions(tmp_path):
     flow = _load_team_flow()
-    result = evaluate_transition_rules(flow, "STORMING", tmp_path)
-    assert result == "PLANNING"
+    # RETRO has a `transitions` entry (RETRO->DONE) but no `transition_rules` entry,
+    # so it exercises the "no rules -> fall back to the transitions map" path.
+    result = evaluate_transition_rules(flow, "RETRO", tmp_path)
+    assert result == "DONE"
 
 
 def test_evaluate_order_l1_before_l3(tmp_path):

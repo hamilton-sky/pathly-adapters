@@ -85,7 +85,7 @@ export async function saveFlowGraph(name: string, graph: FlowYaml): Promise<void
 
 /** Mark a feature DONE from the board (the goals-section "Mark done" button).
  *  POSTs the DB-API mark-done route, which writes the fsm_state row — so the
- *  /db/features card leaves the seeded STORMING/PLANNING default and renders DONE —
+ *  /db/features card leaves its seeded initial state and renders DONE —
  *  and logs a STATE_TRANSITION. Resolves on 2xx; throws otherwise so the caller reverts. */
 export async function markFeatureDone(projectPath: string, featureId: string): Promise<void> {
   const { apiFetch } = await import('../lib/config')

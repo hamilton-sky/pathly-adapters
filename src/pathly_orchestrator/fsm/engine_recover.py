@@ -38,6 +38,17 @@ def recover_state(
             current_state = flow["states"][0]
             conv = 0
 
+    # A persisted `current` this flow does not declare is stale/foreign — e.g. a feature seeded
+    # under an older flow shape (STORMING was dropped from team.flow.yaml), or one whose last run
+    # used a different flow. Downstream lookups (agent_map[current], transition rules) would
+    # KeyError, so recover to the flow's seed state (states[0]) here. This mirrors
+    # supervisor.goal_executor._reset_fsm_state_for_flow, but at the read layer so EVERY caller
+    # (direct /runner/start AND goal runs) is covered — not just goal runs. DONE is a declared
+    # state, so a finished feature is never reset by this.
+    states = flow.get("states") or []
+    if states and current_state not in states:
+        current_state = states[0]
+
     feedback_dir = storage_path / "feedback"
     if feedback_dir.exists():
         open_feedback_files = [

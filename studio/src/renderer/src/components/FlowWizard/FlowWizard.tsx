@@ -29,7 +29,7 @@ export function FlowWizard({ onClose, onCreated }: Props): JSX.Element {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null)
   const [flowName, setFlowName] = useState('')
   const [description, setDescription] = useState('')
-  const [states, setStates] = useState(['STORMING', 'PLANNING', 'BUILDING', 'REVIEWING', 'TESTING', 'DONE'])
+  const [states, setStates] = useState(['PLANNING', 'BUILDING', 'REVIEWING', 'TESTING', 'DONE'])
   const [transitions, setTransitions] = useState<Transition[]>([])
   const [agentMap, setAgentMap] = useState<Record<string, string>>({})
   const [adapterMap, setAdapterMap] = useState<Record<string, string>>({ default: 'claude' })

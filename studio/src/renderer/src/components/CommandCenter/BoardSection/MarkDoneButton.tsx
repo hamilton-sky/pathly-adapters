@@ -7,7 +7,8 @@ type Phase = 'idle' | 'confirm' | 'busy' | 'done'
 
 /**
  * Feature-level "Mark done" — a manual override for goal-driven features whose FSM
- * never auto-advanced (work ran under goal boards, so the feature sat at STORMING).
+ * never auto-advanced (work ran under goal boards, so the feature sat at its seed
+ * state — PLANNING now, STORMING on legacy boards).
  * Always available by design: it does NOT gate itself on goal/task completion, because
  * that same tracking is what tends to be out of sync — the override has to work then.
  * Two-click confirm (idle → "Confirm?" → POST) so it can't fire by accident; on success

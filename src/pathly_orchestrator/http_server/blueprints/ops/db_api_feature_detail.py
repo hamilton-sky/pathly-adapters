@@ -136,10 +136,11 @@ def db_feature_runs(feature: str):
 def db_feature_mark_done(feature: str):
     """Manually mark a feature DONE (the Studio 'Mark done' button).
 
-    Writes the fsm_state row — so the card leaves the seeded STORMING/PLANNING default and
+    Writes the fsm_state row — so the card leaves its seeded initial state and
     the /db/features list renders it DONE — and logs a STATE_TRANSITION for the audit
     trail. This is a manual override: it deliberately does NOT enforce the flow's
-    transition graph, because a goal-driven feature legitimately sits at STORMING while its
+    transition graph, because a goal-driven feature legitimately sits at its seed state
+    (PLANNING for the team flow; legacy boards may still show STORMING) while its
     real work ran under a goal board. Best-effort STATE.json mirror keeps the filesystem/CLI
     view in sync. Never raises past the envelope.
     """

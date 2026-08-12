@@ -7,7 +7,7 @@
 - Electron app (`studio/`) — the supervisory **board / Command Center** through which a human drives *headless* multi-agent runs (the visual flow builder + AI chat panel are surfaces within it)
 - Agent/skill source (`src/pathly_data/`) — canonical role contracts, skill markdown, adapter configs
 
-Features move through: **STORM → PLAN → DESIGN → BUILD → REVIEW → TEST → RETRO → DONE**
+Features move through: **PLAN → DESIGN → BUILD → REVIEW → TEST → RETRO → DONE** (PLANNING is the seed state; STORMING/brainstorm is the interactive `/pathly storm` on-ramp, not a headless team-flow stage)
 
 ## Primary goal — read this first
 

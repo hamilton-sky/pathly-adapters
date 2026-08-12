@@ -3,7 +3,6 @@ flow: test
 storage_path: "pathly/features/{topic}/"
 
 states:
-  - STORMING
   - PLANNING
   - BUILDING
   - REVIEWING
@@ -11,8 +10,6 @@ states:
   - DONE
 
 transitions:
-  STORMING:
-    - PLANNING
   PLANNING:
     - BUILDING
   BUILDING:
@@ -26,13 +23,11 @@ transitions:
   DONE: []
 
 agent_map:
-  STORMING: team/discover
   PLANNING: team/plan
   BUILDING: team/build
   REVIEWING: team/review
   TESTING: team/test
 role_map:
-  STORMING: discoverer
   PLANNING: planner
   BUILDING: builder
   REVIEWING: reviewer

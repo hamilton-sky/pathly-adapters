@@ -149,7 +149,7 @@ package's internal resource API rather than repo-relative path assumptions.
 
 | Flow | File | Storage path | States |
 |---|---|---|---|
-| `team` | `team.flow.yaml` | `pathly/features/{topic}/` | STORMING → PLANNING → DESIGNING → BUILDING → REVIEWING → TESTING → RETRO → DONE |
+| `team` | `team.flow.yaml` | `pathly/features/{topic}/` | PLANNING → DESIGNING → BUILDING → REVIEWING → TESTING → RETRO → DONE |
 | `team-build` | `team-build.flow.yaml` | `pathly/{topic}/` | BUILDING → REVIEWING → TESTING → RETRO → DONE |
 | `debug` | `debug.flow.yaml` | `pathly/debugs/{topic}/` | INVESTIGATING → REPRODUCING → ROOT_CAUSE_FOUND → FIXING → VERIFYING → DONE |
 | `explore` | `explore.flow.yaml` | `pathly/explorations/{topic}/` | FRAMING → ANALYZING → TRACING → CONCLUDING → DONE |
