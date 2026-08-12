@@ -5,6 +5,7 @@ import { SCOPES } from '../constants'
 import { CommsPanel } from '../CommsPanel/CommsPanel/CommsPanel'
 import { useProjectStore } from '../../../store/projectStore'
 import { Tooltip } from '../../ui'
+import { MarkDoneButton } from './MarkDoneButton'
 import s from './BoardSection.module.css'
 
 export interface BoardSectionProps {
@@ -84,6 +85,11 @@ export function BoardSection(props: BoardSectionProps) {
           <span className={s.bsName}>{boardName}</span>
         </Tooltip>
         <div className={s.bsHeadActs}>
+          {/* Feature boards get a manual "Mark done" — closes out a goal-driven feature
+              whose FSM never auto-advanced. Project/global boards have no single state. */}
+          {section.scope === 'feature' && (
+            <MarkDoneButton feature={panelFeature} projectPath={projectPath} />
+          )}
           <button
             type="button"
             className={s.bsIconbtn}

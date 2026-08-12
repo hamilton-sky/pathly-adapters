@@ -1,0 +1,47 @@
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 9px;
+  border: 1px solid var(--text-disabled);
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  font: 600 11px/1 var(--font-family-base);
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--bg-surface1);
+}
+
+/* Second click — the armed/confirm state stands out so it reads as "click again to commit". */
+.btn[data-confirm] {
+  color: var(--bg-base);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.done {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 9px;
+  color: var(--green, #22c55e);
+  font: 600 11px/1 var(--font-family-base);
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}

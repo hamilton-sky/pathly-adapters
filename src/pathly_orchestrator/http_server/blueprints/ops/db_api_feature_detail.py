@@ -6,8 +6,10 @@ Split out of db_api_explorer.py (SRP 400-line cap) — routes moved verbatim.
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
+from pathlib import Path
 
-from flask import jsonify
+from flask import jsonify, request
 
 from ._db_api_bp import _get_db, _project_root_param, bp, logger
 
@@ -127,4 +129,78 @@ def db_feature_runs(feature: str):
         return jsonify([dict(r) for r in rows])
     except Exception as e:
         logger.exception("db_feature_runs error")
+        return jsonify({"error": str(e)}), 500
+
+
+@bp.route("/db/features/<feature>/done", methods=["POST"])
+def db_feature_mark_done(feature: str):
+    """Manually mark a feature DONE (the Studio 'Mark done' button).
+
+    Writes the fsm_state row — so the card leaves the seeded STORMING/PLANNING default and
+    the /db/features list renders it DONE — and logs a STATE_TRANSITION for the audit
+    trail. This is a manual override: it deliberately does NOT enforce the flow's
+    transition graph, because a goal-driven feature legitimately sits at STORMING while its
+    real work ran under a goal board. Best-effort STATE.json mirror keeps the filesystem/CLI
+    view in sync. Never raises past the envelope.
+    """
+    try:
+        conn = _get_db()
+        body = request.get_json(silent=True) or {}
+        project_root = (
+            body.get("project_root") or request.args.get("project_root") or ""
+        ).strip()
+        if not project_root:
+            return jsonify({"error": "project_root required"}), 400
+
+        from pathly_orchestrator.db.queries import fsm_state as _fs
+        from pathly_orchestrator.db.queries.fsm_events import append_event as _append
+
+        prev = _fs.read_state(conn, project_root, feature)
+        if prev is None:
+            # No DB row yet (a goal-driven feature tracked only on disk): fall back to the
+            # STATE.json mirror so from_state + flow reflect what the user actually sees.
+            try:
+                sp = Path(project_root) / "pathly" / "features" / feature / "STATE.json"
+                if sp.exists():
+                    prev = json.loads(sp.read_text(encoding="utf-8"))
+            except Exception:
+                prev = None
+        prev = prev or {}
+        from_state = prev.get("current") or prev.get("current_state")
+        now = datetime.now(timezone.utc).isoformat()
+        new_state = {**prev, "current": "DONE", "updated_at": now}
+        _fs.write_state(conn, project_root, feature, new_state)
+
+        try:
+            _append(
+                conn,
+                project_root,
+                feature,
+                {
+                    "type": "STATE_TRANSITION",
+                    "from_state": from_state,
+                    "to": "DONE",
+                    "reason": "manual mark-done (Studio)",
+                    "ts": now,
+                },
+            )
+        except Exception:
+            logger.exception("mark-done: event append failed")
+
+        try:
+            state_path = (
+                Path(project_root) / "pathly" / "features" / feature / "STATE.json"
+            )
+            if state_path.parent.is_dir():
+                state_path.write_text(
+                    json.dumps(new_state, indent=2), encoding="utf-8"
+                )
+        except Exception:
+            logger.exception("mark-done: STATE.json mirror failed")
+
+        return jsonify(
+            {"ok": True, "feature": feature, "state": "DONE", "from_state": from_state}
+        )
+    except Exception as e:
+        logger.exception("db_feature_mark_done error")
         return jsonify({"error": str(e)}), 500

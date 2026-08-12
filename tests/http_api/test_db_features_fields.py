@@ -139,3 +139,35 @@ def test_split_feature_detail_routes_still_serve(client):
         r = c.get(f"/db/features/feat-detail/{sub}?project_root={pr}")
         assert r.status_code == 200
         assert isinstance(r.get_json(), list)
+
+
+def test_mark_done_endpoint_sets_state_done(client):
+    """POST /db/features/<f>/done writes the fsm_state row (the Studio 'Mark done'
+    button), so a stuck STORMING feature renders DONE from the DB path."""
+    c, tmp_path = client
+
+    pr = str(tmp_path).replace("\\", "/")
+    feat_dir = tmp_path / "pathly" / "features" / "feat-md"
+    feat_dir.mkdir(parents=True)
+    (feat_dir / "STATE.json").write_text(
+        json.dumps({"current": "STORMING", "flow": "team"}), encoding="utf-8"
+    )
+
+    r = c.post("/db/features/feat-md/done", json={"project_root": pr})
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["ok"] is True
+    assert body["state"] == "DONE"
+    assert body["from_state"] == "STORMING"
+
+    rows = c.get(f"/db/features?project_root={pr}").get_json()
+    row = next(x for x in rows if x["feature"] == "feat-md")
+    assert row["state"] == "DONE"
+    assert row["source"] == "db"
+
+
+def test_mark_done_requires_project_root(client):
+    """No project_root → 400, never a silent write to the wrong scope."""
+    c, _ = client
+    r = c.post("/db/features/whatever/done", json={})
+    assert r.status_code == 400
