@@ -9,6 +9,7 @@
   border: var(--border);
   border-radius: var(--radius-md);
   padding: 12px 14px;
+  overflow: hidden; /* hard-clip: a long run slug can never escape the card border */
   cursor: pointer;
   transition: border-color var(--transition-fast), background var(--transition-fast);
   font-family: var(--font-family-base);
@@ -36,6 +37,8 @@
   font-weight: var(--font-weight-semibold);
   color: var(--text-primary);
   font-family: var(--font-family-mono);
+  min-width: 0; /* parity with RunRow .name — allow the flex child to shrink so ellipsis engages */
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
