@@ -92,17 +92,35 @@ def test_flow_parent_visible_while_running_and_costed_after() -> None:
     """GAP 2 (visible while running) + GAP 1 (window cost after) through the read-model."""
     conn = get_db()
     # The early 'running' row start_run now writes (adapter = flow name).
-    upsert_run(conn, PR, FEAT, PARENT, "running", started_at=T0,
-               adapter="team-build", board_scope=FEAT)
+    upsert_run(
+        conn,
+        PR,
+        FEAT,
+        PARENT,
+        "running",
+        started_at=T0,
+        adapter="team-build",
+        board_scope=FEAT,
+    )
     _ins(conn, _AI, (PR, FEAT, ST1, "BUILDING", S1, 1000, 2000, 1.25, FEAT))
 
     running = {r["run_id"]: r for r in list_runs(conn, PR)}
-    assert PARENT in running  # GAP 2: visible WHILE running (was invisible until finish)
+    assert (
+        PARENT in running
+    )  # GAP 2: visible WHILE running (was invisible until finish)
     assert running[PARENT]["kind"] == "flow" and running[PARENT]["status"] == "running"
 
     # Finish keeps the flow name → stays 'flow' with window-summed cost (not single/$0).
-    upsert_run(conn, PR, FEAT, PARENT, "done", finished_at=TF,
-               adapter="team-build", board_scope=FEAT)
+    upsert_run(
+        conn,
+        PR,
+        FEAT,
+        PARENT,
+        "done",
+        finished_at=TF,
+        adapter="team-build",
+        board_scope=FEAT,
+    )
     done = {r["run_id"]: r for r in list_runs(conn, PR)}
     assert done[PARENT]["kind"] == "flow"  # GAP 1: not reclassified to 'single'
     assert done[PARENT]["cost_usd"] == pytest.approx(1.25)  # window sum, NOT $0
@@ -113,12 +131,28 @@ def test_finishing_with_cli_adapter_would_regress_to_single_zero() -> None:
     """Documents the exact bug the fix prevents: stamping the last stage's CLI adapter
     ("claude") on the parent row reclassifies it to single + $0."""
     conn = get_db()
-    upsert_run(conn, PR, FEAT, PARENT, "running", started_at=T0,
-               adapter="team-build", board_scope=FEAT)
+    upsert_run(
+        conn,
+        PR,
+        FEAT,
+        PARENT,
+        "running",
+        started_at=T0,
+        adapter="team-build",
+        board_scope=FEAT,
+    )
     _ins(conn, _AI, (PR, FEAT, ST1, "BUILDING", S1, 1000, 2000, 1.25, FEAT))
     # The clobber (upsert_run adapter COALESCE is new-value-wins).
-    upsert_run(conn, PR, FEAT, PARENT, "done", finished_at=TF,
-               adapter="claude", board_scope=FEAT)
+    upsert_run(
+        conn,
+        PR,
+        FEAT,
+        PARENT,
+        "done",
+        finished_at=TF,
+        adapter="claude",
+        board_scope=FEAT,
+    )
 
     done = {r["run_id"]: r for r in list_runs(conn, PR)}
     assert done[PARENT]["kind"] == "single"  # misclassified
@@ -127,20 +161,51 @@ def test_finishing_with_cli_adapter_would_regress_to_single_zero() -> None:
 
 # --- GAP 3: goal `loop` parent row --------------------------------------------------------
 def test_classify_goal_loop_parent() -> None:
-    assert _classify_kind(LOOP_PARENT, "goal-loop") == "loop"  # bare uuid + goal-loop → parent
-    assert _classify_kind("sched-x", "claude") == "loop"  # a task is also 'loop' (a child)
+    assert (
+        _classify_kind(LOOP_PARENT, "goal-loop") == "loop"
+    )  # bare uuid + goal-loop → parent
+    assert (
+        _classify_kind("sched-x", "claude") == "loop"
+    )  # a task is also 'loop' (a child)
 
 
 def test_loop_parent_folds_tasks_one_row_windowed_cost() -> None:
     """The loop shows as ONE run (the parent); its sched-* task rows fold under it with
-    window-summed cost (the parent uuid carries no invocation of its own → would be $0)."""
+    window-summed cost (the parent uuid carries no invocation of its own → would be $0).
+    """
     conn = get_db()
-    upsert_run(conn, PR, FEAT, LOOP_PARENT, "running", started_at=T0,
-               adapter="goal-loop", board_scope=FEAT)
-    upsert_run(conn, PR, FEAT, TASK1, "done", started_at=S1, finished_at=S1,
-               adapter="claude", board_scope=FEAT)
-    upsert_run(conn, PR, FEAT, TASK2, "done", started_at=S2, finished_at=S2,
-               adapter="claude", board_scope=FEAT)
+    upsert_run(
+        conn,
+        PR,
+        FEAT,
+        LOOP_PARENT,
+        "running",
+        started_at=T0,
+        adapter="goal-loop",
+        board_scope=FEAT,
+    )
+    upsert_run(
+        conn,
+        PR,
+        FEAT,
+        TASK1,
+        "done",
+        started_at=S1,
+        finished_at=S1,
+        adapter="claude",
+        board_scope=FEAT,
+    )
+    upsert_run(
+        conn,
+        PR,
+        FEAT,
+        TASK2,
+        "done",
+        started_at=S2,
+        finished_at=S2,
+        adapter="claude",
+        board_scope=FEAT,
+    )
     _ins(conn, _AI, (PR, FEAT, TASK1, "task", S1, 500, 500, 0.40, FEAT))
     _ins(conn, _AI, (PR, FEAT, TASK2, "task", S2, 500, 500, 0.60, FEAT))
 
@@ -148,19 +213,33 @@ def test_loop_parent_folds_tasks_one_row_windowed_cost() -> None:
     assert LOOP_PARENT in byid  # ONE row for the loop
     assert TASK1 not in byid and TASK2 not in byid  # tasks folded (no double-count)
     assert byid[LOOP_PARENT]["kind"] == "loop"
-    assert byid[LOOP_PARENT]["cost_usd"] == pytest.approx(1.00)  # window sum, not the parent's $0
+    assert byid[LOOP_PARENT]["cost_usd"] == pytest.approx(
+        1.00
+    )  # window sum, not the parent's $0
 
     detail = get_run_detail(conn, LOOP_PARENT)  # resolves (no 404 for the RunPill)
     assert detail["run"] and detail["run"]["kind"] == "loop"
     assert detail["cost"]["cost_usd"] == pytest.approx(1.00)
-    assert {s["run_id"] for s in detail["stages"]} == {TASK1, TASK2}  # tasks folded as stages
+    assert {s["run_id"] for s in detail["stages"]} == {
+        TASK1,
+        TASK2,
+    }  # tasks folded as stages
 
 
 def test_legacy_parentless_loop_still_shows_tasks() -> None:
     """Backward-safe: a loop with NO parent row (pre-fix / historical) still surfaces its
     sched-* task rows in list_runs — nothing folds them."""
     conn = get_db()
-    upsert_run(conn, PR, FEAT, TASK1, "done", started_at=S1, finished_at=S1,
-               adapter="claude", board_scope=FEAT)
+    upsert_run(
+        conn,
+        PR,
+        FEAT,
+        TASK1,
+        "done",
+        started_at=S1,
+        finished_at=S1,
+        adapter="claude",
+        board_scope=FEAT,
+    )
     byid = {r["run_id"]: r for r in list_runs(conn, PR)}
     assert TASK1 in byid and byid[TASK1]["kind"] == "loop"

@@ -31,7 +31,9 @@ from flask import Blueprint, jsonify, request
 
 bp = Blueprint("control_runs_control", __name__)
 
-_ALLOWED_ACTIONS = frozenset({"pause", "resume", "advance", "reroute", "retry", "abort"})
+_ALLOWED_ACTIONS = frozenset(
+    {"pause", "resume", "advance", "reroute", "retry", "abort"}
+)
 
 
 @bp.route("/runs", methods=["POST"])
@@ -75,7 +77,12 @@ def run_action_route(run_id: str, action: str):
             400,
         )
     try:
-        from ._helpers import ACTIVE_STATUSES, find_registry_run, handle_retry, resolve_and_abort
+        from ._helpers import (
+            ACTIVE_STATUSES,
+            find_registry_run,
+            handle_retry,
+            resolve_and_abort,
+        )
 
         if action == "abort":
             payload, status = resolve_and_abort(run_id)
@@ -102,7 +109,12 @@ def run_action_route(run_id: str, action: str):
                 )
             return (
                 jsonify(
-                    {"ok": False, "run_id": run_id, "action": action, "reason": "not_active"}
+                    {
+                        "ok": False,
+                        "run_id": run_id,
+                        "action": action,
+                        "reason": "not_active",
+                    }
                 ),
                 200,
             )
@@ -112,7 +124,11 @@ def run_action_route(run_id: str, action: str):
             payload, status = handle_retry(run_id, topic, state, body)
             return jsonify(payload), status
 
-        from pathly_orchestrator.supervisor.api import pause_run, reroute_run, resume_run
+        from pathly_orchestrator.supervisor.api import (
+            pause_run,
+            reroute_run,
+            resume_run,
+        )
 
         if action == "pause":
             pause_run(topic)
@@ -121,7 +137,10 @@ def run_action_route(run_id: str, action: str):
         else:  # reroute
             adapter = body.get("adapter", "")
             if not isinstance(adapter, str) or not adapter.strip():
-                return jsonify({"error": "Field 'adapter' must be a non-empty string"}), 400
+                return (
+                    jsonify({"error": "Field 'adapter' must be a non-empty string"}),
+                    400,
+                )
             reroute_run(topic, adapter)
             return (
                 jsonify(
@@ -137,7 +156,10 @@ def run_action_route(run_id: str, action: str):
                 200,
             )
 
-        return jsonify({"ok": True, "run_id": run_id, "action": action, "topic": topic}), 200
+        return (
+            jsonify({"ok": True, "run_id": run_id, "action": action, "topic": topic}),
+            200,
+        )
     except Exception as exc:
         logging.exception("control run_action error")
         return jsonify({"error": str(exc), "type": type(exc).__name__}), 500

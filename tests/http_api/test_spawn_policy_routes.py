@@ -20,10 +20,15 @@ def client():
 
 def test_model_policy_roundtrip(client):
     # Empty config → default null, no role overrides.
-    assert client.get("/comms/model-policy").get_json() == {"default": None, "roles": {}}
+    assert client.get("/comms/model-policy").get_json() == {
+        "default": None,
+        "roles": {},
+    }
 
     # Set the global default.
-    r = client.post("/comms/model-policy", json={"adapter": "claude", "model": "claude-opus-4-1"})
+    r = client.post(
+        "/comms/model-policy", json={"adapter": "claude", "model": "claude-opus-4-1"}
+    )
     assert r.status_code == 200 and r.get_json()["ok"] is True
 
     # Set a per-role override.
@@ -44,7 +49,9 @@ def test_model_policy_roundtrip(client):
 
 
 def test_model_policy_rejects_blank_adapter(client):
-    assert client.post("/comms/model-policy", json={"model": "gpt-5"}).status_code == 400
+    assert (
+        client.post("/comms/model-policy", json={"model": "gpt-5"}).status_code == 400
+    )
 
 
 def test_logging_config_roundtrip_and_never_exposes_monitor(client):
@@ -53,9 +60,13 @@ def test_logging_config_roundtrip_and_never_exposes_monitor(client):
     # The invariant: the always-on cost/monitor spine is never a togglable key.
     assert set(cfg.keys()) == {"board", "verbosity"}
 
-    assert client.post("/comms/logging-config", json={"board": False}).status_code == 200
+    assert (
+        client.post("/comms/logging-config", json={"board": False}).status_code == 200
+    )
     assert client.get("/comms/logging-config").get_json()["board"] is False
 
 
 def test_logging_config_rejects_non_bool(client):
-    assert client.post("/comms/logging-config", json={"board": "yes"}).status_code == 400
+    assert (
+        client.post("/comms/logging-config", json={"board": "yes"}).status_code == 400
+    )

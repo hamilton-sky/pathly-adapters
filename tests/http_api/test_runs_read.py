@@ -24,13 +24,32 @@ def client(tmp_path):
         yield c, tmp_path
 
 
-def _seed_run(conn, pr, feat, run_id, *, status="done", adapter="claude", cost=0.0,
-              tokens=0, started="2026-07-30T10:00:00+00:00",
-              finished: "str | None" = "2026-07-30T10:05:00Z"):
+def _seed_run(
+    conn,
+    pr,
+    feat,
+    run_id,
+    *,
+    status="done",
+    adapter="claude",
+    cost=0.0,
+    tokens=0,
+    started="2026-07-30T10:00:00+00:00",
+    finished: "str | None" = "2026-07-30T10:05:00Z",
+):
     from pathly_orchestrator.db.queries.run_history import upsert_run
 
-    upsert_run(conn, pr, feat, run_id, status, started_at=started, finished_at=finished,
-               adapter=adapter, board_scope=feat)
+    upsert_run(
+        conn,
+        pr,
+        feat,
+        run_id,
+        status,
+        started_at=started,
+        finished_at=finished,
+        adapter=adapter,
+        board_scope=feat,
+    )
     if cost or tokens:
         conn.execute(
             "INSERT INTO agent_invocations "
@@ -58,8 +77,20 @@ def test_list_runs_scoped_and_shaped(client):
     assert "run-there-0002" not in ids  # scoped out by project_root
 
     row = next(r for r in body if r["run_id"] == "run-here-0001")
-    assert {"run_id", "kind", "feature", "board_scope", "status", "adapter", "started_at",
-            "finished_at", "stage_count", "cost_usd", "tokens_total", "capabilities"} <= set(row)
+    assert {
+        "run_id",
+        "kind",
+        "feature",
+        "board_scope",
+        "status",
+        "adapter",
+        "started_at",
+        "finished_at",
+        "stage_count",
+        "cost_usd",
+        "tokens_total",
+        "capabilities",
+    } <= set(row)
     assert row["kind"] == "single"
     assert row["cost_usd"] == pytest.approx(0.10)
     assert row["tokens_total"] == 1500
@@ -80,8 +111,9 @@ def test_list_runs_limit_is_respected(client):
     conn = get_db()
     pr = str(tmp_path).replace("\\", "/")
     for i in range(3):
-        _seed_run(conn, pr, "featX", f"run-{i}-000{i}",
-                  started=f"2026-07-30T10:0{i}:00+00:00")
+        _seed_run(
+            conn, pr, "featX", f"run-{i}-000{i}", started=f"2026-07-30T10:0{i}:00+00:00"
+        )
     body = c.get(f"/runs?project_root={pr}&limit=1").get_json()
     assert len(body) == 1
 
@@ -119,7 +151,9 @@ def test_overlay_upgrades_running_row(client, monkeypatch):
     pr = str(tmp_path).replace("\\", "/")
     _seed_run(conn, pr, "featX", "run-live-0009", status="running", finished=None)
     monkeypatch.setitem(
-        reg._registry, "topicLive", SimpleNamespace(run_id="run-live-0009", status="paused")
+        reg._registry,
+        "topicLive",
+        SimpleNamespace(run_id="run-live-0009", status="paused"),
     )
 
     body = c.get(f"/runs?project_root={pr}").get_json()

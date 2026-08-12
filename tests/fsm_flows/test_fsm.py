@@ -53,7 +53,9 @@ def test_recover_state_foreign_state_resets_to_seed(tmp_path):
     flow after STORMING was dropped) recovers to the seed state (states[0]) instead of
     surfacing a foreign state that would KeyError on the downstream agent_map lookup."""
     flow = _load_team_flow()
-    assert "STORMING" not in flow["states"]  # precondition: team no longer declares STORMING
+    assert (
+        "STORMING" not in flow["states"]
+    )  # precondition: team no longer declares STORMING
     # DB path (state_doc provided)
     via_db = recover_state(tmp_path, flow, state_doc={"current": "STORMING"})
     assert via_db["current_state"] == flow["states"][0] == "PLANNING"

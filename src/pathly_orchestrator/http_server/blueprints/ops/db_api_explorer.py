@@ -277,7 +277,9 @@ def db_features():
                     if inv:
                         fs_feat["invocations"] = inv.get("inv", 0)
                         fs_feat["total_tokens"] = int(inv.get("total_tokens", 0))
-                        fs_feat["cost_usd"] = round(float(inv.get("total_cost", 0.0)), 4)
+                        fs_feat["cost_usd"] = round(
+                            float(inv.get("total_cost", 0.0)), 4
+                        )
                     fs_feat["events"] = event_counts.get(key, fs_feat.get("events", 0))
                     results.append(fs_feat)
 

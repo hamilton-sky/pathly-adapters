@@ -71,7 +71,9 @@ def _classify_kind(run_id: str, adapter: str | None) -> str:
     a = adapter or ""
     if a in FLOW_NAMES:
         return "flow"
-    if a == "goal-loop":  # goal `loop` executor PARENT (supervisor/goal_executor._run_loop)
+    if (
+        a == "goal-loop"
+    ):  # goal `loop` executor PARENT (supervisor/goal_executor._run_loop)
         return "loop"
     return "single"
 
@@ -194,9 +196,7 @@ def list_runs(
     return out
 
 
-def _child_rows(
-    conn: sqlite3.Connection, parent: sqlite3.Row
-) -> list[sqlite3.Row]:
+def _child_rows(conn: sqlite3.Connection, parent: sqlite3.Row) -> list[sqlite3.Row]:
     """Child ``run_history`` rows folded into a PARENT run's detail (§1.1 window join), within
     the parent's lifespan (``project_root`` + ``feature`` + ``board_scope`` + timespan), excluding
     the parent itself. For a flow/decompose parent the children are stage-shaped rows; for a loop
@@ -304,9 +304,7 @@ def get_run_detail(conn: sqlite3.Connection, run_id: str) -> dict:
     """Full RunDetail for one run (ARCHITECTURE §4.2): identity+lifecycle, stages, per-stage
     ``run_log`` logs, correlated board posts + artifacts, and cost. Unknown run_id →
     ``{"run": None, ...}`` (the route turns that into a 404)."""
-    row = conn.execute(
-        "SELECT * FROM run_history WHERE run_id=?", (run_id,)
-    ).fetchone()
+    row = conn.execute("SELECT * FROM run_history WHERE run_id=?", (run_id,)).fetchone()
     if row is None:
         return {
             "run": None,

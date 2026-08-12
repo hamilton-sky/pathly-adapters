@@ -62,8 +62,12 @@ def test_codex_reads_tokens_from_jsonl_stream():
         ]
     )
     tin, tout = extract_tokens("codex", {}, stream)
-    assert tin == 1200  # cached_input_tokens (300) already inside input_tokens — not added
-    assert tout == 450  # reasoning_output_tokens (50) already inside output_tokens — not added
+    assert (
+        tin == 1200
+    )  # cached_input_tokens (300) already inside input_tokens — not added
+    assert (
+        tout == 450
+    )  # reasoning_output_tokens (50) already inside output_tokens — not added
 
 
 def test_agy_estimates_output_tokens_from_text():

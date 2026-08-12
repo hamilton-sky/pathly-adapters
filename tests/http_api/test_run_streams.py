@@ -134,7 +134,9 @@ def test_run_events_endpoint_streams_a_live_broadcast():
             with app.test_client() as sc:
                 with sc.get(f"/events/runs?run_id={run_id}") as resp:
                     for chunk in resp.response:
-                        text = chunk.decode("utf-8") if isinstance(chunk, bytes) else chunk
+                        text = (
+                            chunk.decode("utf-8") if isinstance(chunk, bytes) else chunk
+                        )
                         received.append(text)
                         if "connected" in text:
                             connected.set()

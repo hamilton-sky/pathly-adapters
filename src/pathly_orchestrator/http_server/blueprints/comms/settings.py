@@ -275,10 +275,22 @@ def comms_set_model_policy():
         if not isinstance(adapter, str) or not adapter.strip():
             return jsonify({"error": "Field 'adapter' must be a non-empty string"}), 400
         try:
-            set_agent_model(_get_db(), role, adapter, model if isinstance(model, str) else "")
+            set_agent_model(
+                _get_db(), role, adapter, model if isinstance(model, str) else ""
+            )
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
-        return jsonify({"ok": True, "role": role or "default", "adapter": adapter, "model": model}), 200
+        return (
+            jsonify(
+                {
+                    "ok": True,
+                    "role": role or "default",
+                    "adapter": adapter,
+                    "model": model,
+                }
+            ),
+            200,
+        )
     except Exception as exc:
         logging.exception("comms_set_model_policy error")
         return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
@@ -304,7 +316,9 @@ def comms_set_logging_config():
     """Turn agent BOARD narration on/off. Body: {board: bool}. Never touches the monitor spine."""
     try:
         from pathly_orchestrator.db.connection import get_db as _get_db
-        from pathly_orchestrator.db.queries.app_settings import set_logging_board_enabled
+        from pathly_orchestrator.db.queries.app_settings import (
+            set_logging_board_enabled,
+        )
 
         data = request.get_json(silent=True) or {}
         board = data.get("board")

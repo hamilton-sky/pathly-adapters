@@ -52,8 +52,13 @@ def test_stop_fsm_run_aborts_via_registry(client):
     from pathly_orchestrator.supervisor.state import RunnerState
 
     state = RunnerState(
-        topic="t-stop", flow="team", project_root="/p", model="", timeout=600,
-        run_id="run-fsm", status="running",
+        topic="t-stop",
+        flow="team",
+        project_root="/p",
+        model="",
+        timeout=600,
+        run_id="run-fsm",
+        status="running",
     )
     with _lock:
         _registry["t-stop"] = state
@@ -103,8 +108,13 @@ def test_action_pause_flow_run_via_registry(client):
     from pathly_orchestrator.supervisor.state import RunnerState
 
     state = RunnerState(
-        topic="t-pause", flow="team", project_root="/p", model="", timeout=600,
-        run_id="run-pause", status="running",
+        topic="t-pause",
+        flow="team",
+        project_root="/p",
+        model="",
+        timeout=600,
+        run_id="run-pause",
+        status="running",
     )
     with _lock:
         _registry["t-pause"] = state
@@ -122,8 +132,13 @@ def test_action_resume_flow_run_clears_pause_flag(client):
     from pathly_orchestrator.supervisor.state import RunnerState
 
     state = RunnerState(
-        topic="t-resume", flow="team", project_root="/p", model="", timeout=600,
-        run_id="run-resume", status="paused",
+        topic="t-resume",
+        flow="team",
+        project_root="/p",
+        model="",
+        timeout=600,
+        run_id="run-resume",
+        status="paused",
     )
     state._pause_flag = True
     with _lock:
@@ -142,8 +157,13 @@ def test_action_advance_flow_run_clears_pause_flag(client):
     from pathly_orchestrator.supervisor.state import RunnerState
 
     state = RunnerState(
-        topic="t-advance", flow="team", project_root="/p", model="", timeout=600,
-        run_id="run-advance", status="paused",
+        topic="t-advance",
+        flow="team",
+        project_root="/p",
+        model="",
+        timeout=600,
+        run_id="run-advance",
+        status="paused",
     )
     state._pause_flag = True
     with _lock:
@@ -162,8 +182,13 @@ def test_action_reroute_requires_adapter_then_applies_it(client):
     from pathly_orchestrator.supervisor.state import RunnerState
 
     state = RunnerState(
-        topic="t-reroute", flow="team", project_root="/p", model="", timeout=600,
-        run_id="run-reroute", status="running",
+        topic="t-reroute",
+        flow="team",
+        project_root="/p",
+        model="",
+        timeout=600,
+        run_id="run-reroute",
+        status="running",
     )
     with _lock:
         _registry["t-reroute"] = state
@@ -187,8 +212,13 @@ def test_action_retry_rejects_active_run(client):
     from pathly_orchestrator.supervisor.state import RunnerState
 
     state = RunnerState(
-        topic="t-retry-active", flow="team", project_root="/p", model="", timeout=600,
-        run_id="run-retry-active", status="running",
+        topic="t-retry-active",
+        flow="team",
+        project_root="/p",
+        model="",
+        timeout=600,
+        run_id="run-retry-active",
+        status="running",
     )
     with _lock:
         _registry["t-retry-active"] = state
@@ -205,8 +235,13 @@ def test_action_retry_missing_fields_is_400(client):
     from pathly_orchestrator.supervisor.state import RunnerState
 
     state = RunnerState(
-        topic="t-retry", flow="team", project_root="/p", model="", timeout=600,
-        run_id="run-retry", status="error",
+        topic="t-retry",
+        flow="team",
+        project_root="/p",
+        model="",
+        timeout=600,
+        run_id="run-retry",
+        status="error",
     )
     with _lock:
         _registry["t-retry"] = state
@@ -292,7 +327,12 @@ def test_create_run_single_routes_to_start_board_run(client, monkeypatch):
         captured["board"] = board
         captured["scope"] = scope
         captured["mode"] = mode
-        return {"ok": True, "run_id": "run-board-launch", "mode": mode, "status": "started"}
+        return {
+            "ok": True,
+            "run_id": "run-board-launch",
+            "mode": mode,
+            "status": "started",
+        }
 
     monkeypatch.setattr(_br, "start_board_run", fake_start_board_run)
 
@@ -300,7 +340,11 @@ def test_create_run_single_routes_to_start_board_run(client, monkeypatch):
         "/runs", json={"kind": "single", "board": "feature", "scope": "sc-launch"}
     )
     assert resp.status_code == 200, resp.get_data(as_text=True)
-    assert resp.get_json() == {"ok": True, "run_id": "run-board-launch", "kind": "single"}
+    assert resp.get_json() == {
+        "ok": True,
+        "run_id": "run-board-launch",
+        "kind": "single",
+    }
     assert captured["board"] == "feature"
     assert captured["scope"] == "sc-launch"
     assert captured["mode"] == "single-agent"
@@ -313,7 +357,12 @@ def test_create_run_evaluator_maps_to_evaluator_mode(client, monkeypatch):
 
     def fake_start_board_run(board, scope, mode, **kw):
         captured["mode"] = mode
-        return {"ok": True, "run_id": "run-eval-launch", "mode": mode, "status": "started"}
+        return {
+            "ok": True,
+            "run_id": "run-eval-launch",
+            "mode": mode,
+            "status": "started",
+        }
 
     monkeypatch.setattr(_br, "start_board_run", fake_start_board_run)
 

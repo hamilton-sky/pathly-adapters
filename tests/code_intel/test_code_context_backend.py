@@ -20,6 +20,7 @@ def _which_of(*present: str):
 
 def _setting(value: str):
     """Fake _get_setting returning `value` for code_context.backend (uses both args)."""
+
     def _get(key, default):
         return value if key == "code_context.backend" else default
 

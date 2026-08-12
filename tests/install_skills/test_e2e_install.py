@@ -136,7 +136,9 @@ def test_all_skills_installs_everything(tmp_path):
     assert result.returncode == 0, result.stderr
     skills = tmp_path / ".claude" / "skills"
     for s in ("pathly-build", "pathly-review", "pathly-goalize", "pathly-post"):
-        assert (skills / s / "SKILL.md").exists(), f"{s} should install with --all-skills"
+        assert (
+            skills / s / "SKILL.md"
+        ).exists(), f"{s} should install with --all-skills"
 
 
 # ---------------------------------------------------------------------------

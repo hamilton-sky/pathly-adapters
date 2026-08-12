@@ -39,8 +39,12 @@ def _register_run(tmp_path, topic: str, run_id: str):
 
     with _lock:
         st = RunnerState(
-            topic=topic, flow="consultation", project_root=str(tmp_path),
-            model="m", timeout=60, run_id=run_id,
+            topic=topic,
+            flow="consultation",
+            project_root=str(tmp_path),
+            model="m",
+            timeout=60,
+            run_id=run_id,
         )
         st.status = "running"
         _registry[topic] = st
@@ -68,8 +72,11 @@ def test_result_callback_completes_when_stdout_write_raises(client, monkeypatch)
         r = c.post(
             "/runner/terminal/result",
             json={
-                "topic": topic, "run_id": run_id, "exit_code": 0,
-                "stdout_tail": "some output", "user_initiated": False,
+                "topic": topic,
+                "run_id": run_id,
+                "exit_code": 0,
+                "stdout_tail": "some output",
+                "user_initiated": False,
             },
         )
         assert r.status_code == 200  # callback completed despite the raising write
@@ -93,8 +100,11 @@ def test_result_callback_fills_stdout_for_run(client):
         r = c.post(
             "/runner/terminal/result",
             json={
-                "topic": topic, "run_id": run_id, "exit_code": 0,
-                "stdout_tail": "the captured stdout tail", "user_initiated": False,
+                "topic": topic,
+                "run_id": run_id,
+                "exit_code": 0,
+                "stdout_tail": "the captured stdout tail",
+                "user_initiated": False,
             },
         )
         assert r.status_code == 200

@@ -27,20 +27,34 @@ def test_resolve_layers_role_over_default_over_none() -> None:
     assert resolve_agent_model(conn, "builder") is None
     # Global default applies to every role.
     set_agent_model(conn, None, "claude", "claude-opus-4-1")
-    assert resolve_agent_model(conn, "builder") == {"adapter": "claude", "model": "claude-opus-4-1"}
+    assert resolve_agent_model(conn, "builder") == {
+        "adapter": "claude",
+        "model": "claude-opus-4-1",
+    }
     # A per-role override wins over the default.
     set_agent_model(conn, "builder", "codex", "gpt-5-codex")
-    assert resolve_agent_model(conn, "builder") == {"adapter": "codex", "model": "gpt-5-codex"}
+    assert resolve_agent_model(conn, "builder") == {
+        "adapter": "codex",
+        "model": "gpt-5-codex",
+    }
     # A different role still resolves to the default.
-    assert resolve_agent_model(conn, "scout") == {"adapter": "claude", "model": "claude-opus-4-1"}
+    assert resolve_agent_model(conn, "scout") == {
+        "adapter": "claude",
+        "model": "claude-opus-4-1",
+    }
     # Clearing the override falls back to the default.
     clear_agent_model(conn, "builder")
-    assert resolve_agent_model(conn, "builder") == {"adapter": "claude", "model": "claude-opus-4-1"}
+    assert resolve_agent_model(conn, "builder") == {
+        "adapter": "claude",
+        "model": "claude-opus-4-1",
+    }
 
 
 def test_empty_model_means_engine_default() -> None:
     conn = get_db()
-    set_agent_model(conn, "analyze", "claude", "")  # adapter chosen, model = engine default
+    set_agent_model(
+        conn, "analyze", "claude", ""
+    )  # adapter chosen, model = engine default
     assert resolve_agent_model(conn, "analyze") == {"adapter": "claude", "model": ""}
 
 
@@ -69,8 +83,10 @@ def test_malformed_value_degrades_to_none() -> None:
 def test_logging_board_defaults_on_and_toggles() -> None:
     conn = get_db()
     cfg = get_logging_config(conn)
-    assert cfg["board"] is True           # agent board-narration defaults ON
-    assert cfg["verbosity"] == "normal"   # reuses the existing board:default_progress default
+    assert cfg["board"] is True  # agent board-narration defaults ON
+    assert (
+        cfg["verbosity"] == "normal"
+    )  # reuses the existing board:default_progress default
     set_logging_board_enabled(conn, False)
     assert get_logging_config(conn)["board"] is False
 

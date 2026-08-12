@@ -84,12 +84,7 @@ def main() -> None:
                 print(f"[{host}] Error: {e}", file=sys.stderr)
         return
 
-    if (
-        not args.dry_run
-        and not args.apply
-        and not args.export
-        and not args.all_skills
-    ):
+    if not args.dry_run and not args.apply and not args.export and not args.all_skills:
         _interactive_menu(hosts, repair=args.repair, force=args.force)
         return
 

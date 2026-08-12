@@ -188,7 +188,9 @@ def _loop(state: RunnerState, broadcast_fn: Optional[Callable]) -> None:
             # (architect / planner / builder / reviewer / tester / …).
             from .spawn_policy import effective_model
 
-            stage_model = effective_model(response.get("agent", ""), preferred_adapter, stage_model)
+            stage_model = effective_model(
+                response.get("agent", ""), preferred_adapter, stage_model
+            )
 
             # ── Session continuity ────────────────────────────────────────────
             with _lock:

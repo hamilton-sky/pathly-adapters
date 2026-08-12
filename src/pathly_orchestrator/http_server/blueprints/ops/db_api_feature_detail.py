@@ -194,9 +194,7 @@ def db_feature_mark_done(feature: str):
                 Path(project_root) / "pathly" / "features" / feature / "STATE.json"
             )
             if state_path.parent.is_dir():
-                state_path.write_text(
-                    json.dumps(new_state, indent=2), encoding="utf-8"
-                )
+                state_path.write_text(json.dumps(new_state, indent=2), encoding="utf-8")
         except Exception:
             logger.exception("mark-done: STATE.json mirror failed")
 

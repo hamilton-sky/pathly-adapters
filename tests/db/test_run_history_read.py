@@ -54,18 +54,57 @@ def _seed(conn: sqlite3.Connection) -> None:
     """A flow parent + its two stages + a separate single run, with invocations, run_log
     rows, board posts (run_id-exact, NULL-in-window, NULL-out-of-window) and a non-md
     artifact — the fixture every read-model assertion below reads back."""
-    upsert_run(conn, PR, FEAT, PARENT, "done", started_at=T0, finished_at=TF,
-               stage_count=2, adapter="team", board_scope=FEAT)
-    upsert_run(conn, PR, FEAT, ST1, "done", started_at=S1, finished_at=S1,
-               adapter="claude", board_scope=FEAT)
-    upsert_run(conn, PR, FEAT, ST2, "done", started_at=S2, finished_at=S2,
-               adapter="claude", board_scope=FEAT)
-    upsert_run(conn, PR, FEAT, SINGLE, "done", started_at=SG0, finished_at=SGF,
-               adapter="claude", board_scope=FEAT)
+    upsert_run(
+        conn,
+        PR,
+        FEAT,
+        PARENT,
+        "done",
+        started_at=T0,
+        finished_at=TF,
+        stage_count=2,
+        adapter="team",
+        board_scope=FEAT,
+    )
+    upsert_run(
+        conn,
+        PR,
+        FEAT,
+        ST1,
+        "done",
+        started_at=S1,
+        finished_at=S1,
+        adapter="claude",
+        board_scope=FEAT,
+    )
+    upsert_run(
+        conn,
+        PR,
+        FEAT,
+        ST2,
+        "done",
+        started_at=S2,
+        finished_at=S2,
+        adapter="claude",
+        board_scope=FEAT,
+    )
+    upsert_run(
+        conn,
+        PR,
+        FEAT,
+        SINGLE,
+        "done",
+        started_at=SG0,
+        finished_at=SGF,
+        adapter="claude",
+        board_scope=FEAT,
+    )
 
-    ai = ("INSERT INTO agent_invocations "
-          "(project_root,feature,run_id,stage,started_at,tokens_in,tokens_out,cost_usd,board_scope) "
-          "VALUES (?,?,?,?,?,?,?,?,?)")
+    ai = (
+        "INSERT INTO agent_invocations "
+        "(project_root,feature,run_id,stage,started_at,tokens_in,tokens_out,cost_usd,board_scope) "
+        "VALUES (?,?,?,?,?,?,?,?,?)"
+    )
     _ins(conn, ai, (PR, FEAT, ST1, "BUILDING", S1, 1000, 500, 0.10, FEAT))
     _ins(conn, ai, (PR, FEAT, ST2, "REVIEWING", S2, 2000, 800, 0.20, FEAT))
     _ins(conn, ai, (PR, FEAT, SINGLE, "BUILDING", SG0, 100, 50, 0.05, FEAT))
@@ -75,18 +114,69 @@ def _seed(conn: sqlite3.Connection) -> None:
     write_run_log_spawn(conn, ST2, "REVIEWING", "PROMPT review")
     update_run_log_stdout(conn, ST2, "stdout of review")
 
-    cm = ("INSERT INTO comms_messages "
-          "(id,board,scope,from_agent,to_agent,type,text,ts,run_id) VALUES (?,?,?,?,?,?,?,?,?)")
-    _ins(conn, cm, ("msg-exact", FEAT, FEAT, "builder", "*", "decision", "exact",
-                    "2026-07-30T10:00:30+00:00", PARENT))
-    _ins(conn, cm, ("msg-window", FEAT, FEAT, "reviewer", "*", "discovery", "window",
-                    "2026-07-30T10:01:00+00:00", None))
-    _ins(conn, cm, ("msg-outside", FEAT, FEAT, "x", "*", "note", "outside",
-                    "2026-07-29T09:00:00+00:00", None))  # NULL run_id, before window -> excluded
-    _ins(conn, "INSERT INTO comms_artifacts "
-               "(id,message_id,path,type,title,summary,created_at) VALUES (?,?,?,?,?,?,?)",
-         ("art-png", "msg-exact", "assets/diagram.png", "png", "diagram", None,
-          "2026-07-30T10:00:31+00:00"))
+    cm = (
+        "INSERT INTO comms_messages "
+        "(id,board,scope,from_agent,to_agent,type,text,ts,run_id) VALUES (?,?,?,?,?,?,?,?,?)"
+    )
+    _ins(
+        conn,
+        cm,
+        (
+            "msg-exact",
+            FEAT,
+            FEAT,
+            "builder",
+            "*",
+            "decision",
+            "exact",
+            "2026-07-30T10:00:30+00:00",
+            PARENT,
+        ),
+    )
+    _ins(
+        conn,
+        cm,
+        (
+            "msg-window",
+            FEAT,
+            FEAT,
+            "reviewer",
+            "*",
+            "discovery",
+            "window",
+            "2026-07-30T10:01:00+00:00",
+            None,
+        ),
+    )
+    _ins(
+        conn,
+        cm,
+        (
+            "msg-outside",
+            FEAT,
+            FEAT,
+            "x",
+            "*",
+            "note",
+            "outside",
+            "2026-07-29T09:00:00+00:00",
+            None,
+        ),
+    )  # NULL run_id, before window -> excluded
+    _ins(
+        conn,
+        "INSERT INTO comms_artifacts "
+        "(id,message_id,path,type,title,summary,created_at) VALUES (?,?,?,?,?,?,?)",
+        (
+            "art-png",
+            "msg-exact",
+            "assets/diagram.png",
+            "png",
+            "diagram",
+            None,
+            "2026-07-30T10:00:31+00:00",
+        ),
+    )
 
 
 # --- _classify_kind (ARCHITECTURE §1) ------------------------------------------------------
@@ -95,8 +185,13 @@ def test_classify_kind_matches_arch_section1() -> None:
     assert _classify_kind("synthfeat-1-1784800000000", "claude") == "stage"
     assert _classify_kind("t-2-1784800000100-q1", "claude") == "stage"  # retry -q
     assert _classify_kind("t-3-1784800000200-fb2", "claude") == "stage"  # retry -fb
-    for flow_adapter in ("team", "team-build", "consultation",
-                         "feature-consultation", "project-consultation"):
+    for flow_adapter in (
+        "team",
+        "team-build",
+        "consultation",
+        "feature-consultation",
+        "project-consultation",
+    ):
         assert _classify_kind(PARENT, flow_adapter) == "flow"
     assert _classify_kind(PARENT, "claude") == "single"
     assert _classify_kind(PARENT, None) == "single"
@@ -123,15 +218,34 @@ def test_list_runs_folds_stages_and_reconciles_cost() -> None:
     assert byid[SINGLE]["cost_usd"] == pytest.approx(0.05)
     assert byid[SINGLE]["tokens_total"] == 150
     # row shape
-    assert {"run_id", "kind", "feature", "board_scope", "status", "adapter", "started_at",
-            "finished_at", "stage_count", "cost_usd", "tokens_total"} <= set(byid[PARENT])
+    assert {
+        "run_id",
+        "kind",
+        "feature",
+        "board_scope",
+        "status",
+        "adapter",
+        "started_at",
+        "finished_at",
+        "stage_count",
+        "cost_usd",
+        "tokens_total",
+    } <= set(byid[PARENT])
 
 
 def test_list_runs_includes_running_rows() -> None:
     """A run still RUNNING appears (status from run_history) — Monitor RECENT cannot show it."""
     conn = get_db()
-    upsert_run(conn, PR, FEAT, "run-live-0001", "running",
-               started_at=T0, adapter="claude", board_scope=FEAT)
+    upsert_run(
+        conn,
+        PR,
+        FEAT,
+        "run-live-0001",
+        "running",
+        started_at=T0,
+        adapter="claude",
+        board_scope=FEAT,
+    )
     live = [r for r in list_runs(conn, PR, limit=50) if r["status"] == "running"]
     assert any(r["run_id"] == "run-live-0001" for r in live)
 
@@ -152,9 +266,13 @@ def test_get_run_detail_flow_stages_logs_board_and_parity() -> None:
     assert {s["stage"] for s in d["stages"]} == {"BUILDING", "REVIEWING"}
     assert sum(s["cost_usd"] for s in d["stages"]) == pytest.approx(0.30)
     # logs: one run_log row per stage, exactly the §4.2 keys
-    assert {log["stdout"] for log in d["logs"]} == {"stdout of build", "stdout of review"}
+    assert {log["stdout"] for log in d["logs"]} == {
+        "stdout of build",
+        "stdout of review",
+    }
     assert all(
-        set(log) == {"stage", "prompt_sent", "board_context_injected", "stdin", "stdout", "ts"}
+        set(log)
+        == {"stage", "prompt_sent", "board_context_injected", "stdin", "stdout", "ts"}
         for log in d["logs"]
     )
     # board posts: run_id-exact + NULL-in-window, in ts order; out-of-window NULL post excluded
@@ -210,7 +328,9 @@ def test_overlay_attaches_capabilities_and_upgrades_running(monkeypatch) -> None
     ]
     # a live registry entry (keyed by topic, RunnerState-shaped) upgrades r2's persisted
     # 'running' to the live status; monkeypatch.setitem auto-reverts after the test.
-    monkeypatch.setitem(reg._registry, "topicX", SimpleNamespace(run_id="r2", status="paused"))
+    monkeypatch.setitem(
+        reg._registry, "topicX", SimpleNamespace(run_id="r2", status="paused")
+    )
     out = overlay_live_status(runs)
 
     assert out[0]["capabilities"] == ["abort"]

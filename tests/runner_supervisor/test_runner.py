@@ -298,8 +298,12 @@ def test_parse_result_codex_captures_info_total_token_usage():
         '"reasoning_output_tokens": 40}}}'
     )
     result = parse_result("codex", raw)
-    assert result["tokens_in"] == 2000  # cached_input_tokens (300) already inside input_tokens
-    assert result["tokens_out"] == 150  # reasoning_output_tokens (40) already inside output_tokens
+    assert (
+        result["tokens_in"] == 2000
+    )  # cached_input_tokens (300) already inside input_tokens
+    assert (
+        result["tokens_out"] == 150
+    )  # reasoning_output_tokens (40) already inside output_tokens
 
 
 def test_parse_result_codex_keeps_last_nonzero_usage_event():

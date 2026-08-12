@@ -51,7 +51,12 @@ def resolve_and_abort(run_id: str) -> tuple[dict, int]:
     if found is not None:
         topic, _state = found
         abort_run(topic, announced=True)
-        return {"ok": True, "stopped": True, "run_id": run_id, "via": "runner_abort"}, 200
+        return {
+            "ok": True,
+            "stopped": True,
+            "run_id": run_id,
+            "via": "runner_abort",
+        }, 200
 
     board_found = board_lock.find_by_holder(run_id)
     if board_found is not None:
@@ -81,7 +86,9 @@ def _release_board_run(run_id: str, board: str, scope: str) -> None:
     try:
         run = get_run(run_id)
         if run is not None:
-            run.mark_pty_result({"exit_code": 0, "result": {"result": "stopped by user"}})
+            run.mark_pty_result(
+                {"exit_code": 0, "result": {"result": "stopped by user"}}
+            )
     except Exception:
         pass
     board_lock.release(board, scope, run_id)
@@ -165,7 +172,12 @@ def handle_retry(run_id: str, topic: str, state, body: dict) -> tuple[dict, int]
     except ValueError as exc:
         return {"error": str(exc)}, 409
 
-    return {"ok": True, "run_id": new_state.run_id, "topic": topic, "action": "retry"}, 200
+    return {
+        "ok": True,
+        "run_id": new_state.run_id,
+        "topic": topic,
+        "action": "retry",
+    }, 200
 
 
 # ── POST /runs (create) — thin RunSpec -> the matching existing facade ─────────────────

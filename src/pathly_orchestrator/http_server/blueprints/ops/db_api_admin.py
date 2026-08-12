@@ -46,7 +46,9 @@ def db_get_agents():
         merged: dict[str, dict] = {}
         for row in read_agent_definitions(conn, None):
             merged[row["role"]] = row
-        project_root = (request.args.get("project_root") or "").strip().replace("\\", "/")
+        project_root = (
+            (request.args.get("project_root") or "").strip().replace("\\", "/")
+        )
         if project_root:
             for row in read_agent_definitions(conn, project_root):
                 merged[row["role"]] = row

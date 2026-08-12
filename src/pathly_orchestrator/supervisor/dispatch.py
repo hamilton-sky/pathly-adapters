@@ -31,9 +31,7 @@ def overlay_live_status(runs: list[dict]) -> list[dict]:
 
     with _lock:
         live = {
-            s.run_id: s.status
-            for s in _registry.values()
-            if getattr(s, "run_id", None)
+            s.run_id: s.status for s in _registry.values() if getattr(s, "run_id", None)
         }
     for r in runs:
         if r.get("status") == "running" and r.get("run_id") in live:

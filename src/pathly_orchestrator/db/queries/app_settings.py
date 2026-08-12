@@ -233,7 +233,11 @@ _MODEL_ROLE_PREFIX = "models:role:"
 
 def _model_key(role: str | None) -> str:
     """The app_settings key for a role's model, or the global default for ''/'default'/None."""
-    return _MODEL_DEFAULT_KEY if role in ("", "default", None) else f"{_MODEL_ROLE_PREFIX}{role}"
+    return (
+        _MODEL_DEFAULT_KEY
+        if role in ("", "default", None)
+        else f"{_MODEL_ROLE_PREFIX}{role}"
+    )
 
 
 def _coerce_model_policy(raw: str | None) -> dict | None:
@@ -306,7 +310,7 @@ def get_model_policy(conn: sqlite3.Connection) -> dict:
         elif key.startswith(_MODEL_ROLE_PREFIX):
             coerced = _coerce_model_policy(val)
             if coerced is not None:
-                roles[key[len(_MODEL_ROLE_PREFIX):]] = coerced
+                roles[key[len(_MODEL_ROLE_PREFIX) :]] = coerced
     return {"default": default, "roles": roles}
 
 
@@ -319,7 +323,8 @@ _LOGGING_BOARD_KEY = "logging:board_enabled"
 
 def get_logging_config(conn: sqlite3.Connection) -> dict:
     """Return {"board": bool, "verbosity": 'quiet'|'normal'|'verbose'}. Board narration defaults ON;
-    verbosity reuses the existing board:default_progress setting (single source of truth)."""
+    verbosity reuses the existing board:default_progress setting (single source of truth).
+    """
     try:
         raw = get_setting(conn, _LOGGING_BOARD_KEY)
     except sqlite3.OperationalError:
