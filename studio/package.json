@@ -40,7 +40,7 @@
     "node-pty": "^1.0.0",
     "plantuml-encoder": "^1.4.0",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0",
+    "react-dom": "^19.2.6",
     "reactflow": "^11.11.4",
     "recharts": "^3.8.1",
     "zustand": "^4.4.7"
@@ -50,7 +50,7 @@
     "@types/js-yaml": "^4.0.9",
     "@types/marked": "^5.0.2",
     "@types/react": "^18.2.0",
-    "@types/react-dom": "^18.2.0",
+    "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^4.2.1",
     "@vitest/ui": "^1.0.0",
     "electron": "^33.0.0",
