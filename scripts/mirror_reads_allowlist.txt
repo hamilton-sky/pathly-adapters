@@ -9,6 +9,7 @@ src/pathly_orchestrator/fsm/engine_actions.py
 src/pathly_orchestrator/fsm/engine_recover.py
 src/pathly_orchestrator/fsm/engine_transitions.py
 src/pathly_orchestrator/http_server/blueprints/ops/db_api_explorer.py
+src/pathly_orchestrator/http_server/blueprints/ops/db_api_feature_detail.py
 
 # SEED import (fresh clone: BOARD.json -> empty DB board; DB stays authoritative)
 src/pathly_orchestrator/board_mirror_hydrate.py

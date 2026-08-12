@@ -161,6 +161,7 @@ def db_feature_mark_done(feature: str):
             # No DB row yet (a goal-driven feature tracked only on disk): fall back to the
             # STATE.json mirror so from_state + flow reflect what the user actually sees.
             try:
+                # pathly:allow-mirror-read: DB-first — read STATE.json only when fsm_state has no row
                 sp = Path(project_root) / "pathly" / "features" / feature / "STATE.json"
                 if sp.exists():
                     prev = json.loads(sp.read_text(encoding="utf-8"))
