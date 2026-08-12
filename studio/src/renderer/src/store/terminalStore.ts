@@ -4,7 +4,7 @@ import type { TerminalTab } from '../types/terminal'
 export type { TerminalTab }
 type TerminalKind = NonNullable<TerminalTab['kind']>
 
-export interface SessionRecord {
+interface SessionRecord {
   id: string
   label: string
   kind?: TerminalTab['kind']

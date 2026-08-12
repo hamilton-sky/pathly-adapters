@@ -12,7 +12,7 @@ interface CardProps {
   onClick?: (e: React.MouseEvent<HTMLDivElement>) => void
 }
 
-export function Card({ title, actions, children, interactive = false, className, bodyClassName, onClick }: CardProps) {
+function Card({ title, actions, children, interactive = false, className, bodyClassName, onClick }: CardProps) {
   return (
     <div
       className={clsx(styles.card, interactive && styles.interactive, className)}

@@ -4,7 +4,7 @@
 // appends; the renderer only reads and removes (see diagramSidecar.ts).
 
 export type DiagramStyle = 'mermaid' | 'ascii' | 'plantuml'
-export type DiagramStatus = 'draft' | 'kept'
+type DiagramStatus = 'draft' | 'kept'
 
 export interface DiagramEntry {
   /** Stable id, e.g. `dg_k2j9m`. */
@@ -32,7 +32,7 @@ export interface DiagramSidecar {
   diagrams: DiagramEntry[]
 }
 
-export const SIDECAR_SUFFIX = '.diagrams.json'
+const SIDECAR_SUFFIX = '.diagrams.json'
 
 /** Resolve the sidecar path for a given source file. */
 export function sidecarPathFor(filePath: string): string {

@@ -24,7 +24,7 @@ export interface FeatureData {
   dots: DotSegment[]
 }
 
-export interface TransitionData {
+interface TransitionData {
   state: PipelineState
   time: string
   duration: string
@@ -32,21 +32,21 @@ export interface TransitionData {
   w: number
 }
 
-export interface EventData {
+interface EventData {
   time: string
   type: string
   detail: string
   state: PipelineState
 }
 
-export interface AgentData {
+interface AgentData {
   role: 'builder' | 'reviewer' | 'tester'
   conv: string
   state: PipelineState
   cost: number
 }
 
-export interface TraceData {
+interface TraceData {
   name: string
   agent: string
   model: string
@@ -59,7 +59,7 @@ export interface TraceData {
 }
 
 /** A raw pipeline event, expandable to its JSON payload in the Events tab. */
-export interface EventRow {
+interface EventRow {
   seq: number
   type: string
   ts: string
@@ -68,7 +68,7 @@ export interface EventRow {
 }
 
 /** One day of the Trends daily-cost chart (estimated + reported dollars). */
-export interface DailyCostPoint {
+interface DailyCostPoint {
   /** MM-DD or ISO date. */
   date: string
   estimated: number
@@ -94,7 +94,7 @@ export interface RollupCard {
 /** Grid / stack (list) / roll-up view of the feature collection. */
 export type ViewMode = 'grid' | 'stack' | 'rollup'
 
-export interface CostPoint {
+interface CostPoint {
   /** ISO-ish day or MM/DD label. */
   day: string
   cost: number
@@ -114,7 +114,7 @@ export interface TopStat {
 }
 
 /** Per-state hex map — the FSM domain colours. */
-export const STATE_COLORS: Record<PipelineState, string> = {
+const STATE_COLORS: Record<PipelineState, string> = {
   PLANNING: 'var(--state-planning)',
   BUILDING: 'var(--state-building)',
   REVIEWING: 'var(--state-reviewing)',

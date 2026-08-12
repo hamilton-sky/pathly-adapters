@@ -15,7 +15,7 @@ const ANSI_CSI = /\x1b\[[0-9;?]*[A-Za-z]/g
 const ANSI_OSC = /\x1b\][\s\S]*?\x07/g
 
 /** Pull the last meaningful line out of a raw PTY chunk. */
-export function lastMeaningfulLine(chunk: string): string {
+function lastMeaningfulLine(chunk: string): string {
   const clean = chunk
     .replace(ANSI_CSI, '')
     .replace(ANSI_OSC, '')

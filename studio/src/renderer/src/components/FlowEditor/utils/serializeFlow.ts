@@ -6,7 +6,7 @@ import type { FlowYaml } from '../../../types'
  * but no default. Mirrors `_DEFAULT_ADAPTER` in
  * `src/pathly_orchestrator/db/queries/flow_graph_ops.py`.
  */
-export const DEFAULT_ADAPTER = 'claude'
+const DEFAULT_ADAPTER = 'claude'
 
 /**
  * Normalize an `adapter_map` so a serialized flow always passes the FSM validator

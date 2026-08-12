@@ -8,7 +8,7 @@
 
 import type { DragEvent, MouseEvent } from 'react'
 
-export type WsKind = 'root' | 'folder' | 'file'
+type WsKind = 'root' | 'folder' | 'file'
 
 /** Cached directory listing (children names), loaded lazily on expand. */
 export interface WsListing {

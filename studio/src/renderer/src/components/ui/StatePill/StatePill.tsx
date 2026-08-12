@@ -1,7 +1,7 @@
 import clsx from 'clsx'
 import styles from './StatePill.module.css'
 
-export type PipelineState = 'PLANNING' | 'BUILDING' | 'REVIEWING' | 'TESTING' | 'RETRO' | 'DONE' | 'ERROR' | 'IDLE'
+type PipelineState = 'PLANNING' | 'BUILDING' | 'REVIEWING' | 'TESTING' | 'RETRO' | 'DONE' | 'ERROR' | 'IDLE'
 
 interface StatePillProps {
   state?: PipelineState
@@ -12,7 +12,7 @@ interface StatePillProps {
   className?: string
 }
 
-export function StatePill({ state = 'PLANNING', label, solid = false, className }: StatePillProps) {
+function StatePill({ state = 'PLANNING', label, solid = false, className }: StatePillProps) {
   const key = state.toUpperCase() as PipelineState
   return (
     <span

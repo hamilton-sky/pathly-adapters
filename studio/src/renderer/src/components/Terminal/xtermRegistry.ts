@@ -159,7 +159,7 @@ export function dispose(tabId: string): void {
   records.delete(tabId)
 }
 
-export function getHost(tabId: string): HostId | null {
+function getHost(tabId: string): HostId | null {
   return records.get(tabId)?.currentHost ?? null
 }
 

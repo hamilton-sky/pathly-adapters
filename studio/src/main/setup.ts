@@ -8,7 +8,7 @@ function markerPath(): string {
   return join(app.getPath('userData'), `pathly-setup-${app.getVersion()}.done`)
 }
 
-export function isSetupDone(): boolean {
+function isSetupDone(): boolean {
   return existsSync(markerPath())
 }
 

@@ -42,4 +42,4 @@ export interface DrawerDetail {
   fragment: string | null
 }
 
-export type { ComposedSection }
+

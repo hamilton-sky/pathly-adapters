@@ -2,9 +2,9 @@ import { create } from 'zustand'
 import type { NotifCategory } from './notificationStore'
 import { useNotificationStore } from './notificationStore'
 
-export type ToastVariant = 'info' | 'success' | 'error'
+type ToastVariant = 'info' | 'success' | 'error'
 
-export interface Toast {
+interface Toast {
   id: string
   message: string
   variant: ToastVariant

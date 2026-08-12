@@ -5,7 +5,7 @@ import { promisify } from 'node:util'
 
 const run = promisify(execFile)
 
-export interface CommitBoardResult {
+interface CommitBoardResult {
   ok: boolean
   /** True only when a NEW commit was actually created. */
   committed: boolean

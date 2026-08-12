@@ -16,4 +16,4 @@ export const FILTER_GROUPS: FilterGroup[] = [
 ]
 
 // Flat list of every filterable type — for counts / "all" checks.
-export const FILTERABLE_TYPES: MessageType[] = FILTER_GROUPS.flatMap((g) => g.types)
+const FILTERABLE_TYPES: MessageType[] = FILTER_GROUPS.flatMap((g) => g.types)

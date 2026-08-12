@@ -38,7 +38,7 @@ export function getApiSecret(): string {
 }
 export function getApiBase(): string { return _apiBase }
 
-export function apiHeaders(): Record<string, string> {
+function apiHeaders(): Record<string, string> {
   return {
     'Content-Type': 'application/json',
     'X-Pathly-Secret': _apiSecret,

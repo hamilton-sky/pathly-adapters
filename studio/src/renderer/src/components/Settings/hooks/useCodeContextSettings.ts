@@ -2,9 +2,9 @@ import { useState, useEffect, useCallback } from 'react'
 import { apiFetch } from '../../../lib/config'
 import { useToastStore } from '../../../store/toastStore'
 
-export type CodeContextBackend = 'auto' | 'off' | 'cli' | 'lsp' | 'both'
-export type CodeContextReindex = 'off' | 'stage' | 'auto'
-export type CodeContextTool = 'codebase-memory-mcp'
+type CodeContextBackend = 'auto' | 'off' | 'cli' | 'lsp' | 'both'
+type CodeContextReindex = 'off' | 'stage' | 'auto'
+type CodeContextTool = 'codebase-memory-mcp'
 
 const KEY_BACKEND = 'code_context.backend'
 const KEY_REINDEX = 'code_context.reindex'

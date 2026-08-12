@@ -22,7 +22,7 @@ function calcDuration(from: string, to: string): string {
  * Derive the timeline from the raw event stream. Oldest→newest so the flow reads
  * forward, and each state's `duration` measures the gap to the NEXT state.
  */
-export function eventsToTransitions(events: DbEvent[]): TransitionData[] {
+function eventsToTransitions(events: DbEvent[]): TransitionData[] {
   const stateEvents = events
     .filter((e) => e.event_type === 'STATE_TRANSITION')
     .slice()

@@ -28,7 +28,7 @@ function getPlanPath(projectPath: string, topic: string): string {
   return `${projectPath}/pathly/features/${topic}`
 }
 
-export async function safeRead(path: string, maxChars: number): Promise<string> {
+async function safeRead(path: string, maxChars: number): Promise<string> {
   try {
     const content = await window.pathly.fs.read(path)
     const text = content ?? ''
@@ -38,7 +38,7 @@ export async function safeRead(path: string, maxChars: number): Promise<string> 
   }
 }
 
-export function parseNextTodo(progressMd: string): string {
+function parseNextTodo(progressMd: string): string {
   const lines = progressMd.split(/\r?\n/)
   for (const line of lines) {
     const trimmed = line.trim()

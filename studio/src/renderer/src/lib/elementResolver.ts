@@ -30,7 +30,7 @@ function collectElements(): Array<{ selector: string; description: string }> {
   return results
 }
 
-export async function resolveElement(label: string): Promise<string | null> {
+async function resolveElement(label: string): Promise<string | null> {
   const elements = collectElements()
   if (elements.length === 0) return null
 

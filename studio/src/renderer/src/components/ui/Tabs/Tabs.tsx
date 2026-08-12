@@ -1,7 +1,7 @@
 import clsx from 'clsx'
 import styles from './Tabs.module.css'
 
-export interface TabItem {
+interface TabItem {
   id: string
   label: React.ReactNode
   count?: number | string
@@ -16,7 +16,7 @@ interface TabsProps {
   className?: string
 }
 
-export function Tabs({ tabs, activeId, onChange, variant = 'underline', className }: TabsProps) {
+function Tabs({ tabs, activeId, onChange, variant = 'underline', className }: TabsProps) {
   return (
     <div className={clsx(styles.bar, variant === 'pill' ? styles.pill : styles.underline, className)}>
       {tabs.map((t) => {

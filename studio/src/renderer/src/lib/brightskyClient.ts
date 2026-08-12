@@ -4,7 +4,7 @@ import { collectPathlyContext } from './pathlyContextCollector'
 import { executeStudioTool } from './studioAnalyzer'
 import { splitThinkingContent } from './thinkingParser'
 
-export class BrightskyClient {
+class BrightskyClient {
   private ws: WebSocket | null = null
   private streamInProgress = false
   private connectTimeout: ReturnType<typeof setTimeout> | null = null

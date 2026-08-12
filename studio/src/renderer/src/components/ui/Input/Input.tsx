@@ -17,7 +17,7 @@ interface InputProps {
   style?: React.CSSProperties
 }
 
-export function Input({
+function Input({
   value,
   onChange,
   placeholder,

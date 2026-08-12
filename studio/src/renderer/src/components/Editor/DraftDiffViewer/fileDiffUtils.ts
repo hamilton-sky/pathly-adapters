@@ -40,7 +40,7 @@ export function fileDiffOps(original: string, draft: string): DiffLine[] {
   return computeLineDiff(original, draft)
 }
 
-export type SplitCellType = 'same' | 'remove' | 'add' | 'fill'
+type SplitCellType = 'same' | 'remove' | 'add' | 'fill'
 
 export interface SplitRow {
   leftNo: number | null

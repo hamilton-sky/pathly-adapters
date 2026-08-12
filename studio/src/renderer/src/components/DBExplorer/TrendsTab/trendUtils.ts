@@ -2,7 +2,7 @@ import { computeCost } from '../costUtils'
 import type { PricingTable } from '../costUtils'
 import type { DailyCostPoint, HeatmapCell, CsvRow } from './useTrends'
 
-export function countToLevel(count: number): 0 | 1 | 2 | 3 | 4 {
+function countToLevel(count: number): 0 | 1 | 2 | 3 | 4 {
   if (count === 0) return 0
   if (count <= 2) return 1
   if (count <= 5) return 2
@@ -10,7 +10,7 @@ export function countToLevel(count: number): 0 | 1 | 2 | 3 | 4 {
   return 4
 }
 
-export function addDays(dateStr: string, n: number): string {
+function addDays(dateStr: string, n: number): string {
   const d = new Date(dateStr + 'T00:00:00')
   d.setDate(d.getDate() + n)
   return d.toLocaleDateString('en-CA')

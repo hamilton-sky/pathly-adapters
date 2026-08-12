@@ -7,7 +7,7 @@
 // append-array-sidecar shape so their panels are structurally interchangeable.
 
 /** Lens that produced a report. Free-form on disk (agent-stamped); these are the built-ins. */
-export type AnalysisLens = 'full' | 'clarity' | 'gaps' | 'redundancy' | 'legacy'
+type AnalysisLens = 'full' | 'clarity' | 'gaps' | 'redundancy' | 'legacy'
 
 export interface AnalysisEntry {
   /** Stable id, e.g. `an_k2j9m`. */
@@ -34,9 +34,9 @@ export interface AnalysisSidecar {
   analyses: AnalysisEntry[]
 }
 
-export const ANALYSIS_SIDECAR_SUFFIX = '.analyses.json'
+const ANALYSIS_SIDECAR_SUFFIX = '.analyses.json'
 /** The pre-gallery single-report file — migrated into the sidecar on file open. */
-export const LEGACY_ANALYSIS_SUFFIX = '.analysis'
+const LEGACY_ANALYSIS_SUFFIX = '.analysis'
 
 /** Resolve the sidecar path for a given source file. */
 export function analysisSidecarPathFor(filePath: string): string {

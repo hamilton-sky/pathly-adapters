@@ -78,7 +78,7 @@ export function abortLlm(): void {
 
 // ── Ollama backend (works on any Electron version) ────────────────────────────
 
-export async function checkOllama(): Promise<{ available: boolean; models: string[] }> {
+async function checkOllama(): Promise<{ available: boolean; models: string[] }> {
   return window.pathly.llm.ollamaAvailable()
 }
 

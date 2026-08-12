@@ -13,7 +13,7 @@ export interface ExecutorInfo {
   skillRel: string
 }
 
-export const EXECUTOR_INFO: Record<string, ExecutorInfo> = {
+const EXECUTOR_INFO: Record<string, ExecutorInfo> = {
   single: { agent: 'single agent', skill: 'development/drain-dag', skillRel: 'development/drain-dag' },
   loop: { agent: 'builder', skill: 'development/execute-task', skillRel: 'development/execute-task' },
   team: { agent: 'builder → reviewer → tester', skill: 'team-build flow', skillRel: '' },

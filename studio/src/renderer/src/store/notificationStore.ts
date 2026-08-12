@@ -5,12 +5,12 @@ export type NotifCategory = 'db_crud' | 'runner_state' | 'phase_changes' | 'even
 export type ToastPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left'
 export type ToastStyle = 'default' | 'card' | 'minimal' | 'banner'
 
-export interface CategoryPrefs {
+interface CategoryPrefs {
   enabled: boolean
   color: string
 }
 
-export const DEFAULT_CATEGORIES: Record<NotifCategory, CategoryPrefs> = {
+const DEFAULT_CATEGORIES: Record<NotifCategory, CategoryPrefs> = {
   db_crud:        { enabled: true,  color: '#4ade80' },
   runner_state:   { enabled: true,  color: '#60a5fa' },
   phase_changes:  { enabled: true,  color: '#c084fc' },

@@ -7,12 +7,12 @@ import { estimateInputCost, estimateTokens, type PriceCtx } from '../PromptCostM
 import type { PromptLayer } from '../../../services/skillCompose'
 import styles from './SendPreviewModal.module.css'
 
-export interface SendPreviewMeta {
+interface SendPreviewMeta {
   label: string
   value: string
 }
 
-export interface SendPreviewItem {
+interface SendPreviewItem {
   id: string
   label: string
   selected: boolean

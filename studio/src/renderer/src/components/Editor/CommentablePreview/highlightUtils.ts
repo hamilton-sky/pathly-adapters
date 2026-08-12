@@ -6,12 +6,12 @@
 
 import type { Comment, CommentColor } from '../useComments'
 
-export const PENDING_HL = 'pathly-pending'
-export const SUBMITTED_HL = 'pathly-submitted'
-export const COMMENT_HL_PREFIX = 'pathly-comment-'
-export const PULSE_HL = 'pathly-comment-pulse'
+const PENDING_HL = 'pathly-pending'
+const SUBMITTED_HL = 'pathly-submitted'
+const COMMENT_HL_PREFIX = 'pathly-comment-'
+const PULSE_HL = 'pathly-comment-pulse'
 
-export const COMMENT_TINTS: Record<CommentColor, string> = {
+const COMMENT_TINTS: Record<CommentColor, string> = {
   yellow: 'rgba(252, 211, 77, 0.24)',
   green:  'rgba(52, 211, 153, 0.22)',
   blue:   'rgba(96, 165, 250, 0.22)',
@@ -19,7 +19,7 @@ export const COMMENT_TINTS: Record<CommentColor, string> = {
   orange: 'rgba(249, 115, 22, 0.22)',
 }
 
-export const COMMENT_TINTS_PULSE: Record<CommentColor, string> = {
+const COMMENT_TINTS_PULSE: Record<CommentColor, string> = {
   yellow: 'rgba(252, 211, 77, 0.65)',
   green:  'rgba(52, 211, 153, 0.60)',
   blue:   'rgba(96, 165, 250, 0.60)',
@@ -48,7 +48,7 @@ function deleteHL(name: string): void {
 }
 
 /** Find a Range for searchTerm inside container's text nodes — no DOM mutation. */
-export function findTextRange(container: HTMLElement, searchTerm: string): Range | null {
+function findTextRange(container: HTMLElement, searchTerm: string): Range | null {
   if (!searchTerm) return null
   const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null)
   while (walker.nextNode()) {
@@ -87,7 +87,7 @@ export function findTextRange(container: HTMLElement, searchTerm: string): Range
  * Find the best Range for an anchor string.
  * Uses progressive fallbacks to handle selections spanning inline <code> elements.
  */
-export function findAnchorRange(container: HTMLElement, anchor: string): Range | null {
+function findAnchorRange(container: HTMLElement, anchor: string): Range | null {
   const norm = anchor.replace(/\s+/g, ' ').trim()
   if (!norm) return null
 

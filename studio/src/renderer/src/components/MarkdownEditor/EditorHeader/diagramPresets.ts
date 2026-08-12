@@ -114,7 +114,7 @@ export const DIAGRAM_PRESETS: DiagramPreset[] = [
   },
 ]
 
-export const DIAGRAM_PRESETS_BY_GROUP = {
+const DIAGRAM_PRESETS_BY_GROUP = {
   anywhere: DIAGRAM_PRESETS.filter((p) => p.group === 'anywhere'),
   engine: DIAGRAM_PRESETS.filter((p) => p.group === 'engine'),
 }

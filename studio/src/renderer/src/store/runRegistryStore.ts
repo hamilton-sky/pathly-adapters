@@ -33,9 +33,9 @@ import { persist } from 'zustand/middleware'
 // editor/summary are renderer ONE-SHOTS (short-lived, run_id = the spawn's tab id, re-verified
 // via the run record). The one registry + one RunPill is what makes them consistent.
 
-export type RunKind = 'board' | 'goal' | 'flow' | 'editor' | 'summary'
+type RunKind = 'board' | 'goal' | 'flow' | 'editor' | 'summary'
 
-export interface ActiveRunEntry {
+interface ActiveRunEntry {
   /** Stable target key — see the kind→map table above. */
   target: string
   /** The spawn's run_id. '' when the backend minted/returned none (e.g. a decompose). */

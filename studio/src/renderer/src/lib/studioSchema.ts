@@ -247,6 +247,6 @@ export function getStudioSchema(): StudioElement[] {
   return STUDIO_SCHEMA
 }
 
-export function getSchemaForScreen(screen: string): StudioElement[] {
+function getSchemaForScreen(screen: string): StudioElement[] {
   return STUDIO_SCHEMA.filter((el) => el.screen === screen)
 }

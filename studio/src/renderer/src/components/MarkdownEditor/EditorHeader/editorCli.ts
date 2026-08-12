@@ -23,7 +23,7 @@ export const EDITOR_CLIS: CliOption[] = ADAPTER_META.map((m) => ({
 // different engines independently.
 export const CLI_KEY_SPLIT   = 'pathly.notebook.cli.split'
 export const CLI_KEY_ANALYZE = 'pathly.notebook.cli.analyze'
-export const CLI_KEY_EVAL    = 'pathly.comms.cli.eval'
+const CLI_KEY_EVAL    = 'pathly.comms.cli.eval'
 export const CLI_KEY_GOAL    = 'pathly.comms.cli.goal'
 export const CLI_KEY_TASK    = 'pathly.comms.cli.task'
 

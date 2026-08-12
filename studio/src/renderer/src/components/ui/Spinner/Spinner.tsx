@@ -9,7 +9,7 @@ interface SpinnerProps {
   className?: string
 }
 
-export function Spinner({ size = 14, color = 'var(--accent)', className }: SpinnerProps) {
+function Spinner({ size = 14, color = 'var(--accent)', className }: SpinnerProps) {
   return (
     <span
       className={clsx(styles.spinner, className)}

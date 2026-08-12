@@ -1,6 +1,6 @@
 import type { FlowYaml } from '../../../types'
 
-export type FlowValidationScope = 'flow' | 'node' | 'edge' | 'export'
+type FlowValidationScope = 'flow' | 'node' | 'edge' | 'export'
 
 /** Adapters the FSM validator accepts (src/pathly_orchestrator/fsm/state.py `_KNOWN_ADAPTERS`). */
 const KNOWN_ADAPTERS = new Set(['claude', 'codex', 'copilot', 'antigravity'])

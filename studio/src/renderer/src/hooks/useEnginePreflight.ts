@@ -51,7 +51,7 @@ export function useEnginePreflight(): EnginePreflightState {
 }
 
 /** The greyed-out reason for an adapter, or undefined when it is usable / unknown. */
-export function unavailableReason(
+function unavailableReason(
   byAdapter: Record<string, EnginePreflight>,
   adapter: string,
 ): string | undefined {

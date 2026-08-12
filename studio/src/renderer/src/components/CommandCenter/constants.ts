@@ -9,7 +9,7 @@ export interface AgentMeta {
   icon: string | null  // lucide name; null → gradient "YOU" chip
 }
 
-export const AGENTS: Record<AgentId, AgentMeta> = {
+const AGENTS: Record<AgentId, AgentMeta> = {
   you:       { label: 'you',       color: 'var(--brand-gradient)',  icon: 'user' },
   builder:   { label: 'builder',   color: 'var(--state-building)',  icon: 'square-terminal' },
   reviewer:  { label: 'reviewer',  color: 'var(--state-reviewing)', icon: 'search' },
@@ -28,7 +28,7 @@ export function agentMeta(from: string): AgentMeta {
   return { label: from, color: 'var(--text-muted)', icon: 'square-terminal' }
 }
 
-export const STAGE_COLOR: Record<Stage, string> = {
+const STAGE_COLOR: Record<Stage, string> = {
   PLANNING:  'var(--state-planning)',
   BUILDING:  'var(--state-building)',
   REVIEWING: 'var(--state-reviewing)',

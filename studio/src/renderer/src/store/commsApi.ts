@@ -5,7 +5,7 @@ import { apiFetch } from '../lib/config'
 
 // ── Backend row shape ────────────────────────────────────────────────
 
-export interface CommsRow {
+interface CommsRow {
   id: string
   board: string
   scope: string
@@ -81,7 +81,7 @@ function basename(path: string | null): string | undefined {
 
 // ── Row → Message adapter ────────────────────────────────────────────
 
-export function rowToMessage(row: CommsRow): Message {
+function rowToMessage(row: CommsRow): Message {
   const readBy = parseJsonArray(row.read_by)
   const ackedBy = parseJsonArray(row.acknowledged_by)
   const readByAgent = readBy.some((r) => r !== 'you' && r !== 'human')
@@ -705,14 +705,14 @@ export async function apiAttach(
 
 // ── C2: single-agent run ─────────────────────────────────────────────
 
-export interface RunBoardResult {
+interface RunBoardResult {
   ok: true
   run_id: string
   mode: string
   result: unknown
 }
 
-export interface RunBoardBusy {
+interface RunBoardBusy {
   ok: false
   error: 'board_busy'
 }
@@ -976,19 +976,19 @@ export async function apiStartFlow(
 
 // ── Goal DAG run ─────────────────────────────────────────────────────
 
-export interface RunGoalResult {
+interface RunGoalResult {
   ok: true
   run_id: string
   executor: string
 }
 
-export interface RunGoalBusy {
+interface RunGoalBusy {
   ok: false
   error: 'board_busy'
   reason?: string
 }
 
-export interface RunGoalTeamUnavailable {
+interface RunGoalTeamUnavailable {
   ok: false
   error: 'not_implemented'
 }

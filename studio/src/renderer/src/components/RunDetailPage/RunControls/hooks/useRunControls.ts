@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { apiRunAction, apiStopRun } from '../../../../store/commsApi'
 import type { RunDetailRun } from '../../types'
 
-export type RunAction = 'stop' | 'pause' | 'resume' | 'advance' | 'reroute' | 'retry'
+type RunAction = 'stop' | 'pause' | 'resume' | 'advance' | 'reroute' | 'retry'
 
 export interface UseRunControls {
   /** The action currently in flight (disables every button so only one runs at a time), or null. */

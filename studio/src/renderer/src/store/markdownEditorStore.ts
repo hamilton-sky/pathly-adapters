@@ -14,7 +14,7 @@ export interface BodyCell {
   originalContent?: string
 }
 
-export interface FragmentCell {
+interface FragmentCell {
   id: string
   type: 'fragment'
   fragmentName: string
@@ -23,7 +23,7 @@ export interface FragmentCell {
   path?: string
 }
 
-export type MarkdownEditorCell = BodyCell | FragmentCell
+type MarkdownEditorCell = BodyCell | FragmentCell
 
 interface MarkdownEditorState {
   cells: MarkdownEditorCell[]

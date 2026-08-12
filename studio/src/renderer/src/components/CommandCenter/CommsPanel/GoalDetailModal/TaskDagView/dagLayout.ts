@@ -21,7 +21,7 @@ export interface DagNode {
   index: number
   task: Message
 }
-export interface DagEdge {
+interface DagEdge {
   from: string
   to: string
 }

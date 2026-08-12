@@ -30,7 +30,7 @@ function loadSidebarTab(): 'library' | 'workspace' {
 }
 
 /** Lifecycle status of a notebook one-shot AI action (AI Split / AI Analyze / Diagram). */
-export type MdEditorActionStatus = 'idle' | 'running' | 'success' | 'error'
+type MdEditorActionStatus = 'idle' | 'running' | 'success' | 'error'
 
 /** Per-file, per-action run state. The single source of truth for an in-flight run. */
 export interface MdEditorActionSlot {
@@ -54,7 +54,7 @@ export type MdEditorAction = 'split' | 'analyze' | 'diagram'
 // Persist ONLY 'running' slots. success/error/idle are transient (they auto-clear a few seconds
 // after a run) and must not restore stale after a reload; the surviving 'running' slots are then
 // re-verified against the live gate engines by useOneShotReconcile and cleared if no longer alive.
-export function pickRunningActions(
+function pickRunningActions(
   map: Record<string, MdEditorActionRecord>,
 ): Record<string, MdEditorActionRecord> {
   const out: Record<string, MdEditorActionRecord> = {}

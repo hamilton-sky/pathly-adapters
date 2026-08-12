@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo } from 'react'
 export type HunkStatus = 'unchanged' | 'changed' | 'added' | 'removed'
 
 /** A comment that maps onto a hunk, so the reviewer sees which request a change answers. */
-export interface CommentRef {
+interface CommentRef {
   index: number   // 1-based, matching the comments panel's numbering
   body: string
   color: string
@@ -81,7 +81,7 @@ function buildLineHeadingMap(text: string): string[] {
 }
 
 /** Rebuild the final document from the user's per-hunk accept/reject choices. */
-export function reconstruct(hunks: DiffHunk[]): string {
+function reconstruct(hunks: DiffHunk[]): string {
   return hunks
     .filter((h) => {
       if (h.status === 'unchanged') return true

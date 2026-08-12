@@ -7,15 +7,15 @@ export const listDir         = (dir: string): Promise<string[]>                 
 export const listDirs        = (dir: string): Promise<string[]>                                               => window.pathly.fs.listDirs(dir)
 export const getAppRoot      = (): Promise<string>                                                            => window.pathly.fs.appRoot()
 export const pickFolder      = (): Promise<string | null>                                                     => window.pathly.fs.pickFolder()
-export const publish         = (cwd: string): Promise<number | null>                                         => window.pathly.shell.publish(cwd)
+const publish         = (cwd: string): Promise<number | null>                                         => window.pathly.shell.publish(cwd)
 export const upgrade         = (): Promise<number | null>                                                    => window.pathly.shell.upgrade()
 export const onPublishOutput = (cb: (line: string) => void): (() => void)                                    => window.pathly.shell.onOutput(cb)
 export const openWindow      = (path: string): Promise<void>                                                  => window.pathly.shell.openWindow(path)
-export const openSlide       = (filePath: string): Promise<void>                                             => window.pathly.shell.openSlide(filePath)
+const openSlide       = (filePath: string): Promise<void>                                             => window.pathly.shell.openSlide(filePath)
 export const getDsPort       = (): Promise<number>                                                           => window.pathly.shell.dsPort()
-export const fsmPing         = (): Promise<boolean>                                                           => window.pathly.fsm.ping()
-export const watchStart      = (projectPath: string, topic: string): Promise<void>                           => window.pathly.watch.start(projectPath, topic)
-export const onWatchEvent    = (cb: (data: { path: string; content: string }) => void): (() => void)         => window.pathly.watch.onEvent(cb)
+const fsmPing         = (): Promise<boolean>                                                           => window.pathly.fsm.ping()
+const watchStart      = (projectPath: string, topic: string): Promise<void>                           => window.pathly.watch.start(projectPath, topic)
+const onWatchEvent    = (cb: (data: { path: string; content: string }) => void): (() => void)         => window.pathly.watch.onEvent(cb)
 
 /** Directories a fresh Pathly workspace ships with. `project` is the PROJECT-scope
  *  home (its board's artifacts land in pathly/project/artifacts/), so it's scaffolded
@@ -39,9 +39,9 @@ export async function scaffoldPathlyWorkspace(root: string): Promise<void> {
   }
 }
 
-export { PATHLY_API_BASE, apiFetch } from '../lib/config'
 
-export async function fetchFlow(name: string): Promise<{ name: string; flow_yaml: string; file_path: string } | null> {
+
+async function fetchFlow(name: string): Promise<{ name: string; flow_yaml: string; file_path: string } | null> {
   const { apiFetch } = await import('../lib/config')
   try {
     const r = await apiFetch(`/flows/${encodeURIComponent(name)}`)

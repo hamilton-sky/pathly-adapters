@@ -7,7 +7,7 @@ import type { FeatureRigor } from '../FeatureDecomposeConfig/FeatureDecomposeCon
 // altitude down — shared across all three tiers.
 import s from '../GoalTargetConfig/GoalTargetConfig.module.css'
 
-export type ProjectRigor = FeatureRigor
+type ProjectRigor = FeatureRigor
 
 const RIGOR_OPTIONS: { value: ProjectRigor; label: string; hint: string }[] = [
   { value: 'light', label: 'Light', hint: 'One planner run posts the sibling features — fast' },

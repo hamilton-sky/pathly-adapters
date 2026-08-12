@@ -1,6 +1,6 @@
 export type ThemeName = 'dark' | 'light' | 'nord' | 'mocha' | 'solarized' | 'dracula' | 'rose-pine' | 'solarized-light' | 'latte' | 'paper' | 'rose-pine-dawn' | 'mint'
 
-export const LIGHT_PALETTES = new Set<ThemeName>(['light', 'solarized-light', 'latte', 'paper', 'rose-pine-dawn', 'mint'])
+const LIGHT_PALETTES = new Set<ThemeName>(['light', 'solarized-light', 'latte', 'paper', 'rose-pine-dawn', 'mint'])
 export function isLightPalette(name: ThemeName): boolean { return LIGHT_PALETTES.has(name) }
 
 export interface Theme {
@@ -61,7 +61,7 @@ export const darkTheme: Theme = {
   transitionBase: transition,
 }
 
-export const lightTheme: Theme = {
+const lightTheme: Theme = {
   bgBase: '#F8FAFC',
   bgMantle: '#F0F9FF',
   bgSurface0: '#E2E8F0',
@@ -87,7 +87,7 @@ export const lightTheme: Theme = {
   transitionBase: transition,
 }
 
-export const nordTheme: Theme = {
+const nordTheme: Theme = {
   bgBase: '#2e3440',
   bgMantle: '#242933',
   bgSurface0: '#3b4252',
@@ -113,7 +113,7 @@ export const nordTheme: Theme = {
   transitionBase: transition,
 }
 
-export const mochaTheme: Theme = {
+const mochaTheme: Theme = {
   bgBase: '#1e1e2e',
   bgMantle: '#181825',
   bgSurface0: '#313244',
@@ -139,7 +139,7 @@ export const mochaTheme: Theme = {
   transitionBase: transition,
 }
 
-export const solarizedTheme: Theme = {
+const solarizedTheme: Theme = {
   bgBase: '#002b36',
   bgMantle: '#00212b',
   bgSurface0: '#073642',
@@ -165,7 +165,7 @@ export const solarizedTheme: Theme = {
   transitionBase: transition,
 }
 
-export const draculaTheme: Theme = {
+const draculaTheme: Theme = {
   bgBase: '#282a36',
   bgMantle: '#191a21',
   bgSurface0: '#44475a',
@@ -191,7 +191,7 @@ export const draculaTheme: Theme = {
   transitionBase: transition,
 }
 
-export const rosePineTheme: Theme = {
+const rosePineTheme: Theme = {
   bgBase: '#191724',
   bgMantle: '#12111a',
   bgSurface0: '#26233a',
@@ -217,7 +217,7 @@ export const rosePineTheme: Theme = {
   transitionBase: transition,
 }
 
-export const solarizedLightTheme: Theme = {
+const solarizedLightTheme: Theme = {
   bgBase: '#fdf6e3',
   bgMantle: '#eee8d5',
   bgSurface0: '#e0d9c5',
@@ -243,7 +243,7 @@ export const solarizedLightTheme: Theme = {
   transitionBase: transition,
 }
 
-export const latteTheme: Theme = {
+const latteTheme: Theme = {
   bgBase: '#eff1f5',
   bgMantle: '#e6e9ef',
   bgSurface0: '#ccd0da',
@@ -269,7 +269,7 @@ export const latteTheme: Theme = {
   transitionBase: transition,
 }
 
-export const paperTheme: Theme = {
+const paperTheme: Theme = {
   bgBase: '#ffffff',
   bgMantle: '#f9f9f7',
   bgSurface0: '#f0ede8',
@@ -295,7 +295,7 @@ export const paperTheme: Theme = {
   transitionBase: transition,
 }
 
-export const rosePineDawnTheme: Theme = {
+const rosePineDawnTheme: Theme = {
   bgBase: '#faf4ed',
   bgMantle: '#f4ede6',  // darker than bgBase — correct direction
   bgSurface0: '#ebe3d9',
@@ -321,7 +321,7 @@ export const rosePineDawnTheme: Theme = {
   transitionBase: transition,
 }
 
-export const mintTheme: Theme = {
+const mintTheme: Theme = {
   bgBase: '#f0faf5',
   bgMantle: '#e8f5ef',
   bgSurface0: '#d4ede0',

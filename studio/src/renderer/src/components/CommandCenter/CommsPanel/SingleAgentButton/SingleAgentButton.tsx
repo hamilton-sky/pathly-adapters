@@ -9,7 +9,7 @@ import { FlowForm } from './FlowForm'
 import { FlowGatePreview } from '../../../shared/FlowGatePreview/FlowGatePreview'
 import s from './SingleAgentButton.module.css'
 
-export type { SingleAgentConfig }
+
 
 interface Props {
   /** Board key: feature id, 'project', or 'global'. */

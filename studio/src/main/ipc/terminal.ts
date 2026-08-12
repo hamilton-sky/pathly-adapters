@@ -261,7 +261,7 @@ async function resolveEngineLauncher(engine: string): Promise<string> {
 // grey out what isn't there and show the command that installs it.
 
 /** Mirrored in preload/index.ts and renderer types/global.d.ts — keep in sync. */
-export interface EnginePreflight {
+interface EnginePreflight {
   engine: string
   /** CliAdapter id the UI keys off ('claude' | 'codex' | 'antigravity'). */
   adapter: string

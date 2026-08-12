@@ -12,7 +12,7 @@ export type StageName =
 export type ChipVariant = 'host' | 'agent' | 'skill'
 
 /** The three things a phase assembles into a prompt. */
-export interface PhaseConfig {
+interface PhaseConfig {
   host: string
   agent: string
   skill: string

@@ -3,10 +3,10 @@ import { useProjectStore } from '../../../store/projectStore'
 import type { FeatureData, PipelineState, TopStat } from '../types'
 import type { TokenSplit, AgentRoleAgg } from '../metricUtils'
 
-export type ScopeMode = 'project' | 'global'
-export type RangeDays = 7 | 14 | 30
+type ScopeMode = 'project' | 'global'
+type RangeDays = 7 | 14 | 30
 
-export interface ChartSummary {
+interface ChartSummary {
   /** Contiguous daily cost, oldest → newest, gap-filled across the range. */
   series: number[]
   startDate: Date

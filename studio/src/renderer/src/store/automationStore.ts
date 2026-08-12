@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { AutomationStep, AutomationStepStatus } from '../types/automation'
 
-export type { AutomationStep, AutomationStepStatus }
+export type {  AutomationStepStatus }
 
 export interface AutomationState {
   steps: AutomationStep[]

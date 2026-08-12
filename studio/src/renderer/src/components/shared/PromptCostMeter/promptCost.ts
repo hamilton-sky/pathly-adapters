@@ -38,7 +38,7 @@ export function estimateTokens(text: string | undefined | null): number {
 }
 
 /** Input $/MTok for an (engine, role) context, defaulting to the claude sonnet rate. */
-export function inputRate(ctx?: PriceCtx): number {
+function inputRate(ctx?: PriceCtx): number {
   const engine = (ctx?.engine ?? '').toLowerCase()
   if (engine === 'codex') return CODEX_IN
   if (engine === 'agy' || engine === 'antigravity' || engine === 'gemini') return GEMINI_IN

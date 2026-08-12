@@ -43,7 +43,7 @@ export interface HistoricalRun {
   cost: number
 }
 
-export interface PhaseSummaryEntry {
+interface PhaseSummaryEntry {
   agent: string
   text: string
   stage: string

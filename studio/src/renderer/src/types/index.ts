@@ -4,7 +4,7 @@ export type PathlyItemType = 'flow' | 'skill' | 'agent' | 'template' | 'debug' |
 export type PathlySection = 'skills' | 'agents' | 'flows' | 'templates'
 
 // A node in the filesystem tree (file or category folder)
-export interface PathlyTreeNode {
+interface PathlyTreeNode {
   name: string
   type: 'file' | 'folder'
   path: string[]
@@ -22,7 +22,7 @@ export interface PathlyCanvasDragItem {
 }
 
 // Drag payload for tree reorg (from row body — all file/folder items)
-export interface PathlyReorgDragItem {
+interface PathlyReorgDragItem {
   dragType: 'reorg'
   name: string
   section: PathlySection
@@ -32,14 +32,14 @@ export interface PathlyReorgDragItem {
 }
 
 // Drag payload for moving an entire folder between workspace sections
-export interface PathlyFolderDragItem {
+interface PathlyFolderDragItem {
   dragType: 'reorg-folder'
   name: string
   sourcePath: string  // absolute path of the folder
   sectionDir: string  // absolute path of the source section dir
 }
 
-export type PathlyDragItem = PathlyCanvasDragItem | PathlyReorgDragItem | PathlyFolderDragItem
+type PathlyDragItem = PathlyCanvasDragItem | PathlyReorgDragItem | PathlyFolderDragItem
 
 // MIME key used for both drag types — differentiated by dragType field in payload
 export const PATHLY_DRAG_MIME = 'application/pathly-drag-item'
@@ -144,7 +144,7 @@ export interface FsmEvent {
   [key: string]: unknown
 }
 
-export interface SkillFrontmatter {
+interface SkillFrontmatter {
   type: 'skill'
   name?: string
   description?: string
@@ -152,7 +152,7 @@ export interface SkillFrontmatter {
   tools?: string[]
 }
 
-export interface AgentFrontmatter {
+interface AgentFrontmatter {
   type: 'agent'
   name?: string
   description?: string
@@ -160,7 +160,7 @@ export interface AgentFrontmatter {
   model?: string
 }
 
-export interface TemplateFrontmatter {
+interface TemplateFrontmatter {
   type: 'template'
   name?: string
   category?: string

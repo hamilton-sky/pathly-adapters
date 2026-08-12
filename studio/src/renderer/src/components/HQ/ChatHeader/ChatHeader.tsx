@@ -6,7 +6,7 @@ import { TERMINAL_OPTIONS } from '../../../lib/terminalOptions'
 import { Timestamp } from '../../Timestamp/Timestamp'
 import styles from './ChatHeader.module.css'
 
-export interface SessionSummary {
+interface SessionSummary {
   id: string
   title: string
   messageCount: number

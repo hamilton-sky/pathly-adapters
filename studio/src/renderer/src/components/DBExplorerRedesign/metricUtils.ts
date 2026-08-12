@@ -21,7 +21,7 @@ export interface MetricInputs {
   agentRoles: AgentRoleAgg[] | null
 }
 
-export interface MetricSegment {
+interface MetricSegment {
   label: string
   /** Theme-token color string, e.g. "var(--state-done)". */
   color: string
@@ -124,7 +124,7 @@ export function computeMetric(key: MetricKey, inputs: MetricInputs): MetricResul
 }
 
 /** Builds the conic-gradient string + legend rows from a metric result. */
-export function toDonut(m: MetricResult): {
+function toDonut(m: MetricResult): {
   gradient: string
   legend: { label: string; color: string; value: string; pct: string }[]
 } {

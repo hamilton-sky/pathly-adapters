@@ -3,7 +3,7 @@
 // agent_map) so the launcher can preview a flow without a backend round-trip.
 // There is no flow-list endpoint yet — keep this in sync if the YAML changes.
 
-export interface FlowNode {
+interface FlowNode {
   /** FSM state name (e.g. BUILDING). */
   state: string
   /** Human role from the flow's role_map (e.g. builder). */
@@ -15,7 +15,7 @@ export interface FlowNode {
 }
 
 /** A labelled paragraph in a flow's collapsible "About this flow" section. */
-export interface FlowDetail {
+interface FlowDetail {
   label: string
   text: string
 }

@@ -15,9 +15,9 @@ const SEQ_RESERVED = ['note', 'over', 'loop', 'alt', 'opt', 'par', 'and', 'end',
 // Null-byte sentinel for masking label spans — never present in real diagram source.
 const SENT = String.fromCharCode(0)
 
-export type MermaidType = 'flowchart' | 'sequence' | 'mindmap' | 'other'
+type MermaidType = 'flowchart' | 'sequence' | 'mindmap' | 'other'
 
-export function detectMermaidType(src: string): MermaidType {
+function detectMermaidType(src: string): MermaidType {
   const first = (src.trimStart().split('\n')[0] || '').trim().toLowerCase()
   if (first.startsWith('flowchart') || first.startsWith('graph')) return 'flowchart'
   if (first.startsWith('sequencediagram')) return 'sequence'

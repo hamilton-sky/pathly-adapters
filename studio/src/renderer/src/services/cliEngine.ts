@@ -51,7 +51,7 @@ export interface SpawnOpts {
  * starting with '--' is parsed as an unknown option ("error: unknown option '---...'").
  * Mirrors the Python _dash_safe_prompt in src/pathly_orchestrator/adapters.py.
  */
-export function dashSafePrompt(prompt: string): string {
+function dashSafePrompt(prompt: string): string {
   let s = prompt.replace(/^\s+/, '')
   const m = s.match(/^---[ \t]*\n[\s\S]*?\n---[ \t]*\n/)
   if (m) s = s.slice(m[0].length).replace(/^\s+/, '')
@@ -122,7 +122,7 @@ export function buildHeadlessArgv(adapter: CliAdapter, promptRaw: string, opts: 
 }
 
 /** Build argv for an interactive REPL session (no -p, no --print). */
-export function buildInteractiveArgv(adapter: CliAdapter, opts: SpawnOpts = {}): string[] {
+function buildInteractiveArgv(adapter: CliAdapter, opts: SpawnOpts = {}): string[] {
   const { model, session, autonomy = true } = opts
 
   if (adapter === 'claude') {
@@ -144,6 +144,6 @@ export function buildInteractiveArgv(adapter: CliAdapter, opts: SpawnOpts = {}):
 }
 
 /** Human-readable label for an adapter. */
-export function adapterLabel(adapter: CliAdapter): string {
+function adapterLabel(adapter: CliAdapter): string {
   return ADAPTER_META.find((m) => m.id === adapter)?.label ?? adapter
 }

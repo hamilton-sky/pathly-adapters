@@ -6,9 +6,9 @@ import { AI_SELECTION_OFF, isOff, type AiSelection } from '../../../services/aiR
 // AiSelection ↔ option-value mapping ('model:<id>' | 'engine:<id>' | 'off') and
 // builds the grouped Models / CLI-Engines rows the custom dropdown renders.
 
-export const OFF_VALUE = 'off'
+const OFF_VALUE = 'off'
 
-export interface AiOption {
+interface AiOption {
   value: string
   label: string
   /** Present when the row is selectable but disabled — the greyed reason text. */

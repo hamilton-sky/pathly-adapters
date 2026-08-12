@@ -1,16 +1,16 @@
 // Monitor — public barrel. Import the board and (optionally) the pieces / types.
 export { MonitorBoard } from './MonitorBoard/MonitorBoard'
-export { CategoryFilterBar } from './CategoryFilterBar/CategoryFilterBar'
-export type { CategoryFilter } from './CategoryFilterBar/CategoryFilterBar'
-export { EngineSection } from './EngineSection/EngineSection'
-export { EngineCard } from './EngineCard/EngineCard'
-export { EngineDetailModal } from './EngineDetailModal/EngineDetailModal'
-export { EngineControls } from './EngineControls/EngineControls'
-export { controlsForEngine } from './EngineControls/controlsForEngine'
-export type { EngineControl } from './EngineControls/controlsForEngine'
-export { CategoryBadge } from './CategoryBadge/CategoryBadge'
+
+
+
+
+
+
+
+
+
 export { AdapterBadge } from './AdapterBadge/AdapterBadge'
 export { StagePill } from './StagePill/StagePill'
-export { StatusDot } from './StatusDot/StatusDot'
+
 export * from './constants'
 export * from './types'

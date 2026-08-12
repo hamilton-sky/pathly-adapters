@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { ChevronDown, Check } from 'lucide-react'
 import styles from './GoalSelect.module.css'
 
-export interface GoalSelectOption {
+interface GoalSelectOption {
   value: string
   label: string
   hint?: string

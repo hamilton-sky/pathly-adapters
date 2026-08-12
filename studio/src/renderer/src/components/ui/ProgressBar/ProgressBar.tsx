@@ -13,7 +13,7 @@ interface ProgressBarProps {
   className?: string
 }
 
-export function ProgressBar({ value, max = 100, color = 'var(--accent)', height = 6, label, className }: ProgressBarProps) {
+function ProgressBar({ value, max = 100, color = 'var(--accent)', height = 6, label, className }: ProgressBarProps) {
   const pct = Math.max(0, Math.min(100, (value / max) * 100))
   return (
     <div className={clsx(styles.wrap, className)}>

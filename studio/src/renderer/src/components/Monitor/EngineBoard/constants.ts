@@ -19,7 +19,7 @@ export const CATEGORY_META: CategoryMeta[] = [
   { key: 'single', label: 'Single shots', blurb: 'one-shot editor & board actions',  color: 'var(--runtime)' },
 ]
 
-export function categoryColor(cat: EngineCategory): string {
+function categoryColor(cat: EngineCategory): string {
   return CATEGORY_META.find((c) => c.key === cat)?.color ?? 'var(--text-muted)'
 }
 

@@ -23,7 +23,7 @@ const INITIAL: CommandCenterState = {
   sizes: {},
 }
 
-export interface CommandCenterActions {
+interface CommandCenterActions {
   applyPreset: (preset: 'board' | 'pipeline' | 'focus') => void
   toggleSection: (scope: 'project' | 'global') => void
   addFeatureSection: (featureId: string) => void

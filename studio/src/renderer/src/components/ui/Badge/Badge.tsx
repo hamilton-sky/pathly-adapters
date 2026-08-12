@@ -1,7 +1,7 @@
 import clsx from 'clsx'
 import styles from './Badge.module.css'
 
-export type BadgeVariant = 'core' | 'flow' | 'integration' | 'body' | 'neutral'
+type BadgeVariant = 'core' | 'flow' | 'integration' | 'body' | 'neutral'
 
 interface BadgeProps {
   label?: React.ReactNode
@@ -12,7 +12,7 @@ interface BadgeProps {
   className?: string
 }
 
-export function Badge({ label, children, variant = 'neutral', color, className }: BadgeProps) {
+function Badge({ label, children, variant = 'neutral', color, className }: BadgeProps) {
   const style = color ? { '--badge-color': color } as React.CSSProperties : undefined
   return (
     <span

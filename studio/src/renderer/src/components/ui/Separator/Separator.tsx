@@ -4,7 +4,7 @@ interface SeparatorProps {
   label?: string
 }
 
-export function Separator({ label }: SeparatorProps): JSX.Element {
+function Separator({ label }: SeparatorProps): JSX.Element {
   if (!label) {
     return <div className={styles.bare} />
   }

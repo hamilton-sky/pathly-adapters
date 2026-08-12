@@ -1,6 +1,6 @@
 import { BrowserWindow } from 'electron'
 
-export type StepType = 'click' | 'fill' | 'select' | 'navigate'
+type StepType = 'click' | 'fill' | 'select' | 'navigate'
 
 export interface AutomationStep {
   type: StepType

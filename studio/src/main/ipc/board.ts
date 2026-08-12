@@ -1,7 +1,7 @@
 import { ipcMain, BrowserWindow, app } from 'electron'
 import { join } from 'path'
 
-export interface BoardPopoutOpts {
+interface BoardPopoutOpts {
   scope: 'feature' | 'project' | 'global'
   /** Feature id for a feature board; the active main-feature for project/global. */
   feature: string

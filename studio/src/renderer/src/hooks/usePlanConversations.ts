@@ -65,7 +65,7 @@ export function parseProgressMd(md: string): ConvRow[] {
   return rows
 }
 
-export function usePlanConversations(topicOverride?: string | null): { planConvs: ConvRow[] } {
+function usePlanConversations(topicOverride?: string | null): { planConvs: ConvRow[] } {
   const { projectPath, activeTopic, events } = useStore()
   const topic = topicOverride ?? activeTopic
   const [planConvs, setPlanConvs] = useState<ConvRow[]>([])

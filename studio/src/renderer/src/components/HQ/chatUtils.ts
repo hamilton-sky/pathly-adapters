@@ -1,6 +1,6 @@
 import type { buildPathlyContext } from '../../lib/pathlyContext'
 
-export function stripAnsi(raw: string): string {
+function stripAnsi(raw: string): string {
   return raw
     // OSC sequences: ESC ] ... BEL or ST
     .replace(/\x1b\][\s\S]*?(?:\x07|\x1b\\)/g, '')
@@ -17,7 +17,7 @@ export function stripAnsi(raw: string): string {
 }
 
 /** Returns true for noisy progress/spinner lines that should not appear in the snippet */
-export function isNoisyLine(line: string): boolean {
+function isNoisyLine(line: string): boolean {
   if (line.length <= 2) return true
   if (/^Working\s*\(/.test(line)) return true
   if (/^[-─-╿\s]+$/.test(line)) return true

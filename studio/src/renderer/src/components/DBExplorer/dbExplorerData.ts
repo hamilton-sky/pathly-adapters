@@ -6,12 +6,12 @@ export type PipelineState =
   | 'RETRO'
   | 'DONE'
 
-export interface DotSegment {
+interface DotSegment {
   state: PipelineState
   flex?: number
 }
 
-export interface FeatureData {
+interface FeatureData {
   name: string
   state: PipelineState
   events: number
@@ -29,21 +29,21 @@ export interface TransitionData {
   duration: string
 }
 
-export interface AgentData {
+interface AgentData {
   role: string
   conv: string
   stateColor: string
   costFraction: number
 }
 
-export interface EventData {
+interface EventData {
   time: string
   type: string
   detail: string
   dotColor: string
 }
 
-export const FEATURES: FeatureData[] = [
+const FEATURES: FeatureData[] = [
   {
     name: 'fsm-sqlite',
     state: 'DONE',
@@ -145,7 +145,7 @@ export const FEATURES: FeatureData[] = [
   },
 ]
 
-export const TRANSITIONS: TransitionData[] = [
+const TRANSITIONS: TransitionData[] = [
   { state: 'PLANNING', time: '09:02:11', duration: '6m 29s' },
   { state: 'BUILDING', time: '09:08:40', duration: '12m 26s' },
   { state: 'REVIEWING', time: '09:21:06', duration: '6m 27s' },
@@ -157,7 +157,7 @@ export const TRANSITIONS: TransitionData[] = [
   { state: 'DONE', time: '10:06:05', duration: '—' },
 ]
 
-export const AGENTS: AgentData[] = [
+const AGENTS: AgentData[] = [
   { role: 'builder', conv: 'conv 1', stateColor: 'var(--state-building)', costFraction: 0.39 },
   { role: 'reviewer', conv: 'conv 1', stateColor: 'var(--state-reviewing)', costFraction: 0.71 },
   { role: 'builder', conv: 'conv 2', stateColor: 'var(--state-building)', costFraction: 0.42 },
@@ -168,7 +168,7 @@ export const AGENTS: AgentData[] = [
   { role: 'reviewer', conv: 'conv 3', stateColor: 'var(--state-reviewing)', costFraction: 0.58 },
 ]
 
-export const EVENTS: EventData[] = [
+const EVENTS: EventData[] = [
   { time: '09:02:11', type: 'STAGE_ENTER', detail: 'PLANNING', dotColor: 'var(--state-building)' },
   { time: '09:08:40', type: 'AGENT_DONE', detail: 'builder · $0.39', dotColor: 'var(--state-done)' },
   { time: '09:21:06', type: 'STAGE_ENTER', detail: 'REVIEWING', dotColor: 'var(--state-reviewing)' },

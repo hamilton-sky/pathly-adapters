@@ -14,18 +14,13 @@
 
 export {
   MODEL_CATALOG,
-  getModelById,
+  
   RECOMMENDED_MODEL_ID,
   BRIGHTSKY_ID,
 } from './catalog'
-export type { Model } from './catalog'
+
 
 export { runModel } from './runModel'
-export type { RunResult } from './runModel'
 
-export {
-  isGgufAvailable,
-  ollamaStatus,
-  cachedGgufIds,
-  isBrightskyAuthenticated,
-} from './availability'
+
+

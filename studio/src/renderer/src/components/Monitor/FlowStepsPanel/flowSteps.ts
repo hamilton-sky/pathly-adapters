@@ -1,6 +1,6 @@
 import type { FsmState, FsmEvent } from '../../../types'
 
-export type StepStatus = 'completed' | 'active' | 'active-retry' | 'pending'
+type StepStatus = 'completed' | 'active' | 'active-retry' | 'pending'
 
 export interface FlowStep {
   state: string

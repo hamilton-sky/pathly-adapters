@@ -13,7 +13,7 @@ interface ContextMenuProps {
   onClose: () => void
 }
 
-export function ContextMenu({ items, position, onClose }: ContextMenuProps): JSX.Element {
+function ContextMenu({ items, position, onClose }: ContextMenuProps): JSX.Element {
   const ref = useRef<HTMLDivElement>(null)
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([])
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
