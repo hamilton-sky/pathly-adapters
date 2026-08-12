@@ -282,7 +282,7 @@ see [github.com/hamilton-sky/pathly](https://github.com/hamilton-sky/pathly) —
 
 ## Release Status
 
-Current version: **2.24.0**. Four adapters ship: Claude Code, Codex, Copilot,
+Current version: **2.24.1**. Four adapters ship: Claude Code, Codex, Copilot,
 and Antigravity. Core install path (`--dry-run`, `--apply`, `--uninstall`) is
 verified with full rollback on failure. Copilot destination paths follow the VS
 Code Copilot agent spec and may require `--repair` after a VS Code update.
