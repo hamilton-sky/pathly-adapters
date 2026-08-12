@@ -37,7 +37,9 @@ target-version = ["py311"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
+# "src" so pathly_* import; "." (repo root) so `from tests._paths import …` resolves under
+# bare `pytest` (CI). Without the repo root, only `python -m pytest` (which prepends CWD) works.
+pythonpath = ["src", "."]
 addopts = ["-p", "no:cacheprovider"]
 markers = [
     "slow: marks tests as slow (E2E installs)",
