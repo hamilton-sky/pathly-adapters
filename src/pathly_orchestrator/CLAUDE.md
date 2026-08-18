@@ -338,6 +338,22 @@ pathly_orchestrator/
 - `http_server/` — may import all; supervisor/db imports inside route handlers (lazy)
 - Each package's `__init__.py` re-exports all symbols for backward compatibility
 
+**Modules split under the 400-line ratchet (2026-08-18) — import paths unchanged.** Each keeps its
+original name as the entry point and re-exports every symbol its callers and the test-suite already
+import, so no call site moved:
+
+| Entry point | Now delegates to |
+|---|---|
+| `fsm_compose.py` (298) — keeps `build_prompt` / `build_prompt_for_agent` / `_load_agent_text` | `fsm_compose_tables` (lookup tables) · `fsm_compose_vars` (`_inject_prompt_vars` + its inputs) · `fsm_compose_paths` (`resolve_stage_out_path`, `resolve_board_scope`) · `fsm_compose_stage` (section drops, stage overrides, adapter choice) · `fsm_compose_hints` (`_agent_hint`) |
+| `skills/compose.py` (197) — keeps the resolver | `compose_base` (constants + `_strip_leading_frontmatter`) · `compose_resources` (manifest/skill/fragment I/O) · `compose_caps` · `compose_segments` · `compose_validate` |
+| `supervisor/terminal.py` (390) — keeps the spawn | `terminal_argv` · `terminal_identity` · `terminal_reconcile` · `terminal_billing` · `terminal_phase` |
+
+Two constraints govern what may leave these files, and both are load-bearing:
+`fsm_compose._load_agent_text` and `supervisor.terminal._reconciliation_window` are **monkeypatched
+in those namespaces by tests**, so the functions that call them must stay in the same module and
+call them as bare names. `fsm_compose.py` also still loads `fsm_compose_responses` at the BOTTOM of
+the file — that ordering is what keeps its back-reference from becoming a cycle.
+
 ## Visible runner (supervisor/)
 
 `supervisor/` drives the pipeline by polling `/next_action` and calling `/complete_stage`. Every agent invocation goes through a visible terminal — there is no headless fallback.
@@ -373,7 +389,7 @@ Two sanitization sites:
 | Site | Function | Trigger |
 |---|---|---|
 | `adapters.py` `resolve_command` | `_dash_safe_prompt(prompt)` | every headless argv build |
-| `skills/compose.py` (in `compose_skill` / `compose_skill_with_block`) | `_strip_leading_frontmatter(text)` | composed/skill path |
+| `skills/compose_base.py` (used by `compose_skill` / `compose_skill_with_block`) | `_strip_leading_frontmatter(text)` | composed/skill path |
 
 `_dash_safe_prompt` (in `adapters.py`): strips a leading YAML-frontmatter block (`---…---`)
 and then any remaining leading horizontal-rule lines, so the sanitized prompt is guaranteed
