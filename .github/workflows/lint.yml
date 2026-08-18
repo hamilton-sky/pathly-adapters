@@ -50,6 +50,9 @@ jobs:
       - name: No un-sanctioned mirror reads (state-one-authority)
         run: python scripts/check_no_mirror_reads.py
 
+      - name: 400-line SOLID rule (ratchet — no new or growing oversized files)
+        run: python scripts/check_file_size.py
+
   security:
     runs-on: ubuntu-latest
     steps:

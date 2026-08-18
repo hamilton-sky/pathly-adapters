@@ -1,4 +1,15 @@
-"""Terminal stage execution: spawn, watcher, reconciliation."""
+"""Terminal stage execution — spawn a CLI for one stage and return its result.
+
+This module owns the SPAWN. Its neighbours own what happens around it:
+  * ``terminal_identity``  — the run-identity row opened/settled per spawn
+  * ``terminal_reconcile`` — early-advance AGENT_DONE detection + billing reconciliation
+  * ``terminal_billing``   — per-spawn otel span + PTY-result cost patch
+  * ``terminal_phase``     — supervisor-authored phase summaries
+
+The names below are re-exported deliberately: ``supervisor/__init__`` and the test-suite import
+them from ``supervisor.terminal``, and ``_reconciliation_window`` is monkeypatched in THIS
+module's namespace — so it must be called as a bare name here, never via its defining module.
+"""
 
 from __future__ import annotations
 
@@ -11,12 +22,34 @@ from pathly_orchestrator import eventlog as _eventlog
 from .state import RunnerState, logger
 from .registry import (
     _lock,
-    TerminalRun,
     create_run,
     drop_run,
-    _cleanup_run_id,
     _TERMINAL_RESULT_TIMEOUT,
 )
+from .terminal_identity import (
+    _record_spawn_identity,
+    _record_spawn_prompt,
+    _settle_spawn_identity,
+    _run_board_scope,
+)
+from .terminal_reconcile import (
+    _agent_done_watcher,
+    _reconciliation_window,
+    _synthesize_agent_done_if_missing,
+)
+from .terminal_argv import _resolve_spawn_argv
+from .terminal_billing import _emit_executor_telemetry, _reconcile_billing_now
+from .terminal_phase import _write_supervisor_phase_summary
+
+__all__ = [
+    "_run_stage_via_terminal",
+    "_agent_done_watcher",
+    "_reconciliation_window",
+    "_synthesize_agent_done_if_missing",
+    "_write_supervisor_phase_summary",
+    "_record_spawn_identity",
+    "_run_board_scope",
+]
 
 
 def _pty_return(data: dict) -> dict:
@@ -34,370 +67,6 @@ def _pty_return(data: dict) -> dict:
     return result
 
 
-def _write_supervisor_phase_summary(
-    *,
-    project_root: str,
-    topic: str,
-    stage: str,
-    agent: str,
-    text: str,
-    broadcast_fn=None,
-) -> None:
-    """Write a PHASE_SUMMARY event to the feature's SQLite DB and broadcast to Studio via SSE."""
-    import time as _time
-
-    if not project_root or not topic:
-        return
-    try:
-        from pathly_orchestrator import db as _db
-        from pathly_orchestrator.fsm_ops import _load_flow, _resolve_storage_path
-
-        try:
-            flow_config = _load_flow("team")
-            feature_dir = _resolve_storage_path(flow_config, project_root, topic)
-        except Exception:
-            feature_dir = Path(project_root) / "pathly" / "features" / topic
-        if not feature_dir.exists():
-            return
-        conn = _db.get_db()
-        phase = stage.lower().replace("-", "_") if stage else ""
-        event: dict = {
-            "schema_version": 1,
-            "type": "PHASE_SUMMARY",
-            "feature": topic,
-            "agent": agent,
-            "text": text,
-            "ts": _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime()),
-        }
-        if phase:
-            event["phase"] = phase
-        _db.append_event(conn, project_root, topic, event)
-        # Broadcast to Studio so live log cards update in headless mode
-        if broadcast_fn:
-            try:
-                broadcast_fn(topic, event)
-            except Exception:
-                pass
-    except Exception:
-        logger.debug("_write_supervisor_phase_summary failed", exc_info=True)
-
-
-def _agent_done_watcher(
-    run: TerminalRun,
-    feature_dir: Path,
-    feature: str,
-    last_seq: int,
-) -> None:
-    """Poll SQLite fsm_events for AGENT_DONE; call run.mark_agent_done() on first match.
-
-    Runs as a daemon thread when feature_flags.early_advance is True.
-    Stops when run.request_stop_watcher() is called or after _TERMINAL_RESULT_TIMEOUT seconds.
-    The caller passes the TerminalRun object directly so the watcher keeps a live
-    reference even if drop_run() removes it from the registry.
-    """
-    from pathly_orchestrator import db as _db
-
-    try:
-        conn = _db.get_db()
-    except Exception as exc:
-        logger.warning("_agent_done_watcher: cannot open DB for %s: %s", feature, exc)
-        return
-
-    project_root = str(feature_dir.parent.parent.parent)
-    _POLL = 0.15
-    elapsed = 0.0
-    seq = last_seq
-
-    while elapsed < _TERMINAL_RESULT_TIMEOUT:
-        if run.stop_watcher:
-            return
-        try:
-            rows = _db.read_events(conn, project_root, feature, since_seq=seq)
-        except Exception:
-            rows = []
-        for row in rows:
-            if row.get("seq", 0) > seq:
-                seq = row["seq"]
-            if row.get("type") == "AGENT_DONE":
-                run.mark_agent_done()
-                return
-        run.wait_watcher_stop_signal(_POLL)
-        elapsed += _POLL
-
-
-def _record_spawn_identity(
-    state: RunnerState, run_id: str, adapter: str
-) -> Optional[tuple]:
-    """run-identity: issue this spawn's identity row up front — run_id → (project_root,
-    feature SLUG, board_scope) — at the ONE chokepoint every runner/board/goal spawn
-    flows through, so telemetry consumers join by run_id instead of re-deriving identity
-    from storage location. Returns (slug, board_scope) for _settle_spawn_identity, or
-    None when the write was skipped. Best-effort; never blocks a spawn.
-    """
-    try:
-        from pathly_orchestrator.db.connection import get_db
-        from pathly_orchestrator.db.queries.run_history import upsert_run
-        from pathly_orchestrator.fsm_ops import _resolve_storage_path
-
-        storage = (
-            Path(state.storage_path)
-            if state.storage_path
-            else _resolve_storage_path(None, state.project_root, state.topic)
-        )
-        slug = storage.name
-        scope = _run_board_scope(state, storage)
-        upsert_run(
-            get_db(),
-            state.project_root,
-            slug,
-            run_id,
-            "running",
-            adapter=adapter or None,
-            board_scope=scope or None,
-        )
-        return (slug, scope)
-    except Exception:
-        logger.debug("_record_spawn_identity skipped", exc_info=True)
-        return None
-
-
-def _settle_spawn_identity(
-    state: RunnerState, run_id: str, identity: Optional[tuple]
-) -> None:
-    """Settle the spawn's identity row when the spawn ends: done, or error when the
-    stage is unwinding an exception (read via sys.exc_info() — this runs inside the
-    caller's finally). Identity fields COALESCE in upsert_run, so this never
-    overwrites the issued board_scope. Best-effort.
-    """
-    if not identity:
-        return
-    try:
-        import sys as _sys
-        import time as _time
-
-        from pathly_orchestrator.db.connection import get_db
-        from pathly_orchestrator.db.queries.run_history import upsert_run
-
-        slug, scope = identity
-        status = "error" if _sys.exc_info()[0] else "done"
-        upsert_run(
-            get_db(),
-            state.project_root,
-            slug,
-            run_id,
-            status,
-            finished_at=_time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime()),
-            board_scope=scope or None,
-        )
-    except Exception:
-        logger.debug("_settle_spawn_identity skipped", exc_info=True)
-
-
-def _run_board_scope(state: RunnerState, storage: Optional[Path]) -> str:
-    """The board scope for THIS run's telemetry stamps (run-identity).
-
-    Prefer the identity ISSUED at spawn (state.board_scope — the board/loop executors
-    set it); fall back to deriving it exactly as build_prompt does (plain feature →
-    the storage-dir basename; 'project' → normalized project_root; goal runs → the
-    goal's parent board scope). Best-effort: '' when nothing resolves (stored as NULL).
-    """
-    if getattr(state, "board_scope", ""):
-        return state.board_scope
-    try:
-        from pathly_orchestrator.fsm_compose import resolve_board_scope
-
-        feature = storage.name if storage is not None else (state.topic or "")
-        return resolve_board_scope(feature, state.project_root, state.goal_id or "")
-    except Exception:
-        return ""
-
-
-def _reconciliation_window(
-    run: TerminalRun,
-    stage: str,
-    topic: str,
-    events_path: str,
-    timeout: float = 600,
-    model: str = "",
-    board_scope: str = "",
-) -> None:
-    """Wait up to `timeout` seconds for PTY billing POST after early FSM advance.
-
-    If billing data arrives: patch last AGENT_DONE via _patch_last_agent_done.
-    If timeout: write TYPE_STAGE_RECONCILIATION_FAILURE to EVENTS.jsonl.
-    Always drops the run from the registry.
-    """
-    import datetime
-    from pathly_orchestrator.events import TYPE_STAGE_RECONCILIATION_FAILURE
-    from pathly_orchestrator.runner import _patch_last_agent_done
-
-    arrived = run.wait_pty_result(timeout=timeout)
-
-    now_ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    try:
-        if arrived:
-            data = run.pty_result or {}
-            billing_record = data.get("result") or {}
-            cost_usd = float(
-                (billing_record.get("cost_usd") or 0.0)
-                if isinstance(billing_record, dict)
-                else 0.0
-            )
-            tokens_in = int(
-                (billing_record.get("tokens_in") or 0)
-                if isinstance(billing_record, dict)
-                else 0
-            )
-            tokens_out = int(
-                (billing_record.get("tokens_out") or 0)
-                if isinstance(billing_record, dict)
-                else 0
-            )
-            tool_uses = int(
-                (billing_record.get("tool_uses") or 0)
-                if isinstance(billing_record, dict)
-                else 0
-            )
-            wall_seconds = int(data.get("wall_seconds") or 0)
-            try:
-                _patch_last_agent_done(
-                    Path(events_path).parent,
-                    cost_usd,
-                    tokens_in,
-                    tokens_out,
-                    wall_seconds,
-                    tool_uses,
-                    model=model,
-                    run_id=run.run_id,
-                    board_scope=board_scope,
-                )
-            except Exception as exc:
-                logger.warning(
-                    "_reconciliation_window: _patch_last_agent_done failed: %s", exc
-                )
-            # Reconcile the executor invocation written provisionally at AGENT_DONE
-            # (cost=0 / tokens=0 — the CLI billing wasn't known yet) with the real
-            # figures now that the PTY billing has arrived. Without this the rollups
-            # show cost/tokens=0 for every early-advance (loop/single/board) agent.
-            try:
-                from pathly_orchestrator.db.connection import get_db
-                from pathly_orchestrator.db.queries.invocations import (
-                    update_invocation_billing,
-                )
-
-                billed_cost, billed_source = cost_usd, (
-                    "provider_reported" if cost_usd > 0 else "unpriced"
-                )
-                if cost_usd == 0 and (tokens_in + tokens_out) > 0 and model:
-                    from pathly_orchestrator.db.pricing import estimate_cost
-
-                    est_cost, est_source = estimate_cost(model, tokens_in, tokens_out)
-                    if est_source == "estimated":
-                        billed_cost, billed_source = est_cost, est_source
-
-                update_invocation_billing(
-                    get_db(),
-                    run.run_id,
-                    cost_usd=billed_cost,
-                    tokens_in=tokens_in,
-                    tokens_out=tokens_out,
-                    cost_source=billed_source,
-                    provider=model or None,
-                )
-            except Exception as exc:
-                logger.debug(
-                    "_reconciliation_window: invocation billing update skipped: %s", exc
-                )
-        else:
-            try:
-                _eventlog.append_event(
-                    str(Path(events_path).parent),
-                    {
-                        "type": TYPE_STAGE_RECONCILIATION_FAILURE,
-                        "topic": topic,
-                        "stage": stage,
-                        "run_id": run.run_id,
-                        "exit_code": -1,
-                        "ts": now_ts,
-                    },
-                )
-            except Exception as exc:
-                logger.warning("_reconciliation_window: failed to write event: %s", exc)
-    finally:
-        drop_run(run.run_id)
-
-
-def _synthesize_agent_done_if_missing(
-    state: RunnerState, run_id: str, model: str, data: Optional[dict]
-) -> None:
-    """Safety net: give an executor-owned run (board/single/loop) a telemetry row even when
-    its agent wrote NO AGENT_DONE. The invocation projection is keyed on AGENT_DONE, so a run
-    that self-reports none has no row — it never appears in the Monitor's RECENT list and its
-    cost is unbilled (the board evaluator/consolidate were exactly this before they got
-    completion-report). When a real AGENT_DONE for THIS run_id already exists, do nothing (the
-    agent self-reported — never overwrite its identity or figures). Otherwise write a synthetic
-    AGENT_DONE carrying the PTY billing, keyed by run_id + board_scope (run-identity: the
-    spawner knows both), so the projector creates a fully-identified invocation and the
-    reconciliation BILLING_UPDATE folds onto IT — not a stale same-feature AGENT_DONE. Runs
-    BEFORE _reconcile_billing_now so _patch_last_agent_done sees this as the last event.
-    Best-effort; never raises into the loop.
-    """
-    if not getattr(state, "executor_owned_telemetry", False):
-        return
-    try:
-        import time as _time
-
-        from pathly_orchestrator.fsm_ops import _resolve_storage_path
-        from pathly_orchestrator.runner import read_last_agent_done as _read_last
-
-        storage = (
-            Path(state.storage_path)
-            if state.storage_path
-            else _resolve_storage_path(None, state.project_root, state.topic)
-        )
-        last = _read_last(storage)
-        if last and last.get("run_id") == run_id:
-            return  # the agent self-reported this run — nothing to synthesize
-        billing = (data or {}).get("result") or {}
-        if not isinstance(billing, dict):
-            billing = {}
-        tin = int(billing.get("tokens_in") or 0)
-        tout = int(billing.get("tokens_out") or 0)
-        event = {
-            "type": "AGENT_DONE",
-            "agent": state.current_state or "agent",
-            "model": model or None,
-            "run_id": run_id,
-            # run-identity: the board scope issued at spawn (NULL only when unresolvable).
-            "board_scope": _run_board_scope(state, storage) or None,
-            # Executor-owned run TYPE for the Monitor's RECENT bucketing (goal-loop → loop,
-            # board/single runs → single) — mirrors the completion-report <run_category>.
-            "category": (
-                "loop" if (state.flow or "").lower() == "goal-loop" else "single"
-            ),
-            "conversation": 0,
-            "result": "DONE",
-            "outcome": "success",
-            "summary": str(billing.get("summary") or "")[:2000],
-            "cost_usd": float(billing.get("cost_usd") or 0.0),
-            "tokens_in": tin,
-            "tokens_out": tout,
-            "total_tokens": tin + tout,
-            "wall_seconds": int((data or {}).get("wall_seconds") or 0),
-            "tool_uses": int(billing.get("tool_uses") or 0),
-            "ts": _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime()),
-            "schema_version": 1,
-            "synthetic": True,
-        }
-        _eventlog.append_event(str(storage), event)
-        logger.info(
-            "synthesized AGENT_DONE for executor run %s (agent wrote none)",
-            run_id[:8],
-        )
-    except Exception as exc:
-        logger.debug("_synthesize_agent_done_if_missing skipped: %s", exc)
-
-
 def _run_stage_via_terminal(
     state: RunnerState,
     instructions: str,
@@ -411,11 +80,7 @@ def _run_stage_via_terminal(
     import datetime
     from pathly_orchestrator.events import TYPE_STAGE_INTERACTIVE_DONE
     from pathly_orchestrator.feature_flags import FeatureFlags
-    from pathly_orchestrator.runner import (
-        resolve_argv,
-        resolve_interactive_argv,
-        read_last_agent_done,
-    )
+    from pathly_orchestrator.runner import read_last_agent_done
 
     feature_flags = FeatureFlags()
     # Thread run_id into the prompt so the completion-report AGENT_DONE carries it. The gate's
@@ -427,48 +92,18 @@ def _run_stage_via_terminal(
     # run-identity: one identity row per spawn (FSM stages, loop tasks, board runs all
     # pass through here with their own run_id); settled done/error in the finally below.
     _spawn_identity = _record_spawn_identity(state, run_id, adapter)
-    # unified-control-plane P0: persist this spawn's prompt for the Complete Run Record.
-    # Best-effort — MUST NOT raise into the spawn path (this is what keeps the P0
-    # "pure-additive, zero-behavior-change" claim true; mirrors the _record_spawn_identity
-    # guard just above). The injected board context is embedded in `instructions` in P0
-    # (board_context_injected becomes discrete in P1 — see ARCHITECTURE §2.3).
-    try:
-        from pathly_orchestrator.db.connection import get_db as _rl_db
-        from pathly_orchestrator.db.queries.run_log import write_run_log_spawn
-
-        write_run_log_spawn(
-            _rl_db(),
-            run_id,
-            stage=state.current_state or state.status or "stage",
-            prompt_sent=instructions,
-            board_context_injected=None,
-            stdin=None,
-        )
-    except Exception:
-        logger.debug("run_log spawn write skipped", exc_info=True)
+    _record_spawn_prompt(state, run_id, instructions)
     use_interactive = state.interactive
-    if use_interactive and not feature_flags.early_advance:
-        msg = "Interactive mode requires PATHLY_RUNNER_EARLY_ADVANCE=1"
-        if broadcast_fn:
-            try:
-                broadcast_fn(state.topic, {"type": "RUNNER_WARNING", "message": msg})
-            except Exception:
-                pass
-        raise RuntimeError(msg)
-
-    if use_interactive:
-        argv = resolve_interactive_argv(
-            adapter, model, session=session, autonomy=autonomy
-        )
-    else:
-        argv = resolve_argv(
-            adapter,
-            instructions,
-            model,
-            session=session,
-            autonomy=autonomy,
-            interactive=False,
-        )
+    argv = _resolve_spawn_argv(
+        state,
+        instructions,
+        adapter,
+        model,
+        session,
+        autonomy,
+        feature_flags.early_advance,
+        broadcast_fn,
+    )
 
     tab_id = f"runner-{run_id[-10:]}"
     label = f"{adapter} — {state.current_state or state.status}"
@@ -476,86 +111,6 @@ def _run_stage_via_terminal(
         state.active_tab_id = tab_id
 
     run = create_run(run_id)
-
-    def _emit_executor_telemetry(ad: Optional[dict], wall: float) -> None:
-        """Project this spawn's result into otel_spans — but ONLY for executor-owned
-        runs (board/single/loop), which register no topic RunnerState. FSM/team leave
-        executor_owned_telemetry False and are covered by api_lifecycle's span writer.
-        Each task gets a fresh span under the goal's trace (goal=trace, task=span).
-
-        The agent_invocation row is NOT written here: executor runs emit an AGENT_DONE
-        event, and the universal projector (``invocation_projection`` via
-        ``append_event``) derives the invocation from that event stream (folding the
-        superseding BILLING_UPDATE). Writing one here too would double-count — hence
-        ``write_invocation=False``. Best-effort."""
-        if not getattr(state, "executor_owned_telemetry", False):
-            return
-        try:
-            from pathly_orchestrator.runner.telemetry import project_agent_done
-
-            project_agent_done(
-                project_root=state.project_root,
-                feature=state.topic,
-                agent_done=ad,
-                run_id=run_id,
-                stage=state.current_state or "task",
-                agent_role=(ad or {}).get("agent") or "",
-                scope_tier=getattr(state, "scope_tier", "feature"),
-                trace_id=getattr(state, "goal_trace_id", ""),
-                parent_span_id=getattr(state, "goal_span_id", ""),
-                wall_seconds=wall,
-                write_invocation=False,
-            )
-        except Exception:
-            logger.debug("_emit_executor_telemetry skipped", exc_info=True)
-
-    def _reconcile_billing_now(data: Optional[dict]) -> None:
-        """Patch the last AGENT_DONE with the REAL CLI cost/tokens from a PTY result.
-
-        The 'pty_result' and slow paths (the PTY reports its result before/without early-advance
-        detecting AGENT_DONE — the common case for a fast headless stage) otherwise emit NO
-        BILLING_UPDATE, so the DB keeps only the completion-report's subagent-token self-estimate
-        — which is $0 for a stage that spawns no subagents (e.g. project-decompose/planner). This
-        restores the real-cost capture the invocation-projection refactor dropped from these paths
-        (early-advance is covered by _reconciliation_window). Best-effort; never raises into the loop.
-        """
-        billing = (data or {}).get("result") or {}
-        if not isinstance(billing, dict):
-            return
-        try:
-            cost = float(billing.get("cost_usd") or 0.0)
-            tokens_in = int(billing.get("tokens_in") or 0)
-            tokens_out = int(billing.get("tokens_out") or 0)
-            tool_uses = int(billing.get("tool_uses") or 0)
-            wall = int((data or {}).get("wall_seconds") or 0)
-        except (TypeError, ValueError):
-            return
-        # Nothing real to add → skip; a 0/0 update would only restate the self-estimate.
-        if cost <= 0 and (tokens_in + tokens_out) <= 0:
-            return
-        try:
-            from pathly_orchestrator.fsm_ops import _resolve_storage_path
-            from pathly_orchestrator.runner import _patch_last_agent_done
-
-            storage = (
-                Path(state.storage_path)
-                if state.storage_path
-                else _resolve_storage_path(None, state.project_root, state.topic)
-            )
-            _patch_last_agent_done(
-                storage,
-                cost,
-                tokens_in,
-                tokens_out,
-                wall,
-                tool_uses,
-                model=model,
-                run_id=run_id,
-                board_scope=_run_board_scope(state, storage),
-            )
-        except Exception as exc:
-            logger.warning("_reconcile_billing_now: patch failed: %s", exc)
-
     try:
         # Early-advance baseline — capture feature_dir / feature / last_seq BEFORE the spawn
         # broadcast below. The AGENT_DONE watcher only reports events with seq > last_seq; if the
@@ -782,7 +337,7 @@ def _run_stage_via_terminal(
                         name=f"recon-window-{run_id}",
                     )
                     recon_t.start()
-                _emit_executor_telemetry(agent_done_data, 0.0)
+                _emit_executor_telemetry(state, run_id, agent_done_data, 0.0)
                 return result_for_fsm
 
             # outcome == "pty_result" — PTY arrived first; cancel watcher and return
@@ -795,9 +350,12 @@ def _run_stage_via_terminal(
                     f"terminal_exit_nonzero: PTY for {tab_id} exited with code {exit_code}"
                 )
             _synthesize_agent_done_if_missing(state, run_id, model, data)
-            _reconcile_billing_now(data)
+            _reconcile_billing_now(state, run_id, model, data)
             _emit_executor_telemetry(
-                data.get("result") or {}, float(data.get("wall_seconds") or 0)
+                state,
+                run_id,
+                data.get("result") or {},
+                float(data.get("wall_seconds") or 0),
             )
             return _pty_return(data)
 
@@ -818,9 +376,12 @@ def _run_stage_via_terminal(
                 f"terminal_exit_nonzero: PTY for {tab_id} exited with code {exit_code}"
             )
         _synthesize_agent_done_if_missing(state, run_id, model, data)
-        _reconcile_billing_now(data)
+        _reconcile_billing_now(state, run_id, model, data)
         _emit_executor_telemetry(
-            data.get("result") or {}, float(data.get("wall_seconds") or 0)
+            state,
+            run_id,
+            data.get("result") or {},
+            float(data.get("wall_seconds") or 0),
         )
         return _pty_return(data)
     finally:

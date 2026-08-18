@@ -83,11 +83,21 @@ const snippet = (s: string, n = 160): string => (s.length > n ? s.slice(0, n - 1
 // Turn an opaque "no file" failure into a specific, actionable reason using the engine's
 // exit code and last output — so rate limits, auth errors, and "agent wrote nothing" are
 // distinguishable instead of all reading "no draft produced". Shared by AI Split/Analyze
-// (useEditorAgentActions) and the comments Send flow (CommentsPanel).
+// (useEditorAgentActions), the Diagram action, and the comments Send flow (CommentsPanel).
+//
+// MIRROR: the provider-unavailable patterns must stay in sync with TRANSIENT_RE in
+// main/ipc/engineFailure.ts, which the spawn gate uses to decide whether to RETRY. The two
+// cannot share a module — tsconfig scopes the main and renderer bundles apart. If the gate
+// retries a class of failure this function still calls "no file written", the toast blames
+// Pathly for an upstream fault, which is exactly the confusion this wording exists to prevent.
 export function describeAgentFailure(action: string, fileName: string, exitCode?: number, tail?: string): string {
   const last = (tail ?? '').trim()
   const low = last.toLowerCase()
-  if (/rate.?limit|usage limit|quota|429|too many requests|overloaded/.test(low))
+  // "at capacity" / 5xx are provider-side refusals like a 429 — the run never happened, so the
+  // actionable advice is retry or switch model, NOT "the agent produced nothing".
+  if (/at capacity|capacity|\b50[023]\b|service unavailable|temporarily unavailable|overloaded/.test(low))
+    return `${action} failed · ${fileName} — model at capacity; retry or switch model${last ? `: ${snippet(last)}` : ''}`
+  if (/rate.?limit|usage limit|quota|429|too many requests|try again later/.test(low))
     return `${action} failed · ${fileName} — rate limit / quota${last ? `: ${snippet(last)}` : ''}`
   if (/unauthor|not logged in|please log in|\blog ?in\b|api key|credential|forbidden|\b401\b|\b403\b/.test(low))
     return `${action} failed · ${fileName} — auth / login needed${last ? `: ${snippet(last)}` : ''}`

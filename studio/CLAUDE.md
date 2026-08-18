@@ -91,7 +91,27 @@ This guarantees the new server always starts, even against old server versions t
 - `IconStrip` (`sidebar/shell/IconStrip.tsx`) — the collapsed sidebar; shows a `PanelLeft` expand button at the top plus icon shortcuts mirroring the six PANELS entries (Markdown Editor uses `FileText` here to avoid clashing with Library's `BookOpen`).
 - `BottomNav` (`sidebar/shell/BottomNav.tsx`) — the **PANELS** nav, pinned at the foot of the sidebar above `BrightskyProfile` and **outside** the scrolling `treeContainer` so it never scrolls away and is identical in the Workspace and Library tabs. Lists all six panels: Command Center, Pipeline (a single FULL-WIDTH column, internal panel id still `monitor`, e.g. `sidebar-nav-monitor`: the GLOBAL engine board (`MonitorBoard`) with its **Live / Runs** mode toggle, the conditional `OutputBanner` output→modal banner above it, and — ONLY while a run is active — the global runner controls (`FlowControlBar`) as a slim top bar. The old right-side `FlowStepsPanel` dock (stage stepper + flow tabs + per-stage configure) was REMOVED from the panel: the stepper's job is now the `RunDetailPage` **Stages** tab, per-stage config is a flow-AUTHORING concern (flow editor, not a run monitor), and the runner controls act on the single active FSM run — not a `run_id` — so they live at the panel level, not on a per-run page. The old `FlowStepsPanel` dock files were DELETED as dead code (knip); only its pure `deriveFlowSteps` helper (`Monitor/FlowStepsPanel/flowSteps.ts`) survives, still imported by `FlowGatePreview`. The likewise-unmounted `HeaderBar`/`RunCostBadge`/`HealthCheck`/`FsmView` were deleted too), DB Explorer, Markdown Editor, Canvas, Settings. Canvas restores the last-used flow via `openCanvas` in `Sidebar.tsx`.
 
-## CLI-engine spawn scheduler (`src/main/ipc/terminal.ts`)
+## CLI-engine spawn scheduler (`src/main/ipc/terminal.ts` + `src/main/ipc/terminal/`)
+
+`terminal.ts` orchestrates; it no longer implements. The pieces live in `src/main/ipc/terminal/`,
+one concern each (split 2026-08-18 under the 400-line ratchet — the file was 1248 lines):
+
+| Module | Owns |
+|---|---|
+| `shells.ts` | command/argv → `(shell, args)`, launcher resolution, `enrichedPath`, Windows temp script, `isValidCwd` |
+| `spawnGate.ts` | caps, queue, engine registry (`activeEngines`/`queuedEngines`/`recentEngines`), `spawn:state` broadcast, rate-limit cooldown, transient-retry bookkeeping |
+| `ptyRegistry.ts` | the live per-tab maps (`activePtys`/`ptyWindows`/`ptyOwners`/`ptyOutput`/`runnerTabMeta`/`runnerScripts`), `sendToWindow`, `killPtyTree`, `killAllPtys` |
+| `promptInjector.ts` | startup-gate answering + the interactive bracketed-paste injector |
+| `spawnReporting.ts` | the post-exit POSTs (`/runner/terminal/result`, `/db/invocation`) |
+| `preflight.ts` | is this engine installed? |
+| `popout.ts` | detach a tab into its own BrowserWindow |
+| `log.ts` | `slog` |
+
+Dependency direction is one-way — `log` ← `shells` ← {`preflight`, `spawnGate`} ← `ptyRegistry` ←
+`spawnReporting`/`popout` ← `terminal.ts`. `killAllPtys` is re-exported from `terminal.ts` so
+`main/index.ts` keeps one import site. Because `queuePaused` / `rateLimitedUntil` / `spawnStateWin`
+are module-private `let`s, the gate exposes `setQueuePaused` / `armRateLimitCooldown` /
+`setSpawnStateWindow` / `rateLimitCooldownRemaining` / `listActiveEngines` rather than raw bindings.
 
 Every `terminal:spawn` call for a CLI engine goes through a dual-cap concurrency gate. Two classes:
 
@@ -113,7 +133,11 @@ Queue management IPC: `terminal:queue-control` accepts `pause | resume | cancel 
 
 **The gate is the single source of truth for engine liveness.** Its `spawn:state` payload carries `engines: RunningEngine[]` — every identified live engine (`{ tabId, adapter, label, startedAt, category, feature?, role?, runId? }`; `category`/`feature`/`role`/`runId` are derived at the `activeEngines.set` site from the runner topic (`runnerTabMeta`) or `meta.telemetry` so consumers can group cards, scope cost, and open the per-flow rollup — a registered runner tab → `flow`, anything else → `single`; `runId` keys `/db/runs/<run_id>/cost`), added right after `pty.spawn` (queued-but-not-yet-running engines are registered in a parallel `queuedEngines` map at request time so a paused/queued run is visible as a row, not just a count) and removed in `releaseEngineSlot` (the one place exit/kill/cancel converge). the floating `CliMonitorBar` dock (`useDockEngines`, global — all features), the topbar CLI-engine dot, and the Pipeline panel's embedded engine board (`Monitor/EngineBoard/`, projected via `useMonitorEngines` — **GLOBAL**, every engine, in parity with the dock; NOT feature-scoped, and rendered even with no feature selected so an editor/one-shot engine is never invisible in the section) all project THIS list, **not** per-tab `terminalStore` status — so board/runner runs, editor one-shots, and manual REPLs all appear identically, the header count and the dock share one source, and the list survives a renderer reload (engines live in the main process; the renderer store does not). `terminalStore` is joined in only to enrich a row with scrollback/prompt and to enable "open terminal".
 
-**Rate-limit backoff:** when a headless run exits non-zero and its output matches the `RATE_LIMIT_RE` pattern (429, "rate limit", "overloaded", etc.), a 15-second cooldown (`RATE_LIMIT_COOLDOWN_MS`) is armed. Subsequent queued headless runs wait out the cooldown before starting.
+**Transient-failure classification** (`src/main/ipc/engineFailure.ts`): `classifyEngineFailure(exitCode, tail)` separates a *provider* refusal (rate limit, quota, "at capacity", overloaded, 5xx) from a real agent/auth failure. `transient` requires a matching phrase **and** evidence the run actually failed — a non-zero exit **or** an engine abort marker (`ENGINE_ABORT_RE`: codex's `"type":"turn.failed"`, claude's `"is_error":true`), because some CLIs report a failed turn in their JSON stream and still exit 0. The second condition is what stops an agent that merely *writes about* rate limits from being misread as rate-limited.
+
+**Rate-limit backoff:** a headless run classified `transient` arms a 15-second cooldown (`RATE_LIMIT_COOLDOWN_MS`). Subsequent queued headless runs wait out the cooldown before starting.
+
+**Transient retry:** the same classification also re-runs the failed spawn, up to `MAX_TRANSIENT_RETRIES` (2) with exponential backoff (`retryDelayMs` — 4s, 12s). The spawn path is the named `handleSpawn` function (in `terminal.ts`) precisely so the retry can re-enter the whole gate — queue slot, caps, priority and cooldown all apply again rather than being bypassed. The retry returns from `onExit` **before** `terminal:exit` and the telemetry / `/runner/terminal/result` POSTs fire, so consumers see ONE exit for the whole attempt chain (no duplicate invocation rows, no premature "no file produced"); the terminal shows an inline `engine unavailable — retrying (n/2)` banner between attempts. `ptyOutput` is cleared between attempts so each is judged on its own output. A user **Stop** always wins — `terminal:kill` sets `ptyKilledByUser` in BOTH of its branches (after the ownership check when a PTY is live, and unguarded when there is none), because during a retry backoff there is no live PTY to kill and that window must still be stoppable. Interactive sessions are never retried.
 
 **`SPAWN_DEBUG` logging:** when `SPAWN_DEBUG = true` (default), every spawn lifecycle event is logged to the main-process console with a `[spawn]` prefix.
 
@@ -201,12 +225,26 @@ governance agents, and run observability is always-on in the Pipeline, never a t
 
 ## Key Zustand stores
 
+**Two of these were split under the 400-line ratchet (2026-08-18), import sites unchanged:**
+`store/commsApi.ts` is now a **barrel** (16 lines) over `store/commsApi/` — one file per backend
+domain (`rows`, `scope`, `messages`, `artifacts`, `modelPolicy`, `runnerControl`, `search`,
+`boardRun`, `goalRun`, `features`), so all 36 `from '../store/commsApi'` imports still resolve.
+`commsStore.ts` gave up its declaration + pure helpers to `store/commsStore/{types,keys}.ts`
+(`CommsState`/`GlobalSearchHit` are re-exported from `commsStore.ts` for existing importers);
+its ~700-line action object is NOT yet sliced — see the note under the table.
+
 | Store | File | Purpose |
 |---|---|---|
 | `runnerStore` | `store/runnerStore.ts` | pipeline status, stage, adapter, cost, error — driven by SSE |
 | `terminalStore` | `store/terminalStore.ts` | terminal tabs registry; `addTab` registers, `openTab` reveals panel; also holds `spawnQueue: SpawnState` pushed from main via `spawn:state` IPC |
 | `markdownEditorStore` | `store/markdownEditorStore.ts` | cells, dirty state, and load/save logic for the Markdown Editor panel |
 | `runRegistryStore` | `store/runRegistryStore.ts` | **PERSISTED** (`localStorage` `pathly:active-runs`) run_id spine for the board's RunPills — target (`goal:`/`board:`/`flow:`) → `{runId, kind, startedAt, projectRoot, board, scope}`. `commsStore` registers at every board/goal/flow run-start and clears on completion; `commsStore.rehydrateActiveRuns(projectRoot)` (called on `CommandCenter` mount) re-verifies each entry against the backend (board-lock holder / FSM runner status; hiccup-safe — a null status keeps the entry, never false-clears) and repopulates the pill or clears it, so a run still alive after a full renderer reload reappears with its original elapsed clock. The `editor`/`summary` kinds are reserved for the MD-editor one-shots + summarizer (NOT yet wired — those still live in `uiStore.mdEditorActions` / `commsStore.summaryStatus` and survive navigation but not reload). |
+
+**`commsStore`'s action object is deliberately still one block.** Slicing it into zustand slices
+is the only way to get the file under 400, but the store has **no test coverage** and 18 importers,
+and its run-watchers close over `useCommsStore` itself (a slice extraction has to break that cycle
+via injection, not a plain import). Write characterization tests for the board/goal run lifecycle
+FIRST; until then the ratchet just freezes it.
 
 `RunnerStatus` union: `'idle' | 'running' | 'paused' | 'blocked' | 'error' | 'done' | 'aborted' | 'finalizing'`
 

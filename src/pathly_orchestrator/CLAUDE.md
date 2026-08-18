@@ -258,7 +258,15 @@ pathly_orchestrator/
   supervisor/              # Visible runner: PTY spawning, SSE broadcast, registry
     state.py               # RunnerState, OpenSession dataclasses
     registry.py            # _registry, _lock, get_state, recover_stale_mirrors
-    terminal.py            # _run_stage_via_terminal, _agent_done_watcher, _reconciliation_window
+    terminal.py            # _run_stage_via_terminal — THE SPAWN. Re-exports the names below,
+                           #   because supervisor/__init__ and the tests import them from here
+                           #   (and _reconciliation_window is monkeypatched in THIS namespace,
+                           #   so it must be called as a bare name, never via its own module).
+    terminal_argv.py       # _resolve_spawn_argv — the seam a NEW ADAPTER touches
+    terminal_identity.py   # _record_spawn_identity/_record_spawn_prompt/_settle_spawn_identity, _run_board_scope
+    terminal_reconcile.py  # _agent_done_watcher, _reconciliation_window, _synthesize_agent_done_if_missing
+    terminal_billing.py    # _emit_executor_telemetry, _reconcile_billing_now (were spawn-local closures)
+    terminal_phase.py      # _write_supervisor_phase_summary
     interactions.py        # _await_agent_question
     orchestrator.py        # _loop, _resolve_stage_supervised
     api.py                 # start_run, pause_run, resume_run, abort_run, supply_decision, reroute_run
@@ -336,7 +344,7 @@ pathly_orchestrator/
 
 **Stage flow:**
 1. `supervisor/orchestrator.py` calls `/next_action` → gets `agent_hint.instructions` (full prompt)
-2. `supervisor/terminal.py` builds `argv` and emits `TERMINAL_SPAWN` SSE with `{ tab_id, run_id, argv, cwd, label, adapter }`
+2. `supervisor/terminal.py` builds `argv` (via `terminal_argv._resolve_spawn_argv`) and emits `TERMINAL_SPAWN` SSE with `{ tab_id, run_id, argv, cwd, label, adapter }`
 3. Studio opens a PTY tab (`node-pty`) and spawns the process via the `argv`
 4. Studio POSTs `/runner/terminal/started` when PTY is up
 5. PTY exits → `terminal.ts` POSTs `/runner/terminal/result` with exit code and stdout tail

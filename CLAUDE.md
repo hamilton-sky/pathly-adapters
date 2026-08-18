@@ -60,7 +60,7 @@ In runner mode Pathly is the single source of truth for skill content. The CLI r
 
 **Dash-safety:** prompts delivered via CLI argv must never start with `---` (claude parses it as an unknown option). Three mirror implementations enforce this: `_dash_safe_prompt` in `src/pathly_orchestrator/adapters.py` (applied in `resolve_command`); `_strip_leading_frontmatter` in `src/pathly_orchestrator/skills/compose.py` (applied during skill composition); and `dashSafePrompt` in `studio/src/renderer/src/services/cliEngine.ts` (applied in `buildHeadlessArgv`).
 
-**Studio CLI spawn scheduler (`studio/src/main/ipc/terminal.ts`):** a dual-cap concurrency gate controls how many CLI engine processes run simultaneously. Default caps: global ≤ 8, headless ≤ 5, interactive ≤ 5 (all configurable at runtime via the SpawnQueuePanel). Headless one-shots are queued (FIFO + priority); interactive sessions are rejected over cap with a toast. On Windows, headless argv is encoded as a PowerShell temp-script; `codex` headless additionally pipes `$null` as stdin to prevent it stalling on terminal input.
+**Studio CLI spawn scheduler (`studio/src/main/ipc/terminal.ts`, with its concerns split across `studio/src/main/ipc/terminal/`):** a dual-cap concurrency gate controls how many CLI engine processes run simultaneously. Default caps: global ≤ 8, headless ≤ 5, interactive ≤ 5 (all configurable at runtime via the SpawnQueuePanel). Headless one-shots are queued (FIFO + priority); interactive sessions are rejected over cap with a toast. A headless run the *provider* refused (rate limit / quota / "at capacity" / 5xx — classified by `main/ipc/engineFailure.ts`, which requires a non-zero exit **or** an engine abort marker so an agent merely writing about rate limits isn't misread) arms a cooldown **and** is re-run up to 2× with backoff, re-entering the gate rather than bypassing it; the retry short-circuits `onExit` so consumers still see one exit per attempt chain. On Windows, headless argv is encoded as a PowerShell temp-script; `codex` headless additionally pipes `$null` as stdin to prevent it stalling on terminal input.
 
 **FSM response contract (`agent_hint`):** Every `/next_action` response includes:
 - `agent_hint.role` — `"worker"` or `"explorer"` (host-neutral delegation signal)
@@ -158,6 +158,7 @@ in the lint `consistency` job.
 python -m pytest tests/ -q
 python -m build                     # rebuilds all adapters from core
 python3 scripts/check_version_sync.py
+python3 scripts/check_file_size.py    # 400-line SOLID ratchet (--update after a split)
 python scripts/gen_test_index.py    # regenerate tests/*/INDEX.md after adding/moving tests
 
 # Install / propagate agent+skill changes to ~/.claude
@@ -242,6 +243,12 @@ These rules apply to all Python in `src/pathly_orchestrator/` and all TypeScript
 - A blueprint file owns exactly one HTTP domain (messages, tasks, artifacts, runs, goals, settings).
 - A module file owns exactly one concern (DB queries, embeddings, output parsing, …).
 - **Hard limit: 400 lines per file.** If a file approaches this, split it before adding more code.
+- **Gated in CI** by `scripts/check_file_size.py` (lint `consistency` job) as a *ratchet* against
+  `scripts/file_size_baseline.txt`: the 28 files already over the limit are frozen at their current
+  size and may only shrink. A NEW oversized file fails, and so does **growing an already-oversized
+  one** — which is rule #2 mechanically enforced. Adding a new file is always allowed. When a
+  baseline file drops to 400 or under, the check fails until you run
+  `python3 scripts/check_file_size.py --update`, so the debt can never silently creep back.
 
 **2. Open/Closed — extend by adding files, not by growing existing ones.**
 - New endpoints → new file in the correct domain subpackage. Never append to an already-large file.

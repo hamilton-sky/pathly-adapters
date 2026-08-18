@@ -1,0 +1,29 @@
+# Frozen 400-line-rule debt — see scripts/check_file_size.py.
+# One entry per file still over the limit, recorded at its CURRENT size.
+# These may only SHRINK. Regenerate with: python3 scripts/check_file_size.py --update
+
+studio/src/renderer/src/store/commsStore.ts:883
+studio/src/renderer/src/components/HQ/useHQ.tsx:874
+studio/src/renderer/src/components/MarkdownEditor/EditorHeader/EditorHeader.tsx:617
+src/pathly_orchestrator/fsm_compose.py:601
+src/pathly_orchestrator/skills/compose.py:593
+studio/src/renderer/src/components/Editor/index.tsx:576
+src/pathly_orchestrator/supervisor/goal_executor.py:561
+src/pathly_orchestrator/http_server/blueprints/comms/settings.py:521
+src/pathly_orchestrator/supervisor/board_run.py:490
+src/pathly_orchestrator/fsm/engine_actions.py:472
+src/pathly_orchestrator/db/queries/invocation_projection.py:454
+src/pathly_orchestrator/http_server/blueprints/runner/api_lifecycle.py:452
+src/pathly_orchestrator/db/migrations.py:438
+src/pathly_orchestrator/supervisor/goal_decomposer.py:436
+src/pathly_orchestrator/supervisor/scheduler.py:433
+src/pathly_orchestrator/http_server/blueprints/skills/editor_render.py:428
+src/pathly_orchestrator/supervisor/orchestrator.py:427
+studio/src/renderer/src/components/sidebar/Sidebar.tsx:425
+src/pathly_orchestrator/db/queries/comms_tasks.py:418
+src/pathly_orchestrator/http_server/blueprints/comms/tasks.py:413
+src/pathly_orchestrator/http_server/blueprints/comms/goals.py:410
+src/pathly_orchestrator/db/queries/comms_messages.py:405
+src/pathly_orchestrator/runner/hydrate.py:403
+src/pathly_orchestrator/http_server/blueprints/comms/project.py:402
+studio/src/renderer/src/components/shared/SkillSplitModal/SkillSplitModal.tsx:401
