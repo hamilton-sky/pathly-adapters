@@ -111,3 +111,36 @@ def test_decision_missing_a_timestamp_does_not_crash_the_block(monkeypatch):
     )
     assert "no timestamp" in block
     assert UNBLOCK in block
+
+
+# ── One renderer, both paths ─────────────────────────────────────────────────
+
+
+def test_board_runs_get_the_same_governance_rendering_as_flow_runs():
+    """supervisor/board_run.py used to carry a SECOND, weaker copy of this block: no
+    ordering, no timestamps, no precedence rule, no gate note. That is the path the
+    evaluator and single-agent runs take — the very runs the original finding came from —
+    so the weaker copy was doing the damage the flow-path fix was written to prevent."""
+    from pathly_orchestrator.supervisor.board_run import _format_board_info
+
+    block = _format_board_info(
+        decisions=[_decision(GATE, TS_GATE), _decision(UNBLOCK, TS_UNBLOCK)],
+        escalations=[_decision(ESCALATION, TS_ESCALATION)],
+        recent=[],
+    )
+    assert block.index(UNBLOCK) < block.index(GATE), "newest-first must apply here too"
+    assert "LATEST" in block
+    assert "2026-08-10 17:20" in block
+    assert "listed FIRST wins" in block
+    assert "does NOT close a human gate" in block
+
+
+def test_board_info_with_no_governance_renders_nothing_for_it():
+    from pathly_orchestrator.supervisor.board_run import _format_board_info
+
+    assert _format_board_info(decisions=[], escalations=[], recent=[]) == ""
+    only_recent = _format_board_info(
+        decisions=[], escalations=[], recent=[{"from_agent": "a", "type": "note", "text": "hi"}]
+    )
+    assert "Governance" not in only_recent
+    assert "hi" in only_recent
