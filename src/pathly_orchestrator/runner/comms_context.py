@@ -236,24 +236,59 @@ def retrieve_board_context(
         lines.append("Active decisions and open escalations injected unconditionally.")
         lines.append("")
         if decisions:
-            lines.append("**Decisions:**")
-            for msg in decisions:
+            # NEWEST FIRST, and say so. get_pending_decisions returns ts ASC, and _format_age
+            # renders day granularity — so a board whose decisions all landed on one afternoon
+            # rendered every bullet as an indistinguishable "13d ago" in oldest-first order.
+            # An agent then read "X remains a hard human gate" and "X is resolved, unblocked"
+            # as equally-live governance with no way to tell which one won. Ordering is the
+            # cheap half of supersession: until `superseded_by` is set (POST /comms/supersede),
+            # recency is the only signal the reader has, so make it unmissable.
+            ordered = sorted(
+                decisions, key=lambda m: str(m.get("ts") or ""), reverse=True
+            )
+            lines.append("**Decisions (NEWEST FIRST):**")
+            lines.append(
+                "  If two decisions conflict, the one listed FIRST wins — it was made later. "
+                "Do not act on a superseded decision because it appears more detailed."
+            )
+            for idx, msg in enumerate(ordered):
                 tier = msg.get("board", "feature")
                 text = msg.get("text", "")
                 ts_str = msg.get("ts", "")
                 age = _format_age(ts_str) if ts_str else ""
-                lines.append(
-                    f"  • {text}  [{tier} · {age}]" if age else f"  • {text}  [{tier}]"
-                )
+                # Minute-precision stamp alongside the age: same-day decisions are the ones
+                # that actually conflict, and "13d ago" cannot order them.
+                stamp = ts_str[:16].replace("T", " ") if len(ts_str) >= 16 else ts_str
+                marker = "LATEST · " if idx == 0 else ""
+                meta = " · ".join(p for p in (marker + tier, stamp, age) if p)
+                lines.append(f"  • {text}  [{meta}]")
         if escalations:
             lines.append("**Open escalations (human input required):**")
+            newest_decision_ts = (
+                max((str(m.get("ts") or "") for m in decisions), default="")
+                if decisions
+                else ""
+            )
             for msg in escalations:
                 tier = msg.get("board", "feature")
                 text = msg.get("text", "")
                 ts_str = msg.get("ts", "")
                 age = _format_age(ts_str) if ts_str else ""
+                stamp = ts_str[:16].replace("T", " ") if len(ts_str) >= 16 else ts_str
+                meta = " · ".join(p for p in (tier, stamp, age) if p)
+                lines.append(f"  • {text}  [{meta}]")
+            # An escalation stays status='pending' until a human acknowledges it, so a later
+            # agent decision claiming to "resolve" it leaves BOTH on the board — the reader
+            # sees "human input required" and "unblocked, start now" at once. Name that
+            # collision instead of letting the agent silently pick whichever it read last.
+            if newest_decision_ts and newest_decision_ts > max(
+                (str(m.get("ts") or "") for m in escalations), default=""
+            ):
                 lines.append(
-                    f"  • {text}  [{tier} · {age}]" if age else f"  • {text}  [{tier}]"
+                    "  NOTE: decisions above are newer than these escalations and may claim to "
+                    "resolve them. An agent decision does NOT close a human gate — only a human "
+                    "acknowledgement does. If a decision contradicts an open escalation, treat "
+                    "the gate as OPEN and say so rather than proceeding."
                 )
         lines.append("")
         lines.append("---")
