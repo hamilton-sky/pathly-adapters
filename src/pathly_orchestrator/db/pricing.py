@@ -122,7 +122,7 @@ class PricingRegistry:
 
         ``tokens_in`` is cache-INCLUSIVE (see runner/output.py::extract_cache_tokens).
         When a cache split is supplied it is carved OUT of the lump and re-priced at its
-        own tier — cache reads at 0.1x input, cache writes at 1.25x input — leaving only
+        own tier — cache reads at 0.1x input, cache writes at 2.0x input — leaving only
         genuinely uncached input at 1x. Billing the whole lump at 1x overstates a
         cache-heavy agent run by roughly 3x. Omitting the split preserves the old
         (lump-at-1x) behaviour exactly, so existing callers are unaffected.

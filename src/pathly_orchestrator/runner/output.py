@@ -371,7 +371,7 @@ def parse_result(adapter: str, raw_output: str) -> dict[str, Any]:
     # Cache split — reported ALONGSIDE the lump, never instead of it. `tokens_in` keeps its
     # existing cache-inclusive meaning so every downstream reader is unaffected; these two
     # fields let the pricing path (db/pricing.py) charge cache reads at 0.1x and writes at
-    # 1.25x instead of billing the whole lump at the input rate.
+    # 2.0x instead of billing the whole lump at the input rate.
     cache_read_tokens, cache_write_tokens = extract_cache_tokens(payload)
 
     return {

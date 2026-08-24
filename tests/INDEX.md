@@ -7,7 +7,7 @@ Tests are grouped into domain folders that mirror the app's architecture layers.
 | Folder | Purpose | Files |
 | --- | --- | --- |
 | [`code_intel/`](code_intel/INDEX.md) | Code-intelligence query proxy — graph reindex, path resolve, LSP session, query gate & logging. | 6 |
-| [`comms_board/`](comms_board/INDEX.md) | Comms board / message-board subsystem — messages, tasks, artifacts, goals, context retrieval & relevance, board mirror & hydration. | 41 |
+| [`comms_board/`](comms_board/INDEX.md) | Comms board / message-board subsystem — messages, tasks, artifacts, goals, context retrieval & relevance, board mirror & hydration. | 42 |
 | [`consistency/`](consistency/INDEX.md) |  | 1 |
 | [`dag_goals/`](dag_goals/INDEX.md) | Goal/DAG decomposition & scheduling — feature/flow/project decompose, goals read-model, PRD import. | 8 |
 | [`db/`](db/INDEX.md) | Database layer — schema/queries, connection isolation, write guard. | 12 |
@@ -16,4 +16,4 @@ Tests are grouped into domain folders that mirror the app's architecture layers.
 | [`install_skills/`](install_skills/INDEX.md) | Adapter install/setup, stitch & compose, skill composition / round-trip / export, plugin manifests. | 20 |
 | [`runner_supervisor/`](runner_supervisor/INDEX.md) | Runner control loop, supervisor, spawn channel, lane/worktree isolation, file-claim registry, services facade. | 11 |
 | [`storage_paths/`](storage_paths/INDEX.md) | Feature/goal storage layout, slugs, canonical artifact paths, storage migrations. | 10 |
-| [`telemetry/`](telemetry/INDEX.md) | Cost/token telemetry — invocation projection, pricing, OTel export, observability, log formatting. | 15 |
+| [`telemetry/`](telemetry/INDEX.md) | Cost/token telemetry — invocation projection, pricing, OTel export, observability, log formatting. | 16 |

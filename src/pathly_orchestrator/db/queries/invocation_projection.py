@@ -70,7 +70,7 @@ def _price_if_needed(
         from ..pricing import estimate_cost  # intra-db import, layer-safe
 
         # tokens_in is cache-INCLUSIVE. Passing the lump alone bills cache reads (0.1x) and
-        # cache writes (1.25x) at the full input rate, which on a cache-heavy agent run
+        # cache writes (2.0x) at the full input rate, which on a cache-heavy agent run
         # overstates cost by ~3x. Hand the split through so estimate_cost can tier it.
         est, src = estimate_cost(
             model or "", tin, tout, int(_num(cache_read)), int(_num(cache_write))
