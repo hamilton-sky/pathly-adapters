@@ -263,6 +263,10 @@ Rules:
 - **Never supersede an `escalation` or a `question` addressed to a human.** An agent decision
   does not close a human gate; only a human acknowledgement does. If your decision contradicts
   an open human gate, say so in `text` and leave the gate open.
+- An escalation you post with `"to": "human"` **blocks the pipeline's next transition** until a
+  human acknowledges it. That is the point — but it means you must not use a human-addressed
+  escalation for something an agent can resolve. Agent-addressed escalations route through the
+  normal feedback loop and never block.
 - When in doubt, post without `supersedes`. A duplicate decision is a smaller problem than a
   retired one.
 

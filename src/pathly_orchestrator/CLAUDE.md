@@ -166,11 +166,31 @@ retires on its own; three write paths make a resolution durable instead of prose
 |---|---|---|
 | this decision replaces that one | `POST /comms/post` with `supersedes:[id,…]` (`blueprints/comms/_supersede_on_post.py`) | explicit ids ONLY — never inferred from text/embedding similarity, because silently retiring the wrong governance is worse than a duplicate. Capped, de-duplicated, self-reference refused; a bad id degrades to a per-id `skipped` reason and never fails the post |
 | these tasks are settled | `POST /comms/tasks/status` (`blueprints/comms/tasks_status.py`) | `done`/`failed` only; unknown ids reported, not dropped |
-| a human gate is closed | `POST /comms/acknowledge` (human) | an agent decision does NOT close an escalation — `runner/comms_formatters.render_governance_lines` says so in the injected block when a decision post-dates an open escalation |
+| a human gate is closed | `POST /comms/acknowledge` (human) | an agent decision does NOT close an escalation — `runner/comms_formatters.render_governance_lines` says so in the injected block when a decision post-dates an open escalation, and `fsm_human_gate` now makes it structurally true (below) |
 
 The agent-facing half is in `core/skills/fragments/comms-post.md` (supersede a decision you
 replace; never supersede a human-addressed escalation) and `core/skills/planning/evaluate.md`
 Step 5 (close what your analysis settled — evidence-gated).
+
+**Human escalation gate (`fsm_human_gate.py`).** An unacknowledged escalation with
+`to_agent='human'` on the run's board/scope **blocks the transition it stands in front of**.
+`complete_stage` checks it after `next_state` is resolved and before the transition is
+committed, returning the standard `_blocked_response` (`decision: escalate`, `blocked: true`)
+plus a `human_gate` block naming the blocked transition and the escalations, and appending a
+`GATE_FAILED` event. Previously these fired and gated nothing — a run walked past four pending
+human checkpoints to `DONE`.
+
+- **Only `to_agent='human'` gates.** Agent-addressed escalations are ordinary feedback routing
+  and would wedge runs the pipeline self-heals; `"*"` (the default `to` on every post) does not
+  gate either, or every broadcast would be a checkpoint.
+- **Two ways a human clears it:** `POST /comms/acknowledge` (the normal path), or re-send
+  `complete_stage` with `force_past_gate: true` — which advances AND posts a `GATE OVERRIDE`
+  decision naming every skipped gate, so a bypassed gate stays auditable. `force_past_gate` is
+  a human affordance: no agent prompt or fragment mentions it.
+- **Fails OPEN** on a DB read error (same choice as `require_tasks_done`) — a gate that cannot
+  be read is reported absent rather than blocking every transition in the product.
+- Studio has no dedicated force-advance button yet; today the override is the `complete_stage`
+  field. Acknowledging from the board clears the gate through the existing UI.
 
 ### SSE events (GET /events/runner)
 

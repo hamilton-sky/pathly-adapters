@@ -1,6 +1,6 @@
 # Board Lifecycle — Findings, Applied Fixes, and Open Proposals
 
-_Author: Claude (Opus 5) · Date: 2026-08-24 · Status: **A, B and D implemented; C awaiting a design decision; E/F deferred**_
+_Author: Claude (Opus 5) · Date: 2026-08-24 · Status: **A–D implemented; E/F deferred**_
 
 Evidence base: the `local-usage-meter` feature board in
 `~/Documents/project/token-tracker/pathly/`, read live from the running orchestrator on
@@ -19,9 +19,9 @@ resolutions never write back to task state, human gates never actually gate, and
 telemetry couldn't measure itself. One shape, four times — the board is append-only truth where
 nothing ever wins.
 
-Two of those I fixed. Three more (A, B, D) are now implemented — see the status banner on each
-proposal below. **Proposal D turned out to be wrong as originally written**; the correction is
-recorded in place rather than quietly edited away.
+Two of those I fixed directly. A, B, C and D are now implemented too — see the status banner on
+each. **Proposal D turned out to be wrong as originally written**; the correction is recorded in
+place rather than quietly edited away, as is the part of C that is still open.
 
 ---
 
@@ -202,13 +202,31 @@ a call, not a sentence. If an agent can't be trusted to mutate task state direct
 structured `proposed_transitions` block that the orchestrator applies or surfaces for one-click
 approval — but the resolution must land *somewhere* other than prose.
 
-### Proposal C — Human gates don't gate · **NOT BUILT — needs your decision**
+### Proposal C — Human gates don't gate · **IMPLEMENTED**
 
-> **Blocked on a product question, not an implementation one.** "An unacknowledged escalation
-> blocks the transition it names" has two materially different readings: the run **stalls** until
-> a human acknowledges, or it **pauses and pages** a human and can be force-advanced. And if it
-> can be force-advanced, that escape hatch is exactly the mechanism that produced the board below.
-> Guessing on a safety property is worse than leaving it open, so this one is waiting on you.
+> **Status: done**, on two decisions taken by the user after the diagnosis below:
+> **pause + force-advance** (not a hard stall) and **only `to_agent='human'` escalations gate**.
+>
+> `fsm_human_gate.py` + a check in `complete_stage`: an unacknowledged human-addressed
+> escalation on the run's board/scope blocks the transition it stands in front of, returning
+> `decision: escalate` with a `human_gate` block naming the blocked transition and the
+> escalations. A human clears it by acknowledging (the normal path) or by re-sending
+> `complete_stage` with `force_past_gate: true` — which advances **and** posts a `GATE OVERRIDE`
+> decision naming every skipped gate, so a bypass is auditable rather than invisible.
+> `force_past_gate` is a human affordance: no agent prompt or fragment mentions it, because an
+> agent that can force past a human gate is the failure being fixed.
+>
+> Agent-addressed escalations deliberately do **not** gate — they are ordinary feedback routing,
+> and gating them would wedge runs the pipeline is designed to self-heal. `"*"` (the default
+> `to` on every post) does not gate either, or every broadcast would become a checkpoint. The
+> check fails **open** on a DB read error, matching `require_tasks_done`.
+>
+> **Not addressed:** the second half of the original suggestion — "an agent should be
+> structurally unable to resolve an escalation raised for a human" — is only partly closed. An
+> agent still cannot supersede one (Proposal A refuses it, and the fragment says so), but
+> nothing stops it posting a *decision* that contradicts an open gate. The governance block now
+> calls that collision out in words; making it structurally impossible would need a
+> write-permission rule, which is not built. Studio also has no force-advance button yet.
 
 Four board messages are still `status=pending` with `acknowledged_by=[]` and `read_by=[]`:
 
@@ -307,7 +325,7 @@ decomposes to <50% coverage.
 | A — supersession write path | **implemented** (explicit `supersedes`, never inferred) |
 | B — task write-back | **implemented** (`/comms/tasks/status` + evaluator Step 5) |
 | D — terminal-state honesty | **implemented**, after correcting the original diagnosis |
-| C — gates that gate | **open — needs a decision from you** (stall vs. page-and-force) |
+| C — gates that gate | **implemented** (pause + force-advance; human-addressed escalations only) |
 | E / F — split telemetry surfaces, 0% ref coverage | deferred; F is explicitly not urgent |
 
 The next real test is re-running `local-usage-meter` end to end. A, B and D give the board the
@@ -346,6 +364,9 @@ db/migrations_incremental.py                        cache-split watermark
 http_server/blueprints/ops/telemetry_phase.py       surfaces the watermark
 core/skills/fragments/comms-post.md                 agents supersede what they replace
 core/skills/planning/evaluate.md                    Step 5 — close what you resolved
+src/pathly_orchestrator/fsm_human_gate.py           NEW — C: human escalation gate
+src/pathly_orchestrator/fsm_ops_complete.py         gate check before the transition commits
+src/pathly_orchestrator/supervisor/board_run.py     dropped its weaker copy of the governance block
 ```
 
 **Split under the 400-line rule** (the two fix commits pushed two files over the ratchet):
@@ -353,8 +374,9 @@ core/skills/planning/evaluate.md                    Step 5 — close what you re
 re-exports their symbols under the historical private names, so no call site moved.
 
 **Tests:** `tests/telemetry/test_cache_token_pricing.py` (25),
-`tests/comms_board/test_governance_decision_precedence.py` (8),
-`tests/comms_board/test_board_closure.py` (24).
+`tests/comms_board/test_governance_decision_precedence.py` (10),
+`tests/comms_board/test_board_closure.py` (24),
+`tests/fsm_flows/test_human_escalation_gate.py` (8).
 
 **Not touched:** no database rows were modified, no board state mutated, no FSM transition run.
 

@@ -202,6 +202,53 @@ def complete_stage(args: dict) -> dict:
                 result["instructions"] = None
         return result
 
+    # Human escalation gate. Checked AFTER next_state is known and BEFORE the transition is
+    # committed, so an open gate blocks the specific transition it stands in front of rather
+    # than the whole FSM. Only escalations addressed to a human gate — agent-addressed ones
+    # are ordinary feedback routing (see fsm_human_gate for why, and for the two ways a human
+    # clears it). force_past_gate is a HUMAN affordance: no agent prompt or fragment mentions
+    # it, because an agent that can force past a human gate is the failure being fixed.
+    from pathly_orchestrator.fsm_human_gate import (
+        open_human_gates,
+        record_gate_override,
+    )
+
+    human_gates = open_human_gates(board, scope)
+    if human_gates:
+        if args.get("force_past_gate"):
+            record_gate_override(board, scope, human_gates, str(args.get("actor") or "human"))
+        else:
+            result = _fops._blocked_response(
+                {"target_agent": "human", "file": "HUMAN_QUESTIONS.md"},
+                state_info,
+                storage_path,
+                preferred_adapter=_fops._resolve_adapter(
+                    flow_config, state_info["current_state"]
+                ),
+            )
+            result["human_gate"] = {
+                "blocked_transition": f"{state_info['current_state']}->{next_state}",
+                "escalations": human_gates,
+                "clear_by": (
+                    "POST /comms/acknowledge for each escalation, or re-send complete_stage "
+                    "with force_past_gate=true (records a GATE OVERRIDE decision on the board)"
+                ),
+            }
+            result["instructions"] = (
+                f"{len(human_gates)} unacknowledged human escalation(s) block "
+                f"{state_info['current_state']} -> {next_state}. An agent decision does not "
+                f"close a human gate. Acknowledge them, or force past explicitly."
+            )
+            append_event(
+                storage_path,
+                {
+                    "type": "GATE_FAILED",
+                    "gate": "human_escalation",
+                    "transition": f"{state_info['current_state']}->{next_state}",
+                },
+            )
+            return result
+
     run_transition_actions(
         flow_config,
         state_info["current_state"],

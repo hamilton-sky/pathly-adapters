@@ -4,7 +4,7 @@
 
 FSM engine, gates, transitions, flow definitions, feedback protocol & fix-routing.
 
-17 test file(s).
+18 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -18,6 +18,7 @@ FSM engine, gates, transitions, flow definitions, feedback protocol & fix-routin
 | `test_gates.py` | Unit and integration tests for run_gates() — Conv 1 and Conv 2 (scope_gate) | 31 |
 | `test_golden_path.py` | T1 — the end-to-end GOLDEN-PATH smoke test (production-readiness P0) | 7 |
 | `test_hooks.py` | End-to-end tests for hook scripts via subprocess | 11 |
+| `test_human_escalation_gate.py` | Human escalation gate — an open gate addressed to a human blocks the transition | 8 |
 | `test_orchestrator.py` | Tests for Conv 2: STATE.json schema validation, state/transition enforcement, concurrency | 17 |
 | `test_rollback.py` | covers no orphans after mid install failure; failed install leaves no manifest; uninstall without manifest returns empty; … | 4 |
 | `test_stage_override.py` | flow-gate-preview (P2) — the transient per-run, per-stage prompt override channel | 5 |
