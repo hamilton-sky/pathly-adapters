@@ -53,6 +53,8 @@ def _price_if_needed(
     model: str | None,
     tokens_in: object,
     tokens_out: object,
+    cache_read: object = 0,
+    cache_write: object = 0,
 ) -> tuple[float, str]:
     """Estimate cost from tokens when the event stream reported none.
 
@@ -67,7 +69,12 @@ def _price_if_needed(
     if tin + tout > 0:
         from ..pricing import estimate_cost  # intra-db import, layer-safe
 
-        est, src = estimate_cost(model or "", tin, tout)
+        # tokens_in is cache-INCLUSIVE. Passing the lump alone bills cache reads (0.1x) and
+        # cache writes (1.25x) at the full input rate, which on a cache-heavy agent run
+        # overstates cost by ~3x. Hand the split through so estimate_cost can tier it.
+        est, src = estimate_cost(
+            model or "", tin, tout, int(_num(cache_read)), int(_num(cache_write))
+        )
         if src == "estimated":
             return est, "estimated"
         return cost, cost_source
@@ -207,6 +214,16 @@ def _fold_billing(rec: dict, payload: dict) -> None:
         b_total = int(_num(payload.get("total_tokens")))
         if b_total > 0 and int(rec.get("tokens_in") or 0) == 0:
             rec["tokens_in"] = b_total
+    # Cache split (subset of tokens_in). Folded whenever billing reports it so the
+    # cache_read_tokens/cache_write_tokens columns — long present and long empty — get a
+    # producer. Guarded on > 0 so a billing event without the split cannot zero an
+    # anchor that already had one.
+    b_cread = int(_num(payload.get("cache_read_tokens")))
+    b_cwrite = int(_num(payload.get("cache_write_tokens")))
+    if b_cread > 0:
+        rec["cache_read_tokens"] = b_cread
+    if b_cwrite > 0:
+        rec["cache_write_tokens"] = b_cwrite
     if payload.get("tool_uses") is not None:
         rec["tool_uses"] = int(_num(payload.get("tool_uses")))
     # run-identity: billing may carry the spawn-issued board_scope the agent omitted.
@@ -402,7 +419,8 @@ def on_event_appended(
                 return
             anchor_seq = anchor[0]
             row = conn.execute(
-                "SELECT cost_usd, tokens_in, tokens_out, provider, run_id "
+                "SELECT cost_usd, tokens_in, tokens_out, provider, run_id, "
+                "cache_read_tokens, cache_write_tokens "
                 "FROM agent_invocations "
                 "WHERE project_root=? AND feature=? AND source_seq=?",
                 (project_root, anchor_feature, anchor_seq),
@@ -414,6 +432,8 @@ def on_event_appended(
                 "cost_usd": _num(row[0]) if row else 0.0,
                 "tokens_in": int(row[1]) if row and row[1] else 0,
                 "tokens_out": int(row[2]) if row and row[2] else 0,
+                "cache_read_tokens": int(row[5]) if row and row[5] else 0,
+                "cache_write_tokens": int(row[6]) if row and row[6] else 0,
             }
             _fold_billing(rec, event_dict)
             # BILLING_UPDATE carries the model/run_id the original AGENT_DONE couldn't
@@ -429,10 +449,13 @@ def on_event_appended(
                 model,
                 rec.get("tokens_in"),
                 rec.get("tokens_out"),
+                rec.get("cache_read_tokens"),
+                rec.get("cache_write_tokens"),
             )
             with _get_write_lock(conn):
                 conn.execute(
                     "UPDATE agent_invocations SET cost_usd=?, tokens_in=?, tokens_out=?, "
+                    "cache_read_tokens=?, cache_write_tokens=?, "
                     "cost_source=?, provider=COALESCE(?,provider), run_id=COALESCE(?,run_id), "
                     "board_scope=COALESCE(board_scope,?) "
                     "WHERE project_root=? AND feature=? AND source_seq=?",
@@ -440,6 +463,8 @@ def on_event_appended(
                         cost,
                         int(rec.get("tokens_in") or 0),
                         int(rec.get("tokens_out") or 0),
+                        int(rec.get("cache_read_tokens") or 0),
+                        int(rec.get("cache_write_tokens") or 0),
                         cost_source,
                         model,
                         run_id,

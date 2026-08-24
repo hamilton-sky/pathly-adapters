@@ -23,6 +23,8 @@ def _patch_last_agent_done(
     model: str = "",
     run_id: str = "",
     board_scope: str = "",
+    cache_read_tokens: int = 0,
+    cache_write_tokens: int = 0,
 ) -> None:
     """Append a BILLING_UPDATE event with real cost/token data to DB.
 
@@ -58,6 +60,10 @@ def _patch_last_agent_done(
         "cost_usd": cost_usd,
         "tokens_in": tokens_in,
         "tokens_out": tokens_out,
+        # Cache split rides alongside the lump — `tokens_in` still includes these.
+        # Consumers that want a priceable basis use tokens_in - cache_read - cache_write.
+        "cache_read_tokens": int(cache_read_tokens or 0),
+        "cache_write_tokens": int(cache_write_tokens or 0),
         "total_tokens": tokens_in + tokens_out,
         "wall_seconds": wall_seconds,
         "tool_uses": tool_uses,

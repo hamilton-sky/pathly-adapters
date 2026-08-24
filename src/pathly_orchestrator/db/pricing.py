@@ -32,6 +32,30 @@ _ADAPTER_PREFIXES: list[tuple[tuple[str, ...], str]] = [
     (("copilot-",), "copilot"),
 ]
 
+# Prompt-cache tiers, expressed as multipliers on the model's INPUT rate rather than as
+# per-model absolute rates — every provider that offers prompt caching prices it that way, so
+# one pair of constants covers the whole table and cannot drift row by row.
+#   read  0.1x  — Anthropic cache-read and OpenAI cached-input both bill at 1/10 of input.
+#   write 2.0x  — Anthropic ephemeral cache creation, 1-HOUR tier.
+#
+# On the write multiplier: this was originally 1.25x (the 5-minute tier), on the assumption that
+# 5m is Claude Code's default and that the envelope does not break creation out by TTL. Both
+# halves of that assumption are wrong, measured against a real 3,683-line session log on
+# 2026-08-24: `usage.cache_creation.{ephemeral_5m_input_tokens, ephemeral_1h_input_tokens}` is
+# present on 100% of turns (1,772/1,772), and the split was 3,713,390 tokens of 1h against
+# ZERO of 5m. Pricing agent runs at 1.25x understates the cache-write line by 37.5%.
+#
+# 2.0x is therefore an evidence-based default, not a conservative guess.
+#
+# We deliberately do NOT split the two tiers through the pipeline yet: that needs a third token
+# column plus a migration, and the measured 5m share is 0%, so the accuracy gain today is nil.
+# `CACHE_WRITE_5M_MULTIPLIER` is recorded for the day a workload actually uses the 5m tier — at
+# which point `extract_cache_tokens` should return the split and `compute()` should price each
+# tier separately. Until then one blended rate at the observed tier is the honest simplification.
+CACHE_READ_MULTIPLIER = 0.1
+CACHE_WRITE_MULTIPLIER = 2.0
+CACHE_WRITE_5M_MULTIPLIER = 1.25  # unused today; see note above
+
 # Keyed by provider slug → model-family-prefix → (input_$/MTok, output_$/MTok).
 # Prefix matching: longest matching prefix wins.
 #
@@ -87,12 +111,21 @@ class PricingRegistry:
         model: str,
         tokens_in: int,
         tokens_out: int,
+        cache_read_tokens: int = 0,
+        cache_write_tokens: int = 0,
     ) -> tuple[float, str]:
         """Return (cost_usd, cost_source).
 
         Prefix-matches model against the provider's table; longest key wins.
         Returns (0.0, "unpriced") when provider is unknown or no prefix matches,
         or when both token counts are zero.
+
+        ``tokens_in`` is cache-INCLUSIVE (see runner/output.py::extract_cache_tokens).
+        When a cache split is supplied it is carved OUT of the lump and re-priced at its
+        own tier — cache reads at 0.1x input, cache writes at 1.25x input — leaving only
+        genuinely uncached input at 1x. Billing the whole lump at 1x overstates a
+        cache-heavy agent run by roughly 3x. Omitting the split preserves the old
+        (lump-at-1x) behaviour exactly, so existing callers are unaffected.
         """
         if tokens_in == 0 and tokens_out == 0:
             return (0.0, "unpriced")
@@ -112,8 +145,19 @@ class PricingRegistry:
             return (0.0, "unpriced")
 
         in_rate, out_rate = table[best_key]
+        c_read = max(0, int(cache_read_tokens or 0))
+        c_write = max(0, int(cache_write_tokens or 0))
+        # Clamp: the split is a SUBSET of the lump. A malformed pair that exceeds tokens_in
+        # must not drive uncached negative and refund the bill.
+        if c_read + c_write > tokens_in:
+            c_read = min(c_read, tokens_in)
+            c_write = max(0, tokens_in - c_read)
+        uncached_in = tokens_in - c_read - c_write
         cost = round(
-            (tokens_in / 1_000_000 * in_rate) + (tokens_out / 1_000_000 * out_rate),
+            (uncached_in / 1_000_000 * in_rate)
+            + (c_read / 1_000_000 * in_rate * CACHE_READ_MULTIPLIER)
+            + (c_write / 1_000_000 * in_rate * CACHE_WRITE_MULTIPLIER)
+            + (tokens_out / 1_000_000 * out_rate),
             6,
         )
         return (cost, "estimated")
@@ -122,7 +166,15 @@ class PricingRegistry:
         """Return the full pricing table for the API endpoint."""
         return {
             provider: {
-                model: {"input": in_rate, "output": out_rate}
+                model: {
+                    "input": in_rate,
+                    "output": out_rate,
+                    # Surfaced so the endpoint stops implying a 2-bucket world. A reader
+                    # that sees only input/output cannot tell a cache-tiered estimate from
+                    # a lump one.
+                    "cache_read": round(in_rate * CACHE_READ_MULTIPLIER, 6),
+                    "cache_write": round(in_rate * CACHE_WRITE_MULTIPLIER, 6),
+                }
                 for model, (in_rate, out_rate) in models.items()
             }
             for provider, models in PRICING.items()
@@ -138,10 +190,25 @@ def infer_provider(model: str) -> str:
     return "unknown"
 
 
-def estimate_cost(model: str, tokens_in: int, tokens_out: int) -> tuple[float, str]:
-    """Resolve (cost_usd, cost_source) for *model*, inferring its provider from the name."""
+def estimate_cost(
+    model: str,
+    tokens_in: int,
+    tokens_out: int,
+    cache_read_tokens: int = 0,
+    cache_write_tokens: int = 0,
+) -> tuple[float, str]:
+    """Resolve (cost_usd, cost_source) for *model*, inferring its provider from the name.
+
+    The optional cache split is carved out of the cache-inclusive ``tokens_in`` and priced
+    at its own tier; see :meth:`PricingRegistry.compute`.
+    """
     return PricingRegistry().compute(
-        infer_provider(model), model, tokens_in, tokens_out
+        infer_provider(model),
+        model,
+        tokens_in,
+        tokens_out,
+        cache_read_tokens,
+        cache_write_tokens,
     )
 
 

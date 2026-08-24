@@ -71,6 +71,8 @@ def _reconcile_billing_now(
         tokens_in = int(billing.get("tokens_in") or 0)
         tokens_out = int(billing.get("tokens_out") or 0)
         tool_uses = int(billing.get("tool_uses") or 0)
+        cache_read = int(billing.get("cache_read_tokens") or 0)
+        cache_write = int(billing.get("cache_write_tokens") or 0)
         wall = int((data or {}).get("wall_seconds") or 0)
     except (TypeError, ValueError):
         return
@@ -96,6 +98,8 @@ def _reconcile_billing_now(
             model=model,
             run_id=run_id,
             board_scope=_run_board_scope(state, storage),
+            cache_read_tokens=cache_read,
+            cache_write_tokens=cache_write,
         )
     except Exception as exc:
         logger.warning("_reconcile_billing_now: patch failed: %s", exc)

@@ -191,6 +191,54 @@ def _codex_usage(raw_output: str) -> tuple[int, int]:
 # _TOKEN_STRATEGIES below; nothing else changes.
 
 
+def extract_cache_tokens(payload: dict[str, Any]) -> tuple[int, int]:
+    """Return ``(cache_read_tokens, cache_write_tokens)`` from a result envelope.
+
+    ``tokens_in`` is a LUMP that folds cache reads/writes in with uncached input (see
+    ``_normalize_model_usage``). That is the right TOTAL but the wrong basis for pricing:
+    cache reads bill at 0.1x and cache writes at 1.25x/2x, so a lump priced at the plain
+    input rate overstates a cache-heavy run several-fold. ``agent_invocations`` has carried
+    ``cache_read_tokens``/``cache_write_tokens`` columns — and ``trends.py`` has SUMmed
+    them — since the schema was added, but nothing ever populated them, so every bucket
+    read 0. This is the missing producer.
+
+    Reads the top-level ``usage`` block first, falling back to summing ``modelUsage``.
+    Tolerant of camelCase/snake_case; never raises.
+    """
+    try:
+        usage = payload.get("usage") or payload.get("inputUsage") or {}
+        c_read = int(
+            usage.get("cache_read_input_tokens")
+            or usage.get("cacheReadInputTokens")
+            or 0
+        )
+        c_write = int(
+            usage.get("cache_creation_input_tokens")
+            or usage.get("cacheCreationInputTokens")
+            or 0
+        )
+        if c_read or c_write:
+            return c_read, c_write
+        raw_mu = payload.get("modelUsage") or payload.get("model_usage") or {}
+        if isinstance(raw_mu, dict):
+            for u in raw_mu.values():
+                if not isinstance(u, dict):
+                    continue
+                c_read += int(
+                    u.get("cacheReadInputTokens")
+                    or u.get("cache_read_input_tokens")
+                    or 0
+                )
+                c_write += int(
+                    u.get("cacheCreationInputTokens")
+                    or u.get("cache_creation_input_tokens")
+                    or 0
+                )
+        return c_read, c_write
+    except Exception:
+        return 0, 0
+
+
 def _claude_tokens(payload: dict[str, Any], raw_output: str) -> tuple[int, int]:
     """Claude: lump ``usage`` from the result envelope (input + cache, output), with the
     per-model ``modelUsage`` breakdown as a fallback when the lump is absent/partial."""
@@ -320,6 +368,12 @@ def parse_result(adapter: str, raw_output: str) -> dict[str, Any]:
         if isinstance(block, dict) and block.get("type") == "tool_use"
     )
 
+    # Cache split — reported ALONGSIDE the lump, never instead of it. `tokens_in` keeps its
+    # existing cache-inclusive meaning so every downstream reader is unaffected; these two
+    # fields let the pricing path (db/pricing.py) charge cache reads at 0.1x and writes at
+    # 1.25x instead of billing the whole lump at the input rate.
+    cache_read_tokens, cache_write_tokens = extract_cache_tokens(payload)
+
     return {
         "cost_usd": cost_usd,
         "session_id": session_id or None,
@@ -327,6 +381,8 @@ def parse_result(adapter: str, raw_output: str) -> dict[str, Any]:
         "result": payload.get("result", ""),
         "tokens_in": tokens_in,
         "tokens_out": tokens_out,
+        "cache_read_tokens": cache_read_tokens,
+        "cache_write_tokens": cache_write_tokens,
         "tool_uses": tool_uses,
         "model_usage": model_usage,
         # Failure signal from the CLI's own result envelope. Surfaced so the downstream
