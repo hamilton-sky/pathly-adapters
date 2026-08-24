@@ -149,7 +149,48 @@ and tasks in your text output so the user can post them manually.
 
 ---
 
-## Step 5 — Report
+## Step 5 — Close what you resolved (MANDATORY when your analysis settles anything)
+
+Your analysis routinely concludes that existing board state is now stale: a task the board
+still lists as open was already done, or a decision has been overtaken by a later one. **A
+sentence in BOARD_EVAL.md is not a resolution.** Writing "Mark tasks A, B, C as COMPLETE" and
+stopping there leaves the board's system of record saying the work is open — every later agent
+reads the open tasks, not your markdown.
+
+If your analysis settled it, land it.
+
+**Tasks you determined are already complete (or dead):**
+
+```bash
+curl -s -X POST http://127.0.0.1:8765/comms/tasks/status \
+  -H "Content-Type: application/json" \
+  -d '{
+    "task_ids": ["<id>", "<id>"],
+    "status": "done",
+    "from": "evaluator",
+    "reason": "<why — one line, e.g. delivered by ADR-007, verified in src/x.py>",
+    "feature": "<feature>"
+  }'
+```
+
+`status` is `done` or `failed` (`failed` cascades dependents to blocked). Check the response:
+`updated` lists what landed, `newly_ready` what your close unblocked, and `unknown` any id that
+does not exist — an id in `unknown` means you named a stale id and that task is still open.
+
+**Decisions your evaluation supersedes:** re-post the winning decision with `"supersedes":
+["<old id>"]` (see the comms-post fragment). Do not supersede an escalation or a question
+addressed to a human — an agent decision never closes a human gate.
+
+This step is **evidence-gated**. Close a task only when the board context or the code shows it
+is genuinely done; if you are inferring from a plausible-looking artifact, post a `discovery`
+saying so and leave the task open. A wrongly-closed task is invisible — nothing will re-open it.
+
+If the FSM server is unreachable, skip silently and list what you would have closed in your
+text output.
+
+---
+
+## Step 6 — Report
 
 After all posts succeed (or are skipped), output:
 
@@ -160,6 +201,8 @@ Classification: <CODE | RESEARCH | BOTH>
 Analysis artifact: pathly/features/<feature>/artifacts/BOARD_EVAL.md
 Goal posted: <goal text> (id: <$GOAL_ID>)
 Tasks posted: <N>
+Tasks closed: <N>  (ids, or "none")
+Decisions superseded: <N>  (ids, or "none")
 
 - <task 1 text>
 - <task 2 text> (if any)
@@ -169,7 +212,8 @@ Tasks posted: <N>
 
 ## Constraints
 
-- Never execute the proposed tasks yourself. Propose only.
+- Never execute the proposed tasks yourself. Propose only. Step 5 is not an exception:
+  recording that a task is ALREADY settled is bookkeeping, not doing the work.
 - Write only to `pathly/features/<feature>/artifacts/`. Do not touch plan files or state files.
 - One analysis artifact per run — overwrite BOARD_EVAL.md, never append.
 - One post per finding. Do not batch multiple findings into a single board message.

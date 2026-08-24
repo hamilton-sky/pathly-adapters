@@ -22,6 +22,7 @@ from ._helpers import (
     norm_project_root,
 )
 from ._messages_bp import bp
+from ._supersede_on_post import apply_supersedes, validate_supersedes
 
 
 @bp.route("/comms/post", methods=["POST"])
@@ -160,6 +161,11 @@ def comms_post():
             )
         if goal_id is not None and not isinstance(goal_id, str):
             return jsonify({"error": "Field 'goal_id' must be a string or null"}), 400
+        # Supersession, applied AFTER the post lands (see _supersede_on_post) — validated
+        # here so a malformed list 400s before anything is written.
+        supersedes, supersedes_err = validate_supersedes(data.get("supersedes"))
+        if supersedes_err:
+            return jsonify({"error": supersedes_err}), 400
         if executor is not None and not isinstance(executor, str):
             return jsonify({"error": "Field 'executor' must be a string or null"}), 400
         # summary_backend is now ONLY the client-drop suppression signal consumed by
@@ -281,6 +287,12 @@ def comms_post():
             slug=slug if isinstance(slug, str) and slug.strip() else None,
         )
 
+        # Retire the decisions this post replaces. Runs immediately after the write so the
+        # governance block can never contain the new decision AND the one it supersedes.
+        supersede_result = (
+            apply_supersedes(conn, supersedes, message_id) if supersedes else None
+        )
+
         if (
             msg_type == "artifact"
             and isinstance(artifact_path, str)
@@ -359,6 +371,10 @@ def comms_post():
         # auto-derived context — surface that as a NON-BLOCKING warning so the gap is
         # visible to the poster instead of silently degrading context quality (ISSUE-4).
         resp = {"ok": True, "message_id": message_id}
+        if supersede_result is not None:
+            resp["superseded"] = supersede_result["superseded"]
+            if supersede_result["skipped"]:
+                resp["supersede_skipped"] = supersede_result["skipped"]
         if msg_type == "task":
             _has_refs = isinstance(context_refs, list) and len(context_refs) > 0
             if not _has_refs and not data.get("no_refs"):

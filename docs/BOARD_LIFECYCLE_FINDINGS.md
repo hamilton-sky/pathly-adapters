@@ -1,6 +1,6 @@
 # Board Lifecycle — Findings, Applied Fixes, and Open Proposals
 
-_Author: Claude (Opus 5) · Date: 2026-08-24 · Status: **2 fixes applied, 5 proposals awaiting your call**_
+_Author: Claude (Opus 5) · Date: 2026-08-24 · Status: **A, B and D implemented; C awaiting a design decision; E/F deferred**_
 
 Evidence base: the `local-usage-meter` feature board in
 `~/Documents/project/token-tracker/pathly/`, read live from the running orchestrator on
@@ -19,7 +19,9 @@ resolutions never write back to task state, human gates never actually gate, and
 telemetry couldn't measure itself. One shape, four times — the board is append-only truth where
 nothing ever wins.
 
-Two of those I fixed. The rest change agent behaviour, so they're yours to decide.
+Two of those I fixed. Three more (A, B, D) are now implemented — see the status banner on each
+proposal below. **Proposal D turned out to be wrong as originally written**; the correction is
+recorded in place rather than quietly edited away.
 
 ---
 
@@ -105,10 +107,15 @@ Pricing agent runs at 1.25× understates the cache-write line by **37.5%**. The 
 the pipeline needs a third token column plus a migration, and with the 5m share measured at 0%
 the accuracy gain today is nil. That's a deliberate deferral, noted in the source.
 
-**Historical rows are still wrong.** This fix only corrects runs from here on; existing
-`agent_invocations` rows have `cache_read_tokens = cache_write_tokens = 0` and will keep reading
-as pure uncached input. If the Studio trend chart matters, those rows need backfilling from
-`EVENTS.jsonl` or flagging as pre-fix.
+**Historical rows are still wrong — flagged, deliberately not backfilled.** This fix only
+corrects runs from here on; existing `agent_invocations` rows have
+`cache_read_tokens = cache_write_tokens = 0` and read as pure uncached input. Reconstructing them
+would mean re-parsing archived stdout that in many cases was truncated by the PTY tail buffer in
+the first place — inventing the numbers, not recovering them. Instead a watermark
+(`telemetry.cache_split_since`, stamped once by
+`db/migrations_incremental.py::_stamp_cache_split_watermark`, surfaced on `/telemetry/trends`)
+records where capture begins, so a consumer can render earlier buckets as *unavailable* rather
+than mistaking the fix date for the day prompt caching started.
 
 ### Fix 2 — Governance decisions rendered in an order that hid supersession
 
@@ -125,7 +132,8 @@ with no way to tell which won. Same block also carried *"TUI uses Ink (React-for
 governance while the architecture's ADR-007 explicitly rejects Ink and the task's own acceptance
 text says "no Ink/React runtime".
 
-**What I changed** — `runner/comms_context.py`, rendering only:
+**What I changed** — rendering only (now `runner/comms_formatters.py::render_governance_lines`,
+extracted from `comms_context.py` to hold that file under the 400-line rule):
 
 - Decisions sort **newest-first** with a `LATEST ·` marker on the top entry.
 - Minute-precision stamps alongside the age (`2026-08-10 17:20 · 13d ago`) — same-day decisions
@@ -139,11 +147,22 @@ text says "no Ink/React runtime".
 
 ---
 
-## Part 2 — Open proposals
+## Part 2 — Proposals
 
-Each of these changes agent or FSM behaviour, so I stopped at diagnosis.
+Each of these changes agent or FSM behaviour. A, B and D are now implemented (each carries a
+status banner); C is still diagnosis-only because it needs a product decision, not an
+implementation one; E and F are deferred.
 
-### Proposal A — Nothing ever calls `POST /comms/supersede` · **highest value**
+### Proposal A — Nothing ever calls `POST /comms/supersede` · **IMPLEMENTED**
+
+> **Status: done.** `/comms/post` now takes an optional `supersedes: [id, …]`, applied in the same
+> request (`blueprints/comms/_supersede_on_post.py`), and the `comms-post` fragment instructs every
+> decision-posting agent to use it. **The "cheaper 80%" auto-supersede sketched below was
+> deliberately NOT built**: retiring governance on an embedding-similarity guess turns "nothing
+> ever closes" into "the wrong thing closed", and a superseded decision is invisible to every
+> downstream reader. Supersession is now an explicit claim the author makes. Guards: capped,
+> de-duplicated, self-reference refused, and a bad id degrades to a per-id `skipped` reason rather
+> than failing the post.
 
 `superseded_by` is set on **0 of 71** messages on this board.
 
@@ -160,7 +179,15 @@ it. A cheaper 80% version: when an agent posts a `decision` whose text starts wi
 or `UNBLOCKED —`, auto-supersede the most semantically similar prior decision in the same scope
 (the embeddings are already there — 160 rows on this board).
 
-### Proposal B — Agent resolutions never write back to task state
+### Proposal B — Agent resolutions never write back to task state · **IMPLEMENTED**
+
+> **Status: done.** `POST /comms/tasks/status` (`blueprints/comms/tasks_status.py`) takes a batch
+> of ids, a terminal `status` (`done`/`failed`) and a `reason`, and reports `updated` /
+> `newly_ready` / `blocked` / `unknown`. `planning/evaluate` Step 5 now requires the evaluator to
+> call it for anything its analysis settled — evidence-gated, and explicitly NOT a licence to
+> close a task it merely believes is done. Bulk (not N single-id calls) because the failure mode
+> is an agent doing 0 of N, not 3 of 5. Re-opening a task is not offered: an agent that can
+> silently reopen its own failures can loop forever without anything closing.
 
 `BOARD_EVAL.md` ends with *"Mark tasks `726aecdd`, `4a0a6706`, `b7d9a7af` as COMPLETE."* Live
 board, 14 days later: all three still `task_status=pending`, `attempts=0`, `claimed_by=null`. So
@@ -175,7 +202,13 @@ a call, not a sentence. If an agent can't be trusted to mutate task state direct
 structured `proposed_transitions` block that the orchestrator applies or surfaces for one-click
 approval — but the resolution must land *somewhere* other than prose.
 
-### Proposal C — Human gates don't gate
+### Proposal C — Human gates don't gate · **NOT BUILT — needs your decision**
+
+> **Blocked on a product question, not an implementation one.** "An unacknowledged escalation
+> blocks the transition it names" has two materially different readings: the run **stalls** until
+> a human acknowledges, or it **pauses and pages** a human and can be force-advanced. And if it
+> can be force-advanced, that escape hatch is exactly the mechanism that produced the board below.
+> Guessing on a safety property is worse than leaving it open, so this one is waiting on you.
 
 Four board messages are still `status=pending` with `acknowledged_by=[]` and `read_by=[]`:
 
@@ -198,14 +231,37 @@ sentence** — *"Use `Defer to build`. Keep it simple."*
 not the whole FSM. And an agent should be structurally unable to resolve an escalation raised for
 `to_agent: human` — that resolution needs a human `acknowledge_message()` call.
 
-### Proposal D — `STATE.json: DONE` on a board with zero delivered work
+### Proposal D — `STATE.json: DONE` on a board with zero delivered work · **IMPLEMENTED, but the diagnosis above was wrong**
 
 The feature reports `DONE` with 14/14 tasks pending and an empty `src/`. $8.29, 65 minutes, six
 agents, 7.65M tokens, ~1,650 lines of markdown, zero lines of code.
 
-A terminal state that says "done" when nothing shipped is an honesty problem in the FSM, not just
-in the telemetry. **Suggested fix:** `DONE` should require the goals' tasks to be terminal.
-Otherwise this state is `PLANNED`, and calling it that costs nothing and misleads nobody.
+**The original suggested fix — "`DONE` should require the goals' tasks to be terminal" — would
+have been a bug.** Reading the flow definitions makes it clear: the state sequence recorded on
+this board (`PO_DISCUSSING → ARCHITECTING → RESEARCHING → DESIGNING → PLANNING → DONE`) is the
+**`consultation`** flow, whose entire job is decomposition. Its `PLANNING → DONE` edge already
+carries a real predicate (`on_board_count > 0` — "a task DAG was seeded"), and pending tasks are
+its *correct output*. Gating that DONE on tasks being terminal would have wedged every decompose
+run in the product, permanently.
+
+The actual defect is narrower and dumber: **`STATE.json` records `current` but not which flow
+produced it.** Every flow terminates at the literal string `"DONE"`, so `{"current": "DONE"}` is
+identical whether it means "decomposed, nothing built" or "feature shipped". The board never lied;
+it was unable to say which DONE it meant, and I read it as the stronger claim.
+
+**What was actually changed:**
+
+1. `eventlog.write_state` stamps `flow` into the state dict (it already received the flow config —
+   it just never persisted the name). `{"current":"DONE","flow":"consultation"}` is self-describing.
+2. The *delivery* flows get the honesty predicate the original proposal was reaching for:
+   `team` and `team-build` now carry `->DONE: require_tasks_done`. That gate type already existed
+   and was wired only to `REVIEWING->TESTING`, which cannot see work posted during TESTING or
+   RETRO. The consultation flows deliberately do **not** get it.
+3. Fixing (2) surfaced a **latent persistence bug**: gates are stored per-edge (`"SOURCE->TARGET"`),
+   so the wildcard `"->DONE"` form — which `run_gates` explicitly supports — matched no edge row and
+   was dropped on the way into the DB. Since flows load DB-first at runtime, any flow authored with
+   a wildcard gate silently ran *without* it. `flow_graph_ops` now round-trips non-edge gate keys.
+   Two existing round-trip tests caught this immediately, which is the only reason it isn't shipped.
 
 ### Proposal E — Two telemetry stores that don't know about each other
 
@@ -242,45 +298,77 @@ decomposes to <50% coverage.
 
 ---
 
-## Part 3 — Suggested order
+## Part 3 — Where this stands
 
-1. **Proposal A** (supersession write path) — root cause of the board's self-contradiction; my
-   Fix 2 is only masking it.
-2. **Proposal B** (decision write-back) — makes the most expensive agent role's output real.
-3. **Proposal C** (gates that gate) — the safety property you probably thought you had.
-4. **Proposal D** (`DONE` means done) — one predicate, big honesty win.
-5. **Proposal E / F** — cleanup.
+| | Status |
+|---|---|
+| Fix 1 — cache-token capture + tiered pricing | applied, regression-tested, historical rows watermarked |
+| Fix 2 — governance ordering | applied, regression-tested |
+| A — supersession write path | **implemented** (explicit `supersedes`, never inferred) |
+| B — task write-back | **implemented** (`/comms/tasks/status` + evaluator Step 5) |
+| D — terminal-state honesty | **implemented**, after correcting the original diagnosis |
+| C — gates that gate | **open — needs a decision from you** (stall vs. page-and-force) |
+| E / F — split telemetry surfaces, 0% ref coverage | deferred; F is explicitly not urgent |
 
-Then re-run `local-usage-meter` end to end. With A–D in place it becomes a genuine test of whether
-Pathly can ship code, rather than a test of whether it can produce documents.
+The next real test is re-running `local-usage-meter` end to end. A, B and D give the board the
+machinery to record a resolution; whether the agents actually *use* it is the thing that run would
+measure, and the honest expectation is that the skills need another pass once we see what they do.
+Note that A and B close the write path but **cannot** make a wrong resolution right — an agent
+that closes a task it shouldn't have now does so durably.
 
 ---
 
 ## Appendix — Files touched
 
-**Modified (fixes applied):**
+**Fix 1 + Fix 2 (telemetry + governance ordering):**
 
 ```
-src/pathly_orchestrator/runner/output.py
-src/pathly_orchestrator/runner/events.py
-src/pathly_orchestrator/runner/comms_context.py
+src/pathly_orchestrator/runner/output.py            extract_cache_tokens
+src/pathly_orchestrator/runner/events.py            cache fields on BILLING_UPDATE
 src/pathly_orchestrator/supervisor/terminal_billing.py
+src/pathly_orchestrator/db/pricing.py               CACHE_READ/WRITE_MULTIPLIER
 src/pathly_orchestrator/db/queries/invocation_projection.py
-src/pathly_orchestrator/db/pricing.py
+src/pathly_orchestrator/runner/comms_formatters.py  render_governance_lines (extracted)
+src/pathly_orchestrator/runner/comms_context.py     now calls it
 ```
 
-All six compile; imports verified; legacy call signatures preserved via defaults.
-**The running server holds the old code — restart to load these:**
+**A / B / D (closure):**
 
-```bash
-curl -s -X POST http://127.0.0.1:8765/shutdown
 ```
+http_server/blueprints/comms/_supersede_on_post.py  NEW — supersedes on /comms/post
+http_server/blueprints/comms/tasks_status.py        NEW — POST /comms/tasks/status
+http_server/blueprints/comms/messages_write.py      wiring + validation
+src/pathly_orchestrator/eventlog.py                 stamp `flow` into the state dict
+src/pathly_data/core/flows/team.flow.yaml           ->DONE: require_tasks_done
+src/pathly_data/core/flows/team-build.flow.yaml     ->DONE: require_tasks_done
+db/queries/flow_graph_ops.py                        wildcard gates survive the DB round-trip
+db/migrations_incremental.py                        cache-split watermark
+http_server/blueprints/ops/telemetry_phase.py       surfaces the watermark
+core/skills/fragments/comms-post.md                 agents supersede what they replace
+core/skills/planning/evaluate.md                    Step 5 — close what you resolved
+```
+
+**Split under the 400-line rule** (the two fix commits pushed two files over the ratchet):
+`db/queries/invocation_pricing.py` and `db/queries/invocation_record.py` are new; the projector
+re-exports their symbols under the historical private names, so no call site moved.
+
+**Tests:** `tests/telemetry/test_cache_token_pricing.py` (25),
+`tests/comms_board/test_governance_decision_precedence.py` (8),
+`tests/comms_board/test_board_closure.py` (24).
 
 **Not touched:** no database rows were modified, no board state mutated, no FSM transition run.
+
+**To pick these up in an interactive install** (runner mode composes prompts in Python and needs
+nothing):
+
+```bash
+pathly-setup claude --apply --repair
+```
 Everything in Part 2 is diagnosis only.
 
-**Caveat worth stating:** `~/Documents/project` has no git commits and `pathly-adapters/` is
-untracked, so there was no version-control safety net for these edits. Backups of all six
-originals were written to this session's scratchpad, but they are session-scoped and will not
-survive indefinitely — `git init && git add -A && git commit` before the next agent run would be
-worth more than any fix in this document.
+**Superseded caveat.** An earlier revision of this document warned that the edits had no
+version-control safety net. That is no longer true and was never true of this repository: all of
+this work is committed on `fix/board-lifecycle-telemetry`, with the full suite and the four
+consistency gates (`check_file_size`, `check_no_mirror_reads`, `check_version_sync`,
+`gen_test_index --check`) green. The warning applied to the *evidence* project
+(`~/Documents/project/token-tracker`), which is a separate repo.

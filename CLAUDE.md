@@ -244,7 +244,7 @@ These rules apply to all Python in `src/pathly_orchestrator/` and all TypeScript
 - A module file owns exactly one concern (DB queries, embeddings, output parsing, …).
 - **Hard limit: 400 lines per file.** If a file approaches this, split it before adding more code.
 - **Gated in CI** by `scripts/check_file_size.py` (lint `consistency` job) as a *ratchet* against
-  `scripts/file_size_baseline.txt`: the 28 files already over the limit are frozen at their current
+  `scripts/file_size_baseline.txt`: the 22 files already over the limit are frozen at their current
   size and may only shrink. A NEW oversized file fails, and so does **growing an already-oversized
   one** — which is rule #2 mechanically enforced. Adding a new file is always allowed. When a
   baseline file drops to 400 or under, the check fails until you run
@@ -272,7 +272,7 @@ blueprints/
   flows/      defs (flow CRUD), stage_configs (per-stage overrides)
   catalog/    items (file-tree catalog)
   skills/     editor (skill notebook routes)
-  comms/      messages, tasks, artifacts, runs, goals, settings, context (board subsystems)
+  comms/      messages, tasks, tasks_status, artifacts, runs, goals, settings, context (board subsystems)
   ops/        telemetry, menu, db_api, chat, export (operational/infra)
   code/       query (codebase-intelligence query)
   control/    runs_read (unified run read API: GET /runs, /runs/<id>) · runs_control (POST /runs/<id>/stop — run_id-addressed stop · POST /runs/<id>/<action> for pause|resume|advance|reroute|retry|abort — run_id-addressed control, mirrors /runner/* — board-lock runs support only abort)
@@ -378,6 +378,24 @@ OTel **span** (for the Traces tab) — the invocation comes from the event proje
 `/db/stats` and `/db/features` both honor `project_root` (scoped SUM/GROUP BY over the
 same table), so the header total always equals the sum of the feature cards for that
 project.
+
+**Prompt-cache tokens are captured and priced at their own tier.** `tokens_in` is a LUMP that
+folds cache reads and cache creation in with uncached input — the right TOTAL, the wrong basis
+for pricing, since reads bill at 0.1x input and 1-hour cache writes at 2.0x. The
+`agent_invocations.cache_read_tokens`/`cache_write_tokens` columns (and `trends.py`'s SUMs over
+them) existed from the schema onward with no producer, so every bucket read 0 and any row the CLI
+did NOT price was billed lump-at-1x — ~3x over on a cache-heavy agent run. The producer is
+`runner/output.py::extract_cache_tokens`, threaded through `BILLING_UPDATE`
+(`runner/events.py::_patch_last_agent_done` → `supervisor/terminal_billing.py`) into the
+projection, where `db/pricing.py` carves the split OUT of the lump and re-prices it
+(`CACHE_READ_MULTIPLIER = 0.1`, `CACHE_WRITE_MULTIPLIER = 2.0`). `tokens_in` keeps its
+cache-inclusive meaning, and omitting the split reproduces the old cost exactly, so no existing
+reader shifts. The 2.0x write tier is measured, not the published 1.25x headline: on a real
+session log 100% of cache creation was `ephemeral_1h_input_tokens` and 0% was 5m. **Historical
+rows are not backfilled** — `telemetry.cache_split_since` (stamped once by
+`db/migrations_incremental.py::_stamp_cache_split_watermark`, surfaced on `/telemetry/trends`)
+marks where capture begins, so a consumer can render earlier buckets as "unavailable" instead of
+mistaking the fix date for the day caching started.
 
 **Two strategies: token-counting is universal, cost is per-provider.** Tracking every CLI
 spawn's usage splits into two independent layers so a rate change never disturbs token

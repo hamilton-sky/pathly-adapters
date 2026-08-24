@@ -227,3 +227,66 @@ def test_projection_never_repriced_a_row_that_already_has_a_cost():
         8.29,
         "reported",
     )
+
+
+# --------------------------------------------------------------------------------------
+# Historical rows: watermark, not backfill
+# --------------------------------------------------------------------------------------
+
+
+def test_cache_split_watermark_is_stamped_once_and_is_stable(tmp_path):
+    """Rows before this timestamp read 0 because nothing captured the split, not because no
+    cache was used. Reconstructing them would mean re-parsing stdout that was often truncated
+    in the first place, so we record where the data starts instead of inventing it."""
+    import sqlite3
+
+    from pathly_orchestrator.db.migrations_incremental import (
+        _stamp_cache_split_watermark,
+    )
+
+    conn = sqlite3.connect(tmp_path / "t.db")
+    conn.row_factory = sqlite3.Row
+    # Mirrors the real schema — value/updated_at are NOT NULL, and an INSERT that omits
+    # updated_at raises into the swallowing except (which is how the first version of this
+    # watermark silently did nothing).
+    conn.execute(
+        "CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, "
+        "updated_at TEXT NOT NULL)"
+    )
+
+    _stamp_cache_split_watermark(conn)
+    first = conn.execute(
+        "SELECT value FROM app_settings WHERE key='telemetry.cache_split_since'"
+    ).fetchone()["value"]
+    assert first
+
+    _stamp_cache_split_watermark(conn)  # a later server start must not move it
+    second = conn.execute(
+        "SELECT value FROM app_settings WHERE key='telemetry.cache_split_since'"
+    ).fetchone()["value"]
+    assert second == first
+    conn.close()
+
+
+def test_cache_split_watermark_never_blocks_startup(tmp_path):
+    """No app_settings table at all — a telemetry watermark must not raise into migrations."""
+    import sqlite3
+
+    from pathly_orchestrator.db.migrations_incremental import (
+        _stamp_cache_split_watermark,
+    )
+
+    conn = sqlite3.connect(tmp_path / "empty.db")
+    _stamp_cache_split_watermark(conn)  # must not raise
+    conn.close()
+
+
+def test_trends_endpoint_reports_the_watermark():
+    from pathly_orchestrator.http_server import app
+
+    app.config["TESTING"] = True
+    with app.test_client() as c:
+        body = c.get("/telemetry/trends?feature=").get_json()
+    assert "cache_split_since" in body, (
+        "a consumer cannot tell 'no cache used' from 'split not captured' without it"
+    )

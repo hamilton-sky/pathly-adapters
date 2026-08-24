@@ -2,6 +2,7 @@
 
 from .messages import bp as messages_bp
 from .tasks import bp as tasks_bp
+from .tasks_status import bp as tasks_status_bp
 from .artifacts import bp as artifacts_bp
 from .artifacts_summary import bp as artifacts_summary_bp
 from .runs import bp as runs_bp
@@ -27,6 +28,7 @@ from ._helpers import (  # noqa: F401
 all_blueprints = [
     messages_bp,
     tasks_bp,
+    tasks_status_bp,
     artifacts_bp,
     artifacts_summary_bp,
     runs_bp,

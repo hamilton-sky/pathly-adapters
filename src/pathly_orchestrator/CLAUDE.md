@@ -21,7 +21,25 @@ Each transition is driven by events written to the central SQLite DB (`~/.pathly
 | `ARTIFACTS.jsonl` | **DROPPED** — artifact metadata lives in `BOARD.json`; reconcile attaches the stage's declared `<out_path>` directly | — | `comms_artifacts` |
 | `*.flow.yaml` | SEED | disk→DB on server start (`_refresh_flows`) | `flow_nodes`/`flow_yaml` |
 | `abilities/*.md`, `prompts/*.md` | SEED (file *is* authority) | disk→compose | n/a |
+
+> `write_state` also stamps `flow` (the flow name) into the state dict whenever a flow config is
+> passed. Every flow ends at the literal `"DONE"`, so `current` alone cannot distinguish
+> `consultation`'s DONE ("the goal was decomposed; none of it is built") from `team`'s DONE ("the
+> feature shipped") — which is how a decompose-only board reads as a delivered feature with 14/14
+> tasks pending. A flow-less call leaves any existing stamp alone rather than erasing it.
+
 - **Flows** load **DB-first at runtime** (`_load_flow`): `flow_nodes`/`flow_edges` → `flow_yaml` blob → packaged `.flow.yaml`. The `core/flows/*.flow.yaml` files are the **version-controlled seed**, re-synced into the DB on every server start (`_refresh_flows`). The filesystem read is a seed + resilience fallback (DB-unavailable / `project_root=None` CLI), not live config.
+- **Gates persist per EDGE** (`flow_edges.config_json`, keyed `"SOURCE->TARGET"`), but the engine
+  ALSO honours the wildcard form `"->TARGET"` (`run_gates` looks up both). A wildcard matches no
+  edge row, so it used to be dropped on the way into the DB — and since flows load DB-first, a
+  flow authored with one silently ran WITHOUT it. `flow_graph_ops` now carries non-edge gate keys
+  through as `_nonedge_gates` flow-level config and merges them back on assemble, so the
+  round-trip is lossless as `_STRUCTURAL_FLOW_KEYS` already promised for every other key.
+  `team`/`team-build` use `->DONE: require_tasks_done` — a DELIVERY flow's DONE claims the feature
+  shipped, so it must not be reachable while board tasks are unfinished (TESTING and RETRO can
+  both post new work, which the `REVIEWING->TESTING` gate cannot see). The consultation flows
+  deliberately do NOT carry it: they END at decomposition, so pending tasks are their correct
+  output, not a lie.
 
 ## HTTP endpoints
 
@@ -103,20 +121,21 @@ The comms blueprint package (`blueprints/comms/`) backs the Studio comms board �
 humans post messages, ask/answer questions, decompose DAG tasks, and supersede stale notes.
 
 ```
-POST /comms/post            ← post a message (embedding computed for hybrid search)
+POST /comms/post            ← post a message (embedding computed for hybrid search); optional `supersedes:[id,…]` retires the decisions this one replaces IN THE SAME CALL (see below)
 GET  /comms                 ← list board messages (scoped)
 POST /comms/search          ← hybrid (semantic + keyword) search; semantic arm floored at SEMANTIC_DISTANCE_CEILING, keyword hits bypass; no match → [] (never padded with recent messages)
 POST /comms/acknowledge     ← mark a message acknowledged
 POST /comms/answer          ← answer a posted question
 GET  /comms/tasks           ← list DAG tasks
 POST /comms/tasks/complete  ← mark a task complete
+POST /comms/tasks/status    ← BULK terminal write-back (done|failed) for a resolving agent: `{task_ids,status,reason,from}`; reports updated/newly_ready/blocked/unknown. Re-opening (→pending) is deliberately NOT offered — that is a supervisory act
 POST /comms/tasks/run       ← run ONE task headlessly: claim it, spawn a builder on its prompt, complete on success
 POST /comms/tasks/stop      ← stop a single-task run: kill its board run and revert the task to pending
 POST /comms/attach          ← attach an artifact to a message
 GET  /comms/artifacts       ← list artifacts linked to a message (comms_artifacts table)
 GET  /comms/trash           ← list trashed messages
 POST /comms/restore         ← restore a trashed message
-POST /comms/supersede       ← mark a message superseded_by another
+POST /comms/supersede       ← mark a message superseded_by another (standalone form; the agent path uses `/comms/post` + `supersedes`)
 GET  /comms/scope           ← read the active board scope
 POST /comms/scope           ← set the active board scope
 GET  /comms/permissions     ← role-based write permissions
@@ -139,6 +158,19 @@ POST /comms/consolidate     ← memory consolidation: near-dup dedup; mode=full 
 POST /comms/hydrate         ← board disk-mirror: import a project's on-disk BOARD.json mirrors into the DB (fresh-clone; DB-authoritative, no-ops non-empty boards)
 GET  /events/comms          ← SSE stream of comms board updates (streams blueprint)
 ```
+
+**Board closure — how a resolution lands in state.** The board is append-only, so nothing
+retires on its own; three write paths make a resolution durable instead of prose:
+
+| Resolution | Write path | Guard |
+|---|---|---|
+| this decision replaces that one | `POST /comms/post` with `supersedes:[id,…]` (`blueprints/comms/_supersede_on_post.py`) | explicit ids ONLY — never inferred from text/embedding similarity, because silently retiring the wrong governance is worse than a duplicate. Capped, de-duplicated, self-reference refused; a bad id degrades to a per-id `skipped` reason and never fails the post |
+| these tasks are settled | `POST /comms/tasks/status` (`blueprints/comms/tasks_status.py`) | `done`/`failed` only; unknown ids reported, not dropped |
+| a human gate is closed | `POST /comms/acknowledge` (human) | an agent decision does NOT close an escalation — `runner/comms_formatters.render_governance_lines` says so in the injected block when a decision post-dates an open escalation |
+
+The agent-facing half is in `core/skills/fragments/comms-post.md` (supersede a decision you
+replace; never supersede a human-addressed escalation) and `core/skills/planning/evaluate.md`
+Step 5 (close what your analysis settled — evidence-gated).
 
 ### SSE events (GET /events/runner)
 
@@ -212,6 +244,11 @@ pathly_orchestrator/
       runner_state.py      # write_runner_state, read_runner_state, mark_stale_runners
       flow_defs.py / skill_defs.py / agent_defs.py / invocations.py / overrides.py / feedback_items.py
       otel_spans.py / run_history.py / stage_configs.py / catalog_items.py / trends.py / app_settings.py
+      invocation_pricing.py    # price_if_needed() — the cost chokepoint every projected row passes
+                           #   through (split out of invocation_projection under the 400-line rule;
+                           #   re-exported there as _price_if_needed/_num, so call sites are unchanged)
+      invocation_record.py     # _agent_done_rec/_tier_for — shape ONE AGENT_DONE payload into a row
+                           #   (the projector owns the STREAM; this owns the ROW)
       invocation_projection.py # agent_invocations = projection of the AGENT_DONE event stream:
                            #   one row per AGENT_DONE (keyed by fsm_events.seq = source_seq), the
                            #   superseding BILLING_UPDATE folded in (billing wins, never summed).
@@ -249,6 +286,12 @@ pathly_orchestrator/
     invoke.py              # invoke_agent(abort_callback=None, proc_callback=None)
     embeddings.py          # embed()/warm() — local embedding model; embed() has a bounded LRU (check inside _model_lock) so the per-board search fan-out re-embedding one query N+2 times computes the vector once; model load RETRIES transient failures (was a permanent silent latch that disabled semantic search process-wide) and embedder_status() reports {loaded,unavailable,load_attempts} to /health; chunk_summary() splits a summary into child chunks (per-bullet for topic-map, per-### for detailed, none for gist); embed_artifact_async() stores one PARENT vector (whole message text + summary) in comms_embeddings + CHILD vectors per chunk in comms_chunk_embeddings
     comms_context.py       # assembles board context (governance + referenced + semantic, relevance-gated); _matched_chunk surfaced as "matched topic: …" via comms_formatters.py
+    comms_formatters.py    # pure list[dict]→list[str] rendering for that context, incl.
+                           #   render_governance_lines(): decisions NEWEST-FIRST with a LATEST
+                           #   marker, minute-precision stamps (same-day decisions are the ones
+                           #   that conflict, and "13d ago" cannot order them), an explicit
+                           #   precedence line, and — when a decision post-dates an open
+                           #   escalation — a note that only a human acknowledgement closes a gate
     sections.py            # parse_sections/slugify_heading/structure_key — markdown section index (anchors)
     hydrate.py             # hydrate_section/ensure_indexed — /section payload + staleness; index_artifact_async (eager, section-index only)
     code_context.py        # CodeContextProvider protocol + get_provider()/build_block() (backend=auto[default]|off|cli|lsp|both) — codebase-intelligence context injection

@@ -220,6 +220,21 @@ def write_state(storage_path: str, state: dict, flow: dict | None = None) -> Non
                         f"Allowed from {old_current!r}: {sorted(allowed)}"
                     )
 
+    # Stamp WHICH flow produced this state. `current` alone is ambiguous at the terminal:
+    # every flow ends at the literal string "DONE", so a reader (human opening STATE.json,
+    # or an agent handed the state) cannot tell `consultation`'s DONE — "the goal was
+    # decomposed into a task DAG, none of it is built" — from `team`'s DONE — "the feature
+    # shipped". That ambiguity is what made a decompose-only board look like it had claimed
+    # to deliver a feature while 14/14 tasks sat pending. The flow name disambiguates it at
+    # zero cost, since write_state already receives the flow config.
+    #
+    # Only stamped when known: a flow-less call (the CLI helpers, recovery paths) leaves any
+    # existing value alone rather than erasing it with None.
+    if flow is not None:
+        flow_name = flow.get("flow")
+        if flow_name:
+            state = {**state, "flow": flow_name}
+
     _write_state_db(feature_dir, feature_dir.name, state)
 
 
