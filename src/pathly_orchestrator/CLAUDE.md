@@ -106,6 +106,7 @@ humans post messages, ask/answer questions, decompose DAG tasks, and supersede s
 POST /comms/post            ← post a message (embedding computed for hybrid search)
 GET  /comms                 ← list board messages (scoped)
 POST /comms/search          ← hybrid (semantic + keyword) search; semantic arm floored at SEMANTIC_DISTANCE_CEILING, keyword hits bypass; no match → [] (never padded with recent messages). Reached by AGENTS too via the `board-search` fragment (own board only) — the self-authored second query the pushed context can't make; Studio's search box is the other caller
+POST /comms/promote         ← copy a decision/constraint UP a tier (feature→project→global). COPY not move: the source board is the audit record of HOW the decision was reached. Stamps promoted_from/original_scope on the copy + promoted_to on the source (the three columns migrations.py reserved and nothing read). Idempotent, keyed off the COPY's promoted_from so one message can promote to two tiers. Own permission set `_PROMOTE_WRITERS` = {director, evaluator, human, **retro**} — NOT _GLOBAL_WRITERS, else the RETRO stage (the one headless role whose job IS capturing lessons) could never promote. decision/constraint only
 POST /comms/acknowledge     ← mark a message acknowledged
 POST /comms/answer          ← answer a posted question
 GET  /comms/tasks           ← list DAG tasks

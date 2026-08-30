@@ -30,6 +30,21 @@ _PROJECT_WRITERS: frozenset[str] = frozenset(
 )
 _GLOBAL_WRITERS: frozenset[str] = frozenset({"director", "evaluator", "human"})
 
+# POST /comms/promote has its OWN gate, deliberately NOT _GLOBAL_WRITERS above.
+# `retro` is the pipeline role for the RETRO stage (core/flows/team-build.flow.yaml
+# `role_map: RETRO: retro`) whose entire job is capturing lessons — if promotion
+# reused the raw global-write gate, the one headless stage designed for
+# consolidation would be locked out of the higher boards, reproducing the exact
+# "knowledge can never move upward" failure that promotion exists to fix.
+# Promoting is safe to allow more widely than raw writing because it is
+# CONSTRAINED: it can only copy an EXISTING decision/constraint upward, carrying
+# provenance columns back to the source — it can never author new global content.
+# Deliberately a fixed set, not perm_table-driven: the settings table describes
+# who may AUTHOR on a tier, which is the very question promotion sidesteps.
+_PROMOTE_WRITERS: frozenset[str] = frozenset(
+    {"director", "evaluator", "human", "retro"}
+)
+
 _PATH_RE = re.compile(r"(?:[\w.\-]+[/\\])+[\w.\-]+\.[A-Za-z0-9]{1,8}")
 
 _EXT_ARTIFACT_TYPE: dict[str, str] = {
@@ -79,6 +94,14 @@ def check_write_permission(
     if board == "global":
         return from_agent in _GLOBAL_WRITERS
     return False
+
+
+def check_promote_permission(from_agent: str) -> bool:
+    """Return True when *from_agent* may promote a message to a higher tier.
+
+    Separate from ``check_write_permission`` on purpose — see _PROMOTE_WRITERS.
+    """
+    return from_agent in _PROMOTE_WRITERS
 
 
 def extract_artifact_path(text: str) -> str | None:

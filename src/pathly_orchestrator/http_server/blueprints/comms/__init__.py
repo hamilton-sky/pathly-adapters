@@ -12,6 +12,7 @@ from .context import bp as context_bp
 from .features import bp as features_bp
 from .project import bp as project_bp
 from .hydrate import bp as hydrate_bp
+from .promote import bp as promote_bp
 
 # Back-compat re-exports: these internal symbols moved into _helpers when this
 # blueprint was decomposed into a subpackage. Re-export them at the package level
@@ -37,4 +38,5 @@ all_blueprints = [
     features_bp,
     project_bp,
     hydrate_bp,
+    promote_bp,
 ]
