@@ -4,7 +4,7 @@
 
 Comms board / message-board subsystem — messages, tasks, artifacts, goals, context retrieval & relevance, board mirror & hydration.
 
-42 test file(s).
+43 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -36,8 +36,9 @@ Comms board / message-board subsystem — messages, tasks, artifacts, goals, con
 | `test_comms_goals_stop.py` | Tests for POST /comms/goals/stop | 6 |
 | `test_comms_hybrid.py` | Tests for Phase 11 — FTS5 virtual table + hybrid search helpers | 11 |
 | `test_comms_hydrate_paths.py` | Regression tests for CT5 — the authoritative-channel 'section not found' bug | 8 |
+| `test_comms_promote.py` | Tests for POST /comms/promote — cross-tier promotion of a decision/constraint | 19 |
 | `test_comms_refs_enforcement.py` | Tests for CT3 — context_refs enforcement + coverage + unverified auto-derive | 6 |
-| `test_comms_scope.py` | Tests for the /comms/scope board_scope endpoints | 6 |
+| `test_comms_scope.py` | Tests for the /comms/scope board_scope endpoints | 9 |
 | `test_comms_search_mode.py` | Tests for Phase 12 — mode param in /comms/search + hybrid default in retrieval | 21 |
 | `test_comms_sections.py` | Tests for comms-board context-retrieval (Phase 3 rigor gate) | 33 |
 | `test_comms_sections_fixes.py` | Regression tests for three confirmed defects fixed in Phase 3 comms-board context-retrieval | 13 |

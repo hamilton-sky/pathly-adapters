@@ -42,6 +42,9 @@ def comms_agent_context_preview():
         project_root = data.get("project_root") or ""
         task_description = data.get("task_description") or ""
         task_id = data.get("task_id") or None
+        # The agent ROLE the task would run as: tiers are allocated per role, so a preview
+        # that omits it would show a different board than the run it is previewing.
+        role = data.get("role") if isinstance(data.get("role"), str) else ""
 
         counts: dict[str, int] = {}
         block = board_context_for(
@@ -51,6 +54,7 @@ def comms_agent_context_preview():
             task_description=task_description,
             task_id=task_id,
             counts=counts,
+            role=role,
         )
 
         return (

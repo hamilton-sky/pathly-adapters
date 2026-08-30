@@ -14,23 +14,23 @@ bp = Blueprint("comms_settings", __name__)
 
 @bp.route("/comms/scope", methods=["GET"])
 def comms_scope_get():
-    """Return the board_scope for a feature."""
+    """Return the board_scope for a feature — or for one agent ROLE on that feature."""
     try:
         from pathly_orchestrator.db.connection import get_db as _get_db
-        from pathly_orchestrator.db.queries.app_settings import (
-            get_board_scope as _get_scope,
-        )
+        from pathly_orchestrator.db.queries import app_settings as _settings
 
         feature = request.args.get("feature", "").strip()
         project_root = request.args.get("project_root", "").strip()
+        # Optional `role` → that agent's own allocation, else the feature-level row.
+        role = request.args.get("role", "").strip()
         if not feature:
             return jsonify({"error": "Query parameter 'feature' is required"}), 400
         if not project_root:
             return jsonify({"error": "Query parameter 'project_root' is required"}), 400
 
         conn = _get_db()
-        scope = _get_scope(
-            conn, project_root=norm_project_root(project_root), feature=feature
+        scope = _settings.get_board_scope(
+            conn, norm_project_root(project_root), feature, role=role or None
         )
         return jsonify(scope), 200
     except Exception as exc:
@@ -40,13 +40,10 @@ def comms_scope_get():
 
 @bp.route("/comms/scope", methods=["POST"])
 def comms_scope_set():
-    """Persist the board_scope for a feature."""
+    """Persist the board_scope for a feature — or, with `role`, for that role alone."""
     try:
         from pathly_orchestrator.db.connection import get_db as _get_db
-        from pathly_orchestrator.db.queries.app_settings import (
-            get_board_scope as _get_scope,
-            set_board_scope as _set_scope,
-        )
+        from pathly_orchestrator.db.queries import app_settings as _settings
 
         data = request.get_json()
         if not data:
@@ -55,6 +52,7 @@ def comms_scope_set():
         feature = data.get("feature", "")
         project_root = data.get("project_root", "")
         scope = data.get("scope")
+        role = data.get("role").strip() if isinstance(data.get("role"), str) else ""
         if not isinstance(feature, str) or not feature.strip():
             return jsonify({"error": "Field 'feature' must be a non-empty string"}), 400
         if not isinstance(project_root, str) or not project_root.strip():
@@ -79,9 +77,11 @@ def comms_scope_set():
 
         conn = _get_db()
         norm_root = norm_project_root(project_root)
-        merged = _get_scope(conn, project_root=norm_root, feature=feature)
+        # A per-role POST seeds from that role's EFFECTIVE scope (its own row, else the
+        # feature-level one), so a partial update stays partial instead of resetting tiers.
+        merged = _settings.get_board_scope(conn, norm_root, feature, role=role or None)
         merged.update(updates)
-        _set_scope(conn, project_root=norm_root, feature=feature, scope_dict=merged)
+        _settings.set_board_scope(conn, norm_root, feature, merged, role=role or None)
         return jsonify(merged), 200
     except Exception as exc:
         logging.exception("comms_scope_set error")

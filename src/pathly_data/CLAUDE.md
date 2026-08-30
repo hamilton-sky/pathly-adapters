@@ -162,8 +162,12 @@ A project ability overrides a global one with the same `<category>/<name>`; an a
   `development/review`, `debug/build`): `catalog-pull` reads an artifact section BY PATH, and
   `board-search` re-queries the board BY QUESTION via `/comms/search`. The injected context is
   one query the runner derives from the task description before the agent has read the task;
-  `board-search` is the agent's own second query when that guess falls short. Own board only —
-  cross-tier context stays governed by the run's board-scope setting.
+  `board-search` is the agent's own second query when that guess falls short. Its reach is the
+  `<search_tiers>` prompt var — the SAME tier selection that decides what gets pushed
+  (`runner/board_scope.py`), rendered as ready-to-use `board`+`scope` pairs because the scope
+  is a different shape per tier and a mismatched pair returns `[]`, which reads to an agent
+  exactly like "nothing on the board". So search extends INSIDE the board-scope governance,
+  never around it: a tier the run does not read is a tier it may not search.
 - A skill **absent** from `skills:` is returned **raw and unchanged** — no fragments, no defaults. Skills are converted incrementally; not all are in the map yet. **Exception — board/flow runs:** the two runtime call sites (`start_board_run` → `_compose_skill_body`, and `fsm_compose.build_prompt`) pass `board_default=True`, so an *unrecognized* skill (a user-created `custom/*` skill from the Run modal) instead composes the **`board_defaults`** bundle (`progress-logging` + `comms-post`) — the "always compose through fragments" guarantee, so a custom skill still posts its artifacts/progress to the board. Build-time install (`stitch.py`, which pre-checks manifest membership) and editor previews (`/skills/preview`, `/skills/compose`) leave `board_default` False and keep the raw contract. Board *context* injection is separate and already fires for raw skills (run-level `board_context_for` / `retrieve_board_context`).
 - `no_defaults: true` on a skill entry opts it out of the global defaults entirely. Used on thirteen skills: the five pure-transform derivations (`development/summarize`, `development/summarize-gist`, `development/summarize-detailed`, `development/analyze`, `development/split`) plus eight task/board skills with no pipeline phases (`planning/create-feature`, `planning/post`, `development/drain-dag`, `development/execute-task`, `planning/feature-decompose`, `planning/project-decompose`, `planning/prd-import`, `planning/goalize`) — where `progress-logging` is dead weight in their prompt.
 - A fragment entry is a bare name (`feedback-protocol`) or a gated object (`{ name: spawn-rules, requires: can_spawn }`). Gated entries are dropped when the adapter's capability flag is false.

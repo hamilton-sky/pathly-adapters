@@ -899,8 +899,24 @@ curl -s -X POST http://127.0.0.1:8765/comms/search \
   relevant and you need more of the same.
 - `mode` — optional: `hybrid` (default, use this), `keyword` for an exact literal string,
   `semantic` when you want meaning-matches only.
-- You are scoped to your own board. Cross-tier (project / global) context reaches you
-  through the injected channels, which are governed by the run's board-scope setting.
+- `feature` — always your own `<feature>`. The route requires it, but it is only a fallback:
+  `board` + `scope` are what actually select which board is searched.
+
+### Which boards you may search
+
+<search_tiers>
+
+Those are the tiers this run reads, and they are the tiers you may query — one `board` +
+`scope` pair each. Pass a pair **exactly as written above**: the scope is a different shape per
+tier (a feature board keys by its slug, the project board by the project root path, the global
+board by the literal `global`), and a mismatched pair is not an error — it returns `[]`, which
+reads exactly like "the board knows nothing". Copy the pair rather than reconstructing it.
+
+The default query above is your own board. Widen to another listed tier when the thing you are
+missing is plainly not local — a cross-cutting decision, a convention, a lesson from another
+feature. A tier that is NOT listed is off for this run: its board-scope setting says this agent
+does not read it, and searching around that is not your call. If nothing is listed, do not
+search at all.
 
 ### Reading the results
 

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import logging
 
+from .board_scope import resolve_board_scope_setting
 from .comms_formatters import _collect_hydrate_channel, _confidence_label, _format_age
 from .context_budget import CONTEXT_CHAR_BUDGET, select_within_budget
 
@@ -348,24 +349,19 @@ def board_context_for(
     task_description: str = "",
     task_id: str | None = None,
     counts: dict[str, int] | None = None,
+    role: str = "",
 ) -> str:
     """Scope-aware board context for ANY execution surface.
 
     Single-agent, loop-executor, and /comms/run agents call this so they see the
     SAME governance + memory the FSM/team path already injects.
     Returns '' on any failure so callers never break the prompt.
-    """
-    bscope: dict[str, bool] | None
-    try:
-        from pathly_orchestrator.db.connection import get_db
-        from pathly_orchestrator.db.queries.app_settings import get_board_scope
 
-        if board == "feature":
-            bscope = get_board_scope(get_db(), project_root or "", scope)
-        else:
-            bscope = {"feature": False, "project": board == "project", "global": True}
-    except Exception:
-        bscope = None
+    ``role`` picks up that agent's own tier allocation when one is configured — an architect
+    and a builder on the same board can need different mixes. Absent a per-role row it
+    resolves to exactly the per-feature answer this helper has always returned.
+    """
+    bscope = resolve_board_scope_setting(board, scope, project_root or "", role)
 
     return retrieve_board_context(
         topic=scope if board == "feature" else "",

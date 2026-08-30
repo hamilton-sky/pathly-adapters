@@ -160,6 +160,15 @@ def build_prompt(
             agent_text, ability_ids, excluded_sections, project_root
         )
 
+    # Tiers this run may read — resolved ONCE, keyed by the agent's ROLE (falling through to
+    # the feature-level setting when that role has none), and used for BOTH the board context
+    # pushed in below and the <search_tiers> the board-search fragment hands the agent. One
+    # lookup, so a run can never be told it may search a tier its own context channel is not
+    # reading.
+    from pathly_orchestrator.runner.board_scope import read_tiers as _read_tiers
+
+    board_tiers = _read_tiers(project_root, board_scope, agent_role)
+
     agent_text = _inject_prompt_vars(
         agent_text,
         board_scope,
@@ -168,6 +177,7 @@ def build_prompt(
         storage_path=storage_path,
         skill=(agent if "/" in agent else None),
         board_tier=board_tier,
+        board_scope_cfg=board_tiers,
     )
 
     context = (
@@ -201,17 +211,13 @@ def build_prompt(
 
     board_block = ""
     try:
-        from pathly_orchestrator.db.connection import get_db as _get_db_comms
-        from pathly_orchestrator.db.queries.app_settings import get_board_scope
         from pathly_orchestrator.runner.comms_context import retrieve_board_context
 
-        _conn = _get_db_comms()
-        _scope = get_board_scope(_conn, project_root, board_scope)
         board_block = retrieve_board_context(
             topic=board_scope,
             project_root=project_root,
             task_description=context,
-            board_scope=_scope,
+            board_scope=board_tiers,
         )
     except Exception:
         pass
