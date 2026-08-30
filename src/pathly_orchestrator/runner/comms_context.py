@@ -323,12 +323,14 @@ def retrieve_board_context(
             tier = msg.get("_tier") or msg.get("board") or "feature"
             entries.append((tier, f"  • {text}  [{header}]"))
 
-        kept = select_within_budget(
+        # `kept_idx`, not `kept`: the per-board search loop above already binds `kept`
+        # as an int counter, and rebinding the name to a list[int] here is a type error.
+        kept_idx = select_within_budget(
             entries, [b for b, _, _ in enabled_boards], _CONTEXT_CHAR_BUDGET
         )
-        for idx in kept:
+        for idx in kept_idx:
             lines.append(entries[idx][1])
-        omitted = len(entries) - len(kept)
+        omitted = len(entries) - len(kept_idx)
         if omitted:
             lines.append(f"  • … ({omitted} more match(es) omitted — budget)")
 
