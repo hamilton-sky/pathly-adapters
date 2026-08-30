@@ -154,7 +154,7 @@ If no DB events exist for this feature, write all three files with every placeho
 
 From the user's answers and RETRO.md, extract 1–3 lessons — patterns that a planner should know before starting a similar feature. Only write a lesson if something concrete went wrong or was missing. If nothing stands out, skip this step.
 
-For each lesson, append to `LESSONS_CANDIDATE.md` in the project root (create if it doesn't exist):
+For each lesson, append to `pathly/lessons/LESSONS_CANDIDATE.md` (create the file, and the `pathly/lessons/` directory, if they don't exist):
 
 ```markdown
 ## [$ARGUMENTS] <brief pattern title>
@@ -259,7 +259,7 @@ Pipeline walkthrough written:
   pathly/pipeline-walkthrough/$ARGUMENTS/01-PIPELINE-FLOW.md
   pathly/pipeline-walkthrough/$ARGUMENTS/02-TOKEN-USAGE.md
   pathly/pipeline-walkthrough/$ARGUMENTS/03-ARTIFACT-MAP.md
-Lessons appended: LESSONS_CANDIDATE.md
+Lessons appended: pathly/lessons/LESSONS_CANDIDATE.md
 Instruction patches written: pathly/features/$ARGUMENTS/INSTRUCTION_PATCHES.md
 Evolution log updated: pathly/INSTRUCTION_EVOLUTION.md
 

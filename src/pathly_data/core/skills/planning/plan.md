@@ -56,7 +56,7 @@ If `$PLAN_DIR/FEATURE_INDEX.md` already exists, treat this as a rigor change or 
 
 ## Step 1: Apply Active Lessons
 
-If `LESSONS.md` exists in the project root, read it now.
+If `pathly/lessons/LESSONS.md` exists, read it now.
 Apply the `Injection` field of each lesson when generating the relevant plan file.
 Do not restate lesson reasoning - just apply the injection silently.
 If two lessons conflict, prefer the one with more sources listed.

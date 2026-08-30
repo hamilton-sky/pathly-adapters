@@ -54,10 +54,10 @@ Write a retro? (y/n):
 
 After the retro completes (or is skipped), check for candidate lessons:
 
-1. Check if `LESSONS_CANDIDATE.md` exists at the project root.
+1. Check if `pathly/lessons/LESSONS_CANDIDATE.md` exists.
 2. If it exists and is non-empty, automatically invoke the `lessons` skill — no prompt needed.
 3. Print the lessons report from the skill output.
-4. If `LESSONS_CANDIDATE.md` does not exist or is empty, skip silently.
+4. If `pathly/lessons/LESSONS_CANDIDATE.md` does not exist or is empty, skip silently.
 
 ## Step 3 — If no feature is in progress
 
