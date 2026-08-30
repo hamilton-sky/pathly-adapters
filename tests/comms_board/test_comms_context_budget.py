@@ -1,9 +1,15 @@
 """Per-tier char budget on the Context channel (context_budget.py).
 
-The channel used to charge ONE shared 2000-char budget in render order, and
-`enabled_boards` renders feature first — so a chatty feature board spent the whole
-allowance and the project/global entries, the expensive cross-cutting ones, were
-dropped every time. These tests pin the split-and-pool behavior that replaced it.
+The channel used to charge ONE shared budget in render order, and `enabled_boards`
+renders feature first — so a chatty feature board spent the whole allowance and the
+project/global entries, the expensive cross-cutting ones, were dropped every time.
+These tests pin the split-and-pool behavior that replaced it.
+
+The budget total is no longer this module's constant — it is settings-driven
+(`board_context.char_budget`, default 4000; see context_settings.py) and passed in by
+the caller. `CONTEXT_CHAR_BUDGET` survives here as that DEFAULT, so these tests pin the
+split MATH against a concrete total; the settings/measurement half is covered by
+test_board_context_settings.py.
 """
 
 from __future__ import annotations
@@ -40,9 +46,12 @@ def test_chatty_feature_board_does_not_starve_cross_tier(monkeypatch):
     cq = _stub_common(monkeypatch)
     import pathly_orchestrator.runner.comms_context as cc
 
-    big = "x" * 900
+    # Sized against the DEFAULT budget so the assertion tracks the configured value
+    # rather than a literal: 4 notes at half the feature tier's share (0.5 * budget)
+    # must overflow it, which is what makes the starvation regression observable.
+    big = "x" * (CONTEXT_CHAR_BUDGET // 4)
     per_board = {
-        "feature": [_row(f"f{i}", f"{big}-{i}") for i in range(3)],
+        "feature": [_row(f"f{i}", f"{big}-{i}") for i in range(4)],
         "project": [_row("p1", "PROJECT-NOTE: the API contract is frozen")],
         "global": [_row("g1", "GLOBAL-NOTE: never log secrets")],
     }
@@ -92,9 +101,11 @@ def test_at_least_one_entry_survives_an_oversized_line():
 
 def test_unspent_tier_budget_is_pooled():
     """A quiet global tier funds a feature line that overflowed its own share."""
-    entries = [("feature", "f" * 1400), ("global", "g" * 10)]
+    # 70% of the total: over feature's own 50% share, under the pooled 100%.
+    entries = [("feature", "f" * int(CONTEXT_CHAR_BUDGET * 0.7)), ("global", "g" * 10)]
     kept = select_within_budget(entries, ["feature", "project", "global"])
-    # feature's own share is 1000 — it only fits once project+global surplus is pooled.
+    # feature's own share is half the budget — it only fits once the project+global
+    # surplus is pooled.
     assert kept == [0, 1]
 
 

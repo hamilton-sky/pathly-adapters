@@ -218,6 +218,11 @@ def build_prompt(
             project_root=project_root,
             task_description=context,
             board_scope=board_tiers,
+            # Measure this build: one BOARD_CONTEXT event per prompt, keyed by the RUN's
+            # own storage dir (same identity eventlog keys every other event by, not the
+            # board scope). Without it the char budget + k-ladder in context_settings.py
+            # would stay unfalsifiable — see context_record.py for how to read it back.
+            storage_path=str(storage_path),
         )
     except Exception:
         pass

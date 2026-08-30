@@ -13,8 +13,14 @@ from __future__ import annotations
 import logging
 
 from .board_scope import resolve_board_scope_setting
-from .comms_formatters import _collect_hydrate_channel, _confidence_label, _format_age
-from .context_budget import CONTEXT_CHAR_BUDGET, select_within_budget
+from .comms_formatters import (
+    _build_context_entries,
+    _collect_hydrate_channel,
+    _format_age,
+)
+from .context_budget import select_within_budget
+from .context_record import record_board_context, render_stats
+from .context_settings import resolve_context_limits
 
 logger = logging.getLogger(__name__)
 
@@ -26,10 +32,9 @@ logger = logging.getLogger(__name__)
 # NOTE: keyword/recency hits carry no _distance and bypass this gate — see CT4 for the keyword bound.
 _SEMANTIC_MAX_DISTANCE = {"feature": 0.75, "project": 0.55, "global": 0.50}
 _SEMANTIC_MAX_DISTANCE_DEFAULT = 0.75
-# Caps the rendered Context body so a long board can't bloat the prompt. The budget is
-# SPLIT PER TIER (see context_budget.py) — a single shared budget let the feature tier,
-# which renders first, spend the whole allowance before project/global ever got a slot.
-_CONTEXT_CHAR_BUDGET = CONTEXT_CHAR_BUDGET
+# The Context channel's SIZE — the per-tier result counts (k) and the char budget the
+# kept lines render against — is settings-driven, not literal, and is measured on every
+# build; see context_settings.py for the defaults, their bounds, and the reasoning.
 
 
 def retrieve_board_context(
@@ -39,6 +44,7 @@ def retrieve_board_context(
     board_scope: dict[str, bool] | None = None,
     task_id: str | None = None,
     counts: dict[str, int] | None = None,
+    storage_path: str | None = None,
 ) -> str:
     """Return a `## Communication Board` markdown block, or '' when empty.
 
@@ -59,19 +65,33 @@ def retrieve_board_context(
         output byte-identical to today.
     counts:
         Optional mutable dict. When provided, it is populated with per-channel
-        counts (governance/referenced/semantic/catalog) as the block is assembled.
+        counts (governance/referenced/semantic/catalog), the budget+k in force,
+        and the rendered/omitted volume — everything the BOARD_CONTEXT record
+        carries, so the /comms/agent-context preview shows the same numbers.
+    storage_path:
+        The run's storage dir. When set, one BOARD_CONTEXT event is recorded for
+        this prompt build (see context_record.py). Default None ⇒ no DB write, which
+        is what the read-only /comms/agent-context/preview endpoint relies on.
     """
     if board_scope is None:
         board_scope = {"feature": True, "project": True, "global": True}
 
+    # Budget + k are a PAIR and both are settings-driven — see context_settings.py.
+    # Resolved ONCE per call: the k's pick the search depth below, the budget caps the
+    # render, and the whole dict is stamped into the BOARD_CONTEXT record so the
+    # measurement can always be read against the config that produced it.
+    stats: dict[str, int] = counts if counts is not None else {}
+    limits = resolve_context_limits()
+    stats.update(limits)
+
     _norm_root = project_root.replace("\\", "/").rstrip("/")
     enabled_boards: list[tuple[str, str, int]] = []
     if board_scope.get("feature", True):
-        enabled_boards.append(("feature", topic, 3))
+        enabled_boards.append(("feature", topic, limits["k_feature"]))
     if board_scope.get("project", True):
-        enabled_boards.append(("project", _norm_root, 2))
+        enabled_boards.append(("project", _norm_root, limits["k_project"]))
     if board_scope.get("global", True):
-        enabled_boards.append(("global", "global", 1))
+        enabled_boards.append(("global", "global", limits["k_global"]))
 
     if not enabled_boards:
         return ""
@@ -140,6 +160,14 @@ def retrieve_board_context(
     over_fetch_margin = len(governance_ids) + 4
 
     for board_type, scope_val, k in enabled_boards:
+        if k <= 0:
+            # k=0 mutes THIS tier's semantic pull without disabling the tier: it stays
+            # eligible as own_board_type / the catalog's primary board, and its pending
+            # decisions + escalations still inject unconditionally above. Skipped here
+            # rather than filtered out of enabled_boards, and skipped BEFORE the query
+            # because `if kept >= k` only fires after a row is appended — k=0 would
+            # otherwise still keep one.
+            continue
         fetch_k = k + over_fetch_margin
         try:
             rows = search_by_hybrid(
@@ -216,15 +244,14 @@ def retrieve_board_context(
     except Exception:
         logger.debug("comms_context: catalog channel failed", exc_info=True)
 
-    if counts is not None:
-        counts.update(
-            {
-                "governance": len(decisions) + len(escalations),
-                "referenced": hydrate_count,
-                "semantic": len(context_msgs),
-                "catalog": catalog_count,
-            }
-        )
+    stats.update(
+        {
+            "governance": len(decisions) + len(escalations),
+            "referenced": hydrate_count,
+            "semantic": len(context_msgs),
+            "catalog": catalog_count,
+        }
+    )
 
     if (
         not decisions
@@ -233,6 +260,9 @@ def retrieve_board_context(
         and not hydrate_lines
         and not catalog_lines
     ):
+        # An empty board is a measurement too — record it, so "the agent got nothing"
+        # is distinguishable in the data from "no prompt was built".
+        record_board_context(storage_path, stats)
         return ""
 
     # --- Build markdown block ------------------------------------------------
@@ -300,36 +330,19 @@ def retrieve_board_context(
         # Build every candidate line first, tagged with the tier it came from, and let
         # the per-tier budget decide what survives (CT5). Charging a shared budget in
         # render order meant a chatty feature board starved project/global outright.
-        entries: list[tuple[str, str]] = []
-        for msg in context_msgs:
-            from_agent = msg.get("from_agent", "?")
-            to_agent = msg.get("to_agent", "*")
-            stage = msg.get("stage") or ""
-            ts_str = msg.get("ts", "")
-            age = _format_age(ts_str) if ts_str else ""
-            parts = [f"{from_agent} → {to_agent}"]
-            if stage:
-                parts.append(stage)
-            if age:
-                parts.append(age)
-            # CT2: surface match confidence as a coarse bucket (strong/moderate/weak),
-            # not a raw float — legible in the /preview audit AND to the agent, without
-            # implying false precision. Absent for keyword/recency hits (no _distance).
-            confidence = _confidence_label(msg.get("_distance"))
-            if confidence:
-                parts.append(confidence)
-            header = ", ".join(parts)
-            text = msg.get("text", "")
-            tier = msg.get("_tier") or msg.get("board") or "feature"
-            entries.append((tier, f"  • {text}  [{header}]"))
+        entries = _build_context_entries(context_msgs)
 
         # `kept_idx`, not `kept`: the per-board search loop above already binds `kept`
         # as an int counter, and rebinding the name to a list[int] here is a type error.
         kept_idx = select_within_budget(
-            entries, [b for b, _, _ in enabled_boards], _CONTEXT_CHAR_BUDGET
+            entries, [b for b, _, _ in enabled_boards], limits["char_budget"]
         )
         for idx in kept_idx:
             lines.append(entries[idx][1])
+        # What the budget actually cost this build, per tier — the only signal that says
+        # whether 4000/5-3-2 is right for THIS board. Merged into `counts` (same dict) so
+        # the preview endpoint sees it too.
+        stats.update(render_stats(entries, kept_idx))
         omitted = len(entries) - len(kept_idx)
         if omitted:
             lines.append(f"  • … ({omitted} more match(es) omitted — budget)")
@@ -341,6 +354,7 @@ def retrieve_board_context(
             lines.append("")
         lines.extend(catalog_lines)
 
+    record_board_context(storage_path, stats)
     return "\n".join(lines) + "\n"
 
 
@@ -352,6 +366,7 @@ def board_context_for(
     task_id: str | None = None,
     counts: dict[str, int] | None = None,
     role: str = "",
+    storage_path: str | None = None,
 ) -> str:
     """Scope-aware board context for ANY execution surface.
 
@@ -362,6 +377,9 @@ def board_context_for(
     ``role`` picks up that agent's own tier allocation when one is configured — an architect
     and a builder on the same board can need different mixes. Absent a per-role row it
     resolves to exactly the per-feature answer this helper has always returned.
+
+    ``storage_path`` is the run's storage dir; pass it from a real prompt build so the
+    render is measured (BOARD_CONTEXT). Omitting it keeps the call read-only.
     """
     bscope = resolve_board_scope_setting(board, scope, project_root or "", role)
 
@@ -372,4 +390,5 @@ def board_context_for(
         board_scope=bscope,
         task_id=task_id,
         counts=counts,
+        storage_path=storage_path,
     )

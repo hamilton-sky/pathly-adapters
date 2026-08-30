@@ -1,6 +1,6 @@
 """Relevance gate on the Context channel (memory-consolidation phase).
 
-Verifies _SEMANTIC_MAX_DISTANCE drops weak semantic hits and _CONTEXT_CHAR_BUDGET
+Verifies _SEMANTIC_MAX_DISTANCE drops weak semantic hits and the char budget
 caps the channel body — by injecting rows with controlled `_distance` values.
 """
 
@@ -224,8 +224,13 @@ def test_confidence_bucket_shown_for_semantic_not_keyword(monkeypatch):
 def test_context_char_budget_truncates(monkeypatch):
     cq = _stub_common(monkeypatch)
     import pathly_orchestrator.runner.comms_context as cc
+    from pathly_orchestrator.runner.context_settings import resolve_context_limits
 
-    big = "x" * 900
+    # Sized against the CONFIGURED budget (board_context.char_budget), not the literal
+    # 900 this used to hardcode against a literal 2000: three lines at half the budget
+    # each must overflow it whatever the budget is tuned to.
+    budget = resolve_context_limits()["char_budget"]
+    big = "x" * (budget // 2)
     rows = [
         {
             "id": f"m{i}",
@@ -244,5 +249,5 @@ def test_context_char_budget_truncates(monkeypatch):
         "q",
         board_scope={"feature": True, "project": False, "global": False},
     )
-    assert "omitted" in block, "channel body should be capped by _CONTEXT_CHAR_BUDGET"
-    assert len(block) < 3 * 900  # not all three full messages rendered
+    assert "omitted" in block, "channel body should be capped by the char budget"
+    assert len(block) < 3 * len(big)  # not all three full messages rendered

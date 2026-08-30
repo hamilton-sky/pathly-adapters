@@ -9,18 +9,30 @@ the feature board it is already sitting on.
 This module splits the SAME total across the enabled tiers by weight, then pools
 whatever each tier leaves unspent so a quiet tier's surplus still funds a long
 entry elsewhere. Total rendered size is unchanged — only the distribution is.
+
+The total itself is no longer a constant this module owns: it is settings-driven
+(``board_context.char_budget``, resolved by ``context_settings``) and passed in by
+the caller. The functions here stay pure so the render path does no DB work.
 """
 
 from __future__ import annotations
 
-# Caps the rendered Context body so a long board can't bloat the prompt.
-CONTEXT_CHAR_BUDGET = 2000
+from .context_settings import DEFAULT_CHAR_BUDGET
 
-# Share of CONTEXT_CHAR_BUDGET each tier may spend, mirroring the k-ladder
-# (3/2/1) and the per-tier distance gates: attention narrows as the board gets
-# further from the task. Normalised over the tiers actually ENABLED for the run,
-# so a disabled tier's share is redistributed rather than lost — a feature-only
-# run still renders against the full budget, exactly as before.
+# Caps the rendered Context body so a long board can't bloat the prompt.
+#
+# This module used to OWN the number (a bare ``= 2000`` nobody could justify). It is now
+# only the DEFAULT: the live value comes from ``context_settings.resolve_context_limits()``
+# and is passed in by the caller, which keeps the split-and-pool math here PURE — no DB
+# read on the render path, and a caller that already resolved the limits never resolves
+# them twice. Kept under the old name because callers and tests import it.
+CONTEXT_CHAR_BUDGET = DEFAULT_CHAR_BUDGET
+
+# Share of the budget each tier may spend, mirroring the k-ladder (5/3/2) and the
+# per-tier distance gates: attention narrows as the board gets further from the task.
+# Normalised over the tiers actually ENABLED for the run, so a disabled tier's share is
+# redistributed rather than lost — a feature-only run still renders against the full
+# budget, exactly as before.
 CONTEXT_BUDGET_WEIGHTS = {"feature": 0.5, "project": 0.3, "global": 0.2}
 
 
