@@ -12,7 +12,7 @@ HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, 
 | `test_chat_agent.py` | covers pathly studio chat is plan aware; generic chat remains unchanged | 2 |
 | `test_config.py` | Tests for Settings.from_env() — specifically bind-host validation | 8 |
 | `test_db_agents_route.py` | GET /db/agents — registry-backed agent list for the spawn-policy Settings model-policy UI | 3 |
-| `test_db_features_fields.py` | Tests for the state-one-authority /db/features extension (split-db-api-explorer) | 5 |
+| `test_db_features_fields.py` | Tests for the state-one-authority /db/features extension (split-db-api-explorer) | 7 |
 | `test_event_prompt_timestamps.py` | covers prompt json event examples include timestamps | 1 |
 | `test_http_server.py` | Integration tests for the HTTP server endpoints | 26 |
 | `test_ops_export.py` | POST /ops/export skill selection + GET /ops/export/skills tier listing | 4 |

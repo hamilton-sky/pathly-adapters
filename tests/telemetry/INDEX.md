@@ -8,7 +8,7 @@ Cost/token telemetry — invocation projection, pricing, OTel export, observabil
 
 | File | Covers | Tests |
 | --- | --- | --- |
-| `test_consumers_board_scope_pivot.py` | run-identity: consumers pivot onto issued identity (board_scope / run_id join) | 4 |
+| `test_consumers_board_scope_pivot.py` | run-identity: consumers pivot onto issued identity (board_scope / run_id join) | 5 |
 | `test_extract_tokens.py` | Token counting is Strategy A — one per-adapter registry (`extract_tokens`) | 9 |
 | `test_goal_telemetry_key.py` | Goal-run telemetry-key unification | 5 |
 | `test_invocation_billing_reconcile.py` | Executor invocations must reconcile the real CLI billing (cost/tokens) after early-advance | 3 |

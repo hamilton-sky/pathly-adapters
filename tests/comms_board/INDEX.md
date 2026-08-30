@@ -4,7 +4,7 @@
 
 Comms board / message-board subsystem — messages, tasks, artifacts, goals, context retrieval & relevance, board mirror & hydration.
 
-41 test file(s).
+42 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -23,6 +23,7 @@ Comms board / message-board subsystem — messages, tasks, artifacts, goals, con
 | `test_comms_artifact_summary_writeback.py` | Conv 3 (unified-ai-routing): CLIENT writes its computed summary + per-artifact | 11 |
 | `test_comms_attach.py` | Tests for POST /comms/attach — real artifact attachment onto an existing | 5 |
 | `test_comms_consolidate.py` | Deterministic memory consolidation — dedupe_board + /comms/consolidate | 9 |
+| `test_comms_context_budget.py` | Per-tier char budget on the Context channel (context_budget.py) | 7 |
 | `test_comms_context_channels.py` | Tests for Phase 1.4c — labeled governance/semantic channels | 12 |
 | `test_comms_context_refs.py` | Tests for Phase 2 — context_refs on the comms write path | 5 |
 | `test_comms_context_relevance.py` | Relevance gate on the Context channel (memory-consolidation phase) | 8 |

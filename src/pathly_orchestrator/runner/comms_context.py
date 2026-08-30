@@ -13,6 +13,7 @@ from __future__ import annotations
 import logging
 
 from .comms_formatters import _collect_hydrate_channel, _confidence_label, _format_age
+from .context_budget import CONTEXT_CHAR_BUDGET, select_within_budget
 
 logger = logging.getLogger(__name__)
 
@@ -24,8 +25,10 @@ logger = logging.getLogger(__name__)
 # NOTE: keyword/recency hits carry no _distance and bypass this gate — see CT4 for the keyword bound.
 _SEMANTIC_MAX_DISTANCE = {"feature": 0.75, "project": 0.55, "global": 0.50}
 _SEMANTIC_MAX_DISTANCE_DEFAULT = 0.75
-# Caps the rendered Context body so a long board can't bloat the prompt.
-_CONTEXT_CHAR_BUDGET = 2000
+# Caps the rendered Context body so a long board can't bloat the prompt. The budget is
+# SPLIT PER TIER (see context_budget.py) — a single shared budget let the feature tier,
+# which renders first, spend the whole allowance before project/global ever got a slot.
+_CONTEXT_CHAR_BUDGET = CONTEXT_CHAR_BUDGET
 
 
 def retrieve_board_context(
@@ -186,6 +189,9 @@ def retrieve_board_context(
                 if dist > cutoff:
                     continue
             seen_ids.add(row_id)
+            # Tag the tier from the LOOP, not from row["board"]: authoritative here and
+            # independent of the search SELECT's shape. Consumed by the per-tier budget.
+            row["_tier"] = board_type
             context_msgs.append(row)
             kept += 1
             if kept >= k:
@@ -290,8 +296,10 @@ def retrieve_board_context(
                 "Semantic matches for this task. Inform but do not override governance above."
             )
         lines.append("")
-        used = 0
-        shown = 0
+        # Build every candidate line first, tagged with the tier it came from, and let
+        # the per-tier budget decide what survives (CT5). Charging a shared budget in
+        # render order meant a chatty feature board starved project/global outright.
+        entries: list[tuple[str, str]] = []
         for msg in context_msgs:
             from_agent = msg.get("from_agent", "?")
             to_agent = msg.get("to_agent", "*")
@@ -311,15 +319,17 @@ def retrieve_board_context(
                 parts.append(confidence)
             header = ", ".join(parts)
             text = msg.get("text", "")
-            entry = f"  • {text}  [{header}]"
-            if used + len(entry) > _CONTEXT_CHAR_BUDGET and shown > 0:
-                lines.append(
-                    f"  • … ({len(context_msgs) - shown} more match(es) omitted — budget)"
-                )
-                break
-            lines.append(entry)
-            used += len(entry)
-            shown += 1
+            tier = msg.get("_tier") or msg.get("board") or "feature"
+            entries.append((tier, f"  • {text}  [{header}]"))
+
+        kept = select_within_budget(
+            entries, [b for b, _, _ in enabled_boards], _CONTEXT_CHAR_BUDGET
+        )
+        for idx in kept:
+            lines.append(entries[idx][1])
+        omitted = len(entries) - len(kept)
+        if omitted:
+            lines.append(f"  • … ({omitted} more match(es) omitted — budget)")
 
     if catalog_lines:
         if decisions or escalations or hydrate_lines or context_msgs:
