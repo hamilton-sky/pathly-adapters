@@ -408,6 +408,52 @@ Wired in `core/flows/team.flow.yaml` and `team-build.flow.yaml`: `BUILDING->REVI
 `verify.build` → `BUILD_FAILURES.md`, `TESTING->RETRO` runs `verify.test` → `TEST_FAILURES.md`.
 Both route to the builder.
 
+## Headless spawn host (`pty_host/`)
+
+The supervisor never spawns a CLI itself. `supervisor/terminal.py` emits `TERMINAL_SPAWN` on the
+topic-independent `/events/spawn` SSE channel and blocks on `TerminalRun.wait_started(30)`, then
+`wait_pty_result(1800)`. Whoever answers is the **spawn host**. There are now two, and the
+supervisor cannot tell them apart:
+
+| Host | Process | Answers with | Used for |
+|---|---|---|---|
+| Studio | Electron main (`studio/src/main/ipc/terminal.ts`), node-pty | a visible PTY tab | desktop, human watching |
+| `pathly-pty-host` | this package, plain pipes | a headless subprocess | server-side drain, CI, no desktop |
+
+```bash
+pathly-fsm-http &        # the FSM server
+pathly-pty-host          # the spawn host — one at a time; two would double-spawn every run
+```
+
+Both implement the same three-event / two-callback contract: consume `TERMINAL_SPAWN`,
+`TERMINAL_KILL`, `TERMINAL_SIGNAL(term)`; answer `POST /runner/terminal/started` (releases the 30s
+wait) and `POST /runner/terminal/result` (the authoritative, run-keyed billing gate). Because the
+result POST carries the same `adapter` + raw `stdout_tail`, headless runs get the SAME telemetry
+path as Studio runs — `parse_result` on the server, `BILLING_UPDATE`, invocation projection.
+
+Module map: `host.py` (SSE loop + dispatch + concurrency) · `process.py` (one child: capture, kill)
+· `client.py` (the two callbacks) · `sse.py` (urllib SSE reader) · `cli.py` (`pathly-pty-host`).
+
+Four behaviors are load-bearing rather than incidental:
+
+- **Pipes, not a pseudo-terminal.** Every adapter's headless mode (`claude -p`, `codex exec`) is
+  non-interactive, so no TTY is needed. **stdin is `/dev/null`** — `codex` headless otherwise stalls
+  waiting on terminal input (the hazard `terminal.ts` handles by piping `$null` on Windows).
+- **The child gets its own process group** (POSIX `start_new_session`, Windows `taskkill /T`), so a
+  kill reaches the CLI's own children. Killing only the direct child is what leaves orphaned CLI
+  processes behind after an abort.
+- **`stop()` shuts the SSE socket down, it does not `close()` the response.** `close()` needs the
+  BufferedReader lock that the blocked `readline()` already holds, so it only returns at the
+  server's next 25s keepalive — a 25s hang on every Ctrl-C. `socket.shutdown()` makes the in-flight
+  `recv()` return immediately (`sse.close_stream`).
+- **An interactive stage is refused, not attempted.** Headless has no terminal and no human, so the
+  host reports `exit_code 1` with a nameable reason instead of letting the supervisor wait out its
+  30-minute result timeout on a stage that can never finish there.
+
+The child env carries `PATHLY_GATE_BILLED=1` (so the interactive stop hook skips the run rather than
+double-billing it via its "most recently active feature" guess) and `PATHLY_PROJECT_ROOT`, matching
+what Studio exports.
+
 ## Visible runner (supervisor/)
 
 `supervisor/` drives the pipeline by polling `/next_action` and calling `/complete_stage`. Every agent invocation goes through a visible terminal — there is no headless fallback.

@@ -155,6 +155,7 @@ pathly-state <feature>              # print current FSM state for a feature
 pathly-tokens                       # print token/cost summary across all pipeline runs
 pathly-validate-flow <flow.yaml>    # validate a flow YAML against the FSM schema
 pathly-studio                       # launch the local Pathly Studio desktop UI
+pathly-pty-host                     # run a pipeline's CLI agents headlessly (no Studio)
 ```
 
 `--dry-run` never writes. `--apply` is required for any writes.

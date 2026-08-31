@@ -38,12 +38,15 @@ User → /pathly <cmd>           skills (installed at ~/.claude/skills/pathly-*)
      → pathly/features/<feature>/  filesystem state (legacy: pathly/plans/<feature>/)
 
 Studio → Start button          FlowControlBar → POST /runner/start
-       → supervisor/            drives FSM + spawns agents as visible terminals
-       → TERMINAL_SPAWN SSE    Studio opens a PTY tab (node-pty) per pipeline stage
+       → supervisor/            drives FSM + delegates every agent spawn to the spawn host
+       → TERMINAL_SPAWN SSE    a SPAWN HOST opens a process per pipeline stage. Two implement the
+                               same contract: Studio (node-pty tab) and `pathly-pty-host`
+                               (src/pathly_orchestrator/pty_host/, plain pipes — server/CI, no
+                               desktop). Run exactly one; the supervisor can't tell them apart.
        → terminal:spawn IPC    argv injected from adapters.yaml headless template, e.g.
                                claude: ['claude', '-p', '{prompt}', '--model', '{model}', '--output-format', 'json', '--dangerously-skip-permissions']
                                codex:  ['codex', 'exec', '--skip-git-repo-check', '--json', '--sandbox', 'workspace-write', '--model', '{model}', '--', '{prompt}']
-       → PTY exits             POST /runner/terminal/result → FSM continues
+       → process exits         POST /runner/terminal/result → FSM continues
      → fsm_events (DB)      Claude writes AGENT_DONE with `summary` mid-run to the central DB; supervisor reads it after PTY exits as the authoritative semantic result (stdout only used for session_id + cost_usd); EVENTS.jsonl is a downstream DB→disk export
 ```
 
