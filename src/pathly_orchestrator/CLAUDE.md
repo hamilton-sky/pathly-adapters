@@ -526,6 +526,27 @@ The child env carries `PATHLY_GATE_BILLED=1` (so the interactive stop hook skips
 double-billing it via its "most recently active feature" guess) and `PATHLY_PROJECT_ROOT`, matching
 what Studio exports.
 
+## Retry ladder — what varies by ATTEMPT, not just who owns it
+
+`escalation_routing` (`fsm/engine_transitions.py::_resolve_feedback_target`) already changes
+the ROLE by round — rounds 1-2 the file's owner, round 3 an upstream specialist, round 4+
+human (`_ESCALATE_AT_ATTEMPT = 3`; a flow's tiers come from `["planner", "architect"]`-style
+lists or explicit `{at, to}` dicts, normalized by `_normalize_tiers`). What escalating the
+ROLE never did is escalate the STRATEGY: every attempt on a given role got the identical
+prompt — no signal it was a repeat, no guaranteed view of what actually failed (only
+Fix-mode roles — po/planner/architect/designer — are told to go read the feedback file), no
+visibility into what an earlier attempt on this stage reported.
+
+`route_feedback` now returns `retry_count` alongside `target_agent` (the SAME count
+`_resolve_feedback_target` used to pick the role — one number, two effects, always in sync).
+`fsm_compose.build_prompt_for_agent(..., retry_count=...)` appends a retry-ladder block from
+round 2 on (`retry_count > 0`): the attempt number, the feedback file's CURRENT content read
+fresh at call time (capped, so a pathological feedback file can't blow up the prompt), and
+`build_pipeline_history_block` — the SAME recent-`AGENT_DONE`-summaries helper `build_prompt`'s
+normal stage-advance path already uses, so no second history mechanism exists. **Round 1
+(`retry_count == 0`, the default) is byte-identical to before this** — every existing caller
+that never threads the new parameter, and every golden snapshot, is unaffected.
+
 ## Visible runner (supervisor/)
 
 `supervisor/` drives the pipeline by polling `/next_action` and calling `/complete_stage`. Every agent invocation goes through a visible terminal — there is no headless fallback.

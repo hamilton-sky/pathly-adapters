@@ -258,10 +258,50 @@ def build_prompt(
     return prompt
 
 
+def _retry_ladder_block(
+    storage_path: Path, feedback_file: str, retry_count: int
+) -> str:
+    """What varies by attempt, not just who owns it — escalation_routing already changes
+    the ROLE by round; this is what was missing: the STRATEGY. Round 1 never calls this
+    (retry_count==0). From round 2 on, an agent otherwise got the exact same prompt every
+    time a retry landed on it, with no signal this was a repeat and no guaranteed view of
+    what actually failed (only Fix-mode roles are told to go read the feedback file)."""
+    attempt = retry_count + 1
+    parts = [
+        f"\n## Retry attempt {attempt} — unresolved after {retry_count} prior attempt(s)\n\n"
+        "Whatever was tried before did not satisfy the gate. Repeating the same approach "
+        "will fail the same way — read what follows before deciding what to change.\n"
+    ]
+    try:
+        feedback_text = (
+            (storage_path / "feedback" / feedback_file)
+            .read_text(encoding="utf-8")
+            .strip()
+        )
+    except OSError:
+        feedback_text = ""
+    if feedback_text:
+        parts.append(
+            f"\n### The current feedback ({feedback_file})\n\n```\n{feedback_text[:4000]}\n```\n"
+        )
+    try:
+        from pathly_orchestrator.runner import build_pipeline_history_block
+
+        history = build_pipeline_history_block(str(storage_path))
+    except Exception:
+        history = ""
+    if history:
+        parts.append(
+            f"\n### What earlier attempts on this stage reported\n\n{history}\n"
+        )
+    return "".join(parts)
+
+
 def build_prompt_for_agent(
     agent_name: str,
     storage_path: Path,
     feedback_file: str | None = None,
+    retry_count: int = 0,
 ) -> str:
     agent_text = _load_agent_text(agent_name)
     context = (
@@ -270,6 +310,8 @@ def build_prompt_for_agent(
         f"Storage path: {storage_path}\n"
     )
     prompt = agent_text + context
+    if retry_count > 0 and feedback_file:
+        prompt += _retry_ladder_block(storage_path, feedback_file, retry_count)
     # Fix mode (smart-fix-routing DESIGN.md ss3.1): only appended when the routed target is
     # a root-cause role (po/planner/architect/designer) AND a feedback file was supplied —
     # the builder/reviewer/human path stays byte-identical to before this feature.
