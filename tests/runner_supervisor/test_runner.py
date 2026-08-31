@@ -233,6 +233,38 @@ def test_invoke_agent_nonzero_exit():
             invoke_agent("do stuff", "/proj", "claude-sonnet-4-6")
 
 
+# ── invoke_agent: PATHLY_PROJECT_ROOT reaches the child (billing fallback) ───
+
+
+def test_invoke_agent_sets_pathly_project_root_for_the_stop_hook():
+    """pathly-run has no gate-billing chokepoint (no /runner/terminal/result — it
+    invokes the adapter directly) — the interactive stop hook is its ONLY cost
+    source, and the hook needs PATHLY_PROJECT_ROOT in ITS OWN env to find the
+    active feature. Without this, a pathly-run session billed nothing at all."""
+    mock_proc = MagicMock()
+    mock_proc.communicate.return_value = (b"{}", None)
+    mock_proc.returncode = 0
+    with patch("subprocess.Popen", return_value=mock_proc) as mock_popen:
+        invoke_agent("do stuff", "/proj/root", "claude-sonnet-4-6")
+
+    _, kwargs = mock_popen.call_args
+    assert kwargs["env"]["PATHLY_PROJECT_ROOT"] == "/proj/root"
+
+
+def test_invoke_agent_preserves_the_rest_of_the_parent_environment():
+    """The child must still inherit everything else (PATH, credentials, …) — this is
+    an ADDITION to os.environ, not a replacement of it."""
+    mock_proc = MagicMock()
+    mock_proc.communicate.return_value = (b"{}", None)
+    mock_proc.returncode = 0
+    with patch.dict("os.environ", {"SOME_MARKER_VAR": "present"}, clear=False):
+        with patch("subprocess.Popen", return_value=mock_proc) as mock_popen:
+            invoke_agent("do stuff", "/proj/root", "claude-sonnet-4-6")
+
+    _, kwargs = mock_popen.call_args
+    assert kwargs["env"]["SOME_MARKER_VAR"] == "present"
+
+
 def test_resolve_argv_claude_adds_json_output():
     argv = resolve_argv("claude", "prompt", "model")
     assert "--output-format=json" in argv

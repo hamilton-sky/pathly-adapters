@@ -571,6 +571,35 @@ pathly-back    # roll back current feature state one step
 pathly-status  # show all active features and their current FSM state
 ```
 
+## `pathly-run` — the OTHER execution path (`runner/cli.py`, `runner/invoke.py`)
+
+`pathly-run <topic> --flow team --model … --project-root …` is a second, self-contained way
+to drive a flow, separate from the supervisor entirely. It calls `next_action`/`complete_stage`
+directly in a loop (`run_flow`/`resolve_stage` in `runner/cli.py`) and spawns each agent itself
+via `invoke_agent` (`runner/invoke.py`, a plain `subprocess.Popen`) — no `RunnerState`, no board,
+no goal DAG, no `TERMINAL_SPAWN`/`/runner/terminal/result`, none of the spawn-scheduler's
+dual-cap concurrency. It is also genuinely interactive, not headless: a human checkpoint or a
+`decide` response calls `input()` and blocks the terminal — this is a personal, desktop-less CLI
+for driving one flow by hand, not a background/CI runner.
+
+Bypassing `/runner/terminal/result` means bypassing the ONE chokepoint that bills every other
+spawn (`CLAUDE.md`'s "spawn gate" telemetry docs, root file) — `pathly-run` had **no cost source
+at all** until this fix: `invoke_agent`'s `Popen` call set no `env`, so the child inherited the
+parent shell's environment unchanged, and the interactive stop hook (the ONLY fallback billing
+path a non-gate-billed claude session has) could not find `PATHLY_PROJECT_ROOT` to know which
+feature to bill. Fixed by exporting it explicitly, matching what Studio already does for every
+interactive tab (`terminal.ts`) — `env={**os.environ, "PATHLY_PROJECT_ROOT": project_root}`. A
+`pathly-run` session now bills the same way any other interactive claude session does.
+
+**What this does NOT fix, and why it's left alone:** `pathly-run` remains a genuinely separate
+execution path from the supervisor — two ways to drive a flow that can drift independently, and
+`pathly-run` runs are invisible to the board/DAG/Monitor. Collapsing it onto the supervisor +
+`pty_host` (so `pathly-run` becomes a thin wrapper around `supervisor.start_run` with an embedded
+spawn host, or is retired in favor of `pathly-fsm-http` + `pathly-pty-host` directly) is real,
+valuable follow-up work — but it means rewriting a public, interactive CLI entry point's control
+flow, and doing it safely needs its own scoped review, not a same-pass bolt-on next to five other
+changes. Flagged here rather than attempted blind.
+
 ## Prompt dash-safety
 
 Headless prompts are sanitized before being passed to the CLI to ensure they never
