@@ -4,7 +4,7 @@
 
 Cost/token telemetry — invocation projection, pricing, OTel export, observability, log formatting.
 
-15 test file(s).
+16 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -21,5 +21,6 @@ Cost/token telemetry — invocation projection, pricing, OTel export, observabil
 | `test_parse_result_model_usage.py` | parse_result must capture the adapter's per-model usage breakdown (`modelUsage`) | 6 |
 | `test_pricing_registry.py` | Unit tests for PricingRegistry.compute() | 10 |
 | `test_projection_board_scope.py` | run-identity: the invocation projection stamps board_scope from the event stream | 5 |
+| `test_stage_provenance.py` | Tests for runner/provenance.py — a MEASURED, server-side record of what a stage's | 14 |
 | `test_telemetry_cost_fix.py` | Tests for the telemetry-cost-fix plan (FIX B + FIX C) | 3 |
 | `test_telemetry_three_tier.py` | Tests for the three-tier telemetry feature (telemetry-three-tier) | 12 |

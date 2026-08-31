@@ -541,6 +541,39 @@ If `summary` is absent (e.g. legacy agent), stdout `result` is used as a fallbac
 
 The runner→FSM result dict `_run_stage_via_terminal` returns also relays the agent's self-reported `outcome` (`success`/`failed`) + `error` from `AGENT_DONE`, so the loop executor's `_outcome_is_failure` (`supervisor/scheduler.py`) fails a task that exited cleanly but reported failure (silent-failure guard #2); a `_pty_return()` helper merges the CLI `exit_code` into the same returned dict for that check.
 
+## Per-stage git provenance — MEASURED, not self-reported (`runner/provenance.py`)
+
+`AGENT_DONE.summary` is written by the agent itself (the `completion-report` fragment runs
+agent-authored Python) — a self-report, same category `command_gate` closed a hole for on the
+correctness side. `runner/provenance.py` answers a different question with a SERVER-measured
+answer: at the moment `POST /runner/terminal/result` fires (the one per-spawn chokepoint every
+adapter's result passes through — see the billing docs above), what does `git` say actually
+changed in `project_root`? `record_stage_provenance` runs `git rev-parse HEAD` + `git diff --stat
+HEAD` + `git status --porcelain` there and appends a `STAGE_PROVENANCE` event
+(`{run_id, stage, head_sha, diff_stat, files_changed}`) — nothing the agent writes or omits can
+affect it.
+
+Two things make this correct rather than superficially similar to `scope_gate`'s git usage:
+
+- **Untracked files are included.** `git diff HEAD` alone only covers tracked paths — a brand new
+  file (the most common thing a builder does) never appears in it. `files_changed`/`diff_stat`
+  fold in `git status --porcelain`'s `??` lines too.
+- **The whole `pathly/` tree is exempt**, wider than `scope_gate`'s `pathly/features/`/
+  `pathly/plans/` prefix check. `pathly/` is entirely Pathly's own storage substrate (features/,
+  project/, board-artifacts/, lessons/, the legacy plans/ — never builder code), and on a brand
+  new project's very first feature git collapses an entirely-untracked tree to its SHALLOWEST
+  boundary (`?? pathly/`, not the deeper `?? pathly/features/<f>/`) — a narrower prefix check
+  would miss exactly the run it exists to exempt.
+
+Deliberately **cumulative, not per-stage-isolated**: with `pathly.auto_commit` off by default,
+changes routinely accumulate across several stages before a human commits, so "the full
+working-tree diff from the last commit, as of right now" is the honest unit — isolating one
+stage's exact incremental delta would need a per-stage baseline snapshot (`scope_gate`'s
+`build_baseline` captures one, but for a narrower purpose — stale scope-drift detection, not
+general provenance). Best-effort throughout: `capture_stage_provenance` returns `None` (never
+raises) outside a git repo or on any git failure, and `record_stage_provenance` never blocks or
+fails the result callback that calls it.
+
 ## Run identity — ISSUED at spawn (run-identity)
 
 Telemetry identity is **issued where truth is known — at spawn — never derived from storage
