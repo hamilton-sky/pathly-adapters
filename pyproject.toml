@@ -10,7 +10,7 @@ requires-python = ">=3.11"
 dependencies = ["pyyaml>=6.0,<7", "flask>=2.3,<4", "sqlite-vec==0.1.6", "sentence-transformers>=2.7.0"]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "pytest-cov>=5", "build", "twine", "jsonschema>=4", "black==26.5.1", "mypy==2.1.0"]
+dev = ["pytest>=8", "pytest-cov>=5", "build", "twine", "jsonschema>=4", "black==26.5.1", "mypy==2.1.0", "import-linter==2.14"]
 
 [project.scripts]
 pathly-setup = "install_cli.__main__:main"
@@ -35,6 +35,34 @@ pathly-otel-export = "pathly_orchestrator.otel_export:cli_main"
 # is deterministic regardless of the runner's interpreter. The black version is
 # pinned exactly in the dev extra above so CI never drifts on a new release.
 target-version = ["py311"]
+
+[tool.importlinter]
+# CLAUDE.md's "Layer dependency rule (no upward imports)" as a CI gate — was documentation
+# only ("Imports that violate this direction are architecture bugs, not style issues") with
+# nothing checking it, exactly the pattern the 400-line ratchet existed to fix for file size.
+# `db/ -> runner/ -> supervisor/ -> http_server/`: a lower layer may never import a higher one.
+root_package = "pathly_orchestrator"
+
+[[tool.importlinter.contracts]]
+name = "Orchestrator layer rule (db -> runner -> supervisor -> http_server)"
+type = "layers"
+layers = [
+    "pathly_orchestrator.http_server",
+    "pathly_orchestrator.supervisor",
+    "pathly_orchestrator.runner",
+    "pathly_orchestrator.db",
+]
+# Pre-existing violations, all routed through shared top-level hub modules OUTSIDE the four
+# layers (eventlog.py, fsm_http_client.py, board_mirror.py) rather than a layer package
+# importing another layer package directly. Frozen exceptions, same spirit as
+# scripts/file_size_baseline.txt: documented and pinned so the gate is meaningful for new
+# code without requiring an unrelated deep refactor to land it. Fixing these is real,
+# separate work — do not add to this list; a NEW layer violation should fail the gate.
+ignore_imports = [
+    "pathly_orchestrator.db.migrations -> pathly_orchestrator.board_mirror",
+    "pathly_orchestrator.runner -> pathly_orchestrator.fsm_http_client",
+    "pathly_orchestrator.eventlog -> pathly_orchestrator.http_server.sse",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

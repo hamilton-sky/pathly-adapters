@@ -337,12 +337,28 @@ pathly_orchestrator/
                            # whenever a payload carries a run_id)
 ```
 
-**Layer rules:**
+**Layer rules — CI-enforced (`import-linter`, `[tool.importlinter]` in `pyproject.toml`).**
+"Architecture bugs, not style issues" now has a gate: `lint.yml`'s consistency job runs
+`lint-imports`, which fails the build on ANY new violation of the direction below (not just
+`.py` files reachable from a route handler — the whole `pathly_orchestrator.*` import graph).
 - `db/` — no imports from runner, supervisor, or http_server
 - `runner/` — may import db; no imports from supervisor or http_server
 - `supervisor/` — may import db and runner; no imports from http_server
-- `http_server/` — may import all; supervisor/db imports inside route handlers (lazy)
+- `http_server/` — may import all; supervisor/db imports inside route handlers (lazy — this is
+  about avoiding a slow/circular import at module load, not something the layers contract
+  itself needs to know: `http_server` importing DOWN into `supervisor`/`db` is the ALLOWED
+  direction regardless of laziness)
 - Each package's `__init__.py` re-exports all symbols for backward compatibility
+
+**Three pre-existing violations are frozen as `ignore_imports` in the contract**, same spirit
+as `scripts/file_size_baseline.txt` — documented debt, not something to add to. All three route
+through a shared top-level hub module OUTSIDE the four layers, not one layer package importing
+another directly: `db.migrations -> board_mirror -> board_mirror_hydrate -> runner.embeddings`;
+`runner/__init__.py -> fsm_http_client -> fsm_ops -> fsm_ops_complete -> supervisor.artifact_reconcile`;
+and `eventlog -> http_server.sse`, which alone accounts for two reported violations
+(`supervisor.{goal_executor,terminal,terminal_reconcile} -> eventlog -> http_server.sse` and
+`runner.{context_record,events,history,provenance} -> eventlog -> http_server.sse`) since
+`eventlog.append_event` broadcasts SSE toasts on write. Fixing these is real, separate work.
 
 **Modules split under the 400-line ratchet (2026-08-18) — import paths unchanged.** Each keeps its
 original name as the entry point and re-exports every symbol its callers and the test-suite already
