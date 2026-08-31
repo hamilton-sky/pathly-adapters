@@ -4,10 +4,11 @@
 
 Goal/DAG decomposition & scheduling — feature/flow/project decompose, goals read-model, PRD import.
 
-9 test file(s).
+10 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
+| `test_cost_cap.py` | Tests for supervisor/cost_cap.py — aggregate cost enforcement for the loop executor | 14 |
 | `test_dag_scheduler.py` | Tests for supervisor/scheduler.py — DAG frontier loop (Phase 2a) | 4 |
 | `test_dag_scheduler_db.py` | Tests for P2 DAG scheduler DB layer | 9 |
 | `test_feature_decompose.py` | Feature-decompose ladder (planner-hierarchy T5): route dispatch, goal-count gate, flow, skill | 9 |

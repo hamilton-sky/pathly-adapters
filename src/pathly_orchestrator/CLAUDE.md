@@ -439,6 +439,31 @@ stop as `"finished"`; a parked run without this would have been silently reporte
 from dead — `goals.py`'s board-message wording does not yet make that distinction (falls
 into the generic "goal run failed" text), a known cosmetic gap, not a correctness one.
 
+## Goal cost cap (`supervisor/cost_cap.py`)
+
+The FSM loop (`orchestrator.py`) refuses to spawn a new stage once `cost_usd_so_far >=
+max_cost_usd` — but that check lives entirely inside `orchestrator.py`; the DAG/loop
+executor's `scheduler.py` frontier loop has no equivalent, so a goal's task-DAG could run
+to any cost. `cost_cap.py` closes this WITHOUT touching `scheduler.py` (frozen at its
+400-line ratchet ceiling): `CostCapTracker.wrap(spawn_fn)` returns a spawn function with
+the same signature that accumulates each task's real `cost_usd` as it becomes known, and
+`goal_executor.py::_run_loop` folds `tracker.exceeded()` into the SAME `abort_check` hook
+`scheduler_loop` already polls at the top of its frontier loop before scheduling anything
+new — no new extension point, no scheduler changes.
+
+Same limitation as the FSM loop's own cap, for the same reason: a headless
+`claude -p --output-format json` spawn reports cost in one JSON envelope at process exit,
+not a stream, so there is no way to know a task's cost before it finishes. This stops the
+DAG from scheduling FURTHER tasks once the aggregate is blown; it cannot preempt one
+already in flight.
+
+Configure per project with `PUT /db/settings/goal.max_cost_usd {"value": "5.0"}` —
+absent/invalid/non-positive means **no cap**, the same fail-open contract as
+`command_gate`. On breach, `tracker.report(res)` sets `res["error"]` /
+`res["cost_cap_exceeded"]` on the loop's result — the same shape `goal_verify`'s
+`verify_clean_drain` already uses, so every `on_done` consumer (which branches on
+`res.get("error")`) reports it as a non-clean stop rather than silent success.
+
 ## Headless spawn host (`pty_host/`)
 
 The supervisor never spawns a CLI itself. `supervisor/terminal.py` emits `TERMINAL_SPAWN` on the

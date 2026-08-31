@@ -317,6 +317,7 @@ def _run_loop(
 ) -> dict:
     """Supervisor owns the frontier via scheduler_loop (SerialIsolation), scoped to goal."""
     from pathly_orchestrator.supervisor import board_lock
+    from pathly_orchestrator.supervisor.cost_cap import init_cost_tracker
     from pathly_orchestrator.supervisor.goal_verify import verify_clean_drain
     from pathly_orchestrator.supervisor.isolation import SerialIsolation
     from pathly_orchestrator.supervisor.registry import _record_run_history
@@ -341,11 +342,9 @@ def _run_loop(
             import os
 
             slug = ensure_goal_slug(get_db(project_root or None), goal_id)
-            # Board-scoped goal home (storage-restructure): feature-tier nests under the feature
-            # (pathly/features/<feature>/goals/<slug>), project/global under pathly/project/goals/
-            # <slug>. Route through the ONE goal-dir resolver — every other goal path (decompose
-            # planner/plan/consultation, _run_team) already does — instead of the flat
-            # pathly/goals/<slug> this used to hardcode.
+            # Board-scoped goal home: feature-tier -> pathly/features/<feature>/goals/<slug>,
+            # project/global -> pathly/project/goals/<slug> — the ONE goal-dir resolver every
+            # other goal path (decompose planner/plan/consultation, _run_team) already uses.
             _goal_dir = _goal_storage_dir(project_root, board, scope, slug)
             os.makedirs(_goal_dir, exist_ok=True)
         except Exception:
@@ -396,9 +395,10 @@ def _run_loop(
     # _run_loop builds its own RunnerState (never start_run), so nothing else writes this row.
     _record_run_history(state, "running")
     isolation = SerialIsolation()
+    cost_tracker = init_cost_tracker()
 
     def _abort_check() -> bool:
-        return board_lock.holder(board, scope) != run_id
+        return board_lock.holder(board, scope) != run_id or cost_tracker.exceeded()
 
     def _work() -> dict:
         import time as _t
@@ -415,12 +415,12 @@ def _run_loop(
                 goal_id=goal_id,
                 abort_check=_abort_check,
             )
-            if spawn_fn is not None:
-                kwargs["spawn_fn"] = spawn_fn
+            kwargs["spawn_fn"] = cost_tracker.wrap(spawn_fn)
             raw = scheduler_loop(state, board, scope, **kwargs)
             res: dict = dict(raw) if isinstance(raw, dict) else {"result": raw}
             res.update(executor="loop", goal_id=goal_id, run_id=run_id)
             verify_clean_drain(res, _goal_dir, board, scope, goal_id)
+            cost_tracker.report(res)
             _safe_call(on_done, run_id, res)
             _record_run_history(state, "done", finished_at=_iso_now())
             return res
