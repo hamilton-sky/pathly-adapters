@@ -585,6 +585,64 @@ the earlier goal-cost-cap / provenance / retry-ladder additions above.
    have broken that safety net and those tests for no benefit — left in place, with a comment
    clarifying it is a generic fallback vocabulary, not any live flow's state machine.
 
+## FSM/DAG convergence — Phase 1: per-task retry/escalation (`supervisor/task_retry.py`)
+
+The `loop` executor's `scheduler.py` frontier loop had NO retry at all: any task failure — a
+worker exception, or an outcome reporting failure (`_outcome_is_failure`) — called `fail_task()`
+immediately and permanently, cascading `blocked` to every transitive dependent. The `attempts`
+column (`comms_messages.attempts`, already incremented by `claim_task` on every claim) was
+written but never read anywhere — a dead signal. Contrast the `team`/`team-build` FSM path,
+which already gets real per-task verification for free: `team-build.flow.yaml`'s
+`BUILDING->REVIEWING` `command_gate` runs once per task (BUILDING spawns one `team/build` agent
+per ready task, per the per-task loop docs above) — that path needed no new gate, just the
+Phase 0 goal-scoping fix. The gap was specifically the `loop` executor's flat, gate-less DAG.
+
+**What Phase 1 does NOT do, and why:** the original plan sketch called for a per-task
+*completion gate* reusing `fsm.gates.command.check_command_gate`, keyed by a `task_kind`/`stage`
+column. Investigation found `assigned_to_stage` (the column that would key it) is declared in
+the schema but written nowhere — populating it is a task-creation change (planner/decomposer),
+out of scope for an additive pass. Worse, running `verify.build`/`verify.test` after EVERY task
+directly contradicts `goal_verify.py`'s own documented rationale for checking once at goal-drain
+("not per task, which would run the whole suite N times for one goal"). So Phase 1 is scoped to
+what the codebase actually has a real gap in — retry — not a redundant per-task command_gate.
+
+**`resolve_task_failure`** is the one decision point `scheduler.py`'s completion handler calls
+on a failed task, and owns the FULL side-effect set for whichever branch it picks (so
+`scheduler.py` only needs the returned `(decision, blocked_ids)`):
+- **Retry** (`current_attempt < goal.task_max_attempts`, default 3): `retry_task` reverts the
+  task to `pending` — the frontier's next poll re-schedules it — and stamps the failure reason
+  into the existing `fail_reason` column (no new column: `get_ready_tasks`' `SELECT *` already
+  returns it, so the NEXT attempt's `task` dict carries it for free).
+- **Escalate** (attempt `>= goal.task_max_attempts`): the original behavior, delayed until
+  retries are exhausted — `fail_task`'s cascade-to-blocked, plus a board `escalation` message
+  (mirrors `goal_verify.post_gate_failure_escalation`) so a human/agent sees it instead of a
+  silent DB-only cascade.
+
+**`build_retry_context`** appends a retry-ladder block to a retried task's prompt from the
+second attempt on — mirrors `fsm_compose._retry_ladder_block`'s "what varies by ATTEMPT, not
+just who owns it": the attempt number and the previous failure's reason, so a retry doesn't
+repeat the identical blind prompt. A first attempt (`attempts == 0`) is unaffected — byte-
+identical to before this feature.
+
+**`detect_deadlocks`** is `scheduler.py`'s former loop-only postscript (any task still `pending`
+after a normal drain has an unsatisfiable dependency — a cycle, or a `depends_on` that will
+never complete; `get_ready_tasks` silently excludes it, so without this a drain returns a
+clean-looking result while work sits stuck forever), extracted so any drain path with DB access
+can reuse it — universal deadlock detection. Only `scheduler_loop` calls it today; wiring the
+`single` executor's agent-driven `drain-dag` loop to it would need a new HTTP endpoint (an
+agent can't call Python directly) and is flagged, not attempted, in this pass.
+
+Configure per project with `PUT /db/settings/goal.task_max_attempts {"value": "5"}` — unlike
+`command_gate`/`goal.max_cost_usd`'s fail-open-to-off contract, an absent/invalid/non-positive
+setting here falls back to the **default (3)**, not "no retry": an unconfigured project should
+still get the safety net.
+
+This shipped as an EXTRACTION-plus-ADDITION, not pure addition: `scheduler.py` was already at
+its 400-line ratchet ceiling (433), so the failure branch's full logic (including the old
+unconditional `fail_task` call and the deadlock postscript) moved into `task_retry.py` — net
+result, `scheduler.py` is now SHORTER (415 lines) despite gaining retry capability, and no flow
+YAML, Studio surface, or existing test needed to change.
+
 ## Visible runner (supervisor/)
 
 `supervisor/` drives the pipeline by polling `/next_action` and calling `/complete_stage`. Every agent invocation goes through a visible terminal — there is no headless fallback.

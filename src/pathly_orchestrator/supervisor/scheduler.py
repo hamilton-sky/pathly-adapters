@@ -21,6 +21,8 @@ import queue
 import threading
 from typing import Any, Callable, Optional
 
+from . import task_retry as _task_retry
+
 logger = logging.getLogger("pathly.scheduler")
 
 # Sentinel pushed onto the completion queue to wake the main loop on abort.
@@ -127,9 +129,7 @@ def scheduler_loop(
     from pathly_orchestrator.db.queries.comms import (
         claim_task,
         complete_task,
-        fail_task,
         get_ready_tasks,
-        get_tasks,
         reclaim_stale_claims,
     )
 
@@ -162,6 +162,9 @@ def scheduler_loop(
     # Short task text kept per in-flight task so the supervisor can name it in the done/failed status it
     # posts at completion (the completion_q item carries only ids, not the text).
     task_texts: dict[str, str] = {}
+    # attempts BEFORE this claim (claim_task increments the column before the worker runs) —
+    # read at completion time to decide retry vs. escalate (task_retry.resolve_task_failure).
+    task_attempts: dict[str, int] = {}
 
     result_completed: list[str] = []
     result_failed: list[str] = []
@@ -197,6 +200,7 @@ def scheduler_loop(
             )
         except Exception:
             instructions = task_text
+        instructions += _task_retry.build_retry_context(task)
         # Inject the same scope-aware board context (governance + memory, honoring
         # the Reads toggle) the FSM/team path gets, so loop-executor tasks aren't
         # blind to the board. Best-effort — never block a task on context.
@@ -268,6 +272,7 @@ def scheduler_loop(
             )
             # Guaranteed supervisor-side progress (not agent-dependent): Started on claim.
             task_texts[task_id] = task.get("text", "") or ""
+            task_attempts[task_id] = int(task.get("attempts") or 0)
             _post_task_status(
                 conn, board, scope, f"Started: {(task.get('text') or task_id)[:110]}"
             )
@@ -326,28 +331,23 @@ def scheduler_loop(
                     or outcome.get("outcome")
                     or "task reported failure"
                 )[:500]
-            logger.warning("scheduler: task %s failed: %s", task_id, reason)
-            blocked_ids = fail_task(conn, task_id, reason=reason)
-            result_failed.append(task_id)
-            result_blocked.extend(blocked_ids)
-            _broadcast(
-                event_broadcast_fn,
-                scope,
-                "task_failed",
-                {
-                    "task_id": task_id,
-                    "lane": lane,
-                    "reason": reason,
-                    "blocked": blocked_ids,
-                    "text": task_texts.get(task_id, ""),
-                },
-            )
-            _post_task_status(
+            current_attempt = task_attempts.pop(task_id, 0) + 1
+            decision, blocked_ids = _task_retry.resolve_task_failure(
                 conn,
-                board,
-                scope,
-                f"Failed: {(task_texts.pop(task_id, '') or task_id)[:80]} — {reason[:80]}",
+                task_id,
+                current_attempt,
+                reason,
+                board=board,
+                scope=scope,
+                goal_id=goal_id,
+                text=task_texts.pop(task_id, ""),
+                lane=lane,
+                broadcast=lambda ev, pl: _broadcast(event_broadcast_fn, scope, ev, pl),
+                post_status=lambda t: _post_task_status(conn, board, scope, t),
             )
+            if decision == "escalated":
+                result_failed.append(task_id)
+                result_blocked.extend(blocked_ids)
         else:
             complete_task(conn, task_id)
             result_completed.append(task_id)
@@ -373,34 +373,16 @@ def scheduler_loop(
 
     # ── Deadlock guard ──────────────────────────────────────────────────────────
     # After a NORMAL drain (not an abort), any task still 'pending' has an unsatisfiable
-    # dependency — a cycle, or a depends_on that will never complete. get_ready_tasks
-    # silently excludes such tasks (unmet deps), so without this the loop returns a
-    # clean-looking result while the work sits stuck forever. Surface it LOUDLY: mark
-    # each blocked with a reason, report it, and warn.
+    # dependency (cycle, or a depends_on that will never complete) — get_ready_tasks
+    # silently excludes it, so without this the loop would return a clean-looking result
+    # while the work sits stuck forever. Extracted to task_retry.detect_deadlocks (Phase 1
+    # universal deadlock detection) so any drain path with DB access can reuse it, not just
+    # this loop.
     result_deadlocked: list[str] = []
     if not aborted:
-        for row in get_tasks(
-            conn, board, scope, task_status="pending", goal_id=goal_id
-        ):
-            tid = row["id"]
-            conn.execute(
-                "UPDATE comms_messages SET task_status='blocked', fail_reason=? WHERE id=?",
-                (
-                    "deadlocked: unsatisfiable dependency (cycle or missing depends_on)",
-                    tid,
-                ),
-            )
-            result_deadlocked.append(tid)
-            result_blocked.append(tid)
+        result_deadlocked = _task_retry.detect_deadlocks(conn, board, scope, goal_id)
+        result_blocked.extend(result_deadlocked)
         if result_deadlocked:
-            conn.commit()
-            logger.warning(
-                "scheduler: %d task(s) DEADLOCKED in %s/%s (unsatisfiable deps): %s",
-                len(result_deadlocked),
-                board,
-                scope,
-                result_deadlocked,
-            )
             _broadcast(
                 event_broadcast_fn,
                 scope,
