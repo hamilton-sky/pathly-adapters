@@ -43,6 +43,15 @@ _SCHEMA_PATH = (
 )
 _SCHEMA = json.loads(_SCHEMA_PATH.read_text(encoding="utf-8"))
 
+# GENERIC FALLBACK, not the state machine of any live flow. None of the 9 shipped
+# core/flows/*.flow.yaml carry this exact vocabulary (IDLE, DISCOVERING,
+# REVIEW_BLOCKED, ...) or these exact transitions — every real caller
+# (fsm_ops.py, fsm_ops_complete.py) always passes its own flow_config, which
+# eventlog.write_state/append_event validate against instead (via valid_states()/
+# flow_transitions()). STATES/VALID_STATES/TRANSITIONS exist ONLY as the
+# still-enforced legality check for a caller that omits flow — see
+# eventlog.write_state's `flow is None` branch and
+# tests/fsm_flows/test_orchestrator.py's write_state/append_event legality tests.
 STATES: dict[str, list[str]] = _SCHEMA["transitions"]
 VALID_STATES: frozenset[str] = frozenset(STATES.keys())
 TRANSITIONS: dict[str, list[str]] = STATES

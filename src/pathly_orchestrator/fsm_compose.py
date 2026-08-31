@@ -179,6 +179,14 @@ def build_prompt(
         board_tier=board_tier,
         board_scope_cfg=board_tiers,
     )
+    # <goal_id> = the goal this run belongs to ("" for a plain feature/project run) — lets a
+    # skill's own board queries stay goal-scoped in lockstep with the FSM gates that surround
+    # it (on_board_count, require_tasks_done are already goal-scoped via RunnerState.goal_id).
+    # Substituted for real (not left to the agent to infer from the "Current task" block) so a
+    # goal-executor run can never claim a ready task belonging to a DIFFERENT goal on the same
+    # board. An empty string renders as `goal_id=` in a querystring, which /comms/tasks already
+    # treats as "no filter" (`request.args.get("goal_id") or None`).
+    agent_text = agent_text.replace("<goal_id>", goal_id)
 
     context = (
         f"\n\n## Current task\n"

@@ -49,6 +49,12 @@ role_map:
   RESEARCHING: web-researcher
   DESIGNING: designer
   PLANNING: planner
+# Same per-stage CLI routing as consultation.flow.yaml (this flow is that flow lifted
+# one altitude up, per the header comment) — PO discussion + design run on codex.
+adapter_map:
+  default: claude
+  PO_DISCUSSING: codex
+  DESIGNING: codex
 feedback_routing:
   HUMAN_QUESTIONS: human
   BLOCKED_ON_HUMAN: human

@@ -56,8 +56,11 @@ the sole work source (the legacy per-conversation plan files and conversation mo
 ### Board task DAG
 
 ```
-curl -s "http://127.0.0.1:8765/comms/tasks?ready=true&feature=[feature]&scope=[feature]"
+curl -s "http://127.0.0.1:8765/comms/tasks?ready=true&feature=[feature]&scope=[feature]&goal_id=<goal_id>"
 ```
+`<goal_id>` is substituted for you (empty when this run isn't goal-scoped) — always send it as-is,
+so a goal-executor run never claims a ready task that belongs to a different goal on the same board.
+
 **If the response is a non-empty list of ready tasks, BUILD FROM THE BOARD** — the DAG is the
 authoritative work list. Build **exactly
 ONE task this stage**, then hand off to review. The FSM runs one build→review cycle **per task**:

@@ -547,6 +547,44 @@ normal stage-advance path already uses, so no second history mechanism exists. *
 (`retry_count == 0`, the default) is byte-identical to before this** — every existing caller
 that never threads the new parameter, and every golden snapshot, is unaffected.
 
+## FSM/DAG convergence — Phase 0 hygiene fixes
+
+Four small, independent fixes surfaced while researching converging the FSM engine and the
+DAG/goal engine into one execution model (design at `pathly/features/` — see the root
+`CLAUDE.md`'s Comms board section for the DAG side). None of these change the convergence
+design itself; they clear real bugs/inconsistencies found along the way, same discipline as
+the earlier goal-cost-cap / provenance / retry-ladder additions above.
+
+1. **`team/build`'s board poll is now goal-scoped.** The FSM gates around BUILDING
+   (`on_board_count`, `require_tasks_done`) already read `RunnerState.goal_id`, but the skill's
+   own `GET /comms/tasks?ready=true` query had no `goal_id` param — a goal-executor run could
+   claim a ready task belonging to a DIFFERENT goal on the same feature board.
+   `fsm_compose.build_prompt` now substitutes a real `<goal_id>` prompt var (mirroring
+   `<feature>`/`<board>`/…, not left to the agent to infer) into any composed FSM-stage prompt;
+   `team/build.md`'s curl line sends it as `&goal_id=<goal_id>` (empty string when the run isn't
+   goal-scoped, which `/comms/tasks` already treats as "no filter").
+2. **`test.flow.yaml` no longer self-loops on `TEST_FAILURES.md`.** It routed
+   `TESTING->TESTING` instead of `TESTING->BUILDING` like both `team.flow.yaml` and
+   `team-build.flow.yaml` (and its own `feedback_routing: TEST_FAILURES: builder`). A same-state
+   "transition" skips `eventlog.write_state`'s legality check entirely (`old_current ==
+   new_current`), so this never crashed — it just re-ran `team/test` against unfixed code
+   forever instead of ever handing the failure to the builder.
+3. **`feature-consultation.flow.yaml` / `project-consultation.flow.yaml` now carry the same
+   `adapter_map` as `consultation.flow.yaml`** (PO discussion + design on `codex`, everything
+   else `claude`). Both files' own header comments describe them as "consultation.flow.yaml
+   lifted one altitude up" (same PO→architect→researcher→designer→planner shape); the
+   `adapter_map` was dropped when they were copied and is now reconciled.
+4. **`fsm/state.py`'s `STATES`/`VALID_STATES`/`TRANSITIONS`** (sourced from
+   `pathly_data/schemas/state.schema.json`) were flagged during research as apparent dead code —
+   the vocabulary (`IDLE`, `DISCOVERING`, `REVIEW_BLOCKED`, …) matches none of the 9 shipped
+   flows, and every real caller (`fsm_ops.py`, `fsm_ops_complete.py`) always passes its own
+   `flow_config`. Closer investigation found this was the wrong call: `eventlog.write_state`/
+   `append_event`'s `flow is None` branch is a genuine, still-enforced fallback legality check
+   for a caller that omits a flow, and `tests/fsm_flows/test_orchestrator.py` deliberately
+   exercises it (`test_write_state_rejects_illegal_transition` and siblings). Deleting it would
+   have broken that safety net and those tests for no benefit — left in place, with a comment
+   clarifying it is a generic fallback vocabulary, not any live flow's state machine.
+
 ## Visible runner (supervisor/)
 
 `supervisor/` drives the pipeline by polling `/next_action` and calling `/complete_stage`. Every agent invocation goes through a visible terminal — there is no headless fallback.

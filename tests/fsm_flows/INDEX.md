@@ -4,11 +4,12 @@
 
 FSM engine, gates, transitions, flow definitions, feedback protocol & fix-routing.
 
-19 test file(s).
+22 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
 | `test_command_gate.py` | Tests for ``command_gate`` — the executed (ground-truth) transition gate | 18 |
+| `test_consultation_adapter_map.py` | Phase 0 hygiene fix — consultation.flow.yaml had an adapter_map (PO discussion + | 2 |
 | `test_consultation_dag_gate.py` | The consultation decompose must FAIL LOUDLY when the planner seeds no DAG | 3 |
 | `test_feedback_escalation.py` | 3-tier feedback escalation (fsm.engine.route_feedback) | 11 |
 | `test_feedback_protocol.py` | Adapters side of the feedback protocol contract | 4 |
@@ -17,6 +18,7 @@ FSM engine, gates, transitions, flow definitions, feedback protocol & fix-routin
 | `test_fsm_http_client.py` | covers next action auto starts server and posts json; poll exits early on first healthy response; poll exhausted raises runtime error; … | 8 |
 | `test_fsm_ops.py` | Integration tests for fsm_ops.py (next_action, complete_stage) | 36 |
 | `test_gates.py` | Unit and integration tests for run_gates() — Conv 1 and Conv 2 (scope_gate) | 31 |
+| `test_goal_id_prompt_var.py` | Phase 0 hygiene fix — team/build's board query was unscoped by goal_id | 3 |
 | `test_golden_path.py` | T1 — the end-to-end GOLDEN-PATH smoke test (production-readiness P0) | 7 |
 | `test_hooks.py` | End-to-end tests for hook scripts via subprocess | 11 |
 | `test_orchestrator.py` | Tests for Conv 2: STATE.json schema validation, state/transition enforcement, concurrency | 17 |
@@ -25,5 +27,6 @@ FSM engine, gates, transitions, flow definitions, feedback protocol & fix-routin
 | `test_stage_override.py` | flow-gate-preview (P2) — the transient per-run, per-stage prompt override channel | 5 |
 | `test_stage_selection_apply.py` | flow-phase-inspector (#5) apply-at-spawn: build_prompt applies a stage's saved selection | 7 |
 | `test_team_build_per_task.py` | team-build per-task loop + goal-DAG completeness gate | 9 |
+| `test_test_flow_failure_routing.py` | Phase 0 hygiene fix — test.flow.yaml routed TEST_FAILURES.md to TESTING (a | 3 |
 | `test_transition_actions.py` | Tests for get_transition_actions() and validate_flow_cli() in state.py | 21 |
 | `test_two_flows.py` | Validity tests for the two-flow split — team-build + consultation flows | 7 |

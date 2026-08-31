@@ -72,7 +72,7 @@ transition_rules:
     default: TESTING
   TESTING:
     on_artifact:
-      TEST_FAILURES.md: TESTING
+      TEST_FAILURES.md: BUILDING
     default: DONE
 
 transition_actions:
