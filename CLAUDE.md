@@ -70,6 +70,18 @@ In runner mode Pathly is the single source of truth for skill content. The CLI r
 - `decision` — `"continue"` / `"block"` / `"escalate"` (automation gate)
 - `codex_subagent` — legacy compat field with frozen keys; new adapters should read `agent_hint`
 
+**Ground truth — `command_gate` measures what other gates take on trust.** Four of the five FSM
+transition gates read state an *agent produced*: `require_artifact` (a file exists), `verify_gate`
+(the file's line 1 is `RESULT: PASS`), `require_tasks_done` (tasks marked done), `scope_gate` (the
+git footprint matches the declared one). `command_gate` (`fsm/gates/command.py`) is the one that
+**executes** — it runs the project's own verify command, reads the process exit code, and routes the
+real stdout/stderr back as feedback. So a builder that writes `RESULT: PASS` over code that does not
+compile no longer advances the flow. Configure per project with `PUT /db/settings/verify.build` /
+`verify.test`; **unconfigured means the gate skips**, so it is inert until a project opts in. Wired
+into `team`/`team-build` at `BUILDING->REVIEWING` (`verify.build` → `BUILD_FAILURES.md`) and
+`TESTING->RETRO` (`verify.test` → `TEST_FAILURES.md`). Detail:
+[src/pathly_orchestrator/CLAUDE.md](src/pathly_orchestrator/CLAUDE.md).
+
 **Agent roles** (full definitions in `src/pathly_data/core/agents/`):
 
 | Role | Model | Job |

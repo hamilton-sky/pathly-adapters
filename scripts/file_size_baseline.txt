@@ -9,7 +9,6 @@ studio/src/renderer/src/components/Editor/index.tsx:576
 src/pathly_orchestrator/supervisor/goal_executor.py:561
 src/pathly_orchestrator/http_server/blueprints/comms/settings.py:521
 src/pathly_orchestrator/supervisor/board_run.py:490
-src/pathly_orchestrator/fsm/engine_actions.py:472
 src/pathly_orchestrator/db/queries/invocation_projection.py:454
 src/pathly_orchestrator/http_server/blueprints/runner/api_lifecycle.py:452
 src/pathly_orchestrator/db/migrations.py:438

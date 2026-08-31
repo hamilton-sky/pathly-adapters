@@ -99,6 +99,11 @@ def _exit_requirement(flow_config: dict | None, state_name: str) -> str | None:
                 lines.append(
                     f"Keep changes within the scope declared in `{chk.get('scope_file')}`."
                 )
+            elif t == "command_gate":
+                lines.append(
+                    f"The project's `{chk.get('command_key')}` verification command must "
+                    f"exit 0 — it is RUN, not self-reported (→ {target})."
+                )
 
     rules = (flow_config.get("transition_rules") or {}).get(state_name) or {}
     for rule in rules.get("on_content") or []:

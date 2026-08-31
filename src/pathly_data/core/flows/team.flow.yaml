@@ -57,6 +57,7 @@ feedback_routing:
   TEST_FAILURES: builder
   ACCEPTANCE_QUESTION: po
   INCOMPLETE_TASKS: builder     # REVIEWING->TESTING gate: require_tasks_done -> finish remaining board tasks
+  BUILD_FAILURES: builder       # BUILDING->REVIEWING gate: command_gate (verify.build) exited non-zero
 # 3-tier retry escalation (rounds 1-2 owner -> round 3 upstream specialist -> round 4+ human).
 # Mirrors team-build.flow.yaml, which shares the same team/review + team/test skills.
 escalation_routing:
@@ -119,6 +120,12 @@ gates:
       artifact: VERIFY.md
       pass_marker: 'RESULT: PASS'
       on_fail: VERIFY_FAILURES.md
+    # Measured counterpart to the self-reported VERIFY.md above: run the project's own
+    # build/typecheck command and read its exit code. Skips (fail-open) until
+    # `verify.build` is set, so a project that hasn't configured one is unaffected.
+    - type: command_gate
+      command_key: build
+      on_fail: BUILD_FAILURES.md
   REVIEWING->TESTING:
     # The reviewer writes REVIEW.md (RESULT: PASS) ONLY on a clean pass; a failing review leaves
     # REVIEW_FAILURES.md instead (and deletes any stale REVIEW.md). If REVIEW.md is missing/not-PASS
@@ -133,4 +140,11 @@ gates:
     # so the gate is feature-scoped (board+scope), matching team/build's ready-task fetch.
     - type: require_tasks_done
       on_fail: INCOMPLETE_TASKS.md
+  TESTING->RETRO:
+    # The tester agent REPORTS that acceptance criteria pass; this gate MEASURES it by
+    # running the project's own test command. A non-zero exit routes the real output to
+    # TEST_FAILURES.md -> builder, the same path a tester-authored failure takes.
+    - type: command_gate
+      command_key: test
+      on_fail: TEST_FAILURES.md
 _comments: []

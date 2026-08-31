@@ -352,12 +352,61 @@ import, so no call site moved:
 | `fsm_compose.py` (298) — keeps `build_prompt` / `build_prompt_for_agent` / `_load_agent_text` | `fsm_compose_tables` (lookup tables) · `fsm_compose_vars` (`_inject_prompt_vars` + its inputs) · `fsm_compose_paths` (`resolve_stage_out_path`, `resolve_board_scope`) · `fsm_compose_stage` (section drops, stage overrides, adapter choice) · `fsm_compose_hints` (`_agent_hint`) |
 | `skills/compose.py` (197) — keeps the resolver | `compose_base` (constants + `_strip_leading_frontmatter`) · `compose_resources` (manifest/skill/fragment I/O) · `compose_caps` · `compose_segments` · `compose_validate` |
 | `supervisor/terminal.py` (390) — keeps the spawn | `terminal_argv` · `terminal_identity` · `terminal_reconcile` · `terminal_billing` · `terminal_phase` |
+| `fsm/engine_actions.py` (204) — keeps `run_transition_actions` | `fsm/gates/` — one module per gate type (`artifact` · `tasks` · `scope` · `command`) behind the `run_gates` dispatcher in `gates/__init__.py`; `_helpers` owns `append_event` / `_write_gate_feedback` / `gate_failed` / `project_root_of` |
 
 Two constraints govern what may leave these files, and both are load-bearing:
 `fsm_compose._load_agent_text` and `supervisor.terminal._reconciliation_window` are **monkeypatched
 in those namespaces by tests**, so the functions that call them must stay in the same module and
 call them as bare names. `fsm_compose.py` also still loads `fsm_compose_responses` at the BOTTOM of
 the file — that ordering is what keeps its back-reference from becoming a cycle.
+
+## Transition gates (`fsm/gates/`)
+
+A gate answers one question: may the FSM leave `prev_state` for `next_state`? `run_gates`
+(`fsm/gates/__init__.py`) dispatches through a `_CHECKS` registry — **a new gate type is a new
+module, never another `elif`**. Each check returns `None` to allow the transition or a
+`{"gate_failed", "feedback_file"}` dict to block it; the first failure wins and
+`fsm_ops_complete` turns it into a blocked response routed by `feedback_routing`.
+
+| Gate | Module | Proves | Config |
+|---|---|---|---|
+| `require_artifact` | `artifact.py` | an agent wrote a file | `artifact` |
+| `verify_gate` | `artifact.py` | an agent wrote `pass_marker` on line 1 | `artifact`, `pass_marker` |
+| `require_tasks_done` | `tasks.py` | the board DAG has no unfinished task (goal-scoped when `goal_id` is set, else feature-scoped) | — |
+| `scope_gate` | `scope.py` | the builder stayed inside its declared footprint (git diff ∪ untracked vs. `scope_file`) | `scope_file` |
+| `command_gate` | `command.py` | **the project's own verify command exits 0** | `command_key` (+ optional `command`, `timeout`) |
+
+**The first four read state that agents produced; only `command_gate` executes something.** That
+distinction is the point of it: `verify_gate` is satisfied by an agent writing `RESULT: PASS`, so
+the FSM's pass/fail signal was, end to end, an agent's opinion of its own work. `command_gate`
+re-derives the answer from a process exit code and routes the real stdout/stderr back as feedback.
+
+**Command resolution** (highest precedence first): `gate["command"]` literal → app-setting
+`verify.<command_key>` → **skip**. Configure a project with
+`PUT /db/settings/verify.test {"value": "python -m pytest -q"}` (also `verify.build`, `verify.lint`,
+and `verify.timeout_seconds`; default timeout 600s).
+
+**Fail-open on absent config, fail-closed on everything else.** No configured command → `GATE_SKIPPED`
+(`no_command_configured`), so adding the gate to a shared flow never breaks a project that has not
+configured one. But a command that runs and fails, times out, cannot be parsed, or cannot be executed
+all **block** — a verify command that silently does nothing is worse than no gate at all.
+
+The command is split with `shlex.split` and run **without a shell**, so `&&`, `|` and `>` are not
+operators — put those in a script and call the script. A value starting with `[` is parsed as a JSON
+argv array instead, for exact control on any platform — **required on Windows for batch shims**
+(`npm`/`yarn`/`tsc` are `.cmd` files and do not resolve by bare name without a shell: use
+`["npm.cmd", "test"]`). It runs with cwd = the repo root (via
+`gates/_helpers.project_root_of`, which delegates to `eventlog._project_root_of` so a nested
+`goals/<slug>` run resolves the same root the event log keys off) and `PATHLY_VERIFY_GATE=1` in the
+environment. Failure output is clipped head+tail (3000/5000 chars) — compilers put the first error at
+the top, test runners put the summary at the bottom, so tailing alone loses half the signal.
+
+Events: `GATE_PASSED` (command, `exit_code`, `duration_ms`) on success — the objective evidence on
+the run's record — and `GATE_FAILED` (with `reason`, `command`, `exit_code`) on failure.
+
+Wired in `core/flows/team.flow.yaml` and `team-build.flow.yaml`: `BUILDING->REVIEWING` runs
+`verify.build` → `BUILD_FAILURES.md`, `TESTING->RETRO` runs `verify.test` → `TEST_FAILURES.md`.
+Both route to the builder.
 
 ## Visible runner (supervisor/)
 

@@ -27,6 +27,7 @@ feedback_routing:
   ARCH_FEEDBACK: architect
   ARCH_QUESTION: architect
   BLOCKED_ON_HUMAN: human
+  BUILD_FAILURES: builder
   DESIGN_FEEDBACK: designer
   DESIGN_QUESTIONS: designer
   HUMAN_QUESTIONS: human
@@ -42,6 +43,10 @@ feedback_routing:
   TEST_FAILURES: builder
 flow: team-build
 gates:
+  BUILDING->REVIEWING:
+  - command_key: build
+    on_fail: BUILD_FAILURES.md
+    type: command_gate
   REVIEWING->TESTING:
   - artifact: REVIEW.md
     on_fail: REVIEW_INCOMPLETE.md
@@ -49,6 +54,10 @@ gates:
     type: verify_gate
   - on_fail: INCOMPLETE_TASKS.md
     type: require_tasks_done
+  TESTING->RETRO:
+  - command_key: test
+    on_fail: TEST_FAILURES.md
+    type: command_gate
 role_map:
   BUILDING: builder
   RETRO: retro
