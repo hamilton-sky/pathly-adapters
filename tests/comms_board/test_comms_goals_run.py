@@ -115,7 +115,13 @@ def test_dispatch_loop_runs_scheduler_in_order():
     order = []
 
     def fake_sched_spawn(state, instructions, adapter, model, run_id, broadcast_fn):
-        order.append(run_id[len("sched-") :] if run_id.startswith("sched-") else run_id)
+        # run_id is "sched-<task_id>#<attempt>" — strip both to compare bare task ids.
+        tid = (
+            run_id[len("sched-") :].split("#", 1)[0]
+            if run_id.startswith("sched-")
+            else run_id
+        )
+        order.append(tid)
         return {"ok": True}
 
     result = start_goal_run(
@@ -179,7 +185,13 @@ def test_dispatch_loop_scopes_to_goal():
     ran = []
 
     def fake_sched_spawn(state, instructions, adapter, model, run_id, broadcast_fn):
-        ran.append(run_id[len("sched-") :] if run_id.startswith("sched-") else run_id)
+        # run_id is "sched-<task_id>#<attempt>" — strip both to compare bare task ids.
+        tid = (
+            run_id[len("sched-") :].split("#", 1)[0]
+            if run_id.startswith("sched-")
+            else run_id
+        )
+        ran.append(tid)
         return {"ok": True}
 
     result = start_goal_run(g1, project_root="", spawn_fn=fake_sched_spawn, block=True)
@@ -475,6 +487,84 @@ def test_http_goals_run_team(client, monkeypatch):
     body = json.loads(r.data)
     assert body["ok"] is True
     assert body["executor"] == "team"
+
+
+def test_http_goals_run_parked_status_posts_paused_not_failed(client, monkeypatch):
+    """A parked run (headless human checkpoint, RunnerState.status == "parked") is a
+    deliberate non-failure — resumable via /runner/resume-parked, per CLAUDE.md's Human
+    checkpoints section. It must not fold into the generic 'goal run failed' text/phase
+    the way any other res["error"] does."""
+    import types
+    from pathly_orchestrator.db.connection import get_db
+    import pathly_orchestrator.http_server.blueprints.comms.goals as _goals_mod
+    import pathly_orchestrator.supervisor.api as _api
+
+    conn = get_db()
+    scope = "gr_http_parked"
+    goal = _make_goal(conn, scope, executor="team")
+    broadcasts = []
+    monkeypatch.setattr(
+        _goals_mod,
+        "_broadcast_comms",
+        lambda scope, payload: broadcasts.append(payload),
+    )
+
+    def fake_start_run(**kw):
+        kw["on_done"]("run-1", {"error": "parked", "status": "parked"})
+        return types.SimpleNamespace(run_id="run-1")
+
+    monkeypatch.setattr(_api, "start_run", fake_start_run)
+
+    r = client.post("/comms/goals/run", json={"goal_id": goal})
+    assert r.status_code == 200, r.data
+
+    rows = conn.execute(
+        "SELECT text FROM comms_messages WHERE scope=? AND type='status'",
+        (scope,),
+    ).fetchall()
+    texts_lower = [r["text"].lower() for r in rows]
+    assert any("paused" in t for t in texts_lower), texts_lower
+    assert not any("failed" in t for t in texts_lower), texts_lower
+
+    # Order isn't asserted: _run_team fires on_start AFTER start_fn returns (a REAL run's
+    # on_done fires asynchronously, much later — this test's synchronous stub inverts
+    # that). What matters is that "error" never appears for a parked run.
+    phases = [b.get("phase") for b in broadcasts if b.get("event") == "goal_run"]
+    assert "stopped" in phases
+    assert "error" not in phases
+
+
+def test_http_goals_run_stage_overrides_validated_against_the_chosen_flow(
+    client, monkeypatch
+):
+    """stage_overrides must be validated against the flow ACTUALLY being run (`flow`),
+    not a hardcoded "team-build" — a debug-flow goal run's FIXING override was
+    previously silently dropped because FIXING isn't a team-build.flow.yaml state."""
+    import types
+    from pathly_orchestrator.db.connection import get_db
+    import pathly_orchestrator.supervisor.api as _api
+
+    conn = get_db()
+    goal = _make_goal(conn, "gr_http_stage_override", executor="team")
+    captured = {}
+
+    def fake_start_run(**kw):
+        captured.update(kw)
+        return types.SimpleNamespace(run_id="r-http-override")
+
+    monkeypatch.setattr(_api, "start_run", fake_start_run)
+
+    r = client.post(
+        "/comms/goals/run",
+        json={
+            "goal_id": goal,
+            "flow": "debug",
+            "stage_overrides": {"FIXING": "custom override text"},
+        },
+    )
+
+    assert r.status_code == 200, r.data
+    assert captured.get("stage_overrides") == {"FIXING": "custom override text"}
 
 
 def test_http_goals_run_non_goal(client):

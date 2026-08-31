@@ -344,6 +344,47 @@ def test_scheduler_retries_a_failing_task_then_succeeds():
     assert row["attempts"] == 3
 
 
+def test_scheduler_gives_each_retry_attempt_a_distinct_run_id():
+    """BILLING CORRECTNESS: run_id is the identity the whole billing chain keys off
+    (TERMINAL_SPAWN, the PTY result callback, _reconciliation_window's async patch,
+    agent_invocations.run_id). Before this, every attempt of a retried task reused the
+    SAME run_id (`sched-<task_id>`) — a late-arriving reconciliation for attempt N could
+    fold its real cost onto attempt N+1's row instead of its own
+    (invocation_projection matches a BILLING_UPDATE to the MOST RECENT AGENT_DONE
+    sharing its run_id, so attempt N+1's row wins). Each attempt must now get its own
+    run_id ("sched-<task_id>#<attempt>"), so async billing can never cross attempts."""
+    from pathly_orchestrator.db.connection import get_db
+    from pathly_orchestrator.supervisor.isolation import SerialIsolation
+    from pathly_orchestrator.supervisor.scheduler import scheduler_loop
+
+    conn = get_db()
+    scope = "tr-sched-run-id"
+    mid = _make_task(conn, scope, "flaky task")
+    seen_run_ids: list[str] = []
+
+    def _flaky_spawn(state, instructions, adapter, model, task_run_id, broadcast_fn):
+        seen_run_ids.append(task_run_id)
+        if len(seen_run_ids) < 3:
+            return {"outcome": "failed", "error": "broke"}
+        return {"outcome": "success"}
+
+    result = scheduler_loop(
+        _FakeState(),
+        board="feature",
+        scope=scope,
+        isolation=SerialIsolation(),
+        spawn_fn=_flaky_spawn,
+    )
+
+    assert mid in result["completed"]
+    assert len(seen_run_ids) == 3
+    assert (
+        len(set(seen_run_ids)) == 3
+    ), f"run_ids must be unique per attempt: {seen_run_ids}"
+    for i, run_id in enumerate(seen_run_ids, start=1):
+        assert run_id == f"sched-{mid}#{i}", run_id
+
+
 def test_scheduler_escalates_after_exhausting_retries():
     """A task that ALWAYS fails must end up permanently 'failed' after exactly
     max_attempts (default 3) attempts, with its dependent cascaded to 'blocked' —

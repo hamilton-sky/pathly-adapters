@@ -27,6 +27,6 @@ FSM engine, gates, transitions, flow definitions, feedback protocol & fix-routin
 | `test_stage_override.py` | flow-gate-preview (P2) — the transient per-run, per-stage prompt override channel | 5 |
 | `test_stage_selection_apply.py` | flow-phase-inspector (#5) apply-at-spawn: build_prompt applies a stage's saved selection | 7 |
 | `test_team_build_per_task.py` | team-build per-task loop + goal-DAG completeness gate | 9 |
-| `test_test_flow_failure_routing.py` | Phase 0 hygiene fix — test.flow.yaml routed TEST_FAILURES.md to TESTING (a | 3 |
+| `test_test_flow_failure_routing.py` | Phase 0 hygiene fix — test.flow.yaml routed TEST_FAILURES.md to TESTING (a | 5 |
 | `test_transition_actions.py` | Tests for get_transition_actions() and validate_flow_cli() in state.py | 21 |
 | `test_two_flows.py` | Validity tests for the two-flow split — team-build + consultation flows | 7 |

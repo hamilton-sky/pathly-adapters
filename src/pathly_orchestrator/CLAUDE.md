@@ -643,6 +643,61 @@ unconditional `fail_task` call and the deadlock postscript) moved into `task_ret
 result, `scheduler.py` is now SHORTER (415 lines) despite gaining retry capability, and no flow
 YAML, Studio surface, or existing test needed to change.
 
+**Follow-up bug caught before it shipped to production: retried attempts shared one `run_id`.**
+The first version of this change kept `task_run_id = f"sched-{task_id}"` unchanged — fine when a
+task_id spawned at most once, but retry means the SAME task_id can spawn multiple times. `run_id`
+is the identity the whole billing chain keys off (`TERMINAL_SPAWN`, the PTY result callback,
+`_reconciliation_window`'s async patch, `agent_invocations.run_id`), and
+`invocation_projection.on_event_appended` matches a `BILLING_UPDATE` to the MOST RECENT
+`AGENT_DONE` sharing its `run_id` — so a late-arriving reconciliation for attempt N (early-advance
+mode: the agent self-reports done while the real PTY billing is still in flight on a background
+thread) could fold its real cost onto attempt N+1's row instead of its own once attempt N+1 had
+already written its own `AGENT_DONE` under the identical run_id. Fixed by making `run_id` unique
+per attempt: `f"sched-{task_id}#{attempt}"` (`#` is a safe separator — task ids are uuid4: hex and
+hyphens only). Every place that previously parsed a bare task_id back out of a `sched-` run_id
+(`test_dag_scheduler.py`, `test_golden_path.py`, `test_comms_goals_run.py`) now also strips the
+`#<attempt>` suffix; production code was already unaffected since it only ever checked the
+`sched-` PREFIX (`run_history_read._classify_kind`/`_is_parent`), never parsed the remainder.
+
+## FSM/DAG convergence — more Phase-0-style fixes found while researching Phase 2 readiness
+
+Three more small, independent bugs, found the same way as the original Phase 0 batch (research
+agents scanning the DAG/board, telemetry, and FSM/flow-YAML layers for the same CLASS of defect —
+a sibling divergence or a dropped parameter — before considering Phase 2's bigger compiler work):
+
+- **`POST /comms/goals/run`'s `stage_overrides` validated against a hardcoded `"team-build"`**
+  instead of the flow actually being run (`flow_override`, which the route already accepts and
+  threads to `start_goal_run`). `_validate_stage_overrides` drops any override key not in the
+  named flow's declared `states` — so a goal run with `flow: "debug"` and a `FIXING` override had
+  it silently dropped, since `FIXING` isn't one of `team-build.flow.yaml`'s states. Fixed by
+  validating against `flow_override or "team-build"` (the same default `start_goal_run`/
+  `goal_executor._TEAM_FLOW` already use).
+- **A parked goal run (`RunnerState.status == "parked"`, a headless human checkpoint) was reported
+  to the board as `"goal run failed"`** — the exact cosmetic gap this repo's own docs already named
+  (see "Human checkpoints — parked, not failed" above: *"`goals.py`'s board-message wording does
+  not yet make that distinction"*). `comms_goals_run`'s `_on_done` now special-cases
+  `res.get("status") == "parked"` before the generic error fallback, posting "goal run paused —
+  awaiting human input" on the existing non-error `stopped` phase (Studio's `phase` union has no
+  dedicated `parked` value, so adding one would require a frontend change too — out of scope for
+  this pass; `stopped` already clears the timer pill without the `failed` toast).
+- **`test.flow.yaml` had no `escalation_routing` at all**, unlike `team.flow.yaml`/
+  `team-build.flow.yaml` which share its exact `team/review`+`team/test` skills and carry an
+  identical 3-tier table (`REVIEW_FAILURES`/`SCOPE_VIOLATION` → planner, `TEST_FAILURES` → po, both
+  escalating to human past round 4). An empty `escalation_routing` makes
+  `_resolve_feedback_target` unconditionally return the base agent — so a persistently failing
+  review/test loop in `test.flow.yaml` routed back to `builder` forever, with no round-3 hand-off
+  and no round-4 human escalation. Fixed by copying the same table from `team.flow.yaml`.
+
+**Flagged, not fixed — needs a human call, not a unilateral one:** `DESIGN_QUESTIONS.md` routes to
+`architect` in `team.flow.yaml`/`test.flow.yaml` but to `designer` in `team-build.flow.yaml` and
+all three consultation flows. `team/build.md`'s own inline body text ("If `DESIGN_QUESTIONS.md`
+exists… Spawn `architect`") resolves it before the FSM-level table is ever consulted for
+`team`/`team-build` in the common case, so this is latent rather than live — but
+`tests/fsm_flows/test_two_flows.py` explicitly pins `"designer"` for `team-build.flow.yaml` as a
+deliberate, tested value, and no comment anywhere explains the split. Reversing a tested,
+deliberate-looking decision on a guess is a bigger call than the fixes above — left alone pending
+someone who knows the original intent.
+
 ## Visible runner (supervisor/)
 
 `supervisor/` drives the pipeline by polling `/next_action` and calling `/complete_stage`. Every agent invocation goes through a visible terminal — there is no headless fallback.

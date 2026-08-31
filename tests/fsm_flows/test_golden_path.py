@@ -135,12 +135,17 @@ def test_goal_loop_cascades_block_on_failure(tmp_path):
     c = _seed_task(conn, scope, gid, "task GAMMA")
 
     def failing_spawn(_state, _instructions, _adapter, _model, run_id, _broadcast_fn):
-        # Match by task_id derived from run_id ("sched-<task_id>"), NOT a substring of the
-        # composed prompt: with retry (task_retry.py), a failing task's board context (status
-        # posts, retry-ladder feedback) can leak "task ALPHA" into a SIBLING task's own prompt
-        # (board_context_for pulls recent/relevant board content) — see test_dag_scheduler.py's
-        # _make_fake_spawn docstring for the same documented hazard.
-        task_id = run_id[len("sched-") :] if run_id.startswith("sched-") else run_id
+        # Match by task_id derived from run_id ("sched-<task_id>#<attempt>"), NOT a
+        # substring of the composed prompt: with retry (task_retry.py), a failing task's
+        # board context (status posts, retry-ladder feedback) can leak "task ALPHA" into
+        # a SIBLING task's own prompt (board_context_for pulls recent/relevant board
+        # content) — see test_dag_scheduler.py's _make_fake_spawn docstring for the same
+        # documented hazard.
+        task_id = (
+            run_id[len("sched-") :].split("#", 1)[0]
+            if run_id.startswith("sched-")
+            else run_id
+        )
         if task_id == a:
             raise RuntimeError("simulated agent crash")
         return {"cost_usd": 0.0, "session_id": "sess"}
@@ -181,7 +186,11 @@ def test_goal_loop_fails_task_on_failure_outcome(tmp_path):
     def outcome_fail_spawn(_s, _instructions, _a, _m, run_id, _b):
         # Match by task_id derived from run_id, not a prompt substring — see the identical
         # note in test_goal_loop_cascades_block_on_failure above.
-        task_id = run_id[len("sched-") :] if run_id.startswith("sched-") else run_id
+        task_id = (
+            run_id[len("sched-") :].split("#", 1)[0]
+            if run_id.startswith("sched-")
+            else run_id
+        )
         if task_id == a:
             return {"outcome": "failed", "error": "clean exit but the work failed"}
         return {"cost_usd": 0.0}

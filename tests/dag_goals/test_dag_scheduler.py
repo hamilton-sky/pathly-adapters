@@ -97,16 +97,21 @@ def _make_fake_spawn(
         How long to sleep to simulate work (enables overlap detection).
     fail_for:
         Set of task IDs to raise for. Matched against the task_id derived from
-        run_id ("sched-<task_id>") — NOT the prompt text. The composed prompt now
-        carries scope-aware board context that quotes every sibling task's text, so a
-        substring match on instructions would (flakily) trip whichever task ran first.
+        run_id ("sched-<task_id>#<attempt>") — NOT the prompt text. The composed prompt
+        now carries scope-aware board context that quotes every sibling task's text, so
+        a substring match on instructions would (flakily) trip whichever task ran first.
     """
     fail_for = fail_for or set()
     lock = threading.Lock()
 
     def _spawn(state, instructions, adapter, model, run_id, broadcast_fn):
-        # run_id is "sched-<task_id>"; strip the prefix to get the task_id.
-        task_id = run_id[len("sched-") :] if run_id.startswith("sched-") else run_id
+        # run_id is "sched-<task_id>#<attempt>" (task_retry.py: unique per attempt) —
+        # strip the prefix and the attempt suffix to get the bare task_id.
+        task_id = (
+            run_id[len("sched-") :].split("#", 1)[0]
+            if run_id.startswith("sched-")
+            else run_id
+        )
         start = time.monotonic()
         with lock:
             records[task_id] = {

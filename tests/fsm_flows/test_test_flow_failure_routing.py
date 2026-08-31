@@ -48,3 +48,38 @@ def test_sibling_flows_agree_on_test_failures_routing():
         flow = _load(name)
         rule = flow["transition_rules"][state]
         assert rule["on_artifact"]["TEST_FAILURES.md"] == "BUILDING", name
+
+
+def test_test_flow_has_escalation_routing_matching_siblings():
+    """test.flow.yaml shares team/review + team/test skills with team.flow.yaml and
+    team-build.flow.yaml but had NO escalation_routing at all — an empty
+    escalation_routing makes _resolve_feedback_target unconditionally return the base
+    agent, so a persistently failing review/test loop routed back to builder forever,
+    with no round-3 upstream hand-off and no round-4 human escalation."""
+    expected = {
+        "REVIEW_FAILURES": "planner",
+        "SCOPE_VIOLATION": "planner",
+        "TEST_FAILURES": "po",
+    }
+    assert _load("test.flow.yaml")["escalation_routing"] == expected
+    assert _load("team.flow.yaml")["escalation_routing"] == expected
+    assert _load("team-build.flow.yaml")["escalation_routing"] == expected
+
+
+def test_test_flow_review_failures_escalates_through_the_tiers():
+    """Round 1-2 stays with the base agent (builder); round 3 hands off to planner
+    (the upstream specialist); round 4+ escalates to human — exercised against
+    test.flow.yaml's own escalation_routing via the real resolver."""
+    from pathly_orchestrator.fsm.engine_transitions import _resolve_feedback_target
+
+    esc = _load("test.flow.yaml")["escalation_routing"]
+    assert (
+        _resolve_feedback_target("REVIEW_FAILURES.md", "builder", 0, esc) == "builder"
+    )
+    assert (
+        _resolve_feedback_target("REVIEW_FAILURES.md", "builder", 1, esc) == "builder"
+    )
+    assert (
+        _resolve_feedback_target("REVIEW_FAILURES.md", "builder", 2, esc) == "planner"
+    )
+    assert _resolve_feedback_target("REVIEW_FAILURES.md", "builder", 3, esc) == "human"

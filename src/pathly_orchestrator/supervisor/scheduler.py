@@ -257,8 +257,18 @@ def scheduler_loop(
         for task in schedulable:
             task_id = task["id"]
             lane = task.get("lane") or task_id
+            prior_attempts = int(task.get("attempts") or 0)
 
-            task_run_id = f"sched-{task_id}"
+            # run_id carries the ATTEMPT number (#N), not just the task_id: with retry
+            # (task_retry.py) one task_id can spawn more than once, and run_id is the
+            # identity the whole billing chain keys off (TERMINAL_SPAWN, the PTY result
+            # callback, _reconciliation_window's async patch, agent_invocations.run_id).
+            # A shared run_id across attempts let a LATE-arriving reconciliation for
+            # attempt N fold its real cost onto attempt N+1's row instead of its own
+            # (invocation_projection matches a BILLING_UPDATE to the MOST RECENT
+            # AGENT_DONE sharing its run_id) — silently mis-billing retried tasks. "#" is
+            # a safe separator: task_id is a uuid4 (hex + hyphens only).
+            task_run_id = f"sched-{task_id}#{prior_attempts + 1}"
             won = claim_task(conn, task_id, run_id=task_run_id)
             if not won:
                 # Another scheduler instance (or a race) claimed it first.
@@ -272,7 +282,7 @@ def scheduler_loop(
             )
             # Guaranteed supervisor-side progress (not agent-dependent): Started on claim.
             task_texts[task_id] = task.get("text", "") or ""
-            task_attempts[task_id] = int(task.get("attempts") or 0)
+            task_attempts[task_id] = prior_attempts
             _post_task_status(
                 conn, board, scope, f"Started: {(task.get('text') or task_id)[:110]}"
             )

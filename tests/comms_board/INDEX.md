@@ -33,7 +33,7 @@ Comms board / message-board subsystem — messages, tasks, artifacts, goals, con
 | `test_comms_embed_curation.py` | Tests for Phase 1.4b — write-time embedding curation | 7 |
 | `test_comms_embed_persist.py` | Regression tests for the _VEC_AVAILABLE stale-binding bug (CT6) | 3 |
 | `test_comms_goal_executor.py` | Tests for Phase 0b — goal_id + executor on the comms write path | 5 |
-| `test_comms_goals_run.py` | Tests for Phase 1 — the goal executor dispatcher (start_goal_run + /comms/goals/run) | 34 |
+| `test_comms_goals_run.py` | Tests for Phase 1 — the goal executor dispatcher (start_goal_run + /comms/goals/run) | 36 |
 | `test_comms_goals_stop.py` | Tests for POST /comms/goals/stop | 6 |
 | `test_comms_hybrid.py` | Tests for Phase 11 — FTS5 virtual table + hybrid search helpers | 11 |
 | `test_comms_hydrate_paths.py` | Regression tests for CT5 — the authoritative-channel 'section not found' bug | 8 |
