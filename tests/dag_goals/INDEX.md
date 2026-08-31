@@ -4,7 +4,7 @@
 
 Goal/DAG decomposition & scheduling — feature/flow/project decompose, goals read-model, PRD import.
 
-8 test file(s).
+9 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -12,6 +12,7 @@ Goal/DAG decomposition & scheduling — feature/flow/project decompose, goals re
 | `test_dag_scheduler_db.py` | Tests for P2 DAG scheduler DB layer | 9 |
 | `test_feature_decompose.py` | Feature-decompose ladder (planner-hierarchy T5): route dispatch, goal-count gate, flow, skill | 9 |
 | `test_flow_decompose.py` | Tests for flow decompose/assemble round-trip and DB idempotency | 19 |
+| `test_goal_verify.py` | Tests for supervisor/goal_verify.py — ground truth for the loop executor's DAG | 14 |
 | `test_goals_readmodel.py` | Goals read-model (GET /comms/goals): goals enriched with a task-DAG rollup | 5 |
 | `test_prd_import_new.py` | Board-native PRD import contract (planner-hierarchy G3) | 8 |
 | `test_project_decompose.py` | Project-decompose ladder (planner-hierarchy G2): route dispatch, feature-count gate, flow, skill | 11 |

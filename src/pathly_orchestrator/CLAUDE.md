@@ -50,6 +50,7 @@ than shell-escaped `curl` strings on PowerShell.
 POST /runner/start                   ← Studio FlowControlBar: start a new pipeline run
 POST /runner/pause                   ← pause running pipeline
 POST /runner/resume                  ← resume paused pipeline
+POST /runner/resume-parked           ← resume a run parked on a headless human checkpoint (fresh run_id, same FSM state)
 POST /runner/advance                 ← skip past current block
 POST /runner/decision                ← supply a continue/block/escalate decision to a waiting run
 POST /runner/agent-answer            ← answer an agent's mid-run human question
@@ -407,6 +408,36 @@ the run's record — and `GATE_FAILED` (with `reason`, `command`, `exit_code`) o
 Wired in `core/flows/team.flow.yaml` and `team-build.flow.yaml`: `BUILDING->REVIEWING` runs
 `verify.build` → `BUILD_FAILURES.md`, `TESTING->RETRO` runs `verify.test` → `TEST_FAILURES.md`.
 Both route to the builder.
+
+## Human checkpoints — parked, not failed
+
+When `complete_stage` blocks with `target_agent == "human"`, the supervisor stops the loop
+without treating it as a failure. `orchestrator_stage.py::_park` (not `_fail`) sets
+`RunnerState.status = "parked"` — a status distinct from `"error"`/`"aborted"` and included
+alongside them in `VALID_STATUSES` (`supervisor/state.py`) and in `_set_status`'s
+run-history-finalizing set (`supervisor/registry.py`), since resuming starts a fresh run_id
+rather than reviving this one.
+
+**Why this is safe to resume, not just "not an error":** parking never touches the FSM's own
+state — `fsm_state` still sits exactly where the checkpoint left it, waiting on whatever
+feedback file `target_agent == "human"` named. `_post_human_escalation` posts an answerable
+`type="escalation"` board message naming that file and `POST /runner/resume-parked`. A human
+(or an agent proxying for one) edits the file to resolve it; `POST /runner/resume-parked
+{"topic": ...}` → `supervisor.resume_parked_run` reads the parked `RunnerState`'s
+flow/project_root/model/goal_id and calls `start_run` again under a NEW run_id — `start_run`
+only refuses a topic whose status is running/paused/awaiting_decision, so a parked topic is
+free to restart. The fresh `/next_action` call re-evaluates the SAME feedback file's CURRENT
+content, so the human's edit takes effect immediately — no separate "replay" step exists or
+is needed. Cost/iteration counters restart at zero under the same caps; they are not carried
+over from the parked attempt.
+
+**`on_done` consumers still see it as non-success.** `api.py`'s `_run_and_finalize` sets
+`result["error"]` for `status in {"error", "aborted", "parked"}` — every existing `on_done`
+(e.g. `goals.py`'s `_on_done`) branches on `res.get("error")` to avoid reporting a non-clean
+stop as `"finished"`; a parked run without this would have been silently reported as success.
+`result["status"]` still reads `"parked"` for a caller that wants to distinguish resumable
+from dead — `goals.py`'s board-message wording does not yet make that distinction (falls
+into the generic "goal run failed" text), a known cosmetic gap, not a correctness one.
 
 ## Headless spawn host (`pty_host/`)
 

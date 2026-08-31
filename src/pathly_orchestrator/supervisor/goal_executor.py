@@ -317,6 +317,7 @@ def _run_loop(
 ) -> dict:
     """Supervisor owns the frontier via scheduler_loop (SerialIsolation), scoped to goal."""
     from pathly_orchestrator.supervisor import board_lock
+    from pathly_orchestrator.supervisor.goal_verify import verify_clean_drain
     from pathly_orchestrator.supervisor.isolation import SerialIsolation
     from pathly_orchestrator.supervisor.registry import _record_run_history
     from pathly_orchestrator.supervisor.scheduler import scheduler_loop
@@ -331,7 +332,7 @@ def _run_loop(
             "holder": board_lock.holder(board, scope),
         }
 
-    slug = scope  # fallback
+    slug, _goal_dir = scope, None  # fallback; _goal_dir set below when resolvable
     if project_root and goal_id:
         try:
             from pathly_orchestrator.db.connection import get_db
@@ -418,9 +419,8 @@ def _run_loop(
                 kwargs["spawn_fn"] = spawn_fn
             raw = scheduler_loop(state, board, scope, **kwargs)
             res: dict = dict(raw) if isinstance(raw, dict) else {"result": raw}
-            res["executor"] = "loop"
-            res["goal_id"] = goal_id
-            res["run_id"] = run_id
+            res.update(executor="loop", goal_id=goal_id, run_id=run_id)
+            verify_clean_drain(res, _goal_dir, board, scope, goal_id)
             _safe_call(on_done, run_id, res)
             _record_run_history(state, "done", finished_at=_iso_now())
             return res

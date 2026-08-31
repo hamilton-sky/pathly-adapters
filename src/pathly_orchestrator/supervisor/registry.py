@@ -233,7 +233,9 @@ def _set_status(
             )
         except Exception as exc:
             logger.warning("broadcast_fn error: %s", exc)
-    if status in {"done", "aborted", "error"}:
+    if status in {"done", "aborted", "error", "parked"}:
+        # "parked" finalizes this run_history row too: resuming a parked run starts a
+        # NEW run_id (api.resume_parked_run → start_run), never revives this one.
         import time as _time
 
         _record_run_history(

@@ -97,7 +97,13 @@ def start_run(
         finally:
             if on_done is not None:
                 result: dict[str, object] = {"status": state.status}
-                if state.status in {"error", "aborted"}:
+                # "parked" (headless human checkpoint) carries `error` too: every existing
+                # on_done consumer branches on `res.get("error")` to avoid reporting a
+                # non-clean stop as success (see goals.py's `_on_done`) — without this a
+                # parked run fell through to their "finished" branch, hiding that a human
+                # checkpoint is waiting. `status` still reads "parked", not "error"/"aborted",
+                # for any caller that wants to distinguish resumable-parked from dead.
+                if state.status in {"error", "aborted", "parked"}:
                     result["error"] = state.error_kind or state.status
                     result["announced"] = state.stop_announced
                 try:
@@ -128,6 +134,62 @@ def resume_run(topic: str) -> None:
         if state is None:
             raise KeyError(topic)
         state._pause_flag = False
+
+
+def resume_parked_run(
+    topic: str,
+    broadcast_fn: Optional[Callable] = None,
+    on_done: Optional[Callable] = None,
+) -> RunnerState:
+    """Re-enter the supervisor loop for a run parked on a human checkpoint.
+
+    A parked run's THREAD has already exited (orchestrator_stage._park set status and
+    returned None) — unlike a paused run, there is nothing sleeping to wake, so resuming
+    means a fresh `start_run` under the SAME flow/topic. That is safe and sufficient
+    because the FSM's own state (the `fsm_state` table) was never touched by parking: it
+    is still sitting at whatever state the checkpoint left it in, and `/next_action`
+    re-evaluates the checkpoint's feedback file from its CURRENT content on this call —
+    so a human's edit to that file takes effect immediately, with no separate "replay"
+    step needed.
+
+    Cost/iteration counters restart at zero under the SAME caps (a fresh run_id, like
+    every other start_run call) rather than carrying over the parked run's partial spend.
+    """
+    with _lock:
+        prior = _registry.get(topic)
+        if prior is None:
+            raise KeyError(topic)
+        if prior.status != "parked":
+            raise ValueError(
+                f"Run for topic {topic!r} is not parked (status={prior.status})"
+            )
+        flow, project_root, model, timeout = (
+            prior.flow,
+            prior.project_root,
+            prior.model,
+            prior.timeout,
+        )
+        max_iterations, max_cost_usd = prior.max_iterations, prior.max_cost_usd
+        autonomy, interactive, goal_id = (
+            dict(prior.autonomy),
+            prior.interactive,
+            prior.goal_id,
+        )
+
+    return start_run(
+        topic,
+        flow,
+        project_root,
+        model=model,
+        timeout=timeout,
+        max_iterations=max_iterations,
+        max_cost_usd=max_cost_usd,
+        autonomy=autonomy,
+        broadcast_fn=broadcast_fn,
+        interactive=interactive,
+        goal_id=goal_id,
+        on_done=on_done,
+    )
 
 
 def abort_run(topic: str, *, announced: bool = False) -> None:

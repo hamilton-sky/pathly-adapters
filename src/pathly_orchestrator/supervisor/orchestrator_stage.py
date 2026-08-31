@@ -50,11 +50,33 @@ def _resolve_stage_supervised(
             {"type": "RUNNER_ERROR", "topic": topic, "message": message, "kind": reason}
         )
 
+    def _park(reason: str, message: str) -> None:
+        """Stop the loop on a headless human checkpoint WITHOUT reporting it as a failure.
+
+        The FSM's own state is untouched by parking — it is still sitting exactly where the
+        checkpoint left it, waiting on whatever feedback file `target_agent == "human"` named.
+        Status "parked" (not "error") is what makes this resumable: `start_run` only refuses a
+        topic whose status is running/paused/awaiting_decision, so a fresh
+        `api.resume_parked_run` call re-enters `/next_action` and picks the SAME state back up
+        — once a human has resolved the checkpoint, that call routes forward normally.
+        """
+        with _lock:
+            state.error_kind = reason
+            _set_status(state, "parked", broadcast_fn)
+        _broadcast(
+            {
+                "type": "RUNNER_PARKED",
+                "topic": topic,
+                "message": message,
+                "kind": reason,
+            }
+        )
+
     def _post_human_escalation(file_name: str, res: dict) -> None:
         """Surface a headless human-checkpoint on the board as an answerable escalation.
 
-        Otherwise a human gate just fails the run silently and writes a feedback file nobody
-        sees. Best-effort (never blocks the still-failing run) and layer-legal — the supervisor
+        Otherwise a human gate just parks the run silently and writes a feedback file nobody
+        sees. Best-effort (never blocks the still-parking run) and layer-legal — the supervisor
         posts directly via db.comms_messages. Uses the question text the FSM already put in the
         result, so no feedback-file read is needed.
         """
@@ -63,7 +85,11 @@ def _resolve_stage_supervised(
             from pathly_orchestrator.db.queries.comms_messages import post_message
 
             content = res.get("instructions") or res.get("message") or ""
-            body = f"Human checkpoint required — {file_name}"
+            body = (
+                f"Human checkpoint required — {file_name}\n\n"
+                f"Resolve it (edit the named feedback file with your answer), then resume this "
+                f'run: `POST /runner/resume-parked {{"topic": {topic!r}}}`.'
+            )
             if content:
                 body += f"\n\n{content}"
             post_message(
@@ -164,7 +190,7 @@ def _resolve_stage_supervised(
 
             if target == "human":
                 _post_human_escalation(file_, result)
-                _fail("human_checkpoint", f"Human checkpoint required: {file_}")
+                _park("human_checkpoint", f"Human checkpoint required: {file_}")
                 return None
 
             feedback_rounds += 1

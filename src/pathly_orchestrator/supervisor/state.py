@@ -10,7 +10,19 @@ from typing import Any, Callable, Optional
 logger = logging.getLogger("pathly.supervisor")
 
 VALID_STATUSES = frozenset(
-    {"idle", "running", "paused", "awaiting_decision", "aborted", "done", "error"}
+    {
+        "idle",
+        "running",
+        "paused",
+        "awaiting_decision",
+        "aborted",
+        "done",
+        "error",
+        # A run stopped on a headless human checkpoint (FSM `target_agent == "human"`).
+        # Distinct from "error": the flow itself is unharmed and resumable once a human
+        # resolves the escalation — see orchestrator_stage.py + api.resume_parked_run.
+        "parked",
+    }
 )
 
 MAX_FEEDBACK_ROUNDS = 3
