@@ -7,7 +7,7 @@ import logging
 from flask import Blueprint, jsonify, request
 
 from ...sse import _broadcast_comms
-from ._helpers import extract_artifact_path, guess_artifact_type
+from ._helpers import extract_artifact_path, guess_artifact_type, read_json_body
 
 bp = Blueprint("comms_artifacts", __name__)
 
@@ -22,7 +22,7 @@ def comms_attach():
             insert_artifact as _insert_artifact,
         )
 
-        data = request.get_json()
+        data = read_json_body()
         if not data:
             return jsonify({"error": "Missing JSON body"}), 400
 

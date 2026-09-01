@@ -7,7 +7,7 @@ import logging
 from flask import Blueprint, jsonify, request
 
 from ...sse import _broadcast_comms, _broadcast_runner
-from ._helpers import post_task_status
+from ._helpers import post_task_status, read_json_body
 
 bp = Blueprint("comms_tasks", __name__)
 
@@ -65,7 +65,7 @@ def comms_tasks_complete():
         from pathly_orchestrator.db.connection import get_db as _get_db
         from pathly_orchestrator.db.queries.comms import complete_task as _complete_task
 
-        data = request.get_json()
+        data = read_json_body()
         if not data:
             return jsonify({"error": "Missing JSON body"}), 400
 
@@ -107,7 +107,7 @@ def comms_tasks_claim():
         from pathly_orchestrator.db.connection import get_db as _get_db
         from pathly_orchestrator.db.queries.comms import claim_task as _claim_task
 
-        data = request.get_json()
+        data = read_json_body()
         if not data:
             return jsonify({"error": "Missing JSON body"}), 400
 
@@ -140,7 +140,7 @@ def comms_tasks_fail():
         from pathly_orchestrator.db.connection import get_db as _get_db
         from pathly_orchestrator.db.queries.comms import fail_task as _fail_task
 
-        data = request.get_json()
+        data = read_json_body()
         if not data:
             return jsonify({"error": "Missing JSON body"}), 400
 
@@ -202,7 +202,7 @@ def comms_tasks_run():
         from pathly_orchestrator.db.queries.comms import complete_task as _complete_task
         from pathly_orchestrator.supervisor.board_run import start_board_run
 
-        data = request.get_json()
+        data = read_json_body()
         if not data:
             return jsonify({"error": "Missing JSON body"}), 400
         message_id = data.get("message_id", "")
@@ -356,7 +356,7 @@ def comms_tasks_stop():
         from pathly_orchestrator.db.connection import get_db as _get_db
         from pathly_orchestrator.supervisor import board_lock, get_run
 
-        data = request.get_json() or {}
+        data = read_json_body({})
         message_id = data.get("message_id", "")
         if not isinstance(message_id, str) or not message_id.strip():
             return (

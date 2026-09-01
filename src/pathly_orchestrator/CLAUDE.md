@@ -142,6 +142,36 @@ POST /comms/hydrate         ← board disk-mirror: import a project's on-disk BO
 GET  /events/comms          ← SSE stream of comms board updates (streams blueprint)
 ```
 
+### Request bodies — one lenient reader for every comms route (`_helpers.read_json_body`)
+
+Agents reach `/comms/*` through curl. On Windows a shell not in UTF-8 mode hands curl a
+**cp1252** body — one em-dash in an agent's prose is byte 0x97 — and Flask's
+`request.get_json()` decodes strictly. `/comms/post` was hardened against exactly this, and
+the fix was copy-pasted into `/comms/edit` and nowhere else. Measured across all 36 comms
+POST routes with one em-dash in the body:
+
+- **22 routes returned 500** — the exception was caught by the route's own
+  `except Exception` and the agent's write was lost. `tasks/claim|complete|fail` were all in
+  this set, and `tasks/fail` carries `reason`, agent-written prose (`team/build.md` posts it
+  on every unrecoverable task failure).
+- **The other 14 read `get_json(silent=True) or {}`**, so the body was **silently discarded**
+  and the route then rejected the request for a "missing" field that was right there in it —
+  worse, because it reads as the agent's mistake.
+
+`_helpers.read_json_body(default=None)` is now the single reader, used by all 36. It reads
+`request.get_data()` (so a client that omits the JSON content-type is still understood — what
+`/comms/post` always did), tries UTF-8 then cp1252, and returns *default* when the body is
+absent/undecodable/not a JSON object — so each caller keeps its existing contract:
+`read_json_body()` for routes that 400 on a bad body, `read_json_body({})` for routes that
+fall through to their own defaults.
+
+This is SOLID rule #5 with teeth: the fix could not spread while it lived as two inline
+copies, so the sweep test walks the **live `url_map`** rather than a hand-kept list —
+`tests/comms_board/test_comms_body_encoding.py` covers a route added later without anyone
+remembering to add it. It fails on a werkzeug `BadRequest` (body rejected) **and** on a
+`NameError`/`ImportError` (helper used but not imported) — a wiring mistake that is easy to
+make when touching a dozen files at once, and did happen while writing this.
+
 ### SSE events (GET /events/runner)
 
 | Event type | Payload fields | Purpose |

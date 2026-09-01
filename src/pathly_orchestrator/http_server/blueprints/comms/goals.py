@@ -5,8 +5,8 @@ from __future__ import annotations
 import logging
 
 from flask import Blueprint, jsonify, request
-
 from ...sse import _broadcast_comms, _broadcast_runner
+from ._helpers import read_json_body
 
 bp = Blueprint("comms_goals", __name__)
 
@@ -19,7 +19,7 @@ def comms_goals_run():
         from pathly_orchestrator.db.queries.comms import post_message as _post_message
         from pathly_orchestrator.supervisor.goal_run import start_goal_run
 
-        data = request.get_json()
+        data = read_json_body()
         if not data:
             return jsonify({"error": "Missing JSON body"}), 400
 
@@ -188,7 +188,7 @@ def comms_goals_stop():
         from pathly_orchestrator.db.connection import get_db as _get_db
         from pathly_orchestrator.db.queries.comms import post_message as _post_message
 
-        data = request.get_json() or {}
+        data = read_json_body({})
         goal_id = data.get("goal_id", "")
         if not isinstance(goal_id, str) or not goal_id.strip():
             return jsonify({"error": "Field 'goal_id' must be a non-empty string"}), 400
@@ -288,7 +288,7 @@ def comms_goals_decompose():
         from pathly_orchestrator.db.queries.comms import post_message as _post_message
         from pathly_orchestrator.supervisor.goal_run import start_goal_decompose
 
-        data = request.get_json()
+        data = read_json_body()
         if not data:
             return jsonify({"error": "Missing JSON body"}), 400
 

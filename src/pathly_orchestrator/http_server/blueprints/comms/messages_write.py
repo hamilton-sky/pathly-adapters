@@ -7,11 +7,10 @@ triggers artifact indexing, emits the summary request, and fires the SSE update.
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 
-from flask import jsonify, request
+from flask import jsonify
 
 from ...sse import _broadcast_comms
 from ._helpers import (
@@ -20,6 +19,7 @@ from ._helpers import (
     extract_artifact_path,
     guess_artifact_type,
     norm_project_root,
+    read_json_body,
 )
 from ._messages_bp import bp
 
@@ -38,18 +38,9 @@ def comms_post():
             embed_async as _embed_async,
         )
 
-        # Windows agents post via curl whose JSON body may be cp1252-encoded (a stray em-dash →
-        # byte 0x97), which strict UTF-8 parsing rejects with a 500 — silently dropping a task or
-        # artifact. Decode leniently: UTF-8 first, then cp1252, so the post always lands.
-        raw = request.get_data()
-        data = None
-        if raw:
-            for _enc in ("utf-8", "cp1252"):
-                try:
-                    data = json.loads(raw.decode(_enc))
-                    break
-                except (UnicodeDecodeError, ValueError):
-                    continue
+        # Lenient decode (UTF-8 then cp1252) — this route's original hardening, now the
+        # shared helper every comms route uses. See _helpers.read_json_body.
+        data = read_json_body()
         if not data:
             return jsonify({"error": "Missing or invalid JSON body"}), 400
 

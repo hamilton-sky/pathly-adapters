@@ -14,7 +14,8 @@ from __future__ import annotations
 
 import logging
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify
+from ._helpers import read_json_body
 
 bp = Blueprint("comms_context_preview", __name__)
 
@@ -25,7 +26,7 @@ def comms_agent_context_preview():
     try:
         from pathly_orchestrator.runner.comms_context import board_context_for
 
-        data = request.get_json()
+        data = read_json_body()
         if not data:
             return jsonify({"error": "Missing JSON body"}), 400
 

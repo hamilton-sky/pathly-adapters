@@ -2,7 +2,54 @@
 
 from __future__ import annotations
 
+import json
 import re
+
+from flask import request
+
+
+def read_json_body(default: dict | None = None) -> dict | None:
+    """Parse this request's JSON body, tolerating a non-UTF-8 encoding.
+
+    Agents reach these routes through ``curl``. On Windows a shell that is not in UTF-8
+    mode hands curl a **cp1252** body — one em-dash in an agent's prose is byte 0x97 —
+    and Flask's ``request.get_json()`` decodes strictly, so the whole request dies. What
+    that looked like before this helper existed, measured across all 36 comms POST routes
+    with one em-dash in the body:
+
+    - 22 routes (``tasks/claim|complete|fail``, ``goals/run|stop``, ``answer``,
+      ``supersede`` …) raised, were caught by the route's own ``except Exception`` and
+      returned **500** — the agent's write was simply lost.
+    - The rest read ``get_json(silent=True) or {}``, so the body was **silently
+      discarded** and the route then rejected the request for a "missing" field that was
+      right there in it. That one is worse: it looks like the agent's mistake.
+
+    ``/comms/post`` had already been hardened against exactly this, and the fix was
+    copy-pasted into ``/comms/edit`` — but a copy-pasted fix cannot spread, which is the
+    whole reason SOLID rule #5 puts shared helpers HERE. This is that helper; every comms
+    route reads its body through it.
+
+    Deliberately reads ``request.get_data()`` rather than ``get_json()``, so a client that
+    omits ``Content-Type: application/json`` is still understood. That matches what
+    ``/comms/post`` has always done, and an agent's write is worth more than header
+    pedantry.
+
+    Returns *default* (``None`` unless given) when the body is absent, undecodable, or not
+    JSON — so a caller keeps whichever contract it already had:
+    ``read_json_body()`` for the routes that 400 on a bad body, and
+    ``read_json_body({})`` for the routes that fall back to their own defaults.
+    """
+    raw = request.get_data()
+    if not raw:
+        return default
+    for encoding in ("utf-8", "cp1252"):
+        try:
+            parsed = json.loads(raw.decode(encoding))
+        except (UnicodeDecodeError, ValueError):
+            continue
+        return parsed if isinstance(parsed, dict) else default
+    return default
+
 
 _EMBED_TYPES: frozenset[str] = frozenset(
     {"decision", "discovery", "constraint", "warning", "escalation", "artifact"}

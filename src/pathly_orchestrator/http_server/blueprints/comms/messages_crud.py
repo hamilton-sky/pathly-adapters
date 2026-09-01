@@ -8,6 +8,7 @@ from flask import jsonify, request
 
 from ...sse import _broadcast_comms
 from ._messages_bp import bp
+from ._helpers import read_json_body
 
 
 @bp.route("/comms", methods=["GET"])
@@ -81,7 +82,7 @@ def comms_search():
 
         # silent=True → a malformed/empty body yields None (a clean 400), not a
         # werkzeug BadRequest bubbling into the generic 500 that echoes exception text.
-        data = request.get_json(silent=True)
+        data = read_json_body()
         if not isinstance(data, dict):
             return jsonify({"error": "Missing or malformed JSON body"}), 400
 
@@ -148,7 +149,7 @@ def comms_acknowledge():
         from pathly_orchestrator.db.connection import get_db as _get_db
         from pathly_orchestrator.db.queries.comms import acknowledge_message as _ack
 
-        data = request.get_json()
+        data = read_json_body()
         if not data:
             return jsonify({"error": "Missing JSON body"}), 400
 
@@ -177,7 +178,7 @@ def comms_answer():
         from pathly_orchestrator.db.connection import get_db as _get_db
         from pathly_orchestrator.db.queries.comms import answer_question as _answer
 
-        data = request.get_json()
+        data = read_json_body()
         if not data:
             return jsonify({"error": "Missing JSON body"}), 400
 
@@ -236,20 +237,7 @@ def comms_edit():
             update_message_text as _update_text,
         )
 
-        # Windows clients may POST cp1252-encoded JSON (a stray em-dash → byte 0x97), which strict
-        # UTF-8 parsing rejects with a 500 — dropping the edit. Decode leniently: UTF-8 first, then
-        # cp1252 (mirrors comms_post) so an edit carrying a smart-quote/em-dash lands cleanly.
-        import json as _json
-
-        raw = request.get_data()
-        data = None
-        if raw:
-            for _enc in ("utf-8", "cp1252"):
-                try:
-                    data = _json.loads(raw.decode(_enc))
-                    break
-                except (UnicodeDecodeError, ValueError):
-                    continue
+        data = read_json_body()
         if not data:
             return jsonify({"error": "Missing or invalid JSON body"}), 400
 
@@ -282,7 +270,7 @@ def comms_delete():
             soft_delete_message as _soft_delete,
         )
 
-        data = request.get_json()
+        data = read_json_body()
         if not data:
             return jsonify({"error": "Missing JSON body"}), 400
 
@@ -321,7 +309,7 @@ def comms_supersede():
         from pathly_orchestrator.db.connection import get_db as _get_db
         from pathly_orchestrator.db.queries.comms import supersede_message as _supersede
 
-        data = request.get_json()
+        data = read_json_body()
         if not data:
             return jsonify({"error": "Missing JSON body"}), 400
 
@@ -370,7 +358,7 @@ def comms_restore():
         from pathly_orchestrator.db.connection import get_db as _get_db
         from pathly_orchestrator.db.queries.comms import restore_messages as _restore
 
-        data = request.get_json()
+        data = read_json_body()
         if not data:
             return jsonify({"error": "Missing JSON body"}), 400
 

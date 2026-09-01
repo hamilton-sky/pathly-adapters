@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import logging
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify
 
 from ...sse import _broadcast_comms
 from ._helpers import (
@@ -27,6 +27,7 @@ from ._helpers import (
     _PROMOTE_WRITERS,
     check_promote_permission,
     norm_project_root,
+    read_json_body,
 )
 
 bp = Blueprint("comms_promote", __name__)
@@ -64,7 +65,7 @@ def comms_promote():
 
         # silent=True → a malformed body yields a clean 400 instead of a werkzeug
         # BadRequest bubbling into the generic 500 that echoes exception text.
-        data = request.get_json(silent=True)
+        data = read_json_body()
         if not isinstance(data, dict):
             return jsonify({"error": "Missing or malformed JSON body"}), 400
 

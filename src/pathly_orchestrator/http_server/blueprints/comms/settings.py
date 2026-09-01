@@ -7,7 +7,7 @@ import logging
 from flask import Blueprint, jsonify, request
 
 from ...sse import _broadcast_comms, _broadcast_runner
-from ._helpers import norm_project_root
+from ._helpers import norm_project_root, read_json_body
 
 bp = Blueprint("comms_settings", __name__)
 
@@ -45,7 +45,7 @@ def comms_scope_set():
         from pathly_orchestrator.db.connection import get_db as _get_db
         from pathly_orchestrator.db.queries import app_settings as _settings
 
-        data = request.get_json()
+        data = read_json_body()
         if not data:
             return jsonify({"error": "Missing JSON body"}), 400
 
@@ -135,7 +135,7 @@ def comms_set_default_selection():
             set_default_summary_selection,
         )
 
-        data = request.get_json(silent=True) or {}
+        data = read_json_body({})
         selection = data.get("selection")
         if not isinstance(selection, dict):
             return jsonify({"error": "Field 'selection' must be an object"}), 400
@@ -176,7 +176,7 @@ def comms_set_default_style():
             set_default_summary_style,
         )
 
-        data = request.get_json(silent=True) or {}
+        data = read_json_body({})
         style = data.get("style")
         if not isinstance(style, str):
             return jsonify({"error": "Field 'style' must be a string"}), 400
@@ -217,7 +217,7 @@ def comms_set_default_progress():
             set_default_progress,
         )
 
-        data = request.get_json(silent=True) or {}
+        data = read_json_body({})
         progress = data.get("progress")
         if not isinstance(progress, str):
             return jsonify({"error": "Field 'progress' must be a string"}), 400
@@ -265,7 +265,7 @@ def comms_set_model_policy():
             set_agent_model,
         )
 
-        data = request.get_json(silent=True) or {}
+        data = read_json_body({})
         role = data.get("role")
         if data.get("clear") is True:
             clear_agent_model(_get_db(), role)
@@ -320,7 +320,7 @@ def comms_set_logging_config():
             set_logging_board_enabled,
         )
 
-        data = request.get_json(silent=True) or {}
+        data = read_json_body({})
         board = data.get("board")
         if not isinstance(board, bool):
             return jsonify({"error": "Field 'board' must be a boolean"}), 400
@@ -343,7 +343,7 @@ def comms_agent_context():
         )
         from pathly_orchestrator.supervisor.board_run import _format_board_info
 
-        data = request.get_json()
+        data = read_json_body()
         if not data:
             return jsonify({"error": "Missing JSON body"}), 400
 
@@ -392,7 +392,7 @@ def comms_consolidate():
             post_message as _post_message,
         )
 
-        data = request.get_json() or {}
+        data = read_json_body({})
         scope = data.get("scope")
         board = data.get("board", "feature")
         if not isinstance(scope, str) or not scope.strip():
