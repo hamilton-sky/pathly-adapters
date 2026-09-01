@@ -4,11 +4,12 @@
 
 FSM engine, gates, transitions, flow definitions, feedback protocol & fix-routing.
 
-22 test file(s).
+23 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
 | `test_command_gate.py` | Tests for ``command_gate`` — the executed (ground-truth) transition gate | 18 |
+| `test_compiled_flow.py` | Tests for supervisor/compiled_flow.py — Phase 2 of the FSM/DAG convergence | 15 |
 | `test_consultation_adapter_map.py` | Phase 0 hygiene fix — consultation.flow.yaml had an adapter_map (PO discussion + | 2 |
 | `test_consultation_dag_gate.py` | The consultation decompose must FAIL LOUDLY when the planner seeds no DAG | 3 |
 | `test_feedback_escalation.py` | 3-tier feedback escalation (fsm.engine.route_feedback) | 11 |

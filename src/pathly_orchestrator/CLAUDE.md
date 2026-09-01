@@ -698,6 +698,61 @@ deliberate, tested value, and no comment anywhere explains the split. Reversing 
 deliberate-looking decision on a guess is a bigger call than the fixes above — left alone pending
 someone who knows the original intent.
 
+## FSM/DAG convergence — Phase 2: a lightweight direct executor (`supervisor/compiled_flow.py`)
+
+The plan's original Phase 2 sketch was a compiler that reads a flow YAML and emits an
+equivalent DAG task-chain, drained by Phase 1's generalized `scheduler.py`. Research into
+building it surfaced a landmine specific to the flows chosen as the safest first target
+(`quick-fix`, `debug`): their skills (`fix/build.md`, `debug/build.md`, `debug/verify.md`)
+contain literal "call `pathly-fsm-call complete-stage`" instructions in their bodies,
+neutralized ONLY by the "you're headless, ignore the FSM-operations instructions above"
+runner-contract block `fsm_compose.build_prompt` injects into every FSM-composed prompt.
+`scheduler.py`'s existing DAG-task prompt path (`compose_skill("development/execute-task",
+...)`, what real loop-executor goals use) does **not** inject that override — reusing it
+verbatim for these flows would leave an agent trying to call an FSM endpoint that means
+nothing for a DAG-driven run, a real correctness bug rather than a style issue.
+
+**Resolution: `run_compiled_flow` walks a flow's states directly in Python** — no `fsm_state`
+DB row, no `STATE.json`, no `/next_action`/`/complete_stage` HTTP round-trip; this run's
+position in the flow lives only in a local variable for the call's lifetime. It reuses the
+SAME pure, flow_config+filesystem-only helpers `fsm_ops_complete.complete_stage` already
+orchestrates — `route_feedback`, `evaluate_transition_rules`, `run_gates`,
+`run_transition_actions` — and the SAME prompt-building path (`fsm_compose.build_prompt`/
+`build_prompt_for_agent`), so the runner-contract override is never skipped. This does NOT
+gain Phase 1's DAG-native retry/escalation/deadlock machinery (`task_retry.py` is untouched;
+`scheduler.py` is untouched) — it has its own much simpler in-process feedback-round loop
+instead, capped at the same `MAX_FEEDBACK_ROUNDS` `orchestrator_stage.py` uses.
+
+**Opt-in per flow, off by default.** `resolve_compiled_flows()` reads the
+`flow.compiled_executors` app-setting (comma-separated flow names) — same fail-open-to-off
+contract as `command_gate`/`cost_cap`/`task_retry`'s own settings. The dispatch seam lives in
+`api.py::start_run`, swapping which function `_run_and_finalize` closes over
+(`run_compiled_flow` vs. `orchestrator._loop`) based on `is_compiled_flow(flow)` — every flow
+not in the setting is byte-identical to before this existed. **Nothing is enabled by default**:
+this ships as real, tested code with zero effect on any existing run until an operator
+explicitly opts a flow in. Only `quick-fix` and `debug` have been verified against it (no
+`gates`, no `adapter_map`, no `transition_rules` at all — every transition is the flow's own
+listed default, so `evaluate_transition_rules` never returns a `decide` block for either).
+Adding another flow to the setting is unverified and should not be done without re-checking
+its shape against the limitations below first.
+
+**Known, deliberate limitations vs. the FSM path (documented in the module, not silently
+absorbed):**
+- **No park/resume.** A human-checkpoint feedback file fails the run (`error_kind
+  "human_checkpoint"`, with a board escalation posted) instead of parking it — a parked run
+  has nowhere to resume FROM here (no persisted current-state), so faking "parked" would
+  silently restart the whole flow from `states[0]` on resume, worse than an honest failure.
+  Fine for quick-fix/debug (human checkpoints are their rare/edge-case path per their own
+  `feedback_routing` comments); a flow leaning on human checkpoints routinely should not be
+  added to `flow.compiled_executors`.
+- **No session continuity** — every stage spawns a fresh session, unlike `_loop`'s
+  same-adapter session reuse. A real, small cost increase; not implemented for this slice.
+- **A pre-existing `fsm_state`/`STATE.json` row for the topic refuses the run outright**
+  (`error_kind "existing_fsm_state"`) rather than silently ignoring prior FSM-driven progress
+  on the same topic.
+- **A `decide` transition rule fails loudly** (`error_kind "decide_unsupported"`) rather than
+  being silently mishandled — neither validated flow uses one.
+
 ## Visible runner (supervisor/)
 
 `supervisor/` drives the pipeline by polling `/next_action` and calling `/complete_stage`. Every agent invocation goes through a visible terminal — there is no headless fallback.
