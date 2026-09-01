@@ -831,7 +831,35 @@ So the real gap is architectural, not capability: `scheduler_loop` is wired as a
 honest risk list: [pathly/features/fsm-fan-out/SPEC.md](../../pathly/features/fsm-fan-out/SPEC.md).
 Its Phase A — sharing the `### Runner contract` constant between `build_prompt` and
 `scheduler.py`'s DAG prompt path — is the same three-line fix the reverted compiled executor was
-built to route around.
+built to route around. **Phase A has landed** (below); B and C follow it.
+
+## fsm-fan-out Phase A — ONE runner contract, shared by both prompt paths
+
+`fsm_compose.RUNNER_CONTRACT_BLOCK` is now the single definition of the *"you are headless, the
+supervisor owns the FSM, never call `complete-stage`"* block, and **both** headless prompt paths
+append it:
+
+| Path | Before | Now |
+|---|---|---|
+| `fsm_compose.build_prompt` (FSM stages) | inline f-string in its `context` | appends the constant — output **byte-identical** |
+| `supervisor/scheduler.py` `_worker` (DAG tasks) | **appended nothing** | appends the same constant |
+
+The scheduler side is the real change: a loop-executor task agent was the one headless agent
+never told the supervisor drives the flow, and `development/execute-task` carries no such
+instruction of its own. That is inert while `scheduler_loop` runs as its own engine — but under
+Phase C those agents run INSIDE an FSM stage, where a self-driven transition is a double-advance
+or the 404 respawn loop `tests/runner_supervisor/test_runner_contract.py` was written for. It is
+appended AFTER `_worker`'s compose try/except, so the raw-task-text fallback — the path where the
+agent has the least guidance — is not the one path that loses it.
+
+This is the "three-line fix" the reverted compiled executor spent ~1300 lines routing around
+(above). The `build_prompt` side is a pure extraction: the lifted f-string interpolated nothing,
+and the composed `context` is byte-for-byte what it was. `compose_skill` is untouched, so the
+golden snapshots in `tests/snapshots/` do **not** move. Pinned by
+`tests/fsm_flows/test_runner_contract_shared.py` — present in both paths, exactly once in each
+(a second copy is the obvious regression), and present on the composition-failure fallback.
+
+Shipped inside the ratchet: `scheduler.py` 425 → 432 against its frozen 433.
 
 ## Visible runner (supervisor/)
 

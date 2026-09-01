@@ -22,6 +22,7 @@ import threading
 from typing import Any, Callable, Optional
 
 from . import task_retry as _task_retry
+from ..fsm_compose import RUNNER_CONTRACT_BLOCK
 
 logger = logging.getLogger("pathly.scheduler")
 
@@ -200,6 +201,12 @@ def scheduler_loop(
             )
         except Exception:
             instructions = task_text
+        # The SAME contract build_prompt appends to every FSM-stage prompt. execute-task's
+        # body carries none, so a DAG task agent was the one headless agent never told the
+        # supervisor owns the FSM — under fan-out (where these run INSIDE an FSM stage) one
+        # would advance the flow itself: a double-advance, or the 404 respawn loop
+        # tests/runner_supervisor/test_runner_contract.py pins for the FSM path.
+        instructions += f"\n\n{RUNNER_CONTRACT_BLOCK}"
         instructions += _task_retry.build_retry_context(task)
         # Inject the same scope-aware board context (governance + memory, honoring
         # the Reads toggle) the FSM/team path gets, so loop-executor tasks aren't
