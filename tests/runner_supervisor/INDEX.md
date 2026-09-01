@@ -4,10 +4,11 @@
 
 Runner control loop, supervisor, spawn channel, lane/worktree isolation, file-claim registry, services facade.
 
-14 test file(s).
+15 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
+| `test_fan_out.py` | supervisor/fan_out.py — the DAG scheduler as an FSM stage executor (fan-out Phase C) | 12 |
 | `test_file_claims.py` | Unit tests for the cross-feature file-claim overlap registry | 6 |
 | `test_isolation.py` | Tests for supervisor/isolation.py — LaneIsolation workspace seam | 11 |
 | `test_park_resume.py` | Tests for the human-checkpoint "parked" status and its resume path | 8 |

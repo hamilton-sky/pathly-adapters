@@ -304,7 +304,14 @@ pathly_orchestrator/
     terminal_billing.py    # _emit_executor_telemetry, _reconcile_billing_now (were spawn-local closures)
     terminal_phase.py      # _write_supervisor_phase_summary
     interactions.py        # _await_agent_question
-    orchestrator.py        # _loop, _resolve_stage_supervised
+    orchestrator.py        # _loop, _resolve_stage_supervised (399 lines — under the
+                           #   400 ratchet since fan-out Phase C, so it can never regress)
+    fan_out.py             # run_stage — THE one call site for executing an FSM stage:
+                           #   no parallel_states entry -> _run_stage_via_terminal unchanged;
+                           #   entry present -> scheduler_loop drains the state's ready tasks
+                           #   and returns a merged result in the SAME shape. Phase C pins
+                           #   SerialIsolation regardless of the YAML (Phase D is the swap).
+    orchestrator_session.py # resolve_session — same-adapter session reuse + the SESSION event
     api.py                 # start_run, pause_run, resume_run, abort_run, supply_decision, reroute_run
     goal_run.py            # thin re-export shim (start_goal_run / start_goal_decompose) → the two modules below
     goal_executor.py       # Board→Goals→Task-DAG executor dispatcher:
@@ -886,6 +893,70 @@ is still a stub that raises `NotImplementedError`. `max_workers` rejects `bool` 
 it**, which is what makes this phase inert by construction rather than by assertion.
 `tests/fsm_flows/test_parallel_states_schema.py` pins both: the schema rules, and that all nine
 shipped flows still validate with zero errors and carry no `parallel_states`.
+
+## fsm-fan-out Phase C — the fan-out moves INSIDE the FSM (still serial)
+
+The architectural change: `scheduler_loop` stops being a rival ENGINE and becomes the fan-out
+executor **of a state**. `orchestrator._loop` no longer calls `_run_stage_via_terminal` directly —
+both its spawn call sites now go through `supervisor/fan_out.py::run_stage`, the ONE call site for
+executing a stage:
+
+```
+  next_action() -> current_state = "BUILDING"
+        |
+        +- NOT parallel --> _run_stage_via_terminal      (today, unchanged)
+        |
+        +- parallel ------> scheduler_loop(...)          <- the fan-out
+        |                     returns when the frontier is drained
+        v
+  run_gates(BUILDING -> REVIEWING)   <- the JOIN. ONE gate run, after every worker
+        |                               finished. fan_out does NOT call gates.
+        v
+  complete_stage() -> write_state("REVIEWING")
+```
+
+`fsm_state.current` stays the scalar `"BUILDING"` for the whole drain, so `write_state`'s legality
+check, the `STATE.json` export, the `pathly-*` CLI and Studio's flow editor are all untouched. The
+FSM keeps flow, states, gates and transitions; the scheduler owns only "run these N ready tasks".
+
+**Behaviour is byte-identical, deliberately.** `_resolve_isolation` pins `SerialIsolation`
+*regardless* of the YAML's `isolation:` value — an `isolation: lane` entry is honoured as intent
+and **logged**, not obeyed — so a parallel state still drains one task at a time. Turning
+concurrency on is Phase D's single swap, gated on a real Phase-C run and on tasks declaring
+accurate file footprints (`file_claims.py` only guards collisions it can see).
+
+Fan-out semantics, as implemented:
+
+| Concern | Behaviour |
+|---|---|
+| Frontier | `get_ready_tasks(board="feature", scope=state.topic, goal_id=state.goal_id or None)` — the SAME `(board, scope)` pair `orchestrator_stage.py` posts to `complete_stage`, so the fan-out and `require_tasks_done` cannot disagree about which tasks are this stage's |
+| Isolation | `SerialIsolation()` always (Phase C); the requested strategy is logged |
+| Spawn | `_run_stage_via_terminal` wrapped by `cost_cap.CostCapTracker.wrap`, exactly as `goal_executor._run_loop` does; `session=None`, `autonomy` threaded from the stage |
+| Abort | the FSM's own `_abort_flag` **or** `tracker.exceeded()`, folded into `scheduler_loop`'s existing `abort_check` |
+| Merge | summed `cost_usd` (from the tracker's new `total` property — never re-summed), `session_id=None`, `outcome="failed"` if any task escalated **or** deadlocked |
+| Gates | not called here — `_loop` runs them at the transition, and that is the join |
+
+`session_id` is `None` **by construction**: a fan-out cannot carry one CLI session across N
+agents, and threading one would corrupt context the moment Phase D lets two workers run at once.
+A failed task does not hard-fail the stage — `_loop` surfaces the self-reported failure as a
+`RUNNER_WARNING` and `require_tasks_done` blocks the transition, which is the documented join
+semantics ("frontier drained, these escalated").
+
+**The `orchestrator.py` edit had to be net-negative** — it was frozen at 427 by
+`scripts/check_file_size.py`, where even an added import fails CI. Two extractions paid for the
+fan-out call sites: `supervisor/fan_out.py` (new) and `supervisor/orchestrator_session.py` (new,
+the ~35-line session-continuity block lifted verbatim — same reuse predicate, same `degraded`
+flag, same `SESSION` event). Result: **427 -> 399**, so the ratchet clicked and `orchestrator.py`
+dropped OUT of `file_size_baseline.txt` entirely — it can now never grow past 400 again.
+
+**Production behaviour is provably unchanged**: no packaged flow declares `parallel_states`, so
+no run can take the fan-out branch at all. `tests/runner_supervisor/test_fan_out.py` asserts that
+across all nine flows, alongside the drain, the serial pin (three ready tasks in three distinct
+lanes, never two at once — the assertion that must FLIP in Phase D), the failure/join semantics,
+and abort mid-drain.
+
+**Not done, and gated on a real Phase-C run:** Phase D (swap `LaneIsolation`, honour
+`max_workers`, opt ONE flow in, measure) and Phase E (retire `goal_executor._run_loop`).
 
 ## Visible runner (supervisor/)
 
