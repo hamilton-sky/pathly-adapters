@@ -861,6 +861,32 @@ golden snapshots in `tests/snapshots/` do **not** move. Pinned by
 
 Shipped inside the ratchet: `scheduler.py` 425 → 432 against its frozen 433.
 
+## fsm-fan-out Phase B — the `parallel_states` flow-YAML key (inert)
+
+A state opts into fan-out — one FSM state draining its ready tasks, then joining — by naming
+itself in an optional `parallel_states` block. **Absent means today's exact behavior** (one spawn
+per stage), so no existing flow changes:
+
+```yaml
+parallel_states:
+  BUILDING:
+    max_workers: 4        # optional; default = the isolation's own answer
+    isolation: lane       # optional; lane | serial | worktree
+```
+
+`fsm/state.py::_validate_parallel_states` (called from `validate_flow_dict`, so
+`pathly-validate-flow` and every caller get it) enforces three **errors** — a key that is not a
+declared state, a `max_workers` that is not a positive int, an `isolation` outside
+`_ISOLATION_VOCAB` — and one **warning**: `worktree` is legal vocabulary but `WorktreeIsolation`
+is still a stub that raises `NotImplementedError`. `max_workers` rejects `bool` explicitly, since
+`isinstance(True, int)` is true and `max_workers: true` is a typo, not a cap of 1. A bodiless
+`BUILDING:` (YAML `None`) is a legal "all defaults" entry.
+
+**Nothing reads the key yet** — Phase C is what branches on it, and **no packaged flow declares
+it**, which is what makes this phase inert by construction rather than by assertion.
+`tests/fsm_flows/test_parallel_states_schema.py` pins both: the schema rules, and that all nine
+shipped flows still validate with zero errors and carry no `parallel_states`.
+
 ## Visible runner (supervisor/)
 
 `supervisor/` drives the pipeline by polling `/next_action` and calling `/complete_stage`. Every agent invocation goes through a visible terminal — there is no headless fallback.
