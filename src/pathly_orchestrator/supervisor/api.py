@@ -87,20 +87,13 @@ def start_run(
             logger.warning("broadcast_fn error: %s", exc)
 
     from .orchestrator import _loop
-    from .compiled_flow import is_compiled_flow, run_compiled_flow
-
-    # FSM/DAG convergence Phase 2: a flow opted into `flow.compiled_executors` (app
-    # setting, empty/off by default — see compiled_flow.py) runs through the lightweight
-    # direct executor instead of the FSM engine. Every other flow is byte-identical to
-    # before this branch existed.
-    _run_loop = run_compiled_flow if is_compiled_flow(flow) else _loop
 
     def _run_and_finalize() -> None:
         # The loop owns all status transitions; we only OBSERVE the terminal status and
         # fire on_done once, so a decompose/goal run always reports completion even when
         # _loop returns via an error path (otherwise the board's timer never stops).
         try:
-            _run_loop(state, broadcast_fn)
+            _loop(state, broadcast_fn)
         finally:
             if on_done is not None:
                 result: dict[str, object] = {"status": state.status}

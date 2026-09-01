@@ -10,10 +10,6 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from pathly_orchestrator.cli._compiled import (
-    exit_no_features as _exit_no_features,
-    exit_topic_not_found as _exit_topic_not_found,
-)
 from pathly_orchestrator.cli._discovery import (
     find_most_recent_state as _find_most_recent_state,
     find_topic_dir as _find_topic_dir,
@@ -93,13 +89,15 @@ def main() -> None:
     if args.topic:
         result = _find_topic_dir(cwd, args.topic)
         if result is None:
-            _exit_topic_not_found(cwd, args.topic, "show")
+            print(f"Topic '{args.topic}' not found in any scan root.")
+            sys.exit(1)
         storage_path, flow = result
         topic = args.topic
     else:
         found = _find_most_recent_state(cwd)
         if found is None:
-            _exit_no_features(cwd, "show")
+            print("No active features found.")
+            sys.exit(1)
         storage_path, topic, flow = found
 
     # pathly:allow-mirror-read: human CLI log display reads the exported log directly (DB-less cwd)

@@ -24,7 +24,6 @@ _FEEDBACK_PRIORITY = [
     "TEST_FAILURES",
 ]
 
-from pathly_orchestrator.cli._compiled import latest_compiled_runs
 from pathly_orchestrator.cli._discovery import iter_state_files
 
 _SEP = "─" * 57
@@ -87,26 +86,6 @@ def _scan(cwd: Path) -> tuple[list[dict], list[dict]]:
         else:
             active.append(entry)
 
-    # Compiled-flow runs write no STATE.json, so the glob above cannot see them — merge
-    # them in from run_history (see cli/_compiled.py). Added BEHIND the disk scan and
-    # skipped when the topic already has state on disk: a flow opted into the compiled
-    # executor after some FSM-driven history has rows in both sources, and the disk one
-    # is the richer, still-authoritative answer for that topic.
-    on_disk = {e["topic"] for e in active} | {e["topic"] for e in done}
-    for run in latest_compiled_runs(cwd):
-        if run["topic"] in on_disk:
-            continue
-        entry = {
-            "topic": run["topic"],
-            "flow": run["flow"],
-            "state": str(run["status"]).upper(),
-            "conv": run["stage_count"],
-            "mtime": run["mtime"],
-            "feedback": None,
-            "compiled": True,
-        }
-        (done if run["status"] == "done" else active).append(entry)
-
     active.sort(key=lambda e: e["mtime"], reverse=True)
     return active, done
 
@@ -124,11 +103,6 @@ def _render_row(entry: dict) -> str:
 
     if feedback:
         suffix = f"[BLOCKED: {feedback}]"
-    elif entry.get("compiled"):
-        # "conv" counts FSM conversations; a compiled run has none, so name what it does
-        # have (stages walked) rather than mislabel it — and say the run is compiled, since
-        # its state column shows a run status where every other row shows an FSM state.
-        suffix = f"(compiled · {conv} stage{'' if conv == 1 else 's'})"
     else:
         suffix = f"(conv {conv})"
 
@@ -168,8 +142,7 @@ def main() -> None:
         for entry in done:
             topic = entry["topic"]
             flow = entry["flow"]
-            mark = "✓ (compiled)" if entry.get("compiled") else "✓"
-            print(f"  {topic.ljust(20)} ·  {flow.ljust(8)} ·  DONE             {mark}")
+            print(f"  {topic.ljust(20)} ·  {flow.ljust(8)} ·  DONE             ✓")
 
     print(_SEP)
     sys.exit(0)

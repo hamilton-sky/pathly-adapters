@@ -745,38 +745,20 @@ it — the same "blame the upstream cause, not the code" move `team.flow.yaml` m
 `REVIEW_FAILURES → planner`. Verified against the real `route_feedback`:
 builder → builder → scout → human.
 
-**The compiled executor gets the same ladder, off in-memory counts.** The tiers climb off a
-retry count the FSM path reads from `STATE.json`'s `retry_count_by_key` — which
-`compiled_flow.py` writes none of, so at first the ladder was inert exactly on the two flows
-most likely to loop. No persistence was needed to fix it: `route_feedback` already takes a
-`retry_counts=` argument, and a compiled run lives entirely inside one `run_compiled_flow`
-call, so a per-file `retry_by_file` dict held for that call gives the identical ladder. (That
-this is sound follows from the executor's own no-resume limitation — there is no second call
-for a count to survive into. The visible consequence: a compiled RE-run restarts every file's
-ladder at round 1, where an FSM re-run resumes the persisted count.)
-
-Reaching a human is terminal here, so the wording is the only record of what happened, and
-`supervisor/compiled_escalation.py` (split out under SOLID rule #2 when `compiled_flow.py`
-crossed 400 lines) keeps the two cases apart: `attempts == 0` means the flow routes this file
-to a person and someone is being ASKED something; `attempts > 0` means N rounds of automated
-fixes failed and nobody is being asked anything. Both used to print one flat "human
-checkpoint required".
-
 ## Feedback-file reachability — a flow must route what it can produce
 
 `route_feedback` (`fsm/engine_transitions.py`) ends with a catch-all: any `.md` in
 `feedback/` that no `feedback_routing` key matches returns `target_agent: "human"` with
 *"Unrecognized feedback file: X. Review and resolve manually."* That is a safety **net**, not
 a destination — reaching it means the flow stops and waits on a person instead of routing to
-the role that can fix the problem, and on the compiled executor a `human` target fails the
-run outright (`error_kind="human_checkpoint"`). Two flows were landing there on ordinary
-paths, both found by diffing what a flow's own skills WRITE against what it ROUTES:
+the role that can fix the problem, stalling a run that could have fixed itself. Two flows
+were landing there on ordinary paths, both found by diffing what a flow's own skills WRITE
+against what it ROUTES:
 
 - **`debug.flow.yaml` never routed `VERIFY_FAILURES.md`** — the file its own VERIFYING skill
   (`debug/verify.md`) writes whenever verification fails, i.e. the flow's primary failure
   path. So a failed debug verification escalated to a human instead of looping
-  VERIFYING → FIXING, and since `debug` is one of the two flows opted into
-  `flow.compiled_executors`, on that path the run simply died. Now `VERIFY_FAILURES: builder`,
+  VERIFYING → FIXING. Now `VERIFY_FAILURES: builder`,
   mirroring `quick-fix.flow.yaml`'s `TEST_FAILURES: builder` on the same VERIFYING→FIXING edge.
 - **The three consultation flows never routed `ARCH_FEEDBACK.md`** — the canonical `[ARCH]`
   file in `fragments/feedback-protocol.md`, which `utilities/meet.md` writes into any feature
@@ -794,86 +776,44 @@ gate, and `test.flow.yaml` has no `gates:` block at all, so that file can never 
 Adding a routing key for it would be unreachable noise. Checked by hand across all nine flows;
 only the two above were real.
 
-## FSM/DAG convergence — Phase 2: a lightweight direct executor (`supervisor/compiled_flow.py`)
+## FSM/DAG convergence — Phase 2/3 were REVERTED: one engine, one authority
 
-The plan's original Phase 2 sketch was a compiler that reads a flow YAML and emits an
-equivalent DAG task-chain, drained by Phase 1's generalized `scheduler.py`. Research into
-building it surfaced a landmine specific to the flows chosen as the safest first target
-(`quick-fix`, `debug`): their skills (`fix/build.md`, `debug/build.md`, `debug/verify.md`)
-contain literal "call `pathly-fsm-call complete-stage`" instructions in their bodies,
-neutralized ONLY by the "you're headless, ignore the FSM-operations instructions above"
-runner-contract block `fsm_compose.build_prompt` injects into every FSM-composed prompt.
-`scheduler.py`'s existing DAG-task prompt path (`compose_skill("development/execute-task",
-...)`, what real loop-executor goals use) does **not** inject that override — reusing it
-verbatim for these flows would leave an agent trying to call an FSM endpoint that means
-nothing for a DAG-driven run, a real correctness bug rather than a style issue.
+Phase 2 shipped `supervisor/compiled_flow.py`, a second executor that walked a flow's states
+directly in Python — no `fsm_state` row, no `/next_action`/`/complete_stage` round-trip — and
+Phase 3 opted `quick-fix`/`debug` into it. Both are **removed**. The record of why, so nobody
+rebuilds it:
 
-**Resolution: `run_compiled_flow` walks a flow's states directly in Python** — no `fsm_state`
-DB row, no `STATE.json`, no `/next_action`/`/complete_stage` HTTP round-trip; this run's
-position in the flow lives only in a local variable for the call's lifetime. It reuses the
-SAME pure, flow_config+filesystem-only helpers `fsm_ops_complete.complete_stage` already
-orchestrates — `route_feedback`, `evaluate_transition_rules`, `run_gates`,
-`run_transition_actions` — and the SAME prompt-building path (`fsm_compose.build_prompt`/
-`build_prompt_for_agent`), so the runner-contract override is never skipped. This does NOT
-gain Phase 1's DAG-native retry/escalation/deadlock machinery (`task_retry.py` is untouched;
-`scheduler.py` is untouched) — it has its own much simpler in-process feedback-round loop
-instead, capped at the same `MAX_FEEDBACK_ROUNDS` `orchestrator_stage.py` uses.
+- **It bought almost nothing.** The two calls it skipped are a localhost HTTP round-trip and a
+  SQLite write — roughly 2 ms against a stage whose agent runs for minutes. The expensive part
+  of a spawn (`TERMINAL_SPAWN` over SSE, waiting on `/runner/terminal/result`) went through
+  HTTP either way.
+- **It cost real money.** It passed `session=None` on every spawn where `orchestrator._loop`
+  reuses a session across same-adapter stages, so every stage re-read its context. It saved
+  microseconds of bookkeeping and spent tokens.
+- **It broke the state-one-authority rule**, and that rule pays for itself. With no DB row the
+  run was invisible to `pathly-status`, had no `STATE_TRANSITION` audit trail, could not
+  park/resume, and silently disabled `escalation_routing` (whose tiers climb off
+  `STATE.json`'s `retry_count_by_key`). Two of those needed their own patches — a whole second
+  CLI discovery source and an in-memory retry dict — before anyone noticed they shared one
+  cause.
+- **It made the problem it was meant to solve worse.** The convergence goal was two engines
+  down to one; this added a third alongside `orchestrator._loop` and `scheduler_loop`.
+- **The obstacle that justified it was three lines.** The stated reason for not compiling
+  flows into DAG tasks was that `fix/build.md`/`debug/*.md` carry literal `pathly-fsm-call
+  complete-stage` instructions, neutralized only by the runner-contract block `build_prompt`
+  appends (`fsm_compose.py`, the `### Runner contract` f-string). `scheduler.py`'s DAG prompt
+  path could append the same constant. A shared string was routed around with ~1300 lines.
 
-**Opt-in per flow, off by default.** `resolve_compiled_flows()` reads the
-`flow.compiled_executors` app-setting (comma-separated flow names) — same fail-open-to-off
-contract as `command_gate`/`cost_cap`/`task_retry`'s own settings. The dispatch seam lives in
-`api.py::start_run`, swapping which function `_run_and_finalize` closes over
-(`run_compiled_flow` vs. `orchestrator._loop`) based on `is_compiled_flow(flow)` — every flow
-not in the setting is byte-identical to before this existed. **Nothing is enabled by default**:
-this ships as real, tested code with zero effect on any existing run until an operator
-explicitly opts a flow in. Only `quick-fix` and `debug` have been verified against it (no
-`gates`, no `adapter_map`, no `transition_rules` at all — every transition is the flow's own
-listed default, so `evaluate_transition_rules` never returns a `decide` block for either).
-Adding another flow to the setting is unverified and should not be done without re-checking
-its shape against the limitations below first.
+**The design going forward: one authority (the DB) and one engine (the FSM).** A new execution
+path must persist its state in `fsm_state` like every other caller — that is what makes a run
+resumable, observable, auditable and CLI-visible, and those are not optional extras. If one
+engine is still the goal, start from sharing the runner-contract constant with the DAG prompt
+path, not from a second executor.
 
-**Known, deliberate limitations vs. the FSM path (documented in the module, not silently
-absorbed):**
-- **No park/resume.** A human-checkpoint feedback file fails the run (`error_kind
-  "human_checkpoint"`, with a board escalation posted) instead of parking it — a parked run
-  has nowhere to resume FROM here (no persisted current-state), so faking "parked" would
-  silently restart the whole flow from `states[0]` on resume, worse than an honest failure.
-  Fine for quick-fix/debug (human checkpoints are their rare/edge-case path per their own
-  `feedback_routing` comments); a flow leaning on human checkpoints routinely should not be
-  added to `flow.compiled_executors`.
-- **No session continuity** — every stage spawns a fresh session, unlike `_loop`'s
-  same-adapter session reuse. A real, small cost increase; not implemented for this slice.
-- **A pre-existing `fsm_state`/`STATE.json` row for the topic refuses the run outright**
-  (`error_kind "existing_fsm_state"`) rather than silently ignoring prior FSM-driven progress
-  on the same topic.
-- **A `decide` transition rule fails loudly** (`error_kind "decide_unsupported"`) rather than
-  being silently mishandled — neither validated flow uses one.
-
-### Phase 3 follow-on — the `pathly-*` CLI shortcuts can see a compiled run
-
-"Writes no `fsm_state`, no `STATE.json`" is the executor's design, but it also made an
-opted-in flow's runs **invisible to the human CLI**: `cli/_discovery.py` finds work by
-globbing `STATE.json`, so `pathly-status` printed "Nothing in progress." for a project whose
-compiled run had just failed, and `pathly-log`/`-back`/`-ff` answered `Topic 'x' not found in
-any scan root` — which reads as "you typo'd the topic" rather than "this run exists and has
-no FSM state". `cli/_compiled.py` is the second discovery source that closes it: the
-`run_history` row every supervised run writes (`registry._record_run_history`), whose
-`adapter` column carries the **flow name**, is a compiled-flow run when that flow is in
-`flow.compiled_executors`.
-
-- `pathly-status` merges those runs into the dashboard — **behind** the disk scan and skipped
-  when the topic already has state on disk, since a flow opted in *after* some FSM-driven
-  history has rows in both sources and the disk one is authoritative for that topic. A
-  compiled row shows its run status where an FSM row shows a state, so it is labelled
-  `(compiled · N stages)` rather than borrowing the FSM-only `(conv N)`.
-- `pathly-log`/`-back`/`-ff` diagnose the topic instead of calling it missing
-  (`_compiled.exit_topic_not_found`), and the no-argument path names the most recent compiled
-  run instead of claiming "No active features found" (`exit_no_features`).
-- `resolve_compiled_flows`/`is_compiled_flow` moved to the top-level `flow_settings.py` hub so
-  `cli/` can ask the question without importing the whole supervisor package;
-  `supervisor/compiled_flow.py` re-exports both, so its callers and tests are unchanged.
-- Everything fails safe to empty/None — these shortcuts must keep working in a cwd with no DB,
-  the same contract the disk globs have.
+**Open decision, deliberately not made here:** `scheduler_loop` runs N tasks in parallel across
+lanes; the FSM has one `current_state` and cannot express that. "One engine = the FSM" means
+either giving up parallel task execution or teaching the FSM to fan out. Worth deciding
+explicitly rather than by drift.
 
 ## Visible runner (supervisor/)
 
@@ -900,11 +840,10 @@ pathly-status  # show all active features and their current FSM state
 pathly-log     # readable timeline of a feature's FSM events
 ```
 
-Discovery has two sources: `cli/_discovery.py` globs `STATE.json` off disk (all storage
-layouts, current + legacy), and `cli/_compiled.py` reads `run_history` for **compiled-flow**
-runs, which have no `STATE.json` by design — see the Phase 3 follow-on above. `ff`/`back` act
-on FSM state, so for a compiled topic they explain why there is nothing to act on rather than
-reporting the topic missing.
+Discovery is `cli/_discovery.py`, which globs `STATE.json` off disk across all storage
+layouts, current and legacy. That is sufficient precisely BECAUSE every engine persists its
+state to `fsm_state` (and thence the `STATE.json` export) — a run that skipped the DB would
+be invisible here, which is one of the reasons the compiled executor was reverted.
 
 ## `pathly-run` — the OTHER execution path (`runner/cli.py`, `runner/invoke.py`)
 

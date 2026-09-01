@@ -3,15 +3,13 @@
 `route_feedback` has a catch-all: any `.md` in `feedback/` that no `feedback_routing`
 key matches returns `target_agent: "human"` with "Unrecognized feedback file: X. Review
 and resolve manually." That fallback is a safety net, not a destination — reaching it means
-the flow escalates to a person instead of routing to the role that can fix the problem, and
-on the compiled executor (supervisor/compiled_flow.py) a `human` target fails the run
-outright with `error_kind="human_checkpoint"`.
+the flow escalates to a person instead of routing to the role that can fix the problem,
+stalling a run that could have fixed itself.
 
 Two flows were reaching it on their own normal paths:
 
 - `debug` never routed `VERIFY_FAILURES.md`, which its OWN VERIFYING skill
-  (`debug/verify.md`) writes whenever verification fails — the flow's primary failure path,
-  and `debug` is one of the two flows opted into `flow.compiled_executors`.
+  (`debug/verify.md`) writes whenever verification fails — the flow's primary failure path.
 - The three consultation flows never routed `ARCH_FEEDBACK.md`, which `utilities/meet.md`
   writes into any feature (its option [1], captioned "routes to architect").
 

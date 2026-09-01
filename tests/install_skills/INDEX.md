@@ -4,7 +4,7 @@
 
 Adapter install/setup, stitch & compose, skill composition / round-trip / export, plugin manifests.
 
-22 test file(s).
+21 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -13,7 +13,6 @@ Adapter install/setup, stitch & compose, skill composition / round-trip / export
 | `test_adapter_staleness.py` | Anti-drift guard for the installer's per-adapter skill stitch path | 3 |
 | `test_adapters.py` | Tests for multi-adapter runner Conv 1 — adapters.yaml, resolve_command, TS staleness | 16 |
 | `test_board_search_fragment.py` | The board-search fragment — an agent's own query back to the board | 9 |
-| `test_cli_compiled_runs.py` | The pathly-* CLI shortcuts' SECOND discovery source: compiled-flow runs | 18 |
 | `test_cli_discovery.py` | Dual-root feature discovery for the pathly-* CLI shortcuts (storage-restructure) | 6 |
 | `test_codex_plugin_config.py` | covers install codex plugin writes real marketplace and config; install codex plugin is idempotent; install codex plugin refreshes marketplace with codex cli; … | 8 |
 | `test_compose.py` | Tests for the skill-fragment composition resolver + validator | 62 |
