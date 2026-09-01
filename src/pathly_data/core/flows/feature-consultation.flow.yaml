@@ -53,6 +53,12 @@ feedback_routing:
   HUMAN_QUESTIONS: human
   BLOCKED_ON_HUMAN: human
   ARCH_QUESTION: architect
+  # utilities/meet.md's escalation writes feedback/ARCH_FEEDBACK.md (its option [1],
+  # "routes to architect") into ANY feature regardless of flow, and it is the canonical
+  # [ARCH] file in fragments/feedback-protocol.md. Unrouted here, it hit the
+  # "Unrecognized feedback file" fallback and reached a human as a generic
+  # review-manually note instead of the architect the user asked for.
+  ARCH_FEEDBACK: architect
   PO_QUESTIONS: po
   # DESIGN_QUESTIONS.md is the builder's [ARCH]-tagged technical blocker (written by
   # team/build.md + development/build.md), so it resolves to the ARCHITECT in every

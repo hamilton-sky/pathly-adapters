@@ -703,6 +703,38 @@ and `tests/fsm_flows/test_design_questions_routing.py` pins the uniformity — i
 that the parametrized check has not degraded to all-skips, and a check that every flow with a
 designer stage still has an inbound file for them.
 
+## Feedback-file reachability — a flow must route what it can produce
+
+`route_feedback` (`fsm/engine_transitions.py`) ends with a catch-all: any `.md` in
+`feedback/` that no `feedback_routing` key matches returns `target_agent: "human"` with
+*"Unrecognized feedback file: X. Review and resolve manually."* That is a safety **net**, not
+a destination — reaching it means the flow stops and waits on a person instead of routing to
+the role that can fix the problem, and on the compiled executor a `human` target fails the
+run outright (`error_kind="human_checkpoint"`). Two flows were landing there on ordinary
+paths, both found by diffing what a flow's own skills WRITE against what it ROUTES:
+
+- **`debug.flow.yaml` never routed `VERIFY_FAILURES.md`** — the file its own VERIFYING skill
+  (`debug/verify.md`) writes whenever verification fails, i.e. the flow's primary failure
+  path. So a failed debug verification escalated to a human instead of looping
+  VERIFYING → FIXING, and since `debug` is one of the two flows opted into
+  `flow.compiled_executors`, on that path the run simply died. Now `VERIFY_FAILURES: builder`,
+  mirroring `quick-fix.flow.yaml`'s `TEST_FAILURES: builder` on the same VERIFYING→FIXING edge.
+- **The three consultation flows never routed `ARCH_FEEDBACK.md`** — the canonical `[ARCH]`
+  file in `fragments/feedback-protocol.md`, which `utilities/meet.md` writes into any feature
+  regardless of flow under the caption "routes to architect". Now `ARCH_FEEDBACK: architect`.
+
+`tests/fsm_flows/test_feedback_file_reachability.py` drives the real `route_feedback` against
+the real packaged YAMLs for both, plus a guard that the catch-all still fires for a genuinely
+unknown filename (so the assertions cannot pass by the fallback being removed).
+
+**Why this is a test and not a CI gate.** The obvious generalization — "every feedback file a
+flow's skills mention must be routed" — is regex-only and cannot tell a WRITE from a READ. It
+false-positives on `test.flow.yaml`/`INCOMPLETE_TASKS.md`, which `team/build.md` only *reads*
+("the completeness gate sent you back to finish…"): the writer is the `require_tasks_done`
+gate, and `test.flow.yaml` has no `gates:` block at all, so that file can never appear there.
+Adding a routing key for it would be unreachable noise. Checked by hand across all nine flows;
+only the two above were real.
+
 ## FSM/DAG convergence — Phase 2: a lightweight direct executor (`supervisor/compiled_flow.py`)
 
 The plan's original Phase 2 sketch was a compiler that reads a flow YAML and emits an

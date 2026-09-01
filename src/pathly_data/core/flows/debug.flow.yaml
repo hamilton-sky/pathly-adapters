@@ -35,6 +35,13 @@ role_map:
   VERIFYING: reviewer
 feedback_routing:
   REPRO_QUESTIONS: human
+  # VERIFYING's own skill (debug/verify.md) writes feedback/VERIFY_FAILURES.md when
+  # verification fails — this flow's primary failure path. Unrouted, it fell into
+  # route_feedback's "Unrecognized feedback file" fallback and escalated to a HUMAN
+  # instead of looping VERIFYING -> FIXING (and, on the compiled executor, killed the
+  # run outright: a `human` target there is error_kind=human_checkpoint). -> builder,
+  # matching quick-fix.flow.yaml's TEST_FAILURES for the same VERIFYING->FIXING edge.
+  VERIFY_FAILURES: builder
   TEST_FAILURES: builder
   HUMAN_QUESTIONS: human
   ARCH_FEEDBACK: architect  # rare case: the fix needs a design/architecture change, not just a code fix
