@@ -83,6 +83,16 @@ class CostCapTracker:
 
         return _spawn
 
+    @property
+    def total(self) -> float:
+        """Real spend accumulated so far, read under the same lock `wrap` writes under.
+
+        The tracker already owns this number; `fan_out._drain` reports it as the stage's
+        merged `cost_usd` rather than summing the same per-task costs a second time.
+        """
+        with self._lock:
+            return self._total
+
     def exceeded(self) -> bool:
         return self._max is not None and self._total >= self._max
 

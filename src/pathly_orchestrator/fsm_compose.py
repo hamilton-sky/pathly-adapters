@@ -24,6 +24,7 @@ from .fsm_compose_stage import _drop_sections, _apply_stage_selection, _resolve_
 from .fsm_compose_hints import _codex_subagent_hint, _agent_hint
 
 __all__ = [
+    "RUNNER_CONTRACT_BLOCK",
     "build_prompt",
     "build_prompt_for_agent",
     "_load_agent_text",
@@ -66,6 +67,26 @@ def _load_agent_text(agent: str) -> str:
         f"core/agents/{group}/{agent}.md" if group else f"core/agents/{agent}.md"
     )
     return files("pathly_data").joinpath(relative_path).read_text(encoding="utf-8")
+
+
+# The ONE runner contract, shared by every headless prompt path. Lifted out of
+# build_prompt's `context` (it interpolates nothing) so the DAG-task path in
+# supervisor/scheduler.py can append the identical text: under FSM fan-out those
+# task agents run INSIDE an FSM stage, and without this block one of them will try
+# to advance the flow itself — a double-advance or a 404 respawn loop (the exact
+# failure tests/runner_supervisor/test_runner_contract.py was written for).
+RUNNER_CONTRACT_BLOCK = (
+    "### Runner contract — the supervisor owns the FSM\n"
+    "You are running headless under the Pathly supervisor, which drives every state "
+    "transition. Do your stage's work, write your artifact(s), post progress and results "
+    "to the board (`/comms/*`), then STOP. Do NOT advance the pipeline yourself: never run "
+    "`pathly-fsm-call`, never call `complete-stage`/`next-action`, never POST to "
+    "`/complete_stage` or `/next_action`, and do NOT route back to another skill (e.g. "
+    "`team <feature> …`). The supervisor advances the flow automatically once your artifact "
+    "exists — any transition you trigger yourself causes a double-advance or a 404 loop. "
+    "(Any `FSM operations` / `complete-stage` / `route back` instructions in the skill above "
+    "apply ONLY to interactive `/pathly` use and must be ignored here.)\n"
+)
 
 
 def build_prompt(
@@ -193,17 +214,7 @@ def build_prompt(
         f"Feature: {board_scope}\n"
         f"State: {state_name}\n"
         f"Storage path: {storage_path}\n"
-        "\n"
-        "### Runner contract — the supervisor owns the FSM\n"
-        "You are running headless under the Pathly supervisor, which drives every state "
-        "transition. Do your stage's work, write your artifact(s), post progress and results "
-        "to the board (`/comms/*`), then STOP. Do NOT advance the pipeline yourself: never run "
-        "`pathly-fsm-call`, never call `complete-stage`/`next-action`, never POST to "
-        "`/complete_stage` or `/next_action`, and do NOT route back to another skill (e.g. "
-        "`team <feature> …`). The supervisor advances the flow automatically once your artifact "
-        "exists — any transition you trigger yourself causes a double-advance or a 404 loop. "
-        "(Any `FSM operations` / `complete-stage` / `route back` instructions in the skill above "
-        "apply ONLY to interactive `/pathly` use and must be ignored here.)\n"
+        "\n" + RUNNER_CONTRACT_BLOCK
     )
     from pathly_orchestrator.runner import build_pipeline_history_block
 

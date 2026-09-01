@@ -51,16 +51,17 @@ def _stage_model_for(adapter: str, model: str) -> str:
 
 def _loop(state: RunnerState, broadcast_fn: Optional[Callable]) -> None:
     from pathly_orchestrator import fsm_http_client as fhc
-    from pathly_orchestrator.adapters import resolve_command
-    import pathly_orchestrator.supervisor as _sup
+    from pathly_orchestrator.supervisor import fan_out as _fan_out
+    from pathly_orchestrator.supervisor.orchestrator_session import resolve_session
     from pathly_orchestrator.supervisor.scheduler import _outcome_is_failure
-
-    _run_stage_via_terminal = _sup._run_stage_via_terminal
 
     flow = state.flow
     topic = state.topic
     project_root = state.project_root
     model = state.model
+    # The flow's own dict, read ONCE (a run's flow is immutable) and only to answer "is this
+    # state a fan-out state?". {} on failure => no parallel_states => the single-spawn path.
+    flow_config = _fan_out.load_flow_config(flow, project_root)
 
     def _broadcast(payload: dict) -> None:
         if broadcast_fn:
@@ -193,41 +194,8 @@ def _loop(state: RunnerState, broadcast_fn: Optional[Callable]) -> None:
             )
 
             # ── Session continuity ────────────────────────────────────────────
-            with _lock:
-                open_sess = state.open_session
-                autonomy_for_adapter = state.autonomy.get(preferred_adapter, True)
-
-            session_id: Optional[str] = None
-            degraded = False
-
-            try:
-                cmd_info = resolve_command(preferred_adapter, "", "", autonomy=False)
-                adapter_supports_resume = cmd_info["supports_resume"]
-            except ValueError:
-                adapter_supports_resume = False
-
-            if (
-                open_sess is not None
-                and open_sess.adapter == preferred_adapter
-                and adapter_supports_resume
-                and open_sess.session_id
-            ):
-                session_id = open_sess.session_id
-                session_action = "continued"
-            else:
-                session_id = None
-                session_action = "opened"
-                if not adapter_supports_resume:
-                    degraded = True
-
-            _broadcast(
-                {
-                    "type": "SESSION",
-                    "topic": topic,
-                    "adapter": preferred_adapter,
-                    "kind": session_action,
-                    "degraded": degraded,
-                }
+            session_id, autonomy_for_adapter, adapter_supports_resume = resolve_session(
+                state, topic, preferred_adapter, _broadcast
             )
 
             with _lock:
@@ -249,8 +217,10 @@ def _loop(state: RunnerState, broadcast_fn: Optional[Callable]) -> None:
             run_id = f"{topic}-{state.iterations + 1}-{int(time.time() * 1000)}"
             state.span_id = secrets.token_hex(8)
             try:
-                invoke_result = _run_stage_via_terminal(
+                invoke_result = _fan_out.run_stage(
                     state,
+                    flow_config,
+                    current_fsm_state,
                     instructions,
                     preferred_adapter,
                     stage_model,
@@ -292,8 +262,10 @@ def _loop(state: RunnerState, broadcast_fn: Optional[Callable]) -> None:
                 retry_run_id = f"{run_id}-q{_q_round + 1}"
                 retry_session = (invoke_result or {}).get("session_id") or session_id
                 try:
-                    invoke_result = _run_stage_via_terminal(
+                    invoke_result = _fan_out.run_stage(
                         state,
+                        flow_config,
+                        current_fsm_state,
                         answer_block + instructions,
                         preferred_adapter,
                         model,
