@@ -688,15 +688,20 @@ a sibling divergence or a dropped parameter — before considering Phase 2's big
   review/test loop in `test.flow.yaml` routed back to `builder` forever, with no round-3 hand-off
   and no round-4 human escalation. Fixed by copying the same table from `team.flow.yaml`.
 
-**Flagged, not fixed — needs a human call, not a unilateral one:** `DESIGN_QUESTIONS.md` routes to
-`architect` in `team.flow.yaml`/`test.flow.yaml` but to `designer` in `team-build.flow.yaml` and
-all three consultation flows. `team/build.md`'s own inline body text ("If `DESIGN_QUESTIONS.md`
-exists… Spawn `architect`") resolves it before the FSM-level table is ever consulted for
-`team`/`team-build` in the common case, so this is latent rather than live — but
-`tests/fsm_flows/test_two_flows.py` explicitly pins `"designer"` for `team-build.flow.yaml` as a
-deliberate, tested value, and no comment anywhere explains the split. Reversing a tested,
-deliberate-looking decision on a guess is a bigger call than the fixes above — left alone pending
-someone who knows the original intent.
+**Resolved (was "flagged, not fixed"): `DESIGN_QUESTIONS.md` → `architect` in every flow.** The
+filename used to carry two self-consistent meanings: `team`/`test` treated it as the builder's
+`[ARCH]`-tagged technical blocker (→ architect), while `team-build` and the three consultation
+flows treated it as "questions for the designer" (→ designer), alongside their role-symmetric
+`ARCH_QUESTION`/`PO_QUESTIONS`/`IMPL_QUESTIONS`. The writer side has only ONE contract, which is
+what settled it: `team/build.md` and `development/build.md` both write the file `[ARCH]`-tagged,
+`team/build.md`'s own body spawns `architect` for it, and `utilities/meet.md` tells the user it
+"routes to architect" no matter which flow the feature is on — so 4 of 6 flows silently broke a
+documented promise. Now uniform, with `DESIGN_FEEDBACK.md → designer` added to the consultation
+flows so routing the file away does not strand the designer role (`team`/`team-build` already had
+it). `fragments/feedback-protocol.md`'s hedged "→ designer/architect" line is corrected to match,
+and `tests/fsm_flows/test_design_questions_routing.py` pins the uniformity — including a guard
+that the parametrized check has not degraded to all-skips, and a check that every flow with a
+designer stage still has an inbound file for them.
 
 ## FSM/DAG convergence — Phase 2: a lightweight direct executor (`supervisor/compiled_flow.py`)
 

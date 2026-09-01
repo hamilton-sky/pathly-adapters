@@ -43,6 +43,8 @@ feedback_routing:
   PLAN_FEEDBACK: planner
   ARCH_FEEDBACK: architect
   DESIGN_FEEDBACK: designer
+  # The builder's [ARCH] blocker -> architect, the same in every flow (DESIGN_FEEDBACK
+  # above is the designer's separate UI/UX file).
   DESIGN_QUESTIONS: architect
   IMPL_QUESTIONS: planner
   REVIEW_FAILURES: builder

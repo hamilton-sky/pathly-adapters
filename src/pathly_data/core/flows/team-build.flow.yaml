@@ -29,7 +29,11 @@ feedback_routing:
   BLOCKED_ON_HUMAN: human
   BUILD_FAILURES: builder
   DESIGN_FEEDBACK: designer
-  DESIGN_QUESTIONS: designer
+  # -> architect, NOT designer: this flow's team/build.md writes DESIGN_QUESTIONS.md
+  # [ARCH]-tagged ("how is this possible?") and its own body spawns `architect`, and
+  # team.flow.yaml — same skill — always routed it there. DESIGN_FEEDBACK above is the
+  # designer's UI/UX file; one filename, one meaning across every flow.
+  DESIGN_QUESTIONS: architect
   HUMAN_QUESTIONS: human
   IMPL_QUESTIONS: planner
   INCOMPLETE_TASKS: builder

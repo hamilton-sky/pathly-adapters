@@ -60,7 +60,13 @@ feedback_routing:
   BLOCKED_ON_HUMAN: human
   ARCH_QUESTION: architect
   PO_QUESTIONS: po
-  DESIGN_QUESTIONS: designer
+  # DESIGN_QUESTIONS.md is the builder's [ARCH]-tagged technical blocker (written by
+  # team/build.md + development/build.md), so it resolves to the ARCHITECT in every
+  # flow. It used to route to `designer` here, contradicting both its writers' [ARCH]
+  # tag and utilities/meet.md's documented "-> routes to architect". DESIGN_FEEDBACK
+  # keeps the designer reachable, matching team.flow.yaml/team-build.flow.yaml.
+  DESIGN_QUESTIONS: architect
+  DESIGN_FEEDBACK: designer
   IMPL_QUESTIONS: planner
 # Each stage advances on its default edge once its artifact is written; the stage
 # skill calls `pathly-fsm-call complete-stage` to move on. Optional content gates
