@@ -810,10 +810,28 @@ resumable, observable, auditable and CLI-visible, and those are not optional ext
 engine is still the goal, start from sharing the runner-contract constant with the DAG prompt
 path, not from a second executor.
 
-**Open decision, deliberately not made here:** `scheduler_loop` runs N tasks in parallel across
-lanes; the FSM has one `current_state` and cannot express that. "One engine = the FSM" means
-either giving up parallel task execution or teaching the FSM to fan out. Worth deciding
-explicitly rather than by drift.
+**Parallelism is NOT the cost of one engine** (an earlier note here said it might be — that was
+wrong). A classic FSM holds one state, but the thing Pathly needs is not concurrent *states*
+(Harel orthogonal regions, where `current` becomes a set); it is one state that spawns N agents
+and joins — `BUILDING` fans out over the ready tasks, waits for all, then transitions once.
+`fsm_state.current` stays the scalar `"BUILDING"` throughout, so the DB stays the authority and
+the gates keep running exactly where they do now, at the transition.
+
+Most of the machinery for that is already built and merely pinned off: `scheduler.py` has real
+thread fan-out with a completion queue, `isolation.py` has `LaneIsolation`
+(`max_concurrency = len(ready_lanes)`), `file_claims.py` guards collisions, `depends_on` is the
+graph, and `task_retry.py` handles per-task retry and deadlocks. **`LaneIsolation` is
+instantiated nowhere in production** — every caller uses `SerialIsolation`, whose only job is to
+force `max_concurrency` to 1, and whose own docstring says flipping to parallel is just swapping
+it back.
+
+So the real gap is architectural, not capability: `scheduler_loop` is wired as a rival ENGINE
+(`goal_executor._run_loop`, a peer of `orchestrator._loop`) instead of as the fan-out executor
+*inside* a state. Moving it inside is what turns two engines into one. Design, phasing and the
+honest risk list: [pathly/features/fsm-fan-out/SPEC.md](../../pathly/features/fsm-fan-out/SPEC.md).
+Its Phase A — sharing the `### Runner contract` constant between `build_prompt` and
+`scheduler.py`'s DAG prompt path — is the same three-line fix the reverted compiled executor was
+built to route around.
 
 ## Visible runner (supervisor/)
 
