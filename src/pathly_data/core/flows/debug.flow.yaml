@@ -45,6 +45,16 @@ feedback_routing:
   TEST_FAILURES: builder
   HUMAN_QUESTIONS: human
   ARCH_FEEDBACK: architect  # rare case: the fix needs a design/architecture change, not just a code fix
+# 3-tier retry escalation (rounds 1-2 owner -> round 3 upstream specialist -> round 4+
+# human), the same ladder team/team-build/test carry. Without it _resolve_feedback_target
+# returns the base agent unconditionally, so a fix that keeps failing verification looped
+# back to `builder` forever — no hand-off, no human backstop, just iterations/cost burning
+# down. Round 3 goes to `scout` because when the FIX keeps failing, the suspect is the
+# DIAGNOSIS above it, and INVESTIGATING (scout) is what produced it — the same
+# "upstream cause, not the code" move team.flow.yaml makes with REVIEW_FAILURES -> planner.
+escalation_routing:
+  VERIFY_FAILURES: scout
+  TEST_FAILURES: scout
 transition_actions:
   FIXING->VERIFYING:
     - skill: commit

@@ -53,6 +53,14 @@ flow to the setting is untested and should not be done without re-verifying its 
 - **A ``decide`` transition rule fails loudly** (``decide_unsupported``) rather than being
   silently mishandled — neither validated flow uses one, so this path exists only to fail
   safe if a flow with one is ever added to the setting without updating this executor first.
+- **``escalation_routing`` is inert here.** ``_resolve_feedback_target`` climbs its tiers off
+  a retry count that ``_read_retry_counts`` reads from ``STATE.json``'s
+  ``retry_count_by_key`` — and this executor writes no ``STATE.json``, so every round
+  resolves to the base agent: no round-3 specialist hand-off, no round-4 human escalation,
+  and the ladder injected by ``build_prompt_for_agent(retry_count=…)`` always says round 1.
+  The inner settle loop's ``MAX_FEEDBACK_ROUNDS`` cap (``feedback_exhausted``) is what
+  actually ends a stuck loop here. Pinned by
+  ``tests/fsm_flows/test_small_flow_escalation.py`` so it is not mistaken for working.
 """
 
 from __future__ import annotations

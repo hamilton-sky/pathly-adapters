@@ -703,6 +703,25 @@ and `tests/fsm_flows/test_design_questions_routing.py` pins the uniformity — i
 that the parametrized check has not degraded to all-skips, and a check that every flow with a
 designer stage still has an inbound file for them.
 
+## The small flows got the 3-tier retry ladder (`debug`, `quick-fix`)
+
+`_resolve_feedback_target` returns the BASE agent unconditionally when a flow has no
+`escalation_routing`, so `debug` and `quick-fix` — the only two failure-looping flows without
+one — routed a persistently failing fix back to `builder` forever: no round-3 hand-off, no
+round-4 human backstop, the run just burned its iteration/cost caps. Both now carry the
+ladder the team flows have, escalating to **`scout`** at round 3: when the FIX keeps failing,
+the suspect is the diagnosis (debug's INVESTIGATING) or the scope (quick-fix's SCOPING) above
+it — the same "blame the upstream cause, not the code" move `team.flow.yaml` makes with
+`REVIEW_FAILURES → planner`. Verified against the real `route_feedback`:
+builder → builder → scout → human.
+
+**The ladder is inert on the compiled executor** — `_read_retry_counts` reads `STATE.json`'s
+`retry_count_by_key`, and a compiled-flow run writes no `STATE.json`, so every round resolves
+to the base agent there and `MAX_FEEDBACK_ROUNDS` is what ends a stuck loop. Documented in
+`compiled_flow.py`'s limitations list and pinned by
+`tests/fsm_flows/test_small_flow_escalation.py`. This is the second capability the compiled
+executor silently drops (after park/resume) — worth weighing before opting more flows in.
+
 ## Feedback-file reachability — a flow must route what it can produce
 
 `route_feedback` (`fsm/engine_transitions.py`) ends with a catch-all: any `.md` in
