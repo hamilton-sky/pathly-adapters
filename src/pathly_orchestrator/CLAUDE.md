@@ -753,6 +753,32 @@ absorbed):**
 - **A `decide` transition rule fails loudly** (`error_kind "decide_unsupported"`) rather than
   being silently mishandled — neither validated flow uses one.
 
+### Phase 3 follow-on — the `pathly-*` CLI shortcuts can see a compiled run
+
+"Writes no `fsm_state`, no `STATE.json`" is the executor's design, but it also made an
+opted-in flow's runs **invisible to the human CLI**: `cli/_discovery.py` finds work by
+globbing `STATE.json`, so `pathly-status` printed "Nothing in progress." for a project whose
+compiled run had just failed, and `pathly-log`/`-back`/`-ff` answered `Topic 'x' not found in
+any scan root` — which reads as "you typo'd the topic" rather than "this run exists and has
+no FSM state". `cli/_compiled.py` is the second discovery source that closes it: the
+`run_history` row every supervised run writes (`registry._record_run_history`), whose
+`adapter` column carries the **flow name**, is a compiled-flow run when that flow is in
+`flow.compiled_executors`.
+
+- `pathly-status` merges those runs into the dashboard — **behind** the disk scan and skipped
+  when the topic already has state on disk, since a flow opted in *after* some FSM-driven
+  history has rows in both sources and the disk one is authoritative for that topic. A
+  compiled row shows its run status where an FSM row shows a state, so it is labelled
+  `(compiled · N stages)` rather than borrowing the FSM-only `(conv N)`.
+- `pathly-log`/`-back`/`-ff` diagnose the topic instead of calling it missing
+  (`_compiled.exit_topic_not_found`), and the no-argument path names the most recent compiled
+  run instead of claiming "No active features found" (`exit_no_features`).
+- `resolve_compiled_flows`/`is_compiled_flow` moved to the top-level `flow_settings.py` hub so
+  `cli/` can ask the question without importing the whole supervisor package;
+  `supervisor/compiled_flow.py` re-exports both, so its callers and tests are unchanged.
+- Everything fails safe to empty/None — these shortcuts must keep working in a cwd with no DB,
+  the same contract the disk globs have.
+
 ## Visible runner (supervisor/)
 
 `supervisor/` drives the pipeline by polling `/next_action` and calling `/complete_stage`. Every agent invocation goes through a visible terminal — there is no headless fallback.
@@ -775,7 +801,14 @@ On Windows, the argv is passed to PowerShell via `-EncodedCommand` (base64 UTF-1
 pathly-ff      # fast-forward current feature state one step
 pathly-back    # roll back current feature state one step
 pathly-status  # show all active features and their current FSM state
+pathly-log     # readable timeline of a feature's FSM events
 ```
+
+Discovery has two sources: `cli/_discovery.py` globs `STATE.json` off disk (all storage
+layouts, current + legacy), and `cli/_compiled.py` reads `run_history` for **compiled-flow**
+runs, which have no `STATE.json` by design — see the Phase 3 follow-on above. `ff`/`back` act
+on FSM state, so for a compiled topic they explain why there is nothing to act on rather than
+reporting the topic missing.
 
 ## `pathly-run` — the OTHER execution path (`runner/cli.py`, `runner/invoke.py`)
 

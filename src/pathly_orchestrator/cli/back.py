@@ -14,6 +14,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from pathly_orchestrator import eventlog
+from pathly_orchestrator.cli._compiled import (
+    exit_no_features as _exit_no_features,
+    exit_topic_not_found as _exit_topic_not_found,
+)
 from pathly_orchestrator.cli._discovery import (
     find_most_recent_state as _find_most_recent_state,
     find_topic_dir as _find_topic_dir,
@@ -37,15 +41,13 @@ def main() -> None:
     if args.topic:
         result = _find_topic_dir(cwd, args.topic)
         if result is None:
-            print(f"Topic '{args.topic}' not found in any scan root.")
-            sys.exit(1)
+            _exit_topic_not_found(cwd, args.topic, "roll back")
         storage_path, flow = result
         topic = args.topic
     else:
         found = _find_most_recent_state(cwd)
         if found is None:
-            print("No active features found.")
-            sys.exit(1)
+            _exit_no_features(cwd, "roll back")
         storage_path, topic, flow = found
 
     prior_state: str | None = None

@@ -65,27 +65,12 @@ from .registry import _lock, _set_status, _write_mirror
 from .state import MAX_FEEDBACK_ROUNDS, RunnerState, logger
 from .terminal import _write_supervisor_phase_summary
 
+# Both live in the top-level ``flow_settings`` hub so ``cli/`` can ask "is this flow
+# compiled?" without importing the supervisor package (see flow_settings.py). Re-exported
+# here because this module is where every existing caller and test looks for them.
+from ..flow_settings import is_compiled_flow, resolve_compiled_flows
 
-def resolve_compiled_flows() -> frozenset[str]:
-    """Flow names that should run via :func:`run_compiled_flow` instead of the FSM engine.
-
-    Reads the ``flow.compiled_executors`` app-setting (comma-separated flow names).
-    Absent/unreadable -> empty (fail-open to the existing FSM path).
-    """
-    try:
-        from pathly_orchestrator.db.connection import get_db
-        from pathly_orchestrator.db.queries.app_settings import get_setting
-
-        raw = get_setting(get_db(), "flow.compiled_executors", None)
-    except Exception:
-        return frozenset()
-    if not raw:
-        return frozenset()
-    return frozenset(name.strip() for name in raw.split(",") if name.strip())
-
-
-def is_compiled_flow(flow_name: str) -> bool:
-    return flow_name in resolve_compiled_flows()
+__all__ = ["is_compiled_flow", "resolve_compiled_flows", "run_compiled_flow"]
 
 
 def run_compiled_flow(state: RunnerState, broadcast_fn: Optional[Callable]) -> None:
