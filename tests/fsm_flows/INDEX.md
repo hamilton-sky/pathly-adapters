@@ -9,7 +9,7 @@ FSM engine, gates, transitions, flow definitions, feedback protocol & fix-routin
 | File | Covers | Tests |
 | --- | --- | --- |
 | `test_command_gate.py` | Tests for ``command_gate`` — the executed (ground-truth) transition gate | 18 |
-| `test_compiled_flow.py` | Tests for supervisor/compiled_flow.py — Phase 2 of the FSM/DAG convergence | 15 |
+| `test_compiled_flow.py` | Tests for supervisor/compiled_flow.py — Phase 2 of the FSM/DAG convergence | 17 |
 | `test_consultation_adapter_map.py` | Phase 0 hygiene fix — consultation.flow.yaml had an adapter_map (PO discussion + | 2 |
 | `test_consultation_dag_gate.py` | The consultation decompose must FAIL LOUDLY when the planner seeds no DAG | 3 |
 | `test_design_questions_routing.py` | DESIGN_QUESTIONS.md routes to the architect in EVERY flow that routes it at all | 3 |
@@ -27,7 +27,7 @@ FSM engine, gates, transitions, flow definitions, feedback protocol & fix-routin
 | `test_orchestrator.py` | Tests for Conv 2: STATE.json schema validation, state/transition enforcement, concurrency | 17 |
 | `test_retry_ladder.py` | Retry ladder: what varies by ATTEMPT, not just who owns it | 14 |
 | `test_rollback.py` | covers no orphans after mid install failure; failed install leaves no manifest; uninstall without manifest returns empty; … | 4 |
-| `test_small_flow_escalation.py` | debug + quick-fix carry the same 3-tier retry ladder as the team flows | 4 |
+| `test_small_flow_escalation.py` | debug + quick-fix carry the same 3-tier retry ladder as the team flows | 5 |
 | `test_stage_override.py` | flow-gate-preview (P2) — the transient per-run, per-stage prompt override channel | 5 |
 | `test_stage_selection_apply.py` | flow-phase-inspector (#5) apply-at-spawn: build_prompt applies a stage's saved selection | 7 |
 | `test_team_build_per_task.py` | team-build per-task loop + goal-DAG completeness gate | 9 |

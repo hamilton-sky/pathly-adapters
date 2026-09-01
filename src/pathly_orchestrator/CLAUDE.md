@@ -715,12 +715,22 @@ it — the same "blame the upstream cause, not the code" move `team.flow.yaml` m
 `REVIEW_FAILURES → planner`. Verified against the real `route_feedback`:
 builder → builder → scout → human.
 
-**The ladder is inert on the compiled executor** — `_read_retry_counts` reads `STATE.json`'s
-`retry_count_by_key`, and a compiled-flow run writes no `STATE.json`, so every round resolves
-to the base agent there and `MAX_FEEDBACK_ROUNDS` is what ends a stuck loop. Documented in
-`compiled_flow.py`'s limitations list and pinned by
-`tests/fsm_flows/test_small_flow_escalation.py`. This is the second capability the compiled
-executor silently drops (after park/resume) — worth weighing before opting more flows in.
+**The compiled executor gets the same ladder, off in-memory counts.** The tiers climb off a
+retry count the FSM path reads from `STATE.json`'s `retry_count_by_key` — which
+`compiled_flow.py` writes none of, so at first the ladder was inert exactly on the two flows
+most likely to loop. No persistence was needed to fix it: `route_feedback` already takes a
+`retry_counts=` argument, and a compiled run lives entirely inside one `run_compiled_flow`
+call, so a per-file `retry_by_file` dict held for that call gives the identical ladder. (That
+this is sound follows from the executor's own no-resume limitation — there is no second call
+for a count to survive into. The visible consequence: a compiled RE-run restarts every file's
+ladder at round 1, where an FSM re-run resumes the persisted count.)
+
+Reaching a human is terminal here, so the wording is the only record of what happened, and
+`supervisor/compiled_escalation.py` (split out under SOLID rule #2 when `compiled_flow.py`
+crossed 400 lines) keeps the two cases apart: `attempts == 0` means the flow routes this file
+to a person and someone is being ASKED something; `attempts > 0` means N rounds of automated
+fixes failed and nobody is being asked anything. Both used to print one flat "human
+checkpoint required".
 
 ## Feedback-file reachability — a flow must route what it can produce
 

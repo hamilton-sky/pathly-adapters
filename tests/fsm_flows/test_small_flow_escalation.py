@@ -72,11 +72,27 @@ def test_every_flow_with_a_failure_loop_has_a_human_backstop(tmp_path, flow):
     assert _flow(flow).get("escalation_routing") or {}, f"{flow} has no ladder"
 
 
-def test_the_ladder_is_inert_on_the_compiled_executor(tmp_path):
-    """Documented limitation, pinned so it is not mistaken for working: retry counts come
-    from STATE.json's retry_count_by_key, and a compiled-flow run writes no STATE.json (see
-    supervisor/compiled_flow.py), so every round resolves to the base agent. The compiled
-    executor's own MAX_FEEDBACK_ROUNDS cap is what ends such a loop instead."""
+def test_without_any_count_source_the_ladder_starts_at_round_one(tmp_path):
+    """No STATE.json and no injected counts -> attempt 1, the base agent. This is what the
+    compiled executor used to hit on EVERY round (it writes no STATE.json), which is why it
+    now supplies its own counts through route_feedback's `retry_counts=` seam."""
     result = _route(tmp_path, "debug", "VERIFY_FAILURES.md", retry_count=None)
     assert result["target_agent"] == "builder"
     assert result["retry_count"] == 0
+
+
+@pytest.mark.parametrize("retry_count,expected", LADDER)
+def test_injected_counts_drive_the_same_ladder(tmp_path, retry_count, expected):
+    """route_feedback's `retry_counts=` seam is how a caller with no STATE.json (the
+    compiled executor) gets the identical escalation ladder — no persistence required.
+    """
+    storage = tmp_path / "pathly" / "features" / "topic-a"
+    (storage / "feedback").mkdir(parents=True, exist_ok=True)
+    (storage / "feedback" / "VERIFY_FAILURES.md").write_text("x\n", encoding="utf-8")
+    result = route_feedback(
+        _flow("debug"),
+        storage,
+        retry_counts={"VERIFY_FAILURES.md": retry_count},
+    )
+    assert result["target_agent"] == expected
+    assert result["retry_count"] == retry_count

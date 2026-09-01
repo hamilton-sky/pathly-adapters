@@ -381,3 +381,57 @@ def test_compiled_flow_against_the_real_quick_fix_flow(tmp_path, monkeypatch):
     assert len(seen) == 3, seen  # SCOPING, FIXING, VERIFYING — DONE is never spawned
     assert state.status == "done"
     assert state.iterations == 3
+
+
+# ── escalation ladder off in-memory counts (no STATE.json) ────────────────────────
+
+
+def test_escalation_reason_names_which_path_reached_the_human():
+    """The two ways a run reaches a human read very differently to whoever finds the
+    board post: a question to answer vs. N agents that could not fix it."""
+    from pathly_orchestrator.supervisor.compiled_escalation import escalation_reason
+
+    assert escalation_reason(0, "HUMAN_QUESTIONS.md") == (
+        "the flow routes HUMAN_QUESTIONS.md to a human"
+    )
+    assert (
+        escalation_reason(1, "X.md") == "1 round of automated fixes did not resolve it"
+    )
+    assert (
+        escalation_reason(3, "X.md") == "3 rounds of automated fixes did not resolve it"
+    )
+
+
+def test_retry_counts_are_passed_to_route_feedback(tmp_path, monkeypatch):
+    """The executor supplies its OWN per-file counts (it writes no STATE.json), so
+    escalation_routing tiers actually climb. Captures what route_feedback is handed on
+    each round: 0, then 1 — first sighting is attempt 1, exactly as on the FSM path."""
+    import pathly_orchestrator.supervisor.compiled_flow as cf
+
+    seen: list[dict] = []
+
+    def fake_route(flow, storage_path, *, retry_counts=None):
+        seen.append(dict(retry_counts or {}))
+        if len(seen) <= 2:
+            return {
+                "file": "REVIEW_FAILURES.md",
+                "target_agent": "builder",
+                "retry_count": (retry_counts or {}).get("REVIEW_FAILURES.md", 0),
+            }
+        return None
+
+    state = _make_state("esc-topic", tmp_path)
+    _set_setting("flow.compiled_executors", "test-compiled")
+    with (
+        patch.object(fsm_ops, "_load_flow", return_value=SIMPLE_FLOW),
+        patch("pathly_orchestrator.fsm.route_feedback", fake_route),
+        patch.object(fsm_compose, "build_prompt", return_value="p"),
+        patch.object(fsm_compose, "build_prompt_for_agent", return_value="fb"),
+        patch(
+            "pathly_orchestrator.supervisor._run_stage_via_terminal",
+            return_value={"outcome": "success", "cost_usd": 0.0},
+        ),
+    ):
+        run_compiled_flow(state, None)
+
+    assert seen[:3] == [{}, {"REVIEW_FAILURES.md": 1}, {"REVIEW_FAILURES.md": 2}]

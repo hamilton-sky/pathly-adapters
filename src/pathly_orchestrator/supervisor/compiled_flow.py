@@ -53,14 +53,13 @@ flow to the setting is untested and should not be done without re-verifying its 
 - **A ``decide`` transition rule fails loudly** (``decide_unsupported``) rather than being
   silently mishandled — neither validated flow uses one, so this path exists only to fail
   safe if a flow with one is ever added to the setting without updating this executor first.
-- **``escalation_routing`` is inert here.** ``_resolve_feedback_target`` climbs its tiers off
-  a retry count that ``_read_retry_counts`` reads from ``STATE.json``'s
-  ``retry_count_by_key`` — and this executor writes no ``STATE.json``, so every round
-  resolves to the base agent: no round-3 specialist hand-off, no round-4 human escalation,
-  and the ladder injected by ``build_prompt_for_agent(retry_count=…)`` always says round 1.
-  The inner settle loop's ``MAX_FEEDBACK_ROUNDS`` cap (``feedback_exhausted``) is what
-  actually ends a stuck loop here. Pinned by
-  ``tests/fsm_flows/test_small_flow_escalation.py`` so it is not mistaken for working.
+- **``escalation_routing`` works, but off IN-MEMORY counts.** The tiers climb off a retry
+  count the FSM path reads from ``STATE.json``'s ``retry_count_by_key``; this executor
+  writes no ``STATE.json``, so it keeps its own per-file ``retry_by_file`` dict for the
+  run's lifetime and passes it through ``route_feedback``'s ``retry_counts=`` seam. Same
+  ladder, no persistence — which is sound precisely BECAUSE a compiled run cannot resume:
+  there is no second call for a count to survive into. A re-run therefore starts every
+  file's ladder at round 1, where an FSM re-run would resume the persisted count.
 """
 
 from __future__ import annotations
@@ -68,6 +67,7 @@ from __future__ import annotations
 import time
 from typing import Callable, Optional
 
+from .compiled_escalation import escalation_reason, post_human_escalation
 from .orchestrator import _stage_model_for
 from .registry import _lock, _set_status, _write_mirror
 from .state import MAX_FEEDBACK_ROUNDS, RunnerState, logger
@@ -123,29 +123,6 @@ def run_compiled_flow(state: RunnerState, broadcast_fn: Optional[Callable]) -> N
             {"type": "RUNNER_ERROR", "topic": topic, "message": message, "kind": reason}
         )
 
-    def _post_human_escalation(file_name: str) -> None:
-        try:
-            from pathly_orchestrator.db.connection import get_db
-            from pathly_orchestrator.db.queries.comms_messages import post_message
-
-            post_message(
-                get_db(),
-                board="feature",
-                scope=topic,
-                from_agent="system",
-                to_agent="human",
-                type="escalation",
-                text=(
-                    f"Human checkpoint required — {file_name}\n\n"
-                    "This run uses the compiled-flow executor, which does not support "
-                    "pause/resume: resolve the feedback file, then re-run the flow from "
-                    "the start (it will find the file already resolved)."
-                ),
-                goal_id=state.goal_id or None,
-            )
-        except Exception as exc:
-            logger.warning("compiled_flow human escalation post failed: %s", exc)
-
     existing = eventlog.read_state(str(storage_path))
     if existing is not None:
         _fail(
@@ -156,6 +133,16 @@ def run_compiled_flow(state: RunnerState, broadcast_fn: Optional[Callable]) -> N
         return
 
     current = flow_config["states"][0]
+    # Per-FILE retry counts for the run's lifetime, feeding route_feedback's
+    # escalation_routing tiers. The FSM path reads these from STATE.json's
+    # retry_count_by_key (max across conversations); this executor writes no STATE.json,
+    # so without them every round resolved to the base agent — no round-3 specialist
+    # hand-off and no round-4 human escalation, on the two flows most likely to loop.
+    # Nothing needs persisting to fix that: a compiled run lives entirely inside this
+    # call, so an in-memory dict passed through route_feedback's existing `retry_counts`
+    # seam gives the identical ladder. Keyed per file and NOT reset per stage, matching
+    # _read_retry_counts' "how many times has THIS file failed" semantics.
+    retry_by_file: dict[str, int] = {}
 
     try:
         while True:
@@ -273,16 +260,20 @@ def run_compiled_flow(state: RunnerState, broadcast_fn: Optional[Callable]) -> N
                         _set_status(state, "aborted", broadcast_fn)
                         return
 
-                feedback = route_feedback(flow_config, storage_path)
+                feedback = route_feedback(
+                    flow_config, storage_path, retry_counts=retry_by_file
+                )
                 if feedback is not None:
                     target = feedback["target_agent"]
                     file_ = feedback["file"]
                     if target == "human":
-                        _post_human_escalation(file_)
+                        attempts = int(feedback.get("retry_count") or 0)
+                        post_human_escalation(topic, state.goal_id, file_, attempts)
                         _fail(
                             "human_checkpoint",
-                            f"Human checkpoint required: {file_} (the compiled executor "
-                            "does not support park/resume)",
+                            f"Human checkpoint required: {file_} "
+                            f"({escalation_reason(attempts, file_)}; the compiled "
+                            "executor does not support park/resume)",
                         )
                         return
                     feedback_rounds += 1
@@ -314,6 +305,7 @@ def run_compiled_flow(state: RunnerState, broadcast_fn: Optional[Callable]) -> N
                     except RuntimeError as exc:
                         _fail("spawn_failed", str(exc))
                         return
+                    retry_by_file[file_] = retry_by_file.get(file_, 0) + 1
                     continue  # re-check route_feedback
 
                 next_state = evaluate_transition_rules(
