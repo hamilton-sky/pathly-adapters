@@ -71,25 +71,44 @@ def parallel_config(flow_config: dict, state_name: str) -> Optional[dict]:
     return dict(entry) if isinstance(entry, dict) else {}
 
 
-def _resolve_isolation(config: dict, state_name: str):
-    """SerialIsolation — always, in Phase C.
+def _resolve_isolation(
+    config: dict, state_name: str, board: str, scope: str, goal_id: Optional[str]
+):
+    """The isolation this state drains with (Phase D — parallelism is on, but gated).
 
-    ``isolation: lane`` in the YAML is honoured as *intent* and logged, not obeyed: the
-    swap to ``LaneIsolation`` is Phase D and is gated on a real Phase-C run plus tasks
-    with accurate declared file footprints (``file_claims.py`` only protects against
-    collisions it can see). Logging it is what keeps the pin visible rather than silent.
+    ``serial`` is obeyed literally. ``worktree`` is legal vocabulary whose implementation
+    is still a stub (``WorktreeIsolation`` raises ``NotImplementedError``), so it degrades
+    to serial with a warning rather than crashing a run.
+
+    ``lane`` — the default — returns ``AuditedLaneIsolation``: real lane parallelism, but
+    only for as long as the frontier's lane partition actually audits safe, re-checked
+    every scheduling round. On today's DAGs (no declared footprints) that audits UNSAFE
+    and the drain stays serial, which is the correct answer, not a failure: the swap can
+    never be worse than Phase C's behaviour, and becomes parallel exactly when a planner
+    has declared lanes and footprints that hold up.
     """
     from pathly_orchestrator.supervisor.isolation import SerialIsolation
 
     requested = config.get("isolation") or "lane"
-    if requested != "serial":
-        logger.info(
-            "fan_out: state %s asks for isolation=%r; Phase C pins SerialIsolation "
-            "(one task at a time). Parallelism lands in Phase D.",
+    if requested == "serial":
+        return SerialIsolation()
+    if requested == "worktree":
+        logger.warning(
+            "fan_out: state %s asks for isolation='worktree', which is still a stub — "
+            "draining serially instead.",
             state_name,
-            requested,
         )
-    return SerialIsolation()
+        return SerialIsolation()
+
+    from pathly_orchestrator.supervisor.lane_partition import AuditedLaneIsolation
+
+    max_workers = config.get("max_workers")
+    return AuditedLaneIsolation(
+        board,
+        scope,
+        goal_id,
+        max_workers=max_workers if isinstance(max_workers, int) else None,
+    )
 
 
 def _merge_drain_result(drained: dict, cost_usd: float) -> dict:
@@ -151,6 +170,7 @@ def _drain(
     # fan-out and the join would disagree about which tasks belong to this stage.
     # orchestrator_stage.py posts complete_stage with board="feature", scope=topic.
     board, scope = "feature", state.topic
+    goal_id = getattr(state, "goal_id", "") or None
     tracker = init_cost_tracker()
 
     def _spawn(task_state, instructions, adapter, model, task_run_id, task_broadcast):
@@ -176,11 +196,11 @@ def _drain(
         state,
         board,
         scope,
-        isolation=_resolve_isolation(config, state_name),
+        isolation=_resolve_isolation(config, state_name, board, scope, goal_id),
         broadcast_fn=broadcast_fn,
         spawn_fn=tracker.wrap(_spawn),
         abort_check=_abort_check,
-        goal_id=getattr(state, "goal_id", "") or None,
+        goal_id=goal_id,
     )
     merged = _merge_drain_result(drained, tracker.total)
     tracker.report(merged)  # stamps error/cost_cap_exceeded when the cap was breached

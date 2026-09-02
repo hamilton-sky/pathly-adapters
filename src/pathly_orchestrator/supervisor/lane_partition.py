@@ -121,3 +121,76 @@ def audit_lane_partition(
             f"lanes would write the same paths concurrently"
         )
     return report
+
+
+class AuditedLaneIsolation:
+    """``LaneIsolation``, but only while the partition actually audits safe (Phase D).
+
+    ``LaneIsolation`` grants one worker per ready lane on the premise that lanes have
+    disjoint file sets. It cannot check that premise — it is handed lane NAMES, not
+    footprints. This wrapper checks it, and falls back to ONE worker whenever it does
+    not hold, so turning parallelism on can never be worse than serial.
+
+    **Re-audited every scheduling round, not once at drain start.** ``scheduler_loop``
+    calls ``max_concurrency`` on every frontier poll, and the frontier GROWS as tasks
+    complete and unblock their dependents. A task that becomes ready later can conflict
+    with one already running, so a single up-front check would be exactly the kind of
+    "verified once, assumed forever" guarantee this feature exists to stop relying on.
+    The cost is one DB read per round, against rounds that block on agents running for
+    minutes.
+
+    Transitions are logged, not every round — an unsafe frontier would otherwise emit a
+    line per poll for the whole drain.
+    """
+
+    def __init__(
+        self,
+        board: str,
+        scope: str,
+        goal_id: Optional[str] = None,
+        max_workers: Optional[int] = None,
+    ) -> None:
+        from .isolation import LaneIsolation
+
+        self._board = board
+        self._scope = scope
+        self._goal_id = goal_id
+        self._inner = LaneIsolation(max_workers)
+        self._last_safe: Optional[bool] = None
+
+    def acquire(self, task: dict, state):
+        return self._inner.acquire(task, state)
+
+    def release(self, ws, *, success: bool) -> None:
+        self._inner.release(ws, success=success)
+
+    def max_concurrency(self, ready_lanes: set) -> int:
+        try:
+            from pathly_orchestrator.db.connection import get_db
+
+            report = audit_lane_partition(
+                get_db(), self._board, self._scope, self._goal_id
+            )
+        except Exception:
+            # Never let an audit failure widen concurrency — fail CLOSED to serial.
+            logger.debug("lane_partition: audit failed, staying serial", exc_info=True)
+            return 1
+
+        safe = bool(report.get("safe"))
+        if safe != self._last_safe:
+            if safe:
+                logger.info(
+                    "fan_out: %s/%s lane partition is safe — running up to %d in parallel",
+                    self._board,
+                    self._scope,
+                    self._inner.max_concurrency(ready_lanes),
+                )
+            else:
+                logger.warning(
+                    "fan_out: %s/%s draining SERIALLY — %s",
+                    self._board,
+                    self._scope,
+                    report.get("reason") or "lane partition is not safe",
+                )
+            self._last_safe = safe
+        return self._inner.max_concurrency(ready_lanes) if safe else 1
