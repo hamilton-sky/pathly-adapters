@@ -319,9 +319,10 @@ def _run_loop(
     from pathly_orchestrator.supervisor import board_lock
     from pathly_orchestrator.supervisor.cost_cap import init_cost_tracker
     from pathly_orchestrator.supervisor.goal_verify import verify_clean_drain
-    from pathly_orchestrator.supervisor.isolation import SerialIsolation
+    from pathly_orchestrator.supervisor.drain import drain_frontier
+    from pathly_orchestrator.supervisor.lane_partition import AuditedLaneIsolation
     from pathly_orchestrator.supervisor.registry import _record_run_history
-    from pathly_orchestrator.supervisor.scheduler import scheduler_loop
+    from pathly_orchestrator.supervisor.slug import resolve_goal_home
     from pathly_orchestrator.supervisor.state import RunnerState
 
     run_id = str(uuid.uuid4())
@@ -333,22 +334,7 @@ def _run_loop(
             "holder": board_lock.holder(board, scope),
         }
 
-    slug, _goal_dir = scope, None  # fallback; _goal_dir set below when resolvable
-    if project_root and goal_id:
-        try:
-            from pathly_orchestrator.db.connection import get_db
-            from pathly_orchestrator.supervisor.goal_decomposer import _goal_storage_dir
-            from pathly_orchestrator.supervisor.slug import ensure_goal_slug
-            import os
-
-            slug = ensure_goal_slug(get_db(project_root or None), goal_id)
-            # Board-scoped goal home: feature-tier -> pathly/features/<feature>/goals/<slug>,
-            # project/global -> pathly/project/goals/<slug> — the ONE goal-dir resolver every
-            # other goal path (decompose planner/plan/consultation, _run_team) already uses.
-            _goal_dir = _goal_storage_dir(project_root, board, scope, slug)
-            os.makedirs(_goal_dir, exist_ok=True)
-        except Exception:
-            pass
+    slug, _goal_dir = resolve_goal_home(project_root, board, scope, goal_id)
 
     state = RunnerState(
         topic=slug,
@@ -394,11 +380,16 @@ def _run_loop(
     # run in GET /runs while it runs — its per-task sched-* rows fold under it (run_history_read).
     # _run_loop builds its own RunnerState (never start_run), so nothing else writes this row.
     _record_run_history(state, "running")
-    isolation = SerialIsolation()
+    # Same audit-gated parallelism an FSM fan-out stage gets (Phase D): the loop drains in
+    # parallel only while the frontier's lane partition audits safe, and serially otherwise.
+    # On a DAG whose tasks declare no footprints — every DAG today — this is exactly the
+    # SerialIsolation this replaced, so `executor: loop` cannot behave worse than before.
+    isolation = AuditedLaneIsolation(board, scope, goal_id)
     cost_tracker = init_cost_tracker()
 
     def _abort_check() -> bool:
-        return board_lock.holder(board, scope) != run_id or cost_tracker.exceeded()
+        # ONLY the lock check — drain_frontier folds the cost cap in for every drain.
+        return board_lock.holder(board, scope) != run_id
 
     def _work() -> dict:
         import time as _t
@@ -408,16 +399,19 @@ def _run_loop(
 
         try:
             _safe_call(on_start, run_id)
-            kwargs: dict = dict(
+            raw, _ = drain_frontier(
+                state,
+                board,
+                scope,
                 isolation=isolation,
+                spawn_fn=spawn_fn,
+                abort_check=_abort_check,
                 broadcast_fn=broadcast_fn,
                 event_broadcast_fn=event_broadcast_fn,
                 goal_id=goal_id,
-                abort_check=_abort_check,
+                tracker=cost_tracker,
             )
-            kwargs["spawn_fn"] = cost_tracker.wrap(spawn_fn)
-            raw = scheduler_loop(state, board, scope, **kwargs)
-            res: dict = dict(raw) if isinstance(raw, dict) else {"result": raw}
+            res: dict = dict(raw)
             res.update(executor="loop", goal_id=goal_id, run_id=run_id)
             verify_clean_drain(res, _goal_dir, board, scope, goal_id)
             cost_tracker.report(res)

@@ -75,3 +75,33 @@ def ensure_goal_slug(conn, goal_id: str) -> str:
         candidate = f"{base}-{uuid.uuid4().hex}"[:64]
         set_message_slug(conn, goal_id, candidate)
         return candidate
+
+
+def resolve_goal_home(
+    project_root: str, board: str, scope: str, goal_id: str
+) -> tuple[str, str | None]:
+    """``(slug, goal_dir)`` for a goal run — the run's identity and its storage home.
+
+    The slug is the goal's stable filesystem name (``RunnerState.topic`` for a goal run);
+    the dir is its board-scoped home: feature-tier -> ``pathly/features/<feature>/goals/<slug>``,
+    project/global -> ``pathly/project/goals/<slug>`` — the ONE goal-dir resolver every other
+    goal path (decompose planner/plan/consultation, ``_run_team``) already uses.
+
+    Best-effort by design: a goal run must not die because its storage dir could not be
+    resolved, so any failure degrades to ``(scope, None)`` — the caller then keys the run by
+    its board scope and skips the on-disk goal home, exactly as before this was extracted.
+    """
+    if not (project_root and goal_id):
+        return scope, None
+    try:
+        import os
+
+        from pathly_orchestrator.db.connection import get_db
+        from pathly_orchestrator.supervisor.goal_decomposer import _goal_storage_dir
+
+        slug = ensure_goal_slug(get_db(project_root or None), goal_id)
+        goal_dir = _goal_storage_dir(project_root, board, scope, slug)
+        os.makedirs(goal_dir, exist_ok=True)
+        return slug, goal_dir
+    except Exception:
+        return scope, None
