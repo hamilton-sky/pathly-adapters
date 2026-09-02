@@ -6,7 +6,7 @@ studio/src/renderer/src/store/commsStore.ts:883
 studio/src/renderer/src/components/HQ/useHQ.tsx:874
 studio/src/renderer/src/components/MarkdownEditor/EditorHeader/EditorHeader.tsx:617
 studio/src/renderer/src/components/Editor/index.tsx:576
-src/pathly_orchestrator/supervisor/goal_executor.py:561
+src/pathly_orchestrator/supervisor/goal_executor.py:555
 src/pathly_orchestrator/http_server/blueprints/comms/settings.py:521
 src/pathly_orchestrator/supervisor/board_run.py:490
 src/pathly_orchestrator/db/queries/invocation_projection.py:454

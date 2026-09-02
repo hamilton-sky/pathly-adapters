@@ -325,6 +325,9 @@ pathly_orchestrator/
                            #   (mode='planner' or mode='consultation')
     scheduler.py           # DAG frontier loop (scheduler_loop): event-driven, blocks on completion_q;
                            #   at most one worker per lane; goal_id= scopes the frontier to one goal's tasks
+    drain.py               # drain_frontier — the ONE scheduler_loop call site. Owns the cost
+                           #   tracker (wrapping spawn_fn exactly once) and folds the cap into
+                           #   abort_check, so neither fan_out nor goal_executor can forget it.
     isolation.py           # lane / serial isolation strategies for the frontier loop
     file_claims.py         # CROSS-FEATURE file-claim registry (feature A vs feature B) —
                            #   wired in goal_executor only; scheduler_loop never calls it, so it
@@ -1052,8 +1055,12 @@ change. Its `REVIEWING` carries `on_board_count: {metric: ready, op: gt, next: B
 BUILDING today drains **one task per FSM cycle** with a REVIEWING pass between tasks. A
 `parallel_states: {BUILDING: …}` entry makes BUILDING drain the whole ready frontier in one
 stage and review ONCE after — a change to review cadence that lands even at serial isolation.
-That trade (per-task review vs. per-batch review) is a product call, not a side effect to slip
-in with an engine change.
+
+It also changes **which skill runs the work**, which an earlier draft of this section
+understated. `fan_out._drain` never uses the stage's own `instructions`: the per-task prompts
+come from `scheduler.py::_worker`, which composes `development/execute-task`. So a parallel
+BUILDING bypasses its `agent_map` entry entirely — `team/build` does not run. Both effects
+together make the opt-in a product call, not a side effect to slip in with an engine change.
 
 To opt a flow in, once its planner declares lanes and footprints:
 
@@ -1070,9 +1077,61 @@ assertion Phase C could not make — mutation-checked: it fails if the swap is r
 undeclared task keeps the drain serial, `serial`/`worktree` are obeyed/degraded, and the
 re-audit-per-round property is proven with dependents that only conflict once they become ready.
 
-**Still not done:** Phase E (retire `goal_executor._run_loop`), and the residual risk that
-`audit_lane_partition` only sees *declared* footprints — a task that writes outside its declared
-set stays invisible to it. Closing that needs `WorktreeIsolation`, still a stub.
+**Still not done:** Phase E (retire `goal_executor._run_loop` — see below for why it is not the
+deletion the plan assumed), and the residual risk that `audit_lane_partition` only sees
+*declared* footprints — a task that writes outside its declared set stays invisible to it.
+Closing that needs `WorktreeIsolation`, still a stub.
+
+## fsm-fan-out — ONE drain (`supervisor/drain.py`), and why Phase E is NOT a deletion
+
+Phase E was specified as "`_run_loop` becomes a thin alias, then is deleted; `executor: loop`
+means run the flow whose BUILDING is parallel", with the note that "E only removes code, so the
+ratchet is satisfied by construction". Investigating it found that wrong in three ways:
+
+1. **`loop` and `team` are different PRODUCTS, not two implementations of one.** `executor: loop`
+   is a flat drain: `development/execute-task` per task, no REVIEWING/TESTING/RETRO, no gates.
+   `executor: team` is the full `team-build` FSM with two `command_gate`s. Retiring `loop` into
+   `team` deletes the fast path — a user who picked `loop` for speed and cost would silently get
+   a reviewed pipeline. `'flow' | 'loop' | 'single'` is also a Studio-visible category across the
+   Monitor UI.
+2. **It depends on the flow opt-in above**, which is itself an unmade product call.
+3. **It is not deletion.** `_run_loop` owns seven things `_run_team`/`start_run` do not provide:
+   its own `board_lock` lease (what `/comms/goals/stop` releases), goal-scoped storage resolution,
+   `executor_owned_telemetry` + `write_goal_root_span` (goal=trace, task=span),
+   `_record_run_history(flow="goal-loop")` — which `run_history_read._is_parent` keys off to fold
+   `sched-*` rows into ONE run in `GET /runs` — `verify_clean_drain`, the cost-cap tracker, and
+   `terminal_reconcile`'s `"loop" if flow == "goal-loop"` Monitor bucketing. Preserving those on
+   the FSM path is substantial ADDITION.
+
+**What was done instead — the convergence without the product change.** Both drains now go
+through `supervisor/drain.py::drain_frontier`, the single `scheduler_loop` call site:
+
+| Owned by `drain_frontier` (shared) | Left with the caller (genuinely differs) |
+|---|---|
+| the `CostCapTracker` and wrapping `spawn_fn` with it — **exactly once**, so cost cannot double-count | the isolation (a stage reads its flow YAML; a goal loop picks its own) |
+| folding `tracker.exceeded()` into `abort_check`, so neither caller can forget the cap | the caller's own abort reason (FSM `_abort_flag` vs. still holding the board lock) |
+| the `scheduler_loop` call itself | the result shape (stage-merged vs. raw + `verify_clean_drain`) |
+
+`executor: loop` also now gets the **same Phase-D audit-gated isolation** an FSM fan-out stage
+gets, instead of a hardcoded `SerialIsolation()`: it drains in parallel only while the frontier's
+lane partition audits safe. On today's DAGs (no declared footprints) that is exactly the
+`SerialIsolation` it replaced, so the fast path cannot behave worse — it just gets faster once a
+planner declares lanes and footprints. The fast path is made faster rather than deleted.
+
+Paid for inside the ratchet: `goal_executor.py` was frozen at 561, so the goal-home resolution
+moved to `slug.py::resolve_goal_home` (its documented domain — "scope / slug helpers for goal +
+board addressing"), taking it to 555.
+
+`tests/dag_goals/test_drain_shared.py` pins it, including an **AST**-based check that
+`scheduler_loop` is called from `drain.py` and nowhere else in `supervisor/` — a text search
+would match this file's own ASCII diagram.
+
+**Note on CLI spawning, for anyone chasing "one chokepoint":** agent argv CONSTRUCTION is one
+place per language (`adapters.resolve_command`; and `cliEngine.ts::buildHeadlessArgv` in Studio's
+renderer). EXECUTION is three paths: the `TERMINAL_SPAWN` host contract (Studio's node-pty or
+`pty_host`), `runner/invoke.py`'s own `Popen` for `pathly-run`, and Studio's renderer one-shots.
+The supervisor side is genuinely one chokepoint; the other two are documented above and remain
+separate.
 
 ## Visible runner (supervisor/)
 

@@ -163,15 +163,13 @@ def _drain(
 ) -> dict:
     """Drain this state's ready tasks through ``scheduler_loop`` and merge the result."""
     import pathly_orchestrator.supervisor as _sup
-    from pathly_orchestrator.supervisor.cost_cap import init_cost_tracker
-    from pathly_orchestrator.supervisor.scheduler import scheduler_loop
+    from pathly_orchestrator.supervisor.drain import drain_frontier
 
     # The frontier's (board, scope) must be the SAME pair require_tasks_done counts, or the
     # fan-out and the join would disagree about which tasks belong to this stage.
     # orchestrator_stage.py posts complete_stage with board="feature", scope=topic.
     board, scope = "feature", state.topic
     goal_id = getattr(state, "goal_id", "") or None
-    tracker = init_cost_tracker()
 
     def _spawn(task_state, instructions, adapter, model, task_run_id, task_broadcast):
         # session=None: see _merge_drain_result. autonomy is threaded from the FSM stage so
@@ -188,18 +186,18 @@ def _drain(
         )
 
     def _abort_check() -> bool:
-        # The FSM's own abort, plus the goal cost cap — folded into the SAME hook
-        # scheduler_loop already polls before scheduling anything new (cost_cap.py).
-        return bool(getattr(state, "_abort_flag", False)) or tracker.exceeded()
+        # ONLY the FSM's own abort — drain_frontier folds the cost cap in, so neither
+        # caller can forget it.
+        return bool(getattr(state, "_abort_flag", False))
 
-    drained = scheduler_loop(
+    drained, tracker = drain_frontier(
         state,
         board,
         scope,
         isolation=_resolve_isolation(config, state_name, board, scope, goal_id),
-        broadcast_fn=broadcast_fn,
-        spawn_fn=tracker.wrap(_spawn),
+        spawn_fn=_spawn,
         abort_check=_abort_check,
+        broadcast_fn=broadcast_fn,
         goal_id=goal_id,
     )
     merged = _merge_drain_result(drained, tracker.total)
