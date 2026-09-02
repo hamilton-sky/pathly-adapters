@@ -1,5 +1,41 @@
 # Changelog
 
+## Unreleased
+
+### FSM — fan-out foundation: one engine, one authority (Phases A/B/C)
+
+Moves the DAG fan-out machinery INSIDE the FSM, so `scheduler_loop` stops being a rival
+engine (a peer of `orchestrator._loop`) and becomes the fan-out executor *of a state*.
+Behaviour is deliberately unchanged in this pass — Phase C pins `SerialIsolation`
+regardless of configuration, so a parallel state still drains one task at a time. Design
+and phasing: `pathly/features/fsm-fan-out/SPEC.md`.
+
+- One runner contract, shared by both prompt paths: `fsm_compose.RUNNER_CONTRACT_BLOCK`
+  is now the single definition of the "you are headless, the supervisor owns the FSM"
+  block, and `supervisor/scheduler.py`'s DAG-task prompts append it too. A loop-executor
+  task agent was previously the one headless agent never told the supervisor drives the
+  flow — under fan-out that means a double-advance or a 404 respawn loop.
+  `build_prompt`'s output is byte-identical.
+- New optional flow-YAML key `parallel_states`: a state opts into fan-out by naming
+  itself, with optional `max_workers` (positive int) and `isolation`
+  (`lane` | `serial` | `worktree`, the last still a stub). Validated in
+  `validate_flow_dict`, so `pathly-validate-flow` catches a typo'd state name or a zero
+  `max_workers` instead of it silently doing nothing. No shipped flow declares it.
+- New `supervisor/fan_out.py`: `run_stage` is the one call site for executing an FSM
+  stage — no `parallel_states` entry spawns a single agent exactly as before; an entry
+  present drains the state's ready tasks via `scheduler_loop` and returns a merged result
+  in the same shape. `fsm_state.current` stays a scalar throughout, and gates still run
+  once at the transition — that is the join.
+- New `supervisor/orchestrator_session.py`: the session-continuity block lifted out of
+  `orchestrator._loop` verbatim (same reuse predicate, same `SESSION` event). With
+  `fan_out.py` this took `orchestrator.py` 427 → 399 lines, dropping it out of
+  `scripts/file_size_baseline.txt` entirely.
+- `CostCapTracker` gained a `total` property, so a drain reports its summed cost without
+  re-summing the per-task figures the tracker already holds.
+
+Not included, and gated on a real run of the above: turning concurrency on (the
+`LaneIsolation` swap) and retiring `goal_executor._run_loop`.
+
 ## 2.20.0
 
 ### Board — project-planner (G2): spec → sibling features
