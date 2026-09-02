@@ -131,6 +131,73 @@ change review cadence, it changes **which skill runs the work**. `fan_out._drain
 stage's own `instructions`, so a parallel `BUILDING` bypasses its `agent_map` entry entirely and
 `team/build` never runs.
 
+### FSM — `executor: loop` is an FSM flow; the second engine is retired (Phase E)
+
+`executor: loop` no longer bypasses the FSM. It used to build its own `RunnerState` and drive
+`scheduler_loop` top-level, as a peer of `orchestrator._loop` — the last rival engine the
+fan-out feature exists to remove. It now runs a new packaged flow, **`goal-loop`**, whose
+single `DRAINING` state declares `parallel_states`, so the same scheduler drains the same
+frontier as the executor *of a state*.
+
+**The product is unchanged.** Phase E was scoped as "`executor: loop` means run the flow whose
+BUILDING is parallel" — i.e. `team-build`. That would have handed a user who picked `loop` for
+speed a fully reviewed pipeline, because `loop` is a FLAT drain (`development/execute-task` per
+task, no REVIEWING/TESTING/RETRO between tasks) and `team-build` is not. So `loop` got its own
+one-state flow instead of someone else's. It is the ENGINE that was retired, not the fast path.
+
+What a goal run gains, all of it from the DB being the authority — the same list the reverted
+compiled executor was argued on:
+
+- a `fsm_state` row, so `pathly-status` and the `STATE.json` export can see the run;
+- a `STATE_TRANSITION` audit trail;
+- park/resume on a human checkpoint;
+- the escalation ladder (rounds 1-2 builder → round 3 planner → round 4+ human);
+- the two verify commands as **routed** gates. `goal_verify.verify_clean_drain` ran the same
+  `verify.build` / `verify.test` after a clean drain, but could only post a board escalation and
+  stop; a `command_gate` failure re-drives a fix through `feedback_routing`.
+
+The flow NAME is load-bearing, not cosmetic: `run_history` classifies a bare-uuid run whose
+adapter column is `"goal-loop"` as a loop PARENT, and `start_run` writes `state.flow` there — so
+a loop still shows as ONE run in `GET /runs` with its per-task `sched-*` rows folded in, and the
+Monitor still buckets it as `loop`.
+
+### Two prerequisite bugs Phase E would otherwise have shipped on top of
+
+Both were found by checking the plan's assumptions against the code rather than taking them, and
+either one alone makes Phase E a silent no-op:
+
+- **The fan-out drained the wrong scope for a goal run.** `fan_out._drain` resolved the frontier
+  from `state.topic`. For a plain feature pipeline the topic IS the board scope, so this was
+  invisible — but a goal run's topic is its own storage slug (`features/<feature>/goals/<slug>`)
+  while its tasks live on the parent board, and `get_ready_tasks` ANDs `scope IN (…)` with
+  `goal_id`. Measured: **0 ready tasks found against 3 for the same goal.** Every goal run through
+  a parallel flow would have "drained" nothing and advanced. The frontier now resolves through the
+  same board-scope derivation the spawn chokepoint stamps telemetry with, and degrades to the
+  topic. The join still agrees — `require_tasks_done` counts by `goal_id` when a run has one.
+- **A DAG task's prompt was never placeholder-substituted.** `scheduler._worker` composed
+  `development/execute-task` and stopped there, so `completion-report` reached the agent still
+  telling it to key its `AGENT_DONE` on the literal string `<fsm_feature>` — a mis-keyed event,
+  no projected invocation, the task unbilled and absent from the Monitor. This is the same defect
+  `board_run._inject_board_prompt_vars` fixed for board runs and nothing had fixed on the DAG
+  path; it was masked while the loop owned its own telemetry and wrote a synthetic `AGENT_DONE`.
+  Prompt assembly moved to `supervisor/task_prompt.py`, which substitutes through the same
+  injector the FSM and board paths use and stamps `run_category="loop"`.
+
+### Fixed — stopping a goal run reported success while the run kept going
+
+`POST /comms/goals/stop`'s FSM branch looked the run up by board scope, but a goal's FSM run is
+registered under its board-nested topic — so the lookup found nothing and the route answered
+`not_running` without stopping anything. This already affected `executor: team`; it would have
+made a Phase-E `loop` run unstoppable. Runs are now resolved by their own `goal_id`, which is
+correct whatever flow they run, with the scope lookup kept as the fallback for a non-goal run.
+
+### Changed — a `loop` goal no longer writes an OTel goal root span
+
+`write_goal_root_span` belonged to the retired engine. Per-task spans are still written, by the
+FSM's own telemetry writer; what is lost is the labelled `goal:<id>` trace root, which
+`executor: team` has never had either. The helper's own docstring calls this "no labelled root",
+not lost spans.
+
 ## 2.20.0
 
 ### Board — project-planner (G2): spec → sibling features

@@ -230,18 +230,16 @@ def comms_goals_stop():
             stopped = True
             how = "board_run"
         else:
-            from pathly_orchestrator.supervisor.registry import get_state
+            from pathly_orchestrator.supervisor import registry as _reg
 
-            st = get_state(scope)
-            if st is not None and st.status in (
-                "running",
-                "paused",
-                "awaiting_decision",
-            ):
+            # By GOAL, not by scope: a goal's FSM run is registered under its own
+            # board-nested topic (features/<f>/goals/<slug>), so a scope lookup misses it.
+            topic, st = _reg.find_active_run_for_goal(goal_id, scope)
+            if st is not None and st.status in _reg.ACTIVE_STATUSES:
                 from pathly_orchestrator.supervisor.api import abort_run
 
                 # announced=True: this route posts "stopped" itself — no double-announce.
-                abort_run(scope, announced=True)
+                abort_run(topic, announced=True)
                 stopped = True
                 how = "fsm"
 

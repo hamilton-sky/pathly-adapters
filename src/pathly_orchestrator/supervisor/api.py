@@ -24,6 +24,7 @@ def start_run(
     goal_id: str = "",
     on_done: Optional[Callable] = None,
     stage_overrides: Optional[dict] = None,
+    event_broadcast_fn: Optional[Callable] = None,
 ) -> RunnerState:
     """Start a new supervised run for *topic*.  Raises ValueError if already active.
 
@@ -36,6 +37,10 @@ def start_run(
     stage_overrides: transient, per-run {state: prompt} map from the flow gate preview
         (already validated by the caller). Lives only on the returned RunnerState — never
         persisted. See fsm_compose.build_prompt(stage_override=...).
+    event_broadcast_fn: the COMMS broadcaster, ``fn(scope, payload)``. A fan-out state emits
+        per-task task_claimed/task_done COMMS_UPDATEs through it, which is how the board and
+        Studio's toasts see progress inside one stage. Best-effort: without one those events
+        are simply not sent.
     """
     import uuid as _uuid
 
@@ -60,6 +65,7 @@ def start_run(
             interactive=interactive,
             goal_id=goal_id,
             stage_overrides=stage_overrides or {},
+            _comms_broadcast_fn=event_broadcast_fn,
         )
         state.trace_id = secrets.token_hex(16)
         _registry[topic] = state

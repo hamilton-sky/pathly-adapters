@@ -106,6 +106,36 @@ def get_state(topic: str) -> Optional[RunnerState]:
         return _registry.get(topic)
 
 
+#: Statuses a run can still be stopped from; a finished run has nothing to abort.
+ACTIVE_STATUSES = ("running", "paused", "awaiting_decision")
+
+
+def find_active_run_for_goal(goal_id: str, fallback_topic: str = ""):
+    """``(topic, state)`` of the live FSM run for *goal_id*, else ``(fallback_topic, None)``.
+
+    A goal's FSM run is NOT registered under the board scope: its topic is the run's own
+    board-nested storage slug (``features/<feature>/goals/<slug>``, from ``board_run_topic``),
+    because two goals on one board must not share a storage home. So looking a goal run up by
+    scope — which ``/comms/goals/stop`` did — silently found nothing and reported the run as
+    not running.
+
+    That was survivable while the only FSM-driven goal executor was ``team`` (a rarely-stopped
+    path) and ``loop``/``single`` were stopped through the board lock instead. Phase E made
+    ``executor: loop`` an FSM run too, so without this a loop run would be unstoppable.
+
+    Matching on ``goal_id`` rather than reconstructing the topic keeps this correct whatever
+    flow the goal runs and whatever storage kind that flow maps to — the run itself carries
+    the only fact that matters. ``fallback_topic`` preserves the old scope-keyed lookup for a
+    caller that has no goal (and for a legacy run registered under its bare scope).
+    """
+    with _lock:
+        if goal_id:
+            for topic, state in _registry.items():
+                if state.goal_id == goal_id and state.status in ACTIVE_STATUSES:
+                    return topic, state
+        return fallback_topic, _registry.get(fallback_topic)
+
+
 def recover_stale_mirrors(project_root: str) -> None:
     """On server startup, mark any runner_state rows left as 'running' → 'error'.
 

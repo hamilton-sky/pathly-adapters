@@ -1,0 +1,108 @@
+# `executor: loop`, expressed as an FSM flow (fsm-fan-out Phase E).
+#
+# This flow IS the loop executor. Before Phase E, `executor: loop` bypassed the FSM
+# entirely: `goal_executor._run_loop` drove `scheduler_loop` itself, as a peer of
+# `orchestrator._loop`. That second engine is what the whole fan-out feature exists to
+# remove — a run with no `fsm_state` row is invisible to `pathly-status`, has no
+# STATE_TRANSITION audit trail, cannot park/resume, and silently disables the escalation
+# ladder (the exact list of costs that got the compiled executor reverted).
+#
+# The PRODUCT is deliberately unchanged. `loop` is not `team`: it is a FLAT drain —
+# `development/execute-task` per task, no REVIEWING/TESTING/RETRO round-trip between
+# tasks — and retiring it INTO `team-build` would have silently handed a user who chose
+# `loop` for speed a fully reviewed pipeline. So `loop` keeps its own flow with one
+# working state, and gets the FSM's bookkeeping for free.
+#
+# DRAINING is a fan-out state: `parallel_states` makes `orchestrator._loop` hand it to
+# `supervisor/fan_out.py`, which drains the goal's ready frontier through the SAME
+# `scheduler_loop` — now as the executor OF a state rather than a rival engine.
+# `fsm_state.current` stays the scalar "DRAINING" for the whole drain.
+version: 1
+flow: goal-loop
+storage_path: pathly/{topic}/
+
+states:
+  - DRAINING
+  - DONE
+
+transitions:
+  DRAINING:
+    - DONE
+  DONE: []
+
+# The fan-out. `isolation: lane` resolves to AuditedLaneIsolation (Phase D): real lane
+# parallelism, but only while the frontier's lane partition actually audits safe, re-checked
+# every scheduling round. On a DAG whose tasks declare no file footprints — every DAG today
+# — that audits unsafe and the drain stays serial, which is exactly what `_run_loop` did.
+# So this cannot behave worse than the engine it replaces; it gets faster once a planner
+# declares lanes and footprints.
+parallel_states:
+  DRAINING:
+    isolation: lane
+
+# `fan_out._drain` never uses the stage's own `instructions` — each task's prompt is built
+# per task by `supervisor/task_prompt.py` (the composed `development/execute-task`). These
+# entries name the role that actually runs the work rather than leaving the stage unmapped:
+# `/next_action` still needs an agent for the state, and a wrong name here would be a lie in
+# every telemetry row.
+agent_map:
+  DRAINING: development/execute-task
+
+role_map:
+  DRAINING: builder
+
+adapter_map:
+  DRAINING: claude
+  default: claude
+
+# The JOIN, run once after every worker finished — this is what the fan-out buys.
+#
+#   require_tasks_done  the frontier really drained (goal-scoped: it counts THIS goal's
+#                       tasks, so a sibling goal on the same board can't block it).
+#   command_gate build  ─┐ what `goal_verify.verify_clean_drain` used to run by hand after
+#   command_gate test   ─┘ the drain, now as ordinary FSM gates. Same two commands, same
+#                          fail-open-when-unconfigured contract — but a failure is now
+#                          ROUTED (feedback_routing below re-drives a fix) instead of only
+#                          posting a board escalation and stopping.
+gates:
+  DRAINING->DONE:
+    - type: require_tasks_done
+      on_fail: INCOMPLETE_TASKS.md
+    - type: command_gate
+      command_key: build
+      on_fail: BUILD_FAILURES.md
+    - type: command_gate
+      command_key: test
+      on_fail: TEST_FAILURES.md
+
+feedback_priority:
+  - HUMAN_QUESTIONS
+  - BLOCKED_ON_HUMAN
+  - INCOMPLETE_TASKS
+  - BUILD_FAILURES
+  - TEST_FAILURES
+
+# Every file this flow can PRODUCE is routed. An unrouted feedback file falls through
+# `route_feedback`'s catch-all to `human`, which stalls a headless run on a person for a
+# failure the builder could have fixed (see the feedback-file reachability notes in
+# src/pathly_orchestrator/CLAUDE.md).
+feedback_routing:
+  BLOCKED_ON_HUMAN: human
+  BUILD_FAILURES: builder
+  HUMAN_QUESTIONS: human
+  INCOMPLETE_TASKS: builder
+  TEST_FAILURES: builder
+
+# 3-tier ladder: rounds 1-2 the builder, round 3 an upstream specialist, round 4+ human.
+# A drain that keeps failing its verify is more likely a bad DECOMPOSITION than bad code,
+# so round 3 goes to the planner — the role that cut the task-DAG. Without this the flow
+# would route a persistent failure back to `builder` forever with no human backstop.
+escalation_routing:
+  BUILD_FAILURES: planner
+  INCOMPLETE_TASKS: planner
+  TEST_FAILURES: planner
+
+# Every other flow archives on its terminal transition; a goal drain is no different.
+transition_actions:
+  DRAINING->DONE:
+    - skill: archive-artifacts

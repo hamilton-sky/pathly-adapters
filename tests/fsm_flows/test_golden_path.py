@@ -7,10 +7,20 @@ but NOTHING drove `goal -> executor dispatch -> scheduler drain -> DONE` as one 
 is exactly the class of place the historical next_state contract bug hid (mocks on BOTH sides of
 the FSM<->driver boundary shipped GREEN while the real loop stopped after one step).
 
-These tests drive the REAL `start_goal_run -> _run_loop -> scheduler_loop` against the REAL DB and
-REAL SerialIsolation. Only the CLI spawn (`spawn_fn`) is stubbed, so every task makes REAL
-`pending -> in_progress -> done` transitions and real dependency/fail-cascade decisions. `block=True`
-runs the drain synchronously in the test thread — no thread-join races.
+These tests drive the REAL drain against the REAL DB and the REAL packaged flow. Only the CLI
+spawn is stubbed, so every task makes REAL `pending -> in_progress -> done` transitions and real
+dependency/fail-cascade decisions, synchronously in the test thread — no thread-join races.
+
+**Where the drain lives changed in fsm-fan-out Phase E, and these tests followed it.** The chain
+used to be `start_goal_run -> _run_loop -> scheduler_loop`, with `_run_loop` a second ENGINE
+running as a peer of `orchestrator._loop`. That engine is retired: `executor: loop` now launches
+the `goal-loop` FSM flow, whose single DRAINING state declares `parallel_states`, so the drain is
+performed by `fan_out.run_stage` INSIDE an FSM stage. So these drive `run_stage` with the real
+`goal-loop` YAML and a real goal-scoped RunnerState — one layer down from `start_goal_run`, which
+is now a launcher and is covered as such in tests/comms_board/test_comms_goals_run.py.
+
+Driving it goal-scoped is deliberate: it is the shape that catches the frontier bug Phase E had to
+fix first (a goal run's FSM topic is its own storage slug, not the board scope its tasks live on).
 """
 
 from __future__ import annotations
@@ -67,12 +77,60 @@ def _status(conn, mid: str) -> str | None:
     return r["task_status"] if r else None
 
 
-def test_goal_loop_drains_dag_to_done(tmp_path):
+def _drain_goal(
+    gid: str,
+    scope: str,
+    tmp_path,
+    monkeypatch,
+    spawn,
+    *,
+    event_broadcast_fn=None,
+) -> dict:
+    """Drain *gid*'s DAG through the REAL goal-loop flow. Returns the drain tally.
+
+    Exactly what `executor: loop` does at runtime, minus the FSM round-trip that decides WHEN
+    to run this stage: the real packaged YAML, the real isolation it resolves to, the real
+    scheduler, the real DB. `_run_stage_via_terminal` is the one thing stubbed — it is the CLI
+    spawn — patched on the `supervisor` package because `fan_out._drain` calls it from there.
+    """
+    import pathly_orchestrator.supervisor as _sup
+    from pathly_orchestrator.supervisor import fan_out
+    from pathly_orchestrator.supervisor.goal_decomposer import board_run_topic
+    from pathly_orchestrator.supervisor.goal_executor import _LOOP_FLOW
+    from pathly_orchestrator.supervisor.state import RunnerState
+
+    def _fake(state, instructions, adapter, model, run_id, broadcast_fn, **_kw):
+        return spawn(state, instructions, adapter, model, run_id, broadcast_fn)
+
+    monkeypatch.setattr(_sup, "_run_stage_via_terminal", _fake)
+
+    # The goal run's real shape: an FSM topic that is the goal's own nested storage slug,
+    # NOT the board scope — so the frontier has to resolve the board scope from goal_id.
+    state = RunnerState(
+        topic=board_run_topic("feature", scope, "goals", f"{gid[:8]}-goal"),
+        flow=_LOOP_FLOW,
+        project_root=str(tmp_path),
+        model="claude-sonnet-4-6",
+        timeout=600,
+        goal_id=gid,
+        interactive=False,
+        _comms_broadcast_fn=event_broadcast_fn,
+    )
+    flow_config = fan_out.load_flow_config(_LOOP_FLOW, str(tmp_path))
+    assert flow_config, "the packaged goal-loop flow must load"
+
+    merged = fan_out.run_stage(
+        state, flow_config, "DRAINING", "unused", "claude", "m", "run-1", None
+    )
+    assert merged["result"]["fan_out"] is True, "the stage must take the fan-out branch"
+    return merged["result"]
+
+
+def test_goal_loop_drains_dag_to_done(tmp_path, monkeypatch):
     """GOLDEN PATH: a goal + a 3-task DAG (B depends on A; C independent) drains to DONE through
     the REAL loop executor. Assert every task reaches 'done' via real claim->complete, the
     scheduler's own tally agrees, and the dependency is respected (A runs before B)."""
     from pathly_orchestrator.db.connection import get_db
-    from pathly_orchestrator.supervisor.goal_executor import start_goal_run
 
     conn = get_db()
     scope = "golden-path-drain"
@@ -89,18 +147,7 @@ def test_goal_loop_drains_dag_to_done(tmp_path):
         spawn_order.append(instructions)
         return {"cost_usd": 0.0, "session_id": f"sess-{len(spawn_order)}"}
 
-    result = start_goal_run(
-        gid,
-        executor_override="loop",
-        project_root=str(tmp_path),
-        spawn_fn=fake_spawn,
-        block=True,
-    )
-
-    assert result["ok"] is True, result
-    inner = result[
-        "result"
-    ]  # _work() dict: completed/failed/blocked + executor/goal_id/run_id
+    inner = _drain_goal(gid, scope, tmp_path, monkeypatch, fake_spawn)
     assert set(inner["completed"]) == {a, b, c}, inner
     assert inner["failed"] == []
     assert inner["blocked"] == []
@@ -119,13 +166,12 @@ def test_goal_loop_drains_dag_to_done(tmp_path):
     ), "BETA (depends on ALPHA) must not be dispatched before ALPHA"
 
 
-def test_goal_loop_cascades_block_on_failure(tmp_path):
+def test_goal_loop_cascades_block_on_failure(tmp_path, monkeypatch):
     """FAIL PATH through the REAL executor: a task whose spawn RAISES fails, and its dependent
     cascades to 'blocked'; an independent task still completes. Exercises fail_task via the real
     loop, not just the DB query — so a broken agent halts its branch, loudly, not silently.
     """
     from pathly_orchestrator.db.connection import get_db
-    from pathly_orchestrator.supervisor.goal_executor import start_goal_run
 
     conn = get_db()
     scope = "golden-path-fail"
@@ -150,16 +196,7 @@ def test_goal_loop_cascades_block_on_failure(tmp_path):
             raise RuntimeError("simulated agent crash")
         return {"cost_usd": 0.0, "session_id": "sess"}
 
-    result = start_goal_run(
-        gid,
-        executor_override="loop",
-        project_root=str(tmp_path),
-        spawn_fn=failing_spawn,
-        block=True,
-    )
-
-    assert result["ok"] is True, result
-    inner = result["result"]
+    inner = _drain_goal(gid, scope, tmp_path, monkeypatch, failing_spawn)
     assert a in inner["failed"]
     assert b in inner["blocked"]
 
@@ -168,13 +205,12 @@ def test_goal_loop_cascades_block_on_failure(tmp_path):
     assert _status(conn, c) == "done"  # independent branch still drains
 
 
-def test_goal_loop_fails_task_on_failure_outcome(tmp_path):
+def test_goal_loop_fails_task_on_failure_outcome(tmp_path, monkeypatch):
     """SILENT-FAILURE GUARD #2: a spawn that returns NORMALLY but whose outcome signals failure
     (explicit error / non-zero exit / outcome='failed') must mark the task FAILED — not 'done' just
     because the process didn't raise. A clean process exit over broken work is the exact hole.
     """
     from pathly_orchestrator.db.connection import get_db
-    from pathly_orchestrator.supervisor.goal_executor import start_goal_run
 
     conn = get_db()
     scope = "golden-path-fail-outcome"
@@ -195,16 +231,8 @@ def test_goal_loop_fails_task_on_failure_outcome(tmp_path):
             return {"outcome": "failed", "error": "clean exit but the work failed"}
         return {"cost_usd": 0.0}
 
-    result = start_goal_run(
-        gid,
-        executor_override="loop",
-        project_root=str(tmp_path),
-        spawn_fn=outcome_fail_spawn,
-        block=True,
-    )
-
-    assert result["ok"] is True, result
-    assert a in result["result"]["failed"]
+    inner = _drain_goal(gid, scope, tmp_path, monkeypatch, outcome_fail_spawn)
+    assert a in inner["failed"]
     assert (
         _status(conn, a) == "failed"
     )  # failed via the OUTCOME, not a raised exception
@@ -212,13 +240,12 @@ def test_goal_loop_fails_task_on_failure_outcome(tmp_path):
     assert _status(conn, c) == "done"  # independent branch still drains
 
 
-def test_goal_loop_surfaces_deadlocked_dag(tmp_path):
+def test_goal_loop_surfaces_deadlocked_dag(tmp_path, monkeypatch):
     """SILENT-FAILURE GUARD: a task with an unsatisfiable dependency — a dangling ref or a cycle —
     never becomes ready, so the frontier drains leaving it pending forever. The executor must
     SURFACE that as deadlocked/blocked, not return a clean-looking result that hides stuck work.
     """
     from pathly_orchestrator.db.connection import get_db
-    from pathly_orchestrator.supervisor.goal_executor import start_goal_run
 
     conn = get_db()
     scope = "golden-path-deadlock"
@@ -231,16 +258,7 @@ def test_goal_loop_surfaces_deadlocked_dag(tmp_path):
     )
     conn.commit()
 
-    result = start_goal_run(
-        gid,
-        executor_override="loop",
-        project_root=str(tmp_path),
-        spawn_fn=lambda *_a: {},
-        block=True,
-    )
-
-    assert result["ok"] is True, result
-    inner = result["result"]
+    inner = _drain_goal(gid, scope, tmp_path, monkeypatch, lambda *_a: {})
     assert _status(conn, ok) == "done"  # the healthy task still drains
     # The two unsatisfiable tasks are surfaced, not silently left pending.
     assert set(inner.get("deadlocked", [])) == {dangle, cyc}, inner
@@ -248,7 +266,7 @@ def test_goal_loop_surfaces_deadlocked_dag(tmp_path):
     assert _status(conn, cyc) == "blocked"
 
 
-def test_goal_loop_spawns_headless_not_interactive(tmp_path):
+def test_goal_loop_spawns_headless_not_interactive(tmp_path, monkeypatch):
     """The loop executor must spawn HEADLESS one-shots (interactive=False), like every other goal
     executor (_run_team goal_executor.py, _decompose_consultation goal_decomposer.py). Its RunnerState
     was built WITHOUT interactive=, so it defaulted to True (state.py) — which makes
@@ -258,7 +276,6 @@ def test_goal_loop_spawns_headless_not_interactive(tmp_path):
     blocked. Assert the executor hands the spawn a headless state so the real one-shot argv carries the
     prompt."""
     from pathly_orchestrator.db.connection import get_db
-    from pathly_orchestrator.supervisor.goal_executor import start_goal_run
 
     conn = get_db()
     scope = "loop-headless"
@@ -271,22 +288,15 @@ def test_goal_loop_spawns_headless_not_interactive(tmp_path):
         seen["interactive"] = state.interactive
         return {"cost_usd": 0.0}
 
-    result = start_goal_run(
-        gid,
-        executor_override="loop",
-        project_root=str(tmp_path),
-        spawn_fn=capture_spawn,
-        block=True,
-    )
+    _drain_goal(gid, scope, tmp_path, monkeypatch, capture_spawn)
 
-    assert result["ok"] is True, result
     assert seen.get("interactive") is False, (
         "loop executor must spawn headless one-shots (interactive=False), not an interactive REPL "
         "whose argv omits the task prompt"
     )
 
 
-def test_goal_loop_posts_supervisor_progress(tmp_path):
+def test_goal_loop_posts_supervisor_progress(tmp_path, monkeypatch):
     """The loop SUPERVISOR posts a guaranteed start / done status per task to the board.
 
     Per-task progress is guaranteed SERVER-SIDE, never left to the agent: the supervisor owns
@@ -295,7 +305,6 @@ def test_goal_loop_posts_supervisor_progress(tmp_path):
     what a live run exposed. (The single executor gets the equivalent via the /comms/tasks handlers.)
     """
     from pathly_orchestrator.db.connection import get_db
-    from pathly_orchestrator.supervisor.goal_executor import start_goal_run
 
     conn = get_db()
     scope = "loop-progress"
@@ -303,14 +312,7 @@ def test_goal_loop_posts_supervisor_progress(tmp_path):
     a = _seed_task(conn, scope, gid, "task ALPHA")
     _seed_task(conn, scope, gid, "task BETA", depends_on=[a])
 
-    result = start_goal_run(
-        gid,
-        executor_override="loop",
-        project_root=str(tmp_path),
-        spawn_fn=lambda *_a: {"cost_usd": 0.0},
-        block=True,
-    )
-    assert result["ok"] is True, result
+    _drain_goal(gid, scope, tmp_path, monkeypatch, lambda *_a: {"cost_usd": 0.0})
 
     rows = conn.execute(
         "SELECT text FROM comms_messages WHERE scope=? AND type='status' AND from_agent='supervisor' "
@@ -326,12 +328,11 @@ def test_goal_loop_posts_supervisor_progress(tmp_path):
     ), f"expected >=4 supervisor progress posts, got {len(rows)}: {texts}"
 
 
-def test_goal_loop_broadcast_task_done_carries_text(tmp_path):
+def test_goal_loop_broadcast_task_done_carries_text(tmp_path, monkeypatch):
     """The loop's task_done/task_failed SSE events must carry the task TEXT, so Studio can toast a
     meaningful label instead of a bare id. The renderer's task-completion toast reads `data.text`.
     """
     from pathly_orchestrator.db.connection import get_db
-    from pathly_orchestrator.supervisor.goal_executor import start_goal_run
 
     conn = get_db()
     scope = "loop-bcast"
@@ -343,15 +344,14 @@ def test_goal_loop_broadcast_task_done_carries_text(tmp_path):
     def rec(_scope, payload):
         events.append(payload)
 
-    result = start_goal_run(
+    _drain_goal(
         gid,
-        executor_override="loop",
-        project_root=str(tmp_path),
-        spawn_fn=lambda *_a: {"cost_usd": 0.0},
+        scope,
+        tmp_path,
+        monkeypatch,
+        lambda *_a: {"cost_usd": 0.0},
         event_broadcast_fn=rec,
-        block=True,
     )
-    assert result["ok"] is True, result
     done = [e for e in events if e.get("event") == "task_done"]
     assert done, f"no task_done event broadcast: {events}"
     assert "task ALPHA" in (done[0].get("text") or ""), done[0]

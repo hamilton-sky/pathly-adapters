@@ -362,11 +362,14 @@ def test_workers_get_the_stages_autonomy_and_no_session(monkeypatch):
 # ── Production is provably unchanged ─────────────────────────────────────────
 
 
-def test_no_packaged_flow_declares_parallel_states():
-    """Phase C changes the ENGINE, not any flow — so no run can take the fan-out branch.
+def test_goal_loop_is_the_one_packaged_state_that_takes_the_fan_out_branch():
+    """Which STATES can fan out, asked of the branch itself rather than of the YAML key.
 
-    This is what makes "behaviour is byte-identical" a fact rather than a claim; the
-    first flow to opt in is Phase D's, deliberately and with measurement behind it.
+    Phases B-D shipped the engine with nothing opted in, so production behaviour could not
+    change. Phase E adds exactly one opt-in — `goal-loop`'s DRAINING, which IS the
+    `executor: loop` product. Driving `parallel_config` (the predicate `_loop` actually
+    branches on) rather than reading the key means a flow that opts in through a malformed
+    or bodiless entry is caught here too.
     """
     import yaml
 
@@ -374,11 +377,15 @@ def test_no_packaged_flow_declares_parallel_states():
 
     flow_dir = SRC / "pathly_data" / "core" / "flows"
     flows = sorted(flow_dir.glob("*.flow.yaml"))
-    assert len(flows) == 9, "guard against this check silently finding nothing"
+    assert len(flows) == 10, "guard against this check silently finding nothing"
+
+    parallel = []
     for path in flows:
         flow = yaml.safe_load(path.read_text(encoding="utf-8"))
         for state_name in flow.get("states") or []:
-            assert fan_out.parallel_config(flow, state_name) is None, path.name
+            if fan_out.parallel_config(flow, state_name) is not None:
+                parallel.append((path.name, state_name))
+    assert parallel == [("goal-loop.flow.yaml", "DRAINING")]
 
 
 def test_load_flow_config_degrades_to_the_single_spawn_path():
@@ -556,18 +563,3 @@ def test_the_audit_is_re_run_every_round_not_once(monkeypatch):
         "the conflicting dependents became ready only AFTER the first task finished — "
         "catching them requires re-auditing each round"
     )
-
-
-def test_no_packaged_flow_opts_into_parallelism_yet():
-    """Phase D ships the ENGINE. No shipped flow declares `parallel_states`, so production
-    behaviour is still unchanged — opting a flow in is a separate, deliberate decision.
-    """
-    import yaml
-
-    from tests._paths import SRC
-
-    flows = sorted((SRC / "pathly_data" / "core" / "flows").glob("*.flow.yaml"))
-    assert len(flows) == 9
-    for path in flows:
-        flow = yaml.safe_load(path.read_text(encoding="utf-8"))
-        assert "parallel_states" not in flow, path.name

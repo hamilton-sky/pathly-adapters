@@ -53,6 +53,10 @@ core/
                   explore.flow.yaml      exploration flow
                   test.flow.yaml         test-only flow
                   quick-fix.flow.yaml    nano/lite fast path
+                  goal-loop.flow.yaml    the goal `loop` executor (fsm-fan-out Phase E): ONE
+                                         DRAINING state with `parallel_states`, so the FSM
+                                         drains the goal's task-DAG. Flat by design — no
+                                         REVIEWING/TESTING, unlike team-build
 
   design/       UI/UX design subsystem — powers `pathly-design` command:
                   data/   colors.csv, google-fonts.csv, styles.csv, typography.csv,
