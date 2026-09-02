@@ -325,7 +325,12 @@ pathly_orchestrator/
     scheduler.py           # DAG frontier loop (scheduler_loop): event-driven, blocks on completion_q;
                            #   at most one worker per lane; goal_id= scopes the frontier to one goal's tasks
     isolation.py           # lane / serial isolation strategies for the frontier loop
-    file_claims.py         # per-file claim tracking so parallel tasks don't collide on writes
+    file_claims.py         # CROSS-FEATURE file-claim registry (feature A vs feature B) —
+                           #   wired in goal_executor only; scheduler_loop never calls it, so it
+                           #   says nothing about two TASKS inside one drain. See lane_partition.
+    lane_partition.py      # audit_lane_partition — checks the "disjoint files per lane"
+                           #   assumption LaneIsolation rests on: undeclared footprints and
+                           #   cross-lane overlaps. The predicate Phase D gates activation on.
     artifact_reconcile.py  # after a stage/goal run: attach the stage's declared <out_path>
                            #   (resolved from the FSM's own manifest via fsm_compose.resolve_stage_out_path,
                            #   passed as out_path — state-one-authority: NO ARTIFACTS.jsonl ledger) AND
@@ -957,6 +962,58 @@ and abort mid-drain.
 
 **Not done, and gated on a real Phase-C run:** Phase D (swap `LaneIsolation`, honour
 `max_workers`, opt ONE flow in, measure) and Phase E (retire `goal_executor._run_loop`).
+
+## fsm-fan-out C.5 — `lane` and `files` had NO write path (Phase D was not one line)
+
+Phase D was specified as a one-line isolation swap. Checking its stated precondition —
+*"tasks in the target flow declare accurate file footprints"* — found the precondition
+**unsatisfiable**, and the reason is worth keeping:
+
+| Column | Schema | Writer, before C.5 |
+|---|---|---|
+| `comms_messages.lane` | `migrations_incremental.py` | **none anywhere** — `post_message` did not even accept it |
+| `comms_messages.files` | `migrations_incremental.py` | `post_message` accepted it, but `/comms/post` — an agent's ONLY write path — never forwarded it, and no skill emitted it |
+
+So every task reached the scheduler with `lane=NULL, files=NULL`, and `scheduler.py`'s
+`lane = task.get("lane") or task_id` fallback gave **every task its own lane**. That makes
+`LaneIsolation.max_concurrency = max(1, len(ready_lanes))` equal to *the number of ready
+tasks*: the swap would have started N agents at once, on one shared working tree, with the
+one-worker-per-lane rule vacuously satisfied and nothing checking footprints. Measured on a
+6-task DAG posted the way agents actually post: `SerialIsolation -> 1`, `LaneIsolation -> 6`.
+
+**`file_claims.py` does not cover this.** It is wired ONLY in `goal_executor.py`, at the
+**cross-FEATURE** level (whole feature A vs whole feature B, its own docstring: *"gates
+concurrent feature builds"*). `scheduler_loop` never calls it, so it says nothing about two
+TASKS inside one drain. The fan-out SPEC's audit table lists the file-collision guard as
+"built", which is true of the module and misleading about task-level parallelism.
+
+**What C.5 adds**, so that D can be the swap it was meant to be:
+
+- `post_message(..., lane=…)` and `POST /comms/post` forwarding **both** `lane` and `files`
+  (validated: `lane` a non-empty string, `files` a list of strings; omitting either stays
+  valid, so every existing caller is unaffected).
+- `fragments/task-dag-post.md` teaches the planner to declare them, with the rule that makes
+  them safe: **same files ⇒ same lane; disjoint files ⇒ different lanes**, and omitting them
+  is safe (undeclared ⇒ treated as touching everything ⇒ serial). The fragment is
+  `requires: goal_id`-gated, so it reaches the planner exactly when it seeds a DAG — and the
+  `planning/plan` golden snapshot, which composes without a goal_id, does not move.
+- `supervisor/lane_partition.py::audit_lane_partition(conn, board, scope, goal_id)` — checks
+  the disjoint-files-per-lane assumption instead of trusting it. Two distinct failures:
+  **undeclared** (a ready task with no `files` — the `file_claims` WILDCARD, overlaps
+  everything) and **conflicts** (two ready tasks in DIFFERENT lanes whose footprints overlap,
+  reusing `file_claims.overlaps` so directory containment counts). `safe` is the predicate
+  Phase D gates activation on. Audits the READY frontier only — a task still behind
+  `depends_on` cannot run concurrently, so counting it would report conflicts the DAG already
+  prevents. Read-only, never raises.
+
+Shipped inside the ratchet: `comms_messages.py` was frozen at 405, so the four goal-message
+field accessors moved to `db/queries/comms_goal_fields.py` (re-exported, no call site moved),
+taking it to 360 — out of `file_size_baseline.txt` entirely — which is what paid for the
+`lane` parameter.
+
+**Phase D is still not done.** C.5 makes its precondition *reachable*, not *met*: a DAG is
+only safe to parallelise once its planner actually declares lanes and footprints, which
+`audit_lane_partition` is how you check rather than assume.
 
 ## Visible runner (supervisor/)
 

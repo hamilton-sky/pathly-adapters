@@ -113,6 +113,15 @@ def comms_post():
         stage = data.get("stage")
         conv = data.get("conv")
         depends_on = data.get("depends_on")
+        # Scheduler partition + footprint (fsm-fan-out C.5). `lane` is the unit the DAG
+        # scheduler serialises on — at most one worker per lane at a time — and `files`
+        # is the footprint that makes a lane assignment checkable rather than trusted.
+        # Both were columns with NO write path: post_message never accepted `lane`, and
+        # this route never forwarded `files`, so every task reached the scheduler with
+        # lane=NULL — falling back to `lane or task_id`, i.e. one lane per task, which
+        # makes the one-worker-per-lane rule vacuous the moment isolation goes parallel.
+        lane = data.get("lane")
+        files = data.get("files")
         goal_id = data.get("goal_id")
         executor = data.get("executor")
         # run_id correlates this post to a run so RunDetail's Board tab shows it exactly (and — via
@@ -147,6 +156,18 @@ def comms_post():
                 jsonify(
                     {"error": "Field 'depends_on' must be a list of strings or null"}
                 ),
+                400,
+            )
+        if lane is not None and (not isinstance(lane, str) or not lane.strip()):
+            return (
+                jsonify({"error": "Field 'lane' must be a non-empty string or null"}),
+                400,
+            )
+        if files is not None and (
+            not isinstance(files, list) or not all(isinstance(f, str) for f in files)
+        ):
+            return (
+                jsonify({"error": "Field 'files' must be a list of strings or null"}),
                 400,
             )
         if goal_id is not None and not isinstance(goal_id, str):
@@ -268,6 +289,8 @@ def comms_post():
             goal_id=goal_id,
             executor=executor,
             run_id=run_id,
+            lane=lane.strip() if isinstance(lane, str) else None,
+            files=files,
             context_refs=context_refs,
             slug=slug if isinstance(slug, str) and slug.strip() else None,
         )
