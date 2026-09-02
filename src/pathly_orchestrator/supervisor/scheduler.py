@@ -22,7 +22,7 @@ import threading
 from typing import Any, Callable, Optional
 
 from . import task_retry as _task_retry
-from ..fsm_compose import RUNNER_CONTRACT_BLOCK
+from .task_prompt import build_task_prompt
 
 logger = logging.getLogger("pathly.scheduler")
 
@@ -175,57 +175,16 @@ def scheduler_loop(
     def _worker(task: dict, task_run_id: str, ws) -> None:
         """Run in a daemon thread. Calls spawn_fn and pushes result onto completion_q."""
         task_id = task["id"]
-        task_text = task.get("text", "")
         adapter = task.get("adapter") or (
             state.current_adapter if hasattr(state, "current_adapter") else ""
         )
         model = task.get("model") or (state.model if hasattr(state, "model") else "")
-        # Compose the loop task agent through the SAME fragment layer the FSM/team path
-        # uses (progress-logging + comms-post + completion-report, via the execute-task
-        # manifest entry) so it narrates progress, posts findings, and writes AGENT_DONE —
-        # instead of running blind on the raw task text. Best-effort: fall back to the raw
-        # task text if composition is unavailable.
-        try:
-            from pathly_orchestrator.skills.compose import compose_skill
-
-            _body = compose_skill("development/execute-task", adapter or "claude")
-            # Stamp a concrete Pathly role so fragments that reference the agent's role
-            # resolve to a recognized, full-tier value — notably code-query's `role`
-            # field. A loop task agent otherwise has no role, so its code-query was
-            # silently gated (the gate also now defaults unknown roles to a usable tier).
-            instructions = (
-                f"{_body}\n\n## Your task\n\n"
-                "(Your Pathly role for this task is **builder** — use it wherever a "
-                "fragment asks for your role, e.g. the code-query `role` field.)\n\n"
-                f"{task_text}"
-            )
-        except Exception:
-            instructions = task_text
-        # The SAME contract build_prompt appends to every FSM-stage prompt. execute-task's
-        # body carries none, so a DAG task agent was the one headless agent never told the
-        # supervisor owns the FSM — under fan-out (where these run INSIDE an FSM stage) one
-        # would advance the flow itself: a double-advance, or the 404 respawn loop
-        # tests/runner_supervisor/test_runner_contract.py pins for the FSM path.
-        instructions += f"\n\n{RUNNER_CONTRACT_BLOCK}"
-        instructions += _task_retry.build_retry_context(task)
-        # Inject the same scope-aware board context (governance + memory, honoring
-        # the Reads toggle) the FSM/team path gets, so loop-executor tasks aren't
-        # blind to the board. Best-effort — never block a task on context.
-        try:
-            from pathly_orchestrator.runner.comms_context import board_context_for
-
-            _ctx = board_context_for(
-                board,
-                scope,
-                getattr(state, "project_root", "") or "",
-                task_text,
-                task_id=task_id,
-            )
-            if _ctx:
-                instructions = f"{instructions}\n\n{_ctx}"
-        except Exception:
-            pass
-
+        # ONE assembly of a DAG task's prompt (supervisor/task_prompt.py): the composed
+        # execute-task body with its fragment placeholders SUBSTITUTED, the runner
+        # contract, the retry ladder, and the board context.
+        instructions = build_task_prompt(
+            task, state, board, scope, adapter=adapter, task_id=task_id
+        )
         try:
             outcome = spawn_fn(
                 state,

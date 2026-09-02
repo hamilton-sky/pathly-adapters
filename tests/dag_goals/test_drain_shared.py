@@ -1,14 +1,16 @@
-"""One drain, two callers — `supervisor/drain.py` (fan-out convergence).
+"""ONE drain — `supervisor/drain.py` (fan-out convergence).
 
 `fan_out._drain` (an FSM stage with `parallel_states`) and `goal_executor._run_loop`
-(`executor: loop`) both drive `scheduler_loop`, and each used to carry its own copy of the
-same scaffolding: make a cost tracker, wrap `spawn_fn` with it, OR `tracker.exceeded()` into
-an abort predicate, call the loop. Duplicated scaffolding is how two paths drift — a fix to
-one silently misses the other.
+(`executor: loop`) both drove `scheduler_loop`, and each carried its own copy of the same
+scaffolding: make a cost tracker, wrap `spawn_fn` with it, OR `tracker.exceeded()` into an
+abort predicate, call the loop. Duplicated scaffolding is how two paths drift — a fix to one
+silently misses the other. They were converged onto `drain_frontier`; **Phase E then retired
+the second caller outright**, so the fan-out is the only one left.
 
-These tests pin what the shared helper guarantees for BOTH callers: the cost cap applies
-whether or not the caller remembered it, the spawn is wrapped exactly once (a second wrap
-would double-count every task's cost), and a caller's own abort predicate still works.
+These tests pin what the shared helper guarantees: the cost cap applies whether or not the
+caller remembered it, the spawn is wrapped exactly once (a second wrap would double-count
+every task's cost), a caller's own abort predicate still works — and that `executor: loop`
+still gets the audit-gated isolation, now from its flow rather than from code.
 """
 
 from __future__ import annotations
@@ -181,19 +183,32 @@ def test_a_raising_abort_predicate_does_not_strand_the_drain():
 
 
 def test_loop_executor_uses_the_audited_isolation_not_a_bare_serial_pin():
-    """`executor: loop` gets the SAME Phase-D gate an FSM fan-out stage gets.
+    """`executor: loop` still gets the Phase-D gate — now via its flow, not via code.
 
-    Asserted on the type rather than on timing: the timing behaviour is already covered by
-    test_fan_out.py, and what matters here is that the loop is no longer hardcoded to a
-    plain SerialIsolation that could never become parallel.
+    Phase E retired `_run_loop` as an engine, so it no longer names an isolation at all: the
+    `goal-loop` flow's `parallel_states` entry does, and `fan_out._resolve_isolation` turns
+    `lane` into `AuditedLaneIsolation`. The guarantee is unchanged (parallel only while the
+    partition audits safe, serial otherwise) — this asserts it end to end through the REAL
+    packaged flow rather than by reading source.
     """
-    import inspect
+    import yaml
 
-    from pathly_orchestrator.supervisor import goal_executor
+    from pathly_orchestrator.supervisor.fan_out import (
+        _resolve_isolation,
+        parallel_config,
+    )
+    from pathly_orchestrator.supervisor.lane_partition import AuditedLaneIsolation
+    from tests._paths import SRC
 
-    src = inspect.getsource(goal_executor._run_loop)
-    assert "AuditedLaneIsolation(" in src
-    assert "SerialIsolation()" not in src, "the hardcoded serial pin should be gone"
+    flow = yaml.safe_load(
+        (SRC / "pathly_data" / "core" / "flows" / "goal-loop.flow.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+    config = parallel_config(flow, "DRAINING")
+    assert config is not None, "goal-loop's working state must opt into the fan-out"
+    isolation = _resolve_isolation(config, "DRAINING", "feature", "feat", "g1")
+    assert isinstance(isolation, AuditedLaneIsolation)
 
 
 def _called_names(module) -> set[str]:
@@ -213,16 +228,20 @@ def _called_names(module) -> set[str]:
     }
 
 
-def test_both_callers_go_through_the_shared_drain():
-    """The convergence itself: neither caller CALLS scheduler_loop any more."""
+def test_the_fsm_fan_out_is_the_only_thing_that_drains_a_frontier():
+    """The convergence, finished (Phase E): ONE caller, and it is inside the FSM.
+
+    Phase D left two callers sharing `drain_frontier`; Phase E retired the second engine
+    outright, so `goal_executor` drains nothing at all — it launches the `goal-loop` FSM flow
+    and the fan-out state does the work.
+    """
     from pathly_orchestrator.supervisor import fan_out, goal_executor
 
-    for mod in (fan_out, goal_executor):
-        called = _called_names(mod)
-        assert "drain_frontier" in called, f"{mod.__name__} must use the shared drain"
-        assert (
-            "scheduler_loop" not in called
-        ), f"{mod.__name__} still calls scheduler_loop directly"
+    assert "drain_frontier" in _called_names(fan_out)
+
+    called = _called_names(goal_executor)
+    assert "drain_frontier" not in called, "the loop executor must not drain by itself"
+    assert "scheduler_loop" not in called, "the second engine should be gone"
 
 
 def test_the_shared_drain_is_the_only_scheduler_loop_caller_in_the_supervisor():

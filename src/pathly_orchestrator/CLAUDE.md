@@ -293,7 +293,9 @@ pathly_orchestrator/
     cli.py                 # run_flow, main, resolve_stage, handle_blocked, handle_decide
   supervisor/              # Visible runner: PTY spawning, SSE broadcast, registry
     state.py               # RunnerState, OpenSession dataclasses
-    registry.py            # _registry, _lock, get_state, recover_stale_mirrors
+    registry.py            # _registry, _lock, get_state, recover_stale_mirrors,
+                           #   find_active_run_for_goal (a goal's FSM run is registered under
+                           #   its board-nested topic, so a scope lookup misses it)
     terminal.py            # _run_stage_via_terminal — THE SPAWN. Re-exports the names below,
                            #   because supervisor/__init__ and the tests import them from here
                            #   (and _reconciliation_window is monkeypatched in THIS namespace,
@@ -312,6 +314,9 @@ pathly_orchestrator/
                            #   and returns a merged result in the SAME shape. Phase D:
                            #   isolation=lane -> AuditedLaneIsolation (parallel while the
                            #   partition audits safe); serial obeyed; worktree degrades.
+                           #   Phase E: the ONLY drain — `executor: loop` reaches it as the
+                           #   goal-loop flow's DRAINING state. Frontier scope = the run's
+                           #   BOARD scope, not state.topic (a goal run's topic is its own slug).
     orchestrator_session.py # resolve_session — same-adapter session reuse + the SESSION event
     api.py                 # start_run, pause_run, resume_run, abort_run, supply_decision, reroute_run
     goal_run.py            # thin re-export shim (start_goal_run / start_goal_decompose) → the two modules below
@@ -319,12 +324,17 @@ pathly_orchestrator/
                            #   start_goal_run(goal_id, executor_override=…) reads the goal's
                            #   `executor` field and routes to one of three strategies:
                            #   single → one agent drains the whole DAG (start_board_run + drain-dag skill)
-                           #   loop   → supervisor owns the frontier via scheduler_loop + _run_loop
+                           #   loop   → runs the 'goal-loop' FSM flow (Phase E — a flat, one
+                           #            fan-out state drain; NOT team-build, which is reviewed)
                            #   team   → runs an FSM flow (default 'team-build') via start_run
     goal_decomposer.py     # start_goal_decompose() bridges an analyzed goal into a DAG
                            #   (mode='planner' or mode='consultation')
     scheduler.py           # DAG frontier loop (scheduler_loop): event-driven, blocks on completion_q;
                            #   at most one worker per lane; goal_id= scopes the frontier to one goal's tasks
+    task_prompt.py         # build_task_prompt — ONE assembly of a DAG task's prompt: the composed
+                           #   development/execute-task body with its fragment placeholders
+                           #   SUBSTITUTED (the DAG path had no injector at all — see Phase E),
+                           #   plus the runner contract, retry ladder and board context
     drain.py               # drain_frontier — the ONE scheduler_loop call site. Owns the cost
                            #   tracker (wrapping spawn_fn exactly once) and folds the cap into
                            #   abort_check, so neither fan_out nor goal_executor can forget it.
@@ -511,9 +521,10 @@ executor's `scheduler.py` frontier loop has no equivalent, so a goal's task-DAG 
 to any cost. `cost_cap.py` closes this WITHOUT touching `scheduler.py` (frozen at its
 400-line ratchet ceiling): `CostCapTracker.wrap(spawn_fn)` returns a spawn function with
 the same signature that accumulates each task's real `cost_usd` as it becomes known, and
-`goal_executor.py::_run_loop` folds `tracker.exceeded()` into the SAME `abort_check` hook
-`scheduler_loop` already polls at the top of its frontier loop before scheduling anything
-new — no new extension point, no scheduler changes.
+`supervisor/drain.py::drain_frontier` folds `tracker.exceeded()` into the SAME `abort_check`
+hook `scheduler_loop` already polls at the top of its frontier loop before scheduling anything
+new — no new extension point, no scheduler changes. Owning it in the shared drain is what makes
+the cap apply to every frontier drain by construction rather than by each caller remembering it.
 
 Same limitation as the FSM loop's own cap, for the same reason: a headless
 `claude -p --output-format json` spawn reports cost in one JSON envelope at process exit,
@@ -900,10 +911,11 @@ is still a stub that raises `NotImplementedError`. `max_workers` rejects `bool` 
 `isinstance(True, int)` is true and `max_workers: true` is a typo, not a cap of 1. A bodiless
 `BUILDING:` (YAML `None`) is a legal "all defaults" entry.
 
-**Nothing reads the key yet** — Phase C is what branches on it, and **no packaged flow declares
-it**, which is what makes this phase inert by construction rather than by assertion.
-`tests/fsm_flows/test_parallel_states_schema.py` pins both: the schema rules, and that all nine
-shipped flows still validate with zero errors and carry no `parallel_states`.
+**Nothing read the key at Phase B** — Phase C is what branches on it, and no packaged flow
+declared it, which made that phase inert by construction. Since **Phase E, exactly one flow opts
+in**: `goal-loop`, which IS `executor: loop`. `tests/fsm_flows/test_parallel_states_schema.py`
+pins the schema rules and that `goal-loop` is the ONLY opted-in flow, so opting another in stays
+a deliberate, test-visible decision.
 
 ## fsm-fan-out Phase C — the fan-out moves INSIDE the FSM (still serial)
 
@@ -960,14 +972,10 @@ the ~35-line session-continuity block lifted verbatim — same reuse predicate, 
 flag, same `SESSION` event). Result: **427 -> 399**, so the ratchet clicked and `orchestrator.py`
 dropped OUT of `file_size_baseline.txt` entirely — it can now never grow past 400 again.
 
-**Production behaviour is provably unchanged**: no packaged flow declares `parallel_states`, so
-no run can take the fan-out branch at all. `tests/runner_supervisor/test_fan_out.py` asserts that
-across all nine flows, alongside the drain, the serial pin (three ready tasks in three distinct
-lanes, never two at once — the assertion that must FLIP in Phase D), the failure/join semantics,
-and abort mid-drain.
-
-**Not done, and gated on a real Phase-C run:** Phase D (swap `LaneIsolation`, honour
-`max_workers`, opt ONE flow in, measure) and Phase E (retire `goal_executor._run_loop`).
+**Production behaviour was provably unchanged at Phase C**: no packaged flow declared
+`parallel_states`, so no run could take the fan-out branch at all. (Phase E added the first and
+only opt-in, `goal-loop`.) `tests/runner_supervisor/test_fan_out.py` asserts that, alongside the
+drain, the serial pin, the failure/join semantics, and abort mid-drain.
 
 ## fsm-fan-out C.5 — `lane` and `files` had NO write path (Phase D was not one line)
 
@@ -1049,9 +1057,10 @@ cannot be worse than Phase C's behaviour; it becomes parallel exactly when a pla
 declared lanes and footprints that hold up. The two Phase-C serial assertions did NOT have to
 flip: they declare no `files`, so they still pass — for a sounder reason than a hard pin.
 
-**No packaged flow opts in.** Phase D ships the ENGINE; adding `parallel_states` to a flow is a
-separate, deliberate decision, because for `team-build` it is **not** merely a concurrency
-change. Its `REVIEWING` carries `on_board_count: {metric: ready, op: gt, next: BUILDING}`, so
+**No packaged flow opted in at Phase D** — it ships the ENGINE. Phase E added the first and
+only opt-in (`goal-loop`, which IS `executor: loop`). Adding `parallel_states` to any OTHER flow
+stays a separate, deliberate decision, because for `team-build` it is **not** merely a
+concurrency change. Its `REVIEWING` carries `on_board_count: {metric: ready, op: gt, next: BUILDING}`, so
 BUILDING today drains **one task per FSM cycle** with a REVIEWING pass between tasks. A
 `parallel_states: {BUILDING: …}` entry makes BUILDING drain the whole ready frontier in one
 stage and review ONCE after — a change to review cadence that lands even at serial isolation.
@@ -1077,61 +1086,124 @@ assertion Phase C could not make — mutation-checked: it fails if the swap is r
 undeclared task keeps the drain serial, `serial`/`worktree` are obeyed/degraded, and the
 re-audit-per-round property is proven with dependents that only conflict once they become ready.
 
-**Still not done:** Phase E (retire `goal_executor._run_loop` — see below for why it is not the
-deletion the plan assumed), and the residual risk that `audit_lane_partition` only sees
-*declared* footprints — a task that writes outside its declared set stays invisible to it.
-Closing that needs `WorktreeIsolation`, still a stub.
+**Residual risk, still open:** `audit_lane_partition` only sees *declared* footprints — a task
+that writes outside its declared set stays invisible to it. Closing that needs
+`WorktreeIsolation`, still a stub.
 
-## fsm-fan-out — ONE drain (`supervisor/drain.py`), and why Phase E is NOT a deletion
+## fsm-fan-out — ONE drain (`supervisor/drain.py`)
+
+`fan_out._drain` and (at the time) `goal_executor._run_loop` each carried their own copy of the
+same scaffolding — make a cost tracker, wrap `spawn_fn`, OR `tracker.exceeded()` into an abort
+predicate, call `scheduler_loop`. They now share `drain.py::drain_frontier`, the single
+`scheduler_loop` call site:
+
+| Owned by `drain_frontier` (shared) | Left with the caller |
+|---|---|
+| the `CostCapTracker` and wrapping `spawn_fn` with it — **exactly once**, so cost cannot double-count | the isolation (a stage reads its flow YAML) |
+| folding `tracker.exceeded()` into `abort_check`, so no caller can forget the cap | the caller's own abort reason (the FSM's `_abort_flag`) |
+| the `scheduler_loop` call itself | the result shape the caller's consumer expects |
+
+Phase E then removed the second caller entirely (below), so `fan_out` is the only one left —
+pinned by an **AST**-based check in `tests/dag_goals/test_drain_shared.py` (a text search would
+match `drain.py`'s own ASCII diagram).
+
+## fsm-fan-out Phase E — `executor: loop` IS an FSM flow; the second engine is gone
 
 Phase E was specified as "`_run_loop` becomes a thin alias, then is deleted; `executor: loop`
 means run the flow whose BUILDING is parallel", with the note that "E only removes code, so the
-ratchet is satisfied by construction". Investigating it found that wrong in three ways:
+ratchet is satisfied by construction". Two of those three claims were wrong, and the shape of
+the fix follows from why:
 
-1. **`loop` and `team` are different PRODUCTS, not two implementations of one.** `executor: loop`
-   is a flat drain: `development/execute-task` per task, no REVIEWING/TESTING/RETRO, no gates.
-   `executor: team` is the full `team-build` FSM with two `command_gate`s. Retiring `loop` into
-   `team` deletes the fast path — a user who picked `loop` for speed and cost would silently get
-   a reviewed pipeline. `'flow' | 'loop' | 'single'` is also a Studio-visible category across the
-   Monitor UI.
-2. **It depends on the flow opt-in above**, which is itself an unmade product call.
-3. **It is not deletion.** `_run_loop` owns seven things `_run_team`/`start_run` do not provide:
-   its own `board_lock` lease (what `/comms/goals/stop` releases), goal-scoped storage resolution,
-   `executor_owned_telemetry` + `write_goal_root_span` (goal=trace, task=span),
-   `_record_run_history(flow="goal-loop")` — which `run_history_read._is_parent` keys off to fold
-   `sched-*` rows into ONE run in `GET /runs` — `verify_clean_drain`, the cost-cap tracker, and
-   `terminal_reconcile`'s `"loop" if flow == "goal-loop"` Monitor bucketing. Preserving those on
-   the FSM path is substantial ADDITION.
+- **"the flow whose BUILDING is parallel" meant `team-build`, and that would have changed the
+  PRODUCT.** `executor: loop` is a flat drain — `development/execute-task` per task, no
+  REVIEWING/TESTING/RETRO between tasks. `executor: team` is the reviewed `team-build` pipeline.
+  Collapsing them hands a user who picked `loop` for speed a fully reviewed run instead.
+- **"only removes code" was wrong** — `_run_loop` owned real behaviour the FSM path did not
+  provide. That work is addition, not deletion, and is enumerated below.
 
-**What was done instead — the convergence without the product change.** Both drains now go
-through `supervisor/drain.py::drain_frontier`, the single `scheduler_loop` call site:
+So `loop` got **its own flow** rather than someone else's: `core/flows/goal-loop.flow.yaml`, a
+single working state whose drain is the flat product, run by the ONE engine.
 
-| Owned by `drain_frontier` (shared) | Left with the caller (genuinely differs) |
+```yaml
+states: [DRAINING, DONE]
+parallel_states:
+  DRAINING: {isolation: lane}     # -> AuditedLaneIsolation, via fan_out
+gates:
+  DRAINING->DONE:                 # the JOIN, once, after every worker finished
+    - {type: require_tasks_done, on_fail: INCOMPLETE_TASKS.md}
+    - {type: command_gate, command_key: build, on_fail: BUILD_FAILURES.md}
+    - {type: command_gate, command_key: test,  on_fail: TEST_FAILURES.md}
+```
+
+`goal_executor._run_loop` is now a delegation to `_run_team(flow="goal-loop")` — no
+`RunnerState` of its own, no `scheduler_loop` call, no cost tracker, no isolation choice.
+
+**What the goal run GAINS, all of it from the DB being the authority** — the same list the
+compiled-executor revert was argued on: a `fsm_state` row (so `pathly-status` and the
+`STATE.json` export see it), a `STATE_TRANSITION` audit trail, park/resume on a human
+checkpoint, the escalation ladder, and the two verify commands as ROUTED gates.
+`goal_verify.verify_clean_drain` ran those same two commands after a clean drain but could only
+post a board escalation and stop; a `command_gate` failure re-drives a fix through
+`feedback_routing`.
+
+**The flow NAME is load-bearing.** `run_history_read._classify_kind` returns `loop` for a
+bare-uuid run whose `adapter` column is the literal `"goal-loop"`, and `start_run` writes
+`state.flow` into that column — so the parent row still classifies as a loop PARENT and still
+windows its per-task `sched-*` rows into ONE run in `GET /runs`. `_flow_kind` also had to learn
+the name, or the run's storage would nest at `features/<f>/goal-loop/<slug>` instead of under
+`goals/`.
+
+### Two prerequisites the plan did not anticipate — Phase E is a silent no-op without them
+
+1. **`fan_out._drain` resolved the frontier from `state.topic`.** For a plain feature pipeline
+   topic IS the board scope, so this was invisible. A GOAL run's topic is its own storage slug
+   (`features/<feature>/goals/<slug>`) while its tasks live on the parent board at
+   `scope=<feature>`, and `get_ready_tasks` ANDs `scope IN (…)` with `goal_id` — **measured 0
+   ready tasks against 3 for the same goal.** Every goal run through a parallel flow would have
+   "drained" nothing and advanced. `_frontier_scope` now uses `terminal_identity._run_board_scope`
+   — the SAME derivation the spawn chokepoint stamps telemetry with — and degrades to the topic.
+   The join still agrees: `require_tasks_done` counts by `goal_id` when a run has one.
+2. **A DAG task's prompt was never placeholder-substituted.** `scheduler._worker` composed
+   `development/execute-task` via `compose_skill` and stopped there, so `completion-report`
+   reached the agent still saying to key its `AGENT_DONE` on the literal `<fsm_feature>` — the
+   same defect `board_run._inject_board_prompt_vars` fixed for board runs, never fixed here. It
+   was masked while the loop owned its telemetry (`_synthesize_agent_done_if_missing` wrote a
+   synthetic `AGENT_DONE` stamped `category="loop"`); inside an FSM stage that safety net is off.
+   The whole assembly moved to **`supervisor/task_prompt.py`**, which substitutes through the
+   same `_inject_prompt_vars` the other two paths use and stamps `run_category="loop"`.
+   `scheduler.py` 432 → 392, so it dropped out of `file_size_baseline.txt`.
+
+### What had to be preserved, and how
+
+| `_run_loop` owned | Under Phase E |
 |---|---|
-| the `CostCapTracker` and wrapping `spawn_fn` with it — **exactly once**, so cost cannot double-count | the isolation (a stage reads its flow YAML; a goal loop picks its own) |
-| folding `tracker.exceeded()` into `abort_check`, so neither caller can forget the cap | the caller's own abort reason (FSM `_abort_flag` vs. still holding the board lock) |
-| the `scheduler_loop` call itself | the result shape (stage-merged vs. raw + `verify_clean_drain`) |
+| `_record_run_history(flow="goal-loop")` — the loop PARENT row | `start_run` writes `state.flow` into the same column; the flow is NAMED `goal-loop`, so unchanged |
+| the cost-cap tracker | `drain_frontier` owns it for every drain |
+| goal-scoped storage resolution | `_run_team`'s `board_run_topic` + `_flow_kind` (now mapping `goal-loop` → `goals`) |
+| `verify_clean_drain` | the two `command_gate`s at `DRAINING->DONE` — routed, so a failure re-drives a fix |
+| per-task `task_claimed`/`task_done` COMMS_UPDATEs | `RunnerState._comms_broadcast_fn`, set from `start_run(event_broadcast_fn=…)` and read by `_drain`. `supervisor/` may not import `http_server/`, so the broadcaster is injected by the route that already holds it |
+| the `board_lock` lease `/comms/goals/stop` released | the run is an FSM run now, so stop goes through `abort_run` — see below |
+| `write_goal_root_span` (goal=trace, task=span) | **dropped.** A root span whose children are written by the FSM's own telemetry writer would be a childless trace root; `executor: team` has never had one either. Its own docstring calls this "no labelled root", not lost spans |
 
-`executor: loop` also now gets the **same Phase-D audit-gated isolation** an FSM fan-out stage
-gets, instead of a hardcoded `SerialIsolation()`: it drains in parallel only while the frontier's
-lane partition audits safe. On today's DAGs (no declared footprints) that is exactly the
-`SerialIsolation` it replaced, so the fast path cannot behave worse — it just gets faster once a
-planner declares lanes and footprints. The fast path is made faster rather than deleted.
+**Stopping a goal run was broken for `team` and would have broken for `loop`.**
+`/comms/goals/stop`'s FSM branch looked the run up with `get_state(scope)`, but a goal's FSM run
+is registered under its board-nested topic — so the lookup returned `None` and the route reported
+`not_running` while the run kept going. Survivable while `loop`/`single` were stopped through the
+board lock; not once `loop` is an FSM run. `registry.find_active_run_for_goal(goal_id, fallback)`
+matches on the run's own `goal_id` — correct whatever flow it runs and whatever storage kind that
+flow maps to — and keeps the scope-keyed lookup as the fallback for a non-goal run.
 
-Paid for inside the ratchet: `goal_executor.py` was frozen at 561, so the goal-home resolution
-moved to `slug.py::resolve_goal_home` (its documented domain — "scope / slug helpers for goal +
-board addressing"), taking it to 555.
+Pinned by `tests/dag_goals/test_loop_is_an_fsm_flow.py` and the converted golden-path suite
+(`tests/fsm_flows/test_golden_path.py`), which now drives the REAL `goal-loop` YAML through
+`fan_out.run_stage` with a goal-scoped state — mutation-checked: reverting `_frontier_scope` to
+`state.topic` fails all seven with an empty drain.
 
-`tests/dag_goals/test_drain_shared.py` pins it, including an **AST**-based check that
-`scheduler_loop` is called from `drain.py` and nowhere else in `supervisor/` — a text search
-would match this file's own ASCII diagram.
-
-**Note on CLI spawning, for anyone chasing "one chokepoint":** agent argv CONSTRUCTION is one
-place per language (`adapters.resolve_command`; and `cliEngine.ts::buildHeadlessArgv` in Studio's
-renderer). EXECUTION is three paths: the `TERMINAL_SPAWN` host contract (Studio's node-pty or
-`pty_host`), `runner/invoke.py`'s own `Popen` for `pathly-run`, and Studio's renderer one-shots.
-The supervisor side is genuinely one chokepoint; the other two are documented above and remain
-separate.
+**Still open, and deliberately:** no OTHER flow opts into `parallel_states` — for `team-build`
+that would change review cadence AND which skill runs the work (a fan-out state's per-task
+prompts come from `development/execute-task`, so `team/build` would not run), which is a product
+call, not an engine change. And `audit_lane_partition` still only sees *declared* footprints; a
+task writing outside its declared set stays invisible to it, which needs `WorktreeIsolation`
+(still a stub).
 
 ## Visible runner (supervisor/)
 
@@ -1298,7 +1370,8 @@ both now land as columns instead of being re-derived. The pieces:
   `start_run`'s **early `running` row**) writes `state.flow` there — fixing (1) completed flows
   reclassifying to `single`/$0, and (2) `team`/consultation/feature/project runs (which call
   `start_run` directly, bypassing `/runner/start`) being invisible in `GET /runs` until they
-  finished. The goal **`loop`** executor is the same shape: `_run_loop` writes its own PARENT row
+  finished. The goal **`loop`** executor is the same shape, and since Phase E gets there the same
+  way: it runs the `goal-loop` FSM flow, so `start_run` writes the PARENT row
   (`adapter="goal-loop"` via `state.flow`) — the read-model classifies a `goal-loop` bare-uuid as
   a **loop parent** (`_is_parent`) that windows its per-task `sched-*` rows (folded out of
   `list_runs`, folded INTO its RunDetail as stages), so a loop shows as ONE run with real cost

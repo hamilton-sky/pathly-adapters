@@ -218,11 +218,30 @@ One line: `LaneIsolation()` instead of `SerialIsolation()`, honouring `max_worke
 - the cost-cap overshoot is accepted: `cost_cap` stops *scheduling* past the cap but cannot
   preempt in-flight work, so with N workers the overshoot is up to N tasks, not 1.
 
-### Phase E — retire the second engine (NOT this pass)
+### Phase E — retire the second engine — LANDED, but not as written
 
-`goal_executor._run_loop` becomes a thin alias, then is deleted; `executor: loop` means "run
-the flow whose BUILDING is parallel". Only after D is proven. `goal_executor.py` is baselined
-at 561 — E only removes code, so the ratchet is satisfied by construction.
+Shipped: `goal_executor._run_loop` is a thin delegation to the FSM path, and `executor: loop`
+runs the new packaged `goal-loop` flow — one `DRAINING` state with `parallel_states`. Three
+things in the sketch above turned out to be wrong, recorded here because they cost the most:
+
+1. **"the flow whose BUILDING is parallel" meant `team-build`, and that is a different
+   PRODUCT.** `loop` is a flat drain; `team-build` is reviewed. Retiring one into the other
+   silently changes what a user who picked `loop` gets. `loop` got its OWN flow instead.
+2. **"E only removes code" was wrong.** `_run_loop` owned real behaviour the FSM path did not
+   provide (board-lock stop, goal storage, the loop run-history parent, the cost tracker,
+   `verify_clean_drain`, per-task board events, the goal root span). Most was preserved by
+   construction — chiefly by NAMING the flow `goal-loop`, which the run-history read-model and
+   the Monitor already key off — the verify commands became `command_gate`s, and one (the OTel
+   goal root span) was dropped deliberately. Only the ratchet claim held: `goal_executor.py`
+   555 → 492, and `scheduler.py` 432 → 392 (out of the baseline).
+3. **Two prerequisites were unstated and each made E a silent no-op.** `fan_out._drain`
+   resolved the frontier from `state.topic`, which is not a goal run's board scope (measured: 0
+   ready tasks vs 3); and a DAG task's prompt was never placeholder-substituted, so
+   `completion-report` keyed its `AGENT_DONE` on the literal `<fsm_feature>`.
+
+Still deliberately open: no OTHER flow opts into `parallel_states` (for `team-build` that
+changes review cadence AND which skill runs the work — a product call), and
+`audit_lane_partition` still only sees *declared* footprints, which needs `WorktreeIsolation`.
 
 ---
 

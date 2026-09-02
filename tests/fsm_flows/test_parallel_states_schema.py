@@ -128,17 +128,33 @@ def test_isolation_vocab_matches_the_isolation_module():
     "flow_path", sorted(_FLOW_DIR.glob("*.flow.yaml")), ids=lambda p: p.name
 )
 def test_packaged_flows_still_validate_clean(flow_path: pathlib.Path):
-    """All nine shipped flows validate with no errors, and none declares parallel_states.
-
-    Phase B is inert by construction: production behaviour cannot change while no flow
-    opts in. Phase C's tests supply their own flow dicts.
-    """
+    """Every shipped flow validates with no errors."""
     flow = yaml.safe_load(flow_path.read_text(encoding="utf-8"))
     errors, _ = validate_flow_dict(flow)
     assert errors == [], f"{flow_path.name}: {errors}"
-    assert "parallel_states" not in flow
 
 
-def test_all_nine_packaged_flows_were_actually_checked():
+def test_goal_loop_is_the_only_flow_that_opts_into_fan_out():
+    """Opting a flow in is a PRODUCT decision, and this is the list of them.
+
+    Phase B shipped `parallel_states` inert — no flow declared it, so production behaviour
+    could not change. Phase E adds exactly one deliberate opt-in: `goal-loop`, which IS the
+    `executor: loop` product (a flat drain) and so gains nothing but its own engine back.
+
+    Every OTHER flow opting in would change behaviour beyond concurrency — for `team-build`
+    it also changes the review cadence (its `on_board_count` rule makes BUILDING drain one
+    task per FSM cycle) AND which skill runs the work (a fan-out state's per-task prompts come
+    from `development/execute-task`, so `team/build` would not run). This assertion is what
+    makes such a change impossible to slip in unnoticed.
+    """
+    opted_in = sorted(
+        p.name
+        for p in _FLOW_DIR.glob("*.flow.yaml")
+        if "parallel_states" in (yaml.safe_load(p.read_text(encoding="utf-8")) or {})
+    )
+    assert opted_in == ["goal-loop.flow.yaml"]
+
+
+def test_every_packaged_flow_was_actually_checked():
     """Guard against the parametrization above silently collapsing to zero cases."""
-    assert len(list(_FLOW_DIR.glob("*.flow.yaml"))) == 9
+    assert len(list(_FLOW_DIR.glob("*.flow.yaml"))) == 10

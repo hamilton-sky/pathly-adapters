@@ -1,18 +1,18 @@
 """Fan-out execution for ONE FSM state — the DAG scheduler as a stage executor.
 
-``scheduler_loop`` was wired as a rival ENGINE: ``goal_executor._run_loop`` calls it
+``scheduler_loop`` was wired as a rival ENGINE: ``goal_executor._run_loop`` called it
 top-level, as a peer of ``orchestrator._loop``. This module makes it the fan-out executor
-*of a state* instead, which is what turns two engines into one:
+*of a state* instead, which is what turned two engines into one:
 
     next_action() -> current_state = "BUILDING"
           |
-          +- NOT parallel --> spawn one agent          (today, unchanged)
+          +- NOT parallel --> spawn one agent          (unchanged)
           |
           +- parallel ------> scheduler_loop(...)      <- the fan-out
           |                     returns when the frontier is drained
           v
-    run_gates(BUILDING -> REVIEWING)   <- the JOIN. Unchanged: ONE gate run, after
-          |                               every worker finished. Not called here.
+    run_gates(BUILDING -> REVIEWING)   <- the JOIN. ONE gate run, after every worker
+          |                               finished. Not called here.
           v
     complete_stage() -> write_state("REVIEWING")
 
@@ -22,11 +22,10 @@ ready tasks". The parallelism lives inside a state's *execution*, not in the sta
 vocabulary, so ``write_state``'s legality check, the ``STATE.json`` export, the ``pathly-*``
 CLI and Studio's flow editor are all untouched.
 
-**Phase C pins ``SerialIsolation`` regardless of what the YAML asks for**, so a parallel
-state still drains one task at a time and behaviour is byte-identical to today. Turning
-concurrency on is Phase D — the single swap to ``LaneIsolation`` — and it is deliberately
-NOT in this change, so a regression is attributable to the architecture move or to the
-behaviour change, never to both at once.
+Phase C moved the fan-out here with ``SerialIsolation`` pinned; Phase D unpinned it behind
+``AuditedLaneIsolation`` (parallel only while the frontier's lane partition audits safe);
+**Phase E made this the ONLY drain** — ``executor: loop`` is now the ``goal-loop`` flow,
+whose single ``DRAINING`` state comes through here like any other fan-out state.
 
 See: pathly/features/fsm-fan-out/SPEC.md
 """
@@ -111,6 +110,35 @@ def _resolve_isolation(
     )
 
 
+def _frontier_scope(state) -> str:
+    """The board scope whose ready tasks this stage drains.
+
+    NOT ``state.topic``. For a plain feature pipeline the two are the same string, but a
+    GOAL-scoped run's FSM topic is the run's own storage slug —
+    ``features/<feature>/goals/<slug>`` — while its tasks live on the parent board at
+    ``scope=<feature>``. ``get_ready_tasks`` ANDs ``scope IN (…)`` with ``goal_id``, so
+    draining by the topic returns an EMPTY frontier: measured 0 ready tasks against 3 for
+    the same goal. That made every goal run through a parallel flow a silent no-op — the
+    stage would "drain" nothing and advance.
+
+    ``_run_board_scope`` is the SAME derivation the spawn chokepoint stamps telemetry with
+    (prefer the identity issued at spawn, else ``resolve_board_scope``), so the frontier, the
+    prompt's ``<feature>`` and the run's ``board_scope`` column can never disagree about which
+    board this run belongs to. It degrades to ``state.topic`` — today's exact behaviour — when
+    nothing better resolves.
+
+    The join still agrees: ``require_tasks_done`` counts by ``goal_id`` when a run has one and
+    by ``(board, scope)`` otherwise, which is precisely the pair used here.
+    """
+    try:
+        from pathly_orchestrator.supervisor.terminal_identity import _run_board_scope
+
+        return _run_board_scope(state, None) or state.topic
+    except Exception:
+        logger.debug("fan_out: board-scope resolution failed", exc_info=True)
+        return state.topic
+
+
 def _merge_drain_result(drained: dict, cost_usd: float) -> dict:
     """Fold a ``scheduler_loop`` result into the shape a single spawn returns.
 
@@ -165,11 +193,9 @@ def _drain(
     import pathly_orchestrator.supervisor as _sup
     from pathly_orchestrator.supervisor.drain import drain_frontier
 
-    # The frontier's (board, scope) must be the SAME pair require_tasks_done counts, or the
-    # fan-out and the join would disagree about which tasks belong to this stage.
-    # orchestrator_stage.py posts complete_stage with board="feature", scope=topic.
-    board, scope = "feature", state.topic
+    board = "feature"
     goal_id = getattr(state, "goal_id", "") or None
+    scope = _frontier_scope(state)
 
     def _spawn(task_state, instructions, adapter, model, task_run_id, task_broadcast):
         # session=None: see _merge_drain_result. autonomy is threaded from the FSM stage so
@@ -198,6 +224,10 @@ def _drain(
         spawn_fn=_spawn,
         abort_check=_abort_check,
         broadcast_fn=broadcast_fn,
+        # Per-task task_claimed/task_done COMMS_UPDATEs. `executor: loop` handed these to
+        # scheduler_loop directly; now the FSM owns the drain, so the run carries the
+        # broadcaster (supervisor/ may not import http_server/ to fetch one itself).
+        event_broadcast_fn=getattr(state, "_comms_broadcast_fn", None),
         goal_id=goal_id,
     )
     merged = _merge_drain_result(drained, tracker.total)
