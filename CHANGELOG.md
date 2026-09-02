@@ -100,6 +100,37 @@ Not included: retiring `goal_executor._run_loop`. Still open: the audit sees onl
 footprints, so a task writing outside its declared set remains invisible to it — closing that
 needs `WorktreeIsolation`.
 
+### Supervisor — ONE drain shared by both frontier callers
+
+`supervisor/drain.py::drain_frontier` is now the single `scheduler_loop` call site. The two
+paths that drive the DAG frontier — an FSM stage with `parallel_states`, and the
+`executor: loop` goal drain — each carried their own copy of the same scaffolding, which is
+how two paths drift: a fix to one silently misses the other.
+
+- The shared helper owns the `CostCapTracker`, wraps `spawn_fn` with it **exactly once** (a
+  second wrap would double-count every task's cost), and folds `tracker.exceeded()` into
+  `abort_check` — so neither caller can forget the cost cap. What genuinely differs stays
+  with the callers: the isolation, their own abort reason, and the result shape.
+- **`executor: loop` gains the same audit-gated parallelism** an FSM fan-out stage has,
+  replacing a hardcoded `SerialIsolation()`. On a DAG with no declared footprints — every DAG
+  today — that is exactly the isolation it replaced, so the fast path cannot behave worse; it
+  gets faster once a planner declares lanes and footprints.
+
+**`executor: loop` is NOT retired**, and the fan-out plan's Phase E is not the deletion it was
+scoped as. `loop` (a flat drain: `development/execute-task` per task, no review/test/retro, no
+gates) and `team` (the full `team-build` FSM with two `command_gate`s) are different products,
+not two implementations of one — collapsing them would delete the fast path a user chose for
+speed and cost, and `'flow' | 'loop' | 'single'` is a Studio-visible category. It is also
+addition rather than removal: `_run_loop` owns its own board-lock lease, goal storage
+resolution, goal trace/span telemetry, the `run_history` `goal-loop` parent row that folds
+`sched-*` rows into one run in `GET /runs`, `verify_clean_drain`, the cost tracker, and the
+Monitor's run-type bucketing — none of which the FSM path provides.
+
+Also corrected from the Phase D notes above: opting a flow into `parallel_states` does not only
+change review cadence, it changes **which skill runs the work**. `fan_out._drain` never uses the
+stage's own `instructions`, so a parallel `BUILDING` bypasses its `agent_map` entry entirely and
+`team/build` never runs.
+
 ## 2.20.0
 
 ### Board — project-planner (G2): spec → sibling features
