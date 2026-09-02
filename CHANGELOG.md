@@ -36,6 +36,34 @@ and phasing: `pathly/features/fsm-fan-out/SPEC.md`.
 Not included, and gated on a real run of the above: turning concurrency on (the
 `LaneIsolation` swap) and retiring `goal_executor._run_loop`.
 
+### DAG — `lane` and `files` are writable, and the lane partition is checkable (C.5)
+
+Two `comms_messages` columns the DAG scheduler's whole concurrency-safety model rests on
+had **no write path**: `post_message` never accepted `lane`, and `POST /comms/post` — the
+only way an agent creates a task — silently dropped `files`. Every task therefore reached
+the scheduler with both NULL, and `scheduler.py`'s `lane or task_id` fallback put each task
+in its own lane, making "at most one worker per lane" vacuously true.
+
+- `post_message(..., lane=…)`, and `POST /comms/post` now forwards **both** `lane` and
+  `files`, validated (`lane` a non-empty string, `files` a list of strings). Omitting
+  either stays valid, so every existing caller is unaffected.
+- `fragments/task-dag-post.md` teaches the planner to declare them, with the rule that
+  makes them safe — **same files ⇒ same lane; disjoint files ⇒ different lanes** — and
+  that omitting them is safe (undeclared ⇒ treated as touching everything ⇒ serial; costs
+  wall-clock, never correctness). `requires: goal_id`-gated, so it reaches the planner
+  exactly when it seeds a DAG.
+- New `supervisor/lane_partition.py::audit_lane_partition` checks the disjoint-files-per-lane
+  assumption instead of trusting it, reporting **undeclared** footprints and cross-lane
+  **conflicts** separately (reusing `file_claims.overlaps`, so directory containment counts).
+  It audits the ready frontier only — a task behind `depends_on` cannot run concurrently.
+- Note for anyone reading `file_claims.py` as the task-collision guard: it is not. It is
+  wired only in `goal_executor`, at the **cross-feature** level; `scheduler_loop` never
+  calls it, so it says nothing about two tasks inside one drain.
+
+No behaviour change: nothing consumes the two fields yet. This is the prerequisite Phase D
+turned out to need — it makes D's "tasks declare accurate file footprints" precondition
+reachable, where before it was unsatisfiable.
+
 ## 2.20.0
 
 ### Board — project-planner (G2): spec → sibling features
