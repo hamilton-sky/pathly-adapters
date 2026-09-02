@@ -207,8 +207,6 @@ def test_the_flow_name_matches_what_the_read_model_calls_a_loop_parent():
     to FLOW_NAMES, as a flow explicitly), and its per-task `sched-*` rows would stop folding
     into one run in GET /runs.
     """
-    import uuid
-
     from pathly_orchestrator.db.queries.run_history_read import (
         FLOW_NAMES,
         _classify_kind,
@@ -216,7 +214,15 @@ def test_the_flow_name_matches_what_the_read_model_calls_a_loop_parent():
     )
     from pathly_orchestrator.supervisor.goal_executor import _LOOP_FLOW
 
-    parent = str(uuid.uuid4())
+    # A FIXED uuid, never uuid4() — matching the constant in tests/db/
+    # test_run_history_flow_kind.py, and for the same reason. `_classify_kind` checks the
+    # stage-id pattern `-\d+-\d{10,}$` BEFORE the adapter, and a random uuid whose last two
+    # hyphen-groups are both all-digits matches it: measured ~1 collision per 2350 uuid4s,
+    # which is a test that fails a few times a year for a reason unrelated to what it checks.
+    # The edge is documented and accepted in run_history_read itself ("vanishingly rare for
+    # real hex uuids"), so pinning a representative id is the honest way to assert the
+    # classification rather than rolling dice on it.
+    parent = "beadfeed-aaaa-bbbb-cccc-abcdef012345"
     assert _LOOP_FLOW not in FLOW_NAMES, "a loop parent is not a flow parent"
     assert _classify_kind(parent, _LOOP_FLOW) == "loop"
     assert _is_parent(parent, _LOOP_FLOW) is True
