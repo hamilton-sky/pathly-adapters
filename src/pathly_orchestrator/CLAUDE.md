@@ -309,8 +309,9 @@ pathly_orchestrator/
     fan_out.py             # run_stage — THE one call site for executing an FSM stage:
                            #   no parallel_states entry -> _run_stage_via_terminal unchanged;
                            #   entry present -> scheduler_loop drains the state's ready tasks
-                           #   and returns a merged result in the SAME shape. Phase C pins
-                           #   SerialIsolation regardless of the YAML (Phase D is the swap).
+                           #   and returns a merged result in the SAME shape. Phase D:
+                           #   isolation=lane -> AuditedLaneIsolation (parallel while the
+                           #   partition audits safe); serial obeyed; worktree degrades.
     orchestrator_session.py # resolve_session — same-adapter session reuse + the SESSION event
     api.py                 # start_run, pause_run, resume_run, abort_run, supply_decision, reroute_run
     goal_run.py            # thin re-export shim (start_goal_run / start_goal_decompose) → the two modules below
@@ -330,7 +331,9 @@ pathly_orchestrator/
                            #   says nothing about two TASKS inside one drain. See lane_partition.
     lane_partition.py      # audit_lane_partition — checks the "disjoint files per lane"
                            #   assumption LaneIsolation rests on: undeclared footprints and
-                           #   cross-lane overlaps. The predicate Phase D gates activation on.
+                           #   cross-lane overlaps. AuditedLaneIsolation enforces it, re-running
+                           #   the audit EVERY scheduling round (the frontier grows mid-drain)
+                           #   and failing closed to 1 worker.
     artifact_reconcile.py  # after a stage/goal run: attach the stage's declared <out_path>
                            #   (resolved from the FSM's own manifest via fsm_compose.resolve_stage_out_path,
                            #   passed as out_path — state-one-authority: NO ARTIFACTS.jsonl ledger) AND
@@ -1011,9 +1014,65 @@ field accessors moved to `db/queries/comms_goal_fields.py` (re-exported, no call
 taking it to 360 — out of `file_size_baseline.txt` entirely — which is what paid for the
 `lane` parameter.
 
-**Phase D is still not done.** C.5 makes its precondition *reachable*, not *met*: a DAG is
-only safe to parallelise once its planner actually declares lanes and footprints, which
-`audit_lane_partition` is how you check rather than assume.
+C.5 made Phase D's precondition *reachable*. Phase D (below) is what turns concurrency on.
+
+## fsm-fan-out Phase D — parallelism is ON, gated on the partition auditing safe
+
+`_resolve_isolation` no longer pins `SerialIsolation`. `isolation: lane` (the default) now
+returns **`lane_partition.AuditedLaneIsolation`** — real lane parallelism, granted only while
+the frontier's partition actually audits safe:
+
+| YAML | Phase C | Phase D |
+|---|---|---|
+| `isolation: lane` | SerialIsolation (pinned, logged) | `AuditedLaneIsolation` — parallel while `audit_lane_partition(...)["safe"]`, else 1 |
+| `isolation: serial` | SerialIsolation | SerialIsolation (obeyed literally) |
+| `isolation: worktree` | SerialIsolation | SerialIsolation + a warning (`WorktreeIsolation` is still a stub that raises) |
+| `max_workers: N` | ignored | honoured — `LaneIsolation(max_workers=N)` caps below the lane count |
+
+**The audit is re-run every scheduling round, not once at drain start.** `scheduler_loop` calls
+`max_concurrency` on every frontier poll, and the frontier GROWS as tasks complete and unblock
+dependents — so a task that becomes ready *later* can conflict with one already running. A
+single up-front check would be exactly the "verified once, assumed forever" guarantee this
+feature exists to stop relying on. The cost is one DB read per round, against rounds that block
+on agents running for minutes. Safe↔unsafe transitions are logged; the state is not re-logged
+every round.
+
+**Failure widens nothing.** An audit that raises returns 1 (fail CLOSED to serial), so a broken
+audit can never be the reason two agents write the same file.
+
+**On today's DAGs this drains serially, and that is the correct answer** — no planner declares
+footprints yet, so every frontier audits `undeclared` → unsafe → 1 worker. Phase D therefore
+cannot be worse than Phase C's behaviour; it becomes parallel exactly when a planner has
+declared lanes and footprints that hold up. The two Phase-C serial assertions did NOT have to
+flip: they declare no `files`, so they still pass — for a sounder reason than a hard pin.
+
+**No packaged flow opts in.** Phase D ships the ENGINE; adding `parallel_states` to a flow is a
+separate, deliberate decision, because for `team-build` it is **not** merely a concurrency
+change. Its `REVIEWING` carries `on_board_count: {metric: ready, op: gt, next: BUILDING}`, so
+BUILDING today drains **one task per FSM cycle** with a REVIEWING pass between tasks. A
+`parallel_states: {BUILDING: …}` entry makes BUILDING drain the whole ready frontier in one
+stage and review ONCE after — a change to review cadence that lands even at serial isolation.
+That trade (per-task review vs. per-batch review) is a product call, not a side effect to slip
+in with an engine change.
+
+To opt a flow in, once its planner declares lanes and footprints:
+
+```yaml
+parallel_states:
+  BUILDING:
+    isolation: lane
+    max_workers: 4
+```
+
+Pinned by `tests/runner_supervisor/test_fan_out.py`: declared-disjoint lanes DO overlap (the
+assertion Phase C could not make — mutation-checked: it fails if the swap is reverted),
+`max_workers` bounds the peak while still going parallel, a cross-lane conflict or a single
+undeclared task keeps the drain serial, `serial`/`worktree` are obeyed/degraded, and the
+re-audit-per-round property is proven with dependents that only conflict once they become ready.
+
+**Still not done:** Phase E (retire `goal_executor._run_loop`), and the residual risk that
+`audit_lane_partition` only sees *declared* footprints — a task that writes outside its declared
+set stays invisible to it. Closing that needs `WorktreeIsolation`, still a stub.
 
 ## Visible runner (supervisor/)
 
