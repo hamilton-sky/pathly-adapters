@@ -10,6 +10,16 @@ from typing import Any
 
 from ..connection import _get_write_lock
 
+# Goal-message field accessors live in comms_goal_fields (this file sits on the 400-line
+# ratchet). Re-exported so `from ...comms_messages import set_message_slug` — which
+# supervisor/slug.py, goal_executor.py and fsm_compose_paths.py all do — keeps working.
+from .comms_goal_fields import (  # noqa: F401
+    get_goal_board_scope,
+    read_message_slug,
+    set_goal_executor,
+    set_message_slug,
+)
+
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -34,6 +44,7 @@ def post_message(
     executor: str | None = None,
     context_refs: list[dict] | None = None,
     files: list[str] | None = None,
+    lane: str | None = None,
     slug: str | None = None,
     run_id: str | None = None,
 ) -> str:
@@ -47,8 +58,8 @@ def post_message(
     with _get_write_lock(conn):
         conn.execute(
             "INSERT INTO comms_messages "
-            "(id, board, scope, from_agent, to_agent, type, text, options, reply_to, stage, conv, ts, depends_on, task_status, artifact_path, artifact_type, goal_id, executor, context_refs, files, slug, run_id) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "(id, board, scope, from_agent, to_agent, type, text, options, reply_to, stage, conv, ts, depends_on, task_status, artifact_path, artifact_type, goal_id, executor, context_refs, files, lane, slug, run_id) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 message_id,
                 board,
@@ -70,69 +81,13 @@ def post_message(
                 executor,
                 json.dumps(context_refs) if context_refs is not None else None,
                 json.dumps(files) if files is not None else None,
+                lane,
                 slug,
                 run_id,
             ),
         )
         conn.commit()
     return message_id
-
-
-def set_goal_executor(conn: sqlite3.Connection, message_id: str, executor: str) -> None:
-    """Persist the chosen executor on a goal message (UI selector override)."""
-    with _get_write_lock(conn):
-        conn.execute(
-            "UPDATE comms_messages SET executor=? WHERE id=? AND type='goal'",
-            (executor, message_id),
-        )
-        conn.commit()
-
-
-def set_message_slug(conn: sqlite3.Connection, message_id: str, slug: str) -> None:
-    """Persist the filesystem slug on a goal message."""
-    with _get_write_lock(conn):
-        conn.execute(
-            "UPDATE comms_messages SET slug=? WHERE id=?",
-            (slug, message_id),
-        )
-        conn.commit()
-
-
-def read_message_slug(conn: sqlite3.Connection, message_id: str) -> dict | None:
-    """Read slug + text for a goal message. Returns None if not found."""
-    row = conn.execute(
-        "SELECT slug, text FROM comms_messages WHERE id=? AND type='goal'",
-        (message_id,),
-    ).fetchone()
-    if row is None:
-        return None
-    return {"slug": row["slug"], "text": row["text"]}
-
-
-def get_goal_board_scope(
-    conn: sqlite3.Connection, goal_id: str
-) -> tuple[str, str] | None:
-    """Return ``(board, scope)`` for a goal message, or None if not a live goal.
-
-    Used to decouple the *board scope* a goal's decompose agents post to (the
-    parent feature/project board the goal lives on) from the *run identity* the
-    consultation FSM uses on disk (the goal slug). Without this the consultation
-    posts to a throwaway slug-scoped board instead of the board it was spawned from.
-    """
-    if not goal_id:
-        return None
-    row = conn.execute(
-        "SELECT board, scope FROM comms_messages "
-        "WHERE id=? AND type='goal' AND deleted_at IS NULL",
-        (goal_id,),
-    ).fetchone()
-    if row is None:
-        return None
-    board = (row["board"] or "").strip()
-    scope = (row["scope"] or "").strip()
-    if not board or not scope:
-        return None
-    return board, scope
 
 
 def get_messages(
