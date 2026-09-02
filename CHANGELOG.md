@@ -64,6 +64,42 @@ No behaviour change: nothing consumes the two fields yet. This is the prerequisi
 turned out to need — it makes D's "tasks declare accurate file footprints" precondition
 reachable, where before it was unsatisfiable.
 
+### FSM — parallelism is on, gated on the lane partition auditing safe (Phase D)
+
+A `parallel_states` state with `isolation: lane` now drains its ready tasks **concurrently**
+— but only while the frontier's lane partition actually audits safe. `_resolve_isolation`
+returns `lane_partition.AuditedLaneIsolation` instead of the pinned `SerialIsolation`.
+
+- `isolation: lane` (default) → parallel while `audit_lane_partition(...)["safe"]`, else one
+  worker. `isolation: serial` is obeyed literally; `isolation: worktree` degrades to serial
+  with a warning (`WorktreeIsolation` is still a stub that raises).
+- `max_workers: N` is now honoured — `LaneIsolation` gained a cap below the lane count.
+- **The audit re-runs every scheduling round, not once at drain start.** The ready frontier
+  grows as tasks complete and unblock dependents, so a task that becomes ready later can
+  conflict with one already running; a single up-front check would miss it. An audit that
+  raises returns one worker — failure never widens concurrency.
+
+**On a DAG whose tasks declare no footprints this drains serially**, which is every DAG
+today: Phase D cannot behave worse than before it, and becomes parallel exactly when a
+planner has declared lanes and footprints that hold up.
+
+**No shipped flow opts in.** Adding `parallel_states` to a flow stays a deliberate decision,
+because for `team-build` it is not only a concurrency change: its `REVIEWING` loops back to
+`BUILDING` while ready tasks remain, so BUILDING drains one task per FSM cycle with a review
+between each. Opting in makes it drain the whole frontier and review once — a change to
+review cadence that lands even at serial isolation.
+
+```yaml
+parallel_states:
+  BUILDING:
+    isolation: lane
+    max_workers: 4
+```
+
+Not included: retiring `goal_executor._run_loop`. Still open: the audit sees only *declared*
+footprints, so a task writing outside its declared set remains invisible to it — closing that
+needs `WorktreeIsolation`.
+
 ## 2.20.0
 
 ### Board — project-planner (G2): spec → sibling features
