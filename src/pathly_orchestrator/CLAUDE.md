@@ -1133,21 +1133,8 @@ a deliberate, test-visible decision.
 The architectural change: `scheduler_loop` stops being a rival ENGINE and becomes the fan-out
 executor **of a state**. `orchestrator._loop` no longer calls `_run_stage_via_terminal` directly —
 both its spawn call sites now go through `supervisor/fan_out.py::run_stage`, the ONE call site for
-executing a stage:
-
-```
-  next_action() -> current_state = "BUILDING"
-        |
-        +- NOT parallel --> _run_stage_via_terminal      (today, unchanged)
-        |
-        +- parallel ------> scheduler_loop(...)          <- the fan-out
-        |                     returns when the frontier is drained
-        v
-  run_gates(BUILDING -> REVIEWING)   <- the JOIN. ONE gate run, after every worker
-        |                               finished. fan_out does NOT call gates.
-        v
-  complete_stage() -> write_state("REVIEWING")
-```
+executing a stage — drawn in **Architecture at a glance → 2. Inside a stage**, which shows the
+branch as it stands today (Phase C's serial pin is described below, not drawn).
 
 `fsm_state.current` stays the scalar `"BUILDING"` for the whole drain, so `write_state`'s legality
 check, the `STATE.json` export, the `pathly-*` CLI and Studio's flow editor are all untouched. The
