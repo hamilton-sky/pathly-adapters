@@ -2,6 +2,217 @@
 
 Python package that implements the Pathly finite-state machine. Runs as both an MCP server (registered in `.claude/settings.json` as `pathly-fsm`) and an HTTP server on port **8765**.
 
+## Architecture at a glance — control and data flow
+
+Five views of the SAME system, verified against the code rather than reconstructed from the
+prose below. The narrative sections that follow carry the detail and the phase-by-phase history
+of how it got here; these are the map.
+
+### 1. Control — one engine, one authority
+
+```
+ ENTRY POINTS                          all converge on the same engine
+ ------------                          -------------------------------
+ Studio "Start"  - POST /runner/start --+
+ POST /runs (kind=flow) ----------------+
+ /comms/goals/run  -+                   |
+   executor=team ---+- _run_team -------+
+   executor=loop ---+  (flow=goal-loop) |
+ /comms/{goals,features,project}/decompose -+   (mode=consultation only;
+                                            |    mode=planner/plan is a board run)
+                                        v
+                              supervisor.api.start_run()
+                              - RunnerState -> _registry[topic]
+                              - run_history PARENT row (adapter = FLOW NAME)
+                                        |
+                                        v
+                        +------- orchestrator._loop --------+
+                        |  (THE engine - one per run)       |
+                        +----------------+------------------+
+                                         |
+    +------------------------------------v---------------------------------+
+    |  1. abort? pause? caps?  (iterations, max_cost_usd)                   |
+    |  2. POST /next_action  ->  {current_state, agent_hint.instructions,   |
+    |                             preferred_adapter, decision}              |
+    |  3. resolve_session()  ->  reuse session_id iff same adapter          |
+    |  4. fan_out.run_stage(...)          <- THE one stage call site        |
+    |  5. POST /complete_stage  -> run_gates() -> next_state | blocked      |
+    +------------------------------------+---------------------------------+
+                                         |  next_state
+                                         v
+                          eventlog.write_state()   <- legality-checked
+                          fsm_state (DB)  ->  STATE.json (export)
+                                         |
+                                         +--> loop, until DONE / parked / abort
+```
+
+`executor: single` is the one goal path that does **not** enter here — it is agent-driven
+(`start_board_run` + the `development/drain-dag` skill), and `pathly-run` is a separate CLI
+path entirely (see its own section below).
+
+### 2. Inside a stage — single spawn vs fan-out
+
+```
+                        fan_out.run_stage(state, flow_config, STATE, ...)
+                                         |
+                    parallel_config(flow_config, STATE)
+                                         |
+          +------------------------------+------------------------------+
+          | None (no parallel_states entry)      | entry present         |
+          |  -- every state of 9 flows --        |  -- goal-loop/DRAINING|
+          v                                      v   (the ONLY opt-in) --+
+   _run_stage_via_terminal(...)          fan_out._drain(...)
+   ONE agent, stage's own prompt          |
+          |                               +- scope = _frontier_scope(state)
+          |                               |    the run's BOARD scope, NOT state.topic
+          |                               |    (a goal run's topic is its own slug)
+          |                               |
+          |                               +- isolation <- YAML
+          |                               |    lane -> AuditedLaneIsolation
+          |                               |    serial -> Serial ; worktree -> Serial+warn
+          |                               v
+          |                        drain.drain_frontier()   <- ONE scheduler_loop
+          |                        - owns CostCapTracker       call site in the repo
+          |                        - wraps spawn_fn EXACTLY once
+          |                        - ORs tracker.exceeded() into abort_check
+          |                               |
+          |                               v
+          |                        scheduler_loop()  -- frontier poll --+
+          |                          |                                  |
+          |                          |  max_concurrency(ready_lanes)    |
+          |                          |    +- re-AUDITS every round      |
+          |                          |       undeclared files -> 1      |
+          |                          |       cross-lane overlap -> 1    |
+          |                          |       audit raised     -> 1      |
+          |                          |                                  |
+          |                          +-> worker(task) -+  <=1 per lane  |
+          |                          +-> worker(task) -+                |
+          |                          +-> worker(task) -+                |
+          |                                  | completion_q             |
+          |                                  +-- retry | escalate ------+
+          |                                      (task_retry)
+          |                               |
+          |                               v  frontier drained
+          |                        _merge_drain_result()
+          |                        {cost_usd, session_id=None, outcome, result}
+          v                               v
+          +--------------> same dict shape <-------  _loop is untouched below here
+                                         |
+                                         v
+                      run_gates(STATE -> next)   <- THE JOIN, once
+                      (goal-loop's: require_tasks_done + command_gate build + test;
+                       each flow declares its own under `gates:`)
+```
+
+`fsm_state.current` stays the **scalar** `"DRAINING"` for the whole drain. The parallelism is
+inside a state's *execution*, not in the state vocabulary — which is why `write_state`'s
+legality check, the `STATE.json` export, the `pathly-*` CLI and Studio's flow editor never had
+to change.
+
+### 3. The spawn chokepoint — adapter-agnostic, run-keyed
+
+```
+  supervisor._run_stage_via_terminal(state, prompt, adapter, model, run_id, ...)
+        |
+        +- _resolve_spawn_argv()      <- the seam a NEW ADAPTER touches
+        +- _record_spawn_identity()   <- run_history {run_id, feature=slug, board_scope}
+        |
+        +--> SSE  TERMINAL_SPAWN {tab_id, run_id, argv[], cwd, adapter}
+        |         on /events/spawn (topic-independent)
+        |                    |
+        |      +-------------+--------------+   exactly ONE host may listen
+        |      v                            v
+        |   Studio (node-pty tab)      pathly-pty-host (pipes, stdin=/dev/null)
+        |      |  desktop, visible          |  server/CI, headless
+        |      +-------------+--------------+
+        |                    |
+        +-<-- POST /runner/terminal/started      releases wait_started(30)
+        |
+        |     ... agent runs; writes AGENT_DONE to the DB mid-run ...
+        |
+        +-<-- POST /runner/terminal/result {run_id, exit_code, stdout_tail, adapter}
+                     |
+                     +- parse_result(adapter, stdout_tail)  <- ONE server parser
+                     |    claude -> total_cost_usd ; codex -> tokens ; agy -> estimate
+                     +- _patch_last_agent_done(run_id) -> BILLING_UPDATE  (authoritative)
+                     +- record_stage_provenance()  -> git diff, SERVER-measured
+                     +- run.mark_pty_result()  -> unblocks the supervisor
+                                |
+                                v
+                     result merged from TWO sources:
+                       stdout      -> session_id, cost_usd
+                       AGENT_DONE  -> summary, outcome (the pass/fail signal)
+```
+
+`run_id` shapes are the identity every consumer keys off: `{topic}-{N}-{ts}` per FSM stage,
+`sched-{task_id}#{attempt}` per DAG task, a bare uuid per board/parent run.
+
+### 4. Data — the DB is the authority; disk is a seed or an export
+
+```
+  SEEDS (disk -> DB, once)                THE AUTHORITY              EXPORTS (DB -> disk)
+  ------------------------                -------------              --------------------
+  core/flows/*.flow.yaml --_refresh_flows-->+------------+
+                                            | flow_nodes |
+  abilities/*.md, prompts/*.md --compose--->| flow_yaml  |
+                                            +------------+
+                                            | fsm_state  |--atomic--> STATE.json  (git)
+                                            +------------+
+                                            | fsm_events |--debounce-> EVENTS.jsonl (ignored)
+                                            +------------+
+                                            | comms_*    |--debounce-> BOARD.json   (ignored)
+                                            +------------+
+                                            | run_history|
+                                            | agent_invoc|
+                                            +------------+
+  Runtime code reads the DB - never the mirror.
+  Enforced by scripts/check_no_mirror_reads.py (lint `consistency` job).
+```
+
+Telemetry is a **projection**, not a second write path:
+
+```
+  agent writes ---> AGENT_DONE ---+
+  (completion-report)             |  append_event() live hook
+                                  +---> invocation_projection
+  /runner/terminal/result --->    |     - 1 row per AGENT_DONE, keyed by fsm_events.seq
+  BILLING_UPDATE -----------------+     - BILLING_UPDATE folded in (billing WINS, never summed)
+                                        - _price_if_needed(): cost==0 & tokens>0 -> estimate
+                                              |
+                                              v
+                                       agent_invocations ---> /db/stats, /db/rollup,
+                                                              /telemetry/trends, Monitor
+```
+
+### 5. Prompt assembly — three paths, ONE injector
+
+```
+  FSM stage            board run                 DAG task
+  ---------            ---------                 --------
+  build_prompt()       start_board_run()         task_prompt.build_task_prompt()
+       |                    |                          |
+  compose_skill()      compose_skill()           compose_skill("development/execute-task")
+       |                    |                          |
+       v                    v                          v
+  _inject_prompt_vars( _inject_board_prompt_vars  _inject_vars(...)
+    run_category=       run_category="single")     run_category="loop")
+    "flow")                 |                          |
+       +--------------------+--------------+-----------+
+                                           v
+                          ONE injector: fsm_compose._inject_prompt_vars
+                          <fsm_feature> <feature_path> <feature> <board> <run_category>
+                                           |
+                                           v
+                              + RUNNER_CONTRACT_BLOCK  (one constant, all headless paths)
+                              + retry ladder (attempt >= 2)
+                              + board context (governance + semantic, per-tier budget)
+```
+
+**Why all three must share the injector:** an unsubstituted `<fsm_feature>` makes the agent write
+its `AGENT_DONE` under a literal string — mis-keyed event, no projected invocation, so the run is
+unbilled and absent from the Monitor. The DAG path had no injector at all until Phase E; see the
+prerequisites in the Phase E section below.
+
 ## State machine
 
 Features advance through: `PLANNING -> DESIGNING -> BUILDING -> REVIEWING -> TESTING -> RETRO -> DONE` (the literal state identifiers in `core/flows/team.flow.yaml`; the `-ING` suffix matters — `current_state` is e.g. `"BUILDING"`, not `"BUILD"`). PLANNING is `states[0]` — the seed a new feature starts at. (STORMING was dropped as the team seed — it was headless ceremony for spec-driven work; genuine brainstorming lives in the interactive `/pathly storm` on-ramp and the consultation flows. STORMING still exists as a state in `test.flow.yaml` and maps to `/pathly storm`.)
