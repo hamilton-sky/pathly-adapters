@@ -158,6 +158,17 @@ the default tier, which must stay exactly `DEFAULT_EXPOSED_SKILLS`). The default
 under `requires` (asserted). Declared for the **claude** adapter only; an adapter without `requires:`
 simply has no dependency edges.
 
+**Untracked skills are adopted.** Repair, prune and `--uninstall` only reach manifest-owned files, so a
+skill dir the manifest lost (a partial run, an older install) used to survive a trim and every uninstall.
+`install_cli/adopt.py` records such a file in the manifest — on `--apply`/`--repair`, `--remove` and
+`--uninstall`, never on `--list`/`--dry-run` (those preview it: "Would adopt …", and the prune preview counts
+the adoptees) — **only if** it sits at the exact path Pathly writes for a known skill **and** its frontmatter
+`name:` equals that skill's `skill:` key (the signature the stitcher writes, so it is provably
+Pathly-generated; the content is not rewritten by adoption itself). Anything else at a Pathly path — a foreign
+frontmatter, a symlinked skill dir — is left untouched with a warning (`--force` still takes a file over
+explicitly). `--list` shows `installed (untracked)` for the adoptable and `installed (foreign)` for the rest.
+Skills only; agents/flows/templates are not adopted.
+
 **Removals are never silent.** `--dry-run` lists every owned file the repair would delete
 (`install_cli/report.py::report_would_prune`, fed by `materialize.plan_prunes`); without `--repair`
 it says the files are kept but `--repair` would remove them. The real run prints what it pruned.

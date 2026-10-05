@@ -3,7 +3,7 @@ import json
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Iterable
 
 MANIFEST_NAME = ".pathly-manifest.json"
 
@@ -71,18 +71,45 @@ def owned_names(dest: Path) -> set[str]:
     return set(_load_manifest(dest)["files"])
 
 
+def adopt(dest: Path, names: Iterable[str]) -> list[str]:
+    """Record files already on disk as Pathly-owned, without rewriting them.
+
+    For files Pathly wrote but whose manifest entry was lost: once tracked, a repair
+    refreshes or prunes them and ``--uninstall`` removes them, instead of every one of
+    those silently skipping them. Returns the names newly adopted.
+    """
+    manifest = _load_manifest(dest)
+    adopted: list[str] = []
+    for name in sorted(set(names) - set(manifest["files"])):
+        target = dest / name
+        if not target.resolve().is_relative_to(dest.resolve()):
+            raise ValueError(
+                f"Path traversal detected: {name!r} escapes destination {dest}"
+            )
+        if not target.is_file():
+            continue
+        manifest["files"][name] = datetime.now(timezone.utc).isoformat()
+        adopted.append(name)
+    if adopted:
+        _save_manifest(dest, manifest)
+    return adopted
+
+
 def plan_prunes(
     files: dict[str, str],
     dest: Path,
     *,
     prune_filter: Callable[[str], bool] | None = None,
+    extra_owned: Iterable[str] = (),
 ) -> list[str]:
     """Names a ``repair`` materialize of ``files`` would remove from ``dest`` (sorted).
 
     Read-only: this is what ``--dry-run`` reports, since ``materialize(dry_run=True)``
-    returns only the would-write list.
+    returns only the would-write list. ``extra_owned`` are files a real run would adopt
+    first (see ``adopt``), so the preview matches what the run will actually do.
     """
-    return sorted(_stale_names(owned_names(dest), files, prune_filter))
+    owned = owned_names(dest) | set(extra_owned)
+    return sorted(_stale_names(owned, files, prune_filter))
 
 
 def materialize(

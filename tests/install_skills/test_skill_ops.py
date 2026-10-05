@@ -224,15 +224,20 @@ def test_remove_of_a_skill_that_is_not_installed_is_a_noop(tmp_path):
 
 
 @pytest.mark.slow
-def test_remove_will_not_delete_an_untracked_skill(tmp_path):
+def test_remove_will_not_delete_a_skill_that_is_not_pathlys(tmp_path):
+    """On disk, untracked, and not recognisably Pathly-generated: hands off.
+
+    (An untracked file that *is* Pathly-generated is adopted and removed — see
+    test_adopt.py.)
+    """
     assert run_install_cli(["claude", "--apply"], tmp_path).returncode == 0
     stray = tmp_path / ".claude" / "skills" / "pathly-end"
     stray.mkdir()
-    (stray / "SKILL.md").write_text("---\nname: end\n---\nmine", encoding="utf-8")
+    (stray / "SKILL.md").write_text("---\nname: my-own-end\n---\nmine", encoding="utf-8")
 
     r = run_install_cli(["claude", "--remove", "end"], tmp_path)
     assert r.returncode == 1
-    assert "not tracked" in r.stderr
+    assert "not Pathly's" in r.stderr
     assert (stray / "SKILL.md").read_text(encoding="utf-8").endswith("mine")
 
 

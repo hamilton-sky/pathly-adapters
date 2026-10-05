@@ -20,6 +20,7 @@ from .materialize import (
     materialize_flows,
     uninstall,
 )
+from .adopt import adopt_untracked_for_host
 from .report import report_pruned, report_would_prune
 from .skill_catalog import (  # noqa: F401  (DEFAULT_EXPOSED_SKILLS is re-exported)
     DEFAULT_EXPOSED_SKILLS,
@@ -513,8 +514,14 @@ def _run_host(
             prune_filter=_is_flow,
         )
         if skills_dest and skill_files:
+            would_adopt = adopt_untracked_for_host(host, install_cfg, dry_run=True)
             report_would_prune(
-                host, "skill file(s)", skills_dest, skill_files, repair=repair
+                host,
+                "skill file(s)",
+                skills_dest,
+                skill_files,
+                repair=repair,
+                extra_owned=would_adopt,
             )
         if templates_dest and template_files:
             report_would_prune(
@@ -569,6 +576,7 @@ def _run_host(
         report_pruned(host, "flow(s)", dest, flow_pruned)
 
         if skills_dest and skill_files:
+            adopt_untracked_for_host(host, install_cfg, dry_run=False)
             pruned = []
             written = materialize(
                 skill_files,
@@ -660,8 +668,11 @@ def _run_host_uninstall(host: str, dry_run: bool) -> None:
     skills_cfg = install_cfg.get("skills")
     if skills_cfg:
         skills_dest = Path(skills_cfg["destination"]).expanduser()
+        # untracked Pathly skills (manifest lost them) are adopted so they go too
+        adopted = adopt_untracked_for_host(host, install_cfg, dry_run=dry_run)
         skill_removed = uninstall(skills_dest, dry_run=dry_run)
         if dry_run:
+            skill_removed = sorted(set(skill_removed) | set(adopted))
             print(
                 f"\n[{host}] Would remove {len(skill_removed)} skill(s) from {skills_dest}:"
             )

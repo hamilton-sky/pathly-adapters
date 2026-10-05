@@ -6,7 +6,7 @@ the writes. Kept apart from ``materialize`` (file sync) and ``orchestrate`` (flo
 """
 
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Iterable
 
 from .materialize import plan_prunes
 
@@ -20,13 +20,16 @@ def report_would_prune(
     repair: bool,
     prune_filter: Callable[[str], bool] | None = None,
     why: str = "obsolete",
+    extra_owned: Iterable[str] = (),
 ) -> None:
     """Dry-run: list the owned files in ``dest`` that fall outside ``files``.
 
     With ``repair`` they are removed by the real run; without it they are left alone, and
     the note says so (the user sees what ``--repair`` would additionally do).
     """
-    names = plan_prunes(files, dest, prune_filter=prune_filter)
+    names = plan_prunes(
+        files, dest, prune_filter=prune_filter, extra_owned=extra_owned
+    )
     if not names:
         return
     if repair:

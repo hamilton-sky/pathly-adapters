@@ -14,6 +14,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+from .adopt import adopt_untracked, find_untracked
 from .materialize import materialize, owned_names
 from .orchestrate import _load_install_yaml
 from .report import report_pruned, report_would_prune
@@ -48,12 +49,18 @@ def unknown_everywhere(hosts: list[str], names: set[str]) -> list[str]:
     return sorted(names - resolved_anywhere) if names else []
 
 
-def _state(info: SkillInfo, *, on_disk: bool, tracked: bool) -> str:
+def _state(info: SkillInfo, *, on_disk: bool, tracked: str) -> str:
+    """``tracked`` is "owned" (in the manifest), "adoptable" (untracked but provably
+    Pathly's — the next apply/remove/uninstall adopts it) or "foreign" (not adopted)."""
     if info.default:
         return "default" if on_disk else "default (not installed)"
     if not on_disk:
         return "available"
-    return "installed" if tracked else "installed (untracked)"
+    return {
+        "owned": "installed",
+        "adoptable": "installed (untracked)",
+        "foreign": "installed (foreign)",
+    }[tracked]
 
 
 def run_list(host: str) -> bool:
@@ -64,6 +71,12 @@ def run_list(host: str) -> bool:
     dest, catalog = ctx
     owned = owned_names(dest)
     installed = installed_keys(catalog, dest)
+    adoptable, _ = find_untracked(catalog, dest, owned)
+
+    def tracking(info: SkillInfo) -> str:
+        if info.filename in owned:
+            return "owned"
+        return "adoptable" if info.filename in adoptable else "foreign"
 
     rows = [
         (
@@ -72,7 +85,7 @@ def run_list(host: str) -> bool:
             _state(
                 catalog[key],
                 on_disk=key in installed,
-                tracked=catalog[key].filename in owned,
+                tracked=tracking(catalog[key]),
             ),
             ", ".join(catalog[key].requires) or "-",
         )
@@ -96,6 +109,11 @@ def run_list(host: str) -> bool:
         f"\n  remove: pathly-setup {host} --remove <skill>"
         "   (refused while an installed skill requires it)"
     )
+    if adoptable:
+        print(
+            f"\n  {len(adoptable)} untracked Pathly skill(s) will be adopted into the manifest "
+            "by the next --apply / --remove / --uninstall."
+        )
     return True
 
 
@@ -115,7 +133,10 @@ def run_remove(host: str, names: list[str], *, dry_run: bool = False) -> bool:
         )
         return False
 
-    owned = owned_names(dest)
+    # Untracked Pathly skills are adopted first so they can be removed like the rest (a
+    # dry run only reports them — the manifest is not touched).
+    adopted = adopt_untracked(host, dest, catalog, dry_run=dry_run)
+    owned = owned_names(dest) | set(adopted)
     installed = installed_keys(catalog, dest)
     problems: list[tuple[str, str]] = []
     to_remove: list[str] = []
@@ -135,7 +156,8 @@ def run_remove(host: str, names: list[str], *, dry_run: bool = False) -> bool:
             problems.append(
                 (
                     key,
-                    "it is on disk but not tracked in the manifest, "
+                    "it is on disk but is not Pathly's (not tracked in the manifest and "
+                    "not recognisably Pathly-generated — see the warning above), "
                     "so Pathly will not delete it",
                 )
             )
