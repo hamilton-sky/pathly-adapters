@@ -4,7 +4,7 @@
 
 Adapter install/setup, stitch & compose, skill composition / round-trip / export, plugin manifests.
 
-25 test file(s).
+26 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -19,6 +19,7 @@ Adapter install/setup, stitch & compose, skill composition / round-trip / export
 | `test_e2e_install.py` | End-to-end tests for the install_cli install/uninstall flow via subprocess | 9 |
 | `test_evaluator_skill.py` | Tests for the evaluator agent + skill (BLOCK E1 — comms-board) | 9 |
 | `test_hooks_install.py` | Stop-hook install: a command that runs, and a repair that keeps the user's hook order | 16 |
+| `test_hosts_default_tier.py` | The default skill tier is ONE set for every adapter — but an adapter only has the skills it | 8 |
 | `test_manifests.py` | covers manifest required fields; codex plugin version matches distribution version | 2 |
 | `test_prompt_files.py` | System-prompts as .md FILES: scoping, label, CRUD, and the legacy DB→files migration | 8 |
 | `test_prompt_library.py` | prompt_library query layer — CRUD, name-upsert, and global/project merge | 7 |
