@@ -21,19 +21,18 @@ from .materialize import (
     uninstall,
 )
 from .report import report_pruned, report_would_prune
+from .skill_catalog import (  # noqa: F401  (DEFAULT_EXPOSED_SKILLS is re-exported)
+    DEFAULT_EXPOSED_SKILLS,
+    load_catalog,
+    resolve_skill_args,
+)
 
 # Must stay in sync with detect_hosts() — any host returned by detect_hosts()
 # must appear here, or auto-detected installs will fail with a confusing error.
 ALLOWED_HOSTS = {"claude", "codex", "copilot", "antigravity"}
 
-# Tier-1 — the only skills installed by default (`--apply`). These are the interactive board
-# on-ramps (create-feature, post), the dispatcher/help that make them discoverable, and the two
-# operational utilities people actually reach for (status, fsm-call). Every other skill is
-# export-on-demand: `pathly-setup <host> --export <skill>` (or `--all-skills` for the lot).
-# Keyed by the core skill name (the `skill:` field of each *_skill.yaml meta).
-DEFAULT_EXPOSED_SKILLS = frozenset(
-    {"pathly", "help", "create-feature", "post", "status", "fsm-call"}
-)
+# DEFAULT_EXPOSED_SKILLS (the Tier-1 default set) lives in skill_catalog and is re-exported
+# here: the Studio export endpoint and the docs import it from `install_cli.orchestrate`.
 
 # Substring that identifies a hook command as Pathly-owned.
 _PATHLY_HOOK_MARKER = "pathly_hooks"
@@ -299,6 +298,80 @@ def _load_install_yaml(host: str) -> dict:
         return yaml.safe_load(f)
 
 
+def _select_skill_keys(
+    host: str, catalog: dict, export_skills: set[str] | frozenset[str] | None
+) -> set[str]:
+    """The skill keys to install: the default tier plus the requested ``--export`` names."""
+    keys, unknown = resolve_skill_args(catalog, sorted(export_skills or ()))
+    for name in unknown:
+        print(
+            f"  [warn] [{host}] unknown skill {name!r} — not exported "
+            f"(see `pathly-setup {host} --list`)",
+            file=sys.stderr,
+        )
+    return set(DEFAULT_EXPOSED_SKILLS) | set(keys)
+
+
+def _build_skill_files(
+    host: str,
+    install_cfg: dict,
+    dest: Path,
+    *,
+    export_skills: set[str] | frozenset[str] | None = None,
+    all_skills: bool = False,
+) -> tuple[Path | None, dict[str, str]]:
+    """Stitch the skills to install. Returns ``(skills_dest, {relative path: content})``.
+
+    Tier gate: only the default tier installs, plus whatever ``--export`` names (or
+    everything with ``all_skills``). ``(None, {})`` when the host has no skills section.
+    """
+    skills_cfg = install_cfg.get("skills")
+    if not skills_cfg:
+        return None, {}
+    skills_dest = Path(skills_cfg["destination"]).expanduser()
+    catalog = load_catalog(host, nested=skills_cfg.get("structure") == "nested")
+    core_skills_dir = core_skills_path()
+    host_instructions: str | None = None
+    instructions_name = skills_cfg.get("host_instructions")
+    if instructions_name:
+        instructions_path = adapter_path(host) / instructions_name
+        if not instructions_path.exists():
+            raise FileNotFoundError(
+                f"No skill host instructions for {host!r}: {instructions_path}"
+            )
+        host_instructions = instructions_path.read_text(encoding="utf-8")
+    wanted = _select_skill_keys(host, catalog, export_skills)
+
+    skill_files: dict[str, str] = {}
+    for info in catalog.values():
+        if not all_skills and info.key not in wanted:
+            continue
+        core_file = _grouped_core_file(core_skills_dir, info.key, _SKILL_GROUPS)
+        try:
+            # Manifest key = core-skills-relative path without ".md" (e.g. "development/build").
+            _grp = _SKILL_GROUPS.get(info.key)
+            compose_key = f"{_grp}/{info.key}" if _grp else info.key
+            skill_files[info.filename] = stitch_skill(
+                core_file,
+                info.meta_file,
+                flows_dest=dest,
+                host_instructions=host_instructions,
+                compose_key=compose_key,
+                adapter=host,
+            )
+            if host == "codex" and info.filename.endswith("/SKILL.md"):
+                skill_dir = info.filename.removesuffix("/SKILL.md")
+                skill_files[f"{skill_dir}/agents/openai.yaml"] = (
+                    _codex_skill_openai_yaml(info.meta)
+                )
+        except FileNotFoundError:
+            print(
+                f"  [warn] No core skill for {info.name!r}, skipping",
+                file=sys.stderr,
+            )
+    return skills_dest, skill_files
+
+
 def _run_host(
     host: str,
     dry_run: bool,
@@ -345,65 +418,13 @@ def _run_host(
             filename = agent_meta.get("filename", f"{agent_name}.md")
             agent_files[filename] = stitched
 
-    skills_cfg = install_cfg.get("skills")
-    skill_files: dict[str, str] = {}
-    skills_dest: Path | None = None
-    if skills_cfg:
-        skills_dest = Path(skills_cfg["destination"]).expanduser()
-        nested = skills_cfg.get("structure") == "nested"
-        core_skills_dir = core_skills_path()
-        host_instructions: str | None = None
-        instructions_name = skills_cfg.get("host_instructions")
-        if instructions_name:
-            instructions_path = adapter_path(host) / instructions_name
-            if not instructions_path.exists():
-                raise FileNotFoundError(
-                    f"No skill host instructions for {host!r}: {instructions_path}"
-                )
-            host_instructions = instructions_path.read_text(encoding="utf-8")
-        _requested = export_skills or frozenset()
-        for meta_file in sorted(meta_dir.glob("*_skill.yaml")):
-            skill_name = meta_file.stem.removesuffix("_skill")
-            skill_meta = yaml.safe_load(meta_file.read_text(encoding="utf-8"))
-            # Tier gate: install only the Tier-1 on-ramps by default; other skills install
-            # only when explicitly requested (--export <skill>) or with --all-skills.
-            if (
-                not all_skills
-                and skill_meta["skill"] not in DEFAULT_EXPOSED_SKILLS
-                and skill_meta["skill"] not in _requested
-            ):
-                continue
-            core_file = _grouped_core_file(
-                core_skills_dir, skill_meta["skill"], _SKILL_GROUPS
-            )
-            default_filename = (
-                f"{skill_name}/SKILL.md" if nested else f"{skill_name}.md"
-            )
-            try:
-                filename = skill_meta.get("filename", default_filename)
-                # Manifest key = core-skills-relative path without ".md" (e.g. "development/build").
-                _grp = _SKILL_GROUPS.get(skill_meta["skill"])
-                compose_key = (
-                    f"{_grp}/{skill_meta['skill']}" if _grp else skill_meta["skill"]
-                )
-                skill_files[filename] = stitch_skill(
-                    core_file,
-                    meta_file,
-                    flows_dest=dest,
-                    host_instructions=host_instructions,
-                    compose_key=compose_key,
-                    adapter=host,
-                )
-                if host == "codex" and filename.endswith("/SKILL.md"):
-                    skill_dir = filename.removesuffix("/SKILL.md")
-                    skill_files[f"{skill_dir}/agents/openai.yaml"] = (
-                        _codex_skill_openai_yaml(skill_meta)
-                    )
-            except FileNotFoundError:
-                print(
-                    f"  [warn] No core skill for {skill_name!r}, skipping",
-                    file=sys.stderr,
-                )
+    skills_dest, skill_files = _build_skill_files(
+        host,
+        install_cfg,
+        dest,
+        export_skills=export_skills,
+        all_skills=all_skills,
+    )
 
     templates_cfg = install_cfg.get("templates")
     template_files: dict[str, str] = {}

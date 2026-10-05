@@ -19,6 +19,7 @@ def report_would_prune(
     *,
     repair: bool,
     prune_filter: Callable[[str], bool] | None = None,
+    why: str = "obsolete",
 ) -> None:
     """Dry-run: list the owned files in ``dest`` that fall outside ``files``.
 
@@ -29,7 +30,7 @@ def report_would_prune(
     if not names:
         return
     if repair:
-        print(f"\n[{host}] Would remove {len(names)} obsolete {label} from {dest}:")
+        print(f"\n[{host}] Would remove {len(names)} {why} {label} from {dest}:")
     else:
         print(
             f"\n[{host}] {len(names)} installed {label} in {dest} fall outside the "
@@ -39,10 +40,12 @@ def report_would_prune(
         print(f"  {dest / name}")
 
 
-def report_pruned(host: str, label: str, dest: Path, names: list[str]) -> None:
+def report_pruned(
+    host: str, label: str, dest: Path, names: list[str], why: str = "obsolete"
+) -> None:
     """Real run: say what a repair removed instead of pruning silently."""
     if not names:
         return
-    print(f"[{host}] Removed {len(names)} obsolete {label} from {dest}:")
+    print(f"[{host}] Removed {len(names)} {why} {label} from {dest}:")
     for name in sorted(names):
         print(f"  {dest / name}")

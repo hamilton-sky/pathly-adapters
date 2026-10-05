@@ -106,20 +106,37 @@ file — see the root [CLAUDE.md](../../CLAUDE.md) "Skill delivery — two modes
 skills don't need to be installed to *function* in the app; installing all ~60 would only clutter
 the host's slash-command namespace with app-driven commands.
 
-**The lever** is `DEFAULT_EXPOSED_SKILLS` — a frozenset keyed by the `skill:` field, in
-`src/install_cli/orchestrate.py`; `_run_host` skips any skill not in that set unless it is requested.
+**The lever** is `DEFAULT_EXPOSED_SKILLS` — a frozenset keyed by the `skill:` field, defined in
+`src/install_cli/skill_catalog.py` (re-exported from `orchestrate.py`, where the Studio endpoint imports
+it); `_build_skill_files` in `orchestrate.py` skips any skill not in that set unless it is requested.
+`skill_catalog.py` is the one reader of `adapters/<host>/_meta/*_skill.yaml` (key → file → default flag)
+shared by the installer, `--list`/`--remove` and the Studio picker.
 
 ```bash
 pathly-setup claude --apply                          # Tier-1 only (default)
 pathly-setup claude --export build --export review   # Tier-1 + these (repeatable)
 pathly-setup claude --all-skills                     # every skill (the pre-tier behavior)
+pathly-setup claude --list                           # every skill: default / installed / available
+pathly-setup claude --remove review [--dry-run]      # remove an installed non-default skill
 ```
+
+Skills are addressed by their `skill:` key (`build`, `fsm-call`, `team/build`); `--export`/`--remove`
+also accept the directory name (`pathly-team-build`). An unknown name is an error (it used to silently
+install nothing). `--list` and `--remove` are skills-only: they cannot be combined with
+`--apply`/`--repair`/`--force`/`--export`/`--all-skills`/`--uninstall`.
 
 **Export is declarative — `--repair` reconciles.** An apply with `--repair` writes exactly
 {Tier-1 ∪ requested} and **removes** any previously-exported skill no longer requested. So:
 - **export** a skill → `--export <skill>` installs it;
 - **unexport** a skill → re-apply with `--repair` and the skill omitted; repair prunes it as an
   obsolete owned file (see `tests/install_skills/test_setup.py::test_materialize_repair_removes_obsolete_owned_files`).
+
+**`--remove` is the same reconcile, scoped.** The desired set is *installed − removals*, so only the
+removed skills' files fall outside it and only those are pruned (same `materialize` prune primitive and
+reporting as a full repair). It is all-or-nothing, refuses a default-tier skill (defaults are always
+reinstated by the declarative contract — `--uninstall` removes everything), and refuses a skill present
+on disk but not in the manifest. Unlike `--apply --repair` it does not rewrite kept skills or touch
+agents, flows, templates, hooks or MCP config.
 
 **Removals are never silent.** `--dry-run` lists every owned file the repair would delete
 (`install_cli/report.py::report_would_prune`, fed by `materialize.plan_prunes`); without `--repair`

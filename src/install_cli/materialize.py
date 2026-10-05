@@ -66,6 +66,11 @@ def _stale_names(
     return stale
 
 
+def owned_names(dest: Path) -> set[str]:
+    """Relative names the manifest in ``dest`` records as Pathly-owned (empty if none)."""
+    return set(_load_manifest(dest)["files"])
+
+
 def plan_prunes(
     files: dict[str, str],
     dest: Path,
@@ -77,8 +82,7 @@ def plan_prunes(
     Read-only: this is what ``--dry-run`` reports, since ``materialize(dry_run=True)``
     returns only the would-write list.
     """
-    owned = set(_load_manifest(dest)["files"])
-    return sorted(_stale_names(owned, files, prune_filter))
+    return sorted(_stale_names(owned_names(dest), files, prune_filter))
 
 
 def materialize(
