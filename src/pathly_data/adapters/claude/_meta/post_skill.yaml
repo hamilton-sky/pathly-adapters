@@ -1,3 +1,5 @@
 skill: post
 filename: pathly-post/SKILL.md
 natural_language: "/pathly post, post to board, post an artifact to the board, share to a board, post to pathly"
+# requires: skills this skill's own text tells the host to invoke (routes to create-feature when the target board does not exist yet)
+requires: [create-feature]

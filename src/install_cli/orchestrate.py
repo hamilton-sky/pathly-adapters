@@ -23,7 +23,9 @@ from .materialize import (
 from .report import report_pruned, report_would_prune
 from .skill_catalog import (  # noqa: F401  (DEFAULT_EXPOSED_SKILLS is re-exported)
     DEFAULT_EXPOSED_SKILLS,
+    dependents_of,
     load_catalog,
+    requires_closure,
     resolve_skill_args,
 )
 
@@ -301,7 +303,8 @@ def _load_install_yaml(host: str) -> dict:
 def _select_skill_keys(
     host: str, catalog: dict, export_skills: set[str] | frozenset[str] | None
 ) -> set[str]:
-    """The skill keys to install: the default tier plus the requested ``--export`` names."""
+    """The skill keys to install: the default tier, the requested ``--export`` names, and
+    every skill those need (``requires:`` in the skill meta, transitively)."""
     keys, unknown = resolve_skill_args(catalog, sorted(export_skills or ()))
     for name in unknown:
         print(
@@ -309,7 +312,15 @@ def _select_skill_keys(
             f"(see `pathly-setup {host} --list`)",
             file=sys.stderr,
         )
-    return set(DEFAULT_EXPOSED_SKILLS) | set(keys)
+    chosen = set(DEFAULT_EXPOSED_SKILLS) | set(keys)
+    wanted = requires_closure(catalog, chosen)
+    pulled = sorted(wanted - chosen)
+    if pulled:
+        why = ", ".join(
+            f"{k} (for {', '.join(dependents_of(catalog, k, wanted))})" for k in pulled
+        )
+        print(f"[{host}] Also installing required skill(s): {why}")
+    return wanted
 
 
 def _build_skill_files(

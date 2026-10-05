@@ -1,3 +1,5 @@
 skill: review
 filename: pathly-review/SKILL.md
 natural_language: "/pathly review, review code, code review, review"
+# requires: skills this skill's own text tells the host to invoke (invokes the log-agent-done skill to record the review result)
+requires: [log-agent-done]

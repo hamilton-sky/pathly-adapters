@@ -138,6 +138,26 @@ reinstated by the declarative contract — `--uninstall` removes everything), an
 on disk but not in the manifest. Unlike `--apply --repair` it does not rewrite kept skills or touch
 agents, flows, templates, hooks or MCP config.
 
+**Dependencies — `requires:`.** A skill's `_meta/<x>_skill.yaml` may list `requires: [<skill key>, …]`: the
+skills its *own text* tells the host to invoke, on any branch (e.g. `build` → `review` in fast/auto
+mode, `end` → `lessons`/`retro`, `plan` → `scout-path`, `review` → `log-agent-done`). The installer
+adds the transitive closure of `defaults ∪ requested` and prints what it pulled in; `--remove` refuses
+a skill an installed skill needs (directly or through another requirement) and names the
+`--remove a --remove b` that would cascade; `--list` shows a REQUIRES column and `GET /ops/export/skills`
+returns `requires` per row. A required skill is installed as an ordinary skill — removing its dependent
+does not auto-remove it. Requirements apply only in **interactive** installs; runner mode never reads
+skill files.
+
+What is **not** a requirement (declaring these would be wrong — `tests/install_skills/test_skill_requires.py`
+scans the composed skill text and fails on an undeclared invocation, with a short `_NOT_DEPENDENCIES`
+allow-list): the shell command `pathly-fsm-call …` (a console script the skills run in bash — it is
+not the `fsm-call` *skill*, and the bodies say to skip silently if it is unavailable); `Spawn <agent>`
+(an agent, not a skill); a "never route to X" warning; a passive "consumed by X" mention; and the
+`pathly` router's fan-out (it dispatches to ~19 skills — as `requires` it would drag them all into
+the default tier, which must stay exactly `DEFAULT_EXPOSED_SKILLS`). The default tier must be closed
+under `requires` (asserted). Declared for the **claude** adapter only; an adapter without `requires:`
+simply has no dependency edges.
+
 **Removals are never silent.** `--dry-run` lists every owned file the repair would delete
 (`install_cli/report.py::report_would_prune`, fed by `materialize.plan_prunes`); without `--repair`
 it says the files are kept but `--repair` would remove them. The real run prints what it pruned.

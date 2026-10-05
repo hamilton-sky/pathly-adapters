@@ -83,14 +83,14 @@ def test_dry_run_repair_lists_skills_it_would_prune_and_touches_nothing(tmp_path
     before = _snapshot(tmp_path / ".claude")
 
     r = run_install_cli(
-        ["claude", "--dry-run", "--repair", "--export", "build"], tmp_path
+        ["claude", "--dry-run", "--repair", "--export", "design"], tmp_path
     )
     assert r.returncode == 0, r.stderr
 
     out = r.stdout
     would_remove = re.search(r"Would remove (\d+) obsolete skill file\(s\)", out)
     assert would_remove, out
-    # kept = 6 defaults + build; everything else installed is reported.
+    # kept = 6 defaults + design (it requires nothing); everything else installed is reported.
     kept = {
         "pathly",
         "pathly-create-feature",
@@ -98,13 +98,13 @@ def test_dry_run_repair_lists_skills_it_would_prune_and_touches_nothing(tmp_path
         "pathly-help",
         "pathly-post",
         "pathly-status",
-        "pathly-build",
+        "pathly-design",
     }
     assert int(would_remove.group(1)) == len(full - kept)
     assert "pathly-review/SKILL.md" in out
     # the kept skills are never listed under the removal header
     removal_block = out.split("Would remove", 1)[1]
-    assert "pathly-build/SKILL.md" not in removal_block
+    assert "pathly-design/SKILL.md" not in removal_block
     assert "pathly-post/SKILL.md" not in removal_block
     # a preview is a preview: nothing on disk moved
     assert _snapshot(tmp_path / ".claude") == before

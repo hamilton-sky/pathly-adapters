@@ -108,7 +108,7 @@ def test_export_installs_named_skill_plus_defaults(tmp_path):
     skills = tmp_path / ".claude" / "skills"
     assert (skills / "pathly-build" / "SKILL.md").exists()  # requested
     assert (skills / "pathly-post" / "SKILL.md").exists()  # default set still installed
-    assert not (skills / "pathly-review").exists()  # not requested
+    assert not (skills / "pathly-goalize").exists()  # not requested, not required by build
 
 
 @pytest.mark.slow

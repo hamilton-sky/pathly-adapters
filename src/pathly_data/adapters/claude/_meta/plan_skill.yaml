@@ -3,3 +3,5 @@ filename: pathly-plan/SKILL.md
 natural_language: "/pathly plan, plan feature, create plan, plan"
 variables:
   TEMPLATES_DIR: ~/.claude/plugins/pathly/templates
+# requires: skills this skill's own text tells the host to invoke (calls scout-path when the analyze phase reports NEEDS_CONTEXT)
+requires: [scout-path]

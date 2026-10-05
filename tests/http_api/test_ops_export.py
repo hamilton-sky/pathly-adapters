@@ -38,6 +38,18 @@ def test_export_skills_lists_tiers(client):
     assert all(isinstance(s.get("installed"), bool) for s in rows)
 
 
+def test_export_skills_reports_what_each_skill_requires(client):
+    """The picker can show/disable what exporting a skill drags in (the installer adds it)."""
+    rows = {
+        s["name"]: s
+        for s in client.get("/ops/export/skills?adapter=claude").get_json()["skills"]
+    }
+    assert rows["build"]["requires"] == ["review"]
+    assert rows["review"]["requires"] == ["log-agent-done"]
+    assert rows["status"]["requires"] == []
+    assert all(isinstance(s["requires"], list) for s in rows.values())
+
+
 def test_export_skills_rejects_bad_adapter(client):
     r = client.get("/ops/export/skills?adapter=nope")
     assert r.status_code == 400

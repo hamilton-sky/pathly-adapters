@@ -4,7 +4,7 @@
 
 Adapter install/setup, stitch & compose, skill composition / round-trip / export, plugin manifests.
 
-22 test file(s).
+23 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -24,6 +24,7 @@ Adapter install/setup, stitch & compose, skill composition / round-trip / export
 | `test_setup.py` | covers detect hosts returns list; host markers cover all supported hosts; host markers cover antigravity; … | 35 |
 | `test_skill_composition.py` | Tests for DB-backed composition overrides (skill_composition + load_effective_manifest) | 6 |
 | `test_skill_ops.py` | `pathly-setup <host> --list` / `--remove` — CLI parity with the Studio export picker | 18 |
+| `test_skill_requires.py` | Per-skill ``requires:`` — install pulls requirements in, remove refuses to orphan them | 17 |
 | `test_skill_round_trip.py` | Round-trip tests for the notebook skill parser/serializer (Phase 0) | 10 |
 | `test_skills_composition_endpoint.py` | Tests for GET/DELETE /skills/composition — backs the Studio Skill Composition panel | 6 |
 | `test_skills_export.py` | Regression tests for PUT /skills/export — composition.yaml corruption guard | 6 |

@@ -1,3 +1,5 @@
 skill: team/discover
 filename: pathly-team-discover/SKILL.md
 natural_language: "/pathly team discover, team discover stage"
+# requires: skills this skill's own text tells the host to invoke (routes to team/plan, prd-import and explore)
+requires: [team/plan, prd-import, explore]

@@ -43,13 +43,16 @@ def _manifest_names(tmp_path):
     return set(json.loads(path.read_text(encoding="utf-8"))["files"])
 
 
+_STATE = r"default \(not installed\)|default|installed \(untracked\)|installed|available"
+
+
 def _list_states(stdout: str) -> dict[str, str]:
     """{skill key: state} parsed from the --list table."""
     states: dict[str, str] = {}
     for line in stdout.splitlines():
-        m = re.match(r"^  (\S+)\s{2,}(\S+)\s{2,}(.+)$", line)
-        if m and m.group(1) != "SKILL":
-            states[m.group(1)] = m.group(3).strip()
+        m = re.match(rf"^  (\S+)\s{{2,}}(\S+)\s{{2,}}({_STATE})\s{{2,}}(.+)$", line)
+        if m:
+            states[m.group(1)] = m.group(3)
     return states
 
 
@@ -110,7 +113,7 @@ def test_list_on_a_fresh_home_shows_defaults_as_not_installed(tmp_path):
 def test_list_reports_default_installed_untracked_and_available_and_writes_nothing(
     tmp_path,
 ):
-    assert run_install_cli(["claude", "--apply", "--export", "build"], tmp_path).returncode == 0
+    assert run_install_cli(["claude", "--apply", "--export", "design"], tmp_path).returncode == 0
     # a pathly skill dir that is on disk but absent from the manifest
     stray = tmp_path / ".claude" / "skills" / "pathly-end"
     stray.mkdir()
@@ -122,7 +125,7 @@ def test_list_reports_default_installed_untracked_and_available_and_writes_nothi
     states = _list_states(r.stdout)
     assert states["status"] == "default"
     assert states["fsm-call"] == "default"
-    assert states["build"] == "installed"
+    assert states["design"] == "installed"
     assert states["end"] == "installed (untracked)"
     assert states["review"] == "available"
     assert "8 of 49 skills installed" in r.stdout and "(6 default)" in r.stdout
@@ -134,25 +137,25 @@ def test_list_reports_default_installed_untracked_and_available_and_writes_nothi
 
 @pytest.mark.slow
 def test_remove_deletes_only_the_named_skill_and_nothing_else(tmp_path):
-    cmd = ["claude", "--apply", "--export", "build", "--export", "review"]
+    cmd = ["claude", "--apply", "--export", "design", "--export", "test"]
     assert run_install_cli(cmd, tmp_path).returncode == 0
-    assert installed_skill_dirs(tmp_path) == DEFAULT_DIRS | {"pathly-build", "pathly-review"}
+    assert installed_skill_dirs(tmp_path) == DEFAULT_DIRS | {"pathly-design", "pathly-test"}
     skills = tmp_path / ".claude" / "skills"
-    review_before = (skills / "pathly-review" / "SKILL.md").read_bytes()
+    kept_before = (skills / "pathly-test" / "SKILL.md").read_bytes()
     outside_skills = {
         k: v
         for k, v in _snapshot(tmp_path / ".claude").items()
         if not k.startswith("skills/")
     }
 
-    r = run_install_cli(["claude", "--remove", "build"], tmp_path)
+    r = run_install_cli(["claude", "--remove", "design"], tmp_path)
     assert r.returncode == 0, r.stderr
 
     assert "Removed 1 requested skill file(s)" in r.stdout
-    assert installed_skill_dirs(tmp_path) == DEFAULT_DIRS | {"pathly-review"}
-    assert "pathly-build/SKILL.md" not in _manifest_names(tmp_path)
+    assert installed_skill_dirs(tmp_path) == DEFAULT_DIRS | {"pathly-test"}
+    assert "pathly-design/SKILL.md" not in _manifest_names(tmp_path)
     # kept skills are not rewritten, and agents/flows/hooks/MCP/templates are not touched
-    assert (skills / "pathly-review" / "SKILL.md").read_bytes() == review_before
+    assert (skills / "pathly-test" / "SKILL.md").read_bytes() == kept_before
     assert {
         k: v
         for k, v in _snapshot(tmp_path / ".claude").items()
@@ -162,10 +165,10 @@ def test_remove_deletes_only_the_named_skill_and_nothing_else(tmp_path):
 
 @pytest.mark.slow
 def test_remove_accepts_the_directory_name_and_repeats(tmp_path):
-    cmd = ["claude", "--apply", "--export", "build", "--export", "review"]
+    cmd = ["claude", "--apply", "--export", "design", "--export", "test"]
     assert run_install_cli(cmd, tmp_path).returncode == 0
     r = run_install_cli(
-        ["claude", "--remove", "pathly-build", "--remove", "review"], tmp_path
+        ["claude", "--remove", "pathly-design", "--remove", "test"], tmp_path
     )
     assert r.returncode == 0, r.stderr
     assert installed_skill_dirs(tmp_path) == DEFAULT_DIRS

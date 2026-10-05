@@ -36,6 +36,7 @@ class SkillInfo:
     filename: str  # path under the skills dest, e.g. "pathly-build/SKILL.md"
     meta_file: Path
     meta: dict
+    requires: tuple[str, ...] = ()  # `skill:` keys this skill's text tells the host to invoke
 
     @property
     def default(self) -> bool:
@@ -61,6 +62,9 @@ def load_catalog(host: str, *, nested: bool) -> dict[str, SkillInfo]:
         meta = yaml.safe_load(meta_file.read_text(encoding="utf-8")) or {}
         if "skill" not in meta:
             raise ValueError(f"Missing required fields in {meta_file}: ['skill']")
+        requires = meta.get("requires") or []
+        if not isinstance(requires, list) or not all(isinstance(r, str) for r in requires):
+            raise ValueError(f"'requires' in {meta_file} must be a list of skill keys")
         name = meta_file.stem.removesuffix("_skill")
         default_filename = f"{name}/SKILL.md" if nested else f"{name}.md"
         catalog[meta["skill"]] = SkillInfo(
@@ -69,8 +73,43 @@ def load_catalog(host: str, *, nested: bool) -> dict[str, SkillInfo]:
             filename=meta.get("filename", default_filename),
             meta_file=meta_file,
             meta=meta,
+            requires=tuple(requires),
         )
     return catalog
+
+
+def requires_closure(catalog: dict[str, SkillInfo], keys: Iterable[str]) -> set[str]:
+    """``keys`` plus everything they require, transitively.
+
+    A ``requires`` entry that names no skill is a metadata bug, not something to skip: the
+    skill would be installed without a skill its own text invokes.
+    """
+    closure: set[str] = set()
+    pending = list(keys)
+    while pending:
+        key = pending.pop()
+        if key in closure:
+            continue
+        closure.add(key)
+        for needed in catalog[key].requires:
+            if needed not in catalog:
+                raise ValueError(
+                    f"skill {key!r} requires {needed!r}, which is not a skill "
+                    f"(fix `requires:` in {catalog[key].meta_file.name})"
+                )
+            pending.append(needed)
+    return closure
+
+
+def dependents_of(
+    catalog: dict[str, SkillInfo], key: str, among: Iterable[str]
+) -> list[str]:
+    """Skills in ``among`` that need ``key`` (directly or through another requirement)."""
+    return sorted(
+        other
+        for other in among
+        if other != key and key in requires_closure(catalog, [other])
+    )
 
 
 def installed_keys(catalog: dict[str, SkillInfo], skills_dest: Path) -> set[str]:

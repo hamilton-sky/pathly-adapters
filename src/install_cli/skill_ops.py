@@ -19,6 +19,7 @@ from .orchestrate import _load_install_yaml
 from .report import report_pruned, report_would_prune
 from .skill_catalog import (
     SkillInfo,
+    dependents_of,
     installed_keys,
     load_catalog,
     resolve_skill_args,
@@ -73,6 +74,7 @@ def run_list(host: str) -> bool:
                 on_disk=key in installed,
                 tracked=catalog[key].filename in owned,
             ),
+            ", ".join(catalog[key].requires) or "-",
         )
         for key in sorted(catalog)
     ]
@@ -83,13 +85,16 @@ def run_list(host: str) -> bool:
     )
     w_key = max(len("SKILL"), *(len(r[0]) for r in rows))
     w_dir = max(len("DIR"), *(len(r[1]) for r in rows))
-    print(f"  {'SKILL':<{w_key}}  {'DIR':<{w_dir}}  STATE")
-    for key, dirname, state in rows:
-        print(f"  {key:<{w_key}}  {dirname:<{w_dir}}  {state}")
+    w_state = max(len("STATE"), *(len(r[2]) for r in rows))
+    print(f"  {'SKILL':<{w_key}}  {'DIR':<{w_dir}}  {'STATE':<{w_state}}  REQUIRES")
+    for key, dirname, state, requires in rows:
+        print(f"  {key:<{w_key}}  {dirname:<{w_dir}}  {state:<{w_state}}  {requires}")
     print(
         f"\n  add:    pathly-setup {host} --export <skill>"
-        "   (with --apply --repair the set is exact: anything not named is pruned)"
+        "   (also installs what it requires; with --apply --repair the set is exact:"
+        " anything not named is pruned)"
         f"\n  remove: pathly-setup {host} --remove <skill>"
+        "   (refused while an installed skill requires it)"
     )
     return True
 
@@ -136,6 +141,21 @@ def run_remove(host: str, names: list[str], *, dry_run: bool = False) -> bool:
             )
         else:
             to_remove.append(key)
+
+    # A skill another installed skill needs stays — unless that skill is going too.
+    staying = installed - set(to_remove)
+    for key in list(to_remove):
+        needed_by = dependents_of(catalog, key, staying)
+        if needed_by:
+            to_remove.remove(key)
+            problems.append(
+                (
+                    key,
+                    f"it is required by installed skill(s): {', '.join(needed_by)} "
+                    f"(remove those too, e.g. "
+                    f"{' '.join(f'--remove {n}' for n in [*needed_by, key])})",
+                )
+            )
 
     if problems:
         for key, reason in problems:

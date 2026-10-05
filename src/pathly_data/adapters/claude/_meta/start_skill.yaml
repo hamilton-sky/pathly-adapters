@@ -1,3 +1,5 @@
 skill: start
 filename: pathly-start/SKILL.md
 natural_language: "/pathly start, begin pathly, welcome, pathly start"
+# requires: skills this skill's own text tells the host to invoke (free-text intent is routed via go)
+requires: [go]
