@@ -159,6 +159,26 @@ pathly-studio                       # launch the local Pathly Studio desktop UI
 
 `--dry-run` never writes. `--apply` is required for any writes.
 
+### Choosing which skills are installed
+
+`--apply` installs a small default set of skills — `pathly`, `help`, `create-feature`, `post`, `status`,
+`fsm-call` — because the headless app (Studio's **Start** button) injects every pipeline skill's prompt itself
+and never reads a skill file. Add or drop the rest on demand:
+
+```bash
+pathly-setup claude --list                       # every skill: default / installed / available
+pathly-setup claude --apply --export build       # add a skill (also installs the skills it requires)
+pathly-setup claude --remove build --dry-run     # preview a removal; drop --dry-run to apply it
+pathly-setup claude --apply --all-skills         # install every skill
+pathly-setup claude --apply --repair --export design   # exact set: defaults + design; everything else is pruned
+```
+
+`--remove` is refused while another installed skill requires the skill (it names the ones to remove with
+it); default skills can't be removed individually (`--uninstall` removes everything). A `--dry-run` that
+would delete files lists them, and a real repair prints what it removed. Skills are named by their `skill:`
+key (`build`, `team/build`) or directory name (`pathly-build`); the Studio **Settings → Export** picker does
+the same thing.
+
 ## Supported Hosts
 
 | Host | Detected by | Installed locations |
