@@ -6,6 +6,7 @@ from pathlib import Path
 
 from .detect import detect_hosts
 from .orchestrate import ALLOWED_HOSTS, _run_host, _run_host_uninstall
+from .skill_ops import run_list, run_remove, unknown_everywhere
 
 
 def main() -> None:
@@ -56,6 +57,19 @@ def main() -> None:
         help="Install every skill, not just the default board on-ramps.",
     )
     parser.add_argument(
+        "--list",
+        action="store_true",
+        help="List every skill with its state (default / installed / available). Read-only.",
+    )
+    parser.add_argument(
+        "--remove",
+        action="append",
+        metavar="SKILL",
+        default=None,
+        help="Remove an installed non-default skill (repeatable), e.g. --remove review. "
+        "Combine with --dry-run to preview.",
+    )
+    parser.add_argument(
         "--uninstall",
         action="store_true",
         help="Remove all Pathly-owned files from host config locations.",
@@ -76,6 +90,10 @@ def main() -> None:
         )
         sys.exit(1)
 
+    if args.list or args.remove:
+        _run_skill_query(parser, args, hosts)
+        return
+
     if args.uninstall:
         for host in hosts:
             try:
@@ -89,6 +107,14 @@ def main() -> None:
         return
 
     export_skills = set(args.export or [])
+    typos = unknown_everywhere(hosts, export_skills)
+    if typos:
+        print(
+            f"Error: unknown skill(s): {', '.join(typos)} "
+            "(see `pathly-setup <host> --list`)",
+            file=sys.stderr,
+        )
+        sys.exit(1)
     failed = False
     for host in hosts:
         try:
@@ -104,6 +130,46 @@ def main() -> None:
             print(f"[{host}] Error: {e}", file=sys.stderr)
             failed = True
 
+    if failed:
+        sys.exit(1)
+
+
+def _run_skill_query(parser: argparse.ArgumentParser, args, hosts: list[str]) -> None:
+    """--list / --remove: skill-set queries that never run the full install."""
+    if args.list and args.remove:
+        parser.error("--list and --remove cannot be combined")
+    clashing = [
+        flag
+        for flag, on in (
+            ("--apply", args.apply),
+            ("--repair", args.repair),
+            ("--force", args.force),
+            ("--export", bool(args.export)),
+            ("--all-skills", args.all_skills),
+            ("--uninstall", args.uninstall),
+        )
+        if on
+    ]
+    if clashing:
+        which = "--list" if args.list else "--remove"
+        parser.error(f"{which} cannot be combined with {', '.join(clashing)}")
+    if args.remove:
+        typos = unknown_everywhere(hosts, set(args.remove))
+        if typos:
+            parser.error(
+                f"unknown skill(s): {', '.join(typos)} (see `pathly-setup <host> --list`)"
+            )
+    failed = False
+    for host in hosts:
+        try:
+            if args.list:
+                ok = run_list(host)
+            else:
+                ok = run_remove(host, args.remove, dry_run=args.dry_run)
+            failed = failed or not ok
+        except Exception as e:
+            print(f"[{host}] Error: {e}", file=sys.stderr)
+            failed = True
     if failed:
         sys.exit(1)
 

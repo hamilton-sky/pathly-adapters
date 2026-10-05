@@ -1,3 +1,5 @@
 skill: archive
 filename: pathly-archive/SKILL.md
 natural_language: "/pathly archive, archive feature, archive plan, archive"
+# requires: skills this skill's own text tells the host to invoke (archive auto-invokes the lessons skill when it finds candidate lessons)
+requires: [lessons]

@@ -111,38 +111,32 @@ def ops_export_skills():
     """List a host's installable skills, flagging which install by default (Tier-1).
 
     Powers the export panel's skill picker: only non-default skills need explicit
-    selection; the Tier-1 on-ramps always install.
+    selection; the Tier-1 on-ramps always install. ``requires`` lists the skills a row
+    pulls in when exported (the installer installs them too).
     """
     adapter = request.args.get("adapter", "claude")
     if adapter not in _VALID_ADAPTERS:
         return jsonify({"error": f"Unknown adapter {adapter!r}"}), 400
     try:
-        import yaml  # lazy — keep import cost off the hot path
-        from install_cli.orchestrate import DEFAULT_EXPOSED_SKILLS, _load_install_yaml
-        from install_cli.resources import adapter_meta_path
+        # lazy — keep install_cli (and its yaml/meta reads) off the module-import hot path
+        from install_cli.orchestrate import _load_install_yaml
+        from install_cli.skill_catalog import installed_keys, load_catalog
 
         skills_cfg = (_load_install_yaml(adapter) or {}).get("skills") or {}
         dest = skills_cfg.get("destination")
         skills_dest = Path(dest).expanduser() if dest else None
 
-        meta_dir = adapter_meta_path(adapter)
-        skills = []
-        for meta_file in sorted(meta_dir.glob("*_skill.yaml")):
-            meta = yaml.safe_load(meta_file.read_text(encoding="utf-8")) or {}
-            name = meta.get("skill")
-            if not name:
-                continue
-            filename = meta.get("filename")
-            installed = bool(
-                skills_dest and filename and (skills_dest / filename).exists()
-            )
-            skills.append(
-                {
-                    "name": name,
-                    "default": name in DEFAULT_EXPOSED_SKILLS,
-                    "installed": installed,
-                }
-            )
+        catalog = load_catalog(adapter, nested=skills_cfg.get("structure") == "nested")
+        installed = installed_keys(catalog, skills_dest) if skills_dest else set()
+        skills = [
+            {
+                "name": key,
+                "default": info.default,
+                "installed": key in installed,
+                "requires": list(info.requires),
+            }
+            for key, info in catalog.items()
+        ]
         return jsonify({"adapter": adapter, "skills": skills})
     except Exception as exc:  # fail-soft — the panel degrades to on-ramps only
         logger.warning("ops_export_skills failed: %s", exc)

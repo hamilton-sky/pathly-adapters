@@ -84,37 +84,105 @@ Four adapters derive from `core/`:
 
 Each adapter's `_meta/` directory holds per-agent and per-skill YAML files that supply host-specific metadata (model name, tool list, `can_spawn` flag, install destination). `pathly-setup <host> --apply` stitches `core/` content with `_meta/` and writes deployable files.
 
+**Hooks** (`install.yaml` `hooks:` → the host's `settings.json`, `install_cli/hooks.py`). A command may contain
+`{python}`, expanded at install time to the **interpreter running the installer** (absolute, shell-quoted): it
+necessarily has the Pathly package and needs no `python` on `PATH` — the claude Stop hook is
+`{python} -m pathly_hooks.stop_telemetry`; a bare `python -m …` exits 127 at every session end on a machine with only
+`python3` or the package in a venv/pipx env. Entries containing `pathly_hooks` are Pathly-owned: a plain apply adds a
+missing one and leaves an existing one; `--repair` replaces them **in place** (keeping the order of the user's other
+hooks, keeping their own hooks that share a group, and writing nothing when already canonical). A moved or deleted
+venv breaks the absolute path — `--apply --repair` rewrites it.
+
 ## Skill exposure — Tier-1 default + export-on-demand
 
 Not every skill installs to a host. By default `pathly-setup <host> --apply` writes only the
-**Tier-1** skills — the interactive board on-ramps plus the dispatcher/help that surface them:
+**Tier-1** skills — the interactive board on-ramps, the dispatcher/help that surface them, and the
+two operational utilities that saw real use (`status`, `fsm-call`):
 
-| Tier-1 (always installed) | Role |
+| Tier-1 (installed by default) | Role |
 |---|---|
 | `create-feature`, `post` | the two interactive board on-ramps (chat session → board) |
 | `pathly`, `help` | the dispatcher + help that make them discoverable |
+| `status`, `fsm-call` | operational utilities: active-feature status, raw FSM HTTP calls |
+
+The set is the same for every adapter (it is one constant); a skill an adapter has no
+`_meta/*_skill.yaml` for (e.g. copilot has no `fsm-call`) is simply not installed there.
 
 Every other skill (the pipeline — `plan`/`design`/`build`/`review`/`test`/`retro` — plus
-`goalize`/`debug`/`explore`/`storm` and the control/utility skills) is **export-on-demand**. This
+`goalize`/`debug`/`explore`/`storm` and the remaining control/utility skills) is **export-on-demand**. This
 is safe because in **runner mode the app injects each skill's prompt** (the CLI never reads a skill
 file — see the root [CLAUDE.md](../../CLAUDE.md) "Skill delivery — two modes" table), so pipeline
 skills don't need to be installed to *function* in the app; installing all ~60 would only clutter
 the host's slash-command namespace with app-driven commands.
 
-**The lever** is `DEFAULT_EXPOSED_SKILLS` — a frozenset keyed by the `skill:` field, in
-`src/install_cli/orchestrate.py`; `_run_host` skips any skill not in that set unless it is requested.
+**The lever** is `DEFAULT_EXPOSED_SKILLS` — a frozenset keyed by the `skill:` field, defined in
+`src/install_cli/skill_catalog.py` (re-exported from `orchestrate.py`, where the Studio endpoint imports
+it); `_build_skill_files` in `orchestrate.py` skips any skill not in that set unless it is requested.
+`skill_catalog.py` is the one reader of `adapters/<host>/_meta/*_skill.yaml` (key → file → default flag)
+shared by the installer, `--list`/`--remove` and the Studio picker.
 
 ```bash
 pathly-setup claude --apply                          # Tier-1 only (default)
 pathly-setup claude --export build --export review   # Tier-1 + these (repeatable)
 pathly-setup claude --all-skills                     # every skill (the pre-tier behavior)
+pathly-setup claude --list                           # every skill: default / installed / available
+pathly-setup claude --remove review [--dry-run]      # remove an installed non-default skill
 ```
+
+Skills are addressed by their `skill:` key (`build`, `fsm-call`, `team/build`); `--export`/`--remove`
+also accept the directory name (`pathly-team-build`). An unknown name is an error (it used to silently
+install nothing). `--list` and `--remove` are skills-only: they cannot be combined with
+`--apply`/`--repair`/`--force`/`--export`/`--all-skills`/`--uninstall`.
 
 **Export is declarative — `--repair` reconciles.** An apply with `--repair` writes exactly
 {Tier-1 ∪ requested} and **removes** any previously-exported skill no longer requested. So:
 - **export** a skill → `--export <skill>` installs it;
 - **unexport** a skill → re-apply with `--repair` and the skill omitted; repair prunes it as an
   obsolete owned file (see `tests/install_skills/test_setup.py::test_materialize_repair_removes_obsolete_owned_files`).
+
+**`--remove` is the same reconcile, scoped.** The desired set is *installed − removals*, so only the
+removed skills' files fall outside it and only those are pruned (same `materialize` prune primitive and
+reporting as a full repair). It is all-or-nothing, refuses a default-tier skill (defaults are always
+reinstated by the declarative contract — `--uninstall` removes everything), and refuses a skill present
+on disk but not in the manifest. Unlike `--apply --repair` it does not rewrite kept skills or touch
+agents, flows, templates, hooks or MCP config.
+
+**Dependencies — `requires:`.** A skill's `_meta/<x>_skill.yaml` may list `requires: [<skill key>, …]`: the
+skills its *own text* tells the host to invoke, on any branch (e.g. `build` → `review` in fast/auto
+mode, `end` → `lessons`/`retro`, `plan` → `scout-path`, `review` → `log-agent-done`). The installer
+adds the transitive closure of `defaults ∪ requested` and prints what it pulled in; `--remove` refuses
+a skill an installed skill needs (directly or through another requirement) and names the
+`--remove a --remove b` that would cascade; `--list` shows a REQUIRES column and `GET /ops/export/skills`
+returns `requires` per row. A required skill is installed as an ordinary skill — removing its dependent
+does not auto-remove it. Requirements apply only in **interactive** installs; runner mode never reads
+skill files.
+
+What is **not** a requirement (declaring these would be wrong — `tests/install_skills/test_skill_requires.py`
+scans the composed skill text and fails on an undeclared invocation, with a short `_NOT_DEPENDENCIES`
+allow-list): the shell command `pathly-fsm-call …` (a console script the skills run in bash — it is
+not the `fsm-call` *skill*, and the bodies say to skip silently if it is unavailable); `Spawn <agent>`
+(an agent, not a skill); a "never route to X" warning; a passive "consumed by X" mention; and the
+`pathly` router's fan-out (it dispatches to ~19 skills — as `requires` it would drag them all into
+the default tier, which must stay exactly `DEFAULT_EXPOSED_SKILLS`). The default tier must be closed
+under `requires` (asserted). Declared for the **claude** adapter only; an adapter without `requires:`
+simply has no dependency edges.
+
+**Untracked skills are adopted.** Repair, prune and `--uninstall` only reach manifest-owned files, so a
+skill dir the manifest lost (a partial run, an older install) used to survive a trim and every uninstall.
+`install_cli/adopt.py` records such a file in the manifest — on `--apply`/`--repair`, `--remove` and
+`--uninstall`, never on `--list`/`--dry-run` (those preview it: "Would adopt …", and the prune preview counts
+the adoptees) — **only if** it sits at the exact path Pathly writes for a known skill **and** its frontmatter
+`name:` equals that skill's `skill:` key (the signature the stitcher writes, so it is provably
+Pathly-generated; the content is not rewritten by adoption itself). Anything else at a Pathly path — a foreign
+frontmatter, a symlinked skill dir — is left untouched with a warning (`--force` still takes a file over
+explicitly). `--list` shows `installed (untracked)` for the adoptable and `installed (foreign)` for the rest.
+Skills only; agents/flows/templates are not adopted.
+
+**Removals are never silent.** `--dry-run` lists every owned file the repair would delete
+(`install_cli/report.py::report_would_prune`, fed by `materialize.plan_prunes`); without `--repair`
+it says the files are kept but `--repair` would remove them. The real run prints what it pruned.
+Flow YAMLs share the agents manifest but are reconciled separately by `materialize_flows`
+(always-repair), so the agents sync excludes them from its prune.
 
 **Studio surface:** Settings → **Export** (`studio/src/renderer/src/components/Settings/ExportSettings.tsx`
 + `ExportSkillPicker.tsx`) drives this via `POST /ops/export` (`{adapters, repair, skills, all_skills}`)

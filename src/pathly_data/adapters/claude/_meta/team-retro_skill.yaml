@@ -1,3 +1,5 @@
 skill: team/retro
 filename: pathly-team-retro/SKILL.md
 natural_language: "/pathly team retro, team retro stage"
+# requires: skills this skill's own text tells the host to invoke (invokes the log-agent-done skill to record the stage)
+requires: [log-agent-done]

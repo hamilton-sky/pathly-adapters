@@ -22,11 +22,32 @@ def test_export_skills_lists_tiers(client):
     # Tier-1 on-ramps install by default…
     assert by.get("create-feature") is True
     assert by.get("post") is True
+    # …plus the operational utilities (the picker hides defaults, so these drop out of it)…
+    assert by.get("status") is True
+    assert by.get("fsm-call") is True
+    # …and the flag is the installer's constant, not a second copy that can drift.
+    from install_cli.orchestrate import DEFAULT_EXPOSED_SKILLS
+
+    assert {name for name, is_default in by.items() if is_default} == set(
+        DEFAULT_EXPOSED_SKILLS
+    )
     # …pipeline skills are export-only.
     assert by.get("build") is False
     assert by.get("goalize") is False
     # every row reports current install state (powers unexport in the picker)
     assert all(isinstance(s.get("installed"), bool) for s in rows)
+
+
+def test_export_skills_reports_what_each_skill_requires(client):
+    """The picker can show/disable what exporting a skill drags in (the installer adds it)."""
+    rows = {
+        s["name"]: s
+        for s in client.get("/ops/export/skills?adapter=claude").get_json()["skills"]
+    }
+    assert rows["build"]["requires"] == ["review"]
+    assert rows["review"]["requires"] == ["log-agent-done"]
+    assert rows["status"]["requires"] == []
+    assert all(isinstance(s["requires"], list) for s in rows.values())
 
 
 def test_export_skills_rejects_bad_adapter(client):
