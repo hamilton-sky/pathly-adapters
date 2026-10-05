@@ -20,6 +20,7 @@ from .materialize import (
     materialize_flows,
     uninstall,
 )
+from .report import report_pruned, report_would_prune
 
 # Must stay in sync with detect_hosts() — any host returned by detect_hosts()
 # must appear here, or auto-detected installs will fail with a confusing error.
@@ -36,6 +37,11 @@ DEFAULT_EXPOSED_SKILLS = frozenset(
 
 # Substring that identifies a hook command as Pathly-owned.
 _PATHLY_HOOK_MARKER = "pathly_hooks"
+
+
+def _is_flow(name: str) -> bool:
+    """Flow YAMLs share the agents manifest but have their own always-repair sync."""
+    return name.endswith(".flow.yaml")
 
 
 def _apply_hooks(host: str, hooks_cfg: dict, *, dry_run: bool, repair: bool) -> None:
@@ -456,6 +462,36 @@ def _run_host(
             print(f"\n[{host}] Would write plugin files to {plugin_dest}:")
             for name in sorted(plugin_files):
                 print(f"  {plugin_dest / name}")
+        # Removals: --repair prunes every owned file outside the requested set, so the
+        # preview has to say what would disappear, not only what would be written.
+        report_would_prune(
+            host,
+            "agent file(s)",
+            dest,
+            agent_files,
+            repair=repair,
+            prune_filter=lambda n: not _is_flow(n),
+        )
+        report_would_prune(
+            host,
+            "flow(s)",
+            dest,
+            {f.name: "" for f in core_flows_path().glob("*.flow.yaml")},
+            repair=True,  # flows are always reconciled
+            prune_filter=_is_flow,
+        )
+        if skills_dest and skill_files:
+            report_would_prune(
+                host, "skill file(s)", skills_dest, skill_files, repair=repair
+            )
+        if templates_dest and template_files:
+            report_would_prune(
+                host, "template(s)", templates_dest, template_files, repair=repair
+            )
+        if plugin_dest and plugin_files:
+            report_would_prune(
+                host, "plugin file(s)", plugin_dest, plugin_files, repair=repair
+            )
         if host == "codex" and plugin_files:
             install_codex_plugin(plugin_files, dry_run=True)
         hooks_cfg = install_cfg.get("hooks", {})
@@ -469,8 +505,17 @@ def _run_host(
     written_dests: list[Path] = []
     codex_plugin_registered = False
     try:
+        # Flow YAMLs live in this manifest too but are reconciled by materialize_flows
+        # below — exclude them here so a repair doesn't delete-then-rewrite every flow.
+        pruned: list[str] = []
         written = materialize(
-            agent_files, dest, repair=repair, force=force, dry_run=False
+            agent_files,
+            dest,
+            repair=repair,
+            force=force,
+            dry_run=False,
+            prune_filter=lambda n: not _is_flow(n),
+            pruned_out=pruned,
         )
         if written:
             written_dests.append(dest)
@@ -479,37 +524,59 @@ def _run_host(
             print(
                 f"[{host}] Nothing to write (files already current or not Pathly-owned)"
             )
+        report_pruned(host, "agent file(s)", dest, pruned)
 
-        flow_written = materialize_flows(dest, force=force, dry_run=False)
+        flow_pruned: list[str] = []
+        flow_written = materialize_flows(
+            dest, force=force, dry_run=False, pruned_out=flow_pruned
+        )
         if flow_written:
             if dest not in written_dests:
                 written_dests.append(dest)
             print(f"[{host}] Wrote {len(flow_written)} flow(s) to {dest}")
+        report_pruned(host, "flow(s)", dest, flow_pruned)
 
         if skills_dest and skill_files:
+            pruned = []
             written = materialize(
-                skill_files, skills_dest, repair=repair, force=force, dry_run=False
+                skill_files,
+                skills_dest,
+                repair=repair,
+                force=force,
+                dry_run=False,
+                pruned_out=pruned,
             )
             if written:
                 written_dests.append(skills_dest)
                 print(f"[{host}] Wrote {len(written)} skill(s) to {skills_dest}")
+            report_pruned(host, "skill file(s)", skills_dest, pruned)
 
         if templates_dest and template_files:
+            pruned = []
             written = materialize(
                 template_files,
                 templates_dest,
                 repair=repair,
                 force=force,
                 dry_run=False,
+                pruned_out=pruned,
             )
             if written:
                 written_dests.append(templates_dest)
                 print(f"[{host}] Wrote {len(written)} template(s) to {templates_dest}")
+            report_pruned(host, "template(s)", templates_dest, pruned)
 
         if plugin_dest and plugin_files:
+            pruned = []
             written = materialize(
-                plugin_files, plugin_dest, repair=repair, force=force, dry_run=False
+                plugin_files,
+                plugin_dest,
+                repair=repair,
+                force=force,
+                dry_run=False,
+                pruned_out=pruned,
             )
+            report_pruned(host, "plugin file(s)", plugin_dest, pruned)
             if written:
                 written_dests.append(plugin_dest)
                 print(f"[{host}] Wrote {len(written)} plugin file(s) to {plugin_dest}")

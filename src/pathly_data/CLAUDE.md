@@ -121,6 +121,12 @@ pathly-setup claude --all-skills                     # every skill (the pre-tier
 - **unexport** a skill → re-apply with `--repair` and the skill omitted; repair prunes it as an
   obsolete owned file (see `tests/install_skills/test_setup.py::test_materialize_repair_removes_obsolete_owned_files`).
 
+**Removals are never silent.** `--dry-run` lists every owned file the repair would delete
+(`install_cli/report.py::report_would_prune`, fed by `materialize.plan_prunes`); without `--repair`
+it says the files are kept but `--repair` would remove them. The real run prints what it pruned.
+Flow YAMLs share the agents manifest but are reconciled separately by `materialize_flows`
+(always-repair), so the agents sync excludes them from its prune.
+
 **Studio surface:** Settings → **Export** (`studio/src/renderer/src/components/Settings/ExportSettings.tsx`
 + `ExportSkillPicker.tsx`) drives this via `POST /ops/export` (`{adapters, repair, skills, all_skills}`)
 and `GET /ops/export/skills` — which lists each skill flagged `{default, installed}` so the picker

@@ -4,7 +4,7 @@
 
 Adapter install/setup, stitch & compose, skill composition / round-trip / export, plugin manifests.
 
-20 test file(s).
+21 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -20,6 +20,7 @@ Adapter install/setup, stitch & compose, skill composition / round-trip / export
 | `test_manifests.py` | covers manifest required fields; codex plugin version matches distribution version | 2 |
 | `test_prompt_files.py` | System-prompts as .md FILES: scoping, label, CRUD, and the legacy DB→files migration | 8 |
 | `test_prompt_library.py` | prompt_library query layer — CRUD, name-upsert, and global/project merge | 7 |
+| `test_prune_report.py` | --dry-run (and the real run) must say what a --repair removes, not only what it writes | 10 |
 | `test_setup.py` | covers detect hosts returns list; host markers cover all supported hosts; host markers cover antigravity; … | 35 |
 | `test_skill_composition.py` | Tests for DB-backed composition overrides (skill_composition + load_effective_manifest) | 6 |
 | `test_skill_round_trip.py` | Round-trip tests for the notebook skill parser/serializer (Phase 0) | 10 |

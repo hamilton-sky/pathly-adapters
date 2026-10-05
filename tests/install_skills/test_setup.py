@@ -210,7 +210,15 @@ def test_no_detected_hosts_exits():
     assert exc.value.code == 1
 
 
-def test_dry_run_real_claude(capsys):
+@pytest.fixture()
+def fake_home(tmp_path, monkeypatch):
+    """Redirect ~ so a dry-run's manifest reads (prune preview) never touch the real install."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    return tmp_path
+
+
+def test_dry_run_real_claude(capsys, fake_home):
     """Integration smoke: pathly-setup claude --dry-run must not crash."""
     with patch.object(sys, "argv", ["pathly-setup", "claude", "--dry-run"]):
         main()  # no mocks — uses real adapter files
@@ -218,7 +226,7 @@ def test_dry_run_real_claude(capsys):
     assert "[claude]" in captured.out
 
 
-def test_dry_run_real_codex_includes_plugin_manifest(capsys):
+def test_dry_run_real_codex_includes_plugin_manifest(capsys, fake_home):
     """Codex dry-run reports the plugin bundle manifest, not only skills/templates."""
     with patch.object(sys, "argv", ["pathly-setup", "codex", "--dry-run"]):
         main()  # no mocks — uses real adapter files

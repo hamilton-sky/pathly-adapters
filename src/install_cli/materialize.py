@@ -54,6 +54,33 @@ def _remove_empty_parents(parent: Path, dest: Path) -> None:
         parent = parent.parent
 
 
+def _stale_names(
+    owned: set[str],
+    files: dict[str, str],
+    prune_filter: Callable[[str], bool] | None,
+) -> set[str]:
+    """Manifest-owned names a ``repair`` run would remove: owned, but not in ``files``."""
+    stale = owned - set(files)
+    if prune_filter is not None:
+        stale = {name for name in stale if prune_filter(name)}
+    return stale
+
+
+def plan_prunes(
+    files: dict[str, str],
+    dest: Path,
+    *,
+    prune_filter: Callable[[str], bool] | None = None,
+) -> list[str]:
+    """Names a ``repair`` materialize of ``files`` would remove from ``dest`` (sorted).
+
+    Read-only: this is what ``--dry-run`` reports, since ``materialize(dry_run=True)``
+    returns only the would-write list.
+    """
+    owned = set(_load_manifest(dest)["files"])
+    return sorted(_stale_names(owned, files, prune_filter))
+
+
 def materialize(
     files: dict[str, str],
     dest: Path,
@@ -62,8 +89,13 @@ def materialize(
     force: bool = False,
     dry_run: bool = False,
     prune_filter: Callable[[str], bool] | None = None,
+    pruned_out: list[str] | None = None,
 ) -> list[str]:
-    """Synchronize stitched files to dest. Returns filenames written (or would-write)."""
+    """Synchronize stitched files to dest. Returns filenames written (or would-write).
+
+    When ``pruned_out`` is given, the names removed by a ``repair`` prune are appended
+    to it, so callers can report what disappeared instead of pruning silently.
+    """
     manifest = _load_manifest(dest)
     owned = set(manifest["files"].keys())
     written: list[str] = []
@@ -89,9 +121,7 @@ def materialize(
 
     pruned = False
     if repair and not dry_run:
-        stale_names = owned - set(files)
-        if prune_filter is not None:
-            stale_names = {name for name in stale_names if prune_filter(name)}
+        stale_names = _stale_names(owned, files, prune_filter)
         for name in sorted(stale_names):
             target = dest / name
             if not target.resolve().is_relative_to(dest.resolve()):
@@ -105,6 +135,8 @@ def materialize(
             _remove_empty_parents(target.parent, dest)
             del manifest["files"][name]
             pruned = True
+            if pruned_out is not None:
+                pruned_out.append(name)
 
     if not dry_run and (written or pruned):
         _save_manifest(dest, manifest)
@@ -117,6 +149,7 @@ def materialize_flows(
     *,
     force: bool = False,
     dry_run: bool = False,
+    pruned_out: list[str] | None = None,
 ) -> list[str]:
     """Copy *.flow.yaml files from the installed package to dest. Returns list of filenames written.
 
@@ -137,6 +170,7 @@ def materialize_flows(
         force=force,
         dry_run=dry_run,
         prune_filter=lambda name: name.endswith(".flow.yaml"),
+        pruned_out=pruned_out,
     )
 
 
