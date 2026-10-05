@@ -232,7 +232,9 @@ def _select_skill_keys(
             f"(see `pathly-setup {host} --list`)",
             file=sys.stderr,
         )
-    chosen = set(DEFAULT_EXPOSED_SKILLS) | set(keys)
+    # The default tier is one set for every adapter, but an adapter only has the skills it
+    # defines (copilot has no fsm-call) — a default it lacks is simply not installed there.
+    chosen = (set(DEFAULT_EXPOSED_SKILLS) & set(catalog)) | set(keys)
     wanted = requires_closure(catalog, chosen)
     pulled = sorted(wanted - chosen)
     if pulled:
