@@ -22,6 +22,15 @@ def test_export_skills_lists_tiers(client):
     # Tier-1 on-ramps install by default…
     assert by.get("create-feature") is True
     assert by.get("post") is True
+    # …plus the operational utilities (the picker hides defaults, so these drop out of it)…
+    assert by.get("status") is True
+    assert by.get("fsm-call") is True
+    # …and the flag is the installer's constant, not a second copy that can drift.
+    from install_cli.orchestrate import DEFAULT_EXPOSED_SKILLS
+
+    assert {name for name, is_default in by.items() if is_default} == set(
+        DEFAULT_EXPOSED_SKILLS
+    )
     # …pipeline skills are export-only.
     assert by.get("build") is False
     assert by.get("goalize") is False

@@ -26,10 +26,13 @@ from .materialize import (
 ALLOWED_HOSTS = {"claude", "codex", "copilot", "antigravity"}
 
 # Tier-1 — the only skills installed by default (`--apply`). These are the interactive board
-# on-ramps (create-feature, post) plus the dispatcher/help that make them discoverable. Every
-# other skill is export-on-demand: `pathly-setup <host> --export <skill>` (or `--all-skills`
-# for the lot). Keyed by the core skill name (the `skill:` field of each *_skill.yaml meta).
-DEFAULT_EXPOSED_SKILLS = frozenset({"pathly", "help", "create-feature", "post"})
+# on-ramps (create-feature, post), the dispatcher/help that make them discoverable, and the two
+# operational utilities people actually reach for (status, fsm-call). Every other skill is
+# export-on-demand: `pathly-setup <host> --export <skill>` (or `--all-skills` for the lot).
+# Keyed by the core skill name (the `skill:` field of each *_skill.yaml meta).
+DEFAULT_EXPOSED_SKILLS = frozenset(
+    {"pathly", "help", "create-feature", "post", "status", "fsm-call"}
+)
 
 # Substring that identifies a hook command as Pathly-owned.
 _PATHLY_HOOK_MARKER = "pathly_hooks"

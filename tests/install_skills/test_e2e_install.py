@@ -112,12 +112,28 @@ def test_apply_installs_only_tier1_by_default(tmp_path):
     result = _run_install_cli(["claude", "--apply"], tmp_path)
     assert result.returncode == 0, result.stderr
     skills = tmp_path / ".claude" / "skills"
-    # Tier-1: the two board on-ramps + dispatcher/help are always exposed.
-    for s in ("pathly-create-feature", "pathly-post", "pathly", "pathly-help"):
+    # Tier-1: board on-ramps + dispatcher/help + the status / fsm-call utilities.
+    for s in (
+        "pathly-create-feature",
+        "pathly-post",
+        "pathly",
+        "pathly-help",
+        "pathly-status",
+        "pathly-fsm-call",
+    ):
         assert (skills / s / "SKILL.md").exists(), f"{s} should install by default"
     # Tier-2 pipeline skills are export-only — absent from a default apply.
     for s in ("pathly-build", "pathly-goalize", "pathly-review"):
         assert not (skills / s).exists(), f"{s} should be export-only, not default"
+    # A fresh-HOME plain apply yields EXACTLY the default tier, nothing else.
+    assert {p.name for p in skills.glob("pathly*") if p.is_dir()} == {
+        "pathly",
+        "pathly-create-feature",
+        "pathly-fsm-call",
+        "pathly-help",
+        "pathly-post",
+        "pathly-status",
+    }
 
 
 @pytest.mark.slow

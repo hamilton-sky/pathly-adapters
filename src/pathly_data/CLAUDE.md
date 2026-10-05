@@ -87,15 +87,20 @@ Each adapter's `_meta/` directory holds per-agent and per-skill YAML files that 
 ## Skill exposure — Tier-1 default + export-on-demand
 
 Not every skill installs to a host. By default `pathly-setup <host> --apply` writes only the
-**Tier-1** skills — the interactive board on-ramps plus the dispatcher/help that surface them:
+**Tier-1** skills — the interactive board on-ramps, the dispatcher/help that surface them, and the
+two operational utilities that saw real use (`status`, `fsm-call`):
 
-| Tier-1 (always installed) | Role |
+| Tier-1 (installed by default) | Role |
 |---|---|
 | `create-feature`, `post` | the two interactive board on-ramps (chat session → board) |
 | `pathly`, `help` | the dispatcher + help that make them discoverable |
+| `status`, `fsm-call` | operational utilities: active-feature status, raw FSM HTTP calls |
+
+The set is the same for every adapter (it is one constant); a skill an adapter has no
+`_meta/*_skill.yaml` for (e.g. copilot has no `fsm-call`) is simply not installed there.
 
 Every other skill (the pipeline — `plan`/`design`/`build`/`review`/`test`/`retro` — plus
-`goalize`/`debug`/`explore`/`storm` and the control/utility skills) is **export-on-demand**. This
+`goalize`/`debug`/`explore`/`storm` and the remaining control/utility skills) is **export-on-demand**. This
 is safe because in **runner mode the app injects each skill's prompt** (the CLI never reads a skill
 file — see the root [CLAUDE.md](../../CLAUDE.md) "Skill delivery — two modes" table), so pipeline
 skills don't need to be installed to *function* in the app; installing all ~60 would only clutter
