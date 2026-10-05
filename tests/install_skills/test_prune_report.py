@@ -77,7 +77,9 @@ def test_materialize_without_repair_prunes_and_reports_nothing(tmp_path):
 
 @pytest.mark.slow
 def test_dry_run_repair_lists_skills_it_would_prune_and_touches_nothing(tmp_path):
-    assert run_install_cli(["claude", "--apply", "--all-skills"], tmp_path).returncode == 0
+    assert (
+        run_install_cli(["claude", "--apply", "--all-skills"], tmp_path).returncode == 0
+    )
     full = installed_skill_dirs(tmp_path)
     assert {"pathly-review", "pathly-build", "pathly-post"} <= full
     before = _snapshot(tmp_path / ".claude")
@@ -112,7 +114,9 @@ def test_dry_run_repair_lists_skills_it_would_prune_and_touches_nothing(tmp_path
 
 @pytest.mark.slow
 def test_dry_run_without_repair_warns_that_repair_would_remove(tmp_path):
-    assert run_install_cli(["claude", "--apply", "--all-skills"], tmp_path).returncode == 0
+    assert (
+        run_install_cli(["claude", "--apply", "--all-skills"], tmp_path).returncode == 0
+    )
 
     r = run_install_cli(["claude", "--dry-run"], tmp_path)
     assert r.returncode == 0, r.stderr
@@ -130,7 +134,9 @@ def test_dry_run_on_a_fresh_home_reports_no_prunes(tmp_path):
 
 @pytest.mark.slow
 def test_real_repair_reports_the_prune_and_leaves_flows_alone(tmp_path):
-    assert run_install_cli(["claude", "--apply", "--all-skills"], tmp_path).returncode == 0
+    assert (
+        run_install_cli(["claude", "--apply", "--all-skills"], tmp_path).returncode == 0
+    )
     full = installed_skill_dirs(tmp_path)
 
     r = run_install_cli(["claude", "--apply", "--repair"], tmp_path)

@@ -36,7 +36,9 @@ class SkillInfo:
     filename: str  # path under the skills dest, e.g. "pathly-build/SKILL.md"
     meta_file: Path
     meta: dict
-    requires: tuple[str, ...] = ()  # `skill:` keys this skill's text tells the host to invoke
+    requires: tuple[
+        str, ...
+    ] = ()  # `skill:` keys this skill's text tells the host to invoke
 
     @property
     def default(self) -> bool:
@@ -63,7 +65,9 @@ def load_catalog(host: str, *, nested: bool) -> dict[str, SkillInfo]:
         if "skill" not in meta:
             raise ValueError(f"Missing required fields in {meta_file}: ['skill']")
         requires = meta.get("requires") or []
-        if not isinstance(requires, list) or not all(isinstance(r, str) for r in requires):
+        if not isinstance(requires, list) or not all(
+            isinstance(r, str) for r in requires
+        ):
             raise ValueError(f"'requires' in {meta_file} must be a list of skill keys")
         name = meta_file.stem.removesuffix("_skill")
         default_filename = f"{name}/SKILL.md" if nested else f"{name}.md"

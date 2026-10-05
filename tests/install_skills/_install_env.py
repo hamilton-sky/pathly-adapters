@@ -49,4 +49,6 @@ def installed_skill_dirs(tmp_path: Path) -> set[str]:
     skills = tmp_path / ".claude" / "skills"
     if not skills.is_dir():
         return set()
-    return {p.name for p in skills.iterdir() if p.is_dir() and p.name.startswith("pathly")}
+    return {
+        p.name for p in skills.iterdir() if p.is_dir() and p.name.startswith("pathly")
+    }

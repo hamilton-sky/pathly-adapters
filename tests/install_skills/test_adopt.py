@@ -40,7 +40,9 @@ LOST = ("pathly-end/SKILL.md", "pathly-team-build/SKILL.md")  # keys: end, team/
 def _write_skill(dest, filename, name, body="body"):
     path = dest / filename
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(f"---\nname: {name}\ndescription: d\n---\n{body}\n", encoding="utf-8")
+    path.write_text(
+        f"---\nname: {name}\ndescription: d\n---\n{body}\n", encoding="utf-8"
+    )
     return path
 
 
@@ -77,7 +79,12 @@ def test_frontmatter_name(tmp_path):
 
 @pytest.mark.parametrize(
     "text",
-    ["no frontmatter at all", "---\nname: [unclosed\n---\n", "---\n- a\n- list\n---\n", "---\nname: 3\n---\n"],
+    [
+        "no frontmatter at all",
+        "---\nname: [unclosed\n---\n",
+        "---\n- a\n- list\n---\n",
+        "---\nname: 3\n---\n",
+    ],
 )
 def test_frontmatter_name_is_none_when_absent_or_malformed(tmp_path, text):
     f = tmp_path / "SKILL.md"
@@ -98,7 +105,9 @@ def test_find_untracked_splits_adoptable_from_foreign(tmp_path, catalog):
     _write_skill(tmp_path, "pathly-help/SKILL.md", "help")  # already tracked
     (tmp_path / "pathly-review").mkdir()  # dir without a SKILL.md: not a skill file
 
-    adoptable, foreign = find_untracked(catalog, tmp_path, owned={"pathly-help/SKILL.md"})
+    adoptable, foreign = find_untracked(
+        catalog, tmp_path, owned={"pathly-help/SKILL.md"}
+    )
 
     assert adoptable == ["pathly-end/SKILL.md"]
     assert list(foreign) == ["pathly-team-build/SKILL.md"]
@@ -150,7 +159,9 @@ def test_adopt_refuses_path_traversal(tmp_path):
 def test_plan_prunes_counts_files_about_to_be_adopted(tmp_path):
     materialize({"keep.md": "k"}, tmp_path)
     assert plan_prunes({"keep.md": ""}, tmp_path) == []
-    assert plan_prunes({"keep.md": ""}, tmp_path, extra_owned=["lost.md"]) == ["lost.md"]
+    assert plan_prunes({"keep.md": ""}, tmp_path, extra_owned=["lost.md"]) == [
+        "lost.md"
+    ]
 
 
 # ── the user's scenario, end to end ────────────────────────────────────────
@@ -158,7 +169,9 @@ def test_plan_prunes_counts_files_about_to_be_adopted(tmp_path):
 
 def _lose_two_skills(tmp_path):
     """All skills installed, then the manifest forgets `end` and `team/build`."""
-    assert run_install_cli(["claude", "--apply", "--all-skills"], tmp_path).returncode == 0
+    assert (
+        run_install_cli(["claude", "--apply", "--all-skills"], tmp_path).returncode == 0
+    )
     skills = tmp_path / ".claude" / "skills"
     _drop_from_manifest(skills, LOST)
     return skills
@@ -172,7 +185,9 @@ def test_list_flags_untracked_skills_and_says_they_will_be_adopted(tmp_path):
     r = run_install_cli(["claude", "--list"], tmp_path)
     assert r.returncode == 0, r.stderr
     assert re.search(r"^  end\s+pathly-end\s+installed \(untracked\)", r.stdout, re.M)
-    assert re.search(r"^  team/build\s+pathly-team-build\s+installed \(untracked\)", r.stdout, re.M)
+    assert re.search(
+        r"^  team/build\s+pathly-team-build\s+installed \(untracked\)", r.stdout, re.M
+    )
     assert "2 untracked Pathly skill(s) will be adopted" in r.stdout
     assert _snapshot(skills) == before  # listing never adopts
 
@@ -208,7 +223,10 @@ def test_uninstall_reaches_untracked_skills_too(tmp_path):
     skills = _lose_two_skills(tmp_path)
 
     dry = run_install_cli(["claude", "--uninstall", "--dry-run"], tmp_path)
-    assert "pathly-end/SKILL.md" in dry.stdout and "pathly-team-build/SKILL.md" in dry.stdout
+    assert (
+        "pathly-end/SKILL.md" in dry.stdout
+        and "pathly-team-build/SKILL.md" in dry.stdout
+    )
     assert (skills / "pathly-end" / "SKILL.md").exists()
 
     r = run_install_cli(["claude", "--uninstall"], tmp_path)

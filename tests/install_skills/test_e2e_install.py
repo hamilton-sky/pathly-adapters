@@ -10,7 +10,6 @@ import pytest
 
 from _install_env import run_install_cli as _run_install_cli
 
-
 # ---------------------------------------------------------------------------
 # test_dry_run_exits_0
 # ---------------------------------------------------------------------------
@@ -108,7 +107,9 @@ def test_export_installs_named_skill_plus_defaults(tmp_path):
     skills = tmp_path / ".claude" / "skills"
     assert (skills / "pathly-build" / "SKILL.md").exists()  # requested
     assert (skills / "pathly-post" / "SKILL.md").exists()  # default set still installed
-    assert not (skills / "pathly-goalize").exists()  # not requested, not required by build
+    assert not (
+        skills / "pathly-goalize"
+    ).exists()  # not requested, not required by build
 
 
 @pytest.mark.slow

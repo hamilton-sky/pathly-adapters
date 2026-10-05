@@ -27,9 +27,7 @@ def report_would_prune(
     With ``repair`` they are removed by the real run; without it they are left alone, and
     the note says so (the user sees what ``--repair`` would additionally do).
     """
-    names = plan_prunes(
-        files, dest, prune_filter=prune_filter, extra_owned=extra_owned
-    )
+    names = plan_prunes(files, dest, prune_filter=prune_filter, extra_owned=extra_owned)
     if not names:
         return
     if repair:

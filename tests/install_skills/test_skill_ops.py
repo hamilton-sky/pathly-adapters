@@ -43,7 +43,9 @@ def _manifest_names(tmp_path):
     return set(json.loads(path.read_text(encoding="utf-8"))["files"])
 
 
-_STATE = r"default \(not installed\)|default|installed \(untracked\)|installed|available"
+_STATE = (
+    r"default \(not installed\)|default|installed \(untracked\)|installed|available"
+)
 
 
 def _list_states(stdout: str) -> dict[str, str]:
@@ -113,7 +115,12 @@ def test_list_on_a_fresh_home_shows_defaults_as_not_installed(tmp_path):
 def test_list_reports_default_installed_untracked_and_available_and_writes_nothing(
     tmp_path,
 ):
-    assert run_install_cli(["claude", "--apply", "--export", "design"], tmp_path).returncode == 0
+    assert (
+        run_install_cli(
+            ["claude", "--apply", "--export", "design"], tmp_path
+        ).returncode
+        == 0
+    )
     # a pathly skill dir that is on disk but absent from the manifest
     stray = tmp_path / ".claude" / "skills" / "pathly-end"
     stray.mkdir()
@@ -139,7 +146,10 @@ def test_list_reports_default_installed_untracked_and_available_and_writes_nothi
 def test_remove_deletes_only_the_named_skill_and_nothing_else(tmp_path):
     cmd = ["claude", "--apply", "--export", "design", "--export", "test"]
     assert run_install_cli(cmd, tmp_path).returncode == 0
-    assert installed_skill_dirs(tmp_path) == DEFAULT_DIRS | {"pathly-design", "pathly-test"}
+    assert installed_skill_dirs(tmp_path) == DEFAULT_DIRS | {
+        "pathly-design",
+        "pathly-test",
+    }
     skills = tmp_path / ".claude" / "skills"
     kept_before = (skills / "pathly-test" / "SKILL.md").read_bytes()
     outside_skills = {
@@ -176,7 +186,10 @@ def test_remove_accepts_the_directory_name_and_repeats(tmp_path):
 
 @pytest.mark.slow
 def test_remove_dry_run_previews_and_touches_nothing(tmp_path):
-    assert run_install_cli(["claude", "--apply", "--export", "build"], tmp_path).returncode == 0
+    assert (
+        run_install_cli(["claude", "--apply", "--export", "build"], tmp_path).returncode
+        == 0
+    )
     before = _snapshot(tmp_path / ".claude")
 
     r = run_install_cli(["claude", "--remove", "build", "--dry-run"], tmp_path)
@@ -233,7 +246,9 @@ def test_remove_will_not_delete_a_skill_that_is_not_pathlys(tmp_path):
     assert run_install_cli(["claude", "--apply"], tmp_path).returncode == 0
     stray = tmp_path / ".claude" / "skills" / "pathly-end"
     stray.mkdir()
-    (stray / "SKILL.md").write_text("---\nname: my-own-end\n---\nmine", encoding="utf-8")
+    (stray / "SKILL.md").write_text(
+        "---\nname: my-own-end\n---\nmine", encoding="utf-8"
+    )
 
     r = run_install_cli(["claude", "--remove", "end"], tmp_path)
     assert r.returncode == 1
@@ -243,7 +258,10 @@ def test_remove_will_not_delete_a_skill_that_is_not_pathlys(tmp_path):
 
 @pytest.mark.slow
 def test_remove_then_export_round_trips_and_repair_stays_declarative(tmp_path):
-    assert run_install_cli(["claude", "--apply", "--export", "build"], tmp_path).returncode == 0
+    assert (
+        run_install_cli(["claude", "--apply", "--export", "build"], tmp_path).returncode
+        == 0
+    )
     assert run_install_cli(["claude", "--remove", "build"], tmp_path).returncode == 0
     assert "pathly-build" not in installed_skill_dirs(tmp_path)
 
@@ -281,7 +299,9 @@ def test_list_and_remove_reject_clashing_flags(tmp_path, argv):
 def test_export_of_an_unknown_skill_fails_instead_of_silently_installing_nothing(
     tmp_path,
 ):
-    r = run_install_cli(["claude", "--apply", "--export", "build", "--export", "biuld"], tmp_path)
+    r = run_install_cli(
+        ["claude", "--apply", "--export", "build", "--export", "biuld"], tmp_path
+    )
     assert r.returncode == 1
     assert "biuld" in r.stderr
     assert installed_skill_dirs(tmp_path) == set()  # nothing half-applied

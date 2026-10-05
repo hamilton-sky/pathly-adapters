@@ -107,7 +107,9 @@ def test_a_dangling_requirement_is_an_error_not_a_skip(tmp_path):
 
 
 def test_requires_must_be_a_list_of_keys(tmp_path, monkeypatch):
-    (tmp_path / "x_skill.yaml").write_text("skill: x\nrequires: review\n", encoding="utf-8")
+    (tmp_path / "x_skill.yaml").write_text(
+        "skill: x\nrequires: review\n", encoding="utf-8"
+    )
     monkeypatch.setattr(skill_catalog, "adapter_meta_path", lambda host: tmp_path)
     with pytest.raises(ValueError, match="must be a list"):
         load_catalog("claude", nested=True)
@@ -127,7 +129,10 @@ _INVOCATION = [
 ]
 # (skill, target) pairs the patterns match but that are not dependencies.
 _NOT_DEPENDENCIES = {
-    ("team/discover", "build"): "'Never route to pathly-build' — a prohibition, not a call",
+    (
+        "team/discover",
+        "build",
+    ): "'Never route to pathly-build' — a prohibition, not a call",
 }
 
 
@@ -209,9 +214,11 @@ def test_export_installs_the_requirements_too(tmp_path):
 def test_declarative_repair_keeps_requirements_then_drops_them(tmp_path):
     cmd = ["claude", "--apply", "--repair", "--export", "build"]
     assert run_install_cli(cmd, tmp_path).returncode == 0
-    assert {"pathly-build", "pathly-review", "pathly-log-agent-done"} <= installed_skill_dirs(
-        tmp_path
-    )
+    assert {
+        "pathly-build",
+        "pathly-review",
+        "pathly-log-agent-done",
+    } <= installed_skill_dirs(tmp_path)
     # exactly {defaults ∪ requested ∪ requirements}; a bare repair is back to the defaults
     assert run_install_cli(["claude", "--apply", "--repair"], tmp_path).returncode == 0
     assert installed_skill_dirs(tmp_path) == DEFAULT_DIRS
@@ -221,7 +228,10 @@ def test_declarative_repair_keeps_requirements_then_drops_them(tmp_path):
 
 
 def _install_build(tmp_path):
-    assert run_install_cli(["claude", "--apply", "--export", "build"], tmp_path).returncode == 0
+    assert (
+        run_install_cli(["claude", "--apply", "--export", "build"], tmp_path).returncode
+        == 0
+    )
 
 
 @pytest.mark.slow
@@ -249,7 +259,15 @@ def test_remove_refuses_an_indirect_requirement(tmp_path):
 def test_remove_allows_dropping_a_skill_together_with_its_dependents(tmp_path):
     _install_build(tmp_path)
     r = run_install_cli(
-        ["claude", "--remove", "build", "--remove", "review", "--remove", "log-agent-done"],
+        [
+            "claude",
+            "--remove",
+            "build",
+            "--remove",
+            "review",
+            "--remove",
+            "log-agent-done",
+        ],
         tmp_path,
     )
     assert r.returncode == 0, r.stderr
