@@ -84,6 +84,15 @@ Four adapters derive from `core/`:
 
 Each adapter's `_meta/` directory holds per-agent and per-skill YAML files that supply host-specific metadata (model name, tool list, `can_spawn` flag, install destination). `pathly-setup <host> --apply` stitches `core/` content with `_meta/` and writes deployable files.
 
+**Hooks** (`install.yaml` `hooks:` → the host's `settings.json`, `install_cli/hooks.py`). A command may contain
+`{python}`, expanded at install time to the **interpreter running the installer** (absolute, shell-quoted): it
+necessarily has the Pathly package and needs no `python` on `PATH` — the claude Stop hook is
+`{python} -m pathly_hooks.stop_telemetry`; a bare `python -m …` exits 127 at every session end on a machine with only
+`python3` or the package in a venv/pipx env. Entries containing `pathly_hooks` are Pathly-owned: a plain apply adds a
+missing one and leaves an existing one; `--repair` replaces them **in place** (keeping the order of the user's other
+hooks, keeping their own hooks that share a group, and writing nothing when already canonical). A moved or deleted
+venv breaks the absolute path — `--apply --repair` rewrites it.
+
 ## Skill exposure — Tier-1 default + export-on-demand
 
 Not every skill installs to a host. By default `pathly-setup <host> --apply` writes only the

@@ -493,7 +493,9 @@ def test_apply_hooks_dry_run_does_not_write(tmp_path, capsys):
 
 
 def test_apply_hooks_install_yaml_uses_module_notation():
-    """install.yaml stop hook must use 'python -m' to avoid shell backslash issues."""
+    """install.yaml stop hook is `{python} -m <module>`: module notation (no hardcoded
+    paths / shell backslash issues) on an interpreter the installer resolves — never a
+    bare `python`, which fails where only python3 exists."""
     import yaml as _yaml
 
     install_yaml = (
@@ -509,5 +511,5 @@ def test_apply_hooks_install_yaml_uses_module_notation():
     stop_cmds = cfg.get("hooks", {}).get("Stop", [])
     assert stop_cmds, "install.yaml must declare at least one Stop hook"
     assert all(
-        cmd.startswith("python -m") for cmd in stop_cmds
-    ), "Stop hook commands must use 'python -m' notation (no hardcoded paths)"
+        cmd.startswith("{python} -m ") for cmd in stop_cmds
+    ), "Stop hook commands must be '{python} -m <module>' (no bare python, no paths)"

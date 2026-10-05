@@ -21,6 +21,7 @@ from .materialize import (
     uninstall,
 )
 from .adopt import adopt_untracked_for_host
+from .hooks import _apply_hooks  # noqa: F401  (re-exported: tests import it from here)
 from .report import report_pruned, report_would_prune
 from .skill_catalog import (  # noqa: F401  (DEFAULT_EXPOSED_SKILLS is re-exported)
     DEFAULT_EXPOSED_SKILLS,
@@ -37,92 +38,10 @@ ALLOWED_HOSTS = {"claude", "codex", "copilot", "antigravity"}
 # DEFAULT_EXPOSED_SKILLS (the Tier-1 default set) lives in skill_catalog and is re-exported
 # here: the Studio export endpoint and the docs import it from `install_cli.orchestrate`.
 
-# Substring that identifies a hook command as Pathly-owned.
-_PATHLY_HOOK_MARKER = "pathly_hooks"
-
 
 def _is_flow(name: str) -> bool:
     """Flow YAMLs share the agents manifest but have their own always-repair sync."""
     return name.endswith(".flow.yaml")
-
-
-def _apply_hooks(host: str, hooks_cfg: dict, *, dry_run: bool, repair: bool) -> None:
-    """Merge Pathly hooks into the host's settings.json.
-
-    Hook entries whose command contains 'pathly_hooks' are treated as
-    Pathly-owned.  In normal mode they are left as-is; repair=True replaces
-    them with the canonical commands from hooks_cfg.
-
-    All other settings in settings.json are preserved unchanged.
-    """
-    settings_dest_str = hooks_cfg.get("settings_dest")
-    if not settings_dest_str:
-        return
-    settings_path = Path(settings_dest_str).expanduser()
-
-    # event → [cmd, ...] (skip the settings_dest metadata key)
-    events: dict[str, list[str]] = {
-        k: ([v] if isinstance(v, str) else list(v))
-        for k, v in hooks_cfg.items()
-        if k != "settings_dest"
-    }
-    if not events:
-        return
-
-    settings: dict = {}
-    if settings_path.exists():
-        try:
-            settings = json.loads(settings_path.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            settings = {}
-
-    existing_hooks: dict = settings.get("hooks", {})
-    changed = False
-
-    for event, commands in events.items():
-        event_groups: list = list(existing_hooks.get(event, []))
-
-        pathly_indices = [
-            i
-            for i, g in enumerate(event_groups)
-            if isinstance(g, dict)
-            and any(
-                _PATHLY_HOOK_MARKER in h.get("command", "")
-                for h in g.get("hooks", [])
-                if isinstance(h, dict)
-            )
-        ]
-
-        new_group: dict = {
-            "hooks": [{"type": "command", "command": cmd} for cmd in commands]
-        }
-
-        if not pathly_indices:
-            event_groups.append(new_group)
-            changed = True
-        elif repair:
-            kept = [
-                g for i, g in enumerate(event_groups) if i not in set(pathly_indices)
-            ]
-            kept.append(new_group)
-            event_groups = kept
-            changed = True
-        # else: existing Pathly hooks, repair not requested — leave as-is
-
-        existing_hooks[event] = event_groups
-
-    if not changed:
-        return
-
-    settings["hooks"] = existing_hooks
-
-    if dry_run:
-        print(f"[{host}] Would update hooks in {settings_path}")
-        return
-
-    settings_path.parent.mkdir(parents=True, exist_ok=True)
-    settings_path.write_text(json.dumps(settings, indent=2), encoding="utf-8")
-    print(f"[{host}] Updated hooks in {settings_path}")
 
 
 def _run_mcp(host: str, mcp_cfg: dict, *, dry_run: bool, repair: bool) -> None:

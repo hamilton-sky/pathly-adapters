@@ -13,4 +13,4 @@ mcp:
 hooks:
   settings_dest: ~/.claude/settings.json
   Stop:
-    - python -m pathly_hooks.stop_telemetry
+    - "{python} -m pathly_hooks.stop_telemetry"
