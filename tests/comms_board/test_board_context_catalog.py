@@ -71,7 +71,13 @@ def test_empty_board_is_byte_identical(client):
         counts=counts,
     )
     assert block == ""
-    assert counts == {
+    # Every CHANNEL is zero. `counts` also carries the budget+k in force and (once a
+    # Context body renders) the rendered/omitted volume — the BOARD_CONTEXT record's
+    # fields, surfaced here so the preview shows what the run will — so this asserts the
+    # channel subset rather than dict equality.
+    assert {
+        k: counts[k] for k in ("governance", "referenced", "semantic", "catalog")
+    } == {
         "governance": 0,
         "referenced": 0,
         "semantic": 0,

@@ -2,19 +2,24 @@
 
 from __future__ import annotations
 
-import threading
-import uuid
 from typing import Callable, Optional
 
 _DEFAULT_MODEL = "claude-sonnet-4-6"
 _TEAM_FLOW = "team-build"
+# `executor: loop` IS this flow (fsm-fan-out Phase E) — a single fan-out state whose
+# per-task drain is the flat, gate-less product `loop` has always been, now driven by the
+# ONE engine. The NAME matters beyond addressing the YAML: run_history classifies a
+# bare-uuid run with adapter "goal-loop" as a loop PARENT (windowing its sched-* task rows
+# into one run), and terminal_reconcile buckets the Monitor's RECENT list off the same
+# string. Renaming the flow silently re-buckets every loop run as a flow.
+_LOOP_FLOW = "goal-loop"
 
 # Board-scoped run kind per flow (board-scoped-storage): a flow run ON a board nests under
 # features/<f>/<kind>/<slug>. Known run-flows map to their kind; goal/feature-decompose flows
 # use 'goals'; any OTHER (custom, user-created) flow gets its OWN name as the kind — a new flow
 # 'audit' nests at features/<f>/audit/<slug>, self-describing on disk with no code change.
 _FLOW_KIND = {"debug": "debugs", "explore": "explorations", "quick-fix": "fixes"}
-_GOAL_FLOWS = frozenset({"team", "team-build", "consultation", "test", ""})
+_GOAL_FLOWS = frozenset({"team", "team-build", "consultation", "test", _LOOP_FLOW, ""})
 
 
 def _flow_kind(flow: str) -> str:
@@ -220,6 +225,7 @@ def start_goal_run(
                 on_done=_on_done_release,
                 spawn_fn=spawn_fn,
                 block=block,
+                start_fn=start_fn,
             )
         else:  # team
             result = _run_team(
@@ -314,135 +320,52 @@ def _run_loop(
     on_done,
     spawn_fn,
     block: bool,
+    start_fn=None,
 ) -> dict:
-    """Supervisor owns the frontier via scheduler_loop (SerialIsolation), scoped to goal."""
-    from pathly_orchestrator.supervisor import board_lock
-    from pathly_orchestrator.supervisor.isolation import SerialIsolation
-    from pathly_orchestrator.supervisor.registry import _record_run_history
-    from pathly_orchestrator.supervisor.scheduler import scheduler_loop
-    from pathly_orchestrator.supervisor.state import RunnerState
+    """`executor: loop` runs the FSM — the second engine is gone (fsm-fan-out Phase E).
 
-    run_id = str(uuid.uuid4())
-    if not board_lock.acquire(board, scope, run_id):
-        return {
-            "ok": False,
-            "reason": "board_busy",
-            "error": "board is busy",
-            "holder": board_lock.holder(board, scope),
-        }
+    This used to BE an engine: it built its own ``RunnerState``, took a board lock, and drove
+    ``scheduler_loop`` top-level as a peer of ``orchestrator._loop``. Everything it did is now
+    done by the FSM running the ``goal-loop`` flow, whose single ``DRAINING`` state declares
+    ``parallel_states`` and so hands the frontier to ``supervisor/fan_out.py`` — the same
+    scheduler, as the executor OF a state instead of a rival to the one that owns the flow.
 
-    slug = scope  # fallback
-    if project_root and goal_id:
-        try:
-            from pathly_orchestrator.db.connection import get_db
-            from pathly_orchestrator.supervisor.goal_decomposer import _goal_storage_dir
-            from pathly_orchestrator.supervisor.slug import ensure_goal_slug
-            import os
+    **The product is unchanged.** ``goal-loop`` is a flat drain (``development/execute-task``
+    per task, no REVIEWING/TESTING/RETRO between tasks), not ``team-build``. Retiring ``loop``
+    INTO the team flow — which is what "``executor: loop`` becomes a parallel flow" was
+    originally scoped as — would have handed a user who picked ``loop`` for speed a fully
+    reviewed pipeline instead. It is the ENGINE that was retired, not the fast path.
 
-            slug = ensure_goal_slug(get_db(project_root or None), goal_id)
-            # Board-scoped goal home (storage-restructure): feature-tier nests under the feature
-            # (pathly/features/<feature>/goals/<slug>), project/global under pathly/project/goals/
-            # <slug>. Route through the ONE goal-dir resolver — every other goal path (decompose
-            # planner/plan/consultation, _run_team) already does — instead of the flat
-            # pathly/goals/<slug> this used to hardcode.
-            _goal_dir = _goal_storage_dir(project_root, board, scope, slug)
-            os.makedirs(_goal_dir, exist_ok=True)
-        except Exception:
-            pass
+    What the goal run gains, all of it from the DB being the authority: a ``fsm_state`` row (so
+    ``pathly-status`` and the ``STATE.json`` export can see it), a ``STATE_TRANSITION`` audit
+    trail, park/resume on a human checkpoint, the escalation ladder, and the two verify
+    ``command_gate``s as ROUTED gates — ``goal_verify.verify_clean_drain`` ran the same two
+    commands but could only post an escalation and stop, where a gate re-drives a fix.
 
-    state = RunnerState(
-        topic=slug,
-        flow="goal-loop",
+    ``spawn_fn``/``event_broadcast_fn``/``block`` are kept in the signature because
+    ``start_goal_run`` passes them positionally for every executor; they belonged to the drain
+    this no longer performs. ``start_fn`` is the seam that replaces them — the same one
+    ``_run_team`` uses.
+    """
+    result = _run_team(
+        goal_id,
+        board,
+        scope,
+        flow=_LOOP_FLOW,
         project_root=project_root,
-        model=model or _DEFAULT_MODEL,
-        timeout=600,
-        run_id=run_id,
-        current_adapter=adapter or "claude",
-        # Headless one-shot per task — never the interactive REPL. RunnerState.interactive
-        # defaults to True; leaving it unset made _run_stage_via_terminal build an interactive
-        # argv that omits the task prompt, so the spawned CLI exited nonzero with no AGENT_DONE.
-        # Every other goal executor is headless (_run_team, _decompose_consultation).
-        interactive=False,
-        # run-identity: the goal's board scope, ISSUED at spawn (topic is the goal slug, so
-        # the telemetry stamps must not re-derive identity from it).
-        board_scope=scope,
+        adapter=adapter,
+        model=model,
+        broadcast_fn=broadcast_fn,
+        on_start=on_start,
+        on_done=on_done,
+        start_fn=start_fn,
+        event_broadcast_fn=event_broadcast_fn,
     )
-    # telemetry-three-tier: the loop owns its telemetry (no registry RunnerState →
-    # api_lifecycle won't write it). Tag every task with the board's scope_tier and
-    # thread each task's span under one goal trace (goal=trace, task=span).
-    from pathly_orchestrator.runner.telemetry import (
-        new_span_id,
-        new_trace_id,
-        scope_tier_for,
-        write_goal_root_span,
-    )
-
-    state.executor_owned_telemetry = True
-    state.scope_tier = scope_tier_for(board)
-    state.goal_trace_id = new_trace_id()
-    state.goal_span_id = new_span_id()
-    write_goal_root_span(
-        project_root=project_root,
-        feature=scope,
-        goal_id=goal_id,
-        trace_id=state.goal_trace_id,
-        span_id=state.goal_span_id,
-        scope_tier=state.scope_tier,
-        executor="loop",
-    )
-    # Early run_history PARENT row (adapter="goal-loop" via state.flow) so the loop shows as ONE
-    # run in GET /runs while it runs — its per-task sched-* rows fold under it (run_history_read).
-    # _run_loop builds its own RunnerState (never start_run), so nothing else writes this row.
-    _record_run_history(state, "running")
-    isolation = SerialIsolation()
-
-    def _abort_check() -> bool:
-        return board_lock.holder(board, scope) != run_id
-
-    def _work() -> dict:
-        import time as _t
-
-        def _iso_now() -> str:
-            return _t.strftime("%Y-%m-%dT%H:%M:%SZ", _t.gmtime())
-
-        try:
-            _safe_call(on_start, run_id)
-            kwargs: dict = dict(
-                isolation=isolation,
-                broadcast_fn=broadcast_fn,
-                event_broadcast_fn=event_broadcast_fn,
-                goal_id=goal_id,
-                abort_check=_abort_check,
-            )
-            if spawn_fn is not None:
-                kwargs["spawn_fn"] = spawn_fn
-            raw = scheduler_loop(state, board, scope, **kwargs)
-            res: dict = dict(raw) if isinstance(raw, dict) else {"result": raw}
-            res["executor"] = "loop"
-            res["goal_id"] = goal_id
-            res["run_id"] = run_id
-            _safe_call(on_done, run_id, res)
-            _record_run_history(state, "done", finished_at=_iso_now())
-            return res
-        except Exception:
-            _record_run_history(state, "error", finished_at=_iso_now())
-            raise
-        finally:
-            board_lock.release(board, scope, run_id)
-
-    if block:
-        return {"ok": True, "run_id": run_id, "executor": "loop", "result": _work()}
-
-    def _runner() -> None:
-        try:
-            _work()
-        except Exception as exc:
-            _safe_call(on_done, run_id, {"result": f"error: {exc}", "error": str(exc)})
-
-    threading.Thread(
-        target=_runner, daemon=True, name=f"goal-loop-{run_id[:8]}"
-    ).start()
-    return {"ok": True, "run_id": run_id, "executor": "loop", "status": "started"}
+    if isinstance(result, dict) and result.get("ok"):
+        # The dispatcher's own label, NOT the flow's: callers (and the persisted goal row)
+        # address this as `loop`, and `_run_team` stamps "team".
+        result["executor"] = "loop"
+    return result
 
 
 def _run_team(
@@ -459,6 +382,7 @@ def _run_team(
     on_done,
     start_fn,
     stage_overrides: Optional[dict] = None,
+    event_broadcast_fn=None,
 ) -> dict:
     """Run an FSM flow (default team-build) on the goal's scope via start_run."""
     from pathly_orchestrator.supervisor import board_lock
@@ -545,6 +469,9 @@ def _run_team(
             goal_id=goal_id,
             on_done=on_done,
             stage_overrides=stage_overrides,
+            # A fan-out state's per-task board events (goal-loop). Harmless for a
+            # non-parallel flow, which emits none.
+            event_broadcast_fn=event_broadcast_fn,
         )
     except ValueError as exc:
         return {"ok": False, "reason": "board_busy", "error": str(exc)}

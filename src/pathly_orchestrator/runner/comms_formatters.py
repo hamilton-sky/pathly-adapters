@@ -182,3 +182,38 @@ def _collect_hydrate_channel(
     except Exception:
         _logger.debug("comms_context: task_id hydration failed", exc_info=True)
     return hydrate_lines, hydrate_count
+
+
+def _build_context_entries(context_msgs: list[dict]) -> list[tuple[str, str]]:
+    """Render each kept context message as ``(tier, line)`` for the budget pass.
+
+    Split out of ``comms_context`` (which was at the 400-line SOLID limit) rather than
+    inlined: this is pure formatting over ``_format_age`` + ``_confidence_label``, both
+    of which already live here.
+
+    The tier is read from ``_tier`` — stamped by the per-board search loop, and
+    authoritative — falling back to ``board`` only for a row that never went through it.
+    """
+    entries: list[tuple[str, str]] = []
+    for msg in context_msgs:
+        from_agent = msg.get("from_agent", "?")
+        to_agent = msg.get("to_agent", "*")
+        stage = msg.get("stage") or ""
+        ts_str = msg.get("ts", "")
+        age = _format_age(ts_str) if ts_str else ""
+        parts = [f"{from_agent} → {to_agent}"]
+        if stage:
+            parts.append(stage)
+        if age:
+            parts.append(age)
+        # CT2: surface match confidence as a coarse bucket (strong/moderate/weak),
+        # not a raw float — legible in the /preview audit AND to the agent, without
+        # implying false precision. Absent for keyword/recency hits (no _distance).
+        confidence = _confidence_label(msg.get("_distance"))
+        if confidence:
+            parts.append(confidence)
+        header = ", ".join(parts)
+        text = msg.get("text", "")
+        tier = msg.get("_tier") or msg.get("board") or "feature"
+        entries.append((tier, f"  • {text}  [{header}]"))
+    return entries

@@ -14,7 +14,8 @@ from __future__ import annotations
 
 import logging
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify
+from ._helpers import read_json_body
 
 bp = Blueprint("comms_context_preview", __name__)
 
@@ -25,7 +26,7 @@ def comms_agent_context_preview():
     try:
         from pathly_orchestrator.runner.comms_context import board_context_for
 
-        data = request.get_json()
+        data = read_json_body()
         if not data:
             return jsonify({"error": "Missing JSON body"}), 400
 
@@ -42,6 +43,9 @@ def comms_agent_context_preview():
         project_root = data.get("project_root") or ""
         task_description = data.get("task_description") or ""
         task_id = data.get("task_id") or None
+        # The agent ROLE the task would run as: tiers are allocated per role, so a preview
+        # that omits it would show a different board than the run it is previewing.
+        role = data.get("role") if isinstance(data.get("role"), str) else ""
 
         counts: dict[str, int] = {}
         block = board_context_for(
@@ -51,6 +55,7 @@ def comms_agent_context_preview():
             task_description=task_description,
             task_id=task_id,
             counts=counts,
+            role=role,
         )
 
         return (

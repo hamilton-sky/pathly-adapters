@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import subprocess
 import sys
 import time
@@ -49,6 +50,12 @@ def invoke_agent(
         cwd=project_root,
         stdout=subprocess.PIPE,
         stderr=sys.stderr,
+        # pathly-run has no gate-billing chokepoint (no /runner/terminal/result — it
+        # invokes the adapter directly, not via TERMINAL_SPAWN), so the interactive
+        # stop hook is this path's ONLY cost source. Without PATHLY_PROJECT_ROOT in the
+        # child env the hook can't find "the active feature" and silently bills nothing
+        # — the same env Studio already exports for every interactive tab (terminal.ts).
+        env={**os.environ, "PATHLY_PROJECT_ROOT": project_root},
     )
 
     if proc_callback is not None:

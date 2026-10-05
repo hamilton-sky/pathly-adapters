@@ -4,8 +4,9 @@
 
 _(no purpose registered — add one in scripts/gen_test_index.py)_
 
-1 test file(s).
+2 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
+| `test_lessons_paths.py` | The cross-feature lessons pipeline must agree on ONE path | 4 |
 | `test_no_mirror_reads.py` | Run the state-one-authority mirror-read gate inside pytest too | 2 |

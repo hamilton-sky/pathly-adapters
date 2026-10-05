@@ -94,6 +94,7 @@ def complete_stage(args: dict) -> dict:
                     feedback["target_agent"],
                     storage_path,
                     feedback_file=feedback["file"],
+                    retry_count=feedback.get("retry_count", 0),
                 )
                 result["instructions"] = instructions
                 result["agent_hint"] = _fops._agent_hint(
@@ -190,6 +191,7 @@ def complete_stage(args: dict) -> dict:
                     feedback["target_agent"],
                     storage_path,
                     feedback_file=feedback["file"],
+                    retry_count=feedback.get("retry_count", 0),
                 )
                 result["instructions"] = instructions
                 result["agent_hint"] = _fops._agent_hint(

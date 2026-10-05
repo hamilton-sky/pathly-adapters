@@ -20,9 +20,9 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from flask import Blueprint, jsonify, request
-
+from flask import Blueprint, jsonify
 from ...sse import _broadcast_comms, _broadcast_runner
+from ._helpers import read_json_body
 
 bp = Blueprint("comms_project", __name__)
 
@@ -62,7 +62,7 @@ def comms_project_decompose():
     try:
         # silent=True: a missing/invalid body returns a clean 400, never a 500
         # (T3 contract: best-effort, never 500 on a malformed/absent request).
-        data = request.get_json(silent=True)
+        data = read_json_body()
         if not data:
             return (
                 jsonify({"error": "Missing JSON body", "reason": "missing_body"}),

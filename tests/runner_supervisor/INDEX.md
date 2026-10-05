@@ -4,15 +4,19 @@
 
 Runner control loop, supervisor, spawn channel, lane/worktree isolation, file-claim registry, services facade.
 
-11 test file(s).
+15 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
+| `test_fan_out.py` | supervisor/fan_out.py — the DAG scheduler as an FSM stage executor (fan-out Phase C) | 19 |
 | `test_file_claims.py` | Unit tests for the cross-feature file-claim overlap registry | 6 |
 | `test_isolation.py` | Tests for supervisor/isolation.py — LaneIsolation workspace seam | 11 |
+| `test_park_resume.py` | Tests for the human-checkpoint "parked" status and its resume path | 8 |
+| `test_pty_host.py` | Tests for the headless spawn host (``pathly-pty-host``) | 17 |
+| `test_pty_host_e2e.py` | End-to-end: a supervisor spawn wait satisfied WITHOUT Studio | 5 |
 | `test_run_identity_stamps.py` | run-identity: server-side run_id + board_scope stamping (supervisor guarantee) | 6 |
 | `test_run_log_seams.py` | run_log write seams — best-effort spawn + result persistence (unified-control-plane P0, | 2 |
-| `test_runner.py` | Unit tests for pathly_orchestrator.runner | 20 |
+| `test_runner.py` | Unit tests for pathly_orchestrator.runner | 22 |
 | `test_runner_contract.py` | The runner contract injected by build_prompt — headless agents must never self-drive the FSM | 2 |
 | `test_runner_endpoints.py` | Tests for /runner/* control endpoints and /events/runner SSE (Conv 3 — Phases 8-10) | 38 |
 | `test_runner_fsm_integration.py` | Integration tests: the REAL FSM driven through the REAL driver loops | 5 |

@@ -38,12 +38,15 @@ User → /pathly <cmd>           skills (installed at ~/.claude/skills/pathly-*)
      → pathly/features/<feature>/  filesystem state (legacy: pathly/plans/<feature>/)
 
 Studio → Start button          FlowControlBar → POST /runner/start
-       → supervisor/            drives FSM + spawns agents as visible terminals
-       → TERMINAL_SPAWN SSE    Studio opens a PTY tab (node-pty) per pipeline stage
+       → supervisor/            drives FSM + delegates every agent spawn to the spawn host
+       → TERMINAL_SPAWN SSE    a SPAWN HOST opens a process per pipeline stage. Two implement the
+                               same contract: Studio (node-pty tab) and `pathly-pty-host`
+                               (src/pathly_orchestrator/pty_host/, plain pipes — server/CI, no
+                               desktop). Run exactly one; the supervisor can't tell them apart.
        → terminal:spawn IPC    argv injected from adapters.yaml headless template, e.g.
                                claude: ['claude', '-p', '{prompt}', '--model', '{model}', '--output-format', 'json', '--dangerously-skip-permissions']
                                codex:  ['codex', 'exec', '--skip-git-repo-check', '--json', '--sandbox', 'workspace-write', '--model', '{model}', '--', '{prompt}']
-       → PTY exits             POST /runner/terminal/result → FSM continues
+       → process exits         POST /runner/terminal/result → FSM continues
      → fsm_events (DB)      Claude writes AGENT_DONE with `summary` mid-run to the central DB; supervisor reads it after PTY exits as the authoritative semantic result (stdout only used for session_id + cost_usd); EVENTS.jsonl is a downstream DB→disk export
 ```
 
@@ -70,6 +73,18 @@ In runner mode Pathly is the single source of truth for skill content. The CLI r
 - `decision` — `"continue"` / `"block"` / `"escalate"` (automation gate)
 - `codex_subagent` — legacy compat field with frozen keys; new adapters should read `agent_hint`
 
+**Ground truth — `command_gate` measures what other gates take on trust.** Four of the five FSM
+transition gates read state an *agent produced*: `require_artifact` (a file exists), `verify_gate`
+(the file's line 1 is `RESULT: PASS`), `require_tasks_done` (tasks marked done), `scope_gate` (the
+git footprint matches the declared one). `command_gate` (`fsm/gates/command.py`) is the one that
+**executes** — it runs the project's own verify command, reads the process exit code, and routes the
+real stdout/stderr back as feedback. So a builder that writes `RESULT: PASS` over code that does not
+compile no longer advances the flow. Configure per project with `PUT /db/settings/verify.build` /
+`verify.test`; **unconfigured means the gate skips**, so it is inert until a project opts in. Wired
+into `team`/`team-build` at `BUILDING->REVIEWING` (`verify.build` → `BUILD_FAILURES.md`) and
+`TESTING->RETRO` (`verify.test` → `TEST_FAILURES.md`). Detail:
+[src/pathly_orchestrator/CLAUDE.md](src/pathly_orchestrator/CLAUDE.md).
+
 **Agent roles** (full definitions in `src/pathly_data/core/agents/`):
 
 | Role | Model | Job |
@@ -95,7 +110,7 @@ In runner mode Pathly is the single source of truth for skill content. The CLI r
 
 ## Comms board (orchestration substrate)
 
-A DB-backed message board (`comms_messages` + `comms_artifacts` tables, `/comms/*` routes) where agents and humans post decisions, discoveries, artifacts, and DAG tasks. It is the Studio **Command Center** surface and is injected into every agent prompt as governance + semantic context (`retrieve_board_context`). The **Board → Goals → per-goal Task-DAG → pluggable-executors** model is **live** (`goal_id`/`executor` columns; executors = `single`/`loop`/`team`, dispatched by `supervisor/goal_executor.py` (`goal_run.py` is a thin re-export shim; goals decompose via `goal_decomposer.py`); goals decompose via planner/consultation, run with a per-goal executor + CLI-engine selector, and stop via `/comms/goals/stop`). Also live: a **context-retrieval** layer (per-task `context_refs` manifest → `/comms/artifacts/<id>/section` hydration → Board Catalog → client-side AI-Router summaries) and a **memory-consolidation** layer (relevance-gated context channel, near-duplicate dedup + a manual reflection pass via `/comms/consolidate`). Only **P3** (parallel: across-goal lanes → worktree fan-in) remains. Design + roadmap live in `pathly/features/comms-board/` (see `ROADMAP.md`). Details: [src/pathly_orchestrator/CLAUDE.md](src/pathly_orchestrator/CLAUDE.md).
+A DB-backed message board (`comms_messages` + `comms_artifacts` tables, `/comms/*` routes) where agents and humans post decisions, discoveries, artifacts, and DAG tasks. It is the Studio **Command Center** surface and is injected into every agent prompt as governance + semantic context (`retrieve_board_context`). The **Board → Goals → per-goal Task-DAG → pluggable-executors** model is **live** (`goal_id`/`executor` columns; executors = `single`/`loop`/`team`, dispatched by `supervisor/goal_executor.py` (`goal_run.py` is a thin re-export shim; goals decompose via `goal_decomposer.py`); goals decompose via planner/consultation, run with a per-goal executor + CLI-engine selector, and stop via `/comms/goals/stop`). **Since fsm-fan-out Phase E, `loop` and `team` are both FSM runs** — `loop` runs the `goal-loop` flow (one fan-out `DRAINING` state; flat by design, no review/test round-trip), `team` runs `team-build` (reviewed); only `single` is agent-driven, via `development/drain-dag`. Also live: a **context-retrieval** layer (per-task `context_refs` manifest → `/comms/artifacts/<id>/section` hydration → Board Catalog → client-side AI-Router summaries) and a **memory-consolidation** layer (relevance-gated context channel, near-duplicate dedup + a manual reflection pass via `/comms/consolidate`). Only **P3** (parallel: across-goal lanes → worktree fan-in) remains. Design + roadmap live in `pathly/features/comms-board/` (see `ROADMAP.md`). Details: [src/pathly_orchestrator/CLAUDE.md](src/pathly_orchestrator/CLAUDE.md).
 
 ---
 

@@ -26,7 +26,7 @@ Do not write files; quick is read-only. The retro skill/orchestrator writes RETR
 
 After quick completes:
 - Write `<feature_path>/RETRO.md` with the summary provided.
-- Append any extracted lessons to `LESSONS_CANDIDATE.md` (project root or pathly/features/).
+- Append any extracted lessons to `pathly/lessons/LESSONS_CANDIDATE.md` (create the directory if needed).
 
 Parse the `<usage>` block from quick's response:
 - `total_tokens`: the number after `total_tokens:` (0 if absent)
@@ -75,7 +75,7 @@ Pipeline walkthrough written:
   pathly/pipeline-walkthrough/[feature]/01-PIPELINE-FLOW.md
   pathly/pipeline-walkthrough/[feature]/02-TOKEN-USAGE.md
   pathly/pipeline-walkthrough/[feature]/03-ARTIFACT-MAP.md
-Lessons appended to LESSONS_CANDIDATE.md (if any were extracted).
+Lessons appended to pathly/lessons/LESSONS_CANDIDATE.md (if any were extracted).
 Feature '[feature]' is DONE.
 
 To promote lessons to active memory: route to lessons

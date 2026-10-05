@@ -6,6 +6,7 @@ import logging
 
 from flask import jsonify, request
 
+from pathly_orchestrator.runner.provenance import record_stage_provenance
 from ...sse import _broadcast_runner
 from ._runner_bp import _topic_from_body, _validate_stage_overrides, bp
 
@@ -19,8 +20,7 @@ def _write_stage_telemetry(
     AGENT_DONE event, and the universal projector (``invocation_projection`` via
     ``append_event``) derives the invocation row from that event stream, folding in
     the superseding BILLING_UPDATE. Writing an invocation here too would double-count.
-    This still writes the span so the trace tree is intact. It never raises —
-    telemetry must not break the terminal-result callback.
+    This still writes the span so the trace tree is intact; it never raises (telemetry must not break the terminal-result callback).
     """
     try:
         import json as _json
@@ -341,12 +341,12 @@ def runner_terminal_result():
                     exc,
                 )
 
-        # Fill the otel_spans + agent_invocations trace tables (one span + one invocation
-        # per completed stage). Best-effort — never blocks the result callback.
+        # Trace-table span + measured git provenance — both best-effort, non-blocking.
         if runner_state is not None:
             _write_stage_telemetry(
                 runner_state, parsed, agent_done, data.get("wall_seconds")
             )
+            record_stage_provenance(runner_state, run_id)
 
         tab_id = runner_state.active_tab_id if runner_state is not None else ""
         if tab_id and topic:

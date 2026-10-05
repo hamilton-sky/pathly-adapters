@@ -53,6 +53,11 @@ jobs:
       - name: 400-line SOLID rule (ratchet — no new or growing oversized files)
         run: python scripts/check_file_size.py
 
+      - name: Layer dependency rule (db -> runner -> supervisor -> http_server)
+        run: |
+          pip install import-linter==2.14
+          lint-imports
+
   security:
     runs-on: ubuntu-latest
     steps:

@@ -32,6 +32,14 @@ feedback_routing:
   TEST_FAILURES: builder
   HUMAN_QUESTIONS: human
 
+# 3-tier retry escalation (rounds 1-2 owner -> round 3 upstream specialist -> round 4+
+# human). Without it a fix that keeps failing VERIFYING routed back to `builder` forever,
+# with no human backstop — it just ran the run out of iterations/budget. Round 3 goes to
+# `scout` (the SCOPING role): if the fix keeps failing, the scope it was cut from is the
+# suspect, not the code.
+escalation_routing:
+  TEST_FAILURES: scout
+
 transition_actions:
   FIXING->VERIFYING:
     - skill: commit

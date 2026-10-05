@@ -7,11 +7,10 @@ triggers artifact indexing, emits the summary request, and fires the SSE update.
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 
-from flask import jsonify, request
+from flask import jsonify
 
 from ...sse import _broadcast_comms
 from ._helpers import (
@@ -20,6 +19,7 @@ from ._helpers import (
     extract_artifact_path,
     guess_artifact_type,
     norm_project_root,
+    read_json_body,
 )
 from ._messages_bp import bp
 
@@ -38,18 +38,9 @@ def comms_post():
             embed_async as _embed_async,
         )
 
-        # Windows agents post via curl whose JSON body may be cp1252-encoded (a stray em-dash →
-        # byte 0x97), which strict UTF-8 parsing rejects with a 500 — silently dropping a task or
-        # artifact. Decode leniently: UTF-8 first, then cp1252, so the post always lands.
-        raw = request.get_data()
-        data = None
-        if raw:
-            for _enc in ("utf-8", "cp1252"):
-                try:
-                    data = json.loads(raw.decode(_enc))
-                    break
-                except (UnicodeDecodeError, ValueError):
-                    continue
+        # Lenient decode (UTF-8 then cp1252) — this route's original hardening, now the
+        # shared helper every comms route uses. See _helpers.read_json_body.
+        data = read_json_body()
         if not data:
             return jsonify({"error": "Missing or invalid JSON body"}), 400
 
@@ -122,6 +113,15 @@ def comms_post():
         stage = data.get("stage")
         conv = data.get("conv")
         depends_on = data.get("depends_on")
+        # Scheduler partition + footprint (fsm-fan-out C.5). `lane` is the unit the DAG
+        # scheduler serialises on — at most one worker per lane at a time — and `files`
+        # is the footprint that makes a lane assignment checkable rather than trusted.
+        # Both were columns with NO write path: post_message never accepted `lane`, and
+        # this route never forwarded `files`, so every task reached the scheduler with
+        # lane=NULL — falling back to `lane or task_id`, i.e. one lane per task, which
+        # makes the one-worker-per-lane rule vacuous the moment isolation goes parallel.
+        lane = data.get("lane")
+        files = data.get("files")
         goal_id = data.get("goal_id")
         executor = data.get("executor")
         # run_id correlates this post to a run so RunDetail's Board tab shows it exactly (and — via
@@ -156,6 +156,18 @@ def comms_post():
                 jsonify(
                     {"error": "Field 'depends_on' must be a list of strings or null"}
                 ),
+                400,
+            )
+        if lane is not None and (not isinstance(lane, str) or not lane.strip()):
+            return (
+                jsonify({"error": "Field 'lane' must be a non-empty string or null"}),
+                400,
+            )
+        if files is not None and (
+            not isinstance(files, list) or not all(isinstance(f, str) for f in files)
+        ):
+            return (
+                jsonify({"error": "Field 'files' must be a list of strings or null"}),
                 400,
             )
         if goal_id is not None and not isinstance(goal_id, str):
@@ -277,6 +289,8 @@ def comms_post():
             goal_id=goal_id,
             executor=executor,
             run_id=run_id,
+            lane=lane.strip() if isinstance(lane, str) else None,
+            files=files,
             context_refs=context_refs,
             slug=slug if isinstance(slug, str) and slug.strip() else None,
         )

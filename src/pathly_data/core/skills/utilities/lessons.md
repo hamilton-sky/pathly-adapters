@@ -10,8 +10,8 @@ for rendering those routes in their host-native form.
 
 ## Skill Contract
 
-**Consumes:** `LESSONS_CANDIDATE.md` + `pathly/features/.archive/*/RETRO.md` (up to last 6)
-**Produces:** `LESSONS.md` (active lessons, planner reads this)
+**Consumes:** `pathly/lessons/LESSONS_CANDIDATE.md` + `pathly/features/.archive/*/RETRO.md` (up to last 6)
+**Produces:** `pathly/lessons/LESSONS.md` (active lessons, planner reads this)
 **When to run:** After any `retro` workflow, or manually when you want to update active lessons.
 
 ---
@@ -19,7 +19,7 @@ for rendering those routes in their host-native form.
 ## Step 1: Read source material
 
 Read in order:
-1. `LESSONS_CANDIDATE.md` — all candidate lessons (may not exist yet)
+1. `pathly/lessons/LESSONS_CANDIDATE.md` — all candidate lessons (may not exist yet)
 2. Up to 6 most recent `pathly/features/.archive/*/RETRO.md` files — scan the "What to Improve Next Time" sections
 
 If neither exists, report: "No lessons found. Run retro on completed features first." and stop.
@@ -39,12 +39,12 @@ Do NOT promote:
 
 ---
 
-## Step 3: Write LESSONS.md
+## Step 3: Write pathly/lessons/LESSONS.md
 
-Write `LESSONS.md` in the project root. Structure:
+Write `pathly/lessons/LESSONS.md` (create the directory if needed). Structure:
 
 ```markdown
-# LESSONS.md — Active
+# Active Lessons
 
 _Last updated: <today> | Sources: <N> features_
 _Max 12 lessons. Planner reads this before every plan._
@@ -71,7 +71,7 @@ _Max 12 lessons. Planner reads this before every plan._
 ## L-002: ...
 ```
 
-Rules for writing LESSONS.md:
+Rules for writing `pathly/lessons/LESSONS.md`:
 - Maximum 12 lessons total
 - If promoting would exceed 12, drop the lesson with the fewest sources
 - Keep existing lessons that are still valid — this is an update, not a rewrite
@@ -83,7 +83,7 @@ Rules for writing LESSONS.md:
 ## Step 4: Report
 
 ```
-LESSONS.md updated.
+pathly/lessons/LESSONS.md updated.
 
 Active lessons: <N>
 New this run: <titles of newly added lessons>

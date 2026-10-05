@@ -20,6 +20,7 @@ def _inject_prompt_vars(
     skill: str | None = None,
     board_tier: str = "feature",
     run_category: str = "flow",
+    board_scope_cfg: dict[str, bool] | None = None,
 ) -> str:
     """Replace log-phase markers and common placeholders with real values.
 
@@ -27,6 +28,12 @@ def _inject_prompt_vars(
     completion-report ``AGENT_DONE`` so the Monitor's RECENT list buckets a finished run the
     same way its live card did. FSM/team stages are ``flow`` (this default); board/single runs
     override it to ``single`` via ``board_run._inject_board_prompt_vars``.
+
+    ``board_scope_cfg`` is the run's already-resolved tier selection, used for the
+    ``<search_tiers>`` the board-search fragment hands the agent. Omitted, it is looked up from
+    ``board_tier``/``feature``/``agent_role`` — which is what lets the board-run path (which
+    reuses this function) substitute the placeholder without wiring a second resolution of its
+    own, and keeps it resolving from the SAME setting as the context pushed into that prompt.
     """
 
     def _make_log_phase_cmd(m: re.Match) -> str:  # type: ignore[type-arg]
@@ -64,6 +71,26 @@ def _inject_prompt_vars(
     # shows $0 while the cost hides under the feature/board scope.
     fsm_feature = storage_path.name if storage_path is not None else feature
     text = text.replace("<fsm_feature>", fsm_feature)
+    # <search_tiers> = the board tiers this run may query ITSELF via /comms/search, with the
+    # scope addressing each — the board-search fragment's whole reach. Guarded on presence
+    # because resolving the tiers can hit the DB, and only the handful of skills that compose
+    # that fragment carry the placeholder; every other prompt must stay free.
+    if "<search_tiers>" in text:
+        from pathly_orchestrator.runner.board_scope import (
+            resolve_board_scope_setting,
+            search_tiers_value,
+        )
+
+        tiers = (
+            board_scope_cfg
+            if board_scope_cfg is not None
+            else resolve_board_scope_setting(
+                board_tier, feature, project_root, agent_role
+            )
+        )
+        text = text.replace(
+            "<search_tiers>", search_tiers_value(tiers, feature, project_root)
+        )
     if storage_path is not None:
         feature_path = storage_path.as_posix().rstrip("/")
         text = text.replace("<feature_path>", feature_path)

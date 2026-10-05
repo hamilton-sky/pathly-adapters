@@ -48,6 +48,35 @@ def runner_resume():
         return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
 
 
+@bp.route("/runner/resume-parked", methods=["POST"])
+def runner_resume_parked():
+    """Resume a run parked on a headless human checkpoint (status == 'parked').
+
+    Unlike /runner/resume (wakes a sleeping paused-run thread), a parked run's thread
+    already exited — this starts a fresh run under the same flow/topic, which re-enters
+    /next_action at the FSM's unchanged current_state (see api.resume_parked_run).
+    """
+    try:
+        from pathly_orchestrator import supervisor as _sup
+
+        data = request.get_json() or {}
+        topic = _topic_from_body(data)
+        if not topic:
+            return jsonify({"error": "Field 'topic' must be a non-empty string"}), 400
+        state = _sup.resume_parked_run(topic, broadcast_fn=_broadcast_runner)
+        return (
+            jsonify({"status": "resumed", "topic": topic, "run_id": state.run_id}),
+            200,
+        )
+    except KeyError:
+        return jsonify({"error": "No run found for topic"}), 404
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 409
+    except Exception as exc:
+        logging.exception("runner_resume_parked error")
+        return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
 @bp.route("/runner/advance", methods=["POST"])
 def runner_advance():
     """Advance a paused run by one stage."""

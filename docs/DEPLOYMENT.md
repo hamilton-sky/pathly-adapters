@@ -155,6 +155,35 @@ terminal and the full bottom terminal share one xterm instance per terminal tab
 id, so hiding a view keeps the process alive while bin actions kill and remove
 the instance.
 
+## Running headless (no desktop)
+
+A pipeline run needs two processes: the FSM server, and a **spawn host** that actually launches
+each stage's CLI. Studio is one spawn host; `pathly-pty-host` is the other, so a run can drain on a
+server or in CI with no desktop present.
+
+```bash
+pathly-fsm-http &        # the FSM server
+pathly-pty-host          # the spawn host
+```
+
+Run **exactly one** spawn host against a server — Studio or `pathly-pty-host`, not both. Each
+answers every `TERMINAL_SPAWN` on the shared `/events/spawn` channel, so two hosts launch every
+stage twice.
+
+`pathly-pty-host` runs each stage as an ordinary subprocess (pipes, no pseudo-terminal, stdin
+closed) and reports the result through the same `/runner/terminal/result` callback Studio uses, so
+headless runs produce the same telemetry — cost, tokens, spans, invocations. Useful flags:
+
+| Flag | Default | Purpose |
+|---|---|---|
+| `--host` / `--port` | `127.0.0.1:8765` | where the FSM server is listening |
+| `--max-concurrent` | `5` | simultaneous CLI spawns; further spawns queue |
+| `-v` / `--verbose` | off | log every spawn decision |
+
+It exits cleanly on `SIGINT`/`SIGTERM`, killing each child's whole process group so no CLI outlives
+the host. Stages configured as *interactive* are refused with a nameable error rather than hanging —
+those need Studio and a human.
+
 ## Troubleshooting
 
 ### Server won't start

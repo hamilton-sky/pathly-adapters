@@ -101,33 +101,66 @@ def test_dispatch_single_routes_to_board_run():
     assert seen["mode"] == "single-agent"
 
 
-def test_dispatch_loop_runs_scheduler_in_order():
-    """executor='loop' drives scheduler_loop over the goal's DAG (serial, in order)."""
+def test_dispatch_loop_launches_the_goal_loop_fsm_flow():
+    """Phase E: `executor: loop` runs the FSM, not a second engine.
+
+    It used to drive `scheduler_loop` itself, top-level, as a peer of `orchestrator._loop`.
+    Now it launches the `goal-loop` flow — whose single DRAINING state declares
+    `parallel_states`, so the SAME scheduler drains the frontier as the executor OF a state.
+
+    `goal-loop`, deliberately NOT `team-build`: `loop` is a flat drain, and retiring it into
+    the team flow would hand a user who chose `loop` for speed a fully reviewed pipeline.
+    """
+    import types
     from pathly_orchestrator.db.connection import get_db
     from pathly_orchestrator.supervisor.goal_run import start_goal_run
 
     conn = get_db()
-    scope = "gr_loop"
-    goal = _make_goal(conn, scope, executor="loop")
-    a = _make_task(conn, scope, "task-A", goal)
-    b = _make_task(conn, scope, "task-B", goal, depends_on=[a])
+    goal = _make_goal(conn, "gr_loop", executor="loop")
 
-    order = []
+    captured = {}
 
-    def fake_sched_spawn(state, instructions, adapter, model, run_id, broadcast_fn):
-        order.append(run_id[len("sched-") :] if run_id.startswith("sched-") else run_id)
-        return {"ok": True}
+    def fake_start(**kw):
+        captured.update(kw)
+        return types.SimpleNamespace(run_id="loop-run-1")
 
-    result = start_goal_run(
-        goal, project_root="", spawn_fn=fake_sched_spawn, block=True
-    )
+    result = start_goal_run(goal, project_root="/x", start_fn=fake_start, block=True)
 
     assert result["ok"] is True
-    assert result["executor"] == "loop"
-    sched = result["result"]
-    assert set(sched["completed"]) == {a, b}
-    assert sched["failed"] == [] and sched["blocked"] == []
-    assert order == [a, b], "A must run before B (B depends on A)"
+    assert result["executor"] == "loop", "the dispatcher's label, not the flow's"
+    assert result["run_id"] == "loop-run-1"
+    assert captured["flow"] == "goal-loop"
+    assert (
+        captured["flow"] != "team-build"
+    ), "loop must not become the reviewed pipeline"
+    # The goal is carried, so require_tasks_done and the fan-out both scope to THIS goal.
+    assert captured["goal_id"] == goal
+    assert captured["interactive"] is False, "a goal run is headless"
+
+
+def test_the_goal_loop_flow_is_flat_not_a_reviewed_pipeline():
+    """The product guarantee, read off the packaged flow the executor names.
+
+    If `goal-loop` ever grew a REVIEWING/TESTING stage it would stop being the fast path
+    `executor: loop` exists to offer — the failure mode that made "retire loop into team"
+    the wrong reading of Phase E.
+    """
+    import yaml
+
+    from pathly_orchestrator.supervisor.goal_executor import _LOOP_FLOW
+    from tests._paths import SRC
+
+    flow = yaml.safe_load(
+        (SRC / "pathly_data" / "core" / "flows" / f"{_LOOP_FLOW}.flow.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert flow["flow"] == _LOOP_FLOW
+    assert flow["states"] == ["DRAINING", "DONE"], "one working state, then done"
+    assert "parallel_states" in flow, "the drain must be a fan-out state"
+    # The join still runs the ground-truth checks verify_clean_drain used to run by hand.
+    gate_types = {g["type"] for g in flow["gates"]["DRAINING->DONE"]}
+    assert gate_types == {"require_tasks_done", "command_gate"}
 
 
 def test_dispatch_loop_creates_nested_goal_dir(tmp_path):
@@ -164,8 +197,15 @@ def test_dispatch_loop_creates_nested_goal_dir(tmp_path):
     ).exists(), "the flat pathly/goals/ home must not be created"
 
 
-def test_dispatch_loop_scopes_to_goal():
-    """A loop run drains only ITS goal's tasks, not a sibling goal in the same scope."""
+def test_dispatch_loop_scopes_the_run_to_its_own_goal():
+    """A loop run addresses only ITS goal — a sibling goal on the same board is untouched.
+
+    Scoping used to be asserted by draining and checking which tasks ran. The drain moved
+    into the FSM stage (covered end-to-end in tests/runner_supervisor/test_fan_out.py), so
+    what this pins now is the pair that carries the scoping: the goal_id threaded into the
+    run, and the per-goal storage topic that keeps two goals on one board apart.
+    """
+    import types
     from pathly_orchestrator.db.connection import get_db
     from pathly_orchestrator.supervisor.goal_run import start_goal_run
 
@@ -173,44 +213,48 @@ def test_dispatch_loop_scopes_to_goal():
     scope = "gr_loop_scoped"
     g1 = _make_goal(conn, scope, executor="loop", text="Goal 1")
     g2 = _make_goal(conn, scope, executor="loop", text="Goal 2")
-    t1 = _make_task(conn, scope, "g1-task", g1)
-    t2 = _make_task(conn, scope, "g2-task", g2)
 
-    ran = []
+    captured = {}
 
-    def fake_sched_spawn(state, instructions, adapter, model, run_id, broadcast_fn):
-        ran.append(run_id[len("sched-") :] if run_id.startswith("sched-") else run_id)
-        return {"ok": True}
+    def fake_start(**kw):
+        captured.update(kw)
+        return types.SimpleNamespace(run_id="loop-run-1")
 
-    result = start_goal_run(g1, project_root="", spawn_fn=fake_sched_spawn, block=True)
+    start_goal_run(g1, project_root="/x", start_fn=fake_start, block=True)
 
-    assert set(result["result"]["completed"]) == {t1}
-    assert t2 not in ran, "goal 2's task must not run under goal 1's loop"
+    assert captured["goal_id"] == g1
+    assert captured["goal_id"] != g2
+    assert captured["topic"].startswith(f"features/{scope}/goals/")
+    assert g1[:8] in captured["topic"] and g2[:8] not in captured["topic"]
 
 
 def test_dispatch_executor_override_wins_and_persists():
     """executor_override beats the goal's stored executor and is persisted back."""
+    import types
     from pathly_orchestrator.db.connection import get_db
     from pathly_orchestrator.supervisor.goal_run import start_goal_run
 
     conn = get_db()
     scope = "gr_override"
     goal = _make_goal(conn, scope, executor="single")  # stored as single
-    t = _make_task(conn, scope, "task-A", goal)
 
-    ran = []
+    captured = {}
 
-    def fake_sched_spawn(state, instructions, adapter, model, run_id, broadcast_fn):
-        ran.append(run_id)
-        return {"ok": True}
+    def fake_start(**kw):
+        captured.update(kw)
+        return types.SimpleNamespace(run_id="loop-run-1")
 
-    # Override to loop → runs the scheduler (not board_run) and persists 'loop'.
+    # Override to loop → launches the goal-loop flow (not board_run) and persists 'loop'.
     result = start_goal_run(
-        goal, executor_override="loop", spawn_fn=fake_sched_spawn, block=True
+        goal,
+        executor_override="loop",
+        project_root="/x",
+        start_fn=fake_start,
+        block=True,
     )
     assert result["ok"] is True
     assert result["executor"] == "loop"
-    assert set(result["result"]["completed"]) == {t}
+    assert captured["flow"] == "goal-loop"
 
     row = conn.execute(
         "SELECT executor FROM comms_messages WHERE id=?", (goal,)
@@ -475,6 +519,84 @@ def test_http_goals_run_team(client, monkeypatch):
     body = json.loads(r.data)
     assert body["ok"] is True
     assert body["executor"] == "team"
+
+
+def test_http_goals_run_parked_status_posts_paused_not_failed(client, monkeypatch):
+    """A parked run (headless human checkpoint, RunnerState.status == "parked") is a
+    deliberate non-failure — resumable via /runner/resume-parked, per CLAUDE.md's Human
+    checkpoints section. It must not fold into the generic 'goal run failed' text/phase
+    the way any other res["error"] does."""
+    import types
+    from pathly_orchestrator.db.connection import get_db
+    import pathly_orchestrator.http_server.blueprints.comms.goals as _goals_mod
+    import pathly_orchestrator.supervisor.api as _api
+
+    conn = get_db()
+    scope = "gr_http_parked"
+    goal = _make_goal(conn, scope, executor="team")
+    broadcasts = []
+    monkeypatch.setattr(
+        _goals_mod,
+        "_broadcast_comms",
+        lambda scope, payload: broadcasts.append(payload),
+    )
+
+    def fake_start_run(**kw):
+        kw["on_done"]("run-1", {"error": "parked", "status": "parked"})
+        return types.SimpleNamespace(run_id="run-1")
+
+    monkeypatch.setattr(_api, "start_run", fake_start_run)
+
+    r = client.post("/comms/goals/run", json={"goal_id": goal})
+    assert r.status_code == 200, r.data
+
+    rows = conn.execute(
+        "SELECT text FROM comms_messages WHERE scope=? AND type='status'",
+        (scope,),
+    ).fetchall()
+    texts_lower = [r["text"].lower() for r in rows]
+    assert any("paused" in t for t in texts_lower), texts_lower
+    assert not any("failed" in t for t in texts_lower), texts_lower
+
+    # Order isn't asserted: _run_team fires on_start AFTER start_fn returns (a REAL run's
+    # on_done fires asynchronously, much later — this test's synchronous stub inverts
+    # that). What matters is that "error" never appears for a parked run.
+    phases = [b.get("phase") for b in broadcasts if b.get("event") == "goal_run"]
+    assert "stopped" in phases
+    assert "error" not in phases
+
+
+def test_http_goals_run_stage_overrides_validated_against_the_chosen_flow(
+    client, monkeypatch
+):
+    """stage_overrides must be validated against the flow ACTUALLY being run (`flow`),
+    not a hardcoded "team-build" — a debug-flow goal run's FIXING override was
+    previously silently dropped because FIXING isn't a team-build.flow.yaml state."""
+    import types
+    from pathly_orchestrator.db.connection import get_db
+    import pathly_orchestrator.supervisor.api as _api
+
+    conn = get_db()
+    goal = _make_goal(conn, "gr_http_stage_override", executor="team")
+    captured = {}
+
+    def fake_start_run(**kw):
+        captured.update(kw)
+        return types.SimpleNamespace(run_id="r-http-override")
+
+    monkeypatch.setattr(_api, "start_run", fake_start_run)
+
+    r = client.post(
+        "/comms/goals/run",
+        json={
+            "goal_id": goal,
+            "flow": "debug",
+            "stage_overrides": {"FIXING": "custom override text"},
+        },
+    )
+
+    assert r.status_code == 200, r.data
+    assert captured.get("stage_overrides") == {"FIXING": "custom override text"}
 
 
 def test_http_goals_run_non_goal(client):

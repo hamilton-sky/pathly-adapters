@@ -24,6 +24,7 @@ from .fsm_compose_stage import _drop_sections, _apply_stage_selection, _resolve_
 from .fsm_compose_hints import _codex_subagent_hint, _agent_hint
 
 __all__ = [
+    "RUNNER_CONTRACT_BLOCK",
     "build_prompt",
     "build_prompt_for_agent",
     "_load_agent_text",
@@ -66,6 +67,26 @@ def _load_agent_text(agent: str) -> str:
         f"core/agents/{group}/{agent}.md" if group else f"core/agents/{agent}.md"
     )
     return files("pathly_data").joinpath(relative_path).read_text(encoding="utf-8")
+
+
+# The ONE runner contract, shared by every headless prompt path. Lifted out of
+# build_prompt's `context` (it interpolates nothing) so the DAG-task path in
+# supervisor/scheduler.py can append the identical text: under FSM fan-out those
+# task agents run INSIDE an FSM stage, and without this block one of them will try
+# to advance the flow itself — a double-advance or a 404 respawn loop (the exact
+# failure tests/runner_supervisor/test_runner_contract.py was written for).
+RUNNER_CONTRACT_BLOCK = (
+    "### Runner contract — the supervisor owns the FSM\n"
+    "You are running headless under the Pathly supervisor, which drives every state "
+    "transition. Do your stage's work, write your artifact(s), post progress and results "
+    "to the board (`/comms/*`), then STOP. Do NOT advance the pipeline yourself: never run "
+    "`pathly-fsm-call`, never call `complete-stage`/`next-action`, never POST to "
+    "`/complete_stage` or `/next_action`, and do NOT route back to another skill (e.g. "
+    "`team <feature> …`). The supervisor advances the flow automatically once your artifact "
+    "exists — any transition you trigger yourself causes a double-advance or a 404 loop. "
+    "(Any `FSM operations` / `complete-stage` / `route back` instructions in the skill above "
+    "apply ONLY to interactive `/pathly` use and must be ignored here.)\n"
+)
 
 
 def build_prompt(
@@ -160,6 +181,15 @@ def build_prompt(
             agent_text, ability_ids, excluded_sections, project_root
         )
 
+    # Tiers this run may read — resolved ONCE, keyed by the agent's ROLE (falling through to
+    # the feature-level setting when that role has none), and used for BOTH the board context
+    # pushed in below and the <search_tiers> the board-search fragment hands the agent. One
+    # lookup, so a run can never be told it may search a tier its own context channel is not
+    # reading.
+    from pathly_orchestrator.runner.board_scope import read_tiers as _read_tiers
+
+    board_tiers = _read_tiers(project_root, board_scope, agent_role)
+
     agent_text = _inject_prompt_vars(
         agent_text,
         board_scope,
@@ -168,24 +198,23 @@ def build_prompt(
         storage_path=storage_path,
         skill=(agent if "/" in agent else None),
         board_tier=board_tier,
+        board_scope_cfg=board_tiers,
     )
+    # <goal_id> = the goal this run belongs to ("" for a plain feature/project run) — lets a
+    # skill's own board queries stay goal-scoped in lockstep with the FSM gates that surround
+    # it (on_board_count, require_tasks_done are already goal-scoped via RunnerState.goal_id).
+    # Substituted for real (not left to the agent to infer from the "Current task" block) so a
+    # goal-executor run can never claim a ready task belonging to a DIFFERENT goal on the same
+    # board. An empty string renders as `goal_id=` in a querystring, which /comms/tasks already
+    # treats as "no filter" (`request.args.get("goal_id") or None`).
+    agent_text = agent_text.replace("<goal_id>", goal_id)
 
     context = (
         f"\n\n## Current task\n"
         f"Feature: {board_scope}\n"
         f"State: {state_name}\n"
         f"Storage path: {storage_path}\n"
-        "\n"
-        "### Runner contract — the supervisor owns the FSM\n"
-        "You are running headless under the Pathly supervisor, which drives every state "
-        "transition. Do your stage's work, write your artifact(s), post progress and results "
-        "to the board (`/comms/*`), then STOP. Do NOT advance the pipeline yourself: never run "
-        "`pathly-fsm-call`, never call `complete-stage`/`next-action`, never POST to "
-        "`/complete_stage` or `/next_action`, and do NOT route back to another skill (e.g. "
-        "`team <feature> …`). The supervisor advances the flow automatically once your artifact "
-        "exists — any transition you trigger yourself causes a double-advance or a 404 loop. "
-        "(Any `FSM operations` / `complete-stage` / `route back` instructions in the skill above "
-        "apply ONLY to interactive `/pathly` use and must be ignored here.)\n"
+        "\n" + RUNNER_CONTRACT_BLOCK
     )
     from pathly_orchestrator.runner import build_pipeline_history_block
 
@@ -201,17 +230,18 @@ def build_prompt(
 
     board_block = ""
     try:
-        from pathly_orchestrator.db.connection import get_db as _get_db_comms
-        from pathly_orchestrator.db.queries.app_settings import get_board_scope
         from pathly_orchestrator.runner.comms_context import retrieve_board_context
 
-        _conn = _get_db_comms()
-        _scope = get_board_scope(_conn, project_root, board_scope)
         board_block = retrieve_board_context(
             topic=board_scope,
             project_root=project_root,
             task_description=context,
-            board_scope=_scope,
+            board_scope=board_tiers,
+            # Measure this build: one BOARD_CONTEXT event per prompt, keyed by the RUN's
+            # own storage dir (same identity eventlog keys every other event by, not the
+            # board scope). Without it the char budget + k-ladder in context_settings.py
+            # would stay unfalsifiable — see context_record.py for how to read it back.
+            storage_path=str(storage_path),
         )
     except Exception:
         pass
@@ -247,10 +277,50 @@ def build_prompt(
     return prompt
 
 
+def _retry_ladder_block(
+    storage_path: Path, feedback_file: str, retry_count: int
+) -> str:
+    """What varies by attempt, not just who owns it — escalation_routing already changes
+    the ROLE by round; this is what was missing: the STRATEGY. Round 1 never calls this
+    (retry_count==0). From round 2 on, an agent otherwise got the exact same prompt every
+    time a retry landed on it, with no signal this was a repeat and no guaranteed view of
+    what actually failed (only Fix-mode roles are told to go read the feedback file)."""
+    attempt = retry_count + 1
+    parts = [
+        f"\n## Retry attempt {attempt} — unresolved after {retry_count} prior attempt(s)\n\n"
+        "Whatever was tried before did not satisfy the gate. Repeating the same approach "
+        "will fail the same way — read what follows before deciding what to change.\n"
+    ]
+    try:
+        feedback_text = (
+            (storage_path / "feedback" / feedback_file)
+            .read_text(encoding="utf-8")
+            .strip()
+        )
+    except OSError:
+        feedback_text = ""
+    if feedback_text:
+        parts.append(
+            f"\n### The current feedback ({feedback_file})\n\n```\n{feedback_text[:4000]}\n```\n"
+        )
+    try:
+        from pathly_orchestrator.runner import build_pipeline_history_block
+
+        history = build_pipeline_history_block(str(storage_path))
+    except Exception:
+        history = ""
+    if history:
+        parts.append(
+            f"\n### What earlier attempts on this stage reported\n\n{history}\n"
+        )
+    return "".join(parts)
+
+
 def build_prompt_for_agent(
     agent_name: str,
     storage_path: Path,
     feedback_file: str | None = None,
+    retry_count: int = 0,
 ) -> str:
     agent_text = _load_agent_text(agent_name)
     context = (
@@ -259,6 +329,8 @@ def build_prompt_for_agent(
         f"Storage path: {storage_path}\n"
     )
     prompt = agent_text + context
+    if retry_count > 0 and feedback_file:
+        prompt += _retry_ladder_block(storage_path, feedback_file, retry_count)
     # Fix mode (smart-fix-routing DESIGN.md ss3.1): only appended when the routed target is
     # a root-cause role (po/planner/architect/designer) AND a feedback file was supplied —
     # the builder/reviewer/human path stays byte-identical to before this feature.

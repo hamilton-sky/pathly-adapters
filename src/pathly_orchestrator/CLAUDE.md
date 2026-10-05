@@ -2,6 +2,217 @@
 
 Python package that implements the Pathly finite-state machine. Runs as both an MCP server (registered in `.claude/settings.json` as `pathly-fsm`) and an HTTP server on port **8765**.
 
+## Architecture at a glance — control and data flow
+
+Five views of the SAME system, verified against the code rather than reconstructed from the
+prose below. The narrative sections that follow carry the detail and the phase-by-phase history
+of how it got here; these are the map.
+
+### 1. Control — one engine, one authority
+
+```
+ ENTRY POINTS                          all converge on the same engine
+ ------------                          -------------------------------
+ Studio "Start"  - POST /runner/start --+
+ POST /runs (kind=flow) ----------------+
+ /comms/goals/run  -+                   |
+   executor=team ---+- _run_team -------+
+   executor=loop ---+  (flow=goal-loop) |
+ /comms/{goals,features,project}/decompose -+   (mode=consultation only;
+                                            |    mode=planner/plan is a board run)
+                                        v
+                              supervisor.api.start_run()
+                              - RunnerState -> _registry[topic]
+                              - run_history PARENT row (adapter = FLOW NAME)
+                                        |
+                                        v
+                        +------- orchestrator._loop --------+
+                        |  (THE engine - one per run)       |
+                        +----------------+------------------+
+                                         |
+    +------------------------------------v---------------------------------+
+    |  1. abort? pause? caps?  (iterations, max_cost_usd)                   |
+    |  2. POST /next_action  ->  {current_state, agent_hint.instructions,   |
+    |                             preferred_adapter, decision}              |
+    |  3. resolve_session()  ->  reuse session_id iff same adapter          |
+    |  4. fan_out.run_stage(...)          <- THE one stage call site        |
+    |  5. POST /complete_stage  -> run_gates() -> next_state | blocked      |
+    +------------------------------------+---------------------------------+
+                                         |  next_state
+                                         v
+                          eventlog.write_state()   <- legality-checked
+                          fsm_state (DB)  ->  STATE.json (export)
+                                         |
+                                         +--> loop, until DONE / parked / abort
+```
+
+`executor: single` is the one goal path that does **not** enter here — it is agent-driven
+(`start_board_run` + the `development/drain-dag` skill), and `pathly-run` is a separate CLI
+path entirely (see its own section below).
+
+### 2. Inside a stage — single spawn vs fan-out
+
+```
+                        fan_out.run_stage(state, flow_config, STATE, ...)
+                                         |
+                    parallel_config(flow_config, STATE)
+                                         |
+          +------------------------------+------------------------------+
+          | None (no parallel_states entry)      | entry present         |
+          |  -- every state of 9 flows --        |  -- goal-loop/DRAINING|
+          v                                      v   (the ONLY opt-in) --+
+   _run_stage_via_terminal(...)          fan_out._drain(...)
+   ONE agent, stage's own prompt          |
+          |                               +- scope = _frontier_scope(state)
+          |                               |    the run's BOARD scope, NOT state.topic
+          |                               |    (a goal run's topic is its own slug)
+          |                               |
+          |                               +- isolation <- YAML
+          |                               |    lane -> AuditedLaneIsolation
+          |                               |    serial -> Serial ; worktree -> Serial+warn
+          |                               v
+          |                        drain.drain_frontier()   <- ONE scheduler_loop
+          |                        - owns CostCapTracker       call site in the repo
+          |                        - wraps spawn_fn EXACTLY once
+          |                        - ORs tracker.exceeded() into abort_check
+          |                               |
+          |                               v
+          |                        scheduler_loop()  -- frontier poll --+
+          |                          |                                  |
+          |                          |  max_concurrency(ready_lanes)    |
+          |                          |    +- re-AUDITS every round      |
+          |                          |       undeclared files -> 1      |
+          |                          |       cross-lane overlap -> 1    |
+          |                          |       audit raised     -> 1      |
+          |                          |                                  |
+          |                          +-> worker(task) -+  <=1 per lane  |
+          |                          +-> worker(task) -+                |
+          |                          +-> worker(task) -+                |
+          |                                  | completion_q             |
+          |                                  +-- retry | escalate ------+
+          |                                      (task_retry)
+          |                               |
+          |                               v  frontier drained
+          |                        _merge_drain_result()
+          |                        {cost_usd, session_id=None, outcome, result}
+          v                               v
+          +--------------> same dict shape <-------  _loop is untouched below here
+                                         |
+                                         v
+                      run_gates(STATE -> next)   <- THE JOIN, once
+                      (goal-loop's: require_tasks_done + command_gate build + test;
+                       each flow declares its own under `gates:`)
+```
+
+`fsm_state.current` stays the **scalar** `"DRAINING"` for the whole drain. The parallelism is
+inside a state's *execution*, not in the state vocabulary — which is why `write_state`'s
+legality check, the `STATE.json` export, the `pathly-*` CLI and Studio's flow editor never had
+to change.
+
+### 3. The spawn chokepoint — adapter-agnostic, run-keyed
+
+```
+  supervisor._run_stage_via_terminal(state, prompt, adapter, model, run_id, ...)
+        |
+        +- _resolve_spawn_argv()      <- the seam a NEW ADAPTER touches
+        +- _record_spawn_identity()   <- run_history {run_id, feature=slug, board_scope}
+        |
+        +--> SSE  TERMINAL_SPAWN {tab_id, run_id, argv[], cwd, adapter}
+        |         on /events/spawn (topic-independent)
+        |                    |
+        |      +-------------+--------------+   exactly ONE host may listen
+        |      v                            v
+        |   Studio (node-pty tab)      pathly-pty-host (pipes, stdin=/dev/null)
+        |      |  desktop, visible          |  server/CI, headless
+        |      +-------------+--------------+
+        |                    |
+        +-<-- POST /runner/terminal/started      releases wait_started(30)
+        |
+        |     ... agent runs; writes AGENT_DONE to the DB mid-run ...
+        |
+        +-<-- POST /runner/terminal/result {run_id, exit_code, stdout_tail, adapter}
+                     |
+                     +- parse_result(adapter, stdout_tail)  <- ONE server parser
+                     |    claude -> total_cost_usd ; codex -> tokens ; agy -> estimate
+                     +- _patch_last_agent_done(run_id) -> BILLING_UPDATE  (authoritative)
+                     +- record_stage_provenance()  -> git diff, SERVER-measured
+                     +- run.mark_pty_result()  -> unblocks the supervisor
+                                |
+                                v
+                     result merged from TWO sources:
+                       stdout      -> session_id, cost_usd
+                       AGENT_DONE  -> summary, outcome (the pass/fail signal)
+```
+
+`run_id` shapes are the identity every consumer keys off: `{topic}-{N}-{ts}` per FSM stage,
+`sched-{task_id}#{attempt}` per DAG task, a bare uuid per board/parent run.
+
+### 4. Data — the DB is the authority; disk is a seed or an export
+
+```
+  SEEDS (disk -> DB, once)                THE AUTHORITY              EXPORTS (DB -> disk)
+  ------------------------                -------------              --------------------
+  core/flows/*.flow.yaml --_refresh_flows-->+------------+
+                                            | flow_nodes |
+  abilities/*.md, prompts/*.md --compose--->| flow_yaml  |
+                                            +------------+
+                                            | fsm_state  |--atomic--> STATE.json  (git)
+                                            +------------+
+                                            | fsm_events |--debounce-> EVENTS.jsonl (ignored)
+                                            +------------+
+                                            | comms_*    |--debounce-> BOARD.json   (ignored)
+                                            +------------+
+                                            | run_history|
+                                            | agent_invoc|
+                                            +------------+
+  Runtime code reads the DB - never the mirror.
+  Enforced by scripts/check_no_mirror_reads.py (lint `consistency` job).
+```
+
+Telemetry is a **projection**, not a second write path:
+
+```
+  agent writes ---> AGENT_DONE ---+
+  (completion-report)             |  append_event() live hook
+                                  +---> invocation_projection
+  /runner/terminal/result --->    |     - 1 row per AGENT_DONE, keyed by fsm_events.seq
+  BILLING_UPDATE -----------------+     - BILLING_UPDATE folded in (billing WINS, never summed)
+                                        - _price_if_needed(): cost==0 & tokens>0 -> estimate
+                                              |
+                                              v
+                                       agent_invocations ---> /db/stats, /db/rollup,
+                                                              /telemetry/trends, Monitor
+```
+
+### 5. Prompt assembly — three paths, ONE injector
+
+```
+  FSM stage            board run                 DAG task
+  ---------            ---------                 --------
+  build_prompt()       start_board_run()         task_prompt.build_task_prompt()
+       |                    |                          |
+  compose_skill()      compose_skill()           compose_skill("development/execute-task")
+       |                    |                          |
+       v                    v                          v
+  _inject_prompt_vars( _inject_board_prompt_vars  _inject_vars(...)
+    run_category=       run_category="single")     run_category="loop")
+    "flow")                 |                          |
+       +--------------------+--------------+-----------+
+                                           v
+                          ONE injector: fsm_compose._inject_prompt_vars
+                          <fsm_feature> <feature_path> <feature> <board> <run_category>
+                                           |
+                                           v
+                              + RUNNER_CONTRACT_BLOCK  (one constant, all headless paths)
+                              + retry ladder (attempt >= 2)
+                              + board context (governance + semantic, per-tier budget)
+```
+
+**Why all three must share the injector:** an unsubstituted `<fsm_feature>` makes the agent write
+its `AGENT_DONE` under a literal string — mis-keyed event, no projected invocation, so the run is
+unbilled and absent from the Monitor. The DAG path had no injector at all until Phase E; see the
+prerequisites in the Phase E section below.
+
 ## State machine
 
 Features advance through: `PLANNING -> DESIGNING -> BUILDING -> REVIEWING -> TESTING -> RETRO -> DONE` (the literal state identifiers in `core/flows/team.flow.yaml`; the `-ING` suffix matters — `current_state` is e.g. `"BUILDING"`, not `"BUILD"`). PLANNING is `states[0]` — the seed a new feature starts at. (STORMING was dropped as the team seed — it was headless ceremony for spec-driven work; genuine brainstorming lives in the interactive `/pathly storm` on-ramp and the consultation flows. STORMING still exists as a state in `test.flow.yaml` and maps to `/pathly storm`.)
@@ -50,6 +261,7 @@ than shell-escaped `curl` strings on PowerShell.
 POST /runner/start                   ← Studio FlowControlBar: start a new pipeline run
 POST /runner/pause                   ← pause running pipeline
 POST /runner/resume                  ← resume paused pipeline
+POST /runner/resume-parked           ← resume a run parked on a headless human checkpoint (fresh run_id, same FSM state)
 POST /runner/advance                 ← skip past current block
 POST /runner/decision                ← supply a continue/block/escalate decision to a waiting run
 POST /runner/agent-answer            ← answer an agent's mid-run human question
@@ -105,7 +317,8 @@ humans post messages, ask/answer questions, decompose DAG tasks, and supersede s
 ```
 POST /comms/post            ← post a message (embedding computed for hybrid search)
 GET  /comms                 ← list board messages (scoped)
-POST /comms/search          ← hybrid (semantic + keyword) search; semantic arm floored at SEMANTIC_DISTANCE_CEILING, keyword hits bypass; no match → [] (never padded with recent messages)
+POST /comms/search          ← hybrid (semantic + keyword) search; semantic arm floored at SEMANTIC_DISTANCE_CEILING, keyword hits bypass; no match → [] (never padded with recent messages). Reached by AGENTS too via the `board-search` fragment (own board only) — the self-authored second query the pushed context can't make; Studio's search box is the other caller
+POST /comms/promote         ← copy a decision/constraint UP a tier (feature→project→global). COPY not move: the source board is the audit record of HOW the decision was reached. Stamps promoted_from/original_scope on the copy + promoted_to on the source (the three columns migrations.py reserved and nothing read). Idempotent, keyed off the COPY's promoted_from so one message can promote to two tiers. Own permission set `_PROMOTE_WRITERS` = {director, evaluator, human, **retro**} — NOT _GLOBAL_WRITERS, else the RETRO stage (the one headless role whose job IS capturing lessons) could never promote. decision/constraint only
 POST /comms/acknowledge     ← mark a message acknowledged
 POST /comms/answer          ← answer a posted question
 GET  /comms/tasks           ← list DAG tasks
@@ -139,6 +352,36 @@ POST /comms/consolidate     ← memory consolidation: near-dup dedup; mode=full 
 POST /comms/hydrate         ← board disk-mirror: import a project's on-disk BOARD.json mirrors into the DB (fresh-clone; DB-authoritative, no-ops non-empty boards)
 GET  /events/comms          ← SSE stream of comms board updates (streams blueprint)
 ```
+
+### Request bodies — one lenient reader for every comms route (`_helpers.read_json_body`)
+
+Agents reach `/comms/*` through curl. On Windows a shell not in UTF-8 mode hands curl a
+**cp1252** body — one em-dash in an agent's prose is byte 0x97 — and Flask's
+`request.get_json()` decodes strictly. `/comms/post` was hardened against exactly this, and
+the fix was copy-pasted into `/comms/edit` and nowhere else. Measured across all 36 comms
+POST routes with one em-dash in the body:
+
+- **22 routes returned 500** — the exception was caught by the route's own
+  `except Exception` and the agent's write was lost. `tasks/claim|complete|fail` were all in
+  this set, and `tasks/fail` carries `reason`, agent-written prose (`team/build.md` posts it
+  on every unrecoverable task failure).
+- **The other 14 read `get_json(silent=True) or {}`**, so the body was **silently discarded**
+  and the route then rejected the request for a "missing" field that was right there in it —
+  worse, because it reads as the agent's mistake.
+
+`_helpers.read_json_body(default=None)` is now the single reader, used by all 36. It reads
+`request.get_data()` (so a client that omits the JSON content-type is still understood — what
+`/comms/post` always did), tries UTF-8 then cp1252, and returns *default* when the body is
+absent/undecodable/not a JSON object — so each caller keeps its existing contract:
+`read_json_body()` for routes that 400 on a bad body, `read_json_body({})` for routes that
+fall through to their own defaults.
+
+This is SOLID rule #5 with teeth: the fix could not spread while it lived as two inline
+copies, so the sweep test walks the **live `url_map`** rather than a hand-kept list —
+`tests/comms_board/test_comms_body_encoding.py` covers a route added later without anyone
+remembering to add it. It fails on a werkzeug `BadRequest` (body rejected) **and** on a
+`NameError`/`ImportError` (helper used but not imported) — a wiring mistake that is easy to
+make when touching a dozen files at once, and did happen while writing this.
 
 ### SSE events (GET /events/runner)
 
@@ -248,7 +491,11 @@ pathly_orchestrator/
     history.py             # build_pipeline_history_block
     invoke.py              # invoke_agent(abort_callback=None, proc_callback=None)
     embeddings.py          # embed()/warm() — local embedding model; embed() has a bounded LRU (check inside _model_lock) so the per-board search fan-out re-embedding one query N+2 times computes the vector once; model load RETRIES transient failures (was a permanent silent latch that disabled semantic search process-wide) and embedder_status() reports {loaded,unavailable,load_attempts} to /health; chunk_summary() splits a summary into child chunks (per-bullet for topic-map, per-### for detailed, none for gist); embed_artifact_async() stores one PARENT vector (whole message text + summary) in comms_embeddings + CHILD vectors per chunk in comms_chunk_embeddings
-    comms_context.py       # assembles board context (governance + referenced + semantic, relevance-gated); _matched_chunk surfaced as "matched topic: …" via comms_formatters.py
+    board_scope.py         # ONE resolution of which tiers a run may see, serving BOTH directions: the context pushed into the prompt (board_context_for) and the tiers the board-search fragment lets an agent pull (<search_tiers>) — an agent told it may search a tier its own context channel isn't reading would be reaching AROUND the board-scope setting; search_tiers_value() renders board+scope pairs (feature->slug, project->normalized root, global->"global") since a mismatched pair returns [] rather than an error
+    comms_context.py       # assembles board context (governance + referenced + semantic, relevance-gated); tags each kept row _tier from the search loop (authoritative, not row["board"]) so the render can budget per tier; _matched_chunk surfaced as "matched topic: …" via comms_formatters.py
+    context_budget.py      # per-tier char budget MATH (pure — no DB on the render path): allocate_budget() splits the configured char_budget by weight (feature .5/project .3/global .2) NORMALISED over the enabled tiers (a feature-only run still gets the whole budget), select_within_budget() charges each line to its own tier then pools the unspent remainder; replaces a single shared budget that let the feature tier (rendered first) starve project/global outright
+    context_settings.py    # the two numbers that size every board block, as app_settings keys read at CALL time (same contract as code_context.backend): board_context.char_budget (default 4000, bounds [200,40000]) + board_context.k_{feature,project,global} (defaults 5/3/2, bounds [0,25]). They are a PAIR — k binds first in the intended case, so raising the budget alone is half a change. Garbage/out-of-range FALLS BACK to the default rather than clamping, so the rendered block always matches a documented number; k=0 legally mutes one tier's semantic pull while its governance still injects. Needs NO new route: GET /db/settings + PUT /db/settings/<key> already take arbitrary keys. Replaces bare literals (2000, and 3/2/1 inline in enabled_boards) that had no recorded justification — unlike the cosine cutoffs beside them, which carry a live-board calibration
+    context_record.py      # render_stats() + record_board_context() — appends ONE `BOARD_CONTEXT` fsm_event per prompt build carrying the volume actually rendered vs dropped (rendered_entries/chars, per-tier chars, omitted_entries/chars) PLUS the budget+k in force, so the next move on those numbers is made from data. Inert to telemetry: append_event projects only AGENT_DONE/BILLING_UPDATE. Wrapped + never-raising (a telemetry write must never break prompt assembly) and create_dir=False so it can't plant an empty decoy dir that later wins _resolve_storage_path's existence probe. Opt-in via storage_path, which keeps the /comms/agent-context preview write-free
     sections.py            # parse_sections/slugify_heading/structure_key — markdown section index (anchors)
     hydrate.py             # hydrate_section/ensure_indexed — /section payload + staleness; index_artifact_async (eager, section-index only)
     code_context.py        # CodeContextProvider protocol + get_provider()/build_block() (backend=auto[default]|off|cli|lsp|both) — codebase-intelligence context injection
@@ -257,7 +504,9 @@ pathly_orchestrator/
     cli.py                 # run_flow, main, resolve_stage, handle_blocked, handle_decide
   supervisor/              # Visible runner: PTY spawning, SSE broadcast, registry
     state.py               # RunnerState, OpenSession dataclasses
-    registry.py            # _registry, _lock, get_state, recover_stale_mirrors
+    registry.py            # _registry, _lock, get_state, recover_stale_mirrors,
+                           #   find_active_run_for_goal (a goal's FSM run is registered under
+                           #   its board-nested topic, so a scope lookup misses it)
     terminal.py            # _run_stage_via_terminal — THE SPAWN. Re-exports the names below,
                            #   because supervisor/__init__ and the tests import them from here
                            #   (and _reconciliation_window is monkeypatched in THIS namespace,
@@ -268,21 +517,47 @@ pathly_orchestrator/
     terminal_billing.py    # _emit_executor_telemetry, _reconcile_billing_now (were spawn-local closures)
     terminal_phase.py      # _write_supervisor_phase_summary
     interactions.py        # _await_agent_question
-    orchestrator.py        # _loop, _resolve_stage_supervised
+    orchestrator.py        # _loop, _resolve_stage_supervised (399 lines — under the
+                           #   400 ratchet since fan-out Phase C, so it can never regress)
+    fan_out.py             # run_stage — THE one call site for executing an FSM stage:
+                           #   no parallel_states entry -> _run_stage_via_terminal unchanged;
+                           #   entry present -> scheduler_loop drains the state's ready tasks
+                           #   and returns a merged result in the SAME shape. Phase D:
+                           #   isolation=lane -> AuditedLaneIsolation (parallel while the
+                           #   partition audits safe); serial obeyed; worktree degrades.
+                           #   Phase E: the ONLY drain — `executor: loop` reaches it as the
+                           #   goal-loop flow's DRAINING state. Frontier scope = the run's
+                           #   BOARD scope, not state.topic (a goal run's topic is its own slug).
+    orchestrator_session.py # resolve_session — same-adapter session reuse + the SESSION event
     api.py                 # start_run, pause_run, resume_run, abort_run, supply_decision, reroute_run
     goal_run.py            # thin re-export shim (start_goal_run / start_goal_decompose) → the two modules below
     goal_executor.py       # Board→Goals→Task-DAG executor dispatcher:
                            #   start_goal_run(goal_id, executor_override=…) reads the goal's
                            #   `executor` field and routes to one of three strategies:
                            #   single → one agent drains the whole DAG (start_board_run + drain-dag skill)
-                           #   loop   → supervisor owns the frontier via scheduler_loop + _run_loop
+                           #   loop   → runs the 'goal-loop' FSM flow (Phase E — a flat, one
+                           #            fan-out state drain; NOT team-build, which is reviewed)
                            #   team   → runs an FSM flow (default 'team-build') via start_run
     goal_decomposer.py     # start_goal_decompose() bridges an analyzed goal into a DAG
                            #   (mode='planner' or mode='consultation')
     scheduler.py           # DAG frontier loop (scheduler_loop): event-driven, blocks on completion_q;
                            #   at most one worker per lane; goal_id= scopes the frontier to one goal's tasks
+    task_prompt.py         # build_task_prompt — ONE assembly of a DAG task's prompt: the composed
+                           #   development/execute-task body with its fragment placeholders
+                           #   SUBSTITUTED (the DAG path had no injector at all — see Phase E),
+                           #   plus the runner contract, retry ladder and board context
+    drain.py               # drain_frontier — the ONE scheduler_loop call site. Owns the cost
+                           #   tracker (wrapping spawn_fn exactly once) and folds the cap into
+                           #   abort_check, so neither fan_out nor goal_executor can forget it.
     isolation.py           # lane / serial isolation strategies for the frontier loop
-    file_claims.py         # per-file claim tracking so parallel tasks don't collide on writes
+    file_claims.py         # CROSS-FEATURE file-claim registry (feature A vs feature B) —
+                           #   wired in goal_executor only; scheduler_loop never calls it, so it
+                           #   says nothing about two TASKS inside one drain. See lane_partition.
+    lane_partition.py      # audit_lane_partition — checks the "disjoint files per lane"
+                           #   assumption LaneIsolation rests on: undeclared footprints and
+                           #   cross-lane overlaps. AuditedLaneIsolation enforces it, re-running
+                           #   the audit EVERY scheduling round (the frontier grows mid-drain)
+                           #   and failing closed to 1 worker.
     artifact_reconcile.py  # after a stage/goal run: attach the stage's declared <out_path>
                            #   (resolved from the FSM's own manifest via fsm_compose.resolve_stage_out_path,
                            #   passed as out_path — state-one-authority: NO ARTIFACTS.jsonl ledger) AND
@@ -331,12 +606,28 @@ pathly_orchestrator/
                            # whenever a payload carries a run_id)
 ```
 
-**Layer rules:**
+**Layer rules — CI-enforced (`import-linter`, `[tool.importlinter]` in `pyproject.toml`).**
+"Architecture bugs, not style issues" now has a gate: `lint.yml`'s consistency job runs
+`lint-imports`, which fails the build on ANY new violation of the direction below (not just
+`.py` files reachable from a route handler — the whole `pathly_orchestrator.*` import graph).
 - `db/` — no imports from runner, supervisor, or http_server
 - `runner/` — may import db; no imports from supervisor or http_server
 - `supervisor/` — may import db and runner; no imports from http_server
-- `http_server/` — may import all; supervisor/db imports inside route handlers (lazy)
+- `http_server/` — may import all; supervisor/db imports inside route handlers (lazy — this is
+  about avoiding a slow/circular import at module load, not something the layers contract
+  itself needs to know: `http_server` importing DOWN into `supervisor`/`db` is the ALLOWED
+  direction regardless of laziness)
 - Each package's `__init__.py` re-exports all symbols for backward compatibility
+
+**Three pre-existing violations are frozen as `ignore_imports` in the contract**, same spirit
+as `scripts/file_size_baseline.txt` — documented debt, not something to add to. All three route
+through a shared top-level hub module OUTSIDE the four layers, not one layer package importing
+another directly: `db.migrations -> board_mirror -> board_mirror_hydrate -> runner.embeddings`;
+`runner/__init__.py -> fsm_http_client -> fsm_ops -> fsm_ops_complete -> supervisor.artifact_reconcile`;
+and `eventlog -> http_server.sse`, which alone accounts for two reported violations
+(`supervisor.{goal_executor,terminal,terminal_reconcile} -> eventlog -> http_server.sse` and
+`runner.{context_record,events,history,provenance} -> eventlog -> http_server.sse`) since
+`eventlog.append_event` broadcasts SSE toasts on write. Fixing these is real, separate work.
 
 **Modules split under the 400-line ratchet (2026-08-18) — import paths unchanged.** Each keeps its
 original name as the entry point and re-exports every symbol its callers and the test-suite already
@@ -347,12 +638,783 @@ import, so no call site moved:
 | `fsm_compose.py` (298) — keeps `build_prompt` / `build_prompt_for_agent` / `_load_agent_text` | `fsm_compose_tables` (lookup tables) · `fsm_compose_vars` (`_inject_prompt_vars` + its inputs) · `fsm_compose_paths` (`resolve_stage_out_path`, `resolve_board_scope`) · `fsm_compose_stage` (section drops, stage overrides, adapter choice) · `fsm_compose_hints` (`_agent_hint`) |
 | `skills/compose.py` (197) — keeps the resolver | `compose_base` (constants + `_strip_leading_frontmatter`) · `compose_resources` (manifest/skill/fragment I/O) · `compose_caps` · `compose_segments` · `compose_validate` |
 | `supervisor/terminal.py` (390) — keeps the spawn | `terminal_argv` · `terminal_identity` · `terminal_reconcile` · `terminal_billing` · `terminal_phase` |
+| `fsm/engine_actions.py` (204) — keeps `run_transition_actions` | `fsm/gates/` — one module per gate type (`artifact` · `tasks` · `scope` · `command`) behind the `run_gates` dispatcher in `gates/__init__.py`; `_helpers` owns `append_event` / `_write_gate_feedback` / `gate_failed` / `project_root_of` |
 
 Two constraints govern what may leave these files, and both are load-bearing:
 `fsm_compose._load_agent_text` and `supervisor.terminal._reconciliation_window` are **monkeypatched
 in those namespaces by tests**, so the functions that call them must stay in the same module and
 call them as bare names. `fsm_compose.py` also still loads `fsm_compose_responses` at the BOTTOM of
 the file — that ordering is what keeps its back-reference from becoming a cycle.
+
+## Transition gates (`fsm/gates/`)
+
+A gate answers one question: may the FSM leave `prev_state` for `next_state`? `run_gates`
+(`fsm/gates/__init__.py`) dispatches through a `_CHECKS` registry — **a new gate type is a new
+module, never another `elif`**. Each check returns `None` to allow the transition or a
+`{"gate_failed", "feedback_file"}` dict to block it; the first failure wins and
+`fsm_ops_complete` turns it into a blocked response routed by `feedback_routing`.
+
+| Gate | Module | Proves | Config |
+|---|---|---|---|
+| `require_artifact` | `artifact.py` | an agent wrote a file | `artifact` |
+| `verify_gate` | `artifact.py` | an agent wrote `pass_marker` on line 1 | `artifact`, `pass_marker` |
+| `require_tasks_done` | `tasks.py` | the board DAG has no unfinished task (goal-scoped when `goal_id` is set, else feature-scoped) | — |
+| `scope_gate` | `scope.py` | the builder stayed inside its declared footprint (git diff ∪ untracked vs. `scope_file`) | `scope_file` |
+| `command_gate` | `command.py` | **the project's own verify command exits 0** | `command_key` (+ optional `command`, `timeout`) |
+
+**The first four read state that agents produced; only `command_gate` executes something.** That
+distinction is the point of it: `verify_gate` is satisfied by an agent writing `RESULT: PASS`, so
+the FSM's pass/fail signal was, end to end, an agent's opinion of its own work. `command_gate`
+re-derives the answer from a process exit code and routes the real stdout/stderr back as feedback.
+
+**Command resolution** (highest precedence first): `gate["command"]` literal → app-setting
+`verify.<command_key>` → **skip**. Configure a project with
+`PUT /db/settings/verify.test {"value": "python -m pytest -q"}` (also `verify.build`, `verify.lint`,
+and `verify.timeout_seconds`; default timeout 600s).
+
+**Fail-open on absent config, fail-closed on everything else.** No configured command → `GATE_SKIPPED`
+(`no_command_configured`), so adding the gate to a shared flow never breaks a project that has not
+configured one. But a command that runs and fails, times out, cannot be parsed, or cannot be executed
+all **block** — a verify command that silently does nothing is worse than no gate at all.
+
+The command is split with `shlex.split` and run **without a shell**, so `&&`, `|` and `>` are not
+operators — put those in a script and call the script. A value starting with `[` is parsed as a JSON
+argv array instead, for exact control on any platform — **required on Windows for batch shims**
+(`npm`/`yarn`/`tsc` are `.cmd` files and do not resolve by bare name without a shell: use
+`["npm.cmd", "test"]`). It runs with cwd = the repo root (via
+`gates/_helpers.project_root_of`, which delegates to `eventlog._project_root_of` so a nested
+`goals/<slug>` run resolves the same root the event log keys off) and `PATHLY_VERIFY_GATE=1` in the
+environment. Failure output is clipped head+tail (3000/5000 chars) — compilers put the first error at
+the top, test runners put the summary at the bottom, so tailing alone loses half the signal.
+
+Events: `GATE_PASSED` (command, `exit_code`, `duration_ms`) on success — the objective evidence on
+the run's record — and `GATE_FAILED` (with `reason`, `command`, `exit_code`) on failure.
+
+Wired in `core/flows/team.flow.yaml` and `team-build.flow.yaml`: `BUILDING->REVIEWING` runs
+`verify.build` → `BUILD_FAILURES.md`, `TESTING->RETRO` runs `verify.test` → `TEST_FAILURES.md`.
+Both route to the builder.
+
+## Human checkpoints — parked, not failed
+
+When `complete_stage` blocks with `target_agent == "human"`, the supervisor stops the loop
+without treating it as a failure. `orchestrator_stage.py::_park` (not `_fail`) sets
+`RunnerState.status = "parked"` — a status distinct from `"error"`/`"aborted"` and included
+alongside them in `VALID_STATUSES` (`supervisor/state.py`) and in `_set_status`'s
+run-history-finalizing set (`supervisor/registry.py`), since resuming starts a fresh run_id
+rather than reviving this one.
+
+**Why this is safe to resume, not just "not an error":** parking never touches the FSM's own
+state — `fsm_state` still sits exactly where the checkpoint left it, waiting on whatever
+feedback file `target_agent == "human"` named. `_post_human_escalation` posts an answerable
+`type="escalation"` board message naming that file and `POST /runner/resume-parked`. A human
+(or an agent proxying for one) edits the file to resolve it; `POST /runner/resume-parked
+{"topic": ...}` → `supervisor.resume_parked_run` reads the parked `RunnerState`'s
+flow/project_root/model/goal_id and calls `start_run` again under a NEW run_id — `start_run`
+only refuses a topic whose status is running/paused/awaiting_decision, so a parked topic is
+free to restart. The fresh `/next_action` call re-evaluates the SAME feedback file's CURRENT
+content, so the human's edit takes effect immediately — no separate "replay" step exists or
+is needed. Cost/iteration counters restart at zero under the same caps; they are not carried
+over from the parked attempt.
+
+**`on_done` consumers still see it as non-success.** `api.py`'s `_run_and_finalize` sets
+`result["error"]` for `status in {"error", "aborted", "parked"}` — every existing `on_done`
+(e.g. `goals.py`'s `_on_done`) branches on `res.get("error")` to avoid reporting a non-clean
+stop as `"finished"`; a parked run without this would have been silently reported as success.
+`result["status"]` still reads `"parked"` for a caller that wants to distinguish resumable
+from dead — `goals.py`'s board-message wording does not yet make that distinction (falls
+into the generic "goal run failed" text), a known cosmetic gap, not a correctness one.
+
+## Goal cost cap (`supervisor/cost_cap.py`)
+
+The FSM loop (`orchestrator.py`) refuses to spawn a new stage once `cost_usd_so_far >=
+max_cost_usd` — but that check lives entirely inside `orchestrator.py`; the DAG/loop
+executor's `scheduler.py` frontier loop has no equivalent, so a goal's task-DAG could run
+to any cost. `cost_cap.py` closes this WITHOUT touching `scheduler.py` (frozen at its
+400-line ratchet ceiling): `CostCapTracker.wrap(spawn_fn)` returns a spawn function with
+the same signature that accumulates each task's real `cost_usd` as it becomes known, and
+`supervisor/drain.py::drain_frontier` folds `tracker.exceeded()` into the SAME `abort_check`
+hook `scheduler_loop` already polls at the top of its frontier loop before scheduling anything
+new — no new extension point, no scheduler changes. Owning it in the shared drain is what makes
+the cap apply to every frontier drain by construction rather than by each caller remembering it.
+
+Same limitation as the FSM loop's own cap, for the same reason: a headless
+`claude -p --output-format json` spawn reports cost in one JSON envelope at process exit,
+not a stream, so there is no way to know a task's cost before it finishes. This stops the
+DAG from scheduling FURTHER tasks once the aggregate is blown; it cannot preempt one
+already in flight.
+
+Configure per project with `PUT /db/settings/goal.max_cost_usd {"value": "5.0"}` —
+absent/invalid/non-positive means **no cap**, the same fail-open contract as
+`command_gate`. On breach, `tracker.report(res)` sets `res["error"]` /
+`res["cost_cap_exceeded"]` on the loop's result — the same shape `goal_verify`'s
+`verify_clean_drain` already uses, so every `on_done` consumer (which branches on
+`res.get("error")`) reports it as a non-clean stop rather than silent success.
+
+## Headless spawn host (`pty_host/`)
+
+The supervisor never spawns a CLI itself. `supervisor/terminal.py` emits `TERMINAL_SPAWN` on the
+topic-independent `/events/spawn` SSE channel and blocks on `TerminalRun.wait_started(30)`, then
+`wait_pty_result(1800)`. Whoever answers is the **spawn host**. There are now two, and the
+supervisor cannot tell them apart:
+
+| Host | Process | Answers with | Used for |
+|---|---|---|---|
+| Studio | Electron main (`studio/src/main/ipc/terminal.ts`), node-pty | a visible PTY tab | desktop, human watching |
+| `pathly-pty-host` | this package, plain pipes | a headless subprocess | server-side drain, CI, no desktop |
+
+```bash
+pathly-fsm-http &        # the FSM server
+pathly-pty-host          # the spawn host — one at a time; two would double-spawn every run
+```
+
+Both implement the same three-event / two-callback contract: consume `TERMINAL_SPAWN`,
+`TERMINAL_KILL`, `TERMINAL_SIGNAL(term)`; answer `POST /runner/terminal/started` (releases the 30s
+wait) and `POST /runner/terminal/result` (the authoritative, run-keyed billing gate). Because the
+result POST carries the same `adapter` + raw `stdout_tail`, headless runs get the SAME telemetry
+path as Studio runs — `parse_result` on the server, `BILLING_UPDATE`, invocation projection.
+
+Module map: `host.py` (SSE loop + dispatch + concurrency) · `process.py` (one child: capture, kill)
+· `client.py` (the two callbacks) · `sse.py` (urllib SSE reader) · `cli.py` (`pathly-pty-host`).
+
+Four behaviors are load-bearing rather than incidental:
+
+- **Pipes, not a pseudo-terminal.** Every adapter's headless mode (`claude -p`, `codex exec`) is
+  non-interactive, so no TTY is needed. **stdin is `/dev/null`** — `codex` headless otherwise stalls
+  waiting on terminal input (the hazard `terminal.ts` handles by piping `$null` on Windows).
+- **The child gets its own process group** (POSIX `start_new_session`, Windows `taskkill /T`), so a
+  kill reaches the CLI's own children. Killing only the direct child is what leaves orphaned CLI
+  processes behind after an abort.
+- **`stop()` shuts the SSE socket down, it does not `close()` the response.** `close()` needs the
+  BufferedReader lock that the blocked `readline()` already holds, so it only returns at the
+  server's next 25s keepalive — a 25s hang on every Ctrl-C. `socket.shutdown()` makes the in-flight
+  `recv()` return immediately (`sse.close_stream`).
+- **An interactive stage is refused, not attempted.** Headless has no terminal and no human, so the
+  host reports `exit_code 1` with a nameable reason instead of letting the supervisor wait out its
+  30-minute result timeout on a stage that can never finish there.
+
+The child env carries `PATHLY_GATE_BILLED=1` (so the interactive stop hook skips the run rather than
+double-billing it via its "most recently active feature" guess) and `PATHLY_PROJECT_ROOT`, matching
+what Studio exports.
+
+## Retry ladder — what varies by ATTEMPT, not just who owns it
+
+`escalation_routing` (`fsm/engine_transitions.py::_resolve_feedback_target`) already changes
+the ROLE by round — rounds 1-2 the file's owner, round 3 an upstream specialist, round 4+
+human (`_ESCALATE_AT_ATTEMPT = 3`; a flow's tiers come from `["planner", "architect"]`-style
+lists or explicit `{at, to}` dicts, normalized by `_normalize_tiers`). What escalating the
+ROLE never did is escalate the STRATEGY: every attempt on a given role got the identical
+prompt — no signal it was a repeat, no guaranteed view of what actually failed (only
+Fix-mode roles — po/planner/architect/designer — are told to go read the feedback file), no
+visibility into what an earlier attempt on this stage reported.
+
+`route_feedback` now returns `retry_count` alongside `target_agent` (the SAME count
+`_resolve_feedback_target` used to pick the role — one number, two effects, always in sync).
+`fsm_compose.build_prompt_for_agent(..., retry_count=...)` appends a retry-ladder block from
+round 2 on (`retry_count > 0`): the attempt number, the feedback file's CURRENT content read
+fresh at call time (capped, so a pathological feedback file can't blow up the prompt), and
+`build_pipeline_history_block` — the SAME recent-`AGENT_DONE`-summaries helper `build_prompt`'s
+normal stage-advance path already uses, so no second history mechanism exists. **Round 1
+(`retry_count == 0`, the default) is byte-identical to before this** — every existing caller
+that never threads the new parameter, and every golden snapshot, is unaffected.
+
+## FSM/DAG convergence — Phase 0 hygiene fixes
+
+Four small, independent fixes surfaced while researching converging the FSM engine and the
+DAG/goal engine into one execution model (design at `pathly/features/` — see the root
+`CLAUDE.md`'s Comms board section for the DAG side). None of these change the convergence
+design itself; they clear real bugs/inconsistencies found along the way, same discipline as
+the earlier goal-cost-cap / provenance / retry-ladder additions above.
+
+1. **`team/build`'s board poll is now goal-scoped.** The FSM gates around BUILDING
+   (`on_board_count`, `require_tasks_done`) already read `RunnerState.goal_id`, but the skill's
+   own `GET /comms/tasks?ready=true` query had no `goal_id` param — a goal-executor run could
+   claim a ready task belonging to a DIFFERENT goal on the same feature board.
+   `fsm_compose.build_prompt` now substitutes a real `<goal_id>` prompt var (mirroring
+   `<feature>`/`<board>`/…, not left to the agent to infer) into any composed FSM-stage prompt;
+   `team/build.md`'s curl line sends it as `&goal_id=<goal_id>` (empty string when the run isn't
+   goal-scoped, which `/comms/tasks` already treats as "no filter").
+2. **`test.flow.yaml` no longer self-loops on `TEST_FAILURES.md`.** It routed
+   `TESTING->TESTING` instead of `TESTING->BUILDING` like both `team.flow.yaml` and
+   `team-build.flow.yaml` (and its own `feedback_routing: TEST_FAILURES: builder`). A same-state
+   "transition" skips `eventlog.write_state`'s legality check entirely (`old_current ==
+   new_current`), so this never crashed — it just re-ran `team/test` against unfixed code
+   forever instead of ever handing the failure to the builder.
+3. **`feature-consultation.flow.yaml` / `project-consultation.flow.yaml` now carry the same
+   `adapter_map` as `consultation.flow.yaml`** (PO discussion + design on `codex`, everything
+   else `claude`). Both files' own header comments describe them as "consultation.flow.yaml
+   lifted one altitude up" (same PO→architect→researcher→designer→planner shape); the
+   `adapter_map` was dropped when they were copied and is now reconciled.
+4. **`fsm/state.py`'s `STATES`/`VALID_STATES`/`TRANSITIONS`** (sourced from
+   `pathly_data/schemas/state.schema.json`) were flagged during research as apparent dead code —
+   the vocabulary (`IDLE`, `DISCOVERING`, `REVIEW_BLOCKED`, …) matches none of the 9 shipped
+   flows, and every real caller (`fsm_ops.py`, `fsm_ops_complete.py`) always passes its own
+   `flow_config`. Closer investigation found this was the wrong call: `eventlog.write_state`/
+   `append_event`'s `flow is None` branch is a genuine, still-enforced fallback legality check
+   for a caller that omits a flow, and `tests/fsm_flows/test_orchestrator.py` deliberately
+   exercises it (`test_write_state_rejects_illegal_transition` and siblings). Deleting it would
+   have broken that safety net and those tests for no benefit — left in place, with a comment
+   clarifying it is a generic fallback vocabulary, not any live flow's state machine.
+
+## FSM/DAG convergence — Phase 1: per-task retry/escalation (`supervisor/task_retry.py`)
+
+The `loop` executor's `scheduler.py` frontier loop had NO retry at all: any task failure — a
+worker exception, or an outcome reporting failure (`_outcome_is_failure`) — called `fail_task()`
+immediately and permanently, cascading `blocked` to every transitive dependent. The `attempts`
+column (`comms_messages.attempts`, already incremented by `claim_task` on every claim) was
+written but never read anywhere — a dead signal. Contrast the `team`/`team-build` FSM path,
+which already gets real per-task verification for free: `team-build.flow.yaml`'s
+`BUILDING->REVIEWING` `command_gate` runs once per task (BUILDING spawns one `team/build` agent
+per ready task, per the per-task loop docs above) — that path needed no new gate, just the
+Phase 0 goal-scoping fix. The gap was specifically the `loop` executor's flat, gate-less DAG.
+
+**What Phase 1 does NOT do, and why:** the original plan sketch called for a per-task
+*completion gate* reusing `fsm.gates.command.check_command_gate`, keyed by a `task_kind`/`stage`
+column. Investigation found `assigned_to_stage` (the column that would key it) is declared in
+the schema but written nowhere — populating it is a task-creation change (planner/decomposer),
+out of scope for an additive pass. Worse, running `verify.build`/`verify.test` after EVERY task
+directly contradicts `goal_verify.py`'s own documented rationale for checking once at goal-drain
+("not per task, which would run the whole suite N times for one goal"). So Phase 1 is scoped to
+what the codebase actually has a real gap in — retry — not a redundant per-task command_gate.
+
+**`resolve_task_failure`** is the one decision point `scheduler.py`'s completion handler calls
+on a failed task, and owns the FULL side-effect set for whichever branch it picks (so
+`scheduler.py` only needs the returned `(decision, blocked_ids)`):
+- **Retry** (`current_attempt < goal.task_max_attempts`, default 3): `retry_task` reverts the
+  task to `pending` — the frontier's next poll re-schedules it — and stamps the failure reason
+  into the existing `fail_reason` column (no new column: `get_ready_tasks`' `SELECT *` already
+  returns it, so the NEXT attempt's `task` dict carries it for free).
+- **Escalate** (attempt `>= goal.task_max_attempts`): the original behavior, delayed until
+  retries are exhausted — `fail_task`'s cascade-to-blocked, plus a board `escalation` message
+  (mirrors `goal_verify.post_gate_failure_escalation`) so a human/agent sees it instead of a
+  silent DB-only cascade.
+
+**`build_retry_context`** appends a retry-ladder block to a retried task's prompt from the
+second attempt on — mirrors `fsm_compose._retry_ladder_block`'s "what varies by ATTEMPT, not
+just who owns it": the attempt number and the previous failure's reason, so a retry doesn't
+repeat the identical blind prompt. A first attempt (`attempts == 0`) is unaffected — byte-
+identical to before this feature.
+
+**`detect_deadlocks`** is `scheduler.py`'s former loop-only postscript (any task still `pending`
+after a normal drain has an unsatisfiable dependency — a cycle, or a `depends_on` that will
+never complete; `get_ready_tasks` silently excludes it, so without this a drain returns a
+clean-looking result while work sits stuck forever), extracted so any drain path with DB access
+can reuse it — universal deadlock detection. Only `scheduler_loop` calls it today; wiring the
+`single` executor's agent-driven `drain-dag` loop to it would need a new HTTP endpoint (an
+agent can't call Python directly) and is flagged, not attempted, in this pass.
+
+Configure per project with `PUT /db/settings/goal.task_max_attempts {"value": "5"}` — unlike
+`command_gate`/`goal.max_cost_usd`'s fail-open-to-off contract, an absent/invalid/non-positive
+setting here falls back to the **default (3)**, not "no retry": an unconfigured project should
+still get the safety net.
+
+This shipped as an EXTRACTION-plus-ADDITION, not pure addition: `scheduler.py` was already at
+its 400-line ratchet ceiling (433), so the failure branch's full logic (including the old
+unconditional `fail_task` call and the deadlock postscript) moved into `task_retry.py` — net
+result, `scheduler.py` is now SHORTER (415 lines) despite gaining retry capability, and no flow
+YAML, Studio surface, or existing test needed to change.
+
+**Follow-up bug caught before it shipped to production: retried attempts shared one `run_id`.**
+The first version of this change kept `task_run_id = f"sched-{task_id}"` unchanged — fine when a
+task_id spawned at most once, but retry means the SAME task_id can spawn multiple times. `run_id`
+is the identity the whole billing chain keys off (`TERMINAL_SPAWN`, the PTY result callback,
+`_reconciliation_window`'s async patch, `agent_invocations.run_id`), and
+`invocation_projection.on_event_appended` matches a `BILLING_UPDATE` to the MOST RECENT
+`AGENT_DONE` sharing its `run_id` — so a late-arriving reconciliation for attempt N (early-advance
+mode: the agent self-reports done while the real PTY billing is still in flight on a background
+thread) could fold its real cost onto attempt N+1's row instead of its own once attempt N+1 had
+already written its own `AGENT_DONE` under the identical run_id. Fixed by making `run_id` unique
+per attempt: `f"sched-{task_id}#{attempt}"` (`#` is a safe separator — task ids are uuid4: hex and
+hyphens only). Every place that previously parsed a bare task_id back out of a `sched-` run_id
+(`test_dag_scheduler.py`, `test_golden_path.py`, `test_comms_goals_run.py`) now also strips the
+`#<attempt>` suffix; production code was already unaffected since it only ever checked the
+`sched-` PREFIX (`run_history_read._classify_kind`/`_is_parent`), never parsed the remainder.
+
+## FSM/DAG convergence — more Phase-0-style fixes found while researching Phase 2 readiness
+
+Three more small, independent bugs, found the same way as the original Phase 0 batch (research
+agents scanning the DAG/board, telemetry, and FSM/flow-YAML layers for the same CLASS of defect —
+a sibling divergence or a dropped parameter — before considering Phase 2's bigger compiler work):
+
+- **`POST /comms/goals/run`'s `stage_overrides` validated against a hardcoded `"team-build"`**
+  instead of the flow actually being run (`flow_override`, which the route already accepts and
+  threads to `start_goal_run`). `_validate_stage_overrides` drops any override key not in the
+  named flow's declared `states` — so a goal run with `flow: "debug"` and a `FIXING` override had
+  it silently dropped, since `FIXING` isn't one of `team-build.flow.yaml`'s states. Fixed by
+  validating against `flow_override or "team-build"` (the same default `start_goal_run`/
+  `goal_executor._TEAM_FLOW` already use).
+- **A parked goal run (`RunnerState.status == "parked"`, a headless human checkpoint) was reported
+  to the board as `"goal run failed"`** — the exact cosmetic gap this repo's own docs already named
+  (see "Human checkpoints — parked, not failed" above: *"`goals.py`'s board-message wording does
+  not yet make that distinction"*). `comms_goals_run`'s `_on_done` now special-cases
+  `res.get("status") == "parked"` before the generic error fallback, posting "goal run paused —
+  awaiting human input" on the existing non-error `stopped` phase (Studio's `phase` union has no
+  dedicated `parked` value, so adding one would require a frontend change too — out of scope for
+  this pass; `stopped` already clears the timer pill without the `failed` toast).
+- **`test.flow.yaml` had no `escalation_routing` at all**, unlike `team.flow.yaml`/
+  `team-build.flow.yaml` which share its exact `team/review`+`team/test` skills and carry an
+  identical 3-tier table (`REVIEW_FAILURES`/`SCOPE_VIOLATION` → planner, `TEST_FAILURES` → po, both
+  escalating to human past round 4). An empty `escalation_routing` makes
+  `_resolve_feedback_target` unconditionally return the base agent — so a persistently failing
+  review/test loop in `test.flow.yaml` routed back to `builder` forever, with no round-3 hand-off
+  and no round-4 human escalation. Fixed by copying the same table from `team.flow.yaml`.
+
+**Resolved (was "flagged, not fixed"): `DESIGN_QUESTIONS.md` → `architect` in every flow.** The
+filename used to carry two self-consistent meanings: `team`/`test` treated it as the builder's
+`[ARCH]`-tagged technical blocker (→ architect), while `team-build` and the three consultation
+flows treated it as "questions for the designer" (→ designer), alongside their role-symmetric
+`ARCH_QUESTION`/`PO_QUESTIONS`/`IMPL_QUESTIONS`. The writer side has only ONE contract, which is
+what settled it: `team/build.md` and `development/build.md` both write the file `[ARCH]`-tagged,
+`team/build.md`'s own body spawns `architect` for it, and `utilities/meet.md` tells the user it
+"routes to architect" no matter which flow the feature is on — so 4 of 6 flows silently broke a
+documented promise. Now uniform, with `DESIGN_FEEDBACK.md → designer` added to the consultation
+flows so routing the file away does not strand the designer role (`team`/`team-build` already had
+it). `fragments/feedback-protocol.md`'s hedged "→ designer/architect" line is corrected to match,
+and `tests/fsm_flows/test_design_questions_routing.py` pins the uniformity — including a guard
+that the parametrized check has not degraded to all-skips, and a check that every flow with a
+designer stage still has an inbound file for them.
+
+## The small flows got the 3-tier retry ladder (`debug`, `quick-fix`)
+
+`_resolve_feedback_target` returns the BASE agent unconditionally when a flow has no
+`escalation_routing`, so `debug` and `quick-fix` — the only two failure-looping flows without
+one — routed a persistently failing fix back to `builder` forever: no round-3 hand-off, no
+round-4 human backstop, the run just burned its iteration/cost caps. Both now carry the
+ladder the team flows have, escalating to **`scout`** at round 3: when the FIX keeps failing,
+the suspect is the diagnosis (debug's INVESTIGATING) or the scope (quick-fix's SCOPING) above
+it — the same "blame the upstream cause, not the code" move `team.flow.yaml` makes with
+`REVIEW_FAILURES → planner`. Verified against the real `route_feedback`:
+builder → builder → scout → human.
+
+## Feedback-file reachability — a flow must route what it can produce
+
+`route_feedback` (`fsm/engine_transitions.py`) ends with a catch-all: any `.md` in
+`feedback/` that no `feedback_routing` key matches returns `target_agent: "human"` with
+*"Unrecognized feedback file: X. Review and resolve manually."* That is a safety **net**, not
+a destination — reaching it means the flow stops and waits on a person instead of routing to
+the role that can fix the problem, stalling a run that could have fixed itself. Two flows
+were landing there on ordinary paths, both found by diffing what a flow's own skills WRITE
+against what it ROUTES:
+
+- **`debug.flow.yaml` never routed `VERIFY_FAILURES.md`** — the file its own VERIFYING skill
+  (`debug/verify.md`) writes whenever verification fails, i.e. the flow's primary failure
+  path. So a failed debug verification escalated to a human instead of looping
+  VERIFYING → FIXING. Now `VERIFY_FAILURES: builder`,
+  mirroring `quick-fix.flow.yaml`'s `TEST_FAILURES: builder` on the same VERIFYING→FIXING edge.
+- **The three consultation flows never routed `ARCH_FEEDBACK.md`** — the canonical `[ARCH]`
+  file in `fragments/feedback-protocol.md`, which `utilities/meet.md` writes into any feature
+  regardless of flow under the caption "routes to architect". Now `ARCH_FEEDBACK: architect`.
+
+`tests/fsm_flows/test_feedback_file_reachability.py` drives the real `route_feedback` against
+the real packaged YAMLs for both, plus a guard that the catch-all still fires for a genuinely
+unknown filename (so the assertions cannot pass by the fallback being removed).
+
+**Why this is a test and not a CI gate.** The obvious generalization — "every feedback file a
+flow's skills mention must be routed" — is regex-only and cannot tell a WRITE from a READ. It
+false-positives on `test.flow.yaml`/`INCOMPLETE_TASKS.md`, which `team/build.md` only *reads*
+("the completeness gate sent you back to finish…"): the writer is the `require_tasks_done`
+gate, and `test.flow.yaml` has no `gates:` block at all, so that file can never appear there.
+Adding a routing key for it would be unreachable noise. Checked by hand across all nine flows;
+only the two above were real.
+
+## FSM/DAG convergence — Phase 2/3 were REVERTED: one engine, one authority
+
+Phase 2 shipped `supervisor/compiled_flow.py`, a second executor that walked a flow's states
+directly in Python — no `fsm_state` row, no `/next_action`/`/complete_stage` round-trip — and
+Phase 3 opted `quick-fix`/`debug` into it. Both are **removed**. The record of why, so nobody
+rebuilds it:
+
+- **It bought almost nothing.** The two calls it skipped are a localhost HTTP round-trip and a
+  SQLite write — roughly 2 ms against a stage whose agent runs for minutes. The expensive part
+  of a spawn (`TERMINAL_SPAWN` over SSE, waiting on `/runner/terminal/result`) went through
+  HTTP either way.
+- **It cost real money.** It passed `session=None` on every spawn where `orchestrator._loop`
+  reuses a session across same-adapter stages, so every stage re-read its context. It saved
+  microseconds of bookkeeping and spent tokens.
+- **It broke the state-one-authority rule**, and that rule pays for itself. With no DB row the
+  run was invisible to `pathly-status`, had no `STATE_TRANSITION` audit trail, could not
+  park/resume, and silently disabled `escalation_routing` (whose tiers climb off
+  `STATE.json`'s `retry_count_by_key`). Two of those needed their own patches — a whole second
+  CLI discovery source and an in-memory retry dict — before anyone noticed they shared one
+  cause.
+- **It made the problem it was meant to solve worse.** The convergence goal was two engines
+  down to one; this added a third alongside `orchestrator._loop` and `scheduler_loop`.
+- **The obstacle that justified it was three lines.** The stated reason for not compiling
+  flows into DAG tasks was that `fix/build.md`/`debug/*.md` carry literal `pathly-fsm-call
+  complete-stage` instructions, neutralized only by the runner-contract block `build_prompt`
+  appends (`fsm_compose.py`, the `### Runner contract` f-string). `scheduler.py`'s DAG prompt
+  path could append the same constant. A shared string was routed around with ~1300 lines.
+
+**The design going forward: one authority (the DB) and one engine (the FSM).** A new execution
+path must persist its state in `fsm_state` like every other caller — that is what makes a run
+resumable, observable, auditable and CLI-visible, and those are not optional extras. If one
+engine is still the goal, start from sharing the runner-contract constant with the DAG prompt
+path, not from a second executor.
+
+**Parallelism is NOT the cost of one engine** (an earlier note here said it might be — that was
+wrong). A classic FSM holds one state, but the thing Pathly needs is not concurrent *states*
+(Harel orthogonal regions, where `current` becomes a set); it is one state that spawns N agents
+and joins — `BUILDING` fans out over the ready tasks, waits for all, then transitions once.
+`fsm_state.current` stays the scalar `"BUILDING"` throughout, so the DB stays the authority and
+the gates keep running exactly where they do now, at the transition.
+
+Most of the machinery for that is already built and merely pinned off: `scheduler.py` has real
+thread fan-out with a completion queue, `isolation.py` has `LaneIsolation`
+(`max_concurrency = len(ready_lanes)`), `file_claims.py` guards collisions, `depends_on` is the
+graph, and `task_retry.py` handles per-task retry and deadlocks. **`LaneIsolation` is
+instantiated nowhere in production** — every caller uses `SerialIsolation`, whose only job is to
+force `max_concurrency` to 1, and whose own docstring says flipping to parallel is just swapping
+it back.
+
+So the real gap is architectural, not capability: `scheduler_loop` is wired as a rival ENGINE
+(`goal_executor._run_loop`, a peer of `orchestrator._loop`) instead of as the fan-out executor
+*inside* a state. Moving it inside is what turns two engines into one. Design, phasing and the
+honest risk list: [pathly/features/fsm-fan-out/SPEC.md](../../pathly/features/fsm-fan-out/SPEC.md).
+Its Phase A — sharing the `### Runner contract` constant between `build_prompt` and
+`scheduler.py`'s DAG prompt path — is the same three-line fix the reverted compiled executor was
+built to route around. **Phase A has landed** (below); B and C follow it.
+
+## fsm-fan-out Phase A — ONE runner contract, shared by both prompt paths
+
+`fsm_compose.RUNNER_CONTRACT_BLOCK` is now the single definition of the *"you are headless, the
+supervisor owns the FSM, never call `complete-stage`"* block, and **both** headless prompt paths
+append it:
+
+| Path | Before | Now |
+|---|---|---|
+| `fsm_compose.build_prompt` (FSM stages) | inline f-string in its `context` | appends the constant — output **byte-identical** |
+| `supervisor/scheduler.py` `_worker` (DAG tasks) | **appended nothing** | appends the same constant |
+
+The scheduler side is the real change: a loop-executor task agent was the one headless agent
+never told the supervisor drives the flow, and `development/execute-task` carries no such
+instruction of its own. That is inert while `scheduler_loop` runs as its own engine — but under
+Phase C those agents run INSIDE an FSM stage, where a self-driven transition is a double-advance
+or the 404 respawn loop `tests/runner_supervisor/test_runner_contract.py` was written for. It is
+appended AFTER `_worker`'s compose try/except, so the raw-task-text fallback — the path where the
+agent has the least guidance — is not the one path that loses it.
+
+This is the "three-line fix" the reverted compiled executor spent ~1300 lines routing around
+(above). The `build_prompt` side is a pure extraction: the lifted f-string interpolated nothing,
+and the composed `context` is byte-for-byte what it was. `compose_skill` is untouched, so the
+golden snapshots in `tests/snapshots/` do **not** move. Pinned by
+`tests/fsm_flows/test_runner_contract_shared.py` — present in both paths, exactly once in each
+(a second copy is the obvious regression), and present on the composition-failure fallback.
+
+Shipped inside the ratchet: `scheduler.py` 425 → 432 against its frozen 433.
+
+## fsm-fan-out Phase B — the `parallel_states` flow-YAML key (inert)
+
+A state opts into fan-out — one FSM state draining its ready tasks, then joining — by naming
+itself in an optional `parallel_states` block. **Absent means today's exact behavior** (one spawn
+per stage), so no existing flow changes:
+
+```yaml
+parallel_states:
+  BUILDING:
+    max_workers: 4        # optional; default = the isolation's own answer
+    isolation: lane       # optional; lane | serial | worktree
+```
+
+`fsm/state.py::_validate_parallel_states` (called from `validate_flow_dict`, so
+`pathly-validate-flow` and every caller get it) enforces three **errors** — a key that is not a
+declared state, a `max_workers` that is not a positive int, an `isolation` outside
+`_ISOLATION_VOCAB` — and one **warning**: `worktree` is legal vocabulary but `WorktreeIsolation`
+is still a stub that raises `NotImplementedError`. `max_workers` rejects `bool` explicitly, since
+`isinstance(True, int)` is true and `max_workers: true` is a typo, not a cap of 1. A bodiless
+`BUILDING:` (YAML `None`) is a legal "all defaults" entry.
+
+**Nothing read the key at Phase B** — Phase C is what branches on it, and no packaged flow
+declared it, which made that phase inert by construction. Since **Phase E, exactly one flow opts
+in**: `goal-loop`, which IS `executor: loop`. `tests/fsm_flows/test_parallel_states_schema.py`
+pins the schema rules and that `goal-loop` is the ONLY opted-in flow, so opting another in stays
+a deliberate, test-visible decision.
+
+## fsm-fan-out Phase C — the fan-out moves INSIDE the FSM (still serial)
+
+The architectural change: `scheduler_loop` stops being a rival ENGINE and becomes the fan-out
+executor **of a state**. `orchestrator._loop` no longer calls `_run_stage_via_terminal` directly —
+both its spawn call sites now go through `supervisor/fan_out.py::run_stage`, the ONE call site for
+executing a stage:
+
+```
+  next_action() -> current_state = "BUILDING"
+        |
+        +- NOT parallel --> _run_stage_via_terminal      (today, unchanged)
+        |
+        +- parallel ------> scheduler_loop(...)          <- the fan-out
+        |                     returns when the frontier is drained
+        v
+  run_gates(BUILDING -> REVIEWING)   <- the JOIN. ONE gate run, after every worker
+        |                               finished. fan_out does NOT call gates.
+        v
+  complete_stage() -> write_state("REVIEWING")
+```
+
+`fsm_state.current` stays the scalar `"BUILDING"` for the whole drain, so `write_state`'s legality
+check, the `STATE.json` export, the `pathly-*` CLI and Studio's flow editor are all untouched. The
+FSM keeps flow, states, gates and transitions; the scheduler owns only "run these N ready tasks".
+
+**Behaviour is byte-identical, deliberately.** `_resolve_isolation` pins `SerialIsolation`
+*regardless* of the YAML's `isolation:` value — an `isolation: lane` entry is honoured as intent
+and **logged**, not obeyed — so a parallel state still drains one task at a time. Turning
+concurrency on is Phase D's single swap, gated on a real Phase-C run and on tasks declaring
+accurate file footprints (`file_claims.py` only guards collisions it can see).
+
+Fan-out semantics, as implemented:
+
+| Concern | Behaviour |
+|---|---|
+| Frontier | `get_ready_tasks(board="feature", scope=state.topic, goal_id=state.goal_id or None)` — the SAME `(board, scope)` pair `orchestrator_stage.py` posts to `complete_stage`, so the fan-out and `require_tasks_done` cannot disagree about which tasks are this stage's |
+| Isolation | `SerialIsolation()` always (Phase C); the requested strategy is logged |
+| Spawn | `_run_stage_via_terminal` wrapped by `cost_cap.CostCapTracker.wrap`, exactly as `goal_executor._run_loop` does; `session=None`, `autonomy` threaded from the stage |
+| Abort | the FSM's own `_abort_flag` **or** `tracker.exceeded()`, folded into `scheduler_loop`'s existing `abort_check` |
+| Merge | summed `cost_usd` (from the tracker's new `total` property — never re-summed), `session_id=None`, `outcome="failed"` if any task escalated **or** deadlocked |
+| Gates | not called here — `_loop` runs them at the transition, and that is the join |
+
+`session_id` is `None` **by construction**: a fan-out cannot carry one CLI session across N
+agents, and threading one would corrupt context the moment Phase D lets two workers run at once.
+A failed task does not hard-fail the stage — `_loop` surfaces the self-reported failure as a
+`RUNNER_WARNING` and `require_tasks_done` blocks the transition, which is the documented join
+semantics ("frontier drained, these escalated").
+
+**The `orchestrator.py` edit had to be net-negative** — it was frozen at 427 by
+`scripts/check_file_size.py`, where even an added import fails CI. Two extractions paid for the
+fan-out call sites: `supervisor/fan_out.py` (new) and `supervisor/orchestrator_session.py` (new,
+the ~35-line session-continuity block lifted verbatim — same reuse predicate, same `degraded`
+flag, same `SESSION` event). Result: **427 -> 399**, so the ratchet clicked and `orchestrator.py`
+dropped OUT of `file_size_baseline.txt` entirely — it can now never grow past 400 again.
+
+**Production behaviour was provably unchanged at Phase C**: no packaged flow declared
+`parallel_states`, so no run could take the fan-out branch at all. (Phase E added the first and
+only opt-in, `goal-loop`.) `tests/runner_supervisor/test_fan_out.py` asserts that, alongside the
+drain, the serial pin, the failure/join semantics, and abort mid-drain.
+
+## fsm-fan-out C.5 — `lane` and `files` had NO write path (Phase D was not one line)
+
+Phase D was specified as a one-line isolation swap. Checking its stated precondition —
+*"tasks in the target flow declare accurate file footprints"* — found the precondition
+**unsatisfiable**, and the reason is worth keeping:
+
+| Column | Schema | Writer, before C.5 |
+|---|---|---|
+| `comms_messages.lane` | `migrations_incremental.py` | **none anywhere** — `post_message` did not even accept it |
+| `comms_messages.files` | `migrations_incremental.py` | `post_message` accepted it, but `/comms/post` — an agent's ONLY write path — never forwarded it, and no skill emitted it |
+
+So every task reached the scheduler with `lane=NULL, files=NULL`, and `scheduler.py`'s
+`lane = task.get("lane") or task_id` fallback gave **every task its own lane**. That makes
+`LaneIsolation.max_concurrency = max(1, len(ready_lanes))` equal to *the number of ready
+tasks*: the swap would have started N agents at once, on one shared working tree, with the
+one-worker-per-lane rule vacuously satisfied and nothing checking footprints. Measured on a
+6-task DAG posted the way agents actually post: `SerialIsolation -> 1`, `LaneIsolation -> 6`.
+
+**`file_claims.py` does not cover this.** It is wired ONLY in `goal_executor.py`, at the
+**cross-FEATURE** level (whole feature A vs whole feature B, its own docstring: *"gates
+concurrent feature builds"*). `scheduler_loop` never calls it, so it says nothing about two
+TASKS inside one drain. The fan-out SPEC's audit table lists the file-collision guard as
+"built", which is true of the module and misleading about task-level parallelism.
+
+**What C.5 adds**, so that D can be the swap it was meant to be:
+
+- `post_message(..., lane=…)` and `POST /comms/post` forwarding **both** `lane` and `files`
+  (validated: `lane` a non-empty string, `files` a list of strings; omitting either stays
+  valid, so every existing caller is unaffected).
+- `fragments/task-dag-post.md` teaches the planner to declare them, with the rule that makes
+  them safe: **same files ⇒ same lane; disjoint files ⇒ different lanes**, and omitting them
+  is safe (undeclared ⇒ treated as touching everything ⇒ serial). The fragment is
+  `requires: goal_id`-gated, so it reaches the planner exactly when it seeds a DAG — and the
+  `planning/plan` golden snapshot, which composes without a goal_id, does not move.
+- `supervisor/lane_partition.py::audit_lane_partition(conn, board, scope, goal_id)` — checks
+  the disjoint-files-per-lane assumption instead of trusting it. Two distinct failures:
+  **undeclared** (a ready task with no `files` — the `file_claims` WILDCARD, overlaps
+  everything) and **conflicts** (two ready tasks in DIFFERENT lanes whose footprints overlap,
+  reusing `file_claims.overlaps` so directory containment counts). `safe` is the predicate
+  Phase D gates activation on. Audits the READY frontier only — a task still behind
+  `depends_on` cannot run concurrently, so counting it would report conflicts the DAG already
+  prevents. Read-only, never raises.
+
+Shipped inside the ratchet: `comms_messages.py` was frozen at 405, so the four goal-message
+field accessors moved to `db/queries/comms_goal_fields.py` (re-exported, no call site moved),
+taking it to 360 — out of `file_size_baseline.txt` entirely — which is what paid for the
+`lane` parameter.
+
+C.5 made Phase D's precondition *reachable*. Phase D (below) is what turns concurrency on.
+
+## fsm-fan-out Phase D — parallelism is ON, gated on the partition auditing safe
+
+`_resolve_isolation` no longer pins `SerialIsolation`. `isolation: lane` (the default) now
+returns **`lane_partition.AuditedLaneIsolation`** — real lane parallelism, granted only while
+the frontier's partition actually audits safe:
+
+| YAML | Phase C | Phase D |
+|---|---|---|
+| `isolation: lane` | SerialIsolation (pinned, logged) | `AuditedLaneIsolation` — parallel while `audit_lane_partition(...)["safe"]`, else 1 |
+| `isolation: serial` | SerialIsolation | SerialIsolation (obeyed literally) |
+| `isolation: worktree` | SerialIsolation | SerialIsolation + a warning (`WorktreeIsolation` is still a stub that raises) |
+| `max_workers: N` | ignored | honoured — `LaneIsolation(max_workers=N)` caps below the lane count |
+
+**The audit is re-run every scheduling round, not once at drain start.** `scheduler_loop` calls
+`max_concurrency` on every frontier poll, and the frontier GROWS as tasks complete and unblock
+dependents — so a task that becomes ready *later* can conflict with one already running. A
+single up-front check would be exactly the "verified once, assumed forever" guarantee this
+feature exists to stop relying on. The cost is one DB read per round, against rounds that block
+on agents running for minutes. Safe↔unsafe transitions are logged; the state is not re-logged
+every round.
+
+**Failure widens nothing.** An audit that raises returns 1 (fail CLOSED to serial), so a broken
+audit can never be the reason two agents write the same file.
+
+**On today's DAGs this drains serially, and that is the correct answer** — no planner declares
+footprints yet, so every frontier audits `undeclared` → unsafe → 1 worker. Phase D therefore
+cannot be worse than Phase C's behaviour; it becomes parallel exactly when a planner has
+declared lanes and footprints that hold up. The two Phase-C serial assertions did NOT have to
+flip: they declare no `files`, so they still pass — for a sounder reason than a hard pin.
+
+**No packaged flow opted in at Phase D** — it ships the ENGINE. Phase E added the first and
+only opt-in (`goal-loop`, which IS `executor: loop`). Adding `parallel_states` to any OTHER flow
+stays a separate, deliberate decision, because for `team-build` it is **not** merely a
+concurrency change. Its `REVIEWING` carries `on_board_count: {metric: ready, op: gt, next: BUILDING}`, so
+BUILDING today drains **one task per FSM cycle** with a REVIEWING pass between tasks. A
+`parallel_states: {BUILDING: …}` entry makes BUILDING drain the whole ready frontier in one
+stage and review ONCE after — a change to review cadence that lands even at serial isolation.
+
+It also changes **which skill runs the work**, which an earlier draft of this section
+understated. `fan_out._drain` never uses the stage's own `instructions`: the per-task prompts
+come from `scheduler.py::_worker`, which composes `development/execute-task`. So a parallel
+BUILDING bypasses its `agent_map` entry entirely — `team/build` does not run. Both effects
+together make the opt-in a product call, not a side effect to slip in with an engine change.
+
+To opt a flow in, once its planner declares lanes and footprints:
+
+```yaml
+parallel_states:
+  BUILDING:
+    isolation: lane
+    max_workers: 4
+```
+
+Pinned by `tests/runner_supervisor/test_fan_out.py`: declared-disjoint lanes DO overlap (the
+assertion Phase C could not make — mutation-checked: it fails if the swap is reverted),
+`max_workers` bounds the peak while still going parallel, a cross-lane conflict or a single
+undeclared task keeps the drain serial, `serial`/`worktree` are obeyed/degraded, and the
+re-audit-per-round property is proven with dependents that only conflict once they become ready.
+
+**Residual risk, still open:** `audit_lane_partition` only sees *declared* footprints — a task
+that writes outside its declared set stays invisible to it. Closing that needs
+`WorktreeIsolation`, still a stub.
+
+## fsm-fan-out — ONE drain (`supervisor/drain.py`)
+
+`fan_out._drain` and (at the time) `goal_executor._run_loop` each carried their own copy of the
+same scaffolding — make a cost tracker, wrap `spawn_fn`, OR `tracker.exceeded()` into an abort
+predicate, call `scheduler_loop`. They now share `drain.py::drain_frontier`, the single
+`scheduler_loop` call site:
+
+| Owned by `drain_frontier` (shared) | Left with the caller |
+|---|---|
+| the `CostCapTracker` and wrapping `spawn_fn` with it — **exactly once**, so cost cannot double-count | the isolation (a stage reads its flow YAML) |
+| folding `tracker.exceeded()` into `abort_check`, so no caller can forget the cap | the caller's own abort reason (the FSM's `_abort_flag`) |
+| the `scheduler_loop` call itself | the result shape the caller's consumer expects |
+
+Phase E then removed the second caller entirely (below), so `fan_out` is the only one left —
+pinned by an **AST**-based check in `tests/dag_goals/test_drain_shared.py` (a text search would
+match `drain.py`'s own ASCII diagram).
+
+## fsm-fan-out Phase E — `executor: loop` IS an FSM flow; the second engine is gone
+
+Phase E was specified as "`_run_loop` becomes a thin alias, then is deleted; `executor: loop`
+means run the flow whose BUILDING is parallel", with the note that "E only removes code, so the
+ratchet is satisfied by construction". Two of those three claims were wrong, and the shape of
+the fix follows from why:
+
+- **"the flow whose BUILDING is parallel" meant `team-build`, and that would have changed the
+  PRODUCT.** `executor: loop` is a flat drain — `development/execute-task` per task, no
+  REVIEWING/TESTING/RETRO between tasks. `executor: team` is the reviewed `team-build` pipeline.
+  Collapsing them hands a user who picked `loop` for speed a fully reviewed run instead.
+- **"only removes code" was wrong** — `_run_loop` owned real behaviour the FSM path did not
+  provide. That work is addition, not deletion, and is enumerated below.
+
+So `loop` got **its own flow** rather than someone else's: `core/flows/goal-loop.flow.yaml`, a
+single working state whose drain is the flat product, run by the ONE engine.
+
+```yaml
+states: [DRAINING, DONE]
+parallel_states:
+  DRAINING: {isolation: lane}     # -> AuditedLaneIsolation, via fan_out
+gates:
+  DRAINING->DONE:                 # the JOIN, once, after every worker finished
+    - {type: require_tasks_done, on_fail: INCOMPLETE_TASKS.md}
+    - {type: command_gate, command_key: build, on_fail: BUILD_FAILURES.md}
+    - {type: command_gate, command_key: test,  on_fail: TEST_FAILURES.md}
+```
+
+`goal_executor._run_loop` is now a delegation to `_run_team(flow="goal-loop")` — no
+`RunnerState` of its own, no `scheduler_loop` call, no cost tracker, no isolation choice.
+
+**What the goal run GAINS, all of it from the DB being the authority** — the same list the
+compiled-executor revert was argued on: a `fsm_state` row (so `pathly-status` and the
+`STATE.json` export see it), a `STATE_TRANSITION` audit trail, park/resume on a human
+checkpoint, the escalation ladder, and the two verify commands as ROUTED gates.
+`goal_verify.verify_clean_drain` ran those same two commands after a clean drain but could only
+post a board escalation and stop; a `command_gate` failure re-drives a fix through
+`feedback_routing`.
+
+**The flow NAME is load-bearing.** `run_history_read._classify_kind` returns `loop` for a
+bare-uuid run whose `adapter` column is the literal `"goal-loop"`, and `start_run` writes
+`state.flow` into that column — so the parent row still classifies as a loop PARENT and still
+windows its per-task `sched-*` rows into ONE run in `GET /runs`. `_flow_kind` also had to learn
+the name, or the run's storage would nest at `features/<f>/goal-loop/<slug>` instead of under
+`goals/`.
+
+### Two prerequisites the plan did not anticipate — Phase E is a silent no-op without them
+
+1. **`fan_out._drain` resolved the frontier from `state.topic`.** For a plain feature pipeline
+   topic IS the board scope, so this was invisible. A GOAL run's topic is its own storage slug
+   (`features/<feature>/goals/<slug>`) while its tasks live on the parent board at
+   `scope=<feature>`, and `get_ready_tasks` ANDs `scope IN (…)` with `goal_id` — **measured 0
+   ready tasks against 3 for the same goal.** Every goal run through a parallel flow would have
+   "drained" nothing and advanced. `_frontier_scope` now uses `terminal_identity._run_board_scope`
+   — the SAME derivation the spawn chokepoint stamps telemetry with — and degrades to the topic.
+   The join still agrees: `require_tasks_done` counts by `goal_id` when a run has one.
+2. **A DAG task's prompt was never placeholder-substituted.** `scheduler._worker` composed
+   `development/execute-task` via `compose_skill` and stopped there, so `completion-report`
+   reached the agent still saying to key its `AGENT_DONE` on the literal `<fsm_feature>` — the
+   same defect `board_run._inject_board_prompt_vars` fixed for board runs, never fixed here. It
+   was masked while the loop owned its telemetry (`_synthesize_agent_done_if_missing` wrote a
+   synthetic `AGENT_DONE` stamped `category="loop"`); inside an FSM stage that safety net is off.
+   The whole assembly moved to **`supervisor/task_prompt.py`**, which substitutes through the
+   same `_inject_prompt_vars` the other two paths use and stamps `run_category="loop"`.
+   `scheduler.py` 432 → 392, so it dropped out of `file_size_baseline.txt`.
+
+### What had to be preserved, and how
+
+| `_run_loop` owned | Under Phase E |
+|---|---|
+| `_record_run_history(flow="goal-loop")` — the loop PARENT row | `start_run` writes `state.flow` into the same column; the flow is NAMED `goal-loop`, so unchanged |
+| the cost-cap tracker | `drain_frontier` owns it for every drain |
+| goal-scoped storage resolution | `_run_team`'s `board_run_topic` + `_flow_kind` (now mapping `goal-loop` → `goals`) |
+| `verify_clean_drain` | the two `command_gate`s at `DRAINING->DONE` — routed, so a failure re-drives a fix |
+| per-task `task_claimed`/`task_done` COMMS_UPDATEs | `RunnerState._comms_broadcast_fn`, set from `start_run(event_broadcast_fn=…)` and read by `_drain`. `supervisor/` may not import `http_server/`, so the broadcaster is injected by the route that already holds it |
+| the `board_lock` lease `/comms/goals/stop` released | the run is an FSM run now, so stop goes through `abort_run` — see below |
+| `write_goal_root_span` (goal=trace, task=span) | **dropped.** A root span whose children are written by the FSM's own telemetry writer would be a childless trace root; `executor: team` has never had one either. Its own docstring calls this "no labelled root", not lost spans |
+
+**Stopping a goal run was broken for `team` and would have broken for `loop`.**
+`/comms/goals/stop`'s FSM branch looked the run up with `get_state(scope)`, but a goal's FSM run
+is registered under its board-nested topic — so the lookup returned `None` and the route reported
+`not_running` while the run kept going. Survivable while `loop`/`single` were stopped through the
+board lock; not once `loop` is an FSM run. `registry.find_active_run_for_goal(goal_id, fallback)`
+matches on the run's own `goal_id` — correct whatever flow it runs and whatever storage kind that
+flow maps to — and keeps the scope-keyed lookup as the fallback for a non-goal run.
+
+Pinned by `tests/dag_goals/test_loop_is_an_fsm_flow.py` and the converted golden-path suite
+(`tests/fsm_flows/test_golden_path.py`), which now drives the REAL `goal-loop` YAML through
+`fan_out.run_stage` with a goal-scoped state — mutation-checked: reverting `_frontier_scope` to
+`state.topic` fails all seven with an empty drain.
+
+**Still open, and deliberately:** no OTHER flow opts into `parallel_states` — for `team-build`
+that would change review cadence AND which skill runs the work (a fan-out state's per-task
+prompts come from `development/execute-task`, so `team/build` would not run), which is a product
+call, not an engine change. And `audit_lane_partition` still only sees *declared* footprints; a
+task writing outside its declared set stays invisible to it, which needs `WorktreeIsolation`
+(still a stub).
 
 ## Visible runner (supervisor/)
 
@@ -376,7 +1438,42 @@ On Windows, the argv is passed to PowerShell via `-EncodedCommand` (base64 UTF-1
 pathly-ff      # fast-forward current feature state one step
 pathly-back    # roll back current feature state one step
 pathly-status  # show all active features and their current FSM state
+pathly-log     # readable timeline of a feature's FSM events
 ```
+
+Discovery is `cli/_discovery.py`, which globs `STATE.json` off disk across all storage
+layouts, current and legacy. That is sufficient precisely BECAUSE every engine persists its
+state to `fsm_state` (and thence the `STATE.json` export) — a run that skipped the DB would
+be invisible here, which is one of the reasons the compiled executor was reverted.
+
+## `pathly-run` — the OTHER execution path (`runner/cli.py`, `runner/invoke.py`)
+
+`pathly-run <topic> --flow team --model … --project-root …` is a second, self-contained way
+to drive a flow, separate from the supervisor entirely. It calls `next_action`/`complete_stage`
+directly in a loop (`run_flow`/`resolve_stage` in `runner/cli.py`) and spawns each agent itself
+via `invoke_agent` (`runner/invoke.py`, a plain `subprocess.Popen`) — no `RunnerState`, no board,
+no goal DAG, no `TERMINAL_SPAWN`/`/runner/terminal/result`, none of the spawn-scheduler's
+dual-cap concurrency. It is also genuinely interactive, not headless: a human checkpoint or a
+`decide` response calls `input()` and blocks the terminal — this is a personal, desktop-less CLI
+for driving one flow by hand, not a background/CI runner.
+
+Bypassing `/runner/terminal/result` means bypassing the ONE chokepoint that bills every other
+spawn (`CLAUDE.md`'s "spawn gate" telemetry docs, root file) — `pathly-run` had **no cost source
+at all** until this fix: `invoke_agent`'s `Popen` call set no `env`, so the child inherited the
+parent shell's environment unchanged, and the interactive stop hook (the ONLY fallback billing
+path a non-gate-billed claude session has) could not find `PATHLY_PROJECT_ROOT` to know which
+feature to bill. Fixed by exporting it explicitly, matching what Studio already does for every
+interactive tab (`terminal.ts`) — `env={**os.environ, "PATHLY_PROJECT_ROOT": project_root}`. A
+`pathly-run` session now bills the same way any other interactive claude session does.
+
+**What this does NOT fix, and why it's left alone:** `pathly-run` remains a genuinely separate
+execution path from the supervisor — two ways to drive a flow that can drift independently, and
+`pathly-run` runs are invisible to the board/DAG/Monitor. Collapsing it onto the supervisor +
+`pty_host` (so `pathly-run` becomes a thin wrapper around `supervisor.start_run` with an embedded
+spawn host, or is retired in favor of `pathly-fsm-http` + `pathly-pty-host` directly) is real,
+valuable follow-up work — but it means rewriting a public, interactive CLI entry point's control
+flow, and doing it safely needs its own scoped review, not a same-pass bolt-on next to five other
+changes. Flagged here rather than attempted blind.
 
 ## Prompt dash-safety
 
@@ -409,6 +1506,39 @@ It is never subject to the PTY's 500-chunk rolling output buffer.
 If `summary` is absent (e.g. legacy agent), stdout `result` is used as a fallback.
 
 The runner→FSM result dict `_run_stage_via_terminal` returns also relays the agent's self-reported `outcome` (`success`/`failed`) + `error` from `AGENT_DONE`, so the loop executor's `_outcome_is_failure` (`supervisor/scheduler.py`) fails a task that exited cleanly but reported failure (silent-failure guard #2); a `_pty_return()` helper merges the CLI `exit_code` into the same returned dict for that check.
+
+## Per-stage git provenance — MEASURED, not self-reported (`runner/provenance.py`)
+
+`AGENT_DONE.summary` is written by the agent itself (the `completion-report` fragment runs
+agent-authored Python) — a self-report, same category `command_gate` closed a hole for on the
+correctness side. `runner/provenance.py` answers a different question with a SERVER-measured
+answer: at the moment `POST /runner/terminal/result` fires (the one per-spawn chokepoint every
+adapter's result passes through — see the billing docs above), what does `git` say actually
+changed in `project_root`? `record_stage_provenance` runs `git rev-parse HEAD` + `git diff --stat
+HEAD` + `git status --porcelain` there and appends a `STAGE_PROVENANCE` event
+(`{run_id, stage, head_sha, diff_stat, files_changed}`) — nothing the agent writes or omits can
+affect it.
+
+Two things make this correct rather than superficially similar to `scope_gate`'s git usage:
+
+- **Untracked files are included.** `git diff HEAD` alone only covers tracked paths — a brand new
+  file (the most common thing a builder does) never appears in it. `files_changed`/`diff_stat`
+  fold in `git status --porcelain`'s `??` lines too.
+- **The whole `pathly/` tree is exempt**, wider than `scope_gate`'s `pathly/features/`/
+  `pathly/plans/` prefix check. `pathly/` is entirely Pathly's own storage substrate (features/,
+  project/, board-artifacts/, lessons/, the legacy plans/ — never builder code), and on a brand
+  new project's very first feature git collapses an entirely-untracked tree to its SHALLOWEST
+  boundary (`?? pathly/`, not the deeper `?? pathly/features/<f>/`) — a narrower prefix check
+  would miss exactly the run it exists to exempt.
+
+Deliberately **cumulative, not per-stage-isolated**: with `pathly.auto_commit` off by default,
+changes routinely accumulate across several stages before a human commits, so "the full
+working-tree diff from the last commit, as of right now" is the honest unit — isolating one
+stage's exact incremental delta would need a per-stage baseline snapshot (`scope_gate`'s
+`build_baseline` captures one, but for a narrower purpose — stale scope-drift detection, not
+general provenance). Best-effort throughout: `capture_stage_provenance` returns `None` (never
+raises) outside a git repo or on any git failure, and `record_stage_provenance` never blocks or
+fails the result callback that calls it.
 
 ## Run identity — ISSUED at spawn (run-identity)
 
@@ -451,7 +1581,8 @@ both now land as columns instead of being re-derived. The pieces:
   `start_run`'s **early `running` row**) writes `state.flow` there — fixing (1) completed flows
   reclassifying to `single`/$0, and (2) `team`/consultation/feature/project runs (which call
   `start_run` directly, bypassing `/runner/start`) being invisible in `GET /runs` until they
-  finished. The goal **`loop`** executor is the same shape: `_run_loop` writes its own PARENT row
+  finished. The goal **`loop`** executor is the same shape, and since Phase E gets there the same
+  way: it runs the `goal-loop` FSM flow, so `start_run` writes the PARENT row
   (`adapter="goal-loop"` via `state.flow`) — the read-model classifies a `goal-loop` bare-uuid as
   a **loop parent** (`_is_parent`) that windows its per-task `sched-*` rows (folded out of
   `list_runs`, folded INTO its RunDetail as stages), so a loop shows as ONE run with real cost

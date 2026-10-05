@@ -37,23 +37,46 @@ def get_all_settings(conn: sqlite3.Connection) -> dict[str, str]:
     return {r["key"]: r["value"] for r in rows}
 
 
+def _board_scope_key(project_root: str, feature: str, role: str | None = None) -> str:
+    """The app_settings key holding a run's readable tiers — role-qualified when given.
+
+    A role gets its OWN key (mirroring _model_key) rather than rewriting the feature-level
+    one, which is what makes per-role allocation purely additive: every existing
+    `board_scope:<root>:<feature>` row keeps working untouched.
+    """
+    base = f"board_scope:{project_root}:{feature}"
+    return f"{base}:{role}" if role else base
+
+
 def get_board_scope(
     conn: sqlite3.Connection,
     project_root: str,
     feature: str,
+    role: str | None = None,
 ) -> dict[str, bool]:
-    """Return board_scope for a feature, defaulting to all-enabled when absent."""
-    key = f"board_scope:{project_root}:{feature}"
-    raw = get_setting(conn, key)
-    if raw is None:
-        return dict(_BOARD_SCOPE_DEFAULT)
-    try:
-        parsed = json.loads(raw)
-        result = dict(_BOARD_SCOPE_DEFAULT)
-        result.update({k: bool(v) for k, v in parsed.items() if k in result})
-        return result
-    except (json.JSONDecodeError, TypeError, AttributeError):
-        return dict(_BOARD_SCOPE_DEFAULT)
+    """Return board_scope for a feature, defaulting to all-enabled when absent.
+
+    ``role`` narrows the lookup to that agent's own allocation first: an architect needs
+    project/global context far more than a builder does, but keying the mix by feature alone
+    forced them to share one. Resolution: per-role row -> per-feature row -> all-enabled.
+    There is deliberately NO built-in per-role default — absent an explicit row the answer is
+    the per-feature one, so passing a role can never change what an existing run reads. A
+    malformed row falls through to the next key instead of being trusted.
+    """
+    keys = [_board_scope_key(project_root, feature, role)] if role else []
+    keys.append(_board_scope_key(project_root, feature))
+    for key in keys:
+        raw = get_setting(conn, key)
+        if raw is None:
+            continue
+        try:
+            parsed = json.loads(raw)
+            result = dict(_BOARD_SCOPE_DEFAULT)
+            result.update({k: bool(v) for k, v in parsed.items() if k in result})
+            return result
+        except (json.JSONDecodeError, TypeError, AttributeError):
+            continue
+    return dict(_BOARD_SCOPE_DEFAULT)
 
 
 def set_board_scope(
@@ -61,10 +84,12 @@ def set_board_scope(
     project_root: str,
     feature: str,
     scope_dict: dict[str, bool],
+    role: str | None = None,
 ) -> None:
-    """Persist board_scope for a feature as JSON in app_settings."""
-    key = f"board_scope:{project_root}:{feature}"
-    set_setting(conn, key, json.dumps(scope_dict))
+    """Persist board_scope for a feature — or for ONE role on that feature — as JSON."""
+    set_setting(
+        conn, _board_scope_key(project_root, feature, role), json.dumps(scope_dict)
+    )
 
 
 # Keep in sync with _PROJECT_WRITERS / _GLOBAL_WRITERS in

@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import logging
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify
+from ._helpers import read_json_body
 
 bp = Blueprint("comms_hydrate", __name__)
 
@@ -15,7 +16,7 @@ def comms_hydrate():
     that is currently empty — the fresh-clone story (P2). Body: {project_root}.
     """
     try:
-        data = request.get_json()
+        data = read_json_body()
         if not data:
             return jsonify({"error": "Missing JSON body"}), 400
 

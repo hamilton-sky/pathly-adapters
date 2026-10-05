@@ -10,7 +10,19 @@ from typing import Any, Callable, Optional
 logger = logging.getLogger("pathly.supervisor")
 
 VALID_STATUSES = frozenset(
-    {"idle", "running", "paused", "awaiting_decision", "aborted", "done", "error"}
+    {
+        "idle",
+        "running",
+        "paused",
+        "awaiting_decision",
+        "aborted",
+        "done",
+        "error",
+        # A run stopped on a headless human checkpoint (FSM `target_agent == "human"`).
+        # Distinct from "error": the flow itself is unharmed and resumable once a human
+        # resolves the escalation — see orchestrator_stage.py + api.resume_parked_run.
+        "parked",
+    }
 )
 
 MAX_FEEDBACK_ROUNDS = 3
@@ -118,6 +130,14 @@ class RunnerState:
 
     # Broadcast callback — stored so abort_run() can send SSE without a broadcast_fn arg
     _broadcast_fn: Optional[Callable] = field(default=None, repr=False, compare=False)
+    # The COMMS channel, distinct from _broadcast_fn's runner channel: a fan-out state's
+    # per-task task_claimed/task_done events are COMMS_UPDATEs the board listens for, and
+    # Studio toasts them. `executor: loop` used to hand this straight to scheduler_loop;
+    # now the FSM owns the drain, so the run has to carry it. supervisor/ may not import
+    # http_server/, so the broadcaster is injected by the route that already has it.
+    _comms_broadcast_fn: Optional[Callable] = field(
+        default=None, repr=False, compare=False
+    )
 
     # Kind string for error state
     error_kind: Optional[str] = None

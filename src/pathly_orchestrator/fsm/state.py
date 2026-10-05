@@ -43,6 +43,15 @@ _SCHEMA_PATH = (
 )
 _SCHEMA = json.loads(_SCHEMA_PATH.read_text(encoding="utf-8"))
 
+# GENERIC FALLBACK, not the state machine of any live flow. None of the 9 shipped
+# core/flows/*.flow.yaml carry this exact vocabulary (IDLE, DISCOVERING,
+# REVIEW_BLOCKED, ...) or these exact transitions — every real caller
+# (fsm_ops.py, fsm_ops_complete.py) always passes its own flow_config, which
+# eventlog.write_state/append_event validate against instead (via valid_states()/
+# flow_transitions()). STATES/VALID_STATES/TRANSITIONS exist ONLY as the
+# still-enforced legality check for a caller that omits flow — see
+# eventlog.write_state's `flow is None` branch and
+# tests/fsm_flows/test_orchestrator.py's write_state/append_event legality tests.
 STATES: dict[str, list[str]] = _SCHEMA["transitions"]
 VALID_STATES: frozenset[str] = frozenset(STATES.keys())
 TRANSITIONS: dict[str, list[str]] = STATES
@@ -66,7 +75,12 @@ _KNOWN_OPTIONAL_FLOW_KEYS = {
     "adapter_map",
     "composition",
     "feedback_priority",
+    "parallel_states",
 }
+# Isolation strategies a `parallel_states` entry may name, mapping 1:1 onto
+# supervisor/isolation.py's implementations. `worktree` validates but warns —
+# WorktreeIsolation is still a documented stub that raises NotImplementedError.
+_ISOLATION_VOCAB = {"lane", "serial", "worktree"}
 _ACTION_VOCAB = {
     "git_commit",
     "commit",
@@ -90,6 +104,73 @@ def valid_states(flow: dict) -> frozenset[str]:
 
 def flow_transitions(flow: dict) -> dict[str, frozenset[str]]:
     return {k: frozenset(v) for k, v in flow.get("transitions", {}).items()}
+
+
+def _validate_parallel_states(
+    flow: dict, errors: list[str], warnings: list[str]
+) -> None:
+    """Validate the optional ``parallel_states`` block (fsm-fan-out Phase B).
+
+    A state opts into fan-out — one FSM state executing its ready tasks and joining —
+    by naming itself here. Absent means today's exact behavior (one spawn per stage),
+    so every existing flow is unaffected::
+
+        parallel_states:
+          BUILDING:
+            max_workers: 4        # optional; default = the isolation's own answer
+            isolation: lane       # optional; lane | serial | worktree
+
+    Schema only. Nothing reads this yet — Phase C is what branches on it.
+    """
+    if "parallel_states" not in flow:
+        return
+    parallel_states = flow["parallel_states"]
+    if not isinstance(parallel_states, dict):
+        errors.append(
+            "parallel_states: value must be a dict mapping state names to their config"
+        )
+        return
+
+    declared_states = set(flow.get("states") or [])
+    for state_key, config in parallel_states.items():
+        if state_key not in declared_states:
+            errors.append(
+                f"parallel_states key '{state_key}' is not a declared state in 'states'"
+            )
+        # `BUILDING:` with no body parses as None — a legal "all defaults" entry.
+        if config is None:
+            continue
+        if not isinstance(config, dict):
+            errors.append(
+                f"parallel_states['{state_key}']: config must be a dict (or empty for defaults)"
+            )
+            continue
+
+        if "max_workers" in config:
+            max_workers = config["max_workers"]
+            # bool is a subclass of int — `max_workers: true` is a mistake, not a cap of 1.
+            if (
+                isinstance(max_workers, bool)
+                or not isinstance(max_workers, int)
+                or max_workers < 1
+            ):
+                errors.append(
+                    f"parallel_states['{state_key}'].max_workers must be a positive"
+                    f" integer (got {max_workers!r})"
+                )
+
+        if "isolation" in config:
+            isolation = config["isolation"]
+            if isolation not in _ISOLATION_VOCAB:
+                errors.append(
+                    f"parallel_states['{state_key}'].isolation: unknown strategy"
+                    f" {isolation!r} (known: {sorted(_ISOLATION_VOCAB)})"
+                )
+            elif isolation == "worktree":
+                warnings.append(
+                    f"Warning: parallel_states['{state_key}'].isolation is 'worktree' —"
+                    " WorktreeIsolation is still a stub (raises NotImplementedError)."
+                )
 
 
 def validate_flow_dict(flow: dict) -> tuple[list[str], list[str]]:
@@ -192,6 +273,8 @@ def validate_flow_dict(flow: dict) -> tuple[list[str], list[str]]:
                     errors.append(
                         f"composition['{state_key}']: unknown block name '{block_name}'"
                     )
+
+    _validate_parallel_states(flow, errors, warnings)
 
     # Addition 1 — Agent-contract validation (warning only; contracts may not ship with adapters)
     for agent in (flow.get("agent_map") or {}).values():

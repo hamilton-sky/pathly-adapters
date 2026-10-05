@@ -7,6 +7,7 @@ import logging
 from flask import Blueprint, jsonify, request
 
 from ...sse import _broadcast_comms, _broadcast_runner
+from ._helpers import read_json_body
 
 bp = Blueprint("comms_runs", __name__)
 
@@ -17,7 +18,7 @@ def comms_run():
     try:
         from pathly_orchestrator.supervisor.board_run import start_board_run
 
-        data = request.get_json()
+        data = read_json_body()
         if not data:
             return jsonify({"error": "Missing JSON body"}), 400
 
@@ -254,7 +255,7 @@ def comms_run_stop():
         from pathly_orchestrator.db.connection import get_db as _get_db
         from pathly_orchestrator.db.queries.comms import post_message as _post_message
 
-        data = request.get_json() or {}
+        data = read_json_body({})
         board = data.get("board", "feature")
         scope = data.get("scope")
         if not isinstance(scope, str) or not scope.strip():

@@ -53,6 +53,10 @@ core/
                   explore.flow.yaml      exploration flow
                   test.flow.yaml         test-only flow
                   quick-fix.flow.yaml    nano/lite fast path
+                  goal-loop.flow.yaml    the goal `loop` executor (fsm-fan-out Phase E): ONE
+                                         DRAINING state with `parallel_states`, so the FSM
+                                         drains the goal's task-DAG. Flat by design — no
+                                         REVIEWING/TESTING, unlike team-build
 
   design/       UI/UX design subsystem — powers `pathly-design` command:
                   data/   colors.csv, google-fonts.csv, styles.csv, typography.csv,
@@ -225,6 +229,17 @@ assembled = _strip_leading_frontmatter(skill body) + defaults fragments + per-sk
 A project ability overrides a global one with the same `<category>/<name>`; an ability's **id is that `<category>/<name>` path**; categories are `plan|build|review|test`. `src/pathly_orchestrator/skills/abilities.py` owns read/write/list + `ability_segments(ids, project_root)` → `compose_skill_segments(extra_segments=…)`, and is the single helper shared by `POST /skills/compose` and `supervisor/board_run._compose_skill_body`, so the gate preview and the actual spawn can never disagree. (System-prompts — `kind='preset'`, the dropdown alternatives — are now FILES too, mirroring abilities: `pathly/prompts/<category>/<name>.md` + `~/.pathly/prompts/`, categories `system|analyze|split|comment|diagram`, owned by `skills/prompt_files.py`; `prompt_library` keeps only the legacy `kind='ability'` rows + a one-time lazy DB→files migration on first list.)
 
 - `defaults` applies to every skill listed in the `skills:` map (currently `progress-logging`).
+- **Board retrieval is push-first with two pull affordances**, composed as a pair onto the five
+  skills that consume board context (`team/build`, `team/review`, `development/build`,
+  `development/review`, `debug/build`): `catalog-pull` reads an artifact section BY PATH, and
+  `board-search` re-queries the board BY QUESTION via `/comms/search`. The injected context is
+  one query the runner derives from the task description before the agent has read the task;
+  `board-search` is the agent's own second query when that guess falls short. Its reach is the
+  `<search_tiers>` prompt var — the SAME tier selection that decides what gets pushed
+  (`runner/board_scope.py`), rendered as ready-to-use `board`+`scope` pairs because the scope
+  is a different shape per tier and a mismatched pair returns `[]`, which reads to an agent
+  exactly like "nothing on the board". So search extends INSIDE the board-scope governance,
+  never around it: a tier the run does not read is a tier it may not search.
 - A skill **absent** from `skills:` is returned **raw and unchanged** — no fragments, no defaults. Skills are converted incrementally; not all are in the map yet. **Exception — board/flow runs:** the two runtime call sites (`start_board_run` → `_compose_skill_body`, and `fsm_compose.build_prompt`) pass `board_default=True`, so an *unrecognized* skill (a user-created `custom/*` skill from the Run modal) instead composes the **`board_defaults`** bundle (`progress-logging` + `comms-post`) — the "always compose through fragments" guarantee, so a custom skill still posts its artifacts/progress to the board. Build-time install (`stitch.py`, which pre-checks manifest membership) and editor previews (`/skills/preview`, `/skills/compose`) leave `board_default` False and keep the raw contract. Board *context* injection is separate and already fires for raw skills (run-level `board_context_for` / `retrieve_board_context`).
 - `no_defaults: true` on a skill entry opts it out of the global defaults entirely. Used on thirteen skills: the five pure-transform derivations (`development/summarize`, `development/summarize-gist`, `development/summarize-detailed`, `development/analyze`, `development/split`) plus eight task/board skills with no pipeline phases (`planning/create-feature`, `planning/post`, `development/drain-dag`, `development/execute-task`, `planning/feature-decompose`, `planning/project-decompose`, `planning/prd-import`, `planning/goalize`) — where `progress-logging` is dead weight in their prompt.
 - A fragment entry is a bare name (`feedback-protocol`) or a gated object (`{ name: spawn-rules, requires: can_spawn }`). Gated entries are dropped when the adapter's capability flag is false.

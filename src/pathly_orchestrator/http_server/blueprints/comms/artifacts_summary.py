@@ -15,9 +15,10 @@ import json
 import logging
 from typing import Any, TypeGuard
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify
 
 from ...sse import _broadcast_comms
+from ._helpers import read_json_body
 
 bp = Blueprint("comms_artifacts_summary", __name__)
 
@@ -62,7 +63,7 @@ def comms_artifact_set_summary(artifact_id: str):
             set_artifact_summary as _set_summary,
         )
 
-        data = request.get_json(silent=True) or {}
+        data = read_json_body({})
         summary = data.get("summary")
         if not isinstance(summary, str):
             return (
@@ -147,7 +148,7 @@ def comms_artifact_set_selection(artifact_id: str):
             set_artifact_summary_selection as _set_selection,
         )
 
-        data = request.get_json(silent=True) or {}
+        data = read_json_body({})
         selection = data.get("selection")
         if not _validate_selection(selection):
             return (
@@ -202,7 +203,7 @@ def comms_artifact_set_style(artifact_id: str):
             set_artifact_summary_style as _set_style,
         )
 
-        data = request.get_json(silent=True) or {}
+        data = read_json_body({})
         style = data.get("style")
         if style not in _VALID_STYLES:
             return (
@@ -252,7 +253,7 @@ def comms_artifact_set_note(artifact_id: str):
             set_artifact_summary_note as _set_note,
         )
 
-        data = request.get_json(silent=True) or {}
+        data = read_json_body({})
         note = data.get("note", "")
         if not isinstance(note, str):
             return jsonify({"ok": False, "error": "Field 'note' must be a string"}), 400

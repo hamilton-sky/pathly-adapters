@@ -5,8 +5,8 @@ from __future__ import annotations
 import logging
 
 from flask import Blueprint, jsonify, request
-
 from ...sse import _broadcast_comms, _broadcast_runner
+from ._helpers import read_json_body
 
 bp = Blueprint("comms_goals", __name__)
 
@@ -19,7 +19,7 @@ def comms_goals_run():
         from pathly_orchestrator.db.queries.comms import post_message as _post_message
         from pathly_orchestrator.supervisor.goal_run import start_goal_run
 
-        data = request.get_json()
+        data = read_json_body()
         if not data:
             return jsonify({"error": "Missing JSON body"}), 400
 
@@ -39,9 +39,8 @@ def comms_goals_run():
         project_root = data.get("project_root", "") or ""
         # "" (unset) lets start_board_run resolve the app-wide default from Settings.
         progress = data.get("progress", "") or ""
-        # A Sections-assembled prompt (abilities + system-prompts folded in) rides as
-        # prompt_override for the 'single' executor's one drain-dag prompt; loop/team are
-        # multi-spawn and ignore it. (ability_ids kept for back-compat; the client sends override.)
+        # A Sections-assembled prompt rides as prompt_override for the 'single' executor;
+        # loop/team ignore it (ability_ids kept for back-compat — client sends override).
         ability_ids = data.get("ability_ids")
         if not isinstance(ability_ids, list):
             ability_ids = []
@@ -50,13 +49,13 @@ def comms_goals_run():
         if not isinstance(prompt_override, str):
             prompt_override = ""
 
-        # Flow-gate-preview (P3): transient per-stage prompt overrides for the 'team'
-        # executor's FSM flow only — single/loop have no per-stage flow and use
-        # prompt_override instead.
+        # Flow-gate-preview (P3): per-stage prompt overrides for the 'team' executor's FSM
+        # flow only. Validated against flow_override (default "team-build") — a hardcoded
+        # "team-build" here silently dropped every key for a goal run on another flow.
         from ..runner._runner_bp import _validate_stage_overrides
 
         stage_overrides = _validate_stage_overrides(
-            data.get("stage_overrides"), "team-build", project_root
+            data.get("stage_overrides"), flow_override or "team-build", project_root
         )
 
         conn = _get_db()
@@ -102,16 +101,24 @@ def comms_goals_run():
                 if res.get("announced"):
                     return
                 err = str(res.get("error"))
-                low = err.lower()
-                if (
-                    res.get("status") == "aborted"
+                low, status = err.lower(), res.get("status")
+                if status == "parked":
+                    # A headless human checkpoint is resumable, not dead — rides the
+                    # non-error "stopped" phase (Studio has no dedicated "parked" one).
+                    _board_post(
+                        "goal run paused — awaiting human input (resume via "
+                        "/runner/resume-parked once resolved)",
+                        phase="stopped",
+                    )
+                elif (
+                    status == "aborted"
                     or "stop" in low
                     or "abort" in low
                     or "kill" in low
                 ):
                     _board_post("goal run stopped", phase="stopped")
-                    return
-                _board_post(f"goal run failed — {err[:300]}", phase="error")
+                else:
+                    _board_post(f"goal run failed — {err[:300]}", phase="error")
                 return
             summary = ""
             if isinstance(res, dict):
@@ -158,11 +165,8 @@ def comms_goals_run():
 
 @bp.route("/comms/goals/refs-coverage", methods=["GET"])
 def comms_goals_refs_coverage():
-    """Report per-goal context_refs coverage (tasks-with-refs / total) — CT3/T3c.
-
-    Makes the ISSUE-4 gap visible to a human before dispatch: a low coverage_pct means
-    many tasks have no curated refs and will fall back to unverified auto-derived context.
-    """
+    """Report per-goal context_refs coverage (tasks-with-refs / total) — CT3/T3c: a low
+    coverage_pct means many tasks fall back to unverified auto-derived context."""
     try:
         from pathly_orchestrator.db.connection import get_db as _get_db
         from pathly_orchestrator.db.queries.comms import goal_refs_coverage as _coverage
@@ -184,7 +188,7 @@ def comms_goals_stop():
         from pathly_orchestrator.db.connection import get_db as _get_db
         from pathly_orchestrator.db.queries.comms import post_message as _post_message
 
-        data = request.get_json() or {}
+        data = read_json_body({})
         goal_id = data.get("goal_id", "")
         if not isinstance(goal_id, str) or not goal_id.strip():
             return jsonify({"error": "Field 'goal_id' must be a non-empty string"}), 400
@@ -226,19 +230,16 @@ def comms_goals_stop():
             stopped = True
             how = "board_run"
         else:
-            from pathly_orchestrator.supervisor.registry import get_state
+            from pathly_orchestrator.supervisor import registry as _reg
 
-            st = get_state(scope)
-            if st is not None and st.status in (
-                "running",
-                "paused",
-                "awaiting_decision",
-            ):
+            # By GOAL, not by scope: a goal's FSM run is registered under its own
+            # board-nested topic (features/<f>/goals/<slug>), so a scope lookup misses it.
+            topic, st = _reg.find_active_run_for_goal(goal_id, scope)
+            if st is not None and st.status in _reg.ACTIVE_STATUSES:
                 from pathly_orchestrator.supervisor.api import abort_run
 
-                # announced=True: this route posts the "stopped" board message itself
-                # below, so the run's on_done must stay quiet (no double-announce).
-                abort_run(scope, announced=True)
+                # announced=True: this route posts "stopped" itself — no double-announce.
+                abort_run(topic, announced=True)
                 stopped = True
                 how = "fsm"
 
@@ -285,7 +286,7 @@ def comms_goals_decompose():
         from pathly_orchestrator.db.queries.comms import post_message as _post_message
         from pathly_orchestrator.supervisor.goal_run import start_goal_decompose
 
-        data = request.get_json()
+        data = read_json_body()
         if not data:
             return jsonify({"error": "Missing JSON body"}), 400
 
@@ -300,9 +301,8 @@ def comms_goals_decompose():
         project_root = data.get("project_root", "") or ""
         # "" (unset) lets start_board_run resolve the app-wide default from Settings.
         progress = data.get("progress", "") or ""
-        # Layer-3 abilities (compose after the planner skill's fragments) + a gate "use once"
-        # Sections trim. Both apply only to the single-agent decomposers (planner/plan); the
-        # consultation FSM flow has no single prompt to override, so it ignores them.
+        # Layer-3 abilities + a gate "use once" Sections trim — apply only to the
+        # single-agent decomposers (planner/plan); consultation has no single prompt.
         ability_ids = data.get("ability_ids")
         if not isinstance(ability_ids, list):
             ability_ids = []
@@ -358,15 +358,13 @@ def comms_goals_decompose():
 
         def _on_done(_run_id: str, res) -> None:
             if isinstance(res, dict) and res.get("error"):
-                # The ■ Stop route already posted "stopped" before aborting — stay quiet so
-                # the stop isn't announced twice.
+                # The ■ Stop route already posted "stopped" — stay quiet (no double-announce).
                 if res.get("announced"):
                     return
                 err = str(res.get("error"))
                 low = err.lower()
-                # A user stop (killed runner tab → abort) clears the pill as "stopped", not
-                # "failed" — only a genuine crash is a failure. Either way we MUST post a
-                # phase, or the board's "Decomposing…" timer pill ticks forever.
+                # A killed run clears the pill as "stopped", not "failed"; either way we
+                # MUST post a phase, or the "Decomposing…" timer pill ticks forever.
                 if (
                     res.get("status") == "aborted"
                     or "stop" in low

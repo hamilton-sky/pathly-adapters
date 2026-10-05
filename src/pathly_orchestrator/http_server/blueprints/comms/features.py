@@ -5,9 +5,10 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify
 
 from ...sse import _broadcast_comms, _broadcast_runner
+from ._helpers import read_json_body
 
 bp = Blueprint("comms_features", __name__)
 
@@ -25,7 +26,7 @@ def comms_features_decompose():
            "consultation" → feature-consultation FSM flow
     """
     try:
-        data = request.get_json()
+        data = read_json_body()
         if not data:
             return jsonify({"error": "Missing JSON body"}), 400
 

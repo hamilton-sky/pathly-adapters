@@ -7,30 +7,30 @@ import logging
 from flask import Blueprint, jsonify, request
 
 from ...sse import _broadcast_comms, _broadcast_runner
-from ._helpers import norm_project_root
+from ._helpers import norm_project_root, read_json_body
 
 bp = Blueprint("comms_settings", __name__)
 
 
 @bp.route("/comms/scope", methods=["GET"])
 def comms_scope_get():
-    """Return the board_scope for a feature."""
+    """Return the board_scope for a feature — or for one agent ROLE on that feature."""
     try:
         from pathly_orchestrator.db.connection import get_db as _get_db
-        from pathly_orchestrator.db.queries.app_settings import (
-            get_board_scope as _get_scope,
-        )
+        from pathly_orchestrator.db.queries import app_settings as _settings
 
         feature = request.args.get("feature", "").strip()
         project_root = request.args.get("project_root", "").strip()
+        # Optional `role` → that agent's own allocation, else the feature-level row.
+        role = request.args.get("role", "").strip()
         if not feature:
             return jsonify({"error": "Query parameter 'feature' is required"}), 400
         if not project_root:
             return jsonify({"error": "Query parameter 'project_root' is required"}), 400
 
         conn = _get_db()
-        scope = _get_scope(
-            conn, project_root=norm_project_root(project_root), feature=feature
+        scope = _settings.get_board_scope(
+            conn, norm_project_root(project_root), feature, role=role or None
         )
         return jsonify(scope), 200
     except Exception as exc:
@@ -40,21 +40,19 @@ def comms_scope_get():
 
 @bp.route("/comms/scope", methods=["POST"])
 def comms_scope_set():
-    """Persist the board_scope for a feature."""
+    """Persist the board_scope for a feature — or, with `role`, for that role alone."""
     try:
         from pathly_orchestrator.db.connection import get_db as _get_db
-        from pathly_orchestrator.db.queries.app_settings import (
-            get_board_scope as _get_scope,
-            set_board_scope as _set_scope,
-        )
+        from pathly_orchestrator.db.queries import app_settings as _settings
 
-        data = request.get_json()
+        data = read_json_body()
         if not data:
             return jsonify({"error": "Missing JSON body"}), 400
 
         feature = data.get("feature", "")
         project_root = data.get("project_root", "")
         scope = data.get("scope")
+        role = data.get("role").strip() if isinstance(data.get("role"), str) else ""
         if not isinstance(feature, str) or not feature.strip():
             return jsonify({"error": "Field 'feature' must be a non-empty string"}), 400
         if not isinstance(project_root, str) or not project_root.strip():
@@ -79,9 +77,11 @@ def comms_scope_set():
 
         conn = _get_db()
         norm_root = norm_project_root(project_root)
-        merged = _get_scope(conn, project_root=norm_root, feature=feature)
+        # A per-role POST seeds from that role's EFFECTIVE scope (its own row, else the
+        # feature-level one), so a partial update stays partial instead of resetting tiers.
+        merged = _settings.get_board_scope(conn, norm_root, feature, role=role or None)
         merged.update(updates)
-        _set_scope(conn, project_root=norm_root, feature=feature, scope_dict=merged)
+        _settings.set_board_scope(conn, norm_root, feature, merged, role=role or None)
         return jsonify(merged), 200
     except Exception as exc:
         logging.exception("comms_scope_set error")
@@ -135,7 +135,7 @@ def comms_set_default_selection():
             set_default_summary_selection,
         )
 
-        data = request.get_json(silent=True) or {}
+        data = read_json_body({})
         selection = data.get("selection")
         if not isinstance(selection, dict):
             return jsonify({"error": "Field 'selection' must be an object"}), 400
@@ -176,7 +176,7 @@ def comms_set_default_style():
             set_default_summary_style,
         )
 
-        data = request.get_json(silent=True) or {}
+        data = read_json_body({})
         style = data.get("style")
         if not isinstance(style, str):
             return jsonify({"error": "Field 'style' must be a string"}), 400
@@ -217,7 +217,7 @@ def comms_set_default_progress():
             set_default_progress,
         )
 
-        data = request.get_json(silent=True) or {}
+        data = read_json_body({})
         progress = data.get("progress")
         if not isinstance(progress, str):
             return jsonify({"error": "Field 'progress' must be a string"}), 400
@@ -265,7 +265,7 @@ def comms_set_model_policy():
             set_agent_model,
         )
 
-        data = request.get_json(silent=True) or {}
+        data = read_json_body({})
         role = data.get("role")
         if data.get("clear") is True:
             clear_agent_model(_get_db(), role)
@@ -320,7 +320,7 @@ def comms_set_logging_config():
             set_logging_board_enabled,
         )
 
-        data = request.get_json(silent=True) or {}
+        data = read_json_body({})
         board = data.get("board")
         if not isinstance(board, bool):
             return jsonify({"error": "Field 'board' must be a boolean"}), 400
@@ -343,7 +343,7 @@ def comms_agent_context():
         )
         from pathly_orchestrator.supervisor.board_run import _format_board_info
 
-        data = request.get_json()
+        data = read_json_body()
         if not data:
             return jsonify({"error": "Missing JSON body"}), 400
 
@@ -392,7 +392,7 @@ def comms_consolidate():
             post_message as _post_message,
         )
 
-        data = request.get_json() or {}
+        data = read_json_body({})
         scope = data.get("scope")
         board = data.get("board", "feature")
         if not isinstance(scope, str) or not scope.strip():
