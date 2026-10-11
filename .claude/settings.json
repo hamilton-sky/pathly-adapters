@@ -1,0 +1,5 @@
+{
+  "env": {
+    "FLOW_DIR": "pathly/features"
+  }
+}
