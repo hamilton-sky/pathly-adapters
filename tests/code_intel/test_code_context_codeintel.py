@@ -50,7 +50,12 @@ def test_falls_back_to_cli_when_daemon_unreachable():
 
 
 def test_null_answer_passes_reason_through():
-    null = {**_ENVELOPE, "result": None, "reason": "project-not-indexed", "hint": "run codeintel index"}
+    null = {
+        **_ENVELOPE,
+        "result": None,
+        "reason": "project-not-indexed",
+        "hint": "run codeintel index",
+    }
     block, meta = ci.CodeintelProvider(http=lambda u, b, t: null).query("callers", "x")
     assert block == ""
     assert meta["reason"] == "project-not-indexed"
@@ -58,9 +63,9 @@ def test_null_answer_passes_reason_through():
 
 
 def test_nothing_reachable_is_backend_unavailable():
-    block, meta = ci.CodeintelProvider(http=lambda u, b, t: None, cli=lambda b: None).query(
-        "callers", "x"
-    )
+    block, meta = ci.CodeintelProvider(
+        http=lambda u, b, t: None, cli=lambda b: None
+    ).query("callers", "x")
     assert block == "" and meta["reason"] == "backend-unavailable"
 
 
@@ -81,14 +86,18 @@ def test_budget_truncates():
 
 def test_auto_prefers_codeintel_when_installed(monkeypatch):
     have = {"codeintel", "codebase-memory-mcp", "uvx"}
-    monkeypatch.setattr(cc.shutil, "which", lambda n: "/usr/bin/x" if n in have else None)
+    monkeypatch.setattr(
+        cc.shutil, "which", lambda n: "/usr/bin/x" if n in have else None
+    )
     assert cc._auto_backend() == "codeintel"
     assert cc.get_provider("codeintel").name == "codeintel"
 
 
 def test_explicit_codeintel_setting_is_honoured(monkeypatch):
     monkeypatch.setattr(
-        cc, "_get_setting", lambda k, d: "codeintel" if k == "code_context.backend" else d
+        cc,
+        "_get_setting",
+        lambda k, d: "codeintel" if k == "code_context.backend" else d,
     )
     assert cc._resolve_backend() == "codeintel"
 
@@ -115,8 +124,13 @@ def test_proxy_forwards_op_and_engine_to_codeintel(client, monkeypatch):
     for _ in range(2):  # no gateway cache: both requests reach codeintel
         r = client.post(
             "/code/query",
-            json={"op": "search", "target": "auth middleware", "role": "builder",
-                  "engine": "semantic", "scope": "(interactive)"},
+            json={
+                "op": "search",
+                "target": "auth middleware",
+                "role": "builder",
+                "engine": "semantic",
+                "scope": "(interactive)",
+            },
         )
         body = r.get_json()
         assert r.status_code == 200 and body["backend"] == "codeintel"
@@ -127,12 +141,19 @@ def test_proxy_forwards_op_and_engine_to_codeintel(client, monkeypatch):
 def test_proxy_engine_cli_still_reaches_legacy_backend(client, monkeypatch):
     monkeypatch.setattr(cc, "_resolve_backend", lambda: "codeintel")
     monkeypatch.setattr(
-        ci.CodeintelProvider, "query", lambda *a, **k: pytest.fail("codeintel must not run")
+        ci.CodeintelProvider,
+        "query",
+        lambda *a, **k: pytest.fail("codeintel must not run"),
     )
     monkeypatch.setattr(cc, "build_block", lambda *a, **k: "")
     r = client.post(
         "/code/query",
-        json={"op": "callers", "target": "a.py", "role": "builder", "engine": "cli",
-              "scope": "(interactive)"},
+        json={
+            "op": "callers",
+            "target": "a.py",
+            "role": "builder",
+            "engine": "cli",
+            "scope": "(interactive)",
+        },
     )
     assert r.get_json()["backend"] == "cli"
