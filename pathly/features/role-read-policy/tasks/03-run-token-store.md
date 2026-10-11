@@ -1,7 +1,7 @@
 # Add the run_tokens table and the queries to mint, resolve and revoke a run token
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: —
 Test first: yes
 
@@ -49,3 +49,17 @@ exit 0
   follow for an additive table and its queries)
 
 ## Answer
+
+**Built**: `src/pathly_orchestrator/db/migrations_provenance.py` (`add_run_tokens`), one call line added at the end of `db/migrations_incremental.py::_add_additive_migrations`, `src/pathly_orchestrator/db/queries/run_tokens.py` (`mint_run_token`, `resolve_run_token`, `revoke_run_tokens`), `tests/db/test_run_tokens.py` (committed first, failing on ImportError), regenerated `tests/INDEX.md` and `tests/db/INDEX.md`.
+
+**Proof**:
+- `python -m pytest tests/db/test_run_tokens.py -q -p no:cacheprovider` -> 5 passed (mint resolves to run/role/feature/board/scope; no stored column equals the raw token; revoked -> None; unknown, empty, None -> None; migration twice harmless).
+- `git diff --stat -- src/pathly_orchestrator/db/migrations.py` -> empty.
+- `python scripts/check_file_size.py` -> exit 0.
+- Commands.md Test (comms_board, db, runner_supervisor, http_api) -> 907 passed, 2 skipped. Lint pieces all pass (black, file size, mirror reads, test index, lint-imports).
+
+**Decisions**: `resolve_run_token` returns a plain dict of all columns (includes `token_hash`, `created_at`, `revoked_at`); `revoke_run_tokens` only counts still-live tokens, so a second call returns 0. Tokens are hashed with sha256 hexdigest.
+
+**Shortcuts taken**: none.
+
+**For later tickets**: import `mint_run_token`/`resolve_run_token`/`revoke_run_tokens` from `pathly_orchestrator.db.queries.run_tokens`. The revoke is not yet called anywhere; ticket 04 or 06 decides when a run's tokens are revoked.

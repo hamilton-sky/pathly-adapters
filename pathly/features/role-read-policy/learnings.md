@@ -13,3 +13,4 @@ ticket number. Never edit or delete another line. Keep it short; a human prunes 
 - (plan) The Pathly server, if it runs during a build, writes `STATE.json`/`BOARD.json` exports under `pathly/features/`. Do not commit them as part of a ticket; the floor guard counts any change under the plans folder outside your own ticket, `map.md` and `learnings.md`.
 - (01) `runner/read_policy.py` is stdlib-only; `policy_predicate` uses unqualified column names (`type`, `author_*`). `black --check src/ tests/` already fails on 4 code_context/code-query files before any ticket; not ours.
 - (02) `resolve_read_policy` takes an optional `project_root` (settings keys embed it); `read_policy.py` now has a relative import of `db.queries.app_settings`, so it is no longer stdlib-only.
+- (03) `tests/conftest.py` autouse fixture gives each test a fresh tmp DB, so `get_db()` in a db test already has every migrated table; no setup needed.

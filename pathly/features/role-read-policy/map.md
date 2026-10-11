@@ -60,3 +60,4 @@ while `row_allowed` agrees. Ticket 10 runs it.
 - Should a revoked or unknown token be refused on write (`401`), or stored as `author_source=none`?
   Planned default: stored as `none` and logged, so a run that outlives its token does not lose a
   post. Ticket 09.
+- 03 — `db/queries/run_tokens.py`: `mint_run_token` (token_urlsafe(32), only sha256 stored), `resolve_run_token` (dict or None if unknown/empty/revoked), `revoke_run_tokens(run_id)`; table created by `db/migrations_provenance.py::add_run_tokens`, called from `_add_additive_migrations`.
