@@ -159,7 +159,7 @@ def _log_request():
         if _cors_origin:
             resp.headers["Access-Control-Allow-Origin"] = _cors_origin
             resp.headers["Access-Control-Allow-Headers"] = (
-                "Content-Type, X-Pathly-Secret"
+                "Content-Type, X-Pathly-Secret, X-Pathly-Run-Token"
             )
             resp.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
         return resp
@@ -210,7 +210,7 @@ def _log_response(response):
     if _cors_origin:
         response.headers["Access-Control-Allow-Origin"] = _cors_origin
         response.headers["Access-Control-Allow-Headers"] = (
-            "Content-Type, X-Pathly-Secret"
+            "Content-Type, X-Pathly-Secret, X-Pathly-Run-Token"
         )
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
     return response
