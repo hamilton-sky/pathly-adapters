@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### Code intelligence — `codeintel` backend for `/code/query`
+
+- New `code_context.backend` value `codeintel`: `/code/query` hands the requested op to the
+  installed codeintel package (`pip install codecortex`) and returns its real answer —
+  caller/callee/impact rows marked `resolved` vs `name-matched`, LSP symbol lookups and
+  semantic `search` — instead of the per-file symbol-count block the `cli`/`lsp` backends
+  return for every op. Pathly calls a running `codeintel serve-http`
+  (`code_context.codeintel_url`, default `http://127.0.0.1:8766`), else one-shot
+  `codeintel query --json`; codeintel's `reason`/`hint` pass through.
+- `auto` now prefers codeintel when it is on PATH; machines without it behave as before.
+- New ops `callees` and `search`; `engine` is forwarded to codeintel
+  (`graph|lsp|semantic|both|all`), and `engine: cli` still reaches the legacy graph.
+- Prompt injection (`build_block`) still uses the `cli` file-structure block.
+
 ### FSM — fan-out foundation: one engine, one authority (Phases A/B/C)
 
 Moves the DAG fan-out machinery INSIDE the FSM, so `scheduler_loop` stops being a rival
