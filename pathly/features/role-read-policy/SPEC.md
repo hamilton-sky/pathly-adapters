@@ -61,11 +61,29 @@ stage exists to break.
 - Changing write permissions or promotion (already server-enforced).
 - Verifying the *truth* of feature-tier posts (an "unverified discovery" state is a follow-up).
 - Filesystem/Git isolation between stages (ASSESSMENT §0 — a separate, larger problem).
-- Restricting the human / Studio UI: un-attributed UI reads stay unrestricted.
+- Restricting the human / Studio UI: reads carrying the UI token stay unrestricted (C4).
 
 ---
 
 ## C. Design
+
+### C0. Threat model — what the wall can and cannot stop
+
+The risk this spec targets is **anchoring**: a cooperative reviewer that reads the builder's
+narrative and stops looking. It is not a hostile agent working to defeat the wall, and no
+HTTP-level control could stop one. Headless agents run with shell and filesystem access
+(`--dangerously-skip-permissions`, `cwd=project_root`), so an agent that wants the builder's posts
+can read `~/.pathly/pathly.db` with `sqlite3`, or the `BOARD.json` exports on disk, without
+touching `/comms/*`.
+
+So the design goals are:
+- every path an agent uses **by default** (the injected context and the fragment `curl`s) shows
+  only what its role may see, and no path it is told about can be unlocked by dropping or
+  changing a request field;
+- going around the wall is **visible**: unauthenticated agent-style calls are counted (C5).
+
+Making a reviewer unable, rather than unlikely, to see the builder's posts would need process
+isolation (no DB or board-export access from the agent sandbox). That is out of scope; see §F.
 
 ### C1. Policy shape
 
@@ -88,13 +106,14 @@ so existing rows keep reading exactly what they read now.
   straight into `from_agent` (`messages_write.py:56`), and feature-board writes accept any value
   (`_helpers.py:127`), so a builder could label a discovery `explorer` and walk it through the
   wall. The policy keys on a new `author_role` column, stamped **by the server at write time**
-  from the post's `run_id` → spawn record (C4), never from the body. Rules:
-  - post with a resolvable `run_id` → `author_role` = that run's role, whatever `from` says;
+  from the caller's run token (C4), never from the body: a `run_id` in the body is as
+  self-reported as `from`. Rules:
+  - post with a valid run token → `author_role` = that run's role, whatever `from` says;
   - server-internal writers (`supervisor`, `system`, e.g. `goal_verify.py:106`,
     `task_retry.py:176`) → stamped as `system` by the code path, not by a body field;
-  - no `run_id` → `author_role = NULL` ("unverified"). For a role with `exclude_authors` set, an
+  - no run token → `author_role = NULL` ("unverified"). For a role with `exclude_authors` set, an
     unverified row of an excluded type is **withheld** (fail closed), and counted as
-    `unverified` in C7, so the wall cannot be bypassed by dropping `run_id`. Human posts from
+    `unverified` in C7, so the wall cannot be bypassed by dropping the token. Human posts from
     the UI are not affected: humans post `decision`/`constraint`/goals, which are never withheld.
 - **Never withheld, whatever the policy:** governance (pending decisions, active escalations),
   `decision`, `constraint`, `goal`/`task` rows, and the run's own posts. Governance is injected
@@ -145,17 +164,26 @@ hand-copied filters drift.
 
 The pull routes cannot apply a role policy without knowing the caller's role.
 
-- Add optional `run_id` to the `/comms/search` body and `GET /comms` query, and update the
-  `board-search` (and `board-init`) fragment to pass `<run_id>`, the same variable `comms-post`
-  already passes when posting (`messages_write.py:131`).
-- The server resolves `run_id → (role, feature, project_root, board, scope)` from a **spawn-time
-  record**, never from the request body. A body-supplied `role` is ignored for policy purposes —
-  otherwise a reviewer could ask as `human`.
+- **Callers are identified by a spawn-issued token, not by a request field.** At spawn the
+  supervisor mints a random per-run token and records `token → run_id → (role, feature,
+  project_root, board, scope)`. The spawn host puts it in the agent's environment as
+  `PATHLY_RUN_TOKEN`, next to `PATHLY_GATE_BILLED`, which `studio/src/main/ipc/terminal.ts:179`
+  already sets for runner tabs (and the same in `pathly-pty-host`). The `board-search`,
+  `board-init` and `comms-post` fragments send it as a header (`X-Pathly-Run-Token`). A
+  `run_id` or `role` in the body is ignored for policy purposes, so a reviewer cannot ask as
+  `human` or as another run. The same token stamps `author_role` on writes (C1).
+- **The UI is identified through its own channel too.** Studio's main process receives a UI
+  token from the server at startup and sends it on its own `/comms/*` calls. The build has to
+  pick the hand-off (the server writes the token to a file only the Studio user can read, or
+  returns it on the existing startup handshake if there is one).
+- **No token at all = anonymous, not unrestricted.** In `enforce`, a request with neither token
+  gets the `anonymous` policy, which defaults to the **union of the built-in walls** (C2). Dropping
+  the header therefore never shows more than the strictest role sees. Scripts and interactive
+  `/pathly` CLI use that need everything can be given a token explicitly.
 - **Open item:** `agent_invocations.agent_role` (`db/migrations.py:77`) is a projection of
   `AGENT_DONE`, so it is written *after* the run, too late for mid-run reads. The build must find
   or add a record written at spawn (the supervisor knows role + scope when it composes the prompt;
   `supervisor/task_prompt.py`, `supervisor/board_run.py:342`).
-- A request **without** `run_id` is treated as the UI/human and stays unrestricted.
 
 ### C5. Enforcement modes (rollout safety)
 
@@ -165,8 +193,8 @@ The pull routes cannot apply a role policy without knowing the caller's role.
   withheld (and any cross-pair read, C6). Ships first, so real runs show the impact before
   anything is hidden.
 - `enforce`: withhold.
-- The "no `run_id` = unrestricted" loophole is closed only by `enforce` + a per-run token
-  (C4 follow-up). In `warn` it is just measured: how many agent calls arrive without a `run_id`.
+- In both modes, requests without a valid token are counted and logged with their caller
+  details, so going around the wall shows up in the run record instead of passing silently.
 
 ### C6. `(board, scope)` pair binding (ISSUE-1, read side)
 
@@ -179,9 +207,16 @@ The pull routes cannot apply a role policy without knowing the caller's role.
   (`GET /comms?feature=<f>&scope=<f>&type=goal`) and posts one only if none exists. Binding that
   read to the run's own pair would make every lookup come back empty in `enforce`, and the
   fragment would post a duplicate root goal per feature. So reads restricted to structural rows
-  (`type ∈ {goal, task}`) on **feature boards of the same `project_root`** are always allowed;
-  they carry no agent reasoning, and `goal`/`task` rows are never withheld anyway (C1).
-  Anything else on a foreign pair is refused.
+  (`type ∈ {goal, task}`) on **any feature board** are always allowed. They carry no agent
+  reasoning, and `goal`/`task` rows are never withheld anyway (C1). Anything else on a foreign
+  pair is refused.
+- **Why not "feature boards of the same project".** That would need ownership data the board
+  does not have: `comms_messages` is keyed by `(board, scope)` with no `project_root` column
+  (`db/migrations.py:287`), the DB is global (`~/.pathly/pathly.db`), and `board-init` runs its
+  lookup *before* the new feature has any row from which a project could be inferred. Feature
+  boards are therefore not project-qualified today: two projects with a feature of the same name
+  already share one board for every read and write. That is a pre-existing identity problem, not
+  one this spec introduces or can fix with a read rule; see §F, question 5.
 - A refusal is an **HTTP error** (`403` + `reason`), never `200 []`. Fragments that branch on
   "nothing found" (as `board-init` does) must be able to tell "refused" from "empty", or they act
   on a false negative.
@@ -202,14 +237,16 @@ The pull routes cannot apply a role policy without knowing the caller's role.
 | # | Phase | Priority | Risk | Done when |
 |---|---|---|---|---|
 | P1 | Policy shape + `policy_predicate` / `row_allowed` + built-in defaults, unit-tested | P0 | Low | tests cover every rule in C1/C2, incl. governance never withheld; predicate and `row_allowed` agree on every case |
-| P2 | Server-stamped `author_role` on every write (from `run_id`; `system` for internal writers; NULL = unverified) | P0 | Med | a post with `from: explorer` under a builder `run_id` is stored as `author_role=builder` |
+| P2 | Server-stamped `author_role` on every write (from the run token; `system` for internal writers; NULL = unverified). Needs P3's token, so build P3's token half first | P0 | Med | a post with `from: explorer` under a builder token is stored as `author_role=builder`; a body `run_id` changes nothing |
 | P2b | Wire the predicate into the push path (semantic + recency) in `warn`, before `k` | P0 | Low | context record shows withheld counts; prompt unchanged in `warn` |
-| P3 | Spawn-time run record + `run_id` on `/comms/search` and `GET /comms`; fragments pass it | P0 | Med | a search with a reviewer `run_id` returns the policy-filtered set; body `role` ignored |
+| P3 | Spawn-issued run token (env → header) + UI token + `anonymous` policy on `/comms/search` and `GET /comms`; fragments send the token | P0 | Med | a reviewer-token search returns the filtered set; body `run_id`/`role` ignored; the same call with no token returns no more than the strictest wall |
 | P4 | `(board, scope)` pair binding on pull routes + required-pair query helper | P1 | Med | cross-feature content pull → `403` + reason in `enforce`; `board-init` goal lookup on a new feature still works; invariant test over all comms reads |
 | P5 | Preview + Studio visibility of withheld rows | P1 | Low | preview for `role=reviewer` shows what is hidden and why |
 | P6 | Flip default to `enforce` after a `warn` soak on real runs | P1 | Med | soak data reviewed; no review stage starved of needed context |
 
-P1–P3 are the minimum that makes "independent reviewer" true. P4 closes the cross-feature leak.
+P1–P3 are the minimum that makes the wall hold on every default path and for every request an
+agent can shape (C0); none of them stops an agent that reads the DB file directly. P4 closes
+the cross-feature leak.
 
 ---
 
@@ -219,8 +256,9 @@ P1–P3 are the minimum that makes "independent reviewer" true. P4 closes the cr
   governance and `decision`/`constraint` always kept, own-run posts kept, unknown role → no
   filter, unverified author of an excluded type withheld; the SQL predicate and `row_allowed`
   agree on every case.
-- Author stamping: `from: "explorer"` posted under a builder `run_id` is stored and filtered as
-  `builder`; a post with no `run_id` is `author_role = NULL`.
+- Author stamping: `from: "explorer"` posted under a builder token is stored and filtered as
+  `builder`; a body `run_id` naming the explorer's run changes nothing; a post with no token is
+  `author_role = NULL`.
 - Truncation: five top-ranked builder discoveries + one architect discovery, reviewer search
   with `k=5` → returns the architect row (the filter runs before `k`); same on the push path.
 - Resolution: per-role row beats built-in default; explicit row with no `exclude_*` keys reads
@@ -228,8 +266,9 @@ P1–P3 are the minimum that makes "independent reviewer" true. P4 closes the cr
 - Push path: reviewer context for a board seeded with builder `discovery` + architect `discovery`
   + a pending decision → only the latter two appear (in `enforce`); all three in `warn` with a
   withheld count of 1.
-- Pull path: same seed via `/comms/search` with a reviewer `run_id`; body `role: "human"` does
-  not lift the filter; no `run_id` → unrestricted.
+- Pull path: same seed via `/comms/search` with a reviewer token; body `role: "human"` or another
+  run's `run_id` does not lift the filter; no token → `anonymous` policy (in `enforce`, no more
+  than the strictest wall), and the call is counted; a UI-token call is unrestricted.
 - Pair binding: a feature-A run searching `board=feature, scope=B` → `403` + reason in
   `enforce`; counted in `warn`. A `board-init` lookup `GET /comms?scope=<new>&type=goal` from
   the same run is allowed, and no duplicate root goal is posted.
@@ -251,5 +290,10 @@ Tests go in the matching `tests/` domain folder with unique basenames; rerun
    entirely. Out of scope here; worth a note in the `spawn-rules` fragment.
 3. **The working tree.** A reviewer still reads the builder's files and commit messages. The wall
    covers the board only; the diff is meant to be visible, the commit message arguably not.
-4. **Per-run token.** Is a spawn-issued token (C5) worth it for a local, single-user engine, or is
-   `run_id` + `warn` metrics enough until Pathly is multi-user?
+4. **Process isolation.** C0 leaves direct DB and `BOARD.json` reads open. Closing them means
+   running agents without read access to `~/.pathly/` and the board exports. Is that worth
+   pursuing, or is "default paths are walled, bypass is visible" enough?
+5. **Project-qualified feature boards.** Feature boards are keyed by feature name alone in a
+   global DB, so same-named features in two projects share a board. Fixing that (a
+   `project_root` on board identity) would also let C6 narrow the structural-lookup exception to
+   the caller's project. It is a schema change, so it belongs in its own spec.
