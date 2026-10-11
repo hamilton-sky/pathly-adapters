@@ -12,13 +12,14 @@ never post a duplicate.
 
 Look the feature up first:
 ```bash
-curl -s "http://127.0.0.1:8765/comms?feature=<feature>&scope=<feature>&type=goal"
+curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" "http://127.0.0.1:8765/comms?feature=<feature>&scope=<feature>&type=goal"
 ```
 - **A `type=goal` message already exists** → the board is already created; use its `id` as
   `$GOAL_ID` and stop (do not post a duplicate).
 - **None exists** → post the root goal. This POST is what creates the board:
 ```bash
 curl -s -X POST http://127.0.0.1:8765/comms/post \
+  -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "feature": "<feature>",

@@ -30,6 +30,7 @@ Do **not** search:
 
 ```bash
 curl -s -X POST http://127.0.0.1:8765/comms/search \
+  -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "query": "<what you actually want to know, in plain words>",

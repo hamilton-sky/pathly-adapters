@@ -66,7 +66,7 @@ Both orphan and expired files are **safe to delete**. Offer the action to the us
 
 Query the feature's board task DAG and read `pathly/features/$FEATURE/IMPLEMENTATION_PLAN.md`:
 ```bash
-curl -s "http://127.0.0.1:8765/comms/tasks?feature=$FEATURE&scope=$FEATURE"
+curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" "http://127.0.0.1:8765/comms/tasks?feature=$FEATURE&scope=$FEATURE"
 ```
 
 For each task with `task_status: done` (or, if the board is unreachable, each `## Phase N` in

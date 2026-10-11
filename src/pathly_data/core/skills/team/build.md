@@ -56,7 +56,7 @@ the sole work source (the legacy per-conversation plan files and conversation mo
 ### Board task DAG
 
 ```
-curl -s "http://127.0.0.1:8765/comms/tasks?ready=true&feature=[feature]&scope=[feature]&goal_id=<goal_id>"
+curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" "http://127.0.0.1:8765/comms/tasks?ready=true&feature=[feature]&scope=[feature]&goal_id=<goal_id>"
 ```
 `<goal_id>` is substituted for you (empty when this run isn't goal-scoped) — always send it as-is,
 so a goal-executor run never claims a ready task that belongs to a different goal on the same board.

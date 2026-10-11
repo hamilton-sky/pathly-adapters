@@ -56,6 +56,7 @@ On approval, create the goal **first** so `$GOAL_ID` exists for the tasks. Post 
 
 ```bash
 curl -s -X POST http://127.0.0.1:8765/comms/post \
+  -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "feature": "$FEATURE",
@@ -72,7 +73,7 @@ curl -s -X POST http://127.0.0.1:8765/comms/post \
 Record the returned `"message_id"` as `$GOAL_ID`.
 
 **Idempotency:** first list existing goals
-(`curl -s "http://127.0.0.1:8765/comms?feature=$FEATURE&scope=$FEATURE&type=goal"`); if one with the
+(`curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" "http://127.0.0.1:8765/comms?feature=$FEATURE&scope=$FEATURE&type=goal"`); if one with the
 same slug already exists, reuse its id as `$GOAL_ID` instead of posting a duplicate.
 
 **Fallback when the server is unreachable:** write the approved plan to

@@ -29,24 +29,25 @@ Read the following (skip missing sources silently):
 
 1. **Big spec** — the decomposition input. Try, in order:
    - the project board's spec message —
-     `curl -s "http://127.0.0.1:8765/comms?board=project&scope=$PROJECT"` (take the largest
+     `curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" "http://127.0.0.1:8765/comms?board=project&scope=$PROJECT"` (take the largest
      `type=spec` / free-text message);
    - `pathly/project/SPEC.md`, then `pathly/project/PROJECT_INDEX.md`.
 
 2. **Existing features on the board** — check for features already seeded (idempotency):
    ```bash
-   curl -s "http://127.0.0.1:8765/comms?board=project&scope=$PROJECT&type=feature"
+   curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" "http://127.0.0.1:8765/comms?board=project&scope=$PROJECT&type=feature"
    ```
 
 3. **Project-level artifacts** — produced by the consultation tier (absent in light tier):
    ```bash
-   curl -s "http://127.0.0.1:8765/comms/artifacts?board=project&scope=$PROJECT"
+   curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" "http://127.0.0.1:8765/comms/artifacts?board=project&scope=$PROJECT"
    ```
    Collect each `artifact_path` — used in feature `context_refs` below.
 
 4. **Board context** — open decisions, prior research, and discoveries (skip-if-down):
    ```bash
    curl -s -X POST http://127.0.0.1:8765/comms/agent-context \
+     -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" \
      -H "Content-Type: application/json" \
      -d '{"scope": "$PROJECT"}'
    ```
@@ -102,6 +103,7 @@ the one-line goal title. Idempotent: if a `type=goal` already exists at `scope=<
 and do not post a duplicate.
 ```bash
 curl -s -X POST http://127.0.0.1:8765/comms/post \
+  -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "feature": "<slug>",
@@ -121,6 +123,7 @@ sees its spec as a readable card, and the feature→goals decompose inherits it 
 A `board=feature` + `scope=<slug>` write is unrestricted (no role gate), so this always lands.
 ```bash
 curl -s -X POST http://127.0.0.1:8765/comms/post \
+  -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "feature": "<slug>",
@@ -138,6 +141,7 @@ curl -s -X POST http://127.0.0.1:8765/comms/post \
 **4c. Post the feature card on the PROJECT board** — the sibling card, aware of the others:
 ```bash
 curl -s -X POST http://127.0.0.1:8765/comms/post \
+  -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "feature": "$PROJECT",
@@ -174,7 +178,7 @@ each `pathly/features/<slug>/SPEC.md` locally. Continue to Step 5.
 Count `type=feature` messages on the project board for `$PROJECT`:
 
 ```bash
-curl -s "http://127.0.0.1:8765/comms?board=project&scope=$PROJECT&type=feature"
+curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" "http://127.0.0.1:8765/comms?board=project&scope=$PROJECT&type=feature"
 ```
 
 If the count is **< 2**:

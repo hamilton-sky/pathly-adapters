@@ -1,7 +1,7 @@
 # Send the run token on every board call in the core skills, fragments and agents
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 05, 06
 Test first: yes
 
@@ -52,3 +52,23 @@ exit 0
 - Tickets 05 and 06 Answers
 
 ## Answer
+
+**Built**: 21 core files under `src/pathly_data/core/` now send `-H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN"` on every `curl` to `8765/comms` (56 curls: 20 skill and fragment files plus `agents/research/evaluator.md`); new `tests/consistency/test_fragments_run_token.py` (committed first and failing, 21 of 43 tests red); the 9 composed-skill snapshots in `tests/snapshots/` (`team/{build,review,test,design,retro}`, `planning/plan`, `development/{build,review,test}`); regenerated `tests/INDEX.md` and `tests/consistency/INDEX.md`; living doc `src/pathly_data/CLAUDE.md` (one paragraph under Skill composition).
+
+**Proof**:
+- `python -m pytest tests/consistency/test_fragments_run_token.py -q -p no:cacheprovider` -> 43 passed, exit 0. It has one scan sanity test (at least 20 files found), 21 per-file "every board curl has the header" tests, and 21 per-file tests that copy the file to a temp dir, strip the header and assert the check then fails. At the test-only commit it was `21 failed, 22 passed` (the 21 real-tree tests failed).
+- `python -m pytest tests/install_skills -q -p no:cacheprovider` -> 415 passed, 2 skipped, exit 0. Before updating snapshots 9 golden-snapshot tests failed, exactly the snapshots above. I regenerated them from `compose_skill(...)` and checked the diff by script: 19 lines modified by the header insertion only (removing the header from the new line gives the old line) and 26 pure added `-H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" \` lines; nothing else changed.
+- `python scripts/check_adapters.py` -> `Adapter consistency OK: ['antigravity', 'claude', 'codex', 'copilot']`, exit 0.
+- commands.md Test (comms_board, db, runner_supervisor, http_api) -> 926 passed, 2 skipped. Lint: black clean (476 files), check_file_size OK (none new, none grown), check_no_mirror_reads OK, gen_test_index --check up to date, lint-imports 1 kept 0 broken. Build (compileall) ok.
+
+**Decisions**:
+- Single-line curls get the header inline right after `curl -s`; multi-line curls (trailing `\`) get one new continuation line with the same indent as the next line. The test treats a curl as its own line plus lines joined by a trailing backslash, so both shapes are covered.
+- `python -m build` writes only `dist/` (git-ignored). The four adapters hold only `_meta/*.yaml`; no generated adapter copy of any skill text is tracked, so nothing was regenerated and nothing was hand-edited.
+- No file is written for PowerShell; all edited curls are POSIX shell, unchanged assumption.
+
+**Shortcuts taken**: Three board references are not `curl` and were left without a header, because the ticket scopes the edit to curl lines and adding one means rewording: `development/build.md` lines 101 and 131 (`GET http://127.0.0.1:8765/comms/tasks?...`) and `fragments/consult.md` line 16 (`POST http://127.0.0.1:8765/comms/post` plus a JSON body). An agent that turns those into curl will post as anonymous. The test scans only `curl` lines, so it does not see them. Worth upgrading if ticket 09 wants those paths stamped: rewrite them as curl blocks.
+
+**For later tickets**:
+- Ticket 09 (stamping): `development/build.md` and `consult.md` are the two files in the 23-file list that have no curl, so their calls may reach the server without a token.
+- The header value is the empty string for interactive runs (`$PATHLY_RUN_TOKEN` unset); ticket 06's `caller_identity` already treats empty as `anonymous`.
+- Any future change to composed skill text needs the 9 snapshots regenerated; the pattern is writing `compose_skill(skill, "claude")` to `tests/snapshots/<skill with / as __>.claude.md`.
