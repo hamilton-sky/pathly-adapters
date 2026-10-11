@@ -155,10 +155,14 @@ Changes this spec makes:
    against the reader's role. Acknowledgement records who saw it; it no longer hides it.
    A directive is retired only by superseding it (the existing `superseded_by` column), so the
    board shows its history.
-3. **Mid-run delivery.** When a binding decision targets a role that has a run in flight, the
-   supervisor also sends it as a nudge to that run (or, if the run cannot take a nudge, marks
-   the current stage for re-check). Without this, a builder halfway through a stage finishes on
-   the old decision.
+3. **Mid-run delivery.** A headless `claude -p` run cannot take input once spawned, and the
+   supervisor has no nudge channel into a running process today. So delivery is a **post-run
+   check**: when a stage finishes, the supervisor looks for binding decisions posted *after*
+   that run's spawn that target its role. If there are any, the result is marked
+   `stale_directive` and the stage is re-queued with the new directive in its prompt instead of
+   advancing. Without this, a builder halfway through a stage finishes on the old decision and
+   the flow moves on. (An agent that pulls `board-search` mid-run sees it earlier, which is a
+   bonus, not the guarantee.)
 4. **Provenance.** `binding=1` is accepted only from a run token whose role is `chief` or from
    the UI token (role-read-policy C4). A builder cannot post a "binding" decision to steer the
    reviewer.
@@ -174,7 +178,7 @@ Prerequisite: role-read-policy P1–P3 (run token, `author_role`, predicate).
 | P1 | `chief.md` contract + `chief-*` fragments + `chief` read-wall row | P0 | Low | composed chief prompt has the tool list and rules; fragment tests pass |
 | P2 | Chief thread + inbox tables, `POST /chief/message`, `GET /chief/thread` (new `blueprints/chief/` domain); spawn one turn via the spawn host with `--resume` | P0 | Med | a human message produces one spawned turn and a reply in the thread; billing row has `category=chief` |
 | P3 | Inbox subscriptions (run done, interaction asked, escalation, goal blocked) with debounce; relay answers via `/runner/agent-answer` | P0 | Med | an agent question reaches chat, the human's answer unblocks the run, the board shows both |
-| P3b | Standing directives (C6): `chief` write permission, `binding`/`to_agent` on decisions, governance query injects binding rows regardless of `status`, binding accepted only from chief/UI token, mid-run nudge | P0 | Med | a chief decision "use Postgres, not SQLite" appears in the next builder, reviewer and tester prompts, still after an acknowledgement; a builder-token post with `binding=1` is refused |
+| P3b | Standing directives (C6): `chief` write permission, `binding`/`to_agent` on decisions, governance query injects binding rows regardless of `status`, binding accepted only from chief/UI token, post-run stale-directive check | P0 | Med | a chief decision "use Postgres, not SQLite" appears in the next builder, reviewer and tester prompts, still after an acknowledgement; a builder-token post with `binding=1` is refused |
 | P4 | Studio chat panel talks to `/chief/*`; `POST /chat` delegates to the chief (keep `chat_agent.py` as a no-LLM fallback when the chief is off) | P0 | Low | Studio chat drives a goal end-to-end without touching the board UI |
 | P5 | Episodic tier: `memory_episodes` + embedding at run end + retrieval section, behind `policy_predicate` | P1 | Med | a new run on the same feature sees last run's summary; a reviewer does not see the builder's |
 | P6 | Scheduled consolidate + promote at RETRO/DONE with the provenance gate | P1 | Med | lessons appear on project board after DONE; unverified rows are never promoted to global |
