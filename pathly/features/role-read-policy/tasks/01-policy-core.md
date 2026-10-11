@@ -1,7 +1,7 @@
 # Add the read-policy core: policy shape, built-in walls, SQL predicate and its pure twin
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: —
 Test first: yes
 
@@ -72,6 +72,8 @@ prints internal imports: 0
 **Shortcuts taken**: none.
 
 **For later tickets**: `black --check src/ tests/` already fails on 4 files before this ticket (code_context_codeintel.py, test_code_context_codeintel.py, blueprints/code/query.py, code_context.py), so the Lint command fails on a clean tree; not mine. Predicate param order: excluded types, then caller run id (if any), then authors.
+
+**Review fixes**: gate Lint finding (black --check failing on 4 unrelated files) was fixed at repo level by commit 06e323e `style: black baseline`. Re-ran the full Lint command now: black 468 files unchanged, check_file_size OK, check_no_mirror_reads OK, gen_test_index --check OK, lint-imports 1 kept 0 broken, exit 0. No code change in this ticket.
 
 ## Review findings (round 1, gate)
 

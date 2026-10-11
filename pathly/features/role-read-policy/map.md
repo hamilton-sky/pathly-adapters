@@ -58,3 +58,4 @@ while `row_allowed` agrees. Ticket 10 runs it.
   Planned default: stored as `none` and logged, so a run that outlives its token does not lose a
   post. Ticket 09.
 - 01 — `runner/read_policy.py` holds policy shape, built-in walls, `policy_predicate` and pure `row_allowed`; stdlib only, tested to agree.
+- 01 — read-policy core in runner/read_policy.py: row_allowed and policy_predicate agree; no own-post exemption without a caller run id; anonymous = discovery/status/nudge/warning by builder.
