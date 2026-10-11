@@ -1,7 +1,7 @@
 # Add the read-policy core: policy shape, built-in walls, SQL predicate and its pure twin
 
 Type: task
-Status: resolved
+Status: open
 Blocked by: —
 Test first: yes
 
@@ -80,3 +80,17 @@ prints internal imports: 0
 **Shortcuts taken**: none.
 
 **For later tickets**: `policy_predicate` emits unqualified column names, so a query that joins tables or aliases `comms_messages` must make the columns unambiguous. The policy has a `global` key, so it is built with the functional `TypedDict` syntax. Resolution (ticket 02) must treat `anonymous` as a built-in key.
+
+## Review findings (round 1, gate)
+
+gate: Build: python -m compileall -q src/pathly_orchestrator
+gate: Test: python -m pytest tests/comms_board tests/db tests/runner_supervisor tests/http_api -q -x -p no:cacheprovider
+gate: Lint: black --check src/ tests/ && python scripts/check_file_size.py && python scripts/check_no_mirror_reads.py && python scripts/gen_test_index.py --check && lint-imports
+gate: Lint failed. the last lines of its output:
+would reformat /home/claude/pathly-adapters/tests/code_intel/test_code_context_codeintel.py
+would reformat /home/claude/pathly-adapters/src/pathly_orchestrator/runner/code_context_codeintel.py
+would reformat /home/claude/pathly-adapters/src/pathly_orchestrator/runner/code_context.py
+would reformat /home/claude/pathly-adapters/src/pathly_orchestrator/http_server/blueprints/code/query.py
+
+Oh no! 💥 💔 💥
+4 files would be reformatted, 464 files would be left unchanged.
