@@ -24,6 +24,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import os
+from typing import Any
 
 from flask import Blueprint, jsonify, request
 
@@ -39,7 +40,11 @@ _DEFAULT_BUDGET = 1500
 # graph (codebase-memory-mcp, breadth), the LSP (Serena, always-fresh), or both.
 # Absent / unknown → fall through to the configured ``code_context.backend``.
 _ENGINE_TO_BACKEND = {
-    "graph": "cli", "cli": "cli", "lsp": "lsp", "both": "both", "codeintel": "codeintel",
+    "graph": "cli",
+    "cli": "cli",
+    "lsp": "lsp",
+    "both": "both",
+    "codeintel": "codeintel",
 }
 
 # The codeintel backend returns real caller/impact rows rather than a per-file
@@ -56,7 +61,16 @@ _CODEINTEL_BUDGET = 6000
 _TIER_OPS: dict[str, frozenset[str]] = {
     # full — impact + callers + chain (superset also covers the lookup ops)
     "full": frozenset(
-        {"impact", "callers", "callees", "chain", "symbol", "context", "pattern", "search"}
+        {
+            "impact",
+            "callers",
+            "callees",
+            "chain",
+            "symbol",
+            "context",
+            "pattern",
+            "search",
+        }
     ),
     # chain — call-chain tracing only
     "chain": frozenset({"chain"}),
@@ -182,7 +196,9 @@ def _log_query(
         logger.debug("code_query: board logging failed", exc_info=True)
 
 
-def _codeintel_payload(data: dict, op: str, target: str, role: str, scope: str, engine: str):
+def _codeintel_payload(
+    data: dict, op: str, target: str, role: str, scope: str, engine: str
+):
     """Answer one query through the ``codeintel`` backend (op-aware, no gateway cache).
 
     codeintel keeps its own freshness-keyed cache and reindexes itself, so the
@@ -196,7 +212,8 @@ def _codeintel_payload(data: dict, op: str, target: str, role: str, scope: str, 
         budget = int(data.get("budget") or _CODEINTEL_BUDGET)
     except (TypeError, ValueError):
         budget = _CODEINTEL_BUDGET
-    block, meta = _cc.get_provider("codeintel").query(
+    provider: Any = _cc.get_provider("codeintel")  # CodeintelProvider adds .query
+    block, meta = provider.query(
         op, target, str(data.get("project_root") or ""), engine, budget
     )
     result = block or None
@@ -289,7 +306,10 @@ def code_query():
             configured == "codeintel" and (not engine or engine in CODEINTEL_ENGINES)
         ):
             ci_engine = "" if engine == "codeintel" else engine
-            return jsonify(_codeintel_payload(data, op, target, role, scope, ci_engine)), 200
+            return (
+                jsonify(_codeintel_payload(data, op, target, role, scope, ci_engine)),
+                200,
+            )
 
         effective = backend_override or configured
         backend = _cc.get_provider(effective).name

@@ -5,6 +5,8 @@ from __future__ import annotations
 import sqlite3
 import uuid
 
+from .migrations_provenance import add_run_tokens
+
 
 def _backfill_comms_artifacts(conn: sqlite3.Connection) -> None:
     """One-time, idempotent back-fill of comms_artifacts from existing artifact
@@ -174,3 +176,4 @@ def _add_additive_migrations(conn: sqlite3.Connection) -> None:
         conn.commit()
     except sqlite3.OperationalError:
         pass
+    add_run_tokens(conn)

@@ -1,7 +1,7 @@
 # Resolve the read policy for a role and feature from settings, then built-in defaults
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 01
 Test first: yes
 
@@ -49,3 +49,20 @@ prints passed
 - Ticket 01's Answer
 
 ## Answer
+
+**Built**: `resolve_read_policy(conn, role, feature, project_root="")` in `src/pathly_orchestrator/runner/read_policy.py`; `tests/comms_board/test_read_policy_resolve.py` (committed first as a failing test, ImportError at collection); regenerated `tests/INDEX.md`, `tests/comms_board/INDEX.md`.
+
+**Proof**:
+- `python -m pytest tests/comms_board/test_read_policy_resolve.py -q -p no:cacheprovider` -> 12 passed, exit 0 (per-role beats built-in, row without exclude_* is allow-all for content, per-feature fallback, reviewer built-in, unknown role allow-all, None -> anonymous, `anonymous` as a role key, malformed row falls through, copies not shared lists).
+- `python -m pytest tests/comms_board/test_board_context_scope.py tests/comms_board/test_board_context_settings.py tests/comms_board/test_read_policy.py -q` -> 61 passed.
+- Build ok; Test 902 passed, 2 skipped; Lint (black, file size, mirror reads, test index, lint-imports) all exit 0.
+
+**Decisions**:
+- Added an optional `project_root=""` argument: the settings keys embed it and the ticket's signature had no way to pass it. `""` matches what `runner/board_scope.py` does.
+- Tiers still come from `get_board_scope` (unchanged); a small `_stored_exclusions` walks the same two keys with the same malformed-falls-through rule to read only `exclude_types`/`exclude_authors`. Non-list values are ignored.
+- A stored row sets exclude keys only if present in it; it never falls to the built-in wall. Built-in and `None` results are fresh copies. Built-in results carry no tier keys; the unknown-role allow-all carries the three tiers as True.
+- `role=None` returns the anonymous built-in without reading any stored row.
+
+**Shortcuts taken**: none.
+
+**For later tickets**: `read_policy.py` now imports `..db.queries.app_settings` (relative import, allowed by the layer rule). Ticket 01's check "imports nothing from `pathly_orchestrator`" matches only absolute `pathly_orchestrator...` imports, so it still prints 0, but the module is no longer stdlib-only; ticket 02 requires the function to live there. Any caller must pass `project_root` to see stored rows.

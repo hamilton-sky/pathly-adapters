@@ -27,6 +27,7 @@ from .registry import (
     _TERMINAL_RESULT_TIMEOUT,
 )
 from .terminal_identity import (
+    _issue_spawn_token,
     _record_spawn_identity,
     _record_spawn_prompt,
     _settle_spawn_identity,
@@ -112,6 +113,7 @@ def _run_stage_via_terminal(
 
     run = create_run(run_id)
     try:
+        _run_token = _issue_spawn_token(state, run_id, _spawn_identity)
         # Early-advance baseline — capture feature_dir / feature / last_seq BEFORE the spawn
         # broadcast below. The AGENT_DONE watcher only reports events with seq > last_seq; if the
         # baseline is read AFTER the spawn, a fast AGENT_DONE (the test writes one ~50ms after
@@ -153,6 +155,7 @@ def _run_stage_via_terminal(
             "type": "TERMINAL_SPAWN",
             "topic": state.topic,
             "run_id": run_id,
+            "run_token": _run_token,
             "tab_id": tab_id,
             "label": label,
             "adapter": adapter,

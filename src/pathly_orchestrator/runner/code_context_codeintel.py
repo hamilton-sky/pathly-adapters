@@ -69,7 +69,7 @@ def _query_http(url: str, body: dict[str, Any], token: str) -> dict[str, Any] | 
     if token:
         req.add_header("Authorization", f"Bearer {token}")
     try:
-        with urllib.request.urlopen(req, timeout=_HTTP_TIMEOUT_S) as resp:
+        with urllib.request.urlopen(req, timeout=_HTTP_TIMEOUT_S) as resp:  # nosec B310
             out = json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:  # 401/403/404 still carry a JSON body
         try:
@@ -92,7 +92,9 @@ def _query_cli(body: dict[str, Any]) -> dict[str, Any] | None:
     if body.get("project_root"):
         argv += ["--project-root", body["project_root"]]
     try:
-        proc = subprocess.run(argv, capture_output=True, text=True, timeout=_CLI_TIMEOUT_S, check=False)
+        proc = subprocess.run(
+            argv, capture_output=True, text=True, timeout=_CLI_TIMEOUT_S, check=False
+        )
         out = json.loads(proc.stdout) if proc.stdout.strip() else None
     except Exception:
         return None
@@ -158,7 +160,9 @@ class CodeintelProvider:
             body: dict[str, Any] = {
                 "op": op.strip(),
                 "target": target.strip(),
-                "engine": None if eng not in CODEINTEL_ENGINES or eng == "auto" else eng,
+                "engine": (
+                    None if eng not in CODEINTEL_ENGINES or eng == "auto" else eng
+                ),
                 "project_root": os.path.abspath(project_root) if project_root else "",
             }
             url = _setting("code_context.codeintel_url", _DEFAULT_URL)
@@ -170,7 +174,11 @@ class CodeintelProvider:
                 envelope, transport = self._cli(body), "cli"
             if envelope is None:
                 return "", {"reason": "backend-unavailable", "transport": "none"}
-            meta = {k: envelope[k] for k in ("reason", "hint", "outcome", "engine") if k in envelope}
+            meta: dict[str, Any] = {
+                k: envelope[k]
+                for k in ("reason", "hint", "outcome", "engine")
+                if k in envelope
+            }
             meta["transport"] = transport
             return _render(envelope)[: max(0, int(budget))], meta
         except Exception:

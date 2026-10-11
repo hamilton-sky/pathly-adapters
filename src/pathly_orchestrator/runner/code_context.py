@@ -237,7 +237,10 @@ _BACKEND_DEPS: dict[str, tuple[str, str]] = {
         "install the codebase-memory-mcp binary and put it on PATH",
     ),
     "lsp": ("uvx", "install uv (provides uvx) — https://docs.astral.sh/uv/"),
-    "codeintel": ("codeintel", "pip install codecortex && codeintel setup --all <repo>"),
+    "codeintel": (
+        "codeintel",
+        "pip install codecortex && codeintel setup --all <repo>",
+    ),
 }
 
 

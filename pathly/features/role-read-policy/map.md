@@ -50,6 +50,9 @@ while `row_allowed` agrees. Ticket 10 runs it.
 - Plan — the UI token (RRP-2b) is not in this plan; until it lands the Studio UI posts with no run
   token and its rows are `author_source=none`, which only matters once `enforce` exists.
 
+- 01 — `runner/read_policy.py`: `ReadPolicy`, `BUILTIN_DEFAULTS` (reviewer/tester/chief/anonymous), `row_allowed` and `policy_predicate` agree on a generated matrix; never-withheld types are dropped from the predicate.
+- 02 — `resolve_read_policy(conn, role, feature, project_root='')`: stored per-role/per-feature row wins (no exclude_* keys = allow-all content, no fall to built-in), else built-in copy, `None` -> anonymous, unknown role -> allow-all.
+
 ## Open questions
 
 - SPEC § F Q1: ship the `reviewer`/`tester` walls as built-in defaults, or as an opt-in preset?
@@ -57,3 +60,5 @@ while `row_allowed` agrees. Ticket 10 runs it.
 - Should a revoked or unknown token be refused on write (`401`), or stored as `author_source=none`?
   Planned default: stored as `none` and logged, so a run that outlives its token does not lose a
   post. Ticket 09.
+- 03 — `db/queries/run_tokens.py`: `mint_run_token` (token_urlsafe(32), only sha256 stored), `resolve_run_token` (dict or None if unknown/empty/revoked), `revoke_run_tokens(run_id)`; table created by `db/migrations_provenance.py::add_run_tokens`, called from `_add_additive_migrations`.
+- 04 — token minted by `terminal_identity._issue_spawn_token` as the first statement inside `_run_stage_via_terminal`'s try, sent as `run_token` in TERMINAL_SPAWN, revoked in `_settle_spawn_identity`; role = agent_map role (FSM), `builder` (sched- loop task), current_state (board run); feedback spawns carry the stage role.
