@@ -7,7 +7,21 @@ __pycache__/
 .vscode/
 .pytest_cache/
 *.egg
-.claude/
+.claude/*
+# feature-flow (installed by its install.py): the skill, its roles and FLOW_DIR are tracked so a
+# fresh clone or cloud session can run /feature-flow. Everything else in .claude/ stays local.
+!.claude/settings.json
+!.claude/skills/
+.claude/skills/*
+!.claude/skills/feature-flow/
+!.claude/skills/architect-review/
+!.claude/skills/automation-design/
+!.claude/agents/
+.claude/agents/*
+!.claude/agents/feature-planner.md
+!.claude/agents/plan-reviewer.md
+!.claude/agents/ticket-builder.md
+!.claude/agents/ticket-reviewer.md
 .github/hooks/
 # Environment / secrets
 .env
