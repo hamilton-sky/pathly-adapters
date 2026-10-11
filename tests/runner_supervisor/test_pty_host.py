@@ -344,3 +344,39 @@ def test_claim_memory_evicts_in_lockstep(monkeypatch, tmp_path):
     assert len(host._claimed) == 3
     assert len(host._claimed_index) == 3, "the lookup set leaked past the cap"
     assert host._claimed_index == {"tab-3", "tab-4", "tab-5"}
+
+
+def test_host_exports_run_token_when_payload_has_one(monkeypatch, tmp_path):
+    monkeypatch.delenv("PATHLY_RUN_TOKEN", raising=False)
+    rec = _Recorder()
+    rec.install(monkeypatch)
+    host = SpawnHost()
+
+    _drive(
+        host,
+        _spawn_event(
+            "import os; print('TOK=' + os.environ.get('PATHLY_RUN_TOKEN', 'absent'))",
+            cwd=str(tmp_path),
+            run_token="tok-secret-123",
+        ),
+    )
+
+    assert "TOK=tok-secret-123" in rec.wait()["stdout_tail"]
+
+
+def test_host_sets_no_run_token_without_one(monkeypatch, tmp_path):
+    monkeypatch.delenv("PATHLY_RUN_TOKEN", raising=False)
+    rec = _Recorder()
+    rec.install(monkeypatch)
+    host = SpawnHost()
+
+    _drive(
+        host,
+        _spawn_event(
+            "import os; print('TOK=' + os.environ.get('PATHLY_RUN_TOKEN', 'absent'))",
+            cwd=str(tmp_path),
+            run_token=None,
+        ),
+    )
+
+    assert "TOK=absent" in rec.wait()["stdout_tail"]
