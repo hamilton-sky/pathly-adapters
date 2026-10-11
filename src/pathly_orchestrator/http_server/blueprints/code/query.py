@@ -24,6 +24,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import os
+from typing import Any
 
 from flask import Blueprint, jsonify, request
 
@@ -211,7 +212,8 @@ def _codeintel_payload(
         budget = int(data.get("budget") or _CODEINTEL_BUDGET)
     except (TypeError, ValueError):
         budget = _CODEINTEL_BUDGET
-    block, meta = _cc.get_provider("codeintel").query(
+    provider: Any = _cc.get_provider("codeintel")  # CodeintelProvider adds .query
+    block, meta = provider.query(
         op, target, str(data.get("project_root") or ""), engine, budget
     )
     result = block or None

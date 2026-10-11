@@ -69,7 +69,7 @@ def _query_http(url: str, body: dict[str, Any], token: str) -> dict[str, Any] | 
     if token:
         req.add_header("Authorization", f"Bearer {token}")
     try:
-        with urllib.request.urlopen(req, timeout=_HTTP_TIMEOUT_S) as resp:
+        with urllib.request.urlopen(req, timeout=_HTTP_TIMEOUT_S) as resp:  # nosec B310
             out = json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:  # 401/403/404 still carry a JSON body
         try:
@@ -174,7 +174,7 @@ class CodeintelProvider:
                 envelope, transport = self._cli(body), "cli"
             if envelope is None:
                 return "", {"reason": "backend-unavailable", "transport": "none"}
-            meta = {
+            meta: dict[str, Any] = {
                 k: envelope[k]
                 for k in ("reason", "hint", "outcome", "engine")
                 if k in envelope
