@@ -439,7 +439,9 @@ pathly_orchestrator/
                            # busy_timeout=5000 handle cross-process contention; the RLock handles
                            # cross-thread contention within the server process.
     migrations.py          # _run_migrations(), CREATE TABLE SQL
-    pricing.py             # PRICING table, PricingRegistry, estimate_cost()/infer_provider(),
+    pricing.py             # PRICING + CACHE_RATES tables (cached tokens are a subset of tokens_in,
+                           # priced at a multiple of the input rate), cache_tokens_of(),
+                           # PricingRegistry, estimate_cost()/infer_provider(),
                            # estimate_cost_for() (accepts a model OR an adapter slug — falls back
                            # to the adapter's default model family so a renderer one-shot with no
                            # explicit --model, e.g. codex, can still be priced; used by
@@ -486,7 +488,8 @@ pathly_orchestrator/
     argv.py                # resolve_argv, resolve_interactive_argv, _storage_path
     output.py              # parse_result, _extract_json_payload; extract_tokens + the per-adapter
                            # _TOKEN_STRATEGIES registry (Strategy A — token counting; cost is
-                           # Strategy B in db/pricing.py)
+                           # Strategy B in db/pricing.py); extract_cache_tokens() → the cached
+                           # subset of tokens_in, returned by parse_result for cache-aware pricing
     events.py              # read_last_agent_done, _patch_last_agent_done, tail_agent_done
     history.py             # build_pipeline_history_block
     invoke.py              # invoke_agent(abort_callback=None, proc_callback=None)

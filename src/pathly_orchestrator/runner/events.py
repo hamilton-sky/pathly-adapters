@@ -23,6 +23,8 @@ def _patch_last_agent_done(
     model: str = "",
     run_id: str = "",
     board_scope: str = "",
+    cache_read_tokens: int = 0,
+    cache_write_tokens: int = 0,
 ) -> None:
     """Append a BILLING_UPDATE event with real cost/token data to DB.
 
@@ -33,6 +35,9 @@ def _patch_last_agent_done(
     knows it, the agent may not have reported it. The projection folds it onto the
     anchor AGENT_DONE **only when the anchor lacks one** (COALESCE — an agent-provided
     value is never overwritten).
+
+    ``cache_read_tokens``/``cache_write_tokens`` are the cached SUBSET of ``tokens_in``; the
+    projection passes them to the pricing estimate so cached input isn't billed at full rate.
     """
     # --- find last AGENT_DONE for agent/conv identification ---
     patched_agent: str | None = None
@@ -59,6 +64,8 @@ def _patch_last_agent_done(
         "tokens_in": tokens_in,
         "tokens_out": tokens_out,
         "total_tokens": tokens_in + tokens_out,
+        "cache_read_tokens": int(cache_read_tokens or 0),
+        "cache_write_tokens": int(cache_write_tokens or 0),
         "wall_seconds": wall_seconds,
         "tool_uses": tool_uses,
         "model": model or None,
