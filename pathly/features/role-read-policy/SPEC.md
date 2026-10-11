@@ -115,8 +115,25 @@ so existing rows keep reading exactly what they read now.
     unverified row of an excluded type is **withheld** (fail closed), and counted as
     `unverified` in C7, so the wall cannot be bypassed by dropping the token. Human posts from
     the UI are not affected: humans post `decision`/`constraint`/goals, which are never withheld.
+  - the same write also stamps `author_run_id` from the token. The existing `run_id` column is
+    filled from the request body (`messages_write.py:127-132`), so it is not provenance; the
+    policy never reads it.
+- **Rows written before the upgrade.** A migration adds `author_role`, `author_run_id` and
+  `author_source ∈ {token, system, legacy, none}`. Fail-closed applies only to `none` (a row
+  written *after* the upgrade without a token). Existing rows are backfilled as `legacy`, with a
+  best-effort role, so history is not wiped from every reviewer's view:
+  - `from_agent ∈ {supervisor, system}` → `system`;
+  - else, if the row's `run_id` joins an `agent_invocations` row (written after each run
+    finished, `db/migrations.py:71`) → that invocation's `agent_role`;
+  - else → `from_agent` as stored.
+
+  `legacy` roles are as spoofable as `from_agent` always was. The policy applies them as
+  written, and C7 counts `legacy` separately, so the soak (P6) shows how much history a reviewer
+  still sees on unverified attribution before `enforce` is switched on.
 - **Never withheld, whatever the policy:** governance (pending decisions, active escalations),
-  `decision`, `constraint`, `goal`/`task` rows, and the run's own posts. Governance is injected
+  `decision`, `constraint`, `goal`/`task` rows, and the run's own posts, meaning rows whose
+  server-stamped `author_run_id` equals the caller's token run (never the body `run_id`, which
+  a builder could set to the reviewer's run to make a discovery visible). Governance is injected
   unconditionally today ("always applies — do not override"); a read policy must not be able to
   hide a pending decision from the agent that has to respect it.
 
@@ -172,10 +189,24 @@ The pull routes cannot apply a role policy without knowing the caller's role.
   `board-init` and `comms-post` fragments send it as a header (`X-Pathly-Run-Token`). A
   `run_id` or `role` in the body is ignored for policy purposes, so a reviewer cannot ask as
   `human` or as another run. The same token stamps `author_role` on writes (C1).
-- **The UI is identified through its own channel too.** Studio's main process receives a UI
-  token from the server at startup and sends it on its own `/comms/*` calls. The build has to
-  pick the hand-off (the server writes the token to a file only the Studio user can read, or
-  returns it on the existing startup handshake if there is one).
+- **The UI is identified through its own channel too.** The existing `X-Pathly-Secret` cannot
+  be that channel: it lives in `~/.pathly/server_secret.txt`, which agents can read, Studio main
+  copies it into `process.env` (`studio/src/main/apiConfig.ts:29`) where spawned processes
+  inherit it, and the middleware already lets loopback callers without it through
+  (`http_server/middleware.py:168-180`). So a separate **UI token**:
+  - minted by the server at startup and handed to Studio main (file or handshake, the build
+    picks one), **never** written into `process.env`, so spawned agents do not inherit it;
+  - exposed to the renderer through the preload bridge, next to the secret that
+    `window.pathly.shell.apiConfig()` already returns;
+  - sent as `X-Pathly-UI-Token` by the renderer's `apiFetch` wrapper
+    (`studio/src/renderer/src/lib/config.ts:17`). Every board read the UI makes goes through
+    that one wrapper (`store/commsApi/messages.ts:15`, `search.ts:14`), so it is the place to
+    add it; main-process calls add it too;
+  - added to the CORS `Access-Control-Allow-Headers` lists (`middleware.py:162`, `:213`), or
+    the browser preflight drops it.
+
+  Per C0, an agent that goes looking for the token file can still read it; the goal is that no
+  agent has it by default.
 - **No token at all = anonymous, not unrestricted.** In `enforce`, a request with neither token
   gets the `anonymous` policy, which defaults to the **union of the built-in walls** (C2). Dropping
   the header therefore never shows more than the strictest role sees. Scripts and interactive
@@ -226,7 +257,8 @@ The pull routes cannot apply a role policy without knowing the caller's role.
 ### C7. Visibility
 
 - `record_board_context` / `render_stats` (`runner/context_record.py`) gain a `withheld` count
-  per reason (`type`, `author`, `unverified`, `pair`).
+  per reason (`type`, `author`, `unverified`, `pair`), plus how many rows were shown on a
+  `legacy` attribution.
 - The context preview (`POST /comms/agent-context/preview`, `blueprints/comms/context.py`) already takes
   `role`; it shows withheld rows greyed with the rule that hid them, so a human can see the wall.
 
@@ -237,9 +269,9 @@ The pull routes cannot apply a role policy without knowing the caller's role.
 | # | Phase | Priority | Risk | Done when |
 |---|---|---|---|---|
 | P1 | Policy shape + `policy_predicate` / `row_allowed` + built-in defaults, unit-tested | P0 | Low | tests cover every rule in C1/C2, incl. governance never withheld; predicate and `row_allowed` agree on every case |
-| P2 | Server-stamped `author_role` on every write (from the run token; `system` for internal writers; NULL = unverified). Needs P3's token, so build P3's token half first | P0 | Med | a post with `from: explorer` under a builder token is stored as `author_role=builder`; a body `run_id` changes nothing |
+| P2 | Server-stamped `author_role` / `author_run_id` / `author_source` on every write (from the run token; `system` for internal writers; `none` = unverified) + migration that backfills existing rows as `legacy`. Needs P3's token, so build P3's token half first | P0 | Med | a post with `from: explorer` under a builder token is stored as `author_role=builder`; a body `run_id` changes nothing; migrated rows carry `legacy` roles |
 | P2b | Wire the predicate into the push path (semantic + recency) in `warn`, before `k` | P0 | Low | context record shows withheld counts; prompt unchanged in `warn` |
-| P3 | Spawn-issued run token (env → header) + UI token + `anonymous` policy on `/comms/search` and `GET /comms`; fragments send the token | P0 | Med | a reviewer-token search returns the filtered set; body `run_id`/`role` ignored; the same call with no token returns no more than the strictest wall |
+| P3 | Spawn-issued run token (env → header) + UI token (preload bridge → renderer `apiFetch`, not in spawn env) + `anonymous` policy on `/comms/search` and `GET /comms`; fragments send the token | P0 | Med | a reviewer-token search returns the filtered set; body `run_id`/`role` ignored; the same call with no token returns no more than the strictest wall |
 | P4 | `(board, scope)` pair binding on pull routes + required-pair query helper | P1 | Med | cross-feature content pull → `403` + reason in `enforce`; `board-init` goal lookup on a new feature still works; invariant test over all comms reads |
 | P5 | Preview + Studio visibility of withheld rows | P1 | Low | preview for `role=reviewer` shows what is hidden and why |
 | P6 | Flip default to `enforce` after a `warn` soak on real runs | P1 | Med | soak data reviewed; no review stage starved of needed context |
@@ -258,7 +290,14 @@ the cross-feature leak.
   agree on every case.
 - Author stamping: `from: "explorer"` posted under a builder token is stored and filtered as
   `builder`; a body `run_id` naming the explorer's run changes nothing; a post with no token is
-  `author_role = NULL`.
+  `author_role = NULL`, `author_source = none`.
+- Own-post exemption: a builder discovery posted with the **reviewer's** `run_id` in the body
+  stays hidden from that reviewer; the reviewer's own posts stay visible.
+- Legacy backfill: on a DB migrated from before the upgrade, an explorer discovery whose
+  `run_id` joins an explorer invocation is `legacy`/`explorer` and visible to a reviewer; a
+  `supervisor` status is `legacy`/`system`; a builder discovery is hidden.
+- UI token: a renderer board read through `apiFetch` carries `X-Pathly-UI-Token` and gets the
+  unrestricted view in `enforce`; a spawned agent's environment contains no UI token.
 - Truncation: five top-ranked builder discoveries + one architect discovery, reviewer search
   with `k=5` → returns the architect row (the filter runs before `k`); same on the push path.
 - Resolution: per-role row beats built-in default; explicit row with no `exclude_*` keys reads
