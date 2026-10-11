@@ -2,21 +2,15 @@
 
 Why this exists
 ---------------
-The real per-agent cost/tokens live in ``fsm_events`` — each agent writes an
-``AGENT_DONE`` (self-reported cost) via the log-agent-done skill, and the stop hook
-/ reconciliation window later appends a ``BILLING_UPDATE`` that *supersedes* it with
-the provider-accurate figure. The DB-explorer roll-up and cost chart, however, read
-``agent_invocations`` — which previously only captured supervised / board / editor
-runs, written at spawn time with ``cost_usd=0``. So the bulk of real work
-(interactive ``/pathly`` runs) never appeared, and even the rows that did were never
-reconciled to their real cost.
+The real per-agent cost/tokens live in ``fsm_events``: each agent writes an ``AGENT_DONE``
+(self-reported cost) and the stop hook / reconciliation window later appends a superseding
+``BILLING_UPDATE`` with the provider-accurate figure. The roll-ups and cost chart read
+``agent_invocations``, which used to miss interactive runs and never reconciled real cost.
 
-This module makes ``agent_invocations`` a faithful projection of that event stream:
-one row per ``AGENT_DONE``, keyed by its ``fsm_events.seq`` (``source_seq``), with the
-superseding ``BILLING_UPDATE`` folded in (billing wins when priced — matching the
-"supersedes for cost/token display" contract, so the 21 double-counted runs collapse
-to one). Editor/chat one-shots (posted via ``/db/invocation``, feature ``"(project)"``,
-no event) are a disjoint population with ``source_seq IS NULL`` and are left untouched.
+This module projects that stream: one row per ``AGENT_DONE``, keyed by its
+``fsm_events.seq`` (``source_seq``), with the superseding ``BILLING_UPDATE`` folded in
+(billing wins when priced, so a run is never double-counted). Editor/chat one-shots
+(``/db/invocation``, ``source_seq IS NULL``, no event) are disjoint and left untouched.
 
 Contracts
 ---------
@@ -53,8 +47,10 @@ def _price_if_needed(
     model: str | None,
     tokens_in: object,
     tokens_out: object,
+    cache: dict | None = None,
 ) -> tuple[float, str]:
-    """Estimate cost from tokens when the event stream reported none.
+    """Estimate cost from tokens when the event stream reported none (``cache`` carries the
+    billing's cache_read/write_tokens so cached input is priced at the cache rate).
 
     Idempotent chokepoint: only fires when ``cost`` is exactly 0 (a priced cost —
     provider-reported OR an earlier estimate — is never re-priced/overwritten).
@@ -65,9 +61,9 @@ def _price_if_needed(
         return cost, cost_source
     tin, tout = int(_num(tokens_in)), int(_num(tokens_out))
     if tin + tout > 0:
-        from ..pricing import estimate_cost  # intra-db import, layer-safe
+        from ..pricing import cache_tokens_of, estimate_cost  # intra-db, layer-safe
 
-        est, src = estimate_cost(model or "", tin, tout)
+        est, src = estimate_cost(model or "", tin, tout, **cache_tokens_of(cache))
         if src == "estimated":
             return est, "estimated"
         return cost, cost_source
@@ -152,6 +148,7 @@ def _upsert_projected(
         rec.get("provider"),
         rec.get("tokens_in"),
         rec.get("tokens_out"),
+        rec,
     )
     with _get_write_lock(conn):
         conn.execute(
@@ -203,6 +200,8 @@ def _fold_billing(rec: dict, payload: dict) -> None:
     if (b_in + b_out) > 0:
         rec["tokens_in"] = b_in
         rec["tokens_out"] = b_out
+        for k in ("cache_read_tokens", "cache_write_tokens"):
+            rec[k] = int(_num(payload.get(k)))
     else:
         b_total = int(_num(payload.get("total_tokens")))
         if b_total > 0 and int(rec.get("tokens_in") or 0) == 0:
@@ -429,6 +428,7 @@ def on_event_appended(
                 model,
                 rec.get("tokens_in"),
                 rec.get("tokens_out"),
+                rec,
             )
             with _get_write_lock(conn):
                 conn.execute(

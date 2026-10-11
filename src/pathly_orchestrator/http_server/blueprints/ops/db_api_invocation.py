@@ -74,8 +74,10 @@ def db_invocation():
         # tokens above stay as a FALLBACK (older clients / when the server parse finds nothing), so
         # a good client parse never regresses to $0.
         stdout_tail = body.get("stdout_tail") or ""
+        cache: dict = {}  # cached-token subset of tokens_in, only from the server parse
         if stdout_tail and adapter:
             try:
+                from pathly_orchestrator.db.pricing import cache_tokens_of
                 from pathly_orchestrator.runner import parse_result
 
                 parsed = parse_result(adapter, stdout_tail)
@@ -86,6 +88,7 @@ def db_invocation():
                     cost_usd = p_cost
                 if (p_in + p_out) > 0:
                     tokens_in, tokens_out = p_in, p_out
+                    cache = cache_tokens_of(parsed)
                 if not tool_uses and parsed.get("tool_uses"):
                     tool_uses = int(parsed.get("tool_uses") or 0)
                 if not summary and parsed.get("result"):
@@ -106,6 +109,7 @@ def db_invocation():
                 "cost_usd": cost_usd,
                 "tokens_in": tokens_in,
                 "tokens_out": tokens_out,
+                **cache,
                 "summary": summary,
                 "session_id": session_id,
                 "agent": agent_role,

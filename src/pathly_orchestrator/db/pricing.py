@@ -22,6 +22,8 @@ copy of this table again.
 
 from __future__ import annotations
 
+from typing import TypedDict
+
 # Maps model-name prefixes to provider/adapter slugs.
 # Shared by pricing.py and blueprints/telemetry.py (via the telemetry_registry
 # re-export) — single source of truth.
@@ -78,6 +80,56 @@ PRICING: dict[str, dict[str, tuple[float, float]]] = {
 }
 
 
+# Cache-token rate multipliers, as a fraction of the model's INPUT rate:
+# provider → model-family-prefix → (cache_read_mult, cache_write_mult). Longest prefix wins.
+# Cache tokens are a SUBSET of tokens_in (both token strategies fold them in), so without this
+# table every cached token was priced at the full input rate — a ~3-4x overstatement on a
+# heavily-cached codex run, ~10x on claude cache reads. A provider/model with no entry keeps the
+# old flat behavior (1.0, 1.0): no discount is ever invented for a rate we haven't verified.
+#   - Anthropic: cache read 0.1x, 5-minute cache write 1.25x (all current models).
+#   - OpenAI:    cached input 0.1x for the GPT-5 family; 0.5x gpt-4o / o1; 0.25x o3. No write
+#                surcharge (cache writes bill as ordinary input).
+CACHE_RATES: dict[str, dict[str, tuple[float, float]]] = {
+    "claude": {"claude-": (0.10, 1.25)},
+    "codex": {
+        "gpt-5": (0.10, 1.0),
+        "gpt-4o": (0.50, 1.0),
+        "o1": (0.50, 1.0),
+        "o3": (0.25, 1.0),
+    },
+}
+
+
+def _longest_prefix(table: dict[str, tuple[float, float]], model: str) -> str | None:
+    best: str | None = None
+    for key in table:
+        if model.startswith(key) and (best is None or len(key) > len(best)):
+            best = key
+    return best
+
+
+class CacheTokens(TypedDict):
+    cache_read_tokens: int
+    cache_write_tokens: int
+
+
+def cache_tokens_of(record: object) -> CacheTokens:
+    """The ``cache_read_tokens``/``cache_write_tokens`` kwargs carried by a parsed-result /
+    billing dict (0 when absent or malformed) — splat into ``estimate_cost(..., **…)``.
+    """
+
+    def _get(key: str) -> int:
+        try:
+            return max(0, int(record.get(key) or 0)) if isinstance(record, dict) else 0
+        except (TypeError, ValueError):
+            return 0
+
+    return {
+        "cache_read_tokens": _get("cache_read_tokens"),
+        "cache_write_tokens": _get("cache_write_tokens"),
+    }
+
+
 class PricingRegistry:
     """Resolve cost_usd and cost_source for any provider/model combination."""
 
@@ -87,12 +139,18 @@ class PricingRegistry:
         model: str,
         tokens_in: int,
         tokens_out: int,
+        cache_read_tokens: int = 0,
+        cache_write_tokens: int = 0,
     ) -> tuple[float, str]:
         """Return (cost_usd, cost_source).
 
         Prefix-matches model against the provider's table; longest key wins.
         Returns (0.0, "unpriced") when provider is unknown or no prefix matches,
         or when both token counts are zero.
+
+        ``cache_read_tokens``/``cache_write_tokens`` are SUBSETS of ``tokens_in``; they are
+        priced at the ``CACHE_RATES`` multiples of the input rate and the remainder at the
+        full input rate. Clamped so they can never exceed ``tokens_in``.
         """
         if tokens_in == 0 and tokens_out == 0:
             return (0.0, "unpriced")
@@ -101,21 +159,21 @@ class PricingRegistry:
         if not table:
             return (0.0, "unpriced")
 
-        # Find the longest matching prefix key.
-        best_key: str | None = None
-        for key in table:
-            if model.startswith(key):
-                if best_key is None or len(key) > len(best_key):
-                    best_key = key
-
+        best_key = _longest_prefix(table, model)
         if best_key is None:
             return (0.0, "unpriced")
 
         in_rate, out_rate = table[best_key]
-        cost = round(
-            (tokens_in / 1_000_000 * in_rate) + (tokens_out / 1_000_000 * out_rate),
-            6,
+        cache_table = CACHE_RATES.get(provider, {})
+        cache_key = _longest_prefix(cache_table, model)
+        read_mult, write_mult = cache_table[cache_key] if cache_key else (1.0, 1.0)
+        c_read = min(max(0, int(cache_read_tokens or 0)), tokens_in)
+        c_write = min(max(0, int(cache_write_tokens or 0)), tokens_in - c_read)
+        uncached = tokens_in - c_read - c_write
+        input_cost = (
+            (uncached + c_read * read_mult + c_write * write_mult) / 1_000_000 * in_rate
         )
+        cost = round(input_cost + (tokens_out / 1_000_000 * out_rate), 6)
         return (cost, "estimated")
 
     def all_providers(self) -> dict[str, dict[str, dict[str, float]]]:
@@ -138,10 +196,21 @@ def infer_provider(model: str) -> str:
     return "unknown"
 
 
-def estimate_cost(model: str, tokens_in: int, tokens_out: int) -> tuple[float, str]:
+def estimate_cost(
+    model: str,
+    tokens_in: int,
+    tokens_out: int,
+    cache_read_tokens: int = 0,
+    cache_write_tokens: int = 0,
+) -> tuple[float, str]:
     """Resolve (cost_usd, cost_source) for *model*, inferring its provider from the name."""
     return PricingRegistry().compute(
-        infer_provider(model), model, tokens_in, tokens_out
+        infer_provider(model),
+        model,
+        tokens_in,
+        tokens_out,
+        cache_read_tokens=cache_read_tokens,
+        cache_write_tokens=cache_write_tokens,
     )
 
 
@@ -157,17 +226,27 @@ ADAPTER_DEFAULT_MODEL: dict[str, str] = {
 }
 
 
-def estimate_cost_for(name: str, tokens_in: int, tokens_out: int) -> tuple[float, str]:
+def estimate_cost_for(
+    name: str,
+    tokens_in: int,
+    tokens_out: int,
+    cache_read_tokens: int = 0,
+    cache_write_tokens: int = 0,
+) -> tuple[float, str]:
     """Like :func:`estimate_cost`, but *name* may be a model OR an adapter slug.
 
     Tries *name* as a model first; if it doesn't resolve to a priced provider, retries with the
     adapter's default model family (``ADAPTER_DEFAULT_MODEL``). Returns (0.0, "unpriced") when
     neither resolves or there are no tokens.
     """
-    cost, src = estimate_cost(name, tokens_in, tokens_out)
+    cache = {
+        "cache_read_tokens": cache_read_tokens,
+        "cache_write_tokens": cache_write_tokens,
+    }
+    cost, src = estimate_cost(name, tokens_in, tokens_out, **cache)
     if src == "estimated":
         return cost, src
     fallback = ADAPTER_DEFAULT_MODEL.get((name or "").strip().lower())
     if fallback:
-        return estimate_cost(fallback, tokens_in, tokens_out)
+        return estimate_cost(fallback, tokens_in, tokens_out, **cache)
     return cost, src
