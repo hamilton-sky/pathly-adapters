@@ -474,6 +474,8 @@ pathly_orchestrator/
                            #   AGENT_DONE payload (completion-report's <run_category>, or Fix A's
                            #   synthetic) and guarded to the valid set — backs the Monitor RECENT
                            #   bucketing (scope_tier is the board tier, not the run type).
+      cost_by_tool.py      # daily_cost_by_tool() — {local day: {tool: usd/estimated_usd/rows}} from
+                           #   agent_invocations; the Pathly side of GET /telemetry/reconcile
       comms.py             # re-export shim — splits into comms_messages, comms_artifacts, comms_tasks, comms_embeddings, comms_counts, comms_goals_read (import from domain modules for new code)
       comms_messages.py    # board message CRUD; goal_id/executor columns back the Goals->Task-DAG model
       comms_artifacts.py   # artifact metadata CRUD (attach, list, section index, update_summary)
@@ -491,6 +493,10 @@ pathly_orchestrator/
                            # Strategy B in db/pricing.py); extract_cache_tokens() → the cached
                            # subset of tokens_in, returned by parse_result for cache-aware pricing
     events.py              # read_last_agent_done, _patch_last_agent_done, tail_agent_done
+    ccusage.py             # ccusage collector: resolve_ccusage (PATHLY_CCUSAGE_BIN | PATH, never npx),
+                           #   ccusage_daily (`daily --json --offline`), parse_ccusage_daily — optional
+    cost_reconcile.py      # reconcile_costs/compare_day: Pathly spend <= ccusage per local day per
+                           #   tool, else `overstated` — backs GET /telemetry/reconcile (+ a __main__ CLI)
     history.py             # build_pipeline_history_block
     invoke.py              # invoke_agent(abort_callback=None, proc_callback=None)
     embeddings.py          # embed()/warm() — local embedding model; embed() has a bounded LRU (check inside _model_lock) so the per-board search fan-out re-embedding one query N+2 times computes the vector once; model load RETRIES transient failures (was a permanent silent latch that disabled semantic search process-wide) and embedder_status() reports {loaded,unavailable,load_attempts} to /health; chunk_summary() splits a summary into child chunks (per-bullet for topic-map, per-### for detailed, none for gist); embed_artifact_async() stores one PARENT vector (whole message text + summary) in comms_embeddings + CHILD vectors per chunk in comms_chunk_embeddings
@@ -585,7 +591,7 @@ pathly_orchestrator/
       catalog/             # items.py (file-tree catalog)
       skills/              # editor.py re-export shim; editor_render.py (/skills/catalog|parse|preview|compose [returns segments+tokens; accepts ability_ids]|summary-format/<style>); editor_io.py (/skills/save|export); prompt_library.py (/skills/prompts — system-prompts are file-backed via skills/prompt_files.py, kind='ability' stays legacy DB); abilities.py (/skills/abilities — layer-3 ability FILES, see skills/abilities.py)
       comms/               # board + goals/DAG, split by domain: messages*.py, tasks.py, artifacts*.py, runs.py, goals.py, goals_read.py (GET /comms/goals rollup), settings.py, context.py, features.py (/comms/features/decompose), project.py (/comms/project/decompose) (+ _helpers.py); see "Comms board endpoints" above
-      ops/                 # telemetry*.py (/record_activity, /record_phase*, /telemetry/*); menu.py (/menu, /metrics); db_api*.py (/db/* read API); chat.py (/chat); export.py
+      ops/                 # telemetry*.py (/record_activity, /record_phase*, /telemetry/* incl. /telemetry/reconcile); menu.py (/menu, /metrics); db_api*.py (/db/* read API); chat.py (/chat); export.py
       code/                # query.py (POST /code/query — codebase-intelligence)
       control/             # runs_read.py (GET /runs, /runs/<run_id> — unified run read API; P0);
                            # runs_control.py (POST /runs — the unified launcher: a thin RunSpec

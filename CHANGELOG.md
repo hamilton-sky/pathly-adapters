@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Telemetry — reconcile recorded cost against ccusage
+
+`GET /telemetry/reconcile?days=7` (and `python -m pathly_orchestrator.runner.cost_reconcile`)
+compares Pathly's recorded spend per local day per tool with ccusage's independent,
+machine-wide total. Pathly can only ever be lower (ccusage also sees interactive work and other
+projects); a day where Pathly is higher beyond the tolerance is reported as `overstated`, which
+means a token parser or a pricing rate is wrong. ccusage is optional: without it the check
+reports `unavailable`.
+
 ### Telemetry — cached tokens priced at cache rates
 
 Estimated costs (every codex run, and claude runs whose CLI reported no dollar figure) priced

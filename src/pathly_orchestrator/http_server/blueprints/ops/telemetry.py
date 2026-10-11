@@ -3,6 +3,7 @@
 Routes split by concern:
   telemetry_activity.py  — /record_activity
   telemetry_phase.py     — /telemetry/trends, /telemetry/pricing, /record_phase, /record_phase_summary
+  telemetry_reconcile.py — /telemetry/reconcile (Pathly spend vs ccusage)
 """
 
 from ._telemetry_bp import bp  # noqa: F401
@@ -10,3 +11,4 @@ from ._telemetry_bp import bp  # noqa: F401
 # Import sub-modules to register their routes against bp.
 from . import telemetry_activity as _ta  # noqa: F401
 from . import telemetry_phase as _tp  # noqa: F401
+from . import telemetry_reconcile as _tr  # noqa: F401

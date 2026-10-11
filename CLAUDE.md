@@ -446,6 +446,19 @@ threaded into `BILLING_UPDATE` (`runner/events.py::_patch_last_agent_done` →
 `supervisor/terminal.py::_reconciliation_window`) so the projected row's `provider` and
 `run_id` columns get stamped even when the originating `AGENT_DONE` didn't carry them.
 
+**Reconciled against an independent measurement — `GET /telemetry/reconcile` (ccusage).**
+Both strategies are Pathly's own parsers and rate table, so nothing outside them checked them.
+[ccusage](https://github.com/ryoppippi/ccusage) prices the CLIs' on-disk transcripts with its own
+rates, which gives a one-sided invariant per local day per tool: Pathly's spend ≤ ccusage's
+machine-wide spend (ccusage also sees interactive work and other projects, so lower is normal —
+reported as `coverage`). Pathly exceeding it beyond `tolerance` (default 10%) is `overstated`: a
+parser double-counts or a `PRICING`/`CACHE_RATES` entry is too high. Optional and external like
+the code-intel backends (`PATHLY_CCUSAGE_BIN` or `ccusage` on PATH, run `--offline`, never
+`npx`); absent → `status: "unavailable"`. Only `claude`/`codex` are compared (what `ccusage daily`
+measures); other tools read `not_covered`. Code: `runner/ccusage.py` (collector),
+`db/queries/cost_by_tool.py` (Pathly side), `runner/cost_reconcile.py` (comparison; also
+`python -m pathly_orchestrator.runner.cost_reconcile --days 7`, exit 1 when overstated).
+
 **Renderer one-shots (editor Diagram/Analyze) get the same codex treatment via a parallel
 path**, because they post to `/db/invocation` (`source_seq NULL`) and so bypass the event
 projector + its `_price_if_needed`. Two mirrors close the gap: (1) the Studio spawn gate parses
