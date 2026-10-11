@@ -81,9 +81,21 @@ so existing rows keep reading exactly what they read now.
 ```
 
 - A row is withheld if `type ∈ exclude_types` **and** (`exclude_authors` is empty **or**
-  `from_agent ∈ exclude_authors`). Both lists together mean "this kind of post *from these
-  roles*", which is the precise wall we want (a reviewer still sees a `discovery` from the
-  explorer or the architect).
+  the row's **trusted author role** `∈ exclude_authors`). Both lists together mean "this kind of
+  post *from these roles*", which is the precise wall we want (a reviewer still sees a
+  `discovery` from the explorer or the architect).
+- **The author role is not `from_agent`.** `/comms/post` copies the caller's `from` field
+  straight into `from_agent` (`messages_write.py:56`), and feature-board writes accept any value
+  (`_helpers.py:127`), so a builder could label a discovery `explorer` and walk it through the
+  wall. The policy keys on a new `author_role` column, stamped **by the server at write time**
+  from the post's `run_id` → spawn record (C4), never from the body. Rules:
+  - post with a resolvable `run_id` → `author_role` = that run's role, whatever `from` says;
+  - server-internal writers (`supervisor`, `system`, e.g. `goal_verify.py:106`,
+    `task_retry.py:176`) → stamped as `system` by the code path, not by a body field;
+  - no `run_id` → `author_role = NULL` ("unverified"). For a role with `exclude_authors` set, an
+    unverified row of an excluded type is **withheld** (fail closed), and counted as
+    `unverified` in C7, so the wall cannot be bypassed by dropping `run_id`. Human posts from
+    the UI are not affected: humans post `decision`/`constraint`/goals, which are never withheld.
 - **Never withheld, whatever the policy:** governance (pending decisions, active escalations),
   `decision`, `constraint`, `goal`/`task` rows, and the run's own posts. Governance is injected
   unconditionally today ("always applies — do not override"); a read policy must not be able to
@@ -107,16 +119,27 @@ Up for debate in review of this spec.
 
 ### C3. One policy function, three read paths
 
-A single pure function, e.g. `runner/read_policy.py::apply_read_policy(rows, policy, run)`,
-used by:
+One policy, applied **inside the query, before `k`/`limit`**, on all three read paths:
 
-1. `retrieve_board_context` — after `_is_context`, before budgeting, on both the semantic and the
-   recency-fallback rows.
-2. `POST /comms/search` — after the search, before returning.
-3. `GET /comms` — same.
+1. `retrieve_board_context` — semantic and recency-fallback rows.
+2. `POST /comms/search`.
+3. `GET /comms`.
 
-Keeping it one function is the point: the assessment's through-line is "trusted, not enforced",
-and three hand-copied filters drift.
+**Filter before truncating, not after.** All three paths are bounded (`k` on search, `limit` on
+`GET /comms`, `k + over_fetch_margin` on the push path, `comms_context.py:171`). Filtering the
+bounded window afterwards can empty it while permitted matches sit just below: five top-ranked
+builder discoveries followed by an architect discovery would give a reviewer `k=5` search
+nothing. So the policy compiles to a SQL predicate,
+`runner/read_policy.py::policy_predicate(policy) -> (where_sql, params)`, which the comms read
+queries (`search_by_keyword`, `search_by_embedding`, `search_by_hybrid`, `get_messages`) AND into
+their `WHERE` before ranking and `LIMIT`. Where a query cannot take a predicate (e.g. the
+vector-distance arm), it **fetches until `k` permitted rows are found or the candidates run out**,
+never a single fixed over-fetch.
+
+The predicate is generated from one place, and a pure `row_allowed(row, policy)` twin exists only
+for tests and the `warn`-mode counters (C5), with a test that the two always agree. Keeping it
+one source is the point: the assessment's through-line is "trusted, not enforced", and three
+hand-copied filters drift.
 
 ### C4. Who is asking — run identity on pull paths
 
@@ -149,16 +172,26 @@ The pull routes cannot apply a role policy without knowing the caller's role.
 
 - With a resolved run, a pull request may only target the pairs the run is entitled to:
   `search_tiers_value` (`runner/board_scope.py:47`) already renders exactly that set. A request
-  for another pair (e.g. another feature's board) is refused in `enforce` (empty result + an
-  explicit `reason`, not a silent `[]` that "reads like the board knows nothing") and counted in
-  `warn`.
+  for another pair (e.g. another feature's board) is refused in `enforce` (see below for the
+  structural-lookup exception and the error shape) and counted in `warn`.
+- **Structural lookups are not bound to the current pair.** `board-init` deliberately reads
+  *other* feature boards: when a run creates features it looks up each new feature's root goal
+  (`GET /comms?feature=<f>&scope=<f>&type=goal`) and posts one only if none exists. Binding that
+  read to the run's own pair would make every lookup come back empty in `enforce`, and the
+  fragment would post a duplicate root goal per feature. So reads restricted to structural rows
+  (`type ∈ {goal, task}`) on **feature boards of the same `project_root`** are always allowed;
+  they carry no agent reasoning, and `goal`/`task` rows are never withheld anyway (C1).
+  Anything else on a foreign pair is refused.
+- A refusal is an **HTTP error** (`403` + `reason`), never `200 []`. Fragments that branch on
+  "nothing found" (as `board-init` does) must be able to tell "refused" from "empty", or they act
+  on a false negative.
 - Add a query helper that **requires** both `board` and `scope` and use it in the comms read
   queries, as ASSESSMENT ISSUE-1 proposes.
 
 ### C7. Visibility
 
 - `record_board_context` / `render_stats` (`runner/context_record.py`) gain a `withheld` count
-  per reason (`type`, `author`, `pair`).
+  per reason (`type`, `author`, `unverified`, `pair`).
 - The context preview (`POST /comms/agent-context/preview`, `blueprints/comms/context.py`) already takes
   `role`; it shows withheld rows greyed with the rule that hid them, so a human can see the wall.
 
@@ -168,10 +201,11 @@ The pull routes cannot apply a role policy without knowing the caller's role.
 
 | # | Phase | Priority | Risk | Done when |
 |---|---|---|---|---|
-| P1 | Policy shape + `apply_read_policy` + built-in defaults, pure and unit-tested | P0 | Low | function tests cover every rule in C1/C2, incl. governance never withheld |
-| P2 | Wire into the push path (`retrieve_board_context`, semantic + recency) in `warn` | P0 | Low | context record shows withheld counts; prompt unchanged in `warn` |
+| P1 | Policy shape + `policy_predicate` / `row_allowed` + built-in defaults, unit-tested | P0 | Low | tests cover every rule in C1/C2, incl. governance never withheld; predicate and `row_allowed` agree on every case |
+| P2 | Server-stamped `author_role` on every write (from `run_id`; `system` for internal writers; NULL = unverified) | P0 | Med | a post with `from: explorer` under a builder `run_id` is stored as `author_role=builder` |
+| P2b | Wire the predicate into the push path (semantic + recency) in `warn`, before `k` | P0 | Low | context record shows withheld counts; prompt unchanged in `warn` |
 | P3 | Spawn-time run record + `run_id` on `/comms/search` and `GET /comms`; fragments pass it | P0 | Med | a search with a reviewer `run_id` returns the policy-filtered set; body `role` ignored |
-| P4 | `(board, scope)` pair binding on pull routes + required-pair query helper | P1 | Med | cross-feature pull refused in `enforce` with a reason; invariant test over all comms reads |
+| P4 | `(board, scope)` pair binding on pull routes + required-pair query helper | P1 | Med | cross-feature content pull → `403` + reason in `enforce`; `board-init` goal lookup on a new feature still works; invariant test over all comms reads |
 | P5 | Preview + Studio visibility of withheld rows | P1 | Low | preview for `role=reviewer` shows what is hidden and why |
 | P6 | Flip default to `enforce` after a `warn` soak on real runs | P1 | Med | soak data reviewed; no review stage starved of needed context |
 
@@ -181,8 +215,14 @@ P1–P3 are the minimum that makes "independent reviewer" true. P4 closes the cr
 
 ## E. Tests
 
-- Unit (`apply_read_policy`): type-only, author-only, type∧author, empty lists, governance and
-  `decision`/`constraint` always kept, own-run posts kept, unknown role → no filter.
+- Unit (`row_allowed` + `policy_predicate`): type-only, author-only, type∧author, empty lists,
+  governance and `decision`/`constraint` always kept, own-run posts kept, unknown role → no
+  filter, unverified author of an excluded type withheld; the SQL predicate and `row_allowed`
+  agree on every case.
+- Author stamping: `from: "explorer"` posted under a builder `run_id` is stored and filtered as
+  `builder`; a post with no `run_id` is `author_role = NULL`.
+- Truncation: five top-ranked builder discoveries + one architect discovery, reviewer search
+  with `k=5` → returns the architect row (the filter runs before `k`); same on the push path.
 - Resolution: per-role row beats built-in default; explicit row with no `exclude_*` keys reads
   as today (back-compat).
 - Push path: reviewer context for a board seeded with builder `discovery` + architect `discovery`
@@ -190,8 +230,9 @@ P1–P3 are the minimum that makes "independent reviewer" true. P4 closes the cr
   withheld count of 1.
 - Pull path: same seed via `/comms/search` with a reviewer `run_id`; body `role: "human"` does
   not lift the filter; no `run_id` → unrestricted.
-- Pair binding: a feature-A run searching `board=feature, scope=B` → refused with a reason in
-  `enforce`; counted in `warn`.
+- Pair binding: a feature-A run searching `board=feature, scope=B` → `403` + reason in
+  `enforce`; counted in `warn`. A `board-init` lookup `GET /comms?scope=<new>&type=goal` from
+  the same run is allowed, and no duplicate root goal is posted.
 - Recency fallback (no embedding) filtered the same as the semantic path.
 
 Tests go in the matching `tests/` domain folder with unique basenames; rerun
