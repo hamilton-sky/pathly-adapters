@@ -125,6 +125,44 @@ code-aware one. Out of scope to choose here.
 - A turn the provider refuses (rate limit / quota) is shown in chat as "paused until …", never
   silently dropped.
 
+### C6. Chief decisions reach the workers through the board
+
+The chief never messages a builder, reviewer or tester directly. It posts to the board, and
+the workers read it through the paths they already use. How that works today (verified):
+
+- **Pending decisions are injected into every prompt.** `retrieve_board_context` puts
+  `get_pending_decisions` (`type='decision' AND status='pending'`, not superseded,
+  `db/queries/comms_messages.py:153`) into the governance block ("injected unconditionally",
+  `runner/comms_context.py:120-135`, `:271`). Role-read-policy C1 never withholds them.
+- **Other posts reach a worker only by relevance.** A `constraint`, or a decision that is no
+  longer `pending`, is retrieved semantically and has to clear the tier cutoff
+  (`comms_context.py:151-227`).
+- **Acknowledging ends the guarantee.** `POST /comms/acknowledge` sets `status='active'` for
+  the whole row (`comms_messages.py:212`), so after the first acknowledgement a decision drops
+  out of the unconditional block for every role. No fragment calls it today; the UI can.
+- **Timing.** Context is composed at spawn, so a worker sees a new decision on its **next**
+  spawn. A worker already running sees it only if it pulls (`board-search`).
+- **Write gate.** Any role may write a feature board; `chief` is not in `_PROJECT_WRITERS` /
+  `_GLOBAL_WRITERS` (`http_server/blueprints/comms/_helpers.py:63-78`).
+
+Changes this spec makes:
+1. Add `chief` to `_PROJECT_WRITERS` (and `_DEFAULT_WRITE_PERMISSIONS`, kept in sync). Not to
+   `_GLOBAL_WRITERS`: global writes stay with director/evaluator/human, and the chief asks the
+   human.
+2. **Standing directives.** A chief decision is posted as `type='decision'` with a new
+   `binding=1` flag and an optional `to_agent` (role or `*`). The governance query injects
+   `binding=1` rows while not superseded, **whatever their `status`**, filtered by `to_agent`
+   against the reader's role. Acknowledgement records who saw it; it no longer hides it.
+   A directive is retired only by superseding it (the existing `superseded_by` column), so the
+   board shows its history.
+3. **Mid-run delivery.** When a binding decision targets a role that has a run in flight, the
+   supervisor also sends it as a nudge to that run (or, if the run cannot take a nudge, marks
+   the current stage for re-check). Without this, a builder halfway through a stage finishes on
+   the old decision.
+4. **Provenance.** `binding=1` is accepted only from a run token whose role is `chief` or from
+   the UI token (role-read-policy C4). A builder cannot post a "binding" decision to steer the
+   reviewer.
+
 ---
 
 ## D. Phases (each → one board task)
@@ -136,6 +174,7 @@ Prerequisite: role-read-policy P1–P3 (run token, `author_role`, predicate).
 | P1 | `chief.md` contract + `chief-*` fragments + `chief` read-wall row | P0 | Low | composed chief prompt has the tool list and rules; fragment tests pass |
 | P2 | Chief thread + inbox tables, `POST /chief/message`, `GET /chief/thread` (new `blueprints/chief/` domain); spawn one turn via the spawn host with `--resume` | P0 | Med | a human message produces one spawned turn and a reply in the thread; billing row has `category=chief` |
 | P3 | Inbox subscriptions (run done, interaction asked, escalation, goal blocked) with debounce; relay answers via `/runner/agent-answer` | P0 | Med | an agent question reaches chat, the human's answer unblocks the run, the board shows both |
+| P3b | Standing directives (C6): `chief` write permission, `binding`/`to_agent` on decisions, governance query injects binding rows regardless of `status`, binding accepted only from chief/UI token, mid-run nudge | P0 | Med | a chief decision "use Postgres, not SQLite" appears in the next builder, reviewer and tester prompts, still after an acknowledgement; a builder-token post with `binding=1` is refused |
 | P4 | Studio chat panel talks to `/chief/*`; `POST /chat` delegates to the chief (keep `chat_agent.py` as a no-LLM fallback when the chief is off) | P0 | Low | Studio chat drives a goal end-to-end without touching the board UI |
 | P5 | Episodic tier: `memory_episodes` + embedding at run end + retrieval section, behind `policy_predicate` | P1 | Med | a new run on the same feature sees last run's summary; a reviewer does not see the builder's |
 | P6 | Scheduled consolidate + promote at RETRO/DONE with the provenance gate | P1 | Med | lessons appear on project board after DONE; unverified rows are never promoted to global |
@@ -148,6 +187,8 @@ Prerequisite: role-read-policy P1–P3 (run token, `author_role`, predicate).
 - Episode read for `role=reviewer` withholds builder-authored episodes; `role=chief` sees them.
 - Promotion of a `legacy`/`none` row to global is refused.
 - Debounce: ten events in one second → one chief turn.
+- Directive targeting: `to_agent='reviewer'` reaches the reviewer prompt and not the builder's;
+  `to_agent='*'` reaches all; a superseded directive reaches none.
 - Session loss: fresh session reconstructs goal status from board + memory only.
 
 Tests go in the matching `tests/` domain folder with unique basenames; rerun
