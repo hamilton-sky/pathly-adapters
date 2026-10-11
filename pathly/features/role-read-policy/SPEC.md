@@ -147,6 +147,7 @@ The new step is the **built-in role default**, which today does not exist by des
 |---|---|---|---|
 | reviewer | discovery, status, nudge, warning | builder | judge the diff + spec, not the builder's narrative |
 | tester | discovery, status, nudge | builder | acceptance criteria are the oracle, not the build log |
+| chief | status, nudge, discovery | — (any author) | keep the long-lived chief's context lean; see C8 |
 | everyone else | — | — | unchanged |
 
 `warning` is withheld from the reviewer only when authored by the builder: a builder warning
@@ -262,6 +263,34 @@ The pull routes cannot apply a role policy without knowing the caller's role.
 - The context preview (`POST /comms/agent-context/preview`, `blueprints/comms/context.py`) already takes
   `role`; it shows withheld rows greyed with the rule that hid them, so a human can see the wall.
 
+### C8. Future read paths must go through the same predicate
+
+This spec walls the three read paths that exist today. Two planned features add more, and
+each one would reopen the wall if it read the comms tables (or anything derived from them)
+on its own:
+
+- **Memory tiers** ([`chief-agent/SPEC.md`](../chief-agent/SPEC.md) §C3). An episodic tier
+  (embedded run summaries) and a semantic tier (promoted lessons) are new retrieval sources
+  injected next to `retrieve_board_context`. A run summary written by the builder is the
+  builder's narrative in another table, so a reviewer must not get it through memory when
+  the board would withhold it. **Rule:** every memory record carries the same provenance
+  columns (`author_role`, `author_run_id`, `author_source`, C1), stamped from the run token
+  at write time, and every memory read ANDs `policy_predicate` into its query before `k`,
+  the same as C3.
+- **The chief agent** ([`chief-agent/SPEC.md`](../chief-agent/SPEC.md)). The chief is a
+  role like any other: it gets a run token (C4) and a built-in default (C2 gains a `chief`
+  row). Its wall exists to save context, not to prevent anchoring: it reads decisions,
+  constraints, goals/tasks, escalations, pending interactions and run summaries, and not
+  every `status`/`nudge`/`discovery` post. Default:
+  `exclude_types: ["status", "nudge", "discovery"]`, `exclude_authors: []` (all authors).
+  It can still pull a specific row by id when it needs one.
+
+**Provenance before promotion.** `/comms/promote` and `/comms/consolidate` will be scheduled
+automatically by the memory work. Promotion to `global` must then require
+`author_source ∈ {token, system}` (not `legacy`/`none`) plus evaluator or human approval, so
+a spoofed or unverified post cannot become a lesson injected into every future prompt. This
+reuses P2's columns; nothing new in this spec.
+
 ---
 
 ## D. Phases (each → one board task)
@@ -275,6 +304,11 @@ The pull routes cannot apply a role policy without knowing the caller's role.
 | P4 | `(board, scope)` pair binding on pull routes + required-pair query helper | P1 | Med | cross-feature content pull → `403` + reason in `enforce`; `board-init` goal lookup on a new feature still works; invariant test over all comms reads |
 | P5 | Preview + Studio visibility of withheld rows | P1 | Low | preview for `role=reviewer` shows what is hidden and why |
 | P6 | Flip default to `enforce` after a `warn` soak on real runs | P1 | Med | soak data reviewed; no review stage starved of needed context |
+
+**Sequencing with the chief agent.** P1–P3 are also the identity layer the chief agent and the
+memory tiers build on (run token, server-stamped `author_role`, one predicate). So the order is:
+P1–P3 here → chief-agent P1–P4 → P4–P6 here, in parallel with the rest of chief-agent. Building
+the chief first would give it a pre-token identity that P3 then has to retrofit.
 
 P1–P3 are the minimum that makes the wall hold on every default path and for every request an
 agent can shape (C0); none of them stops an agent that reads the DB file directly. P4 closes
@@ -312,6 +346,9 @@ the cross-feature leak.
   `enforce`; counted in `warn`. A `board-init` lookup `GET /comms?scope=<new>&type=goal` from
   the same run is allowed, and no duplicate root goal is posted.
 - Recency fallback (no embedding) filtered the same as the semantic path.
+- Invariant (C8): every query that reads `comms_messages`, or a memory table derived from it,
+  goes through `policy_predicate`. A test enumerates those queries, so a new read path that
+  skips the predicate fails CI instead of quietly reopening the wall.
 
 Tests go in the matching `tests/` domain folder with unique basenames; rerun
 `scripts/gen_test_index.py`.
