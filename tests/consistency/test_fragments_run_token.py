@@ -7,7 +7,7 @@ from pathlib import Path
 from tests._paths import SRC
 
 CORE = SRC / "pathly_data" / "core"
-HEADER = 'X-Pathly-Run-Token: $PATHLY_RUN_TOKEN'
+HEADER = "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN"
 
 
 def missing_header(root: Path) -> list[str]:
@@ -36,5 +36,7 @@ def test_check_detects_a_removed_header(tmp_path):
     target = copy / "skills" / "fragments" / "comms-post.md"
     text = target.read_text(encoding="utf-8")
     assert HEADER in text
-    target.write_text(re.sub(r'-H "X-Pathly-Run-Token[^"]*" ', "", text, count=1), encoding="utf-8")
+    target.write_text(
+        re.sub(r'-H "X-Pathly-Run-Token[^"]*" ', "", text, count=1), encoding="utf-8"
+    )
     assert missing_header(copy) != []

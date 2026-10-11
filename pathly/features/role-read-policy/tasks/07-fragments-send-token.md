@@ -1,7 +1,7 @@
 # Send the run token on every board call in the core skills, fragments and agents
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 05, 06
 Test first: yes
 
@@ -58,6 +58,8 @@ exit 0
 **Decisions**: header placed inline after `curl -s` (single-line curls need it on the same line; also covers inline-backtick curls in project-decompose/goalize). Snapshot diffs are only those curl lines gaining the header. The test treats a curl and its backslash continuations as one command. Non-curl mentions (`GET http...`, consult.md `POST http...`) are prose and unchanged.
 **Shortcuts taken**: none. All files assume POSIX shell; none written for PowerShell. Adapter copies are not tracked in the tree (generated at install), so `python -m build` produced nothing to commit.
 **For later tickets**: new fragments with a board curl must carry the header or the consistency test fails.
+
+**Review fixes**: gate Lint failure (black would reformat tests/consistency/test_fragments_run_token.py): ran black on that file; black --check, file-size, mirror-reads, gen_test_index --check and lint-imports all pass; install_skills 417 passed, check_adapters exit 0.
 
 ## Review findings (round 1, gate)
 
