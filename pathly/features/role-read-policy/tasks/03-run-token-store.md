@@ -1,7 +1,7 @@
 # Add the run_tokens table and the queries to mint, resolve and revoke a run token
 
 Type: task
-Status: resolved
+Status: open
 Blocked by: —
 Test first: yes
 
@@ -63,3 +63,9 @@ exit 0
 **Shortcuts taken**: none.
 
 **For later tickets**: import `mint_run_token`/`resolve_run_token`/`revoke_run_tokens` from `pathly_orchestrator.db.queries.run_tokens`. The revoke is not yet called anywhere; ticket 04 or 06 decides when a run's tokens are revoked.
+
+## Review findings (round 1, floor guard)
+
+floor guard: the diff weakens the bar instead of meeting it
+suppress: tests/db/test_run_tokens.py: assert resolve_run_token(conn, None) is None  # type: ignore[arg-type]
+if a finding is intended, the ticket needs a line like: Floor: allow <category>
