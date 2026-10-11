@@ -84,7 +84,8 @@ export function TerminalSpawnListener(): null {
       // Carry the run kind (board one-shot → 'single', FSM pipeline → 'flow') so the Monitor
       // categorizes it correctly instead of tagging every registered runner tab 'flow'.
       const category = data.category as 'flow' | 'loop' | 'single' | undefined
-      void window.pathly.terminal.registerRunner(tab_id, topic, run_id, label, category)
+      const runToken = typeof data.run_token === 'string' ? data.run_token : undefined
+      void window.pathly.terminal.registerRunner(tab_id, topic, run_id, label, category, runToken)
         .then(() => window.pathly.terminal.spawn(tab_id, cwd, undefined, argv, initialInput))
         .then(() => {
           useTerminalStore.getState().updateTabStatus(tab_id, 'running')

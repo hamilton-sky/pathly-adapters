@@ -194,7 +194,9 @@ class SpawnHost:
     ) -> SpawnedProcess | None:
         cwd = str(event.get("cwd") or os.getcwd())
         try:
-            proc = SpawnedProcess(argv, cwd, self._child_env(cwd))
+            proc = SpawnedProcess(
+                argv, cwd, self._child_env(cwd, event.get("run_token"))
+            )
         except OSError as exc:
             logger.error("pty_host: spawn failed for %s (%s): %s", tab_id, argv[0], exc)
             self._report_unrunnable(
@@ -217,16 +219,19 @@ class SpawnHost:
         return proc
 
     @staticmethod
-    def _child_env(cwd: str) -> dict[str, str]:
+    def _child_env(cwd: str, run_token: str | None = None) -> dict[str, str]:
         # PATHLY_GATE_BILLED marks this as a gate-billed runner spawn so the interactive
         # stop hook skips it — without it the hook double-bills and mis-attributes via its
         # "most recently active feature" guess. PATHLY_PROJECT_ROOT matches what Studio
         # exports on every child.
-        return {
+        env = {
             **os.environ,
             "PATHLY_PROJECT_ROOT": cwd,
             "PATHLY_GATE_BILLED": "1",
         }
+        if run_token:
+            env["PATHLY_RUN_TOKEN"] = str(run_token)
+        return env
 
     # ── result reporting ──────────────────────────────────────────────────────
 

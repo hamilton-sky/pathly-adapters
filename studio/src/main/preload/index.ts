@@ -255,8 +255,8 @@ contextBridge.exposeInMainWorld('pathly', {
       ipcRenderer.invoke('terminal:preflight', force),
     getEngines: (): Promise<RunningEngine[]> =>
       ipcRenderer.invoke('terminal:get-engines'),
-    registerRunner: (tabId: string, topic: string, runId: string, label?: string, category?: 'flow' | 'loop' | 'single'): Promise<void> =>
-      ipcRenderer.invoke('terminal:register-runner', tabId, topic, runId, label, category),
+    registerRunner: (tabId: string, topic: string, runId: string, label?: string, category?: 'flow' | 'loop' | 'single', runToken?: string): Promise<void> =>
+      ipcRenderer.invoke('terminal:register-runner', tabId, topic, runId, label, category, runToken),
     onStageResult: (cb: (tabId: string, data: Record<string, unknown>) => void): (() => void) => {
       const listener = (_e: Electron.IpcRendererEvent, tabId: string, data: Record<string, unknown>): void => cb(tabId, data)
       ipcRenderer.on('terminal:stage-result', listener)

@@ -1,7 +1,7 @@
 # Put the run token into the spawned agent's environment in both spawn hosts
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 04
 Test first: yes
 
@@ -59,3 +59,13 @@ prints terminal.ts shorter: True
 - Ticket 04's Answer
 
 ## Answer
+
+**Built**: `pty_host/host.py` (`_child_env(cwd, run_token=None)` sets `PATHLY_RUN_TOKEN` only when the event has a non-empty `run_token`); new `studio/src/main/ipc/terminal/spawnEnv.ts` (`buildSpawnEnv(cwd, meta)`); `terminal.ts` calls it (391 -> 382 lines) and `terminal:register-runner` takes an optional `runToken`; `ptyRegistry.ts` meta type gains `run_token`; preload `index.ts`, `global.d.ts` and `TerminalSpawnListener.tsx` pass `data.run_token`. Tests: two new in `tests/runner_supervisor/test_pty_host.py`, new `spawnEnv.test.ts`.
+
+**Proof**: `pytest test_pty_host.py` -> 19 passed (new token test failed first at commit 800ad33). `npx vitest run src/main/ipc/terminal/spawnEnv.test.ts` -> 3 passed. Both tsc projects exit 0. terminal.ts shorter: True (382). black on pty_host clean, check_file_size OK, lint-imports 1 kept 0 broken.
+
+**Decisions**: `buildSpawnEnv` returns only the Pathly entries (PROJECT_ROOT, GATE_BILLED for runner tabs, RUN_TOKEN); `terminal.ts` still layers `process.env` and the enriched PATH under it, so the token never touches the main process env. The PROJECT_ROOT/GATE_BILLED comment moved into spawnEnv.ts with the code.
+
+**Shortcuts taken**: none.
+
+**For later tickets**: the child env var is `PATHLY_RUN_TOKEN` in both hosts. Studio's non-runner tabs never get it.

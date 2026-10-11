@@ -26,6 +26,7 @@ import {
 import { attachStartupHandling } from './terminal/promptInjector'
 import { reportRunFinished, type OneShotTelemetry } from './terminal/spawnReporting'
 import { openTerminalPopout } from './terminal/popout'
+import { buildSpawnEnv } from './terminal/spawnEnv'
 import {
   CLI_ENGINES, caps, interactiveRunning, activeEngines, queuedEngines, type RunningEngine,
   acquireEngineSlot, releaseEngineSlot, awaitRateLimitCooldown, broadcastSpawnState,
@@ -160,23 +161,13 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
         cols: 80,
         rows: 24,
         cwd: cwd,
-        // Export PATHLY_PROJECT_ROOT so the stop hook (which runs as a child of this
-        // agent PTY) can find the active feature in the DB and write the BILLING_UPDATE.
-        // Without it, stop_telemetry.py hits `if not project_root: sys.exit(0)` and
-        // in-app COST silently stays blank. cwd IS the project root (validated above);
-        // the hook forward-slash-normalizes it, matching the stored fsm_events key.
-        // Runner spawns are billed authoritatively by the gate → /runner/terminal/result
-        // (adapter-agnostic, run-keyed). Mark them so the claude stop hook SKIPS them and can't
-        // double-bill / mis-attribute via its "most recent feature" guess. Interactive claude
-        // (no runner tab) carries no marker, so the hook still bills it (its only cost source).
         env: {
           ...process.env,
           // Widened PATH — a Finder-launched Electron app inherits launchd's minimal PATH,
           // not the user's shell PATH, so without this an engine (or a tool the engine
           // shells out to) can be unresolvable even though it works in the user's terminal.
           PATH: enrichedPath(),
-          PATHLY_PROJECT_ROOT: cwd,
-          ...(runnerTabMeta.has(tabId) ? { PATHLY_GATE_BILLED: '1' } : {}),
+          ...buildSpawnEnv(cwd, runnerTabMeta.get(tabId)),
         } as Record<string, string>,
       })
     } catch (e) {
@@ -382,8 +373,8 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
   // first and race a reconcile into false-clearing a run that is actually still alive.
   ipcMain.handle('terminal:get-engines', () => listActiveEngines())
 
-  ipcMain.handle('terminal:register-runner', (_event, tabId: string, topic: string, runId: string, label?: string, category?: 'flow' | 'loop' | 'single') => {
-    runnerTabMeta.set(tabId, { run_id: runId, topic, spawnedAt: Date.now(), label: label ?? tabId, category })
+  ipcMain.handle('terminal:register-runner', (_event, tabId: string, topic: string, runId: string, label?: string, category?: 'flow' | 'loop' | 'single', runToken?: string) => {
+    runnerTabMeta.set(tabId, { run_id: runId, topic, spawnedAt: Date.now(), label: label ?? tabId, category, run_token: runToken })
   })
 
   ipcMain.handle('terminal:popout', (event, tabId: string, label: string) =>
