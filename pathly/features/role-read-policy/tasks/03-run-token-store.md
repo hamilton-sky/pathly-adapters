@@ -1,7 +1,7 @@
 # Add the run_tokens table and the queries to mint, resolve and revoke a run token
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: —
 Test first: yes
 
@@ -61,6 +61,8 @@ exit 0
 **Decisions**: `resolve_run_token` returns a plain dict of all columns (includes `token_hash`, `created_at`, `revoked_at`); `revoke_run_tokens` only counts still-live tokens, so a second call returns 0. Tokens are hashed with sha256 hexdigest.
 
 **Shortcuts taken**: none.
+
+**Review fixes**: round 1 floor guard (suppression `# type: ignore[arg-type]` on the `resolve_run_token(conn, None)` assert): removed the comment. `resolve_run_token` is already annotated `token: str | None`, so the call type-checks; `mypy tests/db/test_run_tokens.py` -> no issues. The None case is still asserted. Re-ran: test_run_tokens 5 passed, check_file_size exit 0, migrations.py diff empty, Commands.md Test 907 passed 2 skipped, Lint all pass.
 
 **For later tickets**: import `mint_run_token`/`resolve_run_token`/`revoke_run_tokens` from `pathly_orchestrator.db.queries.run_tokens`. The revoke is not yet called anywhere; ticket 04 or 06 decides when a run's tokens are revoked.
 

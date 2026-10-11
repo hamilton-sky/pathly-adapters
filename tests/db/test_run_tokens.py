@@ -47,7 +47,7 @@ def test_unknown_and_empty_tokens_resolve_to_none() -> None:
     conn = get_db()
     assert resolve_run_token(conn, "not-a-real-token") is None
     assert resolve_run_token(conn, "") is None
-    assert resolve_run_token(conn, None) is None  # type: ignore[arg-type]
+    assert resolve_run_token(conn, None) is None
 
 
 def test_migration_twice_is_harmless() -> None:
