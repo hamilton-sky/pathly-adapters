@@ -57,3 +57,4 @@ while `row_allowed` agrees. Ticket 10 runs it.
 - Should a revoked or unknown token be refused on write (`401`), or stored as `author_source=none`?
   Planned default: stored as `none` and logged, so a run that outlives its token does not lose a
   post. Ticket 09.
+- 01 — `runner/read_policy.py` holds policy shape, built-in walls, `policy_predicate` and pure `row_allowed`; stdlib only, tested to agree.

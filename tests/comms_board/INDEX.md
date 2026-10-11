@@ -4,7 +4,7 @@
 
 Comms board / message-board subsystem — messages, tasks, artifacts, goals, context retrieval & relevance, board mirror & hydration.
 
-45 test file(s).
+46 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -53,3 +53,4 @@ Comms board / message-board subsystem — messages, tasks, artifacts, goals, con
 | `test_comms_write_perm.py` | Tests for Phase 13 — role-based write permissions | 33 |
 | `test_phase_board_post.py` | unified-ai-routing Conv 6 — /record_phase mirrors phase boundaries onto the board | 3 |
 | `test_post_artifact_indexing.py` | Regression (unified-ai-routing review): /comms/post must call index_artifact_async | 1 |
+| `test_read_policy.py` | Read policy core: row_allowed rules and the SQL predicate agreeing with it | 10 |

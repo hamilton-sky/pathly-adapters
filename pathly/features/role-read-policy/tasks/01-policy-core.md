@@ -1,7 +1,7 @@
 # Add the read-policy core: policy shape, built-in walls, SQL predicate and its pure twin
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: —
 Test first: yes
 
@@ -62,3 +62,13 @@ prints internal imports: 0
 - `src/pathly_orchestrator/runner/board_scope.py` (read only here)
 
 ## Answer
+
+**Built**: `src/pathly_orchestrator/runner/read_policy.py` (ReadPolicy, BUILTIN_DEFAULTS, NEVER_WITHHELD_TYPES, row_allowed, policy_predicate); `tests/comms_board/test_read_policy.py` (21 tests); regenerated `tests/INDEX.md` and `tests/comms_board/INDEX.md`.
+
+**Proof**: `pytest tests/comms_board/test_read_policy.py` -> 21 passed (rules plus a matrix of every type x role x source x own/other/none run, for each of 4 built-ins and caller run set/None, predicate ids == row_allowed ids). Import check printed `internal imports: 0`. Test-only commit made first and failed on import. Test command (4 domains): 890 passed, 2 skipped. compileall, check_file_size, gen_test_index --check, lint-imports all OK.
+
+**Decisions**: ReadPolicy uses the functional TypedDict form since `global` is a keyword. `anonymous` = type union (discovery, status, nudge, warning) with author `builder`. A None caller_run_id grants no own-post exemption. The predicate wraps columns in COALESCE so NULLs never make a row vanish.
+
+**Shortcuts taken**: none.
+
+**For later tickets**: `black --check src/ tests/` already fails on 4 files before this ticket (code_context_codeintel.py, test_code_context_codeintel.py, blueprints/code/query.py, code_context.py), so the Lint command fails on a clean tree; not mine. Predicate param order: excluded types, then caller run id (if any), then authors.
