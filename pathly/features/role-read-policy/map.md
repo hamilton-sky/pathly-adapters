@@ -63,3 +63,4 @@ while `row_allowed` agrees. Ticket 10 runs it.
 - 03 — run_tokens table (sha256 only) + mint/resolve/revoke in db/queries/run_tokens.py; resolve returns a dict or None; migration is add_run_tokens in migrations_provenance.py.
 - 04 — token minted in terminal_identity._mint_spawn_token, payload key `run_token`, revoked in _settle_spawn_identity; role = state.agent_role (FSM response agent) / board-run current_state / goal-loop builder.
 - 05 — both hosts export PATHLY_RUN_TOKEN from payload run_token (pty_host._child_env; Studio via register-runner arg + terminal/spawnEnv.ts buildSpawnEnv).
+- 06 — http_server/run_identity.py: caller_identity(request) -> CallerIdentity(kind run|anonymous, run_id, role, feature, project_root, board, scope); body never read; CORS lists allow X-Pathly-Run-Token.

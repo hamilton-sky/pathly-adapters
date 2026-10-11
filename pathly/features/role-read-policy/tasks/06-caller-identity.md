@@ -1,7 +1,7 @@
 # Resolve the caller's identity from the X-Pathly-Run-Token header
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 03
 Test first: yes
 
@@ -43,3 +43,13 @@ prints passed
 - Ticket 03's Answer
 
 ## Answer
+
+**Built**: `src/pathly_orchestrator/http_server/run_identity.py` (`CallerIdentity` dataclass, `caller_identity(request)`); `X-Pathly-Run-Token` added to both CORS `Allow-Headers` strings in `http_server/middleware.py`; `tests/http_api/test_caller_identity.py` (+ regenerated INDEX.md files).
+
+**Proof**: `python -m pytest tests/http_api/test_caller_identity.py -q -p no:cacheprovider` -> 8 passed (valid token -> run; missing/empty/unknown/revoked -> anonymous; body role human with no token -> anonymous; body role does not override token; preflight allows header). The test failed (8 failed) at the test-only commit. Commands.md Test: 916 passed, 2 skipped. check_file_size, lint-imports, gen_test_index --check, black on my files all clean.
+
+**Decisions**: `CallerIdentity` is a frozen dataclass with `kind` Literal incl. reserved `ui`. Empty header skips the DB and is not logged; only a non-empty unresolved token is logged at info with remote_addr.
+
+**Shortcuts taken**: none.
+
+**For later tickets**: import `from ..http_server.run_identity import caller_identity` lazily inside route functions; call `caller_identity(request)` with the Flask request.
