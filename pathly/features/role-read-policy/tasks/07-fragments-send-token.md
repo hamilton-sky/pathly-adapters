@@ -1,7 +1,7 @@
 # Send the run token on every board call in the core skills, fragments and agents
 
 Type: task
-Status: resolved
+Status: open
 Blocked by: 05, 06
 Test first: yes
 
@@ -58,3 +58,14 @@ exit 0
 **Decisions**: header placed inline after `curl -s` (single-line curls need it on the same line; also covers inline-backtick curls in project-decompose/goalize). Snapshot diffs are only those curl lines gaining the header. The test treats a curl and its backslash continuations as one command. Non-curl mentions (`GET http...`, consult.md `POST http...`) are prose and unchanged.
 **Shortcuts taken**: none. All files assume POSIX shell; none written for PowerShell. Adapter copies are not tracked in the tree (generated at install), so `python -m build` produced nothing to commit.
 **For later tickets**: new fragments with a board curl must carry the header or the consistency test fails.
+
+## Review findings (round 1, gate)
+
+gate: Build: python -m compileall -q src/pathly_orchestrator
+gate: Test: python -m pytest tests/comms_board tests/db tests/runner_supervisor tests/http_api -q -x -p no:cacheprovider
+gate: Lint: black --check src/ tests/ && python scripts/check_file_size.py && python scripts/check_no_mirror_reads.py && python scripts/gen_test_index.py --check && lint-imports
+gate: Lint failed. the last lines of its output:
+would reformat /home/user/pathly-adapters/tests/consistency/test_fragments_run_token.py
+
+Oh no! 💥 💔 💥
+1 file would be reformatted, 475 files would be left unchanged.
