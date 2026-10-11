@@ -1,7 +1,7 @@
 # Add the run_tokens table and the queries to mint, resolve and revoke a run token
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: —
 Test first: yes
 
@@ -71,3 +71,8 @@ exit 0
 floor guard: the diff weakens the bar instead of meeting it
 suppress: tests/db/test_run_tokens.py: assert resolve_run_token(conn, None) is None  # type: ignore[arg-type]
 if a finding is intended, the ticket needs a line like: Floor: allow <category>
+
+
+### Review fixes
+
+- Floor guard (`# type: ignore[arg-type]` on the `None` assert): removed the suppression. `resolve_run_token` is typed `token: str | None`, so the call type-checks without it; the assertion is unchanged. Re-ran `pytest tests/db/test_run_tokens.py` -> 5 passed; `check_file_size.py` exit 0; `db/migrations.py` unchanged.

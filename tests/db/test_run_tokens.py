@@ -48,7 +48,7 @@ def test_unknown_and_empty_token_resolve_to_none() -> None:
     _mint(conn)
     assert resolve_run_token(conn, "nope") is None
     assert resolve_run_token(conn, "") is None
-    assert resolve_run_token(conn, None) is None  # type: ignore[arg-type]
+    assert resolve_run_token(conn, None) is None
 
 
 def test_migration_twice_is_harmless() -> None:
