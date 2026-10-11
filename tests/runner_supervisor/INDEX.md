@@ -4,7 +4,7 @@
 
 Runner control loop, supervisor, spawn channel, lane/worktree isolation, file-claim registry, services facade.
 
-15 test file(s).
+16 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -22,4 +22,5 @@ Runner control loop, supervisor, spawn channel, lane/worktree isolation, file-cl
 | `test_runner_fsm_integration.py` | Integration tests: the REAL FSM driven through the REAL driver loops | 5 |
 | `test_services.py` | Tests for the services layer. No fixture declarations needed — conftest._isolate_db is autouse | 10 |
 | `test_spawn_channel.py` | The topic-independent terminal spawn channel | 4 |
+| `test_spawn_run_token.py` | A spawn mints a run token, sends it in TERMINAL_SPAWN, and revokes it when the spawn ends | 5 |
 | `test_supervisor.py` | Tests for pathly_orchestrator.supervisor (Conv 2 — Phases 5-7) | 28 |
