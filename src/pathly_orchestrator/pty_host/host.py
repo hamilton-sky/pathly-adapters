@@ -194,7 +194,9 @@ class SpawnHost:
     ) -> SpawnedProcess | None:
         cwd = str(event.get("cwd") or os.getcwd())
         try:
-            proc = SpawnedProcess(argv, cwd, self._child_env(cwd))
+            proc = SpawnedProcess(
+                argv, cwd, self._child_env(cwd, event.get("run_token"))
+            )
         except OSError as exc:
             logger.error("pty_host: spawn failed for %s (%s): %s", tab_id, argv[0], exc)
             self._report_unrunnable(
@@ -217,16 +219,22 @@ class SpawnHost:
         return proc
 
     @staticmethod
-    def _child_env(cwd: str) -> dict[str, str]:
+    def _child_env(cwd: str, run_token: object = None) -> dict[str, str]:
         # PATHLY_GATE_BILLED marks this as a gate-billed runner spawn so the interactive
         # stop hook skips it — without it the hook double-bills and mis-attributes via its
         # "most recently active feature" guess. PATHLY_PROJECT_ROOT matches what Studio
-        # exports on every child.
-        return {
+        # exports on every child. PATHLY_RUN_TOKEN is the per-run identity token minted at
+        # spawn; it is set only when the payload carries one (the mint is best-effort), and a
+        # token inherited from the host's own environment is never passed on to a child.
+        env = {
             **os.environ,
             "PATHLY_PROJECT_ROOT": cwd,
             "PATHLY_GATE_BILLED": "1",
         }
+        env.pop("PATHLY_RUN_TOKEN", None)
+        if isinstance(run_token, str) and run_token:
+            env["PATHLY_RUN_TOKEN"] = run_token
+        return env
 
     # ── result reporting ──────────────────────────────────────────────────────
 

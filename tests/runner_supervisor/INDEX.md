@@ -12,7 +12,7 @@ Runner control loop, supervisor, spawn channel, lane/worktree isolation, file-cl
 | `test_file_claims.py` | Unit tests for the cross-feature file-claim overlap registry | 6 |
 | `test_isolation.py` | Tests for supervisor/isolation.py — LaneIsolation workspace seam | 11 |
 | `test_park_resume.py` | Tests for the human-checkpoint "parked" status and its resume path | 8 |
-| `test_pty_host.py` | Tests for the headless spawn host (``pathly-pty-host``) | 17 |
+| `test_pty_host.py` | Tests for the headless spawn host (``pathly-pty-host``) | 19 |
 | `test_pty_host_e2e.py` | End-to-end: a supervisor spawn wait satisfied WITHOUT Studio | 5 |
 | `test_run_identity_stamps.py` | run-identity: server-side run_id + board_scope stamping (supervisor guarantee) | 6 |
 | `test_run_log_seams.py` | run_log write seams — best-effort spawn + result persistence (unified-control-plane P0, | 2 |

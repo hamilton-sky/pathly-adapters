@@ -798,7 +798,8 @@ Four behaviors are load-bearing rather than incidental:
 
 The child env carries `PATHLY_GATE_BILLED=1` (so the interactive stop hook skips the run rather than
 double-billing it via its "most recently active feature" guess) and `PATHLY_PROJECT_ROOT`, matching
-what Studio exports.
+what Studio exports. When the `TERMINAL_SPAWN` payload carries a `run_token` it also sets
+`PATHLY_RUN_TOKEN` (exactly as received; absent token = no key), same as Studio's `buildSpawnEnv`.
 
 ## Retry ladder — what varies by ATTEMPT, not just who owns it
 
