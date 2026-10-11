@@ -20,7 +20,7 @@ export const ptyOwners = new Map<string, number>()
 export const ptyOutput = new Map<string, string[]>()
 
 // Maps tabId → runner metadata registered before spawn
-export const runnerTabMeta = new Map<string, { run_id: string; topic: string; spawnedAt: number; label: string; category?: 'flow' | 'loop' | 'single' }>()
+export const runnerTabMeta = new Map<string, { run_id: string; topic: string; spawnedAt: number; label: string; category?: 'flow' | 'loop' | 'single'; run_token?: string }>()
 // Tracks tabs killed by the user (not by the runner exiting naturally)
 export const ptyKilledByRunner = new Set<string>()
 // Tabs the user explicitly stopped — suppresses the transient-failure retry, so Stop always

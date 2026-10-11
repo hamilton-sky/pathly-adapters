@@ -104,6 +104,7 @@ one concern each (split 2026-08-18 under the 400-line ratchet — the file was 1
 | `promptInjector.ts` | startup-gate answering + the interactive bracketed-paste injector |
 | `spawnReporting.ts` | the post-exit POSTs (`/runner/terminal/result`, `/db/invocation`) |
 | `preflight.ts` | is this engine installed? |
+| `spawnEnv.ts` | `buildSpawnEnv(cwd, meta)` — the PTY child env: project root, enriched PATH, and for a runner tab `PATHLY_GATE_BILLED` + `PATHLY_RUN_TOKEN` (the per-run token from the `TERMINAL_SPAWN` payload, via `terminal:register-runner`'s `runToken` arg; set only when present, never in `process.env`, never logged) |
 | `popout.ts` | detach a tab into its own BrowserWindow |
 | `log.ts` | `slog` |
 
