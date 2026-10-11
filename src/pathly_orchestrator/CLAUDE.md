@@ -501,9 +501,10 @@ pathly_orchestrator/
     context_record.py      # render_stats() + record_board_context() — appends ONE `BOARD_CONTEXT` fsm_event per prompt build carrying the volume actually rendered vs dropped (rendered_entries/chars, per-tier chars, omitted_entries/chars) PLUS the budget+k in force, so the next move on those numbers is made from data. Inert to telemetry: append_event projects only AGENT_DONE/BILLING_UPDATE. Wrapped + never-raising (a telemetry write must never break prompt assembly) and create_dir=False so it can't plant an empty decoy dir that later wins _resolve_storage_path's existence probe. Opt-in via storage_path, which keeps the /comms/agent-context preview write-free
     sections.py            # parse_sections/slugify_heading/structure_key — markdown section index (anchors)
     hydrate.py             # hydrate_section/ensure_indexed — /section payload + staleness; index_artifact_async (eager, section-index only)
-    code_context.py        # CodeContextProvider protocol + get_provider()/build_block() (backend=auto[default]|off|cli|lsp|both) — codebase-intelligence context injection
+    code_context.py        # CodeContextProvider protocol + get_provider()/build_block() (backend=auto[default]|off|cli|lsp|both|codeintel) — codebase-intelligence context injection
     code_context_cli.py    # CliProvider — shells out to codebase-memory-mcp graph for code_context.py
     code_context_lsp.py    # LspProvider — bridges a long-lived Serena MCP session (LSP, always-fresh); async warm-up, never-raise
+    code_context_codeintel.py # CodeintelProvider — backend=codeintel: answers /code/query's op as asked (real callers/impact rows, semantic search) via the installed `codeintel` package — a running `codeintel serve-http` first, else one-shot `codeintel query --json`; `auto` prefers it when installed; never-raise
     cli.py                 # run_flow, main, resolve_stage, handle_blocked, handle_decide
   supervisor/              # Visible runner: PTY spawning, SSE broadcast, registry
     state.py               # RunnerState, OpenSession dataclasses

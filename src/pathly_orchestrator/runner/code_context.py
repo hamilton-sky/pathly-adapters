@@ -27,6 +27,7 @@ import time
 from typing import Protocol, Sequence, runtime_checkable
 
 from .code_context_cli import CliProvider
+from .code_context_codeintel import CodeintelProvider
 from .code_context_lsp import LspProvider
 
 logger = logging.getLogger(__name__)
@@ -145,6 +146,8 @@ def get_provider(backend: str | None) -> CodeContextProvider:
         return LspProvider()
     if key == "both":
         return CompositeProvider([CliProvider(_resolve_tool()), LspProvider()])
+    if key == "codeintel":
+        return CodeintelProvider()
     return _PROVIDERS.get(key, _PROVIDERS["none"])
 
 
@@ -171,7 +174,7 @@ def _resolve_backend() -> str:
 
     Values: ``auto`` (**default** — detect an installed backend, see
     :func:`_auto_backend`), ``off`` (safe-off → ``none``), ``cli`` (graph), ``lsp``
-    (Serena), or ``both``. Persisted in ``~/.pathly`` via app_settings and read at
+    (Serena), ``both``, or ``codeintel`` (op-aware, see ``code_context_codeintel``). Persisted in ``~/.pathly`` via app_settings and read at
     call time, so flipping it takes effect without a server restart.
 
     The default is ``auto`` (not ``off``) so code-intelligence just-works wherever
@@ -182,12 +185,12 @@ def _resolve_backend() -> str:
     key = _get_setting("code_context.backend", "auto").strip().lower()
     if key == "auto":
         return _auto_backend()
-    return key if key in ("cli", "lsp", "both") else "none"
+    return key if key in ("cli", "lsp", "both", "codeintel") else "none"
 
 
 def _auto_backend() -> str:
     """Resolve ``auto`` by probing which external code-intel tool is installed:
-    prefer the graph (``cli`` / codebase-memory-mcp) for headless breadth, else
+    prefer ``codeintel`` (answers the op asked, not a per-file summary), then the graph (``cli`` / codebase-memory-mcp) for headless breadth, else
     fall back to ``lsp`` (Serena, launched via ``uvx``), else ``none``.
 
     A pure PATH probe (:func:`shutil.which`) — never raises. The backends are NOT
@@ -195,6 +198,8 @@ def _auto_backend() -> str:
     fallback) instead of a config that claims to be on while doing nothing.
     """
     try:
+        if shutil.which("codeintel"):
+            return "codeintel"
         if shutil.which(_resolve_tool()):
             return "cli"
         if shutil.which("uvx"):
@@ -232,6 +237,7 @@ _BACKEND_DEPS: dict[str, tuple[str, str]] = {
         "install the codebase-memory-mcp binary and put it on PATH",
     ),
     "lsp": ("uvx", "install uv (provides uvx) — https://docs.astral.sh/uv/"),
+    "codeintel": ("codeintel", "pip install codecortex && codeintel setup --all <repo>"),
 }
 
 

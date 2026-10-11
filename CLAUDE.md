@@ -211,7 +211,15 @@ the backend is off → then just use Grep/Read. (`pathly-fsm-call code-query --o
 is a shim, but the HTTP form passes `project_root`, which the proxy needs to resolve
 relative targets.)
 
-Two backends sit behind the one proxy — pick per request with `"engine": "graph" | "lsp" | "both"`
+**`codeintel` backend (sketch).** When the `codeintel` package is installed (`pip install codecortex`),
+`auto` resolves to it and `/code/query` hands the op to codeintel unchanged — real caller/callee/impact
+rows and semantic `search` (new ops: `callees`, `search`), instead of the per-file symbol-count block
+below. Pathly calls a running `codeintel serve-http` (`code_context.codeintel_url`, default
+`http://127.0.0.1:8766`; token via `CODEINTEL_TOKEN` or `code_context.codeintel_token`), else one-shot
+`codeintel query --json`. `engine` is forwarded to codeintel (`graph|lsp|semantic|both|all`);
+`engine: cli` still reaches the legacy graph. Prompt injection (`build_block`) still uses the `cli` block.
+
+Two legacy backends sit behind the one proxy — pick per request with `"engine": "graph" | "lsp" | "both"`
 (omit → the `code_context.backend` setting decides — default `auto` (detect the installed
 backend), else `off` | `cli` | `lsp` | `both`):
 
