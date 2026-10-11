@@ -1,7 +1,7 @@
 # Mint a run token at spawn, send it in the TERMINAL_SPAWN payload, revoke it when the spawn ends
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 03
 Test first: yes
 
@@ -53,3 +53,21 @@ prints terminal.py lines ok: True
 - Ticket 03's Answer
 
 ## Answer
+
+**Built**: `supervisor/terminal_identity.py` (`_spawn_role`, `_mint_spawn_token`, `_issue_spawn_token`; `_settle_spawn_identity` now revokes the run's tokens before its early return), `supervisor/terminal.py` (3 lines: import, `_run_token = _issue_spawn_token(...)` as the first statement inside the `try`, `"run_token"` in the `TERMINAL_SPAWN` payload; 390 -> 393 lines), `tests/runner_supervisor/test_spawn_run_token.py` (committed first, failing), regenerated `tests/INDEX.md` and `tests/runner_supervisor/INDEX.md`.
+
+**Proof**:
+- `python -m pytest tests/runner_supervisor/test_spawn_run_token.py tests/runner_supervisor/test_run_identity_stamps.py -q -p no:cacheprovider` -> 11 passed (FSM stage token resolves to run_id + `builder`; board run resolves to `planner` and `(project, scope-x)`; loop task -> `builder`; token resolves to None after settle; token revoked when the broadcast raises; mint error -> `run_token: None`, spawn still goes out).
+- terminal.py line check prints `terminal.py lines ok: True` (393 lines).
+- Commands.md Test -> 912 passed, 2 skipped. Lint (black, check_file_size, check_no_mirror_reads, gen_test_index --check, lint-imports) all pass.
+
+**Decisions**: where role comes from, per kind of spawn:
+- FSM stage: the flow's `agent_map[state.current_state]` (via `fsm_ops._load_flow(state.flow, project_root)`), mapped through `fsm_compose_tables._SKILL_AGENT_ROLE` (e.g. `team/build` -> `builder`), else the last path segment (`architect`). Decompose in `consultation` mode is an FSM flow too, so it reads the same field.
+- Loop task (`sched-` run_id prefix): `task_prompt._TASK_ROLE` = `builder`.
+- Board run (`flow == "board-run"`, incl. planner/plan decompose, evaluator, single): `state.current_state`, which `board_run` sets to the agent (or the mode when no agent was chosen).
+- board = `state.scope_tier` (default `feature`), scope = the issued board scope from the identity tuple, feature = the run slug.
+- The mint is inside the `try`/`finally` that settles identity (review note), and revoke runs before the `if not identity` early return, so a token is revoked even when the identity row was never written.
+
+**Shortcuts taken**: a feedback-resolution spawn (`orchestrator_stage`, run_id `<topic>-fb<N>-<ts>`) runs a different agent (`target`) than the stage but its token carries the STAGE's role, because the spawn chokepoint only sees `state`. Stops working when ticket 09 trusts the token role for such a post; fix is to pass the role through (editing `orchestrator_stage.py`, outside this ticket). A flow whose `agent_map` lacks the current state mints `role=None`.
+
+**For later tickets**: `TERMINAL_SPAWN` payload now has `run_token` (str or None); ticket 05 reads it. Tokens are revoked in `_settle_spawn_identity`. Ticket 09 should treat the feedback-spawn role caveat above as known.

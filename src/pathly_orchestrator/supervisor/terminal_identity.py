@@ -50,6 +50,65 @@ def _record_spawn_identity(
         return None
 
 
+def _spawn_role(state: RunnerState, run_id: str) -> Optional[str]:
+    """The Pathly role this spawn runs as. Board run: the selected agent (current_state).
+    Loop task (``sched-`` run_id): the DAG task role. FSM stage: the role of the flow's
+    agent_map entry for the current state. None when it cannot be resolved."""
+    try:
+        if (state.flow or "") == "board-run":
+            return state.current_state or None
+        if (run_id or "").startswith("sched-"):
+            from .task_prompt import _TASK_ROLE
+
+            return _TASK_ROLE
+        from pathly_orchestrator.fsm_compose_tables import _SKILL_AGENT_ROLE
+        from pathly_orchestrator.fsm_ops import _load_flow
+
+        flow = _load_flow(state.flow or "team", state.project_root or None) or {}
+        agent = (flow.get("agent_map") or {}).get(state.current_state)
+        if not agent:
+            return None
+        return _SKILL_AGENT_ROLE.get(agent) or agent.split("/")[-1]
+    except Exception:
+        logger.debug("_spawn_role skipped", exc_info=True)
+        return None
+
+
+def _mint_spawn_token(
+    state: RunnerState,
+    run_id: str,
+    role: Optional[str],
+    slug: Optional[str],
+    board_scope: Optional[str],
+) -> Optional[str]:
+    """Mint this spawn's run token (stored hashed). Best-effort: None on any error, so a
+    spawn never fails because of its token."""
+    try:
+        from pathly_orchestrator.db.connection import get_db
+        from pathly_orchestrator.db.queries.run_tokens import mint_run_token
+
+        return mint_run_token(
+            get_db(),
+            run_id,
+            role,
+            slug,
+            state.project_root,
+            state.scope_tier or "feature",
+            board_scope,
+        )
+    except Exception:
+        logger.debug("_mint_spawn_token skipped", exc_info=True)
+        return None
+
+
+def _issue_spawn_token(
+    state: RunnerState, run_id: str, identity: Optional[tuple]
+) -> Optional[str]:
+    """Mint the token for a spawn whose identity was recorded as ``identity``."""
+    slug, scope = identity or (None, None)
+    return _mint_spawn_token(state, run_id, _spawn_role(state, run_id), slug, scope)
+
+
 def _settle_spawn_identity(
     state: RunnerState, run_id: str, identity: Optional[tuple]
 ) -> None:
@@ -58,6 +117,13 @@ def _settle_spawn_identity(
     caller's finally). Identity fields COALESCE in upsert_run, so this never
     overwrites the issued board_scope. Best-effort.
     """
+    try:
+        from pathly_orchestrator.db.connection import get_db
+        from pathly_orchestrator.db.queries.run_tokens import revoke_run_tokens
+
+        revoke_run_tokens(get_db(), run_id)
+    except Exception:
+        logger.debug("revoke_run_tokens skipped", exc_info=True)
     if not identity:
         return
     try:
