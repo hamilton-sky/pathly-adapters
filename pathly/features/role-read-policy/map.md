@@ -50,6 +50,8 @@ while `row_allowed` agrees. Ticket 10 runs it.
 - Plan — the UI token (RRP-2b) is not in this plan; until it lands the Studio UI posts with no run
   token and its rows are `author_source=none`, which only matters once `enforce` exists.
 
+- 01 — `runner/read_policy.py`: `ReadPolicy`, `BUILTIN_DEFAULTS` (reviewer/tester/chief/anonymous), `row_allowed` and `policy_predicate` agree on a generated matrix; never-withheld types are dropped from the predicate.
+
 ## Open questions
 
 - SPEC § F Q1: ship the `reviewer`/`tester` walls as built-in defaults, or as an opt-in preset?

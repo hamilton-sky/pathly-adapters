@@ -1,7 +1,7 @@
 # Add the read-policy core: policy shape, built-in walls, SQL predicate and its pure twin
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: —
 Test first: yes
 
@@ -62,3 +62,21 @@ prints internal imports: 0
 - `src/pathly_orchestrator/runner/board_scope.py` (read only here)
 
 ## Answer
+
+**Built**: `src/pathly_orchestrator/runner/read_policy.py` (new; stdlib only), `tests/comms_board/test_read_policy.py` (new, committed first as a failing test), regenerated `tests/INDEX.md` and `tests/comms_board/INDEX.md`.
+
+**Proof**:
+- `python -m pytest tests/comms_board/test_read_policy.py -q -p no:cacheprovider` -> 21 passed, exit 0. Covers type only, author only, type+author, empty lists, each never-withheld type, own-run kept, `author_source="none"` withheld, body `run_id` not exempting, and the predicate vs `row_allowed` matrix (type x author_role x author_source x own/other/null run) for all four built-ins, with and without a caller run.
+- The AST import check printed `internal imports: 0`.
+- Test-first: the test-only commit failed at collection (module missing) before the code existed.
+- Build, Test (890 passed, 2 skipped), file-size, mirror-reads, test-index and lint-imports all pass. `black --check` reports 4 files (code_context*.py, code/query.py, test_code_context_codeintel.py) that were already unformatted before this ticket; none are mine.
+
+**Decisions**:
+- `chief` has no `exclude_authors` (any author). `anonymous` = union of reviewer and tester walls: types discovery/status/nudge/warning, authors builder.
+- Never-withheld types are dropped from the predicate's type list, so `exclude_types` containing `decision` has no effect.
+- An empty or None `caller_run_id` means no own-run exemption; a NULL `author_run_id` never counts as own.
+- `exclude_authors` empty withholds the type from any author; `author_source="none"` is withheld even when the author list is set. NULL columns are COALESCEd so `NOT (...)` never yields NULL.
+
+**Shortcuts taken**: none.
+
+**For later tickets**: `policy_predicate` emits unqualified column names, so a query that joins tables or aliases `comms_messages` must make the columns unambiguous. The policy has a `global` key, so it is built with the functional `TypedDict` syntax. Resolution (ticket 02) must treat `anonymous` as a built-in key.
