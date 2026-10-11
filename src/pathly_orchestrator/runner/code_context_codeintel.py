@@ -31,7 +31,8 @@ import shutil
 import subprocess
 import urllib.error
 import urllib.request
-from typing import Any, Callable, Sequence
+from collections.abc import Callable, Sequence
+from typing import Any
 
 from .code_context_cli import CliProvider
 
@@ -91,7 +92,7 @@ def _query_cli(body: dict[str, Any]) -> dict[str, Any] | None:
     if body.get("project_root"):
         argv += ["--project-root", body["project_root"]]
     try:
-        proc = subprocess.run(argv, capture_output=True, text=True, timeout=_CLI_TIMEOUT_S)
+        proc = subprocess.run(argv, capture_output=True, text=True, timeout=_CLI_TIMEOUT_S, check=False)
         out = json.loads(proc.stdout) if proc.stdout.strip() else None
     except Exception:
         return None
