@@ -60,15 +60,15 @@ Read project guidance and board context before proposing cards:
 1. Project guidance files and rule files, if present.
 2. Existing project-board features:
    ```bash
-   curl -s "http://127.0.0.1:8765/comms?board=project&scope=$PROJECT&type=feature"
+   curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" "http://127.0.0.1:8765/comms?board=project&scope=$PROJECT&type=feature"
    ```
 3. Existing artifacts on the project board:
    ```bash
-   curl -s "http://127.0.0.1:8765/comms/artifacts?board=project&scope=$PROJECT"
+   curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" "http://127.0.0.1:8765/comms/artifacts?board=project&scope=$PROJECT"
    ```
 4. Board context:
    ```bash
-   curl -s -X POST http://127.0.0.1:8765/comms/agent-context \
+   curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" -X POST http://127.0.0.1:8765/comms/agent-context \
      -H "Content-Type: application/json" \
      -d '{"scope": "$PROJECT"}'
    ```
@@ -116,7 +116,7 @@ later dependency names to those ids.
 Before posting features:
 
 ```bash
-curl -s "http://127.0.0.1:8765/comms?board=project&scope=$PROJECT&type=feature"
+curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" "http://127.0.0.1:8765/comms?board=project&scope=$PROJECT&type=feature"
 ```
 
 If the project already has 2 or more `type=feature` cards, do not duplicate the
@@ -141,7 +141,7 @@ Ensure the feature has its own feature board/root goal, matching
 `scope=<feature-slug>`, reuse it. Otherwise post:
 
 ```bash
-curl -s -X POST http://127.0.0.1:8765/comms/post \
+curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" -X POST http://127.0.0.1:8765/comms/post \
   -H "Content-Type: application/json" \
   -d '{
     "feature": "<feature-slug>",
@@ -159,7 +159,7 @@ curl -s -X POST http://127.0.0.1:8765/comms/post \
 Post features in dependency order:
 
 ```bash
-curl -s -X POST http://127.0.0.1:8765/comms/post \
+curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" -X POST http://127.0.0.1:8765/comms/post \
   -H "Content-Type: application/json" \
   -d '{
     "feature": "$PROJECT",
@@ -189,7 +189,7 @@ unless the PRD has clear story-level structure.
 For each feature:
 
 ```bash
-curl -s "http://127.0.0.1:8765/comms?feature=$FEATURE&scope=$FEATURE&type=goal"
+curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" "http://127.0.0.1:8765/comms?feature=$FEATURE&scope=$FEATURE&type=goal"
 ```
 
 If the feature already has 2 or more `type=goal` cards, do not duplicate that
@@ -200,7 +200,7 @@ goal set.
 Post goals in dependency order:
 
 ```bash
-curl -s -X POST http://127.0.0.1:8765/comms/post \
+curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" -X POST http://127.0.0.1:8765/comms/post \
   -H "Content-Type: application/json" \
   -d '{
     "feature": "$FEATURE",

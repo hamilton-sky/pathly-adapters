@@ -64,3 +64,4 @@ while `row_allowed` agrees. Ticket 10 runs it.
 - 04 — token minted in terminal_identity._mint_spawn_token, payload key `run_token`, revoked in _settle_spawn_identity; role = state.agent_role (FSM response agent) / board-run current_state / goal-loop builder.
 - 05 — both hosts export PATHLY_RUN_TOKEN from payload run_token (pty_host._child_env; Studio via register-runner arg + terminal/spawnEnv.ts buildSpawnEnv).
 - 06 — http_server/run_identity.py: caller_identity(request) -> CallerIdentity(kind run|anonymous, run_id, role, feature, project_root, board, scope); body never read; CORS lists allow X-Pathly-Run-Token.
+- 07 — all core board curls send X-Pathly-Run-Token via inline -H after 'curl -s'; consistency test tests/consistency/test_fragments_run_token.py guards it; adapters not tracked.

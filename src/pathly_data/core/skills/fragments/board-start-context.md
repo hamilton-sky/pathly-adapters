@@ -4,7 +4,7 @@ Before producing tasks, pull existing board context scoped to this goal. This su
 decisions, open questions, and prior research so your task DAG avoids duplication.
 
 ```bash
-curl -s -X POST http://127.0.0.1:8765/comms/agent-context \
+curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" -X POST http://127.0.0.1:8765/comms/agent-context \
   -H "Content-Type: application/json" \
   -d '{"scope": "$FEATURE", "goal_id": "$GOAL_ID"}'
 ```

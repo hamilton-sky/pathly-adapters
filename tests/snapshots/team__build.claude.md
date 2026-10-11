@@ -56,7 +56,7 @@ the sole work source (the legacy per-conversation plan files and conversation mo
 ### Board task DAG
 
 ```
-curl -s "http://127.0.0.1:8765/comms/tasks?ready=true&feature=[feature]&scope=[feature]&goal_id=<goal_id>"
+curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" "http://127.0.0.1:8765/comms/tasks?ready=true&feature=[feature]&scope=[feature]&goal_id=<goal_id>"
 ```
 `<goal_id>` is substituted for you (empty when this run isn't goal-scoped) — always send it as-is,
 so a goal-executor run never claims a ready task that belongs to a different goal on the same board.
@@ -343,7 +343,7 @@ see it without opening the file. If the server is unreachable (connection refuse
 skip silently — the on-disk `<out_path>` file is the source of truth, and the supervisor's
 artifact reconciliation attaches it to the board from the FSM's own record after the stage.
 ```bash
-curl -s -X POST http://127.0.0.1:8765/comms/post \
+curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" -X POST http://127.0.0.1:8765/comms/post \
   -H "Content-Type: application/json" \
   -d '{"feature": "<feature>", "from": "<agent>", "type": "artifact", "board": "feature",
        "scope": "<feature>", "text": "<1-2 sentence description>",
@@ -712,10 +712,10 @@ they are already hydrated.
 
 ```bash
 # List what's available on your board (already permission-scoped to you)
-curl -s "http://127.0.0.1:8765/comms/artifacts?board=feature&scope=<feature>"
+curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" "http://127.0.0.1:8765/comms/artifacts?board=feature&scope=<feature>"
 
 # Read one section (omit &anchor for the whole file)
-curl -s "http://127.0.0.1:8765/comms/artifacts/section?scope=<feature>&artifact=<path>&anchor=<anchor>&trail=<task_id>"
+curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" "http://127.0.0.1:8765/comms/artifacts/section?scope=<feature>&artifact=<path>&anchor=<anchor>&trail=<task_id>"
 ```
 
 Read the returned `text` field — it is the authoritative section, not the `summary`.
@@ -760,7 +760,7 @@ Do **not** search:
 ### How to search
 
 ```bash
-curl -s -X POST http://127.0.0.1:8765/comms/search \
+curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" -X POST http://127.0.0.1:8765/comms/search \
   -H "Content-Type: application/json" \
   -d '{
     "query": "<what you actually want to know, in plain words>",

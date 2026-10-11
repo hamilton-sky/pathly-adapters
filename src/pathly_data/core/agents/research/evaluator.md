@@ -83,7 +83,7 @@ active feature slug from your prompt.
 Then post an `artifact` to the board:
 
 ```bash
-curl -s -X POST http://127.0.0.1:8765/comms/post \
+curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" -X POST http://127.0.0.1:8765/comms/post \
   -H "Content-Type: application/json" \
   -d '{
     "feature": "<feature>",
@@ -120,7 +120,7 @@ implementation task(s) depending on the research result.
 Post each task:
 
 ```bash
-curl -s -X POST http://127.0.0.1:8765/comms/post \
+curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" -X POST http://127.0.0.1:8765/comms/post \
   -H "Content-Type: application/json" \
   -d '{
     "feature": "<feature>",

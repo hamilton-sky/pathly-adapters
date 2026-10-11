@@ -31,7 +31,7 @@ are no free-form notes to consolidate and stop.
 Before synthesizing, check for a recent consolidated note:
 
 ```bash
-curl -s "http://127.0.0.1:8765/comms?feature=$FEATURE&scope=$FEATURE"
+curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" "http://127.0.0.1:8765/comms?feature=$FEATURE&scope=$FEATURE"
 ```
 
 Inspect the response for any `type=discovery` message whose `text` starts with
@@ -72,7 +72,7 @@ must NOT restate or reproduce them. Keep the synthesis to 3–6 sentences.
 POST the synthesis as a `type=discovery` message:
 
 ```bash
-curl -s -X POST http://127.0.0.1:8765/comms/post \
+curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" -X POST http://127.0.0.1:8765/comms/post \
   -H "Content-Type: application/json" \
   -d '{
     "feature": "$FEATURE",
@@ -95,7 +95,7 @@ warning}), supersede it by the consolidated summary. NEVER supersede goal, task,
 escalation, question, or answer messages.
 
 ```bash
-curl -s -X POST http://127.0.0.1:8765/comms/supersede \
+curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" -X POST http://127.0.0.1:8765/comms/supersede \
   -H "Content-Type: application/json" \
   -d '{
     "old_id": "<raw note id>",

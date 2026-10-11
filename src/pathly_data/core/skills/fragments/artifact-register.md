@@ -13,7 +13,7 @@ see it without opening the file. If the server is unreachable (connection refuse
 skip silently — the on-disk `<out_path>` file is the source of truth, and the supervisor's
 artifact reconciliation attaches it to the board from the FSM's own record after the stage.
 ```bash
-curl -s -X POST http://127.0.0.1:8765/comms/post \
+curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" -X POST http://127.0.0.1:8765/comms/post \
   -H "Content-Type: application/json" \
   -d '{"feature": "<feature>", "from": "<agent>", "type": "artifact", "board": "feature",
        "scope": "<feature>", "text": "<1-2 sentence description>",

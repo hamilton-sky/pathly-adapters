@@ -91,8 +91,8 @@ controls — no intermediate "options" layer.
 **Idempotency guard — skip THIS STEP ONLY (never Step 3) if a DAG already exists for this scope.** Before posting, check:
 
 ```bash
-curl -s "http://127.0.0.1:8765/comms?feature=<feature>&board=<board>&scope=<feature>&type=goal"
-curl -s "http://127.0.0.1:8765/comms/tasks?feature=<feature>"
+curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" "http://127.0.0.1:8765/comms?feature=<feature>&board=<board>&scope=<feature>&type=goal"
+curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" "http://127.0.0.1:8765/comms/tasks?feature=<feature>"
 ```
 
 If either response contains any messages, skip this entire step — the board has already been
@@ -101,7 +101,7 @@ seeded. Do not double-post.
 **Post the goal first.** Compose a one-line synthesis of what the board calls for and POST:
 
 ```bash
-curl -s -X POST http://127.0.0.1:8765/comms/post \
+curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" -X POST http://127.0.0.1:8765/comms/post \
   -H "Content-Type: application/json" \
   -d '{
     "feature": "<feature>",
@@ -126,7 +126,7 @@ Record the response `"message_id"` as `$GOAL_ID`.
 Each task must include `"goal_id": "$GOAL_ID"`. Example shape:
 
 ```bash
-curl -s -X POST http://127.0.0.1:8765/comms/post \
+curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" -X POST http://127.0.0.1:8765/comms/post \
   -H "Content-Type: application/json" \
   -d '{
     "feature": "<feature>",

@@ -36,7 +36,7 @@ The retro seed is needed for future storm sessions.
 
 Check the feature's work is complete before archiving. Query the board task DAG:
 ```bash
-curl -s "http://127.0.0.1:8765/comms/tasks?feature=$FEATURE&scope=$FEATURE"
+curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" "http://127.0.0.1:8765/comms/tasks?feature=$FEATURE&scope=$FEATURE"
 ```
 If any task's `task_status` is not `done`: stop →
 ```

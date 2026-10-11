@@ -6,7 +6,7 @@ This is the single canonical mechanism for posting task children to an existing 
 **Idempotency guard — skip if this goal already has tasks:**
 
 ```bash
-curl -s "http://127.0.0.1:8765/comms/tasks?goal_id=$GOAL_ID"
+curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" "http://127.0.0.1:8765/comms/tasks?goal_id=$GOAL_ID"
 ```
 
 If the response has a non-empty `tasks` array, skip all task POSTs below.
@@ -14,7 +14,7 @@ If the response has a non-empty `tasks` array, skip all task POSTs below.
 For each task, POST this exact shape:
 
 ```bash
-curl -s -X POST http://127.0.0.1:8765/comms/post \
+curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" -X POST http://127.0.0.1:8765/comms/post \
   -H "Content-Type: application/json" \
   -d '{
     "feature": "$FEATURE",

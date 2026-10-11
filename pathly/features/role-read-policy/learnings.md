@@ -17,3 +17,4 @@ ticket number. Never edit or delete another line. Keep it short; a human prunes 
 - (04) Test a spawn without a PTY: call `_run_stage_via_terminal` with a broadcast_fn that raises on TERMINAL_SPAWN; the finally settles. `supervisor/orchestrator.py` is now exactly 400 lines.
 - (05) `npx vitest run <file>` works from `studio/`; tsc rejects an all-optional (weak) type for a meta object with other fields unless it has an index signature.
 - (06) Test identity with a bare Flask() app + test_request_context(headers=, json=); the DB fixture is autouse so mint_run_token(get_db(), ...) works directly.
+- (07) Golden snapshots have no update flag: regenerate with compose_skill(skill,'claude') over tests/snapshots/*.claude.md and check the diff.

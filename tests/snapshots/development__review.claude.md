@@ -317,7 +317,7 @@ For each finding (one post per finding — not one per file line), POST to the b
 `designer`, `explorer`, `builder`, `planner`, …), and `<CURRENT_STATE>` with the active FSM stage.
 
 ```bash
-curl -s -X POST http://127.0.0.1:8765/comms/post \
+curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" -X POST http://127.0.0.1:8765/comms/post \
   -H "Content-Type: application/json" \
   -d '{
     "feature": "<feature>",
@@ -352,7 +352,7 @@ start the server or retry in a loop just to post.
     gloss. This is the catalog entry other agents scan, and it is embedded for **semantic
     retrieval**, so make it cover the real section topics.
   ```bash
-  curl -s -X POST http://127.0.0.1:8765/comms/post -H "Content-Type: application/json" -d '{
+  curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" -X POST http://127.0.0.1:8765/comms/post -H "Content-Type: application/json" -d '{
     "feature": "<feature>", "from": "<your-role>", "type": "artifact", "board": "<board>",
     "run_id": "<run_id>",
     "text": "<1-2 sentence description>", "summary": "<topic map, one line per section>",
@@ -382,7 +382,7 @@ You continue working on the assumption stated in `text`; if a human answers, the
 injected at the next `/next_action`. Never wait in a loop for the reply.
 
 ```bash
-curl -s -X POST http://127.0.0.1:8765/comms/post \
+curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" -X POST http://127.0.0.1:8765/comms/post \
   -H "Content-Type: application/json" \
   -d '{
     "feature": "<feature>",
@@ -421,10 +421,10 @@ they are already hydrated.
 
 ```bash
 # List what's available on your board (already permission-scoped to you)
-curl -s "http://127.0.0.1:8765/comms/artifacts?board=feature&scope=<feature>"
+curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" "http://127.0.0.1:8765/comms/artifacts?board=feature&scope=<feature>"
 
 # Read one section (omit &anchor for the whole file)
-curl -s "http://127.0.0.1:8765/comms/artifacts/section?scope=<feature>&artifact=<path>&anchor=<anchor>&trail=<task_id>"
+curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" "http://127.0.0.1:8765/comms/artifacts/section?scope=<feature>&artifact=<path>&anchor=<anchor>&trail=<task_id>"
 ```
 
 Read the returned `text` field — it is the authoritative section, not the `summary`.
@@ -469,7 +469,7 @@ Do **not** search:
 ### How to search
 
 ```bash
-curl -s -X POST http://127.0.0.1:8765/comms/search \
+curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" -X POST http://127.0.0.1:8765/comms/search \
   -H "Content-Type: application/json" \
   -d '{
     "query": "<what you actually want to know, in plain words>",

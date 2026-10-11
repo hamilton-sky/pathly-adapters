@@ -37,7 +37,7 @@ Parse `$ARGUMENTS` for a plan folder name (FEATURE). If blank, use the auto-dete
 
 Check the build is complete before testing. Query the board task DAG:
 ```
-curl -s "http://127.0.0.1:8765/comms/tasks?feature=<feature>&scope=<feature>"
+curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" "http://127.0.0.1:8765/comms/tasks?feature=<feature>&scope=<feature>"
 ```
 If any task's `task_status` is not `done`, stop:
 

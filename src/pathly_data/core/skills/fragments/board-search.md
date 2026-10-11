@@ -29,7 +29,7 @@ Do **not** search:
 ### How to search
 
 ```bash
-curl -s -X POST http://127.0.0.1:8765/comms/search \
+curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" -X POST http://127.0.0.1:8765/comms/search \
   -H "Content-Type: application/json" \
   -d '{
     "query": "<what you actually want to know, in plain words>",

@@ -13,10 +13,10 @@ they are already hydrated.
 
 ```bash
 # List what's available on your board (already permission-scoped to you)
-curl -s "http://127.0.0.1:8765/comms/artifacts?board=feature&scope=<feature>"
+curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" "http://127.0.0.1:8765/comms/artifacts?board=feature&scope=<feature>"
 
 # Read one section (omit &anchor for the whole file)
-curl -s "http://127.0.0.1:8765/comms/artifacts/section?scope=<feature>&artifact=<path>&anchor=<anchor>&trail=<task_id>"
+curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" "http://127.0.0.1:8765/comms/artifacts/section?scope=<feature>&artifact=<path>&anchor=<anchor>&trail=<task_id>"
 ```
 
 Read the returned `text` field — it is the authoritative section, not the `summary`.
