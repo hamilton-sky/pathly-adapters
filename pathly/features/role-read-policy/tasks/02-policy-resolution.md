@@ -1,7 +1,7 @@
 # Resolve the read policy for a role and feature from settings, then built-in defaults
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 01
 Test first: yes
 
@@ -49,3 +49,13 @@ prints passed
 - Ticket 01's Answer
 
 ## Answer
+
+**Built**: `resolve_read_policy` (plus `_stored_row`) in `src/pathly_orchestrator/runner/read_policy.py`; `tests/comms_board/test_read_policy_resolve.py` (7 tests); regenerated test INDEX files. Test-only commit first; it failed on collection (import error).
+
+**Proof**: `pytest tests/comms_board/test_read_policy_resolve.py` -> 7 passed. `test_board_context_scope.py` + `test_board_context_settings.py` + `test_read_policy.py` -> 61 passed. Full Test command (4 domains) -> 897 passed, 2 skipped. Lint: black 469 unchanged, check_file_size OK, check_no_mirror_reads OK, gen_test_index --check OK, lint-imports 1 kept 0 broken.
+
+**Decisions**: The signature gained a 4th argument, `project_root: str = ""`, because the stored key is `board_scope:<root>:<feature>[:<role>]` and cannot be built without a root. The first well-formed stored row (per-role, then per-feature) is final: its tiers come from `get_board_scope` and its `exclude_*` default to `[]`, so it never falls through to the built-in wall. A malformed or non-dict row is skipped, as `get_board_scope` does. The built-in step lives only in `resolve_read_policy`. `get_board_scope` is untouched. The module docstring no longer says "stdlib only", since it now imports `db` (allowed by the layer rule).
+
+**Shortcuts taken**: none.
+
+**For later tickets**: callers must pass `project_root=` or the lookup uses root `""` and misses real rows. Output always has the three tier keys plus both `exclude_*` lists.

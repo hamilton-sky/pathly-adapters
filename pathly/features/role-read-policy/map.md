@@ -59,3 +59,4 @@ while `row_allowed` agrees. Ticket 10 runs it.
   post. Ticket 09.
 - 01 — `runner/read_policy.py` holds policy shape, built-in walls, `policy_predicate` and pure `row_allowed`; stdlib only, tested to agree.
 - 01 — read-policy core in runner/read_policy.py: row_allowed and policy_predicate agree; no own-post exemption without a caller run id; anonymous = discovery/status/nudge/warning by builder.
+- 02 — resolve_read_policy(conn, role, feature, project_root=''): first stored row wins (no exclude_* = allow-all), else BUILTIN_DEFAULTS, None = anonymous; get_board_scope untouched.

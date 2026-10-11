@@ -1,12 +1,20 @@
 """Role read policy: one definition of what a role's board reads withhold.
 
-Stdlib only. ``policy_predicate`` (SQL) and ``row_allowed`` (pure) encode the same rule and
+Pure rules plus one settings read (``resolve_read_policy``). ``policy_predicate`` (SQL) and ``row_allowed`` (pure) encode the same rule and
 must agree; tests enforce it.
 """
 
 from __future__ import annotations
 
+import json
+import sqlite3
 from typing import Any, Mapping, TypedDict
+
+from ..db.queries.app_settings import (
+    _board_scope_key,
+    get_board_scope,
+    get_setting,
+)
 
 ReadPolicy = TypedDict(
     "ReadPolicy",
@@ -85,3 +93,51 @@ def policy_predicate(
         )
         params.extend(authors)
     return f"NOT ({' AND '.join(clauses)})", params
+
+
+def _stored_row(
+    conn: sqlite3.Connection, project_root: str, feature: str, role: str | None
+) -> dict | None:
+    """First well-formed stored board_scope row: per-role, then per-feature."""
+    keys = [_board_scope_key(project_root, feature, role)] if role else []
+    keys.append(_board_scope_key(project_root, feature))
+    for key in keys:
+        raw = get_setting(conn, key)
+        if raw is None:
+            continue
+        try:
+            parsed = json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            continue
+        if isinstance(parsed, dict):
+            return parsed
+    return None
+
+
+def resolve_read_policy(
+    conn: sqlite3.Connection,
+    role: str | None,
+    feature: str,
+    project_root: str = "",
+) -> ReadPolicy:
+    """Per-role row -> per-feature row -> BUILTIN_DEFAULTS[role] -> allow-all.
+
+    A stored row without ``exclude_*`` keys is allow-all for content (it never falls through
+    to the built-in wall), so existing rows read exactly what they read today.
+    ``role=None`` is the anonymous caller.
+    """
+    row = _stored_row(conn, project_root, feature, role)
+    if row is not None:
+        policy: ReadPolicy = dict(get_board_scope(conn, project_root, feature, role))
+        for k in ("exclude_types", "exclude_authors"):
+            v = row.get(k)
+            policy[k] = [str(x) for x in v] if isinstance(v, list) else []
+        return policy
+    builtin = BUILTIN_DEFAULTS.get("anonymous" if role is None else role, {})
+    return {
+        "feature": True,
+        "project": True,
+        "global": True,
+        "exclude_types": list(builtin.get("exclude_types", [])),
+        "exclude_authors": list(builtin.get("exclude_authors", [])),
+    }
