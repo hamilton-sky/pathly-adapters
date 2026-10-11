@@ -1,7 +1,7 @@
 # Send the run token on every board call in the core skills, fragments and agents
 
 Type: task
-Status: resolved
+Status: open
 Blocked by: 05, 06
 Test first: yes
 
@@ -71,3 +71,7 @@ would reformat /home/user/pathly-adapters/tests/consistency/test_fragments_run_t
 
 Oh no! 💥 💔 💥
 1 file would be reformatted, 475 files would be left unchanged.
+
+## Review findings (round 2, test first)
+
+the test-only commit(s) 783b585a5a: the Test command passes without the production change (or timed out after 30 minutes), so it does not show a failing test before the code. Write a test that fails without the production change. If the test and the code are in one commit (or the test commit sits on top of code that is already there), recover: revert that commit, commit the test files alone, then restore the production files in a later commit (git checkout <the old commit> -- <paths>). Do not rewrite history.
