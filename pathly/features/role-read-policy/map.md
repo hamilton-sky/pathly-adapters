@@ -51,6 +51,7 @@ while `row_allowed` agrees. Ticket 10 runs it.
   token and its rows are `author_source=none`, which only matters once `enforce` exists.
 
 - 01 — `runner/read_policy.py`: `ReadPolicy`, `BUILTIN_DEFAULTS` (reviewer/tester/chief/anonymous), `row_allowed` and `policy_predicate` agree on a generated matrix; never-withheld types are dropped from the predicate.
+- 02 — `resolve_read_policy(conn, role, feature, project_root='')`: stored per-role/per-feature row wins (no exclude_* keys = allow-all content, no fall to built-in), else built-in copy, `None` -> anonymous, unknown role -> allow-all.
 
 ## Open questions
 
