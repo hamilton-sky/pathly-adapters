@@ -114,6 +114,10 @@ class RunnerState:
     # paths fall back to fsm_compose.resolve_board_scope over the storage dir + goal_id.
     board_scope: str = ""
 
+    # The Pathly role the current FSM stage runs as (the FSM response's ``agent``), read by the
+    # run-token mint; "" for board runs (their role is current_state) and unstaged states.
+    agent_role: str = ""
+
     # Flow-gate-preview (P2): transient, per-run, per-stage prompt overrides from the gate
     # ({state: prompt}), keyed by FSM state. In-memory ONLY — never written to public_dict()
     # / the runner_state DB mirror, so it dies with the run and never shows up as a "saved"

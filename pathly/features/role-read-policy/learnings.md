@@ -14,3 +14,4 @@ ticket number. Never edit or delete another line. Keep it short; a human prunes 
 - (01) `black --check src/ tests/` already fails on 4 codeintel-related files at the base commit; check only your own files. Full 4-domain Test takes ~3 min: run it in background.
 - (02) Stored board_scope keys embed project_root, so resolve_read_policy needs project_root= (default '' misses real rows). Test-only commit: gen_test_index before committing tests.
 - (03) Test DB fixture is autouse; use get_db() directly in tests/db. black reformats new files on first run — run it before the test-only commit.
+- (04) Test a spawn without a PTY: call `_run_stage_via_terminal` with a broadcast_fn that raises on TERMINAL_SPAWN; the finally settles. `supervisor/orchestrator.py` is now exactly 400 lines.

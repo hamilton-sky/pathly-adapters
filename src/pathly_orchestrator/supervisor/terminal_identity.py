@@ -50,6 +50,44 @@ def _record_spawn_identity(
         return None
 
 
+def _spawn_role(state: RunnerState) -> Optional[str]:
+    """The Pathly role this spawn runs as: the FSM stage's agent (``agent_role``), else for a
+    board run the selected agent (``current_state``), else a loop task agent -> builder.
+    """
+    if getattr(state, "agent_role", ""):
+        return state.agent_role
+    if state.flow == "board-run":
+        return state.current_state or None
+    if state.flow == "goal-loop":
+        return "builder"
+    return None
+
+
+def _mint_spawn_token(
+    state: RunnerState, run_id: str, identity: Optional[tuple]
+) -> Optional[str]:
+    """Mint this spawn's run token (role, slug, project, board scope). Best-effort: any
+    error is logged at debug and yields None; a spawn never fails because of the token.
+    """
+    try:
+        from pathly_orchestrator.db.connection import get_db
+        from pathly_orchestrator.db.queries.run_tokens import mint_run_token
+
+        slug, scope = identity or (None, None)
+        return mint_run_token(
+            get_db(),
+            run_id,
+            _spawn_role(state),
+            slug,
+            state.project_root,
+            state.scope_tier,
+            scope or None,
+        )
+    except Exception:
+        logger.debug("_mint_spawn_token skipped", exc_info=True)
+        return None
+
+
 def _settle_spawn_identity(
     state: RunnerState, run_id: str, identity: Optional[tuple]
 ) -> None:
@@ -58,6 +96,13 @@ def _settle_spawn_identity(
     caller's finally). Identity fields COALESCE in upsert_run, so this never
     overwrites the issued board_scope. Best-effort.
     """
+    try:
+        from pathly_orchestrator.db.connection import get_db as _db
+        from pathly_orchestrator.db.queries.run_tokens import revoke_run_tokens
+
+        revoke_run_tokens(_db(), run_id)
+    except Exception:
+        logger.debug("run token revoke skipped", exc_info=True)
     if not identity:
         return
     try:

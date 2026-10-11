@@ -200,6 +200,7 @@ def _loop(state: RunnerState, broadcast_fn: Optional[Callable]) -> None:
 
             with _lock:
                 state.current_state = current_fsm_state
+                state.agent_role = response.get("agent", "")
                 state.current_adapter = preferred_adapter
                 _write_mirror(state)
 

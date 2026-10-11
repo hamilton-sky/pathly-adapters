@@ -27,6 +27,7 @@ from .registry import (
     _TERMINAL_RESULT_TIMEOUT,
 )
 from .terminal_identity import (
+    _mint_spawn_token,
     _record_spawn_identity,
     _record_spawn_prompt,
     _settle_spawn_identity,
@@ -92,6 +93,7 @@ def _run_stage_via_terminal(
     # run-identity: one identity row per spawn (FSM stages, loop tasks, board runs all
     # pass through here with their own run_id); settled done/error in the finally below.
     _spawn_identity = _record_spawn_identity(state, run_id, adapter)
+    _run_token = _mint_spawn_token(state, run_id, _spawn_identity)
     _record_spawn_prompt(state, run_id, instructions)
     use_interactive = state.interactive
     argv = _resolve_spawn_argv(
@@ -161,6 +163,7 @@ def _run_stage_via_terminal(
             "prompt": instructions,
             "stage": state.current_state,
             "interactive": use_interactive,
+            "run_token": _run_token,
             # Monitor category for this engine. Board one-shots (single-agent / evaluator /
             # decompose) run with flow=='board-run' → 'single'; FSM pipeline stages → 'flow'.
             # Without this the frontend tags EVERY registered runner tab 'flow' (terminal.ts
