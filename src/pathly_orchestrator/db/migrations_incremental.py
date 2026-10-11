@@ -5,6 +5,8 @@ from __future__ import annotations
 import sqlite3
 import uuid
 
+from .migrations_provenance import add_run_tokens
+
 
 def _backfill_comms_artifacts(conn: sqlite3.Connection) -> None:
     """One-time, idempotent back-fill of comms_artifacts from existing artifact
@@ -42,6 +44,7 @@ def _backfill_comms_artifacts(conn: sqlite3.Connection) -> None:
 
 def _add_additive_migrations(conn: sqlite3.Connection) -> None:
     """ALTER TABLE migrations — safe to re-run; skips columns that already exist."""
+    add_run_tokens(conn)
     for table, col, ctype in [
         ("catalog_items", "content", "TEXT"),
         ("flow_definitions", "file_path", "TEXT"),

@@ -1,7 +1,7 @@
 # Add the run_tokens table and the queries to mint, resolve and revoke a run token
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: —
 Test first: yes
 
@@ -49,3 +49,19 @@ exit 0
   follow for an additive table and its queries)
 
 ## Answer
+
+**Built**: `src/pathly_orchestrator/db/migrations_provenance.py` (`add_run_tokens`), one call line in `db/migrations_incremental.py::_add_additive_migrations`, `src/pathly_orchestrator/db/queries/run_tokens.py` (`mint_run_token`, `resolve_run_token`, `revoke_run_tokens`), `tests/db/test_run_tokens.py` (+ regenerated INDEX.md files).
+
+**Proof**:
+- `python -m pytest tests/db/test_run_tokens.py -q -p no:cacheprovider` -> 5 passed (resolve fields, no raw token in any column, revoked -> None, unknown/empty/None -> None, migration twice).
+- Test-first: the failing-test commit failed at collection (ImportError) before the code existed.
+- `git diff --stat src/pathly_orchestrator/db/migrations.py` -> empty (unchanged).
+- `python scripts/check_file_size.py` -> exit 0 ("none new, none grown").
+- Extra: `lint-imports` kept; `pytest tests/db tests/comms_board` -> 595 passed, 2 skipped.
+
+**Decisions**: `resolve_run_token` returns a plain dict of all columns (including `token_hash`); `revoke_run_tokens` only touches not-yet-revoked rows so the count is of newly revoked tokens.
+
+**Shortcuts taken**: none.
+
+**For later tickets**: `mint_run_token(conn, run_id, role, feature, project_root, board, scope)` takes positional args in that order. Revoking is by `run_id`; nothing calls it yet (ticket 04+ decides when).
+

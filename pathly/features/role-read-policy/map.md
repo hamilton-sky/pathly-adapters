@@ -60,3 +60,4 @@ while `row_allowed` agrees. Ticket 10 runs it.
 - 01 — `runner/read_policy.py` holds policy shape, built-in walls, `policy_predicate` and pure `row_allowed`; stdlib only, tested to agree.
 - 01 — read-policy core in runner/read_policy.py: row_allowed and policy_predicate agree; no own-post exemption without a caller run id; anonymous = discovery/status/nudge/warning by builder.
 - 02 — resolve_read_policy(conn, role, feature, project_root=''): first stored row wins (no exclude_* = allow-all), else BUILTIN_DEFAULTS, None = anonymous; get_board_scope untouched.
+- 03 — run_tokens table (sha256 only) + mint/resolve/revoke in db/queries/run_tokens.py; resolve returns a dict or None; migration is add_run_tokens in migrations_provenance.py.

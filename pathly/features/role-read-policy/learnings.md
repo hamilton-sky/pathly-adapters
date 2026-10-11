@@ -13,3 +13,4 @@ ticket number. Never edit or delete another line. Keep it short; a human prunes 
 - (plan) The Pathly server, if it runs during a build, writes `STATE.json`/`BOARD.json` exports under `pathly/features/`. Do not commit them as part of a ticket; the floor guard counts any change under the plans folder outside your own ticket, `map.md` and `learnings.md`.
 - (01) `black --check src/ tests/` already fails on 4 codeintel-related files at the base commit; check only your own files. Full 4-domain Test takes ~3 min: run it in background.
 - (02) Stored board_scope keys embed project_root, so resolve_read_policy needs project_root= (default '' misses real rows). Test-only commit: gen_test_index before committing tests.
+- (03) Test DB fixture is autouse; use get_db() directly in tests/db. black reformats new files on first run — run it before the test-only commit.
