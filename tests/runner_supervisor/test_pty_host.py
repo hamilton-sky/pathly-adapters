@@ -304,6 +304,45 @@ def test_host_marks_the_child_env(monkeypatch, tmp_path):
     assert str(tmp_path) in out
 
 
+def test_host_exports_the_run_token_to_the_child(monkeypatch, tmp_path):
+    """A TERMINAL_SPAWN carrying run_token gives the child PATHLY_RUN_TOKEN, exactly as sent."""
+    monkeypatch.delenv("PATHLY_RUN_TOKEN", raising=False)
+    rec = _Recorder()
+    rec.install(monkeypatch)
+    host = SpawnHost()
+
+    _drive(
+        host,
+        _spawn_event(
+            "import os; print('TOK=' + os.environ['PATHLY_RUN_TOKEN'])",
+            cwd=str(tmp_path),
+            run_token="tok-abc_123",
+        ),
+    )
+
+    assert "TOK=tok-abc_123" in rec.wait()["stdout_tail"]
+
+
+@pytest.mark.parametrize("payload", [{}, {"run_token": None}, {"run_token": ""}])
+def test_host_sets_no_run_token_without_one(monkeypatch, tmp_path, payload):
+    """No token in the payload (mint is best-effort) means no PATHLY_RUN_TOKEN key at all."""
+    monkeypatch.delenv("PATHLY_RUN_TOKEN", raising=False)
+    rec = _Recorder()
+    rec.install(monkeypatch)
+    host = SpawnHost()
+
+    _drive(
+        host,
+        _spawn_event(
+            "import os; print('HAS=' + str('PATHLY_RUN_TOKEN' in os.environ))",
+            cwd=str(tmp_path),
+            **payload,
+        ),
+    )
+
+    assert "HAS=False" in rec.wait()["stdout_tail"]
+
+
 def test_stop_kills_running_children(monkeypatch, tmp_path):
     rec = _Recorder()
     rec.install(monkeypatch)
