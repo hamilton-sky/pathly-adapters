@@ -1,7 +1,7 @@
 # Add the run_tokens table and the queries to mint, resolve and revoke a run token
 
 Type: task
-Status: resolved
+Status: open
 Blocked by: —
 Test first: yes
 
@@ -65,3 +65,9 @@ exit 0
 
 **For later tickets**: `mint_run_token(conn, run_id, role, feature, project_root, board, scope)` takes positional args in that order. Revoking is by `run_id`; nothing calls it yet (ticket 04+ decides when).
 
+
+## Review findings (round 1, floor guard)
+
+floor guard: the diff weakens the bar instead of meeting it
+suppress: tests/db/test_run_tokens.py: assert resolve_run_token(conn, None) is None  # type: ignore[arg-type]
+if a finding is intended, the ticket needs a line like: Floor: allow <category>
