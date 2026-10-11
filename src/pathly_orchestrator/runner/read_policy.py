@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from typing import Any, TypedDict
+from typing import Any, TypedDict, cast
 
 from ..db.queries.app_settings import _board_scope_key, get_board_scope, get_setting
 
@@ -97,7 +97,10 @@ def policy_predicate(policy: ReadPolicy, caller_run_id: str | None) -> tuple[str
 
 
 def _copy_policy(policy: ReadPolicy) -> ReadPolicy:
-    return {k: list(v) if isinstance(v, list) else v for k, v in policy.items()}
+    return cast(
+        ReadPolicy,
+        {k: list(v) if isinstance(v, list) else v for k, v in policy.items()},
+    )
 
 
 def _stored_exclusions(
@@ -139,8 +142,10 @@ def resolve_read_policy(
         return _copy_policy(BUILTIN_DEFAULTS["anonymous"])
     stored = _stored_exclusions(conn, project_root, feature, role)
     if stored is not None:
-        policy: ReadPolicy = dict(get_board_scope(conn, project_root, feature, role))
-        policy.update(stored)
+        policy = cast(
+            ReadPolicy, dict(get_board_scope(conn, project_root, feature, role))
+        )
+        policy.update(cast(ReadPolicy, stored))
         return policy
     if role in BUILTIN_DEFAULTS:
         return _copy_policy(BUILTIN_DEFAULTS[role])
