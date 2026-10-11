@@ -576,6 +576,7 @@ pathly_orchestrator/
   http_server/             # Flask HTTP server: FSM endpoints + SSE + runner routes
     app.py                 # Flask app factory, blueprint registration, main()
     middleware.py          # _log_request, _log_response, rate limiting, metrics
+    run_identity.py        # caller_identity(request) -> CallerIdentity: kind run|anonymous from the X-Pathly-Run-Token header (body role/run_id/from never read); unknown/revoked token logged at info with the remote addr; `ui` kind reserved (RRP-2b). Nothing applies a policy from it yet
     sse.py                 # SSE globals (_clients, _runner_clients, _menu_clients) + broadcast helpers
     pricing.py             # MODEL_PRICING, compute_cost_usd()
     feedback.py            # _feedback_watcher, _process_feedback_file
