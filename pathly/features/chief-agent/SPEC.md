@@ -171,7 +171,8 @@ Changes this spec makes:
 
 ## D. Phases (each → one board task)
 
-Prerequisite: role-read-policy P1–P3 (run token, `author_role`, predicate).
+Prerequisite: role-read-policy P1–P3 (run token, `author_role`, predicate). Built immediately
+after them, before role-read-policy P4–P6.
 
 | # | Phase | Priority | Risk | Done when |
 |---|---|---|---|---|

@@ -19,6 +19,8 @@ RRP-2 run token ────┼─► RRP-3 author stamping ───┼─► R
 ```
 
 Minimum the chief-agent work depends on: **RRP-1, RRP-2, RRP-3** (SPEC D, "Sequencing").
+Build order: RRP-1..3 (feature-flow `tasks/01..10`) → chief-agent (its `tasks/01..13`, started as
+soon as this plan reaches DONE) → RRP-2b, RRP-4..8 as a later plan.
 
 ---
 

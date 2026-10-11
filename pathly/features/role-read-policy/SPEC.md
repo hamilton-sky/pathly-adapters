@@ -307,8 +307,9 @@ reuses P2's columns; nothing new in this spec.
 
 **Sequencing with the chief agent.** P1–P3 are also the identity layer the chief agent and the
 memory tiers build on (run token, server-stamped `author_role`, one predicate). So the order is:
-P1–P3 here → chief-agent P1–P4 → P4–P6 here, in parallel with the rest of chief-agent. Building
-the chief first would give it a pre-token identity that P3 then has to retrofit.
+P1–P3 here (the feature-flow plan in `tasks/`) → the whole chief-agent feature-flow plan, started
+in the next session as soon as this one reaches DONE → P4–P6 here as a later plan. Building the
+chief first would give it a pre-token identity that P3 then has to retrofit.
 
 P1–P3 are the minimum that makes the wall hold on every default path and for every request an
 agent can shape (C0); none of them stops an agent that reads the DB file directly. P4 closes

@@ -11,8 +11,12 @@ an episodic memory tier behind the role read wall, and schedules lesson promotio
 provenance gate. Design: `SPEC.md`; stories: `USER_STORIES.md`; the human-facing ticket list
 (CHF-1..8) is `IMPLEMENTATION_PLAN.md`.
 
-**Prerequisite.** role-read-policy tickets 01–10 (RRP-1..3) are built: run tokens, server-stamped
-provenance, `runner/read_policy.py`. `commands.md` Smoke fails until they are.
+**Prerequisite and order.** This plan starts right after the role-read-policy plan
+(`pathly/features/role-read-policy/tasks/01..10`, RRP-1..3) reaches `DONE`, on the same branch:
+run tokens, server-stamped provenance and `runner/read_policy.py` must exist. `commands.md` Smoke
+fails until they do, so a run started too early stops before spending anything. The rest of
+role-read-policy (RRP-2b, RRP-4..8) is built after this plan; until then the Studio UI posts as
+`author_source=none` and no read is withheld, which the tickets here already allow for.
 
 **The bar.** `python -m pytest tests/comms_board/test_chief_acceptance.py -q` passes with a fake
 spawn host: a chat message creates a goal on the board through the API with a `chief` token; an

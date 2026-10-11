@@ -12,6 +12,11 @@ policy into the read paths (RRP-4, RRP-5), the UI token (RRP-2b), pair binding (
 visibility (RRP-7) are later plans. Nothing is withheld from any agent by this plan: reads are
 unchanged, so it ships with no behaviour change for agents.
 
+**What comes next.** When this plan reaches `DONE`, the chief-agent plan
+(`pathly/features/chief-agent/`) starts: `/feature-flow chief-agent auto`, on the same branch, so
+its Smoke finds the modules built here. RRP-2b and RRP-4..8 come after chief-agent, as a later
+plan.
+
 **The bar.** `python -m pytest tests/ -q -p no:cacheprovider` passes in full, and
 `python -m pytest tests/comms_board/test_rrp_acceptance.py -q` passes: a spawned stage's
 `TERMINAL_SPAWN` payload carries a token that resolves to its run and role; a post made with that

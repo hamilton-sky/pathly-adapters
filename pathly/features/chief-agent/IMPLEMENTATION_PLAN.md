@@ -5,7 +5,9 @@ Each ticket maps to one board task. Design: [SPEC.md](SPEC.md); acceptance:
 
 **Prerequisite:** role-read-policy RRP-1, RRP-2, RRP-3
 ([plan](../role-read-policy/IMPLEMENTATION_PLAN.md)). The chief's identity, its read wall and
-the provenance gate on promotion all come from there.
+the provenance gate on promotion all come from there. Build order: role-read-policy's
+feature-flow plan (RRP-1..3) reaches DONE → this plan (`tasks/01..13`) on the same branch →
+role-read-policy RRP-2b, RRP-4..8 later.
 
 Layering and size rules as in role-read-policy: new endpoints get a **new blueprint domain**
 (`blueprints/chief/`), new tables get a **new migration module**, and near-limit files
