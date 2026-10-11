@@ -1,7 +1,7 @@
 # Add the read-policy core: policy shape, built-in walls, SQL predicate and its pure twin
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: —
 Test first: yes
 
@@ -80,6 +80,8 @@ prints internal imports: 0
 **Shortcuts taken**: none.
 
 **For later tickets**: `policy_predicate` emits unqualified column names, so a query that joins tables or aliases `comms_messages` must make the columns unambiguous. The policy has a `global` key, so it is built with the functional `TypedDict` syntax. Resolution (ticket 02) must treat `anonymous` as a built-in key.
+
+**Review fixes**: the single gate finding (`black --check` failing on code_context.py, code_context_codeintel.py, code/query.py, test_code_context_codeintel.py) was unrelated to this ticket. Commit 8035f00d (`style: black baseline`) reformatted those four files. Re-run fresh: `black --check src/ tests/` reports 468 files unchanged; the full Lint command exits 0; Build exits 0; Test is 890 passed, 2 skipped; the ticket check block gives 21 passed and `internal imports: 0`.
 
 ## Review findings (round 1, gate)
 
