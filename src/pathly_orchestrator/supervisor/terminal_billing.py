@@ -79,6 +79,7 @@ def _reconcile_billing_now(
         return
     try:
         from pathly_orchestrator.fsm_ops import _resolve_storage_path
+        from pathly_orchestrator.db.pricing import cache_tokens_of
         from pathly_orchestrator.runner import _patch_last_agent_done
 
         storage = (
@@ -96,6 +97,7 @@ def _reconcile_billing_now(
             model=model,
             run_id=run_id,
             board_scope=_run_board_scope(state, storage),
+            **cache_tokens_of(billing),
         )
     except Exception as exc:
         logger.warning("_reconcile_billing_now: patch failed: %s", exc)

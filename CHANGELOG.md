@@ -16,6 +16,16 @@
   (`graph|lsp|semantic|both|all`), and `engine: cli` still reaches the legacy graph.
 - Prompt injection (`build_block`) still uses the `cli` file-structure block.
 
+### Telemetry — cached tokens priced at cache rates
+
+Estimated costs (every codex run, and claude runs whose CLI reported no dollar figure) priced
+cached input tokens at the full input rate, overstating a heavily-cached codex run ~3-4x.
+`parse_result` now returns the cached subset of `tokens_in` (`cache_read_tokens` /
+`cache_write_tokens`), every billing path carries it on `BILLING_UPDATE`, and
+`db/pricing.py::CACHE_RATES` prices it (claude read 0.1x / write 1.25x; GPT-5 family cached
+0.1x). Models without a verified cache rate keep the flat price. Provider-reported costs are
+unchanged.
+
 ### FSM — fan-out foundation: one engine, one authority (Phases A/B/C)
 
 Moves the DAG fan-out machinery INSIDE the FSM, so `scheduler_loop` stops being a rival

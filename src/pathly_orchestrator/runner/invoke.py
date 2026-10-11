@@ -14,6 +14,7 @@ from typing import Any, Callable
 from .argv import resolve_argv
 from .output import parse_result
 from .events import _patch_last_agent_done
+from ..db.pricing import cache_tokens_of
 
 logger = logging.getLogger("pathly.runner")
 
@@ -120,6 +121,7 @@ def invoke_agent(
     tokens_out = 0
     tool_uses = 0
     session_id_out: str | None = None
+    parsed: dict = {}
     try:
         raw_text = stdout_bytes.decode("utf-8", errors="replace")
         parsed = parse_result(adapter, raw_text)
@@ -150,7 +152,13 @@ def invoke_agent(
 
     if storage_path:
         _patch_last_agent_done(
-            storage_path, cost_usd, tokens_in, tokens_out, wall_seconds, tool_uses
+            storage_path,
+            cost_usd,
+            tokens_in,
+            tokens_out,
+            wall_seconds,
+            tool_uses,
+            **cache_tokens_of(parsed),
         )
 
     return {"cost_usd": cost_usd, "session_id": session_id_out}

@@ -432,7 +432,14 @@ pricing table/`PricingRegistry`/`estimate_cost`/`infer_provider` live in
 upward into `http_server/`); `http_server/telemetry_registry.py` re-exports them for
 back-compat. The projector applies a `_price_if_needed` chokepoint on every projected
 row (idempotent: only fires when `cost_usd==0` and `tokens_in+tokens_out>0`; a
-provider-reported or already-estimated cost is never re-priced). Per-adapter behavior:
+provider-reported or already-estimated cost is never re-priced). **Cache-aware:** both
+token strategies fold cached tokens INTO `tokens_in`, so `parse_result` also returns the
+cached subset (`cache_read_tokens`/`cache_write_tokens`, via `runner/output.py::extract_cache_tokens`
+— claude: `cache_read`/`cache_creation`; codex: `cached_input_tokens`), every billing path
+carries it on `BILLING_UPDATE` (`_patch_last_agent_done(..., **cache_tokens_of(parsed))`), and
+`PricingRegistry.compute` prices it at the `CACHE_RATES` multiple of the input rate (claude read
+0.1x / write 1.25x; GPT-5 family cached 0.1x). Without that a heavily-cached codex run was
+overstated ~3-4x; a model with no `CACHE_RATES` entry keeps the flat price. Per-adapter behavior:
 `codex exec --json` (JSONL events on stdout) never reports a dollar cost, so its token
 strategy (`runner/output.py::_codex_tokens` → `_codex_usage`) scans the stream for a
 token-usage event (defensive — the exact field shape is unconfirmed, several layouts are

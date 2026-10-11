@@ -89,6 +89,8 @@ def _reconciliation_window(
     now_ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     try:
         if arrived:
+            from pathly_orchestrator.db.pricing import cache_tokens_of, estimate_cost
+
             data = run.pty_result or {}
             billing_record = data.get("result") or {}
             cost_usd = float(
@@ -123,6 +125,7 @@ def _reconciliation_window(
                     model=model,
                     run_id=run.run_id,
                     board_scope=board_scope,
+                    **cache_tokens_of(billing_record),
                 )
             except Exception as exc:
                 logger.warning(
@@ -142,9 +145,9 @@ def _reconciliation_window(
                     "provider_reported" if cost_usd > 0 else "unpriced"
                 )
                 if cost_usd == 0 and (tokens_in + tokens_out) > 0 and model:
-                    from pathly_orchestrator.db.pricing import estimate_cost
-
-                    est_cost, est_source = estimate_cost(model, tokens_in, tokens_out)
+                    est_cost, est_source = estimate_cost(
+                        model, tokens_in, tokens_out, **cache_tokens_of(billing_record)
+                    )
                     if est_source == "estimated":
                         billed_cost, billed_source = est_cost, est_source
 
