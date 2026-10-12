@@ -3,7 +3,10 @@ one-time backfill that marks every row written before the upgrade as ``legacy``.
 
 from __future__ import annotations
 
+import re
 import sqlite3
+
+import pytest
 
 from pathly_orchestrator.db import get_db
 from pathly_orchestrator.db.migrations_incremental import _add_additive_migrations
@@ -165,3 +168,88 @@ def test_columns_are_added_to_a_table_that_lacks_them() -> None:
     assert _provenance(conn, "a") == ("explorer", None, "legacy")
     assert _provenance(conn, "b") == ("system", None, "legacy")
     assert _provenance(conn, "c") == ("builder", None, "legacy")
+
+
+def _backfill_join_plans(conn) -> list[str]:
+    """EXPLAIN QUERY PLAN detail lines for how the backfill reads agent_invocations (alias ai).
+
+    Captures the statements add_comms_provenance really runs, so the plan checked is the plan
+    the migration gets, not a copy of its SQL.
+    """
+    statements: list[str] = []
+    conn.set_trace_callback(statements.append)
+    try:
+        add_comms_provenance(conn)
+    finally:
+        conn.set_trace_callback(None)
+    details: list[str] = []
+    for sql in statements:
+        if sql.lstrip().upper().startswith("UPDATE") and "agent_invocations" in sql:
+            for row in conn.execute("EXPLAIN QUERY PLAN " + sql):
+                details.append(row[3])
+    return [d for d in details if re.match(r"(SCAN|SEARCH) ai\b", d)]
+
+
+def _assert_every_join_uses_an_index(plans: list[str]) -> None:
+    assert plans, "the backfill no longer reads agent_invocations"
+    for detail in plans:
+        assert detail.startswith("SEARCH") and "INDEX" in detail, detail
+        assert "AUTOMATIC" not in detail, detail
+
+
+def test_backfill_join_on_run_id_uses_an_index() -> None:
+    conn = get_db()
+    _seed_pre_upgrade_rows(conn)
+    _assert_every_join_uses_an_index(_backfill_join_plans(conn))
+
+
+def test_backfill_creates_its_own_run_id_index() -> None:
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    conn.executescript(
+        "CREATE TABLE comms_messages (id TEXT PRIMARY KEY, from_agent TEXT NOT NULL,"
+        " run_id TEXT);"
+        "CREATE TABLE agent_invocations (id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        " run_id TEXT, agent_role TEXT);"
+    )
+    _assert_every_join_uses_an_index(_backfill_join_plans(conn))
+
+
+class _ConnWithStaleColumnList:
+    """A connection whose PRAGMA table_info(comms_messages) still reports no columns.
+
+    That is what a process sees when another process added the columns between its
+    table_info check and its ALTER.
+    """
+
+    def __init__(self, conn, alter_error=None) -> None:
+        self._conn = conn
+        self._alter_error = alter_error
+
+    def execute(self, sql, *args):
+        if sql.startswith("PRAGMA table_info(comms_messages)"):
+            return []
+        if self._alter_error is not None and sql.startswith("ALTER TABLE"):
+            raise self._alter_error
+        return self._conn.execute(sql, *args)
+
+    def __getattr__(self, name):
+        return getattr(self._conn, name)
+
+
+def test_a_concurrent_duplicate_column_alter_is_tolerated() -> None:
+    conn = get_db()
+    _seed_pre_upgrade_rows(conn)
+    add_comms_provenance(conn)
+    before = _all_provenance(conn)
+
+    add_comms_provenance(_ConnWithStaleColumnList(conn))
+
+    assert _all_provenance(conn) == before
+
+
+def test_another_alter_failure_is_not_swallowed() -> None:
+    conn = get_db()
+    locked = sqlite3.OperationalError("database is locked")
+    with pytest.raises(sqlite3.OperationalError, match="database is locked"):
+        add_comms_provenance(_ConnWithStaleColumnList(conn, alter_error=locked))
