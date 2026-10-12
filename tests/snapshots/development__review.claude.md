@@ -69,6 +69,7 @@ and read the returned `text` field (the full section — the advisory spec for t
 e.g. edge cases / happy flow). The `summary` is a pointer, not the spec — read `text`.
 If `anchor` is absent or null, omit it to retrieve the whole file. These are the same
 refs the builder hydrated — review against the same advisory spec the builder used.
+Send `-H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN"` on that call.
 
 ## Step 3 — Check for violations
 

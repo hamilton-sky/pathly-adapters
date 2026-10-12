@@ -11,6 +11,7 @@ Adapter skills should load and follow this prompt instead of duplicating workflo
 The consolidate skill is triggered when the board is asked to synthesize its free-form
 notes into a single durable summary. It is invoked via `POST /comms/consolidate` with
 `mode="full"` or `mode="reflect"`. Do not run this skill manually unless asked to.
+Send `-H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN"` on every board call this skill makes.
 
 ---
 

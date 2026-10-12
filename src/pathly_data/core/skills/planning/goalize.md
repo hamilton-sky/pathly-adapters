@@ -90,3 +90,4 @@ Report back: the goal slug + `$GOAL_ID`, the number of tasks posted, and that it
 board — plus a nudge that they can run it now (dispatch the goal to its executor) or refine the tasks
 from the Goals & Tasks view. Then read it back with `GET /comms/goals?feature=$FEATURE` and show the
 `{total, ready, …}` rollup so they can see the DAG landed.
+Send `-H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN"` on that call, as on the posts.

@@ -280,6 +280,7 @@ After all plan files are verified, seed the comms board DAG so the builder can p
 `GET /comms/tasks?ready=true` and Studio can visualize task progress. The DAG hangs off
 a **goal message** (`type=goal`): you post the goal first, then stamp every phase task
 with `goal_id` pointing at it.
+Send `-H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN"` on every board call in this step.
 
 **Advisory artifact heading convention (anchor-addressable phases).** When writing
 `EDGE_CASES.md`, `HAPPY_FLOW.md`, and `PLAN_ARCHITECTURE.md`, you MUST use `## Phase N`

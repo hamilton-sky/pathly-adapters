@@ -600,6 +600,7 @@ POST http://127.0.0.1:8765/comms/post
 { "feature": "<feature>", "scope": "<feature>", "from": "<your role>", "to": "<role>",
   "type": "question", "text": "<ONE bounded question — and the assumption you will proceed on>" }
 ```
+Send `-H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN"` on that call.
 
 Who owns what:
 

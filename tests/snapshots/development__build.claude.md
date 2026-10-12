@@ -95,6 +95,7 @@ The **board task DAG is the authoritative work list.** Query it:
 ```
 GET http://127.0.0.1:8765/comms/tasks?feature=$PLAN&scope=$PLAN&ready=true
 ```
+Send `-H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN"` on this and every other board call in this skill.
 
 - **Board reachable with ready tasks →** drain the DAG (Step 4.6). Each task's `text` is a
   self-contained builder prompt (what to build · Files · Done when); its `artifact_path` points

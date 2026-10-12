@@ -101,6 +101,7 @@ If the task being reviewed has `context_refs`, for each `{artifact, anchor}` cal
 and read the returned `text` field (the full advisory spec — edge cases / happy flow
 for the phase the builder implemented). The `summary` is a pointer, not the spec —
 read `text`. These are the same refs the builder hydrated; review against the same spec.
+Send `-H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN"` on that call.
 
 Check against these rules and <feature_path>/ARCHITECTURE_PROPOSAL.md. Classify each
 violation by ROOT CAUSE and write it into the matching file (see Feedback protocol —
@@ -662,6 +663,7 @@ POST http://127.0.0.1:8765/comms/post
 { "feature": "<feature>", "scope": "<feature>", "from": "<your role>", "to": "<role>",
   "type": "question", "text": "<ONE bounded question — and the assumption you will proceed on>" }
 ```
+Send `-H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN"` on that call.
 
 Who owns what:
 
