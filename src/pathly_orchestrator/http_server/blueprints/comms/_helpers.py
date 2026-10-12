@@ -186,6 +186,7 @@ def post_task_status(conn, message_id: str, verb: str, reason: str = "") -> None
     """
     try:
         from pathly_orchestrator.db.queries.comms import post_message
+        from pathly_orchestrator.runner.provenance import system_stamp
 
         row = conn.execute(
             "SELECT board, scope, text FROM comms_messages "
@@ -206,6 +207,7 @@ def post_task_status(conn, message_id: str, verb: str, reason: str = "") -> None
             from_agent="supervisor",
             type="status",
             text=line,
+            **system_stamp(),
         )
     except Exception:
         import logging

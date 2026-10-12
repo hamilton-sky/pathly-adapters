@@ -15,6 +15,11 @@ narrower purpose — stale scope-drift detection, not general provenance). With
 before a human commits, so "the full working-tree diff from the last commit, as of right
 now" is the natural, honest unit here — cumulative, not per-stage-isolated, and stated as
 such in the event this writes.
+
+The same module holds the other half of "provenance": who wrote a board row.
+``stamp`` / ``system_stamp`` give the three ``comms_messages`` author columns
+(role-read-policy, SPEC C1), taken from the caller's run token or the code path, never
+from the request body.
 """
 
 from __future__ import annotations
@@ -104,6 +109,32 @@ def record_stage_provenance(runner_state, run_id: str) -> None:
         )
     except Exception:
         logger.debug("provenance: record_stage_provenance failed", exc_info=True)
+
+
+def stamp(identity) -> dict:
+    """Author columns for a board write made by ``identity`` (a ``CallerIdentity``).
+
+    A live run token gives ``author_role`` / ``author_run_id`` from the run it was minted
+    for and ``author_source="token"``, whatever the request body says in ``from`` or
+    ``run_id``. Anything else (no token, an unknown or revoked one, a UI caller) is
+    anonymous: no role, no run, ``author_source="none"``. The identity is a parameter
+    because ``caller_identity`` lives in ``http_server/`` and this layer may not import it.
+    """
+    if getattr(identity, "kind", None) == "run":
+        return {
+            "author_role": identity.role,
+            "author_run_id": identity.run_id,
+            "author_source": "token",
+        }
+    return {"author_role": None, "author_run_id": None, "author_source": "none"}
+
+
+def system_stamp() -> dict:
+    """Author columns for a row the server itself writes (supervisor, gates, lifecycle).
+
+    A separate function, never chosen from a request field: only server code calls it.
+    """
+    return {"author_role": "system", "author_run_id": None, "author_source": "system"}
 
 
 def _is_own_storage(path: str) -> bool:

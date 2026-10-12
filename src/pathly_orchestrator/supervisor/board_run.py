@@ -413,7 +413,7 @@ def start_board_run(
         "the context below). Carry it out.\n\n"
         "IMPORTANT — this run is headless, so the human CANNOT see your terminal. Keep "
         "them in the loop by posting brief progress to the board as you go. POST to "
-        "http://127.0.0.1:8765/comms/post with a JSON body:\n"
+        "http://127.0.0.1:8765/comms/post with the header X-Pathly-Run-Token: $PATHLY_RUN_TOKEN and a JSON body:\n"
         f'  {{"feature": "{scope}", "from": "{_from}", "board": "{board}", "scope": "{scope}", '
         '"type": "status", "text": "<one or two sentences>"}\n'
         f"{cadence} Keep each post to one or two sentences — the board is the human's "
@@ -423,7 +423,7 @@ def start_board_run(
         "human can open it from the board. Provide TWO fields: text = a real 1-2 sentence "
         "description (what it is and why it matters, NOT a bare label); summary = a topic map of "
         "the file's sections (one line per heading) — this is the catalog entry other agents scan "
-        "and is embedded for semantic retrieval. Include artifact_path and artifact_type:\n"
+        "and is embedded for semantic retrieval. Include artifact_path and artifact_type, and send the same header:\n"
         f'  {{"feature": "{scope}", "from": "{_from}", "board": "{board}", "scope": "{scope}", '
         '"type": "artifact", "text": "<1-2 sentence description>", '
         '"summary": "<topic map of the file sections, one line per heading>", '

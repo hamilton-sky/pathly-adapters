@@ -31,6 +31,7 @@ def post_phase_to_board(
         from pathly_orchestrator.db.queries.run_history import (
             latest_running_run_id_for_feature,
         )
+        from pathly_orchestrator.runner.provenance import system_stamp
         from pathly_orchestrator.http_server.sse import _broadcast_comms
 
         conn = get_db()
@@ -49,6 +50,7 @@ def post_phase_to_board(
             stage=phase,
             conv=conv,
             run_id=run_id,
+            **system_stamp(),
         )
         _broadcast_comms(
             feature,

@@ -58,6 +58,7 @@ def comms_run():
 
         from pathly_orchestrator.db.connection import get_db as _get_db
         from pathly_orchestrator.db.queries.comms import post_message as _post_message
+        from pathly_orchestrator.runner.provenance import system_stamp
 
         def _board_post(
             text: str, phase: str | None = None, run_id: str | None = None
@@ -72,6 +73,7 @@ def comms_run():
                     type="status",
                     text=text,
                     run_id=run_id,
+                    **system_stamp(),
                 )
                 payload = {
                     "type": "COMMS_UPDATE",
@@ -168,6 +170,7 @@ def comms_run():
                                     ),
                                     artifact_path=art_path.replace("\\", "/"),
                                     artifact_type="md",
+                                    **system_stamp(),
                                 )
                                 _broadcast_comms(
                                     scope,
@@ -200,6 +203,7 @@ def comms_run():
                                     "already has a goal/task DAG, the evaluator must still post the "
                                     "analysis artifact (it may skip only the goal/task proposals)."
                                 ),
+                                **system_stamp(),
                             )
                             _broadcast_comms(
                                 scope,
@@ -254,6 +258,7 @@ def comms_run_stop():
         from pathly_orchestrator.supervisor import board_lock, get_run
         from pathly_orchestrator.db.connection import get_db as _get_db
         from pathly_orchestrator.db.queries.comms import post_message as _post_message
+        from pathly_orchestrator.runner.provenance import system_stamp
 
         data = read_json_body({})
         board = data.get("board", "feature")
@@ -293,6 +298,7 @@ def comms_run_stop():
                 from_agent="system",
                 type="status",
                 text="⏹ run stopped by user",
+                **system_stamp(),
             )
             _broadcast_comms(
                 scope,

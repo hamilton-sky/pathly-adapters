@@ -10,8 +10,9 @@ from __future__ import annotations
 import logging
 import os
 
-from flask import jsonify
+from flask import jsonify, request
 
+from ...run_identity import caller_identity
 from ...sse import _broadcast_comms
 from ._helpers import (
     _EMBED_TYPES,
@@ -37,6 +38,7 @@ def comms_post():
             embed_artifact_async as _embed_artifact_async,
             embed_async as _embed_async,
         )
+        from pathly_orchestrator.runner.provenance import stamp, system_stamp
 
         # Lenient decode (UTF-8 then cp1252) — this route's original hardening, now the
         # shared helper every comms route uses. See _helpers.read_json_body.
@@ -260,6 +262,7 @@ def comms_post():
                                         f"{art_name} §{anc} unresolved → hydrating whole file. "
                                         f"Check heading conventions (§3.1)."
                                     ),
+                                    **system_stamp(),
                                 )
                             except Exception:
                                 pass
@@ -293,6 +296,7 @@ def comms_post():
             files=files,
             context_refs=context_refs,
             slug=slug if isinstance(slug, str) and slug.strip() else None,
+            **stamp(caller_identity(request)),
         )
 
         if (

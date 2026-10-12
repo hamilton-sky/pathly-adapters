@@ -98,6 +98,7 @@ def post_gate_failure_escalation(
     try:
         from pathly_orchestrator.db.connection import get_db
         from pathly_orchestrator.db.queries.comms import post_message
+        from pathly_orchestrator.runner.provenance import system_stamp
 
         post_message(
             get_db(),
@@ -111,6 +112,7 @@ def post_gate_failure_escalation(
                 f"not pass:\n\n{gate_failure['reason'][:1500]}"
             ),
             goal_id=goal_id,
+            **system_stamp(),
         )
     except Exception:
         logger.debug("goal_verify: escalation post failed", exc_info=True)

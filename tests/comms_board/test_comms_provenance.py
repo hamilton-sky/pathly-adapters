@@ -350,6 +350,46 @@ def test_no_writer_leaves_author_source_null(client, tmp_path):
     )
 
 
+# ── instruction text that tells an agent to post ───────────────────────────────
+
+_HEADER = "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN"
+
+
+def test_board_run_prompt_tells_the_agent_to_send_the_run_token():
+    """Without the header a board-run agent's posts would be stamped `none`."""
+    from pathly_orchestrator.supervisor import board_lock
+    from pathly_orchestrator.supervisor.board_run import start_board_run
+
+    calls: list = []
+
+    def fake_spawn(**kwargs):
+        calls.append(kwargs)
+        return {"result": "ok"}
+
+    board_lock._held.clear()
+    start_board_run(
+        "feature", "feat-token", "single-agent", spawn_fn=fake_spawn, block=True
+    )
+    prompt = calls[0]["prompt"]
+    assert f"/comms/post with the header {_HEADER} and a JSON body" in prompt
+    assert "artifact_type, and send the same header" in prompt
+
+
+def test_catalog_channel_tells_the_agent_to_send_the_run_token_on_its_pulls():
+    from pathly_orchestrator.db.connection import get_db
+    from pathly_orchestrator.db.queries.comms_artifacts import ensure_attached
+    from pathly_orchestrator.runner.comms_catalog import build_catalog_channel
+
+    conn = get_db()
+    ensure_attached(conn, "feat-cat", "pathly/features/feat-cat/SPEC.md", role="po")
+    lines, count = build_catalog_channel(conn, "feature", "feat-cat")
+    assert count == 1
+    list_line = next(ln for ln in lines if ln.startswith("To list all:"))
+    read_line = next(ln for ln in lines if ln.startswith("To read one:"))
+    assert _HEADER in list_line
+    assert "same header" in read_line
+
+
 # ── source scans ───────────────────────────────────────────────────────────────
 
 

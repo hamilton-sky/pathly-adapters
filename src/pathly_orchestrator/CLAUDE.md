@@ -1559,6 +1559,19 @@ general provenance). Best-effort throughout: `capture_stage_provenance` returns 
 raises) outside a git repo or on any git failure, and `record_stage_provenance` never blocks or
 fails the result callback that calls it.
 
+**Author provenance on board writes (role-read-policy)** lives in the same module. `stamp(identity)`
+returns the three `comms_messages` author columns for a caller: a live run token gives
+`author_role`/`author_run_id` of the run it was minted for and `author_source="token"`; anything
+else (no token, an unknown or revoked one) gives `none`. `system_stamp()` gives `system`/`system`
+for rows the server writes itself. `POST /comms/post` computes `stamp(caller_identity(request))`
+(`caller_identity` is in `http_server/`, so the identity is a parameter here), and the body's
+`from` / `run_id` are still stored in `from_agent` / `run_id` but never used for provenance. Server-internal
+`post_message` callers pass `**system_stamp()`; `post_message` itself stores a caller that passes
+no source as `none`, never NULL (the startup backfill turns NULL into `legacy`).
+`tests/comms_board/test_comms_provenance.py` scans `src/` for a `post_message` call without a
+stamp and for an `INSERT INTO comms_messages` without `author_source`; the few files left on the
+`none` default are on its commented allow-list.
+
 ## Run identity — ISSUED at spawn (run-identity)
 
 Telemetry identity is **issued where truth is known — at spawn — never derived from storage

@@ -95,6 +95,7 @@ def _release_board_run(run_id: str, board: str, scope: str) -> None:
     try:
         from pathly_orchestrator.db.connection import get_db as _get_db
         from pathly_orchestrator.db.queries.comms import post_message as _post_message
+        from pathly_orchestrator.runner.provenance import system_stamp
 
         mid = _post_message(
             _get_db(),
@@ -103,6 +104,7 @@ def _release_board_run(run_id: str, board: str, scope: str) -> None:
             from_agent="system",
             type="status",
             text="⏹ run stopped by user",
+            **system_stamp(),
         )
         _broadcast_comms(
             scope,

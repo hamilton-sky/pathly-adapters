@@ -238,8 +238,8 @@ def find_or_create_artifact_by_path(
     with _get_write_lock(conn):
         conn.execute(
             "INSERT INTO comms_messages "
-            "(id, board, scope, from_agent, to_agent, type, text, ts) "
-            "VALUES (?, 'feature', ?, 'system', '*', 'artifact', ?, ?)",
+            "(id, board, scope, from_agent, to_agent, type, text, ts, author_role, author_source) "
+            "VALUES (?, 'feature', ?, 'system', '*', 'artifact', ?, ?, 'system', 'system')",
             (sentinel_msg_id, scope, f"[legacy artifact] {title}", now),
         )
         conn.execute(
@@ -304,6 +304,8 @@ def ensure_attached(
         artifact_path=artifact_path,
         artifact_type=type,
         goal_id=goal_id,
+        author_role="system",
+        author_source="system",
     )
     artifact_id = insert_artifact(
         conn,

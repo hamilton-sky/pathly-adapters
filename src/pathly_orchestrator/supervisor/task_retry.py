@@ -168,6 +168,7 @@ def _post_escalation(
     try:
         from pathly_orchestrator.db.connection import get_db
         from pathly_orchestrator.db.queries.comms import post_message
+        from pathly_orchestrator.runner.provenance import system_stamp
 
         post_message(
             get_db(),
@@ -180,6 +181,7 @@ def _post_escalation(
                 f"{(text or task_id)[:200]}\n\n{reason[:1500]}"
             ),
             goal_id=goal_id or None,
+            **system_stamp(),
         )
     except Exception:
         logger.debug("task_retry: escalation post failed", exc_info=True)

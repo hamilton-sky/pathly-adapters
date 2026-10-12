@@ -101,6 +101,7 @@ def _dispatch_board_run(
     """Dispatch a light or full single-agent board run for the feature."""
     from pathly_orchestrator.db.connection import get_db as _get_db
     from pathly_orchestrator.db.queries.comms import post_message as _post_message
+    from pathly_orchestrator.runner.provenance import system_stamp
     from pathly_orchestrator.supervisor.board_run import start_board_run
 
     skill = "planning/feature-decompose" if rigor == "light" else "planning/plan"
@@ -139,6 +140,7 @@ def _dispatch_board_run(
                 from_agent="system",
                 type="status",
                 text=text,
+                **system_stamp(),
             )
             payload: dict = {
                 "type": "COMMS_UPDATE",
@@ -216,6 +218,7 @@ def _dispatch_consultation(
     """Dispatch a feature-consultation FSM flow for the feature."""
     from pathly_orchestrator.db.connection import get_db as _get_db
     from pathly_orchestrator.db.queries.comms import post_message as _post_message
+    from pathly_orchestrator.runner.provenance import system_stamp
     from pathly_orchestrator.supervisor import board_lock
     from pathly_orchestrator.supervisor.goal_executor import _safe_call
     from pathly_orchestrator.supervisor.registry import get_state
@@ -278,6 +281,7 @@ def _dispatch_consultation(
                 from_agent="system",
                 type="status",
                 text=text,
+                **system_stamp(),
             )
             payload: dict = {
                 "type": "COMMS_UPDATE",

@@ -47,19 +47,27 @@ def post_message(
     lane: str | None = None,
     slug: str | None = None,
     run_id: str | None = None,
+    author_role: str | None = None,
+    author_run_id: str | None = None,
+    author_source: str | None = None,
 ) -> str:
     """Insert a new message into comms_messages. Returns the new message_id.
 
     ``run_id`` (unified-control-plane) correlates this post to the run that made it, so the
     control plane's RunDetail Board tab shows a run's *exact* posts instead of a time-window guess.
+
+    ``author_role`` / ``author_run_id`` / ``author_source`` are the server-stamped provenance
+    (``runner.provenance.stamp`` / ``system_stamp``), never the body's ``from`` or ``run_id``.
+    A caller that passes no source is stored as ``none`` (unverified), never NULL: the startup
+    backfill turns a NULL into ``legacy``, which would hide the unstamped writer.
     """
     message_id = str(uuid.uuid4())
     task_status = "pending" if type == "task" else None
     with _get_write_lock(conn):
         conn.execute(
             "INSERT INTO comms_messages "
-            "(id, board, scope, from_agent, to_agent, type, text, options, reply_to, stage, conv, ts, depends_on, task_status, artifact_path, artifact_type, goal_id, executor, context_refs, files, lane, slug, run_id) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "(id, board, scope, from_agent, to_agent, type, text, options, reply_to, stage, conv, ts, depends_on, task_status, artifact_path, artifact_type, goal_id, executor, context_refs, files, lane, slug, run_id, author_role, author_run_id, author_source) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 message_id,
                 board,
@@ -84,6 +92,9 @@ def post_message(
                 lane,
                 slug,
                 run_id,
+                author_role,
+                author_run_id,
+                author_source or "none",
             ),
         )
         conn.commit()

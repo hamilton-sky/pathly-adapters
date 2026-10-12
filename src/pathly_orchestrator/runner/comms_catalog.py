@@ -89,10 +89,14 @@ def build_catalog_channel(conn: Any, board: str, scope: str) -> tuple[list[str],
     if overflow > 0:
         lines.append(f"  • … ({overflow}+ more — list via the URL below)")
     lines.append("")
-    lines.append(f"To list all: `GET /comms/artifacts?board={board}&scope={scope}`")
+    lines.append(
+        f"To list all: `GET /comms/artifacts?board={board}&scope={scope}` "
+        "with the header `X-Pathly-Run-Token: $PATHLY_RUN_TOKEN`."
+    )
     lines.append(
         f"To read one: `GET /comms/artifacts/section?scope={scope}"
-        "&artifact=<path>&anchor=<anchor>` (omit anchor for the whole file)."
+        "&artifact=<path>&anchor=<anchor>` (omit anchor for the whole file), "
+        "with the same header."
     )
     lines.append(
         "The referenced items above are already hydrated — don't refetch them. Append "
