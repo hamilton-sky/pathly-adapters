@@ -1,7 +1,7 @@
 # Send the run token on every board call in the core skills, fragments and agents
 
 Type: task
-Status: resolved
+Status: open
 Blocked by: 05, 06
 Test first: yes
 
@@ -72,3 +72,14 @@ exit 0
 - Ticket 09 (stamping): `development/build.md` and `consult.md` are the two files in the 23-file list that have no curl, so their calls may reach the server without a token.
 - The header value is the empty string for interactive runs (`$PATHLY_RUN_TOKEN` unset); ticket 06's `caller_identity` already treats empty as `anonymous`.
 - Any future change to composed skill text needs the 9 snapshots regenerated; the pattern is writing `compose_skill(skill, "claude")` to `tests/snapshots/<skill with / as __>.claude.md`.
+
+## Review findings (round 1, quality review)
+
+QUALITY
+1. major tests/consistency/test_fragments_run_token.py, src/pathly_data/core/skills/development/drain-dag.md: about 25 agent-run board calls written as `GET|POST [http://127.0.0.1:8765]/comms/...` pseudo-requests carry no token and the scanner skips them (drain-dag.md 8 calls, team/review.md and development/review.md artifacts/section, team/build.md 3, development/build.md 5, fragments/consult.md 1, custom/testing.md 3, plan.md and goalize.md 1 each). The ticket counted build.md and consult.md among the files to edit; both untouched. The "a new fragment cannot forget it" promise is false for this style - extend the scan to flag such lines in a file that never mentions X-Pathly-Run-Token, or rewrite them in curl form, and add an instruction line per affected skill to send -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN".
+2. minor src/pathly_data/CLAUDE.md: the new paragraph understates the pseudo-request gap - fix it together with 1.
+3. minor tests/consistency/test_fragments_run_token.py: _board_curls tests the accumulated command's rstrip().endswith("\\") so a blank line after a trailing backslash swallows the next curl - test lines[j].rstrip().endswith("\\").
+4. minor tests/consistency/test_fragments_run_token.py: test_removing_the_header_from_a_file_is_caught repeats the same logic 21 times and strips every header at once; add synthetic per-curl cases and note the shell-variable-URL limitation in the docstring.
+5. minor src/pathly_orchestrator/supervisor/board_run.py:416: the Python-built board-run prompt tells the agent to POST http://127.0.0.1:8765/comms/post with no token; outside core/ and this ticket, record it in map.md or ticket 09.
+
+REVIEW: FAIL
