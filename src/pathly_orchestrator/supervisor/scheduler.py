@@ -61,6 +61,7 @@ def _post_task_status(conn, board: str, scope: str, text: str) -> None:
     Best-effort: never raises, never blocks the drain."""
     try:
         from pathly_orchestrator.db.queries.comms import post_message
+        from pathly_orchestrator.runner.provenance import system_stamp
 
         post_message(
             conn,
@@ -69,6 +70,7 @@ def _post_task_status(conn, board: str, scope: str, text: str) -> None:
             from_agent="supervisor",
             type="status",
             text=text,
+            **system_stamp(),
         )
     except Exception:
         logger.debug("scheduler: _post_task_status failed", exc_info=True)

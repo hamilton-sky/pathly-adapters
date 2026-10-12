@@ -387,10 +387,8 @@ def comms_consolidate():
     """Memory consolidation — deterministic dedup and optional LLM synthesis."""
     try:
         from pathly_orchestrator.db.connection import get_db as _get_db
-        from pathly_orchestrator.db.queries.comms import (
-            dedupe_board as _dedupe,
-            post_message as _post_message,
-        )
+        from pathly_orchestrator.db.queries.comms import dedupe_board as _dedupe
+        from pathly_orchestrator.runner.provenance import post_system as _post_message
 
         data = read_json_body({})
         scope = data.get("scope")

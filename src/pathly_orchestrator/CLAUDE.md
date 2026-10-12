@@ -451,7 +451,13 @@ pathly_orchestrator/
                            #   `system`; else the role of the agent_invocations row its run_id
                            #   joins; else from_agent; author_run_id stays NULL). The NULL filter
                            #   re-runs on every start, so a writer that leaves author_source NULL
-                           #   is relabelled `legacy` at the next start.
+                           #   is relabelled `legacy` at the next start; hydrate_board
+                           #   (board_mirror_hydrate.py) runs it after importing a snapshot, so
+                           #   a pre-upgrade BOARD.json row is `legacy` at once.
+    provenance_values.py   # the author_source vocabulary and the `system` stamp, defined ONCE
+                           # (AUTHOR_SOURCES = token|system|legacy|none, SYSTEM_ROLE, SYSTEM_AUTHOR,
+                           # SYSTEM_PAIR); imported by runner/provenance.py, post_message (rejects
+                           # an unknown source with ValueError) and comms_artifacts.py
     pricing.py             # PRICING + CACHE_RATES tables (cached tokens are a subset of tokens_in,
                            # priced at a multiple of the input rate), cache_tokens_of(),
                            # PricingRegistry, estimate_cost()/infer_provider(),
@@ -1558,6 +1564,30 @@ stage's exact incremental delta would need a per-stage baseline snapshot (`scope
 general provenance). Best-effort throughout: `capture_stage_provenance` returns `None` (never
 raises) outside a git repo or on any git failure, and `record_stage_provenance` never blocks or
 fails the result callback that calls it.
+
+**Author provenance on board writes (role-read-policy)** lives in the same module. `stamp(identity)`
+returns the three `comms_messages` author columns for a caller: a live run token whose run has a
+role gives `author_role`/`author_run_id` of the run it was minted for and `author_source="token"`;
+anything else gives `none` (no token, an unknown or revoked one, a UI caller, and a run whose token
+carries no role, which is also logged as a warning naming the run: `token` with no role would
+pass every role wall). `system_stamp()` gives `system`/`system` for rows the server writes itself,
+and `post_system(conn, **fields)` is `post_message` with that stamp applied (the three size-frozen
+blueprints `comms/goals.py`, `project.py` and `settings.py` import it `as _post_message`, so their
+call sites need no stamp argument). The values (`AUTHOR_SOURCES`, the `system` constants) are
+defined once in `db/provenance_values.py`. `POST /comms/post` computes
+`stamp(caller_identity(request))` (`caller_identity` is in `http_server/`, so the identity is a
+parameter here), and the body's `from` / `run_id` are still stored in `from_agent` / `run_id` but
+never used for provenance. Handlers that write a row whose content is the caller's (the
+`/code/query` log row, `/record_phase`, the context-pull trail) are stamped from the same
+`stamp(caller_identity(request))`, so the row keeps the caller's role. Server-internal
+`post_message` callers pass `**system_stamp()`; `post_message` itself stores a caller that passes
+no source as `none`, never NULL (the startup backfill turns NULL into `legacy`), and raises
+`ValueError` for a source outside `AUTHOR_SOURCES`. `promote_message` copies the source row's three
+author values onto the promoted copy. `tests/comms_board/test_comms_provenance.py` scans `src/` for
+a `post_message` call without a stamp (a name bound to `post_system` counts as stamped; an aliased
+or indirect use of `post_message` fails), for an `INSERT`/`REPLACE INTO comms_messages` without
+`author_source`, and for a hard-coded author value; the two files left on the `none` default or a
+copied stamp are on its commented allow-list.
 
 ## Run identity — ISSUED at spawn (run-identity)
 

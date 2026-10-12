@@ -50,6 +50,7 @@ def _post_commit_skipped_note(
     try:
         from pathly_orchestrator.db.connection import get_db
         from pathly_orchestrator.db.queries.comms import post_message
+        from pathly_orchestrator.runner.provenance import system_stamp
 
         count = f"{n} changed file(s)" if n >= 0 else "pending changes"
         post_message(
@@ -63,6 +64,7 @@ def _post_commit_skipped_note(
                 "Auto-commit is OFF (pathly.auto_commit); commit when you've reviewed."
             ),
             stage=next_state,
+            **system_stamp(),
         )
     except Exception:
         pass

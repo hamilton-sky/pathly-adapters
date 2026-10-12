@@ -83,6 +83,7 @@ def _resolve_stage_supervised(
         try:
             from pathly_orchestrator.db.connection import get_db
             from pathly_orchestrator.db.queries.comms_messages import post_message
+            from pathly_orchestrator.runner.provenance import system_stamp
 
             content = res.get("instructions") or res.get("message") or ""
             body = (
@@ -101,6 +102,7 @@ def _resolve_stage_supervised(
                 type="escalation",
                 text=body,
                 goal_id=state.goal_id or None,
+                **system_stamp(),
             )
         except Exception as exc:
             logger.warning("human escalation post failed: %s", exc)

@@ -147,7 +147,7 @@ def _dispatch_board_run(
     project-decompose. 'full' differs only by a deeper instruction.)
     """
     from pathly_orchestrator.db.connection import get_db as _get_db
-    from pathly_orchestrator.db.queries.comms import post_message as _post_message
+    from pathly_orchestrator.runner.provenance import post_system as _post_message
     from pathly_orchestrator.supervisor.board_run import start_board_run
 
     skill = "planning/project-decompose"
@@ -269,7 +269,7 @@ def _dispatch_consultation(
 ) -> tuple:
     """Dispatch a project-consultation FSM flow for the project."""
     from pathly_orchestrator.db.connection import get_db as _get_db
-    from pathly_orchestrator.db.queries.comms import post_message as _post_message
+    from pathly_orchestrator.runner.provenance import post_system as _post_message
     from pathly_orchestrator.supervisor import board_lock
     from pathly_orchestrator.supervisor.goal_executor import _safe_call
     from pathly_orchestrator.supervisor.registry import get_state

@@ -103,7 +103,8 @@ def promote_message(
     away through ``promoted_from``.
     """
     src = conn.execute(
-        "SELECT id, board, scope, from_agent, type, text, original_scope "
+        "SELECT id, board, scope, from_agent, type, text, original_scope, "
+        "author_role, author_run_id, author_source "
         "FROM comms_messages WHERE id=? AND deleted_at IS NULL",
         (message_id,),
     ).fetchone()
@@ -154,6 +155,11 @@ def promote_message(
         from_agent=promoted_by,
         type=src_type,
         text=src["text"] or "",
+        # The copy is not a new author: it keeps the source's provenance, so a chain
+        # feature -> project -> global still shows who really wrote the decision.
+        author_role=src["author_role"],
+        author_run_id=src["author_run_id"],
+        author_source=src["author_source"],
     )
 
     with _get_write_lock(conn):
