@@ -16,7 +16,7 @@ def comms_goals_run():
     """Dispatch a goal's task-DAG to its executor."""
     try:
         from pathly_orchestrator.db.connection import get_db as _get_db
-        from pathly_orchestrator.db.queries.comms import post_message as _post_message
+        from pathly_orchestrator.runner.provenance import post_system as _post_message
         from pathly_orchestrator.supervisor.goal_run import start_goal_run
 
         data = read_json_body()
@@ -186,7 +186,7 @@ def comms_goals_stop():
     try:
         from pathly_orchestrator.supervisor import board_lock, get_run
         from pathly_orchestrator.db.connection import get_db as _get_db
-        from pathly_orchestrator.db.queries.comms import post_message as _post_message
+        from pathly_orchestrator.runner.provenance import post_system as _post_message
 
         data = read_json_body({})
         goal_id = data.get("goal_id", "")
@@ -283,7 +283,7 @@ def comms_goals_decompose():
     """Decompose a goal into a task DAG."""
     try:
         from pathly_orchestrator.db.connection import get_db as _get_db
-        from pathly_orchestrator.db.queries.comms import post_message as _post_message
+        from pathly_orchestrator.runner.provenance import post_system as _post_message
         from pathly_orchestrator.supervisor.goal_run import start_goal_decompose
 
         data = read_json_body()

@@ -7,6 +7,7 @@ import uuid
 from typing import Any
 
 from ..connection import _get_write_lock
+from ..provenance_values import SYSTEM_AUTHOR, SYSTEM_PAIR
 from .comms_messages import _now, post_message
 
 
@@ -239,8 +240,8 @@ def find_or_create_artifact_by_path(
         conn.execute(
             "INSERT INTO comms_messages "
             "(id, board, scope, from_agent, to_agent, type, text, ts, author_role, author_source) "
-            "VALUES (?, 'feature', ?, 'system', '*', 'artifact', ?, ?, 'system', 'system')",
-            (sentinel_msg_id, scope, f"[legacy artifact] {title}", now),
+            "VALUES (?, 'feature', ?, 'system', '*', 'artifact', ?, ?, ?, ?)",
+            (sentinel_msg_id, scope, f"[legacy artifact] {title}", now, *SYSTEM_PAIR),
         )
         conn.execute(
             "INSERT INTO comms_artifacts "
@@ -304,8 +305,7 @@ def ensure_attached(
         artifact_path=artifact_path,
         artifact_type=type,
         goal_id=goal_id,
-        author_role="system",
-        author_source="system",
+        **SYSTEM_AUTHOR,
     )
     artifact_id = insert_artifact(
         conn,

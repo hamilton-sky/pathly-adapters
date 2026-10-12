@@ -230,7 +230,10 @@ def comms_artifact_section(artifact_id: str | None = None):
                 from pathly_orchestrator.db.queries.comms import (
                     post_message as _post_message,
                 )
-                from pathly_orchestrator.runner.provenance import system_stamp
+                from pathly_orchestrator.http_server.run_identity import (
+                    caller_identity,
+                )
+                from pathly_orchestrator.runner.provenance import stamp
 
                 anchor_label = f" §{anchor}" if anchor else ""
                 target = artifact or artifact_id or "?"
@@ -241,7 +244,7 @@ def comms_artifact_section(artifact_id: str | None = None):
                     from_agent="agent",
                     type="status",
                     text=f"📚 context pull · {target}{anchor_label}",
-                    **system_stamp(),
+                    **stamp(caller_identity(request)),
                 )
             except Exception:
                 logging.debug("context-access trail post failed", exc_info=True)

@@ -39,7 +39,7 @@ Comms board / message-board subsystem — messages, tasks, artifacts, goals, con
 | `test_comms_hybrid.py` | Tests for Phase 11 — FTS5 virtual table + hybrid search helpers | 11 |
 | `test_comms_hydrate_paths.py` | Regression tests for CT5 — the authoritative-channel 'section not found' bug | 8 |
 | `test_comms_promote.py` | Tests for POST /comms/promote — cross-tier promotion of a decision/constraint | 19 |
-| `test_comms_provenance.py` | role-read-policy 09: the server stamps author_role / author_run_id / author_source on every | 26 |
+| `test_comms_provenance.py` | role-read-policy 09: the server stamps author_role / author_run_id / author_source on every | 58 |
 | `test_comms_refs_enforcement.py` | Tests for CT3 — context_refs enforcement + coverage + unverified auto-derive | 6 |
 | `test_comms_scope.py` | Tests for the /comms/scope board_scope endpoints | 9 |
 | `test_comms_search_mode.py` | Tests for Phase 12 — mode param in /comms/search + hybrid default in retrieval | 21 |

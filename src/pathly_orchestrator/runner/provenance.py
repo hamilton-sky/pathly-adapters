@@ -19,13 +19,15 @@ such in the event this writes.
 The same module holds the other half of "provenance": who wrote a board row.
 ``stamp`` / ``system_stamp`` give the three ``comms_messages`` author columns
 (role-read-policy, SPEC C1), taken from the caller's run token or the code path, never
-from the request body.
+from the request body; ``post_system`` is ``post_message`` with the system stamp applied.
 """
 
 from __future__ import annotations
 
 import logging
 import subprocess
+
+from ..db.provenance_values import SOURCE_NONE, SOURCE_TOKEN, SYSTEM_AUTHOR
 
 logger = logging.getLogger("pathly.provenance")
 
@@ -114,19 +116,29 @@ def record_stage_provenance(runner_state, run_id: str) -> None:
 def stamp(identity) -> dict:
     """Author columns for a board write made by ``identity`` (a ``CallerIdentity``).
 
-    A live run token gives ``author_role`` / ``author_run_id`` from the run it was minted
-    for and ``author_source="token"``, whatever the request body says in ``from`` or
-    ``run_id``. Anything else (no token, an unknown or revoked one, a UI caller) is
-    anonymous: no role, no run, ``author_source="none"``. The identity is a parameter
-    because ``caller_identity`` lives in ``http_server/`` and this layer may not import it.
+    A live run token whose run has a role gives ``author_role`` / ``author_run_id`` from
+    the run it was minted for and ``author_source="token"``, whatever the request body says
+    in ``from`` or ``run_id``. Anything else (no token, an unknown or revoked one, a UI
+    caller, or a run with no role) is anonymous: no role, no run, ``author_source="none"``.
+    A role-less run is logged: ``token`` with no role would pass every role wall, which only
+    withholds ``none`` or a named role. The identity is a parameter because
+    ``caller_identity`` lives in ``http_server/`` and this layer may not import it.
     """
     if getattr(identity, "kind", None) == "run":
-        return {
-            "author_role": identity.role,
-            "author_run_id": identity.run_id,
-            "author_source": "token",
-        }
-    return {"author_role": None, "author_run_id": None, "author_source": "none"}
+        role = getattr(identity, "role", None)
+        if isinstance(role, str) and role.strip():
+            return {
+                "author_role": role,
+                "author_run_id": identity.run_id,
+                "author_source": SOURCE_TOKEN,
+            }
+        logger.warning(
+            "run %s has no role: its board write is stamped %r, not %r",
+            getattr(identity, "run_id", None),
+            SOURCE_NONE,
+            SOURCE_TOKEN,
+        )
+    return {"author_role": None, "author_run_id": None, "author_source": SOURCE_NONE}
 
 
 def system_stamp() -> dict:
@@ -134,7 +146,19 @@ def system_stamp() -> dict:
 
     A separate function, never chosen from a request field: only server code calls it.
     """
-    return {"author_role": "system", "author_run_id": None, "author_source": "system"}
+    return dict(SYSTEM_AUTHOR)
+
+
+def post_system(conn, **fields) -> str:
+    """``post_message`` for a row the server composes itself: always stamped ``system``.
+
+    The blueprints that are over the 400-line ratchet import this as ``_post_message``, so
+    their call sites need no stamp argument. Passing an ``author_*`` field raises
+    ``TypeError``: the stamp is not the caller's to choose.
+    """
+    from ..db.queries.comms_messages import post_message
+
+    return post_message(conn, **fields, **system_stamp())
 
 
 def _is_own_storage(path: str) -> bool:

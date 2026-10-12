@@ -16,6 +16,8 @@ import sqlite3
 from collections.abc import Callable
 from pathlib import Path
 
+from pathly_orchestrator.db.connection import _get_write_lock
+from pathly_orchestrator.db.migrations_provenance import add_comms_provenance
 from pathly_orchestrator.db.queries.comms_artifacts import insert_artifact_row
 from pathly_orchestrator.db.queries.comms_messages import (
     get_all_messages,
@@ -33,7 +35,8 @@ def hydrate_board(conn: sqlite3.Connection, board: str, scope: str, path: Path) 
     overwritten by a stale or divergent mirror. Otherwise every message/artifact row
     in the snapshot is inserted (full-fidelity, idempotent) and each inserted message
     is best-effort re-embedded — the rows landing in the DB are hydration's whole
-    value, so a missing/broken embedder must never block or fail it. Never raises.
+    value, so a missing/broken embedder must never block or fail it. Rows that carry no
+    ``author_source`` (a pre-upgrade snapshot) are then labelled ``legacy``. Never raises.
     """
     try:
         if get_all_messages(conn, board, scope):
@@ -53,6 +56,15 @@ def hydrate_board(conn: sqlite3.Connection, board: str, scope: str, path: Path) 
         insert_message_row(conn, msg)
     for art in artifacts:
         insert_artifact_row(conn, art)
+
+    # A snapshot exported before the provenance columns existed has no author_* keys, so
+    # its rows landed with a NULL author_source (which no read wall treats as `none`).
+    # The startup backfill labels them `legacy`; run it now rather than at the next start.
+    try:
+        with _get_write_lock(conn):
+            add_comms_provenance(conn)
+    except Exception:
+        logger.debug("hydrate_board: provenance backfill failed", exc_info=True)
 
     _embed_fn: Callable[[str, str, str], None] | None = None
     try:

@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import logging
 
+from flask import request
+
 logger = logging.getLogger(__name__)
 
 
@@ -24,14 +26,19 @@ def post_phase_to_board(
     event_type: str,
     conv: int | None = None,
 ) -> None:
-    """Post a phase-boundary marker to the feature board. Never raises."""
+    """Post a phase-boundary marker to the feature board. Never raises.
+
+    The row's agent and phase come from the request body, so it is stamped from the
+    request's run token (``stamp(caller_identity(request))``), not as a server line.
+    """
     try:
         from pathly_orchestrator.db.connection import get_db
         from pathly_orchestrator.db.queries.comms import post_message
         from pathly_orchestrator.db.queries.run_history import (
             latest_running_run_id_for_feature,
         )
-        from pathly_orchestrator.runner.provenance import system_stamp
+        from pathly_orchestrator.http_server.run_identity import caller_identity
+        from pathly_orchestrator.runner.provenance import stamp
         from pathly_orchestrator.http_server.sse import _broadcast_comms
 
         conn = get_db()
@@ -50,7 +57,7 @@ def post_phase_to_board(
             stage=phase,
             conv=conv,
             run_id=run_id,
-            **system_stamp(),
+            **stamp(caller_identity(request)),
         )
         _broadcast_comms(
             feature,

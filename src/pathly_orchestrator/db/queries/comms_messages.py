@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from ..connection import _get_write_lock
+from ..provenance_values import AUTHOR_SOURCES, SOURCE_NONE
 
 # Goal-message field accessors live in comms_goal_fields (this file sits on the 400-line
 # ratchet). Re-exported so `from ...comms_messages import set_message_slug` — which
@@ -58,9 +59,14 @@ def post_message(
 
     ``author_role`` / ``author_run_id`` / ``author_source`` are the server-stamped provenance
     (``runner.provenance.stamp`` / ``system_stamp``), never the body's ``from`` or ``run_id``.
-    A caller that passes no source is stored as ``none`` (unverified), never NULL: the startup
-    backfill turns a NULL into ``legacy``, which would hide the unstamped writer.
+    A caller that passes no source (``None``) is stored as ``none`` (unverified), never NULL:
+    the startup backfill turns a NULL into ``legacy``, which would hide the unstamped writer.
+    Any other value outside ``AUTHOR_SOURCES`` raises ``ValueError`` before anything is written.
     """
+    if author_source is not None and author_source not in AUTHOR_SOURCES:
+        raise ValueError(
+            f"unknown author_source {author_source!r}; expected one of {sorted(AUTHOR_SOURCES)}"
+        )
     message_id = str(uuid.uuid4())
     task_status = "pending" if type == "task" else None
     with _get_write_lock(conn):
@@ -94,7 +100,7 @@ def post_message(
                 run_id,
                 author_role,
                 author_run_id,
-                author_source or "none",
+                author_source or SOURCE_NONE,
             ),
         )
         conn.commit()

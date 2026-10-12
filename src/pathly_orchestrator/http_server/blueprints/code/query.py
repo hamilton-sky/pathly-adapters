@@ -183,7 +183,8 @@ def _log_query(
     try:
         from pathly_orchestrator.db.connection import get_db
         from pathly_orchestrator.db.queries.comms import post_message
-        from pathly_orchestrator.runner.provenance import system_stamp
+        from pathly_orchestrator.http_server.run_identity import caller_identity
+        from pathly_orchestrator.runner.provenance import stamp
 
         post_message(
             get_db(),
@@ -192,7 +193,7 @@ def _log_query(
             from_agent="code-intel",
             type="discovery",
             text=_query_log_text(op, target, role, backend, hit),
-            **system_stamp(),
+            **stamp(caller_identity(request)),
         )
     except Exception:
         logger.debug("code_query: board logging failed", exc_info=True)
