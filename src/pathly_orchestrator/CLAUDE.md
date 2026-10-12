@@ -116,8 +116,9 @@ to change.
         |
         +- _resolve_spawn_argv()      <- the seam a NEW ADAPTER touches
         +- _record_spawn_identity()   <- run_history {run_id, feature=slug, board_scope}
+        +- _issue_spawn_token()       <- run_tokens {sha256(token) -> run_id, role, board, scope}
         |
-        +--> SSE  TERMINAL_SPAWN {tab_id, run_id, argv[], cwd, adapter}
+        +--> SSE  TERMINAL_SPAWN {tab_id, run_id, run_token, argv[], cwd, adapter}
         |         on /events/spawn (topic-independent)
         |                    |
         |      +-------------+--------------+   exactly ONE host may listen
@@ -383,12 +384,83 @@ remembering to add it. It fails on a werkzeug `BadRequest` (body rejected) **and
 `NameError`/`ImportError` (helper used but not imported) — a wiring mistake that is easy to
 make when touching a dozen files at once, and did happen while writing this.
 
+### Who wrote a board row, and who may read it (role-read-policy)
+
+Two halves, built in this order. **The first is live. The second is built and tested but not
+wired, so the policy withholds nothing from any agent today.**
+`tests/comms_board/test_rrp_acceptance.py` drives a spawn through to a stamped post and the
+policy over it: a real spawn through `supervisor/terminal.py`, the real Flask app and the real
+policy, with the spawn host and the agent faked (one fake broadcaster stands in for both and
+posts with the token from the `TERMINAL_SPAWN` payload). The hosts' `PATHLY_RUN_TOKEN` export and
+the fragments' header are not links it drives; `tests/runner_supervisor/test_pty_host.py`,
+`studio/src/main/ipc/terminal/spawnEnv.test.ts` and
+`tests/consistency/test_fragments_run_token.py` pin those. Design:
+`pathly/features/role-read-policy/SPEC.md`.
+
+**1. Identity and provenance (live).**
+
+- **Mint.** `supervisor/terminal_identity._issue_spawn_token` is the first statement inside
+  `_run_stage_via_terminal`'s `try`, the one place a `TERMINAL_SPAWN` is built, so every runner,
+  board and goal spawn the supervisor drives is minted a token. Best-effort: a failed mint sends
+  `run_token: None` and the spawn still goes out. A spawn that does not go through it gets none:
+  Studio's one-shot editor actions and manual interactive tabs, and `pathly-run`.
+  `db/queries/run_tokens.py::mint_run_token` stores only `sha256(token)` in `run_tokens`, next to
+  `run_id`, `role`, `feature`, `project_root`, `board` and `scope`.
+- **Role.** `_spawn_role` looks the flow's `agent_map[current_state]` entry up in
+  `_SKILL_AGENT_ROLE` (`team/build` -> `builder`, `team/review` -> `reviewer`, `team/test` ->
+  `tester`, `team/plan` -> `planner`, `team/design` -> `designer`, `team/retro` -> `planner`),
+  else takes its last path segment; a DAG-task spawn (`sched-` run_id) is `builder`;
+  a board run is its agent (`state.current_state`). It does not read the flow's `role_map`, so
+  some states differ from it: `quick-fix` and `debug` FIXING mint `build` (not `builder`),
+  `debug` VERIFYING mints `verify`, the consultation PLANNING states mint `plan` /
+  `feature-decompose` / `project-decompose`. A row stamped `build` is not matched by the built-in
+  `exclude_authors: ["builder"]`.
+- **Carry.** `run_token` rides in the `TERMINAL_SPAWN` payload, and both spawn hosts put it in
+  the child env as `PATHLY_RUN_TOKEN` (only when it is a non-empty string). Agents send
+  `-H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN"` on every `curl` to `8765/comms` under `core/`
+  (`tests/consistency/test_fragments_run_token.py` fails on one that lacks it; `.md` files that
+  describe calls as bare `GET|POST /comms/...` carry an instruction line instead), and the
+  Python-built board-run prompt (`supervisor/board_run.py`) and the catalog hint
+  (`runner/comms_catalog.py`) say the same. An interactive `/pathly` run has no
+  `PATHLY_RUN_TOKEN`, so the header expands to nothing, `curl` does not send it, and the call is
+  `anonymous`.
+- **Resolve.** `http_server/run_identity.py::caller_identity(request)`: a live token is
+  `kind="run"` with its `run_id`, `role`, `feature`, `project_root`, `board` and `scope`; a
+  missing, empty, unknown or revoked one is `anonymous` (unknown and revoked are logged at info
+  with the remote address). `caller_identity` never reads the body's `role`, `run_id` or `from`.
+  Studio's own requests send no token yet, so UI posts are `anonymous` too.
+- **Stamp.** `POST /comms/post` stores `stamp(caller_identity(request))` as `author_role`,
+  `author_run_id` and `author_source` on the `comms_messages` row (rules under "Author provenance
+  on board writes" below; the columns and the `legacy` backfill are `db/migrations_provenance.py`).
+  The body's `from` and `run_id` are still stored as sent (`from_agent`, `run_id`) but never used
+  for provenance (only the `legacy` backfill, `add_comms_provenance`, derives a role from them,
+  and only for rows that have no stamp; it runs at server start and after a board snapshot is
+  hydrated). They are not inert: `from` still gates writes to the project and global boards
+  (`check_write_permission`; the feature board accepts any `from`), and `run_id` still correlates
+  the post to a run for RunDetail's Board tab and the `/events/runs` live push.
+- **Revoke.** `_settle_spawn_identity` revokes the spawn's tokens in the spawn's `finally`. A run
+  that outlives its token is not refused: its post is stored with `author_source="none"`.
+
+**2. The read policy (built, not wired).** `runner/read_policy.py` holds `ReadPolicy` (the tier
+booleans plus optional `exclude_types` / `exclude_authors`), `BUILTIN_DEFAULTS` (`reviewer`,
+`tester`, `chief`, `anonymous`), `NEVER_WITHHELD_TYPES` (`decision`, `constraint`, `goal`, `task`,
+`escalation`), `row_allowed` and `policy_predicate` (one rule, as a pure function and as a SQL
+fragment over `type` / `author_*`; tests keep them in agreement), and
+`resolve_read_policy(conn, role, feature, project_root)` (stored per-role row, else per-feature
+row, else the built-in default, else allow-all; `role=None` is `anonymous`; a stored row without
+`exclude_*` keys is allow-all for content and never falls to the built-in wall). **No production
+code calls any of it**: `retrieve_board_context`, `POST /comms/search` and `GET /comms` select the
+same rows as before this feature (each row now also carries the three `author_*` columns), and no
+code reads the `read_policy.mode` setting. A role's reads still differ only by the existing
+per-role `board_scope` tier switches. Wiring the predicate into the three read paths (in `warn`
+first) is a later plan.
+
 ### SSE events (GET /events/runner)
 
 | Event type | Payload fields | Purpose |
 |---|---|---|
 | `RUN_STARTED` | `topic`, `run_id` | pipeline run began |
-| `TERMINAL_SPAWN` | `tab_id`, `run_id`, `label`, `cwd`, `argv[]`, `adapter` | Studio should open a new terminal tab and spawn the PTY |
+| `TERMINAL_SPAWN` | `tab_id`, `run_id`, `run_token`, `label`, `cwd`, `argv[]`, `adapter` | Studio should open a new terminal tab and spawn the PTY. `run_token` is the spawn's identity token, sent raw: `_broadcast_runner` delivers the whole payload to the topic's `/events/runner` clients, to every `/events/spawn` client and to the `/events/runs` clients of that `run_id`, so a client subscribed to any of them when the spawn starts can read the token and use it until the spawn settles (`None` when the best-effort mint failed) |
 | `SESSION` | `kind` (new/continue), `session_id` | adapter session continuity signal |
 | `RUNNER_WARNING` | `message` | non-fatal warning to surface as a toast |
 | `RUNNER_STATUS` | `status`, `topic` | status change + periodic state sync (`running`/`paused`/`done`/`aborted`/`error`) — `supervisor/registry.py` `_set_status` |
@@ -503,6 +575,7 @@ pathly_orchestrator/
       comms_summary.py     # per-artifact AI-summary selection/style/note setters+getters (unified-ai-routing)
       skill_composition.py # per-project skill-composition overrides (composition editor)
       prompt_library.py    # prompt_library table CRUD — now the LEGACY kind='ability' store only; global/project merge, name-upsert, idempotent seed. kind='preset' (system-prompts) moved to FILES → skills/prompt_files.py (mirrors abilities), with a one-time lazy DB→files migration
+      run_tokens.py        # mint_run_token / resolve_run_token / revoke_run_tokens — the per-spawn identity (role-read-policy): the raw token is returned once and only its sha256 is stored, next to run_id/role/feature/project_root/board/scope; resolve returns None for an empty, unknown or revoked token; revoked when the spawn settles
   runner/                  # CLI runner, agent invocation, argv, output parsing
     argv.py                # resolve_argv, resolve_interactive_argv, _storage_path
     output.py              # parse_result, _extract_json_payload; extract_tokens + the per-adapter
@@ -514,6 +587,7 @@ pathly_orchestrator/
     invoke.py              # invoke_agent(abort_callback=None, proc_callback=None)
     embeddings.py          # embed()/warm() — local embedding model; embed() has a bounded LRU (check inside _model_lock) so the per-board search fan-out re-embedding one query N+2 times computes the vector once; model load RETRIES transient failures (was a permanent silent latch that disabled semantic search process-wide) and embedder_status() reports {loaded,unavailable,load_attempts} to /health; chunk_summary() splits a summary into child chunks (per-bullet for topic-map, per-### for detailed, none for gist); embed_artifact_async() stores one PARENT vector (whole message text + summary) in comms_embeddings + CHILD vectors per chunk in comms_chunk_embeddings
     board_scope.py         # ONE resolution of which tiers a run may see, serving BOTH directions: the context pushed into the prompt (board_context_for) and the tiers the board-search fragment lets an agent pull (<search_tiers>) — an agent told it may search a tier its own context channel isn't reading would be reaching AROUND the board-scope setting; search_tiers_value() renders board+scope pairs (feature->slug, project->normalized root, global->"global") since a mismatched pair returns [] rather than an error
+    read_policy.py         # the role read wall (role-read-policy), defined once: ReadPolicy, BUILTIN_DEFAULTS (reviewer/tester/chief/anonymous), NEVER_WITHHELD_TYPES, row_allowed (pure) + policy_predicate (the same rule as a SQL fragment over type/author_*; tests keep them in agreement) and resolve_read_policy(conn, role, feature, project_root). BUILT BUT NOT WIRED: no read path calls it and nothing reads the read_policy.mode setting, so it withholds nothing from any agent (see "Who wrote a board row, and who may read it")
     comms_context.py       # assembles board context (governance + referenced + semantic, relevance-gated); tags each kept row _tier from the search loop (authoritative, not row["board"]) so the render can budget per tier; _matched_chunk surfaced as "matched topic: …" via comms_formatters.py
     context_budget.py      # per-tier char budget MATH (pure — no DB on the render path): allocate_budget() splits the configured char_budget by weight (feature .5/project .3/global .2) NORMALISED over the enabled tiers (a feature-only run still gets the whole budget), select_within_budget() charges each line to its own tier then pools the unspent remainder; replaces a single shared budget that let the feature tier (rendered first) starve project/global outright
     context_settings.py    # the two numbers that size every board block, as app_settings keys read at CALL time (same contract as code_context.backend): board_context.char_budget (default 4000, bounds [200,40000]) + board_context.k_{feature,project,global} (defaults 5/3/2, bounds [0,25]). They are a PAIR — k binds first in the intended case, so raising the budget alone is half a change. Garbage/out-of-range FALLS BACK to the default rather than clamping, so the rendered block always matches a documented number; k=0 legally mutes one tier's semantic pull while its governance still injects. Needs NO new route: GET /db/settings + PUT /db/settings/<key> already take arbitrary keys. Replaces bare literals (2000, and 3/2/1 inline in enabled_boards) that had no recorded justification — unlike the cosine cutoffs beside them, which carry a live-board calibration
@@ -535,7 +609,7 @@ pathly_orchestrator/
                            #   (and _reconciliation_window is monkeypatched in THIS namespace,
                            #   so it must be called as a bare name, never via its own module).
     terminal_argv.py       # _resolve_spawn_argv — the seam a NEW ADAPTER touches
-    terminal_identity.py   # _record_spawn_identity/_record_spawn_prompt/_settle_spawn_identity, _run_board_scope
+    terminal_identity.py   # _record_spawn_identity/_record_spawn_prompt/_settle_spawn_identity, _run_board_scope; _issue_spawn_token/_spawn_role mint the spawn's run token (revoked in _settle_spawn_identity)
     terminal_reconcile.py  # _agent_done_watcher, _reconciliation_window, _synthesize_agent_done_if_missing
     terminal_billing.py    # _emit_executor_telemetry, _reconcile_billing_now (were spawn-local closures)
     terminal_phase.py      # _write_supervisor_phase_summary
@@ -1579,7 +1653,11 @@ defined once in `db/provenance_values.py`. `POST /comms/post` computes
 parameter here), and the body's `from` / `run_id` are still stored in `from_agent` / `run_id` but
 never used for provenance. Handlers that write a row whose content is the caller's (the
 `/code/query` log row, `/record_phase`, the context-pull trail) are stamped from the same
-`stamp(caller_identity(request))`, so the row keeps the caller's role. Server-internal
+`stamp(caller_identity(request))`: the row carries the caller's role only when the request sends a
+live `X-Pathly-Run-Token`, and is `none` when it does not. The context-pull trail is reached
+through `8765/comms` calls, which send the header; today's agent `curl`s to `/code/query`
+(`fragments/code-query.md`) and to `/record_phase` (`utilities/log-phase.md`,
+`development/design.md`, `planning/storm.md`) send none, so those rows land `none`. Server-internal
 `post_message` callers pass `**system_stamp()`; `post_message` itself stores a caller that passes
 no source as `none`, never NULL (the startup backfill turns NULL into `legacy`), and raises
 `ValueError` for a source outside `AUTHOR_SOURCES`. `promote_message` copies the source row's three
