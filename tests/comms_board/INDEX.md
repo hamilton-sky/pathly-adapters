@@ -4,7 +4,7 @@
 
 Comms board / message-board subsystem — messages, tasks, artifacts, goals, context retrieval & relevance, board mirror & hydration.
 
-48 test file(s).
+49 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -56,3 +56,4 @@ Comms board / message-board subsystem — messages, tasks, artifacts, goals, con
 | `test_post_artifact_indexing.py` | Regression (unified-ai-routing review): /comms/post must call index_artifact_async | 1 |
 | `test_read_policy.py` | Read-policy core: row_allowed, policy_predicate and their agreement | 10 |
 | `test_read_policy_resolve.py` | resolve_read_policy: per-role row -> per-feature row -> built-in default -> allow all | 10 |
+| `test_rrp_acceptance.py` | Identity and provenance end to end: spawn token, stamped board post, reviewer wall | 7 |

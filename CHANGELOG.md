@@ -2,6 +2,40 @@
 
 ## Unreleased
 
+### Board — run identity and authorship provenance (role-read-policy)
+
+Every spawn now gets a server-issued identity, and every board row records who really wrote
+it. Until now a post's author was whatever its `from` field said, so "independent review"
+rested on the reviewer's prompt, not on the board. This is the identity half only: **nothing
+is withheld from any agent yet.** Design: `pathly/features/role-read-policy/SPEC.md`.
+
+- Run token: each runner, board and goal spawn mints a random token at the spawn chokepoint
+  (`supervisor/terminal_identity.py`). It is stored hashed in the new `run_tokens` table with
+  the run's id, role and board scope, sent as `run_token` in the `TERMINAL_SPAWN` payload,
+  exported to the agent as `PATHLY_RUN_TOKEN` by both spawn hosts (Studio and
+  `pathly-pty-host`), and revoked when the spawn ends. The payload travels over
+  `/events/spawn`, so anything that can listen there can read the token.
+- `X-Pathly-Run-Token`: every board `curl` in the core skills, fragments and the evaluator
+  agent sends it (a consistency test fails on one that does not).
+  `http_server/run_identity.py::caller_identity` resolves it to a run, or to `anonymous` when
+  it is missing, unknown or revoked. The body's `role`, `run_id` and `from` are never read.
+- `comms_messages` gains `author_role`, `author_run_id` and `author_source`
+  (`token | system | legacy | none`), stamped by the server on every write: a post with a live
+  token is stored with that run's role whatever its `from` says, server-written lines are
+  `system`, a post with no live token is `none`, and rows that predate the upgrade are
+  backfilled as `legacy`. `from_agent` and the body `run_id` are still stored as sent.
+- New `runner/read_policy.py`: the role read wall written once, as a pure `row_allowed` and an
+  equivalent SQL `policy_predicate`, with built-in defaults for `reviewer`, `tester`, `chief`
+  and `anonymous`, and `resolve_read_policy`. Tests keep the two forms in agreement, and
+  `tests/comms_board/test_rrp_acceptance.py` drives the whole chain end to end.
+
+No behaviour change for agents: no read path calls the policy (`retrieve_board_context`,
+`POST /comms/search` and `GET /comms` return what they returned), so a reviewer still reads
+the builder's posts. Known limits: Studio's own posts carry no token yet and are stored
+`none`; the agent `curl`s to `/code/query` and `/record_phase` send none; and roles are minted
+from a flow's `agent_map`, which differs from its `role_map` in some states. Not included:
+wiring the policy into the read paths, `(board, scope)` pair binding, the UI token.
+
 ### Code intelligence — `codeintel` backend for `/code/query`
 
 - New `code_context.backend` value `codeintel`: `/code/query` hands the requested op to the
