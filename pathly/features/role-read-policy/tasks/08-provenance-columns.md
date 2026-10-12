@@ -1,7 +1,7 @@
 # Add author_role, author_run_id and author_source to comms_messages and backfill existing rows as legacy
 
 Type: convert
-Status: resolved
+Status: open
 Blocked by: 03
 Test first: yes
 
@@ -72,3 +72,13 @@ prints passed
 **For later tickets**:
 - Ticket 09: until it lands, rows written after this migration keep `author_source` NULL, and the next server start backfills them as `legacy`. That is the intended gap, not a bug. Once 09 stamps every write (token / system / none), the NULL filter makes the backfill a no-op for them, but any write path 09 misses will be silently relabelled `legacy` on the next start, which is the one place a missed path would hide. 09's test should assert that every `comms_messages` insert path sets `author_source`.
 - `author_run_id` is NULL for every legacy row, so the policy's "run's own posts" rule (SPEC C1) never matches history; that is by design.
+
+## Review findings (round 1, quality review)
+
+QUALITY
+1. major src/pathly_orchestrator/db/migrations_provenance.py: The backfill's second UPDATE correlates `comms_messages.run_id` against `agent_invocations.run_id` twice per candidate row (the `EXISTS` and the `ORDER BY ai.id DESC LIMIT 1` subselect). `agent_invocations` has no index on `run_id` (its only index is the unique `idx_agent_invocations_source` on `(project_root, feature, source_seq)`), so the backfill scans `agent_invocations` once per message with a run_id, which is quadratic. It runs inside `get_db()` -> `_run_migrations` -> `_add_additive_migrations`, so it blocks every process's first DB open after upgrade. Measured on synthetic tables where every message joins an invocation: 5k x 5k took 1.1 s, 20k x 20k took 19 s, 50k x 50k took 128 s; with `CREATE INDEX idx_ai_run ON agent_invocations(run_id)` 20k x 20k took 0.05 s and 50k x 50k took 0.12 s. Fix: `CREATE INDEX IF NOT EXISTS idx_agent_invocations_run_id ON agent_invocations(run_id)` at the top of `add_comms_provenance`, before the UPDATEs, and add a test that fails if the backfill goes quadratic (assert `EXPLAIN QUERY PLAN` uses an index on `agent_invocations`, or time a 5k x 5k seed).
+2. minor src/pathly_orchestrator/db/migrations_provenance.py: the `PRAGMA table_info` check followed by `ALTER TABLE` is not race-safe. The sibling loop in `_add_additive_migrations` catches `sqlite3.OperationalError` for "duplicate column". If two processes open a pre-upgrade DB at the same moment, the second raises "duplicate column name" out of `get_db()`. Wrap each `ALTER` in `try/except sqlite3.OperationalError` as the sibling loop does.
+3. minor src/pathly_orchestrator/db/migrations_provenance.py: the NULL filter runs on every startup, so any row with a NULL `author_source` is relabelled `legacy`, including rows from write paths ticket 09 does not stamp; after 09 they would be mislabelled `legacy` instead of `none`, hiding the gap. Ticket 09 must stamp every writer or give unstamped rows `none` explicitly. The three `WHERE author_source IS NULL` UPDATEs scan `comms_messages` on every start (cheap at normal sizes).
+4. minor src/pathly_orchestrator/CLAUDE.md: the `db/` package map does not mention `migrations_provenance.py` or the new `comms_messages` provenance columns. The root CLAUDE.md doc-sync rule asks for the living doc to be updated in the same change.
+
+REVIEW: FAIL
