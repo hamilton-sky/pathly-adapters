@@ -21,18 +21,19 @@ Read the following (skip missing files silently):
 
 2. **Existing goals on the board** — check for goals already seeded (idempotency):
    ```bash
-   curl -s "http://127.0.0.1:8765/comms?feature=$FEATURE&scope=$FEATURE&type=goal"
+   curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" "http://127.0.0.1:8765/comms?feature=$FEATURE&scope=$FEATURE&type=goal"
    ```
 
 3. **Feature-level artifacts** — produced by the consultation tier (absent in light tier):
    ```bash
-   curl -s "http://127.0.0.1:8765/comms/artifacts?board=feature&scope=$FEATURE"
+   curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" "http://127.0.0.1:8765/comms/artifacts?board=feature&scope=$FEATURE"
    ```
    Collect the `artifact_path` of each artifact — used in goal `context_refs` below.
 
 4. **Board context** — open decisions, prior research, and discoveries (skip-if-down):
    ```bash
    curl -s -X POST http://127.0.0.1:8765/comms/agent-context \
+     -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" \
      -H "Content-Type: application/json" \
      -d '{"scope": "$FEATURE"}'
    ```
@@ -67,6 +68,7 @@ Post goals in dependency order (upstream goals first). For each goal:
 
 ```bash
 curl -s -X POST http://127.0.0.1:8765/comms/post \
+  -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "feature": "$FEATURE",
@@ -105,7 +107,7 @@ Continue to Step 5.
 Count `type=goal` messages on the board for `$FEATURE`:
 
 ```bash
-curl -s "http://127.0.0.1:8765/comms?feature=$FEATURE&scope=$FEATURE&type=goal"
+curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" "http://127.0.0.1:8765/comms?feature=$FEATURE&scope=$FEATURE&type=goal"
 ```
 
 If the count is **< 2**:

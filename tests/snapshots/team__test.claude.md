@@ -36,7 +36,7 @@ Run: `python -c "import time; print(int(time.time()))"` and note the integer as 
 
 **Board task DAG.** Check whether this goal/feature has a board DAG:
 ```
-curl -s "http://127.0.0.1:8765/comms/tasks?feature=[feature]&scope=[feature]"
+curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" "http://127.0.0.1:8765/comms/tasks?feature=[feature]&scope=[feature]"
 ```
 If the response is a non-empty list, the DAG is the authoritative work list — you test the whole
 goal ONCE, after every task is built and reviewed. Every task must be `task_status: done`. The
@@ -289,6 +289,7 @@ skip silently — the on-disk `<out_path>` file is the source of truth, and the 
 artifact reconciliation attaches it to the board from the FSM's own record after the stage.
 ```bash
 curl -s -X POST http://127.0.0.1:8765/comms/post \
+  -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"feature": "<feature>", "from": "<agent>", "type": "artifact", "board": "feature",
        "scope": "<feature>", "text": "<1-2 sentence description>",
@@ -599,6 +600,7 @@ POST http://127.0.0.1:8765/comms/post
 { "feature": "<feature>", "scope": "<feature>", "from": "<your role>", "to": "<role>",
   "type": "question", "text": "<ONE bounded question — and the assumption you will proceed on>" }
 ```
+Send `-H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN"` on that call.
 
 Who owns what:
 
@@ -649,6 +651,7 @@ For each finding (one post per finding — not one per file line), POST to the b
 
 ```bash
 curl -s -X POST http://127.0.0.1:8765/comms/post \
+  -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "feature": "<feature>",
@@ -683,7 +686,7 @@ start the server or retry in a loop just to post.
     gloss. This is the catalog entry other agents scan, and it is embedded for **semantic
     retrieval**, so make it cover the real section topics.
   ```bash
-  curl -s -X POST http://127.0.0.1:8765/comms/post -H "Content-Type: application/json" -d '{
+  curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" -X POST http://127.0.0.1:8765/comms/post -H "Content-Type: application/json" -d '{
     "feature": "<feature>", "from": "<your-role>", "type": "artifact", "board": "<board>",
     "run_id": "<run_id>",
     "text": "<1-2 sentence description>", "summary": "<topic map, one line per section>",
@@ -714,6 +717,7 @@ injected at the next `/next_action`. Never wait in a loop for the reply.
 
 ```bash
 curl -s -X POST http://127.0.0.1:8765/comms/post \
+  -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "feature": "<feature>",

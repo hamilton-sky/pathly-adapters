@@ -5,6 +5,7 @@ decisions, open questions, and prior research so your task DAG avoids duplicatio
 
 ```bash
 curl -s -X POST http://127.0.0.1:8765/comms/agent-context \
+  -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"scope": "$FEATURE", "goal_id": "$GOAL_ID"}'
 ```

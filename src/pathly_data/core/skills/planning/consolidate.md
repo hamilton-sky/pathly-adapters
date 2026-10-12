@@ -11,6 +11,7 @@ Adapter skills should load and follow this prompt instead of duplicating workflo
 The consolidate skill is triggered when the board is asked to synthesize its free-form
 notes into a single durable summary. It is invoked via `POST /comms/consolidate` with
 `mode="full"` or `mode="reflect"`. Do not run this skill manually unless asked to.
+Send `-H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN"` on every board call this skill makes.
 
 ---
 
@@ -31,7 +32,7 @@ are no free-form notes to consolidate and stop.
 Before synthesizing, check for a recent consolidated note:
 
 ```bash
-curl -s "http://127.0.0.1:8765/comms?feature=$FEATURE&scope=$FEATURE"
+curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" "http://127.0.0.1:8765/comms?feature=$FEATURE&scope=$FEATURE"
 ```
 
 Inspect the response for any `type=discovery` message whose `text` starts with
@@ -73,6 +74,7 @@ POST the synthesis as a `type=discovery` message:
 
 ```bash
 curl -s -X POST http://127.0.0.1:8765/comms/post \
+  -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "feature": "$FEATURE",
@@ -96,6 +98,7 @@ escalation, question, or answer messages.
 
 ```bash
 curl -s -X POST http://127.0.0.1:8765/comms/supersede \
+  -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "old_id": "<raw note id>",

@@ -280,6 +280,7 @@ After all plan files are verified, seed the comms board DAG so the builder can p
 `GET /comms/tasks?ready=true` and Studio can visualize task progress. The DAG hangs off
 a **goal message** (`type=goal`): you post the goal first, then stamp every phase task
 with `goal_id` pointing at it.
+Send `-H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN"` on every board call in this step.
 
 **Advisory artifact heading convention (anchor-addressable phases).** When writing
 `EDGE_CASES.md`, `HAPPY_FLOW.md`, and `PLAN_ARCHITECTURE.md`, you MUST use `## Phase N`
@@ -294,7 +295,7 @@ phase-agnostic note may use descriptive headings instead.
 **Idempotency guard — skip only if THIS goal already has a task DAG.** After you resolve
 `$GOAL_ID` (the "Find OR create the goal" block just below), check for tasks **scoped to that goal**:
 ```
-curl -s "http://127.0.0.1:8765/comms/tasks?goal_id=$GOAL_ID"
+curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" "http://127.0.0.1:8765/comms/tasks?goal_id=$GOAL_ID"
 ```
 Skip the task-posting only if **this goal** already has tasks. Do NOT skip just because some
 *other* goal on the feature has tasks — a feature-wide check is what previously made a fresh
@@ -304,7 +305,7 @@ decompose of a new goal silently seed nothing.
 goal card you were launched from — its `goal_id` may be named in your prompt) OR a fresh plan.
 Look the goal up first:
 ```
-curl -s "http://127.0.0.1:8765/comms?feature=$FEATURE&scope=$FEATURE&type=goal"
+curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" "http://127.0.0.1:8765/comms?feature=$FEATURE&scope=$FEATURE&type=goal"
 ```
 - **If a `type=goal` message exists** (or your prompt names a `goal_id`): use its `id` as
   `$GOAL_ID`. Do **NOT** post a duplicate goal — you are only adding its task children.
@@ -314,6 +315,7 @@ curl -s "http://127.0.0.1:8765/comms?feature=$FEATURE&scope=$FEATURE&type=goal"
 
 ```bash
 curl -s -X POST http://127.0.0.1:8765/comms/post \
+  -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "feature": "$FEATURE",
@@ -338,6 +340,7 @@ refused branch as the rest of Step 6.
 ```bash
 # Post EDGE_CASES.md if it exists
 curl -s -X POST http://127.0.0.1:8765/comms/post \
+  -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "feature": "$FEATURE",
@@ -352,6 +355,7 @@ curl -s -X POST http://127.0.0.1:8765/comms/post \
 
 # Post HAPPY_FLOW.md if it exists
 curl -s -X POST http://127.0.0.1:8765/comms/post \
+  -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "feature": "$FEATURE",
@@ -366,6 +370,7 @@ curl -s -X POST http://127.0.0.1:8765/comms/post \
 
 # Post PLAN_ARCHITECTURE.md if it exists
 curl -s -X POST http://127.0.0.1:8765/comms/post \
+  -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "feature": "$FEATURE",
