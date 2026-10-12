@@ -439,6 +439,19 @@ pathly_orchestrator/
                            # busy_timeout=5000 handle cross-process contention; the RLock handles
                            # cross-thread contention within the server process.
     migrations.py          # _run_migrations(), CREATE TABLE SQL
+    migrations_provenance.py # run provenance (role-read-policy), called last from
+                           # migrations_incremental._add_additive_migrations:
+                           #   add_run_tokens() creates run_tokens (per-spawn identity, only the
+                           #   sha256 of the token stored);
+                           #   add_comms_provenance() adds comms_messages.author_role /
+                           #   author_run_id / author_source (source = token|system|legacy|none),
+                           #   indexes agent_invocations(run_id) (the backfill's join would scan it
+                           #   once per message otherwise), and backfills every row whose
+                           #   author_source is NULL as `legacy` (supervisor/system -> role
+                           #   `system`; else the role of the agent_invocations row its run_id
+                           #   joins; else from_agent; author_run_id stays NULL). The NULL filter
+                           #   re-runs on every start, so a writer that leaves author_source NULL
+                           #   is relabelled `legacy` at the next start.
     pricing.py             # PRICING + CACHE_RATES tables (cached tokens are a subset of tokens_in,
                            # priced at a multiple of the input rate), cache_tokens_of(),
                            # PricingRegistry, estimate_cost()/infer_provider(),
