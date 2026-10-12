@@ -13,6 +13,6 @@ The full suite takes about 10 minutes, so Test after each ticket covers the four
 this feature touches. Ticket 10 runs the full suite once.
 
 Build: `python -m compileall -q src/pathly_orchestrator`
-Test: `python -m pytest tests/comms_board tests/db tests/runner_supervisor tests/http_api -q -x -p no:cacheprovider`
+Test: `python -m pytest tests/comms_board tests/db tests/runner_supervisor tests/http_api tests/consistency/test_fragments_run_token.py -q -x -p no:cacheprovider`
 Lint: `black --check src/ tests/ && python scripts/check_file_size.py && python scripts/check_no_mirror_reads.py && python scripts/gen_test_index.py --check && lint-imports`
 Smoke: `python -c "import pathly_orchestrator.http_server.app, pathly_orchestrator.supervisor.terminal"`
