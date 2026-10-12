@@ -4,37 +4,50 @@
 
 ### Board — run identity and authorship provenance (role-read-policy)
 
-Every spawn now gets a server-issued identity, and every board row records who really wrote
-it. Until now a post's author was whatever its `from` field said, so "independent review"
-rested on the reviewer's prompt, not on the board. This is the identity half only: **nothing
-is withheld from any agent yet.** Design: `pathly/features/role-read-policy/SPEC.md`.
+Runner, board and goal spawns that the supervisor drives now get a server-issued identity, and
+a board post made with it is stamped with the role that really wrote it. Until now a post's
+author was whatever its `from` field said, so "independent review" rested on the reviewer's
+prompt, not on the board. Spawns the supervisor does not drive (Studio's one-shot editor
+actions and manual interactive tabs, `pathly-run`) get no identity, and neither do Studio's own
+posts; a post without one is stored as unverified (`none`). This is the identity half only:
+**this change withholds nothing from any agent.** Design:
+`pathly/features/role-read-policy/SPEC.md`.
 
-- Run token: each runner, board and goal spawn mints a random token at the spawn chokepoint
-  (`supervisor/terminal_identity.py`). It is stored hashed in the new `run_tokens` table with
-  the run's id, role and board scope, sent as `run_token` in the `TERMINAL_SPAWN` payload,
-  exported to the agent as `PATHLY_RUN_TOKEN` by both spawn hosts (Studio and
-  `pathly-pty-host`), and revoked when the spawn ends. The payload travels over
-  `/events/spawn`, so anything that can listen there can read the token.
-- `X-Pathly-Run-Token`: every board `curl` in the core skills, fragments and the evaluator
-  agent sends it (a consistency test fails on one that does not).
+- Run token: each runner, board and goal spawn the supervisor drives mints a random token at
+  the spawn chokepoint (`supervisor/terminal_identity.py`; best-effort, a failed mint still
+  lets the spawn go out). It is stored hashed in the new `run_tokens` table with the run's id,
+  role and board scope, sent as `run_token` in the `TERMINAL_SPAWN` payload, exported to the
+  agent as `PATHLY_RUN_TOKEN` by both spawn hosts (Studio and `pathly-pty-host`), and revoked
+  when the spawn ends. The payload carries the raw token, and `_broadcast_runner` delivers it
+  to the topic's `/events/runner` clients, to every `/events/spawn` client and to the
+  `/events/runs` clients of that run, so a client subscribed to any of them when the spawn
+  starts can read the token and use it until the spawn ends.
+- `X-Pathly-Run-Token`: every `curl` to `8765/comms` in the core skills, fragments and the
+  evaluator agent sends it (a consistency test fails on one that does not).
   `http_server/run_identity.py::caller_identity` resolves it to a run, or to `anonymous` when
-  it is missing, unknown or revoked. The body's `role`, `run_id` and `from` are never read.
+  it is missing, unknown or revoked, and never reads the body's `role`, `run_id` or `from`.
 - `comms_messages` gains `author_role`, `author_run_id` and `author_source`
-  (`token | system | legacy | none`), stamped by the server on every write: a post with a live
-  token is stored with that run's role whatever its `from` says, server-written lines are
-  `system`, a post with no live token is `none`, and rows that predate the upgrade are
-  backfilled as `legacy`. `from_agent` and the body `run_id` are still stored as sent.
+  (`token | system | legacy | none`), stamped by the server when a board route or server code
+  posts a row: a post with a live token is stored with that run's role whatever its `from`
+  says, server-written lines are `system`, a post with no live token is `none`, and rows that
+  predate the upgrade are backfilled as `legacy`. The body's `from` and `run_id` are still
+  stored as sent and never decide a new post's stamp: `from` still gates writes to the project
+  and global boards, and `run_id` still correlates the post to a run.
 - New `runner/read_policy.py`: the role read wall written once, as a pure `row_allowed` and an
   equivalent SQL `policy_predicate`, with built-in defaults for `reviewer`, `tester`, `chief`
   and `anonymous`, and `resolve_read_policy`. Tests keep the two forms in agreement, and
-  `tests/comms_board/test_rrp_acceptance.py` drives the whole chain end to end.
+  `tests/comms_board/test_rrp_acceptance.py` drives a spawn through to a stamped post and the
+  policy over it (the spawn host and the agent are faked).
 
-No behaviour change for agents: no read path calls the policy (`retrieve_board_context`,
-`POST /comms/search` and `GET /comms` return what they returned), so a reviewer still reads
-the builder's posts. Known limits: Studio's own posts carry no token yet and are stored
-`none`; the agent `curl`s to `/code/query` and `/record_phase` send none; and roles are minted
-from a flow's `agent_map`, which differs from its `role_map` in some states. Not included:
-wiring the policy into the read paths, `(board, scope)` pair binding, the UI token.
+No change to which rows any agent can read: no production code calls the policy
+(`retrieve_board_context`, `POST /comms/search` and `GET /comms` select the same rows as
+before), so a reviewer still reads the builder's posts. Known limits: Studio's own posts carry
+no token yet and are stored `none`; the agent `curl`s to `/code/query` and `/record_phase` send
+none; roles are minted from a flow's `agent_map`, which differs from its `role_map` in some
+states; `POST /db/query` still accepts a `WITH ... INSERT`, which can write a row with a
+forged stamp; and a board restored from a `BOARD.json` snapshot (`POST /comms/hydrate`) keeps
+the stamps written in the file. Not included: wiring the policy into the read paths,
+`(board, scope)` pair binding, the UI token.
 
 ### Code intelligence — `codeintel` backend for `/code/query`
 
