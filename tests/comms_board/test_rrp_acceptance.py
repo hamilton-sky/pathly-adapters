@@ -1,14 +1,18 @@
 """Identity and provenance end to end: spawn token, stamped board post, reviewer wall
 
-role-read-policy ticket 10: the bar from the plan's map.md, driven through the real pieces.
-Stages are spawned through ``supervisor/terminal.py``; the only fake is the spawn host (a
-broadcaster that "runs" the agent when ``TERMINAL_SPAWN`` goes out). The agent uses the token
-from the payload the way the fragments do (the ``X-Pathly-Run-Token`` header on
-``POST /comms/post``) through the real Flask app, and the read policy of tickets 01 and 02 is
-then evaluated over what the server stored.
+role-read-policy ticket 10: the bar from the plan's map.md, driven through the real spawn path
+(``supervisor/terminal.py``), the real Flask app and the real read policy. One fake broadcaster
+stands in for the spawn host AND the agent: when ``TERMINAL_SPAWN`` goes out it posts with the
+token from the payload, the way a fragment's ``curl`` sends the ``X-Pathly-Run-Token`` header
+on ``POST /comms/post``. So the hosts' ``PATHLY_RUN_TOKEN`` export and the fragments' header are
+not links this test drives; ``tests/runner_supervisor/test_pty_host.py``,
+``studio/src/main/ipc/terminal/spawnEnv.test.ts`` and
+``tests/consistency/test_fragments_run_token.py`` pin those. The read policy of tickets 01 and
+02 is then evaluated over what the server stored.
 
-The policy is NOT wired into any read path yet: nothing is withheld from any agent. The last
-test pins that, and is the one a later plan changes when it starts withholding.
+The policy is NOT wired into any read path yet: no production code calls it, so it withholds
+nothing from any agent. The last test pins that for ``GET /comms``, the one read path it
+checks, and is the one a later plan changes when that route starts withholding.
 """
 
 from __future__ import annotations
@@ -84,9 +88,10 @@ def _spawn(
 ) -> Spawn:
     """Spawn FSM stage ``stage`` of the ``team`` flow.
 
-    On ``TERMINAL_SPAWN`` the fake host runs ``agent(token)`` (the CLI process, which
-    reads the token from PATHLY_RUN_TOKEN), then reports the process started and exited
-    0, so the spawn settles and revokes its token.
+    On ``TERMINAL_SPAWN`` the fake broadcaster (spawn host and agent in one) runs
+    ``agent(token)`` with the token from the payload, where a real CLI process would read
+    it from PATHLY_RUN_TOKEN. It then reports the process started and exited 0, so the
+    spawn settles and revokes its token.
     """
     from pathly_orchestrator.db import get_db
     from pathly_orchestrator.db.queries.run_tokens import resolve_run_token
@@ -143,7 +148,8 @@ def scenario(tmp_path: Path, client) -> Scenario:
 
     def builder_agent(token: str) -> None:
         # Steps 2 and 3. The builder labels its discovery "explorer" and puts the reviewer's
-        # run id in the body; the server must ignore both. Its other post lost the header.
+        # run id in the body; the server must not take the stamp from either. Its other
+        # post lost the header.
         ids["discovery"] = _post(
             client, token, text="the builder's story", run_id=REVIEWER_RUN
         )
@@ -205,7 +211,7 @@ def test_post_with_the_token_is_stamped_from_the_token_not_the_body(scenario):
 
     discovery = scenario.ids["discovery"]
     assert _stamp(discovery) == ("builder", BUILDER_RUN, "token")
-    # The old body columns are still written as sent; they are just not provenance.
+    # The old body columns are still written as sent; the stamp does not come from them.
     cur = get_db().execute(
         "SELECT from_agent, run_id FROM comms_messages WHERE id=?", (discovery,)
     )
@@ -261,7 +267,7 @@ def test_reviewer_wall_withholds_the_builder_row_and_the_unverified_row(scenario
     assert ids["decision"] in selected  # a builder decision is never withheld
     assert ids["review"] in selected  # the reviewer's own, labelled "builder"
     # The pure twin agrees with the SQL on every row of the board, and these two are
-    # the only rows the reviewer cannot see.
+    # the only rows the wall withholds from the reviewer.
     assert kept == selected
     assert {r["id"] for r in rows} - selected == {ids["discovery"], ids["unverified"]}
 
@@ -297,7 +303,8 @@ def test_a_server_restart_keeps_the_stamps(scenario):
 
 
 def test_get_comms_still_returns_every_row_to_a_reviewer(scenario):
-    """The policy exists but no read path calls it, so a reviewer's own live token
-    reads every row, the two the wall would hide included (GET /comms only).
+    """The policy exists but no production code calls it, so ``GET /comms`` with a
+    reviewer's own live token returns every row, the two the wall would hide included.
+    Only this read path is pinned.
     """
     assert set(scenario.ids.values()) <= scenario.reviewer_saw
