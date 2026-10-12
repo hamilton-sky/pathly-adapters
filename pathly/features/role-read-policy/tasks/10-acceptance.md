@@ -1,7 +1,7 @@
 # Prove the identity and provenance layer end to end, and update the living docs
 
 Type: task
-Status: resolved
+Status: open
 Blocked by: 02, 07, 09
 Test first: no
 
@@ -88,3 +88,30 @@ exit 0
 - A spawn whose role cannot be resolved mints `role=None` and its posts are stored `none`. A chief spawn is only stamped `chief` if its role resolves, through a board run (`state.current_state`) or an `agent_map` entry.
 - The plan that wires the policy in `enforce` must change `test_get_comms_still_returns_every_row_to_a_reviewer` on purpose; it fails the day a read path starts withholding.
 - RRP-4 open items, all in `map.md`: `_spawn_role` versus `role_map`; `POST /db/query` forging provenance and minting tokens; `POST /comms/edit` keeping the original stamp; roles not normalised by `stamp()`; the agent `curl`s to `/code/query` and `/record_phase` sending no token.
+
+## Review findings (round 1, spec review)
+
+SPEC (role-read-policy ticket 10, spec pass)
+
+Range: base 77a2cb80 (the printed base 818473127 is not an ancestor of HEAD). The ticket's last commit is HEAD af9c131d. The Answer was not read; the only change above it is `Status: open` to `Status: resolved`, and the Done when text is untouched.
+
+- `python -m pytest tests/comms_board/test_rrp_acceptance.py -q -p no:cacheprovider`: MET. Exit 0, `7 passed in 2.49s`; six more runs all passed, so no flakiness.
+- `python -m pytest tests/ -q -p no:cacheprovider`: MET. Exit 0, `2302 passed, 14 skipped in 359.75s`, no FAILED or ERROR lines.
+- `studio/node_modules/.bin/tsc --noEmit -p studio/tsconfig.node.json`: MET. Exit 0, no output.
+- `studio/node_modules/.bin/tsc --noEmit -p studio/tsconfig.web.json`: MET. Exit 0, no output.
+- `python scripts/gen_test_index.py --check`: MET. Exit 0, "All test INDEX.md files up to date."
+- Ticket body, living docs and CHANGELOG (every claim about the code must be true): NOT MET. About 40 claims were checked against the code and are true (what is live and what is not wired; the mint is the first statement in the spawn `try` and `_settle_spawn_identity` revokes in the `finally`; both spawn hosts set `PATHLY_RUN_TOKEN`; all 65 `core/` curls to `/comms` carry the header; the `/code/query` and `/record_phase` curls send no token; Studio never sends the header; exactly 13 `agent_map` vs `role_map` mismatches; the `/comms/edit` and `/db/query` open items). One claim is false:
+  1. BLOCKING. `src/pathly_orchestrator/CLAUDE.md:426` says "`from_agent` and the body `run_id` are still stored as sent, but nothing keys on them." That is false.
+     - `POST /comms/post` runs `check_write_permission(from_agent, board, ...)` on the body's `from` (`http_server/blueprints/comms/messages_write.py:83`; `comms/_helpers.py:129-143`, `_PROJECT_WRITERS` / `_GLOBAL_WRITERS`). Probed in a scratch copy with no token header: `from:"builder"` to the global board returned 403, `from:"director"` returned 200.
+     - The body `run_id` still correlates the post to a run for RunDetail's Board tab and the `/events/runs` live push (`messages_write.py:129-134`).
+     - The same file's "Author provenance" paragraph already has the true wording, "never used for provenance". Use that, and say that `from` still gates project and global writes.
+     - map.md says each open item was "checked against the code", but this gap is not among them.
+  Smaller points to fix in the same edit, not blocking by themselves:
+  2. The CHANGELOG lead says "Every spawn now gets a server-issued identity, and every board row records who really wrote it". That is too broad. Only supervisor-driven runner, board and goal spawns mint a token, via `_run_stage_via_terminal`. Studio one-shots, interactive tabs and `pathly-run` do not, and Studio posts are stored `none`. The bullets and "Known limits" below the lead are accurate.
+  3. The CHANGELOG ("travels over `/events/spawn`") and the SSE table row ("anything on `/events/spawn` can read it") name one channel. `sse._broadcast_runner` (sse.py:220-243) also sends the raw token to `/events/runner?topic=` clients and tees it to `/events/runs?run_id=`. The statements are true but incomplete, so name all three.
+- scope: OK. The 8 changed files are the acceptance test, `src/pathly_orchestrator/CLAUDE.md`, `CHANGELOG.md`, the two regenerated INDEX.md files, map.md, learnings.md (append-only) and the ticket. `git diff --name-only 77a2cb80 HEAD -- src studio scripts` is empty apart from the one living doc, so no production code changed. Root `CLAUDE.md` is unchanged and its comms-board paragraph names no read rule.
+- test first: n/a (the ticket says `Test first: no`). The new tests have teeth: 10 single-line breaks in a scratch copy each failed the intended test(s) (no token issued; token never revoked; stamp taken from the body; caller always anonymous; SQL predicate ignoring unverified rows; `row_allowed` ignoring unverified rows; empty reviewer wall; backfill relabelling every row; role from the last path segment instead of `_SKILL_AGENT_ROLE`; `GET /comms` dropping discoveries).
+
+Every Done-when command passes and the work meets the ticket's five steps. The FAIL rests only on finding 1 (with 2 and 3 to be fixed in the same edit). Nothing was left behind in the repo; `git status` is clean.
+
+REVIEW: FAIL
