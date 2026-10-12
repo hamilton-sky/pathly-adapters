@@ -27,12 +27,6 @@ def add_run_tokens(conn: sqlite3.Connection) -> None:
 
 _COMMS_PROVENANCE_COLUMNS = ("author_role", "author_run_id", "author_source")
 
-# An agent_invocations row only counts as a join when it recorded a role.
-_INVOCATION_WITH_ROLE = (
-    "SELECT 1 FROM agent_invocations ai"
-    " WHERE ai.run_id = comms_messages.run_id AND COALESCE(ai.agent_role, '') != ''"
-)
-
 
 def add_comms_provenance(conn: sqlite3.Connection) -> None:
     """Add author_role / author_run_id / author_source to comms_messages, then backfill.
@@ -70,7 +64,9 @@ def add_comms_provenance(conn: sqlite3.Connection) -> None:
         " WHERE ai.run_id = comms_messages.run_id AND COALESCE(ai.agent_role, '') != ''"
         " ORDER BY ai.id DESC LIMIT 1)"
         " WHERE author_source IS NULL AND COALESCE(run_id, '') != ''"
-        f" AND EXISTS ({_INVOCATION_WITH_ROLE})"
+        # an agent_invocations row only counts as a join when it recorded a role
+        " AND EXISTS (SELECT 1 FROM agent_invocations ai"
+        " WHERE ai.run_id = comms_messages.run_id AND COALESCE(ai.agent_role, '') != '')"
     )
     conn.execute(
         "UPDATE comms_messages SET author_role = from_agent, author_source = 'legacy'"
