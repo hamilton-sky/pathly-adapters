@@ -43,11 +43,23 @@ def add_comms_provenance(conn: sqlite3.Connection) -> None:
     ``from_agent`` as stored. ``author_run_id`` stays NULL (the old run_id came from the
     request body, so it is not provenance). The NULL filter makes a second run touch no row,
     and a row stamped after the upgrade already has its source. Idempotent.
+
+    ``agent_invocations.run_id`` is indexed first: without it the backfill scans
+    ``agent_invocations`` once per message that has a run_id, which is quadratic.
     """
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_agent_invocations_run_id"
+        " ON agent_invocations(run_id)"
+    )
     have = {row[1] for row in conn.execute("PRAGMA table_info(comms_messages)")}
     for col in _COMMS_PROVENANCE_COLUMNS:
         if col not in have:
-            conn.execute(f"ALTER TABLE comms_messages ADD COLUMN {col} TEXT")
+            try:
+                conn.execute(f"ALTER TABLE comms_messages ADD COLUMN {col} TEXT")
+            except sqlite3.OperationalError as exc:
+                # another process added it between the check above and this ALTER
+                if "duplicate column name" not in str(exc):
+                    raise
     conn.execute(
         "UPDATE comms_messages SET author_role = 'system', author_source = 'legacy'"
         " WHERE author_source IS NULL AND from_agent IN ('supervisor', 'system')"
