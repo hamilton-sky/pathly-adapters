@@ -10,7 +10,7 @@ Tests are grouped into domain folders that mirror the app's architecture layers.
 | [`comms_board/`](comms_board/INDEX.md) | Comms board / message-board subsystem — messages, tasks, artifacts, goals, context retrieval & relevance, board mirror & hydration. | 47 |
 | [`consistency/`](consistency/INDEX.md) |  | 3 |
 | [`dag_goals/`](dag_goals/INDEX.md) | Goal/DAG decomposition & scheduling — feature/flow/project decompose, goals read-model, PRD import. | 14 |
-| [`db/`](db/INDEX.md) | Database layer — schema/queries, connection isolation, write guard. | 13 |
+| [`db/`](db/INDEX.md) | Database layer — schema/queries, connection isolation, write guard. | 14 |
 | [`fsm_flows/`](fsm_flows/INDEX.md) | FSM engine, gates, transitions, flow definitions, feedback protocol & fix-routing. | 27 |
 | [`http_api/`](http_api/INDEX.md) | HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, prompt-event contract. | 13 |
 | [`install_skills/`](install_skills/INDEX.md) | Adapter install/setup, stitch & compose, skill composition / round-trip / export, plugin manifests. | 27 |
