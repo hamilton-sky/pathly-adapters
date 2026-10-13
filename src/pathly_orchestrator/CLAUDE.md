@@ -1252,7 +1252,7 @@ it back.
 So the real gap is architectural, not capability: `scheduler_loop` is wired as a rival ENGINE
 (`goal_executor._run_loop`, a peer of `orchestrator._loop`) instead of as the fan-out executor
 *inside* a state. Moving it inside is what turns two engines into one. Design, phasing and the
-honest risk list: [pathly/features/fsm-fan-out/SPEC.md](../../pathly/features/fsm-fan-out/SPEC.md).
+honest risk list: [pathly/features/.archive/fsm-fan-out/SPEC.md](../../pathly/features/.archive/fsm-fan-out/SPEC.md).
 Its Phase A — sharing the `### Runner contract` constant between `build_prompt` and
 `scheduler.py`'s DAG prompt path — is the same three-line fix the reverted compiled executor was
 built to route around. **Phase A has landed** (below); B and C follow it.

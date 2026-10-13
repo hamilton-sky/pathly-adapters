@@ -1,4 +1,4 @@
-"""Smart fix-routing (pathly/features/smart-fix-routing/DESIGN.md).
+"""Smart fix-routing (pathly/features/.archive/smart-fix-routing/DESIGN.md).
 
 Unit tests for two pieces:
   - ``route_feedback``'s optional ``feedback_priority`` sort (ss1.5 — upstream-first

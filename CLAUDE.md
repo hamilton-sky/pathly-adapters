@@ -121,7 +121,7 @@ Storage mirrors board scope — **one home per feature**. New features live unde
 out of `pathly/plans/` and dropped the feature-discovery fallback; the `pathly/plans/` path is
 still referenced by a few subsystems (event log, artifact hydration, feedback/health probes),
 so it is not fully removed from the code.
-Design + phases: [pathly/features/storage-restructure/SPEC.md](pathly/features/storage-restructure/SPEC.md).
+Design + phases (shipped, archived): [pathly/features/.archive/storage-restructure/SPEC.md](pathly/features/.archive/storage-restructure/SPEC.md).
 
 ```
 pathly/features/<name>/            FEATURE scope — team pipeline files live DIRECTLY here

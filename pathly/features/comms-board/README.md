@@ -17,7 +17,7 @@ have moved to [`_archive/`](_archive/) — they are history now, not active plan
 | [ROADMAP.md](ROADMAP.md) | **Live tracker** — what shipped, the remaining P3 + deferred-polish items |
 | [GOALS-DAG-EXECUTORS.md](GOALS-DAG-EXECUTORS.md) | **The model** — Board→Goals→Task-DAG, 2 decomposers, 3 executors, schema |
 | [MEMORY-CONSOLIDATION.md](MEMORY-CONSOLIDATION.md) | The 💡 channel + dedup/reflection pass (`/comms/consolidate`) |
-| [HQ-COMMAND-CENTER.md](HQ-COMMAND-CENTER.md) | _Later / separate_ — fleet dashboard framing; overlaps `../parallel-fleet-part-2/` |
+| [HQ-COMMAND-CENTER.md](HQ-COMMAND-CENTER.md) | _Later / separate_ — fleet / oversight dashboard framing |
 
 `STATE.json` / `EVENTS.jsonl` are the feature's own FSM state — left in place.
 `artifacts/` holds board-run output (e.g. `BOARD_EVAL.md` from an evaluator run).
@@ -40,6 +40,6 @@ Plus the original storm/early-design history: `SPEC.md`, `LIVE-BOARD-ARCHITECTUR
 
 ## What's left
 
-Only **P3 (parallel)** — across-goal lanes → worktree fan-in → consolidation — which
-lives in `../parallel-fleet-part-1/` and `-part-2/`, plus a few small deferred-polish
-items. See [ROADMAP.md](ROADMAP.md) for the live list.
+Only **P3 (parallel)** — across-goal lanes → worktree fan-in → consolidation — of which
+lane parallelism inside a state already shipped (`../.archive/fsm-fan-out/`); worktree
+isolation is the open half. Plus a few small deferred-polish items. See [ROADMAP.md](ROADMAP.md) for the live list.

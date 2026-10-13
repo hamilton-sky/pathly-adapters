@@ -4,8 +4,8 @@ A feature's build claims the set of files/dir-globs its tasks will touch. A seco
 feature whose claim OVERLAPS an active claim is refused (serialized); a DISJOINT claim
 runs in parallel. A feature that declared no files claims the WILDCARD, which overlaps
 everything — so un-annotated features serialize conservatively. Purely in-process
-(mirrors board_lock); the pre-isolation safety net until worktree-per-feature isolation
-(parallel-fleet) lands. Cleared on server restart.
+(mirrors board_lock); the pre-isolation safety net until worktree isolation lands (the
+``WorktreeIsolation`` stub in ``supervisor/isolation.py``). Cleared on server restart.
 """
 
 from __future__ import annotations

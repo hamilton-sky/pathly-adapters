@@ -295,7 +295,7 @@ Caption: A markdown plan artifact — shows text diff in unified layout with no 
 ║  │   ## Phase 2 — Storage                                            │  ║
 ║  │ -  Nest goals under their feature directory.                      │  ║
 ║  │ +  Nest goals under their feature directory (board-scoped).       │  ║
-║  │    See pathly/features/storage-restructure/SPEC.md                │  ║
+║  │    See pathly/features/.archive/storage-restructure/SPEC.md        │  ║
 ║  │                                                                   │  ║
 ║  │ -  Artifact hydration uses pathly/plans/ prefix.                  │  ║
 ║  │ +  Artifact hydration uses pathly/features/ prefix.               │  ║

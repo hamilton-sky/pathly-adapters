@@ -230,7 +230,7 @@ def test_supervisor_loop_advances_through_real_fsm_to_done(tmp_path, monkeypatch
     assert state.iterations == 2
 
 
-# ── Smart fix-routing (pathly/features/smart-fix-routing/DESIGN.md) — drives the REAL
+# ── Smart fix-routing (pathly/features/.archive/smart-fix-routing/DESIGN.md) — drives the REAL
 # team.flow.yaml + REAL complete_stage/route_feedback across a full routing chain, per
 # DESIGN.md ss5's integration test plan. Only build_prompt (the non-blocked, state-advance
 # path) is stubbed — same technique as _patch_build_prompt above — build_prompt_for_agent

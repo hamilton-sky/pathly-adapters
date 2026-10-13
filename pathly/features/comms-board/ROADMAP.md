@@ -29,9 +29,11 @@ evaluator / planner / consultation seed a goal + DAG → single / loop / team ex
 
 ### P3 — parallel  🔭 (the only unbuilt phase)
 Across-goal lanes → within-goal worktree fan-in + **consolidation**. Flip `k>1` by lane;
-the data model is already parallel-ready. Design lives in `../parallel-fleet-part-1/` and
-`../parallel-fleet-part-2/` (the latter overlaps [HQ-COMMAND-CENTER.md](HQ-COMMAND-CENTER.md)
-— consolidate the fleet-dashboard framing when P3 starts).
+the data model is already parallel-ready. Lane parallelism inside an FSM state shipped with
+fsm-fan-out (`../.archive/fsm-fan-out/`: `AuditedLaneIsolation`, gated on the lane-partition
+audit); what is left is worktree isolation (the `WorktreeIsolation` stub in
+`supervisor/isolation.py`) and the fan-in. The older parallel-fleet plans were deleted as
+superseded by that design; the HQ dashboard framing is in [HQ-COMMAND-CENTER.md](HQ-COMMAND-CENTER.md).
 
 ### Deferred polish (small, non-blocking — none gate the chain above)
 - **per-task ad-hoc Run** button — no backend route yet (goal-level Run already covers it)

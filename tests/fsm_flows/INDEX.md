@@ -15,7 +15,7 @@ FSM engine, gates, transitions, flow definitions, feedback protocol & fix-routin
 | `test_feedback_escalation.py` | 3-tier feedback escalation (fsm.engine.route_feedback) | 11 |
 | `test_feedback_file_reachability.py` | A feedback file a flow can actually produce must be ROUTED by that flow | 4 |
 | `test_feedback_protocol.py` | Adapters side of the feedback protocol contract | 4 |
-| `test_fix_routing.py` | Smart fix-routing (pathly/features/smart-fix-routing/DESIGN.md) | 11 |
+| `test_fix_routing.py` | Smart fix-routing (pathly/features/.archive/smart-fix-routing/DESIGN.md) | 11 |
 | `test_fsm.py` | Unit tests for pathly_orchestrator.fsm functions | 35 |
 | `test_fsm_http_client.py` | covers next action auto starts server and posts json; poll exits early on first healthy response; poll exhausted raises runtime error; … | 8 |
 | `test_fsm_ops.py` | Integration tests for fsm_ops.py (next_action, complete_stage) | 36 |

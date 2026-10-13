@@ -27,7 +27,7 @@ Phase C moved the fan-out here with ``SerialIsolation`` pinned; Phase D unpinned
 **Phase E made this the ONLY drain** — ``executor: loop`` is now the ``goal-loop`` flow,
 whose single ``DRAINING`` state comes through here like any other fan-out state.
 
-See: pathly/features/fsm-fan-out/SPEC.md
+See: pathly/features/.archive/fsm-fan-out/SPEC.md
 """
 
 from __future__ import annotations

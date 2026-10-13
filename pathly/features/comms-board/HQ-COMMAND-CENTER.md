@@ -2,10 +2,10 @@
 
 **Status:** parked / future. **Depends on:** multi-adapter routing (P1-rider) + P2 board UI.
 
-> ⚠ **Overlap — consolidate, don't duplicate.** This substantially overlaps the existing
-> `../parallel-fleet-part-2/` **"Studio HQ Fleet Dashboard"** plan and the broader
-> multi-adapter initiative. This doc is the **Goals-DAG-context framing + the reason it's
-> deferred**; the detailed build plan should live in (or merge with) `parallel-fleet-part-2/`.
+> This doc is the **Goals-DAG-context framing + the reason it's deferred**. The older
+> parallel-fleet "Studio HQ Fleet Dashboard" plan it overlapped was deleted as superseded
+> (it was built on a fleet coordinator that was never built); a detailed build plan, when
+> this is picked up, starts from here.
 
 ## What it is
 A Studio **"mission control"** for a fleet of runs across adapters — the human oversight
@@ -31,7 +31,7 @@ dashboard built before the routing is exercised would have nothing to show.
 3. (already exist) `/runner/reroute`, `BILLING_UPDATE` telemetry, `/events/runner` SSE
 
 ## Relationship to existing plans
-- **Fleet mechanics + the original HQ fleet dashboard:** `../parallel-fleet-part-1/`, `../parallel-fleet-part-2/`.
+- **Parallel mechanics:** lane parallelism shipped in fsm-fan-out (`../.archive/fsm-fan-out/`); worktree isolation is the `WorktreeIsolation` stub in `supervisor/isolation.py`.
 - **Locked design decisions** for the multi-adapter/fleet work live in the project memory
   (FSM stays passive; supervisor is the active layer; routing is deterministic code, never an LLM).
 
