@@ -184,6 +184,92 @@ def _collect_hydrate_channel(
     return hydrate_lines, hydrate_count
 
 
+# Which board's decision wins a conflict: a global decision outranks a project one, and a
+# project decision a feature one. The feature board accepts a post from any role, so ranking
+# by recency alone let any newer feature-board note outrank an older director or human call.
+_TIER_RANK = {"global": 0, "project": 1, "feature": 2}
+
+
+def render_governance_lines(
+    decisions: list[dict], escalations: list[dict]
+) -> list[str]:
+    """Render the unconditional governance block: active decisions + open escalations.
+
+    Pure formatting — the caller does the retrieval. Returns [] when there is nothing to
+    render, so the caller can `lines.extend(...)` unconditionally.
+    """
+    if not decisions and not escalations:
+        return []
+    lines: list[str] = []
+    lines.append("### Governance (always applies — do not override)")
+    lines.append("Active decisions and open escalations injected unconditionally.")
+    lines.append("")
+    if decisions:
+        # NEWEST FIRST, and say so. get_pending_decisions returns ts ASC, and _format_age
+        # renders day granularity — so a board whose decisions all landed on one afternoon
+        # rendered every bullet as an indistinguishable "13d ago" in oldest-first order.
+        # An agent then read "X remains a hard human gate" and "X is resolved, unblocked"
+        # as equally-live governance with no way to tell which one won. Ordering is the
+        # cheap half of supersession: until `superseded_by` is set (POST /comms/supersede),
+        # recency is the only signal the reader has, so make it unmissable.
+        ordered = sorted(decisions, key=lambda m: str(m.get("ts") or ""), reverse=True)
+        # Stable sort: tier rank first, recency kept within each tier.
+        ordered.sort(key=lambda m: _TIER_RANK.get(str(m.get("board") or "feature"), 2))
+        lines.append("**Decisions (higher tier first, NEWEST FIRST within a tier):**")
+        lines.append(
+            "  A global decision outranks a project one, and a project decision a feature "
+            "one. Within a tier, if two decisions conflict, the one listed FIRST wins — it "
+            "was made later. Do not act on a superseded decision because it appears more "
+            "detailed. To replace one, post a decision with `supersedes` naming its id."
+        )
+        seen_tiers: set[str] = set()
+        for msg in ordered:
+            tier = msg.get("board", "feature")
+            text = msg.get("text", "")
+            ts_str = msg.get("ts", "")
+            age = _format_age(ts_str) if ts_str else ""
+            # Minute-precision stamp alongside the age: same-day decisions are the ones
+            # that actually conflict, and "13d ago" cannot order them.
+            stamp = ts_str[:16].replace("T", " ") if len(ts_str) >= 16 else ts_str
+            marker = "LATEST · " if tier not in seen_tiers else ""
+            seen_tiers.add(tier)
+            ident = f"id: {msg['id']}" if msg.get("id") else ""
+            meta = " · ".join(p for p in (ident, marker + tier, stamp, age) if p)
+            lines.append(f"  • {text}  [{meta}]")
+    if escalations:
+        lines.append("**Open escalations (human input required):**")
+        newest_decision_ts = (
+            max((str(m.get("ts") or "") for m in decisions), default="")
+            if decisions
+            else ""
+        )
+        for msg in escalations:
+            tier = msg.get("board", "feature")
+            text = msg.get("text", "")
+            ts_str = msg.get("ts", "")
+            age = _format_age(ts_str) if ts_str else ""
+            stamp = ts_str[:16].replace("T", " ") if len(ts_str) >= 16 else ts_str
+            meta = " · ".join(p for p in (tier, stamp, age) if p)
+            lines.append(f"  • {text}  [{meta}]")
+        # An escalation stays status='pending' until a human acknowledges it, so a later
+        # agent decision claiming to "resolve" it leaves BOTH on the board — the reader
+        # sees "human input required" and "unblocked, start now" at once. Name that
+        # collision instead of letting the agent silently pick whichever it read last.
+        if newest_decision_ts and newest_decision_ts > max(
+            (str(m.get("ts") or "") for m in escalations), default=""
+        ):
+            lines.append(
+                "  NOTE: decisions above are newer than these escalations and may claim to "
+                "resolve them. An agent decision does NOT close a human gate — only a human "
+                "acknowledgement does. If a decision contradicts an open escalation, treat "
+                "the gate as OPEN and say so rather than proceeding."
+            )
+    lines.append("")
+    lines.append("---")
+    lines.append("")
+    return lines
+
+
 def _build_context_entries(context_msgs: list[dict]) -> list[tuple[str, str]]:
     """Render each kept context message as ``(tier, line)`` for the budget pass.
 

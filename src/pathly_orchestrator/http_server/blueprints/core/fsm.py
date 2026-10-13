@@ -69,6 +69,17 @@ def complete_stage_endpoint():
                     400,
                 )
 
+        if data.get("force_past_gate"):
+            from pathly_orchestrator.http_server.run_identity import caller_identity
+
+            # Forcing past a human escalation gate is a human affordance; an agent run
+            # (live run token) may never use it.
+            if caller_identity(request).kind == "run":
+                return (
+                    jsonify({"error": "force_past_gate is refused for an agent run"}),
+                    403,
+                )
+
         import pathly_orchestrator.http_server as _hs
 
         result = _hs.complete_stage(data)

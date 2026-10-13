@@ -8,7 +8,8 @@ from flask import jsonify, request
 
 from ...sse import _broadcast_comms
 from ._messages_bp import bp
-from ._helpers import read_json_body
+from ._helpers import read_json_body, refuse_agent_on_human_gate
+from ._supersede_on_post import refuse_agent_supersede
 
 
 @bp.route("/comms", methods=["GET"])
@@ -164,6 +165,9 @@ def comms_acknowledge():
             return jsonify({"error": "Field 'agent' must be a non-empty string"}), 400
 
         conn = _get_db()
+        refused = refuse_agent_on_human_gate(conn, request, message_id)
+        if refused:
+            return refused
         _ack(conn, message_id=message_id, agent=agent)
         return jsonify({"ok": True}), 200
     except Exception as exc:
@@ -194,6 +198,9 @@ def comms_answer():
 
         option_id = data.get("option_id")
         conn = _get_db()
+        refused = refuse_agent_on_human_gate(conn, request, question_id)
+        if refused:
+            return refused
         answer_id = _answer(
             conn, question_id=question_id, answer_text=answer_text, option_id=option_id
         )
@@ -283,6 +290,9 @@ def comms_delete():
 
         force = bool(data.get("force", False))
         conn = _get_db()
+        refused = refuse_agent_on_human_gate(conn, request, message_id)
+        if refused:
+            return refused
         result = _soft_delete(conn, message_id, force=force)
         if result == "not_found":
             return jsonify({"ok": False, "error": "Message not found"}), 404
@@ -321,6 +331,9 @@ def comms_supersede():
             return jsonify({"error": "Field 'new_id' must be a non-empty string"}), 400
 
         conn = _get_db()
+        refused = refuse_agent_supersede(conn, old_id)
+        if refused:
+            return refused
         result = _supersede(conn, old_id=old_id, new_id=new_id)
         if result == "not_found":
             return jsonify({"ok": False, "error": "Message not found"}), 404

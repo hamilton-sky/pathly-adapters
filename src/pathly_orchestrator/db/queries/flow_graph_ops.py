@@ -46,6 +46,7 @@ _ASSEMBLED_FLOW_KEYS = frozenset(
         "scope_gate",
         "_comments",
         "adapter_default",
+        "_nonedge_gates",
     }
 )
 
@@ -102,6 +103,22 @@ def _decompose_flow_dict(flow_dict: dict) -> tuple[dict, list[dict], list[dict]]
     adapter_default = adapter_map.get("default")
     if adapter_default is not None:
         flow_level_config["adapter_default"] = adapter_default
+
+    # Gates are stored per-EDGE (keyed "SOURCE->TARGET"), but the engine also honours the
+    # wildcard form "->TARGET" (run_gates looks up BOTH), which matches no edge row and was
+    # therefore dropped on the way into the DB. Since flows load DB-first at runtime, a flow
+    # authored with a wildcard gate silently ran WITHOUT it — a gate that doesn't fire is
+    # worse than no gate, because the flow looks guarded. Carry the non-edge keys through as
+    # flow-level config so the round-trip is lossless, as the comment on _STRUCTURAL_FLOW_KEYS
+    # already promises for every other key.
+    _edge_keys = {
+        f"{state}->{target}"
+        for state in (flow_dict.get("states") or [])
+        for target in (transitions.get(state) or [])
+    }
+    _nonedge_gates = {k: v for k, v in gates.items() if k not in _edge_keys}
+    if _nonedge_gates:
+        flow_level_config["_nonedge_gates"] = _nonedge_gates
 
     states = flow_dict.get("states") or []
     node_rows: list[dict] = []
@@ -269,6 +286,10 @@ def _assemble_from_parts(
         if edge_gates is not None:
             key = f"{edge['source_node']}->{edge['target_node']}"
             gates[key] = edge_gates
+    # Restore wildcard ("->TARGET") gates, which belong to no edge row (see decompose).
+    _nonedge_gates = flow_level_config.get("_nonedge_gates")
+    if isinstance(_nonedge_gates, dict):
+        gates.update(_nonedge_gates)
     if gates:
         result["gates"] = gates
 

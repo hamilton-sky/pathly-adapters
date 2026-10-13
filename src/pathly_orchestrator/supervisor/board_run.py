@@ -29,22 +29,16 @@ def _format_board_info(
 
     lines: list[str] = ["## Board Context", ""]
 
-    if decisions or escalations:
-        lines.append("### Governance")
-        lines.append("")
-        if decisions:
-            lines.append("**Pending decisions:**")
-            for msg in decisions:
-                text = msg.get("text", "")
-                tier = msg.get("board", "feature")
-                lines.append(f"  • [{tier}] {text}")
-        if escalations:
-            lines.append("**Open escalations:**")
-            for msg in escalations:
-                text = msg.get("text", "")
-                tier = msg.get("board", "feature")
-                lines.append(f"  • [{tier}] {text}")
-        lines.append("")
+    # ONE governance renderer, shared with the FSM-flow context path
+    # (runner/comms_formatters.render_governance_lines). This block used to be a second,
+    # weaker copy: no ordering (raw ts ASC straight from the query), no timestamps at all,
+    # no precedence rule, and no note that an agent decision cannot close a human gate. That
+    # made the BOARD-RUN path — the evaluator and single-agent runs — strictly worse than the
+    # flow path it was meant to mirror, and it is the path the evidence board actually ran on.
+    # Layer-legal: supervisor/ may import runner/.
+    from ..runner.comms_formatters import render_governance_lines
+
+    lines.extend(render_governance_lines(decisions, escalations))
 
     if recent:
         lines.append("### Recent context")

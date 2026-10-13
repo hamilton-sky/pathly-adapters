@@ -16,7 +16,7 @@ from .board_scope import resolve_board_scope_setting
 from .comms_formatters import (
     _build_context_entries,
     _collect_hydrate_channel,
-    _format_age,
+    render_governance_lines,
 )
 from .context_budget import select_within_budget
 from .context_record import record_board_context, render_stats
@@ -268,33 +268,9 @@ def retrieve_board_context(
     # --- Build markdown block ------------------------------------------------
     lines: list[str] = ["## Communication Board", ""]
 
-    if decisions or escalations:
-        lines.append("### Governance (always applies — do not override)")
-        lines.append("Active decisions and open escalations injected unconditionally.")
-        lines.append("")
-        if decisions:
-            lines.append("**Decisions:**")
-            for msg in decisions:
-                tier = msg.get("board", "feature")
-                text = msg.get("text", "")
-                ts_str = msg.get("ts", "")
-                age = _format_age(ts_str) if ts_str else ""
-                lines.append(
-                    f"  • {text}  [{tier} · {age}]" if age else f"  • {text}  [{tier}]"
-                )
-        if escalations:
-            lines.append("**Open escalations (human input required):**")
-            for msg in escalations:
-                tier = msg.get("board", "feature")
-                text = msg.get("text", "")
-                ts_str = msg.get("ts", "")
-                age = _format_age(ts_str) if ts_str else ""
-                lines.append(
-                    f"  • {text}  [{tier} · {age}]" if age else f"  • {text}  [{tier}]"
-                )
-        lines.append("")
-        lines.append("---")
-        lines.append("")
+    # Governance rendering lives in comms_formatters (one module, one concern) — it is a
+    # pure list[dict] -> list[str] transform with no retrieval in it.
+    lines.extend(render_governance_lines(decisions, escalations))
 
     if hydrate_lines:
         lines.append("### Referenced context (authoritative for this task)")

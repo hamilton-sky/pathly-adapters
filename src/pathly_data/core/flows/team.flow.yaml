@@ -149,4 +149,15 @@ gates:
     - type: command_gate
       command_key: test
       on_fail: TEST_FAILURES.md
+  # A DELIVERY flow's DONE is a claim that the feature shipped, so it must not be reachable
+  # while board tasks are unfinished. The REVIEWING->TESTING gate above does not cover this:
+  # TESTING and RETRO can both post new tasks (a failing acceptance criterion becomes work),
+  # and a task re-opened after that gate passed rode straight through to DONE. Wildcard form
+  # ("->DONE") so it applies to every inbound edge, not just RETRO's.
+  #
+  # NOT added to consultation/feature-consultation/project-consultation: those flows END at
+  # decomposition, so pending tasks are their correct and expected output, not a lie.
+  ->DONE:
+    - type: require_tasks_done
+      on_fail: INCOMPLETE_TASKS.md
 _comments: []

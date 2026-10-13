@@ -62,6 +62,10 @@ gates:
   - command_key: test
     on_fail: TEST_FAILURES.md
     type: command_gate
+  # See team.flow.yaml: a delivery flow's DONE must not be reachable with unfinished tasks.
+  ->DONE:
+  - on_fail: INCOMPLETE_TASKS.md
+    type: require_tasks_done
 role_map:
   BUILDING: builder
   RETRO: retro

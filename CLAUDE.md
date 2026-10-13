@@ -271,7 +271,7 @@ These rules apply to all Python in `src/pathly_orchestrator/` and all TypeScript
 - A module file owns exactly one concern (DB queries, embeddings, output parsing, …).
 - **Hard limit: 400 lines per file.** If a file approaches this, split it before adding more code.
 - **Gated in CI** by `scripts/check_file_size.py` (lint `consistency` job) as a *ratchet* against
-  `scripts/file_size_baseline.txt`: the 28 files already over the limit are frozen at their current
+  `scripts/file_size_baseline.txt`: the 19 files already over the limit are frozen at their current
   size and may only shrink. A NEW oversized file fails, and so does **growing an already-oversized
   one** — which is rule #2 mechanically enforced. Adding a new file is always allowed. When a
   baseline file drops to 400 or under, the check fails until you run
@@ -299,7 +299,7 @@ blueprints/
   flows/      defs (flow CRUD), stage_configs (per-stage overrides)
   catalog/    items (file-tree catalog)
   skills/     editor (skill notebook routes)
-  comms/      messages, tasks, artifacts, runs, goals, settings, context (board subsystems)
+  comms/      messages, tasks, tasks_status, artifacts, runs, goals, settings, context (board subsystems)
   ops/        telemetry, menu, db_api, chat, export (operational/infra)
   code/       query (codebase-intelligence query)
   control/    runs_read (unified run read API: GET /runs, /runs/<id>) · runs_control (POST /runs/<id>/stop — run_id-addressed stop · POST /runs/<id>/<action> for pause|resume|advance|reroute|retry|abort — run_id-addressed control, mirrors /runner/* — board-lock runs support only abort)

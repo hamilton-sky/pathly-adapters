@@ -23,6 +23,7 @@ from ._helpers import (
     read_json_body,
 )
 from ._messages_bp import bp
+from ._supersede_on_post import apply_supersedes, response_fields, validate_supersedes
 
 
 @bp.route("/comms/post", methods=["POST"])
@@ -174,6 +175,10 @@ def comms_post():
             )
         if goal_id is not None and not isinstance(goal_id, str):
             return jsonify({"error": "Field 'goal_id' must be a string or null"}), 400
+        # Supersedes: validated here so a malformed list 400s before anything is written.
+        supersedes, bad = validate_supersedes(data.get("supersedes"), msg_type)
+        if bad:
+            return jsonify({"error": bad}), 400
         if executor is not None and not isinstance(executor, str):
             return jsonify({"error": "Field 'executor' must be a string or null"}), 400
         # summary_backend is now ONLY the client-drop suppression signal consumed by
@@ -299,6 +304,10 @@ def comms_post():
             **stamp(caller_identity(request)),
         )
 
+        # Retire what this post replaces right after the write, so the governance block can
+        # never hold the new decision AND the one it supersedes.
+        supersede_result = apply_supersedes(conn, supersedes or [], message_id)
+
         if (
             msg_type == "artifact"
             and isinstance(artifact_path, str)
@@ -377,6 +386,7 @@ def comms_post():
         # auto-derived context — surface that as a NON-BLOCKING warning so the gap is
         # visible to the poster instead of silently degrading context quality (ISSUE-4).
         resp = {"ok": True, "message_id": message_id}
+        resp.update(response_fields(supersede_result))
         if msg_type == "task":
             _has_refs = isinstance(context_refs, list) and len(context_refs) > 0
             if not _has_refs and not data.get("no_refs"):

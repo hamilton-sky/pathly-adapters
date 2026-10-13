@@ -4,11 +4,12 @@
 
 Comms board / message-board subsystem — messages, tasks, artifacts, goals, context retrieval & relevance, board mirror & hydration.
 
-49 test file(s).
+51 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
 | `test_artifact_reconcile.py` | T12: ensure_attached idempotency + reconcile + goal-path resolution + complete_stage threading | 5 |
+| `test_board_closure.py` | Board closure — the write paths that let a resolution actually land | 29 |
 | `test_board_context_catalog.py` | Tests for board-context-pull Solution A — the 📚 Catalog channel | 3 |
 | `test_board_context_scope.py` | Tests for board_context_for — scope-aware context honoring the Reads toggle | 3 |
 | `test_board_context_settings.py` | Board-context size is configured and measured, not hardcoded | 16 |
@@ -52,6 +53,7 @@ Comms board / message-board subsystem — messages, tasks, artifacts, goals, con
 | `test_comms_tasks_claim_fail.py` | Tests for POST /comms/tasks/claim and POST /comms/tasks/fail (DAG scheduler routes) | 13 |
 | `test_comms_tasks_status.py` | Guaranteed per-task progress for the SINGLE executor (route-level status posts) | 5 |
 | `test_comms_write_perm.py` | Tests for Phase 13 — role-based write permissions | 33 |
+| `test_governance_decision_precedence.py` | Governance block ordering — decisions render newest-first with explicit precedence | 12 |
 | `test_phase_board_post.py` | unified-ai-routing Conv 6 — /record_phase mirrors phase boundaries onto the board | 3 |
 | `test_post_artifact_indexing.py` | Regression (unified-ai-routing review): /comms/post must call index_artifact_async | 1 |
 | `test_read_policy.py` | Read-policy core: row_allowed, policy_predicate and their agreement | 10 |

@@ -380,6 +380,52 @@ start the server or retry in a loop just to post.
 | `builder` (debugging) | `DEBUG_REPORT.md` | one `discovery` for the root cause; one `decision` for the chosen fix |
 | `planner` (RETRO) | `RETRO.md` | one `artifact` summarizing lessons; one `decision` per accepted instruction patch |
 
+### Superseding a decision you replace (REQUIRED for `decision` posts)
+
+The board is append-only: a `decision` you post does **not** retire the one it contradicts.
+Both stay live, both get injected into every later agent's prompt as equal governance, and the
+next agent has no way to tell which one won. That is how a board ends up telling a builder
+"this remains a hard human gate" and "this is resolved, start building" in the same block.
+
+So when your decision **replaces, resolves, or reverses** an earlier one, name it:
+
+```bash
+curl -s -X POST http://127.0.0.1:8765/comms/post \
+  -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "feature": "<feature>",
+    "from": "<your-role>",
+    "type": "decision",
+    "text": "<the new decision, self-contained — do not assume the reader saw the old one>",
+    "supersedes": ["<id of the decision this replaces>"],
+    "board": "<board>",
+    "run_id": "<run_id>",
+    "stage": "<CURRENT_STATE>"
+  }'
+```
+
+The ids are the `[id: …]` values on the decisions in your injected board context. The response
+echoes `superseded` (retired) and `supersede_skipped` (with a per-id reason — `not_found`,
+`already_superseded`, `not_a_decision` for an escalation, task or note, or `other_board` for a
+decision on another board); a bad id never fails your post, so check the response rather than
+assuming.
+
+Rules:
+
+- Supersede only what your decision **actually** replaces. It is not a tidy-up tool — a
+  superseded decision disappears from every future agent's governance block, so retiring the
+  wrong one hides live governance.
+- **Never supersede an `escalation` or a `question` addressed to a human.** An agent decision
+  does not close a human gate; only a human acknowledgement does. If your decision contradicts
+  an open human gate, say so in `text` and leave the gate open.
+- An escalation you post with `"to": "human"` **blocks the pipeline's next transition** until a
+  human acknowledges it. That is the point — but it means you must not use a human-addressed
+  escalation for something an agent can resolve. Agent-addressed escalations route through the
+  normal feedback loop and never block.
+- When in doubt, post without `supersedes`. A duplicate decision is a smaller problem than a
+  retired one.
+
 ### Asking a question (non-blocking)
 
 When you need a human decision but must **not** block, post a `question` with 2–4 options.
