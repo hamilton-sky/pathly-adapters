@@ -178,7 +178,10 @@ curl -s -X POST http://127.0.0.1:8765/comms/tasks/status \
 
 `status` is `done` or `failed` (`failed` cascades dependents to blocked). Check the response:
 `updated` lists what landed, `newly_ready` what your close unblocked, and `unknown` any id that
-does not exist — an id in `unknown` means you named a stale id and that task is still open.
+does not exist — an id in `unknown` means you named a stale id and that task is still open. Only
+tasks on your own board can be settled: one on another board comes back in `refused`, and a call
+without your run token is refused outright (403). `from` and `feature` are ignored; your run
+token says who and where you are.
 
 **Decisions your evaluation supersedes:** re-post the winning decision with `"supersedes":
 ["<old id>"]` (see the comms-post fragment). Do not supersede an escalation or a question

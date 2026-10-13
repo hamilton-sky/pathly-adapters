@@ -185,6 +185,53 @@ def test_force_past_gate_advances_and_records_the_override(harness):
     overrides = [m for m in posts if "GATE OVERRIDE" in (m.get("text") or "")]
     assert len(overrides) == 1, "a forced gate must leave a trace on the board"
     assert "Option B is not recommended" in overrides[0]["text"]
+    # One force is enough: the forced-past escalation no longer re-blocks every later step.
+    from pathly_orchestrator.fsm_human_gate import open_human_gates
+
+    assert open_human_gates("feature", harness["feature"]) == []
+
+
+def test_a_truthy_string_does_not_force(harness):
+    """Only a JSON true forces; "false" is a truthy string."""
+    _escalate(harness["conn"], harness["feature"], "needs a human", "human")
+    r = harness["advance"](force_past_gate="false")
+    assert "human_gate" in r
+
+
+def test_force_past_gate_is_refused_for_an_agent_run():
+    """An agent that can force past a human gate is the failure the gate exists to stop."""
+    from pathly_orchestrator.db.connection import get_db
+    from pathly_orchestrator.db.queries.run_tokens import mint_run_token
+    from pathly_orchestrator.http_server import app
+
+    token = mint_run_token(
+        get_db(), "run-force", "builder", "f", "/tmp/p", "feature", "f"
+    )
+    with app.test_client() as client:
+        r = client.post(
+            "/complete_stage",
+            headers={"X-Pathly-Run-Token": token},
+            json={
+                "flow": "test",
+                "topic": "f",
+                "project_root": "/tmp/p",
+                "force_past_gate": True,
+            },
+        )
+    assert r.status_code == 403
+
+
+def test_goal_runs_check_the_parent_board_scope(harness):
+    """A goal run's topic is its own slug while its agents post on the parent feature board;
+    checking only the topic scope made the gate a silent no-op for every goal run."""
+    from pathly_orchestrator.fsm_human_gate import gate_scopes
+
+    goal = post_message(
+        harness["conn"], "feature", harness["feature"], "planner", type="goal", text="g"
+    )
+    topic = f"features/{harness['feature']}/goals/g-slug"
+    scopes = gate_scopes(topic, topic, "/tmp/p", goal)
+    assert topic in scopes and harness["feature"] in scopes
 
 
 def test_gate_read_failure_fails_open(monkeypatch):

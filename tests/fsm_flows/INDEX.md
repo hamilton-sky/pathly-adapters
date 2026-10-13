@@ -23,7 +23,7 @@ FSM engine, gates, transitions, flow definitions, feedback protocol & fix-routin
 | `test_goal_id_prompt_var.py` | Phase 0 hygiene fix — team/build's board query was unscoped by goal_id | 3 |
 | `test_golden_path.py` | T1 — the end-to-end GOLDEN-PATH smoke test (production-readiness P0) | 7 |
 | `test_hooks.py` | End-to-end tests for hook scripts via subprocess | 11 |
-| `test_human_escalation_gate.py` | Human escalation gate — an open gate addressed to a human blocks the transition | 9 |
+| `test_human_escalation_gate.py` | Human escalation gate — an open gate addressed to a human blocks the transition | 12 |
 | `test_orchestrator.py` | Tests for Conv 2: STATE.json schema validation, state/transition enforcement, concurrency | 17 |
 | `test_parallel_states_schema.py` | The `parallel_states` flow-YAML key — fsm-fan-out Phase B (schema only, inert) | 11 |
 | `test_retry_ladder.py` | Retry ladder: what varies by ATTEMPT, not just who owns it | 14 |

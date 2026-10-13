@@ -208,16 +208,19 @@ def complete_stage(args: dict) -> dict:
     # committed, so an open gate blocks the specific transition it stands in front of rather
     # than the whole FSM. Only escalations addressed to a human gate — agent-addressed ones
     # are ordinary feedback routing (see fsm_human_gate for why, and for the two ways a human
-    # clears it). force_past_gate is a HUMAN affordance: no agent prompt or fragment mentions
-    # it, because an agent that can force past a human gate is the failure being fixed.
+    # clears it). force_past_gate is a HUMAN affordance: no agent prompt, fragment or block
+    # response mentions it, and /complete_stage refuses it from a caller with a run token.
     from pathly_orchestrator.fsm_human_gate import (
+        gate_scopes,
         open_human_gates,
         record_gate_override,
     )
 
-    human_gates = open_human_gates(board, scope)
+    human_gates = open_human_gates(
+        board, gate_scopes(topic, scope, project_root, goal_id or "")
+    )
     if human_gates:
-        if args.get("force_past_gate"):
+        if args.get("force_past_gate") is True:  # a JSON true, never a truthy string
             record_gate_override(
                 board, scope, human_gates, str(args.get("actor") or "human")
             )
@@ -233,15 +236,12 @@ def complete_stage(args: dict) -> dict:
             result["human_gate"] = {
                 "blocked_transition": f"{state_info['current_state']}->{next_state}",
                 "escalations": human_gates,
-                "clear_by": (
-                    "POST /comms/acknowledge for each escalation, or re-send complete_stage "
-                    "with force_past_gate=true (records a GATE OVERRIDE decision on the board)"
-                ),
+                "clear_by": "a human acknowledges each escalation (POST /comms/acknowledge)",
             }
             result["instructions"] = (
                 f"{len(human_gates)} unacknowledged human escalation(s) block "
                 f"{state_info['current_state']} -> {next_state}. An agent decision does not "
-                f"close a human gate. Acknowledge them, or force past explicitly."
+                f"close a human gate. Wait for a human to acknowledge them."
             )
             append_event(
                 storage_path,

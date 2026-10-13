@@ -184,6 +184,12 @@ def _collect_hydrate_channel(
     return hydrate_lines, hydrate_count
 
 
+# Which board's decision wins a conflict: a global decision outranks a project one, and a
+# project decision a feature one. The feature board accepts a post from any role, so ranking
+# by recency alone let any newer feature-board note outrank an older director or human call.
+_TIER_RANK = {"global": 0, "project": 1, "feature": 2}
+
+
 def render_governance_lines(
     decisions: list[dict], escalations: list[dict]
 ) -> list[str]:
@@ -207,12 +213,17 @@ def render_governance_lines(
         # cheap half of supersession: until `superseded_by` is set (POST /comms/supersede),
         # recency is the only signal the reader has, so make it unmissable.
         ordered = sorted(decisions, key=lambda m: str(m.get("ts") or ""), reverse=True)
-        lines.append("**Decisions (NEWEST FIRST):**")
+        # Stable sort: tier rank first, recency kept within each tier.
+        ordered.sort(key=lambda m: _TIER_RANK.get(str(m.get("board") or "feature"), 2))
+        lines.append("**Decisions (higher tier first, NEWEST FIRST within a tier):**")
         lines.append(
-            "  If two decisions conflict, the one listed FIRST wins — it was made later. "
-            "Do not act on a superseded decision because it appears more detailed."
+            "  A global decision outranks a project one, and a project decision a feature "
+            "one. Within a tier, if two decisions conflict, the one listed FIRST wins — it "
+            "was made later. Do not act on a superseded decision because it appears more "
+            "detailed. To replace one, post a decision with `supersedes` naming its id."
         )
-        for idx, msg in enumerate(ordered):
+        seen_tiers: set[str] = set()
+        for msg in ordered:
             tier = msg.get("board", "feature")
             text = msg.get("text", "")
             ts_str = msg.get("ts", "")
@@ -220,8 +231,10 @@ def render_governance_lines(
             # Minute-precision stamp alongside the age: same-day decisions are the ones
             # that actually conflict, and "13d ago" cannot order them.
             stamp = ts_str[:16].replace("T", " ") if len(ts_str) >= 16 else ts_str
-            marker = "LATEST · " if idx == 0 else ""
-            meta = " · ".join(p for p in (marker + tier, stamp, age) if p)
+            marker = "LATEST · " if tier not in seen_tiers else ""
+            seen_tiers.add(tier)
+            ident = f"id: {msg['id']}" if msg.get("id") else ""
+            meta = " · ".join(p for p in (ident, marker + tier, stamp, age) if p)
             lines.append(f"  • {text}  [{meta}]")
     if escalations:
         lines.append("**Open escalations (human input required):**")

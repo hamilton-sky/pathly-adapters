@@ -32,7 +32,61 @@ import logging
 MAX_SUPERSEDES = 20
 
 
-def validate_supersedes(value: object) -> tuple[list[str] | None, str | None]:
+# Governance rows a decision can replace. An escalation is never one of them: a human-addressed
+# escalation is a gate only a human acknowledgement closes, and superseding it would retire the
+# gate silently (get_active_escalations filters superseded rows out).
+SUPERSEDABLE_TYPES = ("decision", "constraint")
+_ROW_SQL = (
+    "SELECT type, board, scope FROM comms_messages WHERE id=? AND deleted_at IS NULL"
+)
+
+
+def _request_identity():
+    """The caller's identity inside a request, else None (a direct call, as in tests)."""
+    from flask import has_request_context, request
+
+    if not has_request_context():
+        return None
+    from pathly_orchestrator.http_server.run_identity import caller_identity
+
+    return caller_identity(request)
+
+
+def _off_token_board(identity, row) -> bool:
+    """True when an agent run targets a row off its own token's board and scope."""
+    if identity is None or identity.kind != "run":
+        return False
+    return (row["board"], row["scope"]) != (identity.board, identity.scope)
+
+
+def refuse_agent_supersede(conn, old_id: str):
+    """403 for an agent run superseding through POST /comms/supersede what /comms/post refuses.
+
+    The direct route checks neither type nor board, so an agent could retire a human-addressed
+    escalation (silently opening the human gate) or another board's decision. Studio's
+    supersede menu sends no run token and keeps working until the UI token (RRP-2b).
+    """
+    from flask import jsonify
+
+    identity = _request_identity()
+    if identity is None or identity.kind != "run":
+        return None
+    row = conn.execute(_ROW_SQL, (old_id,)).fetchone()
+    if row is None:
+        return None  # the route answers 404
+    if row["type"] not in SUPERSEDABLE_TYPES:
+        return (
+            jsonify({"error": "an agent may supersede only a decision or constraint"}),
+            403,
+        )
+    if _off_token_board(identity, row):
+        return jsonify({"error": "an agent may supersede only on its own board"}), 403
+    return None
+
+
+def validate_supersedes(
+    value: object, msg_type: object = "decision"
+) -> tuple[list[str] | None, str | None]:
     """Return ``(ids, error)``. ``ids`` is None when the field was absent.
 
     Rejects the malformed shapes at the request boundary (so the caller can 400 before
@@ -40,6 +94,11 @@ def validate_supersedes(value: object) -> tuple[list[str] | None, str | None]:
     """
     if value is None:
         return None, None
+    if msg_type not in SUPERSEDABLE_TYPES:
+        return (
+            None,
+            "Field 'supersedes' is only accepted on a decision or constraint post",
+        )
     if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
         return None, "Field 'supersedes' must be a list of message-id strings or null"
     ids = [v.strip() for v in value if v.strip()]
@@ -54,7 +113,8 @@ def apply_supersedes(conn, old_ids: list[str], new_id: str) -> dict:
     Returns ``{"superseded": [...], "skipped": [{"id":…, "reason":…}]}``. ``reason`` is
     ``supersede_message``'s own verdict (``not_found`` / ``already_superseded``), passed
     through unchanged so the agent can tell "you named a stale id" from "someone else got
-    there first" — and ``self_reference`` for the one case the query layer cannot see.
+    there first"; ``self_reference``, ``not_a_decision`` (an escalation, task or note) and
+    ``other_board`` (not the board and scope the post landed on) are refused here.
     """
     result: dict = {"superseded": [], "skipped": []}
     if not old_ids:
@@ -69,11 +129,32 @@ def apply_supersedes(conn, old_ids: list[str], new_id: str) -> dict:
         logging.debug("supersede import failed", exc_info=True)
         return result
 
+    new_row = conn.execute(_ROW_SQL, (new_id,)).fetchone()
+    identity = _request_identity()
     for old_id in old_ids:
         if old_id == new_id:
             # A message cannot supersede itself: get_pending_decisions filters on
             # `superseded_by IS NULL`, so this would silently retire the post being made.
             result["skipped"].append({"id": old_id, "reason": "self_reference"})
+            continue
+        old_row = conn.execute(_ROW_SQL, (old_id,)).fetchone()
+        if old_row is None:
+            result["skipped"].append({"id": old_id, "reason": "not_found"})
+            continue
+        if old_row["type"] not in SUPERSEDABLE_TYPES:
+            result["skipped"].append({"id": old_id, "reason": "not_a_decision"})
+            continue
+        # Only the board the post lands on: the feature board accepts any role, so a
+        # cross-board supersede would let a feature post retire a project or global decision.
+        if new_row is None or (old_row["board"], old_row["scope"]) != (
+            new_row["board"],
+            new_row["scope"],
+        ):
+            result["skipped"].append({"id": old_id, "reason": "other_board"})
+            continue
+        # The post's board/scope come from the body; an agent run is bound to its token's.
+        if _off_token_board(identity, old_row):
+            result["skipped"].append({"id": old_id, "reason": "other_board"})
             continue
         try:
             verdict = _supersede(conn, old_id=old_id, new_id=new_id)

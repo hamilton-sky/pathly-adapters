@@ -43,8 +43,30 @@ _log = logging.getLogger("pathly.fsm")
 _HUMAN_TARGETS = ("human",)
 
 
-def open_human_gates(board: str, scope: str) -> list[dict]:
-    """Return unacknowledged escalations addressed to a human for this board/scope.
+def gate_scopes(
+    topic: str, scope: str, project_root: str, goal_id: str = ""
+) -> list[str]:
+    """The scopes a run's human escalations can sit on: its own, plus its parent board's.
+
+    A goal run's topic (and the ``scope`` the supervisor sends) is its own storage slug,
+    ``features/<f>/goals/<slug>``, while its agents post on the parent feature board, ``<f>``.
+    Checking only the topic scope made the gate silently a no-op for every goal run.
+    """
+    scopes = [scope]
+    try:
+        from pathlib import PurePosixPath
+
+        from pathly_orchestrator.fsm_compose import resolve_board_scope
+
+        slug = PurePosixPath(str(topic).replace("\\", "/")).name or scope
+        scopes.append(resolve_board_scope(slug, project_root, goal_id or ""))
+    except Exception:
+        _log.debug("gate_scopes: board scope unresolved", exc_info=True)
+    return [s for s in dict.fromkeys(scopes) if s]
+
+
+def open_human_gates(board: str, scope: str | list[str]) -> list[dict]:
+    """Return unacknowledged escalations addressed to a human for this board/scope(s).
 
     Never raises: a DB hiccup must not wedge the pipeline, so it fails OPEN (returns []) —
     the same choice ``run_gates`` makes for ``require_tasks_done``. A gate that cannot be
@@ -54,8 +76,9 @@ def open_human_gates(board: str, scope: str) -> list[dict]:
         from pathly_orchestrator.db.connection import get_db
         from pathly_orchestrator.db.queries.comms import get_active_escalations
 
+        scopes = [scope] if isinstance(scope, str) else list(scope)
         rows = get_active_escalations(
-            get_db(), boards=[board or "feature"], scopes=[scope]
+            get_db(), boards=[board or "feature"], scopes=scopes
         )
     except Exception:
         _log.debug("open_human_gates read failed — failing open", exc_info=True)
@@ -83,6 +106,7 @@ def open_human_gates(board: str, scope: str) -> list[dict]:
                 "id": row.get("id"),
                 "text": (row.get("text") or "")[:400],
                 "from": row.get("from_agent"),
+                "scope": row.get("scope"),
                 "ts": row.get("ts"),
             }
         )
@@ -92,32 +116,47 @@ def open_human_gates(board: str, scope: str) -> list[dict]:
 def record_gate_override(
     board: str, scope: str, gates: list[dict], actor: str = "human"
 ) -> None:
-    """Post a board `decision` naming every gate a force-advance skipped.
+    """Post a board `decision` naming every gate a force-advance skipped, then acknowledge them.
 
-    Without this the override is invisible: the escalations stay pending, the run continues,
-    and the board looks exactly like the un-gated behaviour this module replaced. Best-effort
-    — failing to record must not block the advance the human explicitly asked for.
+    Without the decision the override is invisible and the board looks exactly like the
+    un-gated behaviour this module replaced. The acknowledgement is what makes one force
+    enough: a forced-past escalation left pending re-blocked every later transition, and each
+    re-force posted another override. Best-effort — failing to record must not block the
+    advance the human explicitly asked for.
     """
     if not gates:
         return
     try:
         from pathly_orchestrator.db.connection import get_db
-        from pathly_orchestrator.db.queries.comms import post_message
+        from pathly_orchestrator.db.queries.comms import (
+            acknowledge_message,
+            post_message,
+        )
         from pathly_orchestrator.runner.provenance import system_stamp
 
-        listed = "; ".join(f"{g['text'][:80]} [{g['id']}]" for g in gates)
-        post_message(
-            get_db(),
-            board=board or "feature",
-            scope=scope,
-            from_agent=actor,
-            type="decision",
-            text=(
-                f"GATE OVERRIDE — advanced past {len(gates)} unacknowledged human "
-                f"escalation(s) without answering them: {listed}"
-            ),
-            # The server writes this row; the caller's identity is not known here.
-            **system_stamp(),
-        )
+        # One override per board scope a gate sat on: a goal run's gates can sit on the parent
+        # feature board, where a note on the run's own topic scope would never be read.
+        by_scope: dict[str, list[dict]] = {}
+        for g in gates:
+            by_scope.setdefault(g.get("scope") or scope, []).append(g)
+        for gate_scope, scoped in by_scope.items():
+            listed = "; ".join(f"{g['text'][:80]} [{g['id']}]" for g in scoped)
+            post_message(
+                get_db(),
+                board=board or "feature",
+                scope=gate_scope,
+                from_agent=actor,
+                type="decision",
+                text=(
+                    f"GATE OVERRIDE — advanced past {len(scoped)} unacknowledged human "
+                    f"escalation(s) without answering them: {listed}"
+                ),
+                # The server writes this row; the caller's identity is not known here.
+                **system_stamp(),
+            )
+        for g in gates:
+            acknowledge_message(
+                get_db(), message_id=g["id"], agent=f"{actor} (gate override)"
+            )
     except Exception:
         _log.debug("record_gate_override failed", exc_info=True)

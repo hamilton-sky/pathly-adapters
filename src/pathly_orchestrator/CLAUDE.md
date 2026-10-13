@@ -360,7 +360,7 @@ POST /comms/attach          ← attach an artifact to a message
 GET  /comms/artifacts       ← list artifacts linked to a message (comms_artifacts table)
 GET  /comms/trash           ← list trashed messages
 POST /comms/restore         ← restore a trashed message
-POST /comms/supersede       ← mark a message superseded_by another (standalone form; the agent path uses `/comms/post` + `supersedes`)
+POST /comms/supersede       ← mark a message superseded_by another (standalone form, used by Studio's supersede menu and the consolidate skill; an agent run is held to the same decision-only, own-board rules as `/comms/post` + `supersedes`)
 GET  /comms/scope           ← read the active board scope
 POST /comms/scope           ← set the active board scope
 GET  /comms/permissions     ← role-based write permissions
@@ -389,16 +389,21 @@ retires on its own; three write paths make a resolution durable instead of prose
 
 | Resolution | Write path | Guard |
 |---|---|---|
-| this decision replaces that one | `POST /comms/post` with `supersedes:[id,…]` (`blueprints/comms/_supersede_on_post.py`) | explicit ids ONLY — never inferred from text/embedding similarity, because silently retiring the wrong governance is worse than a duplicate. Capped, de-duplicated, self-reference refused; a bad id degrades to a per-id `skipped` reason and never fails the post |
-| these tasks are settled | `POST /comms/tasks/status` (`blueprints/comms/tasks_status.py`) | `done`/`failed` only; unknown ids reported, not dropped |
-| a human gate is closed | `POST /comms/acknowledge` (human) | an agent decision does NOT close an escalation — `runner/comms_formatters.render_governance_lines` says so in the injected block when a decision post-dates an open escalation, and `fsm_human_gate` now makes it structurally true (below) |
+| this decision replaces that one | `POST /comms/post` with `supersedes:[id,…]` (`blueprints/comms/_supersede_on_post.py`) | explicit ids ONLY — never inferred from text/embedding similarity, because silently retiring the wrong governance is worse than a duplicate. Capped, de-duplicated; only on a `decision`/`constraint` post (else 400), and only targets that are themselves a decision or constraint on the SAME board and scope (`not_a_decision` covers escalations, so a human gate cannot be superseded away; `other_board` stops a feature post retiring a project/global call). Self-reference and bad ids degrade to a per-id `skipped` reason and never fail the post |
+| these tasks are settled | `POST /comms/tasks/status` (`blueprints/comms/tasks_status.py`) | needs a live `X-Pathly-Run-Token` (403 otherwise), and each task must sit on the token's board and scope (else `refused`); the status line is stamped as the caller. `done`/`failed` only; unknown ids reported, not dropped |
+| a human gate is closed | `POST /comms/acknowledge` (human; an agent run's live token gets 403 on a human-addressed escalation, as do `/comms/delete` and `/comms/answer` — `_helpers.refuse_agent_on_human_gate`; and `POST /comms/supersede` holds an agent run to the same decision-only, own-board rules as `supersedes` — `_supersede_on_post.refuse_agent_supersede`) | an agent decision does NOT close an escalation — `runner/comms_formatters.render_governance_lines` says so in the injected block when a decision post-dates an open escalation, and `fsm_human_gate` now makes it structurally true (below) |
 
 The agent-facing half is in `core/skills/fragments/comms-post.md` (supersede a decision you
-replace; never supersede a human-addressed escalation) and `core/skills/planning/evaluate.md`
-Step 5 (close what your analysis settled — evidence-gated).
+replace, by the `[id: …]` the governance block now shows on each decision) and
+`core/skills/planning/evaluate.md` Step 5 (close what your analysis settled — evidence-gated).
+Governance decisions render higher tier first (global > project > feature), newest first within a
+tier: the feature board accepts any role, so recency alone let a newer feature note outrank an
+older project or global call.
 
 **Human escalation gate (`fsm_human_gate.py`).** An unacknowledged escalation with
 `to_agent='human'` on the run's board/scope **blocks the transition it stands in front of**.
+The gate checks the run's topic scope AND its parent board scope (`gate_scopes`): a goal run's
+topic is `features/<f>/goals/<slug>` while its agents post on `<f>`.
 `complete_stage` checks it after `next_state` is resolved and before the transition is
 committed, returning the standard `_blocked_response` (`decision: escalate`, `blocked: true`)
 plus a `human_gate` block naming the blocked transition and the escalations, and appending a
@@ -414,9 +419,15 @@ human checkpoints to `DONE`.
   resumed run (`POST /runner/resume-parked`). The override decision itself is posted with
   `system_stamp()`.
 - **Two ways a human clears it:** `POST /comms/acknowledge` (the normal path), or re-send
-  `complete_stage` with `force_past_gate: true` — which advances AND posts a `GATE OVERRIDE`
-  decision naming every skipped gate, so a bypassed gate stays auditable. `force_past_gate` is
-  a human affordance: no agent prompt or fragment mentions it.
+  `complete_stage` with `force_past_gate: true` — which advances, posts a `GATE OVERRIDE`
+  decision naming every skipped gate (so a bypassed gate stays auditable) and acknowledges
+  them, so one force is enough. `force_past_gate` is a human affordance: no agent prompt,
+  fragment or block response mentions it, and `/complete_stage` returns 403 for it when the
+  caller sends a live run token.
+- **These guards are keyed on the run token.** They stop an agent run that sends its
+  `X-Pathly-Run-Token` (every runner spawn's fragments do). A tokenless loopback caller is still
+  treated as a human, because the server cannot tell Studio from a local process until the UI
+  token (RRP-2b) exists.
 - **Fails OPEN** on a DB read error (same choice as `require_tasks_done`) — a gate that cannot
   be read is reported absent rather than blocking every transition in the product.
 - Studio has no dedicated force-advance button yet; today the override is the `complete_stage`

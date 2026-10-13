@@ -18,6 +18,11 @@ Scope is deliberately ``done`` and ``failed`` only:
 * ``done``   — this task is settled; dependents unblock (via ``complete_task``).
 * ``failed`` — this task cannot proceed; dependents cascade to ``blocked`` (via ``fail_task``).
 
+Only an agent run may call it, and only for its own board: the caller must send a live
+``X-Pathly-Run-Token``, each task must sit on the token's board and scope, and the audit line
+is stamped as that caller. Without that, any process could mark every task done and walk a
+run straight through the ``->DONE: require_tasks_done`` gate.
+
 Re-opening a task (→ ``pending``) is NOT offered. Reopening is a supervisory act with a
 human or an executor behind it (``reclaim_stale_tasks``, the Studio controls), and an agent
 that can silently reopen its own failures can loop forever without anything closing.
@@ -30,7 +35,7 @@ import logging
 from flask import Blueprint, jsonify, request
 
 from ...sse import _broadcast_comms
-from ._helpers import post_task_status
+from ._helpers import read_json_body
 
 bp = Blueprint("comms_tasks_status", __name__)
 
@@ -61,7 +66,15 @@ def comms_tasks_status():
             fail_task as _fail_task,
         )
 
-        data = request.get_json(silent=True)
+        from pathly_orchestrator.http_server.run_identity import caller_identity
+
+        identity = caller_identity(request)
+        if identity.kind != "run" or not identity.board or not identity.scope:
+            return (
+                jsonify({"error": "needs a live X-Pathly-Run-Token (an agent run)"}),
+                403,
+            )
+        data = read_json_body()
         if not data:
             return jsonify({"error": "Missing JSON body"}), 400
 
@@ -88,11 +101,11 @@ def comms_tasks_status():
 
         reason = data.get("reason")
         reason = reason.strip() if isinstance(reason, str) else ""
-        from_agent = str(data.get("from") or "agent").strip() or "agent"
-        scope = data.get("feature") or data.get("scope") or ""
+        scope = identity.scope
 
         conn = _get_db()
         updated: list[str] = []
+        refused: list[str] = []
         newly_ready: list[str] = []
         cascaded: list[str] = []
 
@@ -102,28 +115,35 @@ def comms_tasks_status():
             # "you named a stale id" from "it was already done" — and an agent that gets
             # ok:true for a typo'd id learns nothing.
             row = conn.execute(
-                "SELECT task_status FROM comms_messages "
+                "SELECT task_status, board, scope, text FROM comms_messages "
                 "WHERE id=? AND type='task' AND deleted_at IS NULL",
                 (tid,),
             ).fetchone()
             if row is None:
+                continue
+            if (row["board"], row["scope"]) != (identity.board, identity.scope):
+                refused.append(tid)  # another board's task: not this run's to settle
                 continue
             if row["task_status"] == status:
                 updated.append(tid)  # idempotent: already where the caller wants it
                 continue
             if status == "done":
                 newly_ready.extend(_complete_task(conn, message_id=tid))
-                post_task_status(
-                    conn, tid, "Done", f"{from_agent}: {reason}" if reason else ""
-                )
             else:
                 cascaded.extend(_fail_task(conn, message_id=tid, reason=reason))
-                post_task_status(
-                    conn, tid, "Failed", f"{from_agent}: {reason}" if reason else ""
-                )
+            _audit_line(conn, request, row, status, reason)
             updated.append(tid)
+            _broadcast_comms(
+                scope,
+                {
+                    "type": "COMMS_UPDATE",
+                    "message_id": tid,
+                    "event": "task_done" if status == "done" else "task_failed",
+                    "feature": scope,
+                },
+            )
 
-        unknown = [t for t in task_ids if t not in updated]
+        unknown = [t for t in task_ids if t not in updated and t not in refused]
 
         for mid in set(newly_ready) | set(cascaded):
             _broadcast_comms(
@@ -150,7 +170,36 @@ def comms_tasks_status():
             # Surfaced, never silently dropped — a resolving agent naming a stale id must
             # find out, because its whole contribution is knowing which tasks are settled.
             resp["unknown"] = unknown
+        if refused:
+            resp["refused"] = refused
         return jsonify(resp), 200
     except Exception as exc:
         logging.exception("comms_tasks_status error")
         return jsonify({"error": str(exc), "type": type(exc).__name__}), 500
+
+
+def _audit_line(conn, request, row, status: str, reason: str) -> None:
+    """Post the task's Done/Failed status line, stamped as the calling run. Best-effort."""
+    try:
+        from pathly_orchestrator.db.queries.comms import post_message
+        from pathly_orchestrator.http_server.run_identity import caller_identity
+        from pathly_orchestrator.runner.provenance import stamp
+
+        verb = "Done" if status == "done" else "Failed"
+        text = row["text"] or ""
+        line = (
+            f"{verb}: {text[:80]} — {reason[:80]}"
+            if reason
+            else f"{verb}: {text[:110]}"
+        )
+        post_message(
+            conn,
+            board=row["board"],
+            scope=row["scope"],
+            from_agent=caller_identity(request).role or "agent",
+            type="status",
+            text=line,
+            **stamp(caller_identity(request)),
+        )
+    except Exception:
+        logging.debug("tasks/status audit line failed", exc_info=True)

@@ -235,3 +235,27 @@ def task_duration_seconds(task: dict) -> float | None:
         return secs if secs > 0 else 0.0
     except Exception:
         return None
+
+
+def refuse_agent_on_human_gate(conn, request, message_id: str):
+    """403 when an agent run (live run token) tries to close a human-addressed escalation.
+
+    Only a human closes a human gate (fsm_human_gate.py). Acknowledging or deleting the row is
+    how one is closed, and both routes trust the body's ``agent`` / nothing at all, so an agent
+    could otherwise clear the gate "as human". Returns None when the call may proceed; a caller
+    with no run token is unaffected until the UI token (RRP-2b) can tell Studio from an agent.
+    """
+    from flask import jsonify
+
+    from pathly_orchestrator.http_server.run_identity import caller_identity
+
+    if caller_identity(request).kind != "run":
+        return None
+    row = conn.execute(
+        "SELECT type, to_agent FROM comms_messages WHERE id=?", (message_id,)
+    ).fetchone()
+    if row is None or row["type"] != "escalation":
+        return None
+    if str(row["to_agent"] or "").strip().lower() != "human":
+        return None
+    return jsonify({"error": "only a human closes a human-addressed escalation"}), 403

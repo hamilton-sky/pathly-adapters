@@ -176,9 +176,9 @@ def comms_post():
         if goal_id is not None and not isinstance(goal_id, str):
             return jsonify({"error": "Field 'goal_id' must be a string or null"}), 400
         # Supersedes: validated here so a malformed list 400s before anything is written.
-        supersedes, supersedes_err = validate_supersedes(data.get("supersedes"))
-        if supersedes_err:
-            return jsonify({"error": supersedes_err}), 400
+        supersedes, bad = validate_supersedes(data.get("supersedes"), msg_type)
+        if bad:
+            return jsonify({"error": bad}), 400
         if executor is not None and not isinstance(executor, str):
             return jsonify({"error": "Field 'executor' must be a string or null"}), 400
         # summary_backend is now ONLY the client-drop suppression signal consumed by

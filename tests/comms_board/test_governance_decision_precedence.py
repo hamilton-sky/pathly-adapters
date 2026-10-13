@@ -154,3 +154,22 @@ def test_board_info_with_no_governance_renders_nothing_for_it():
     )
     assert "Governance" not in only_recent
     assert "hi" in only_recent
+
+
+def test_a_higher_tier_decision_outranks_a_newer_feature_one(monkeypatch):
+    """The feature board takes a post from any role, so recency alone let any newer feature
+    note outrank an older project or global call."""
+    project = {
+        **_decision("Project rule: no new dependencies", TS_GATE),
+        "board": "project",
+    }
+    feature = _decision("Add the left-pad dependency", TS_UNBLOCK)
+    block = _render(monkeypatch, [feature, project])
+    assert block.index("Project rule") < block.index("left-pad")
+    assert "global decision outranks a project one" in block
+
+
+def test_each_decision_shows_its_id_for_supersedes(monkeypatch):
+    """comms-post.md tells an agent to supersede by the `[id: ...]` on a decision."""
+    block = _render(monkeypatch, [_decision(UNBLOCK, TS_UNBLOCK)])
+    assert f"[id: {TS_UNBLOCK}" in block

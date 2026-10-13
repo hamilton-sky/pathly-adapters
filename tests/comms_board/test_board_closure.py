@@ -41,6 +41,25 @@ def _decision(client, text, **extra):
     )
 
 
+def _agent_headers(role="evaluator", board="feature", scope="closure-demo"):
+    """A live run token for an agent on *board*/*scope* — /comms/tasks/status needs one."""
+    import uuid
+
+    from pathly_orchestrator.db.connection import get_db
+    from pathly_orchestrator.db.queries.run_tokens import mint_run_token
+
+    token = mint_run_token(
+        get_db(),
+        f"run-{uuid.uuid4().hex[:8]}",
+        role,
+        scope,
+        "/tmp/closure",
+        board,
+        scope,
+    )
+    return {"X-Pathly-Run-Token": token}
+
+
 def _superseded_by(message_id):
     from pathly_orchestrator.db.connection import get_db
 
@@ -121,6 +140,62 @@ def test_a_message_cannot_supersede_itself(client):
     assert posted["message_id"] in live_ids
 
 
+def test_supersede_refuses_an_escalation(client):
+    """A human-addressed escalation is a gate only a human closes; superseding it would
+    retire the gate silently (get_active_escalations filters superseded rows)."""
+    esc = _post(
+        client,
+        **{
+            "from": "architect",
+            "type": "escalation",
+            "to": "human",
+            "text": "needs a human",
+        },
+    )
+    resp = _decision(client, "unblocked, start now", supersedes=[esc["message_id"]])
+    assert resp["superseded"] == []
+    assert resp["supersede_skipped"] == [
+        {"id": esc["message_id"], "reason": "not_a_decision"}
+    ]
+    assert _superseded_by(esc["message_id"]) is None
+
+
+def test_supersede_refuses_a_decision_on_another_board(client):
+    """The feature board takes a post from any role, so a cross-board supersede would let it
+    retire a decision it could never have written."""
+    other = _post(
+        client,
+        **{
+            "feature": "other-board",
+            "scope": "other-board",
+            "from": "architect",
+            "type": "decision",
+            "text": "a decision on another board",
+        },
+    )
+    resp = _decision(client, "tries to retire it", supersedes=[other["message_id"]])
+    assert resp["supersede_skipped"][0]["reason"] == "other_board"
+    assert _superseded_by(other["message_id"]) is None
+
+
+def test_supersedes_on_a_non_decision_post_is_rejected(client):
+    old = _decision(client, "a live decision")
+    r = client.post(
+        "/comms/post",
+        json={
+            "feature": "closure-demo",
+            "board": "feature",
+            "scope": "closure-demo",
+            "from": "builder",
+            "type": "status",
+            "text": "a status line",
+            "supersedes": [old["message_id"]],
+        },
+    )
+    assert r.status_code == 400
+    assert _superseded_by(old["message_id"]) is None
+
+
 @pytest.mark.parametrize("bad", ["not-a-list", [1, 2], [{"id": "x"}]])
 def test_malformed_supersedes_is_rejected_before_anything_is_written(client, bad):
     r = client.post(
@@ -185,6 +260,7 @@ def test_status_marks_a_batch_of_tasks_done_in_one_call(client):
     ids = [_task(client, f"task {i}")["message_id"] for i in range(3)]
     r = client.post(
         "/comms/tasks/status",
+        headers=_agent_headers(),
         json={
             "task_ids": ids,
             "status": "done",
@@ -201,7 +277,9 @@ def test_completing_a_dependency_reports_newly_ready_dependents(client):
     dep = _task(client, "the blocker")
     blocked = _task(client, "waits on the blocker", depends_on=[dep["message_id"]])
     r = client.post(
-        "/comms/tasks/status", json={"task_ids": [dep["message_id"]], "status": "done"}
+        "/comms/tasks/status",
+        headers=_agent_headers(),
+        json={"task_ids": [dep["message_id"]], "status": "done"},
     )
     assert blocked["message_id"] in json.loads(r.data)["newly_ready"]
 
@@ -213,6 +291,7 @@ def test_failing_a_task_cascades_to_its_dependents(client):
     )
     r = client.post(
         "/comms/tasks/status",
+        headers=_agent_headers(),
         json={
             "task_ids": [dep["message_id"]],
             "status": "failed",
@@ -227,6 +306,7 @@ def test_unknown_ids_are_reported_not_silently_dropped(client):
     real = _task(client, "real task")
     r = client.post(
         "/comms/tasks/status",
+        headers=_agent_headers(),
         json={"task_ids": [real["message_id"], "ghost-id"], "status": "done"},
     )
     body = json.loads(r.data)
@@ -238,7 +318,9 @@ def test_status_is_idempotent(client):
     tid = _task(client, "done twice")["message_id"]
     for _ in range(2):
         r = client.post(
-            "/comms/tasks/status", json={"task_ids": [tid], "status": "done"}
+            "/comms/tasks/status",
+            headers=_agent_headers(),
+            json={"task_ids": [tid], "status": "done"},
         )
         assert json.loads(r.data)["updated"] == [tid]
     assert _task_status(tid) == "done"
@@ -248,7 +330,9 @@ def test_reopening_a_task_is_refused(client):
     """An agent that can reopen its own failures can loop without anything closing."""
     tid = _task(client, "no reopening")["message_id"]
     r = client.post(
-        "/comms/tasks/status", json={"task_ids": [tid], "status": "pending"}
+        "/comms/tasks/status",
+        headers=_agent_headers(),
+        json={"task_ids": [tid], "status": "pending"},
     )
     assert r.status_code == 400
     assert "supervisory" in json.loads(r.data)["note"]
@@ -264,12 +348,178 @@ def test_reopening_a_task_is_refused(client):
     ],
 )
 def test_status_rejects_malformed_requests(client, body):
-    assert client.post("/comms/tasks/status", json=body).status_code == 400
+    assert (
+        client.post(
+            "/comms/tasks/status", headers=_agent_headers(), json=body
+        ).status_code
+        == 400
+    )
+
+
+def test_status_without_a_run_token_is_refused(client):
+    """Without a caller identity any process could mark every task done and walk a run
+    through the ->DONE: require_tasks_done gate."""
+    tid = _task(client, "needs an agent")["message_id"]
+    r = client.post("/comms/tasks/status", json={"task_ids": [tid], "status": "done"})
+    assert r.status_code == 403
+    assert _task_status(tid) != "done"
+
+
+def test_status_refuses_a_task_on_another_board(client):
+    tid = _task(client, "belongs to closure-demo")["message_id"]
+    r = client.post(
+        "/comms/tasks/status",
+        headers=_agent_headers(scope="some-other-feature"),
+        json={"task_ids": [tid], "status": "done"},
+    )
+    body = json.loads(r.data)
+    assert body["updated"] == []
+    assert body["refused"] == [tid]
+    assert _task_status(tid) != "done"
+
+
+def test_status_line_is_stamped_as_the_calling_run(client):
+    from pathly_orchestrator.db.connection import get_db
+
+    tid = _task(client, "stamped settle")["message_id"]
+    client.post(
+        "/comms/tasks/status",
+        headers=_agent_headers(role="evaluator"),
+        json={"task_ids": [tid], "status": "done", "reason": "covered by ADR-7"},
+    )
+    row = (
+        get_db()
+        .execute(
+            "SELECT author_role, author_source FROM comms_messages "
+            "WHERE type='status' AND text LIKE 'Done: stamped settle%'"
+        )
+        .fetchone()
+    )
+    assert (row["author_role"], row["author_source"]) == ("evaluator", "token")
+
+
+def test_an_agent_cannot_close_a_human_escalation(client):
+    """Acknowledging or deleting the row is how a human gate closes; an agent run (live
+    token) may do neither, whatever `agent` it names in the body."""
+    esc = _post(
+        client,
+        **{
+            "from": "architect",
+            "type": "escalation",
+            "to": "human",
+            "text": "human call",
+        },
+    )
+    mid = esc["message_id"]
+    headers = _agent_headers(role="builder")
+    ack = client.post(
+        "/comms/acknowledge",
+        headers=headers,
+        json={"message_id": mid, "agent": "human"},
+    )
+    assert ack.status_code == 403
+    gone = client.post(
+        "/comms/delete", headers=headers, json={"message_id": mid, "force": True}
+    )
+    assert gone.status_code == 403
+    # A caller without a run token (a human in Studio, until the UI token) still can.
+    ok = client.post("/comms/acknowledge", json={"message_id": mid, "agent": "human"})
+    assert ok.status_code == 200
+
+
+def test_an_agent_cannot_answer_a_human_escalation_away(client):
+    """`/comms/answer` flips the row to `answered`, and the gate only reads pending rows."""
+    esc = _post(
+        client,
+        **{"from": "architect", "type": "escalation", "to": "human", "text": "h?"},
+    )
+    r = client.post(
+        "/comms/answer",
+        headers=_agent_headers(role="builder"),
+        json={"question_id": esc["message_id"], "answer": "yes, go"},
+    )
+    assert r.status_code == 403
+
+
+def test_the_direct_supersede_route_holds_an_agent_to_the_same_rules(client):
+    """POST /comms/supersede checked neither type nor board, so an agent could retire a
+    human escalation through it even after /comms/post refused to."""
+    esc = _post(
+        client,
+        **{"from": "architect", "type": "escalation", "to": "human", "text": "gate"},
+    )
+    new = _decision(client, "the replacement")
+    headers = _agent_headers(role="builder")
+    r = client.post(
+        "/comms/supersede",
+        headers=headers,
+        json={"old_id": esc["message_id"], "new_id": new["message_id"]},
+    )
+    assert r.status_code == 403
+    assert _superseded_by(esc["message_id"]) is None
+    other = _post(
+        client,
+        **{
+            "feature": "elsewhere",
+            "scope": "elsewhere",
+            "from": "architect",
+            "type": "decision",
+            "text": "a decision on another board",
+        },
+    )
+    r = client.post(
+        "/comms/supersede",
+        headers=headers,
+        json={"old_id": other["message_id"], "new_id": new["message_id"]},
+    )
+    assert r.status_code == 403
+    # Studio's supersede menu sends no run token and still works.
+    old = _decision(client, "superseded from the UI")
+    r = client.post(
+        "/comms/supersede",
+        json={"old_id": old["message_id"], "new_id": new["message_id"]},
+    )
+    assert r.status_code == 200
+
+
+def test_supersedes_on_post_is_bound_to_the_agents_token_board(client):
+    """The post's board/scope come from the body; an agent cannot claim another board's
+    scope on its decision and retire a decision there."""
+    other = _post(
+        client,
+        **{
+            "feature": "board-b",
+            "scope": "board-b",
+            "from": "architect",
+            "type": "decision",
+            "text": "board B's decision",
+        },
+    )
+    r = client.post(
+        "/comms/post",
+        headers=_agent_headers(role="builder", scope="closure-demo"),
+        json={
+            "feature": "board-b",
+            "board": "feature",
+            "scope": "board-b",
+            "from": "builder",
+            "type": "decision",
+            "text": "claims board B's scope",
+            "supersedes": [other["message_id"]],
+        },
+    )
+    body = json.loads(r.data)
+    assert body["supersede_skipped"][0]["reason"] == "other_board"
+    assert _superseded_by(other["message_id"]) is None
 
 
 def test_single_task_id_form_is_accepted(client):
     tid = _task(client, "singular form")["message_id"]
-    r = client.post("/comms/tasks/status", json={"task_id": tid, "status": "done"})
+    r = client.post(
+        "/comms/tasks/status",
+        headers=_agent_headers(),
+        json={"task_id": tid, "status": "done"},
+    )
     assert json.loads(r.data)["updated"] == [tid]
 
 
@@ -317,8 +567,10 @@ def test_delivery_flows_gate_done_on_tasks_done():
     correct output, so they must NOT carry this gate."""
     import yaml
 
+    from tests._paths import SRC
+
     def gates_for(flow):
-        with open(f"src/pathly_data/core/flows/{flow}.flow.yaml") as fh:
+        with open(SRC / "pathly_data" / "core" / "flows" / f"{flow}.flow.yaml") as fh:
             return yaml.safe_load(fh).get("gates") or {}
 
     for delivery in ("team", "team-build"):
