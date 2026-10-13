@@ -1,38 +1,53 @@
-# Prove the chief end to end and update the living docs
+# Prove the chief core end to end
 
 Type: task
 Status: open
-Blocked by: 06, 08, 09, 11, 12
+Blocked by: 01, 02, 03, 04, 05, 06, 07, 08, 09, 10, 11, 12
 Test first: no
 
-Write `tests/comms_board/test_chief_acceptance.py`, the bar in map.md, with a fake spawn host
-that plays the chief by issuing its fragment calls (no mocks of code this plan built):
+Write `tests/comms_board/test_chief_acceptance.py`: the brief's bar, run against the real Flask
+app and the real supervisor, with a fake spawn host: a thread reading a queue registered in
+`sse._spawn_clients` (what `/events/spawn` clients get) that records every payload and, for a
+worker `TERMINAL_SPAWN`, marks the run started and finished the way
+`tests/comms_board/test_rrp_acceptance.py` does. One scenario per bar item:
 
-1. `POST /chief/message "add rate limiting, standard rigor"` → one chief turn with a `chief`
-   token; the fake chief calls decompose and run → the goal and its tasks are on the board.
-2. A stage asks a question → it reaches the chief inbox → the chief asks in the thread → the human
-   answers with a thread message → the fake chief relays it with `human_message_id` → the stage
-   unblocks; the board shows question and answer.
-3. The human says "use Postgres" → the chief posts a binding decision to `*` → after an
-   acknowledgement, the next builder, reviewer and tester prompts all contain it; a builder-token
-   `binding` post is `403`.
-4. A finished builder run's episode is in the next builder prompt on the same feature and not in
-   the reviewer's.
+1. Open: `POST /chief/open` with engine `claude`, preset `operator` and a prompt that starts with
+   front matter → 201 with `tier: "operator"`; the recorded `TERMINAL_SPAWN` has
+   `interactive: true` and `submit: false`, its `prompt` is the text without front matter and
+   contains no token, and its `run_token` resolves to role `chief` with the session's run id.
+2. Operator acts through the API: with that token, `POST /comms/post` creates a `goal` on the
+   project board, and `POST /runs` starts a single run; the fake host sees a second
+   `TERMINAL_SPAWN` whose token resolves to the worker's role (not `chief`), proving the run went
+   through `_run_stage_via_terminal`. Resolve it in the host thread before marking the run
+   finished: the spawn revokes its token when it settles.
+3. Status is read-only: close the operator, open with preset `status`; `GET /comms?feature=<f>`
+   is 200 and `POST /comms/post` is 403.
+4. Cited answers: with a `RunnerState` waiting in `_await_agent_question`, an uncited chief answer
+   is 403 and the question stays pending; a human message posted through the hook route after the
+   question is cited and the answer is delivered.
+5. Binding directive: an operator chief posts a `*` directive, `/comms/acknowledge` marks it, and
+   `fsm_compose.build_prompt` for the `team/build`, `team/review` and `team/test` agents of a
+   feature in the project carries its text.
+6. Token stays off the open streams: queues registered on `/events/runner` (the chief's topic and a
+   worker's) and on `/events/runs` receive the spawns without `run_token`; the `/events/spawn`
+   queue receives it.
 
-Then update the living docs in the same commit: root `CLAUDE.md` (the chief in "Primary goal" and
-the blueprint map), `src/pathly_orchestrator/CLAUDE.md` (chief domain, inbox, binding directives,
-episodic tier, scheduled promotion), `src/pathly_data/CLAUDE.md` (chief role and fragments), and a
-`CHANGELOG.md` entry.
+Then the release notes: a CHANGELOG "Unreleased" entry whose heading ends in `(chief-agent)`, in
+the style of the role-read-policy entry: what exists, what is refused, the three holes closed,
+and the gaps that wait for round two and RRP-2b. Check every living doc touched by tickets 01 to
+12 against the code once more (verify-then-fix, do not rewrite).
+Regenerate the test indexes and run the full suite.
 
 ## Not in this ticket
 
-- Turning `chief.enabled` on by default.
+- Studio, the `pathly` CLI, the overview and inbox calls, the badge and the re-queue: round two.
 
 ## Done when
 
-- `python -m pytest tests/comms_board/test_chief_acceptance.py -q` passes.
-- `python -m pytest tests/ -q -p no:cacheprovider` passes in full; both Studio typechecks exit 0;
-  `python scripts/gen_test_index.py --check` exits 0.
+- `python -m pytest tests/comms_board/test_chief_acceptance.py -q -p no:cacheprovider` passes.
+- `python -m pytest tests/ -q -p no:cacheprovider` passes in full.
+- `python scripts/gen_test_index.py --check` exits 0.
+- `CHANGELOG.md` has a `### ... (chief-agent)` entry under "Unreleased".
 
 ```check
 $ python -m pytest tests/comms_board/test_chief_acceptance.py -q -p no:cacheprovider
@@ -41,17 +56,17 @@ prints passed
 $ python -m pytest tests/ -q -p no:cacheprovider
 exit 0
 prints passed
-$ studio/node_modules/.bin/tsc --noEmit -p studio/tsconfig.web.json
-exit 0
-$ studio/node_modules/.bin/tsc --noEmit -p studio/tsconfig.node.json
-exit 0
 $ python scripts/gen_test_index.py --check
 exit 0
+$ grep -n "(chief-agent)" CHANGELOG.md
+exit 0
+prints (chief-agent)
 ```
 
 ## Reference
 
-- map.md "The bar"; SPEC.md; USER_STORIES.md
-- Answers of tickets 01–12; root `CLAUDE.md` "Documentation sync"
+- map.md (the bar), spec.md § Goal and the bar, § Happy path
+- `tests/comms_board/test_rrp_acceptance.py` (fake host, `client` fixture, token helpers)
+- `tests/conftest.py` (fresh temporary DB per test; `get_db()` is per thread)
 
 ## Answer
