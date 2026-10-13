@@ -14,8 +14,12 @@ from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from pathly_orchestrator.config import fsm_port
+
 DEFAULT_HOST = "127.0.0.1"
-DEFAULT_PORT = 8765
+# The supervisor's own /next_action + /complete_stage calls go through here, so this must
+# follow PATHLY_FSM_HTTP_PORT — a literal 8765 sends a run on another port to whatever owns 8765.
+DEFAULT_PORT = fsm_port()
 
 _SERVER_MODULE = "pathly_orchestrator.http_server"
 _HEALTH_PATH = "/health"
@@ -154,6 +158,8 @@ def _start_server(*, host: str = DEFAULT_HOST, port: int = DEFAULT_PORT) -> None
             )
         else:
             kwargs["start_new_session"] = True
+        # The server picks its port from the env, so an explicit --port must reach it.
+        kwargs["env"] = {**os.environ, "PATHLY_FSM_HTTP_PORT": str(port)}
 
         proc = subprocess.Popen(
             [sys.executable, "-m", _SERVER_MODULE],

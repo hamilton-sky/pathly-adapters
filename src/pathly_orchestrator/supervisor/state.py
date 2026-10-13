@@ -7,6 +7,8 @@ import threading
 from dataclasses import dataclass, field
 from typing import Any, Callable, Optional
 
+from pathly_orchestrator.config import fsm_port as _configured_fsm_port
+
 logger = logging.getLogger("pathly.supervisor")
 
 VALID_STATUSES = frozenset(
@@ -102,7 +104,7 @@ class RunnerState:
     # Runtime-config seam (§5, DAG scheduler) — populated by start_run; carried
     # into TaskWorkspace.env so workers inherit the shared DB path and FSM port.
     db_path: str = ""  # resolved DB file path; "" means use get_db() default
-    fsm_port: int = 8765  # FSM HTTP port (mirrors PATHLY_FSM_HTTP_PORT default)
+    fsm_port: int = field(default_factory=_configured_fsm_port)  # PATHLY_FSM_HTTP_PORT
 
     # Set when this run is a goal decompose/executor — the terminal planner stage is
     # told to seed THIS existing goal's DAG instead of finding-or-creating its own.

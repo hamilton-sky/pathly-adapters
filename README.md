@@ -198,7 +198,7 @@ the same thing.
 
 ## FSM HTTP Server
 
-Pathly skills communicate with the Python FSM engine over HTTP. The server runs locally on port 8765 and is auto-started by the `fsm-call` skill when needed - no manual setup required.
+Pathly skills communicate with the Python FSM engine over HTTP. The server runs locally on port 8765 and is auto-started by the `fsm-call` skill when needed - no manual setup required. To run it beside something else on 8765, set `PATHLY_FSM_HTTP_PORT` before launching Studio (or `pathly-fsm-http`); Studio, the supervisor and the headless agents it spawns all follow it.
 
 ```
 POST http://127.0.0.1:8765/next_action            ← get current state + agent instructions

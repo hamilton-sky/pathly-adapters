@@ -8,7 +8,7 @@ import { useAutomationStore } from '../../store/automationStore'
 import { useTerminalStore } from '../../store/terminalStore'
 import type { TerminalTab } from '../../types/terminal'
 import { useStore } from '../../store'
-import { apiFetch } from '../../lib/config'
+import { apiFetch, PATHLY_API_BASE } from '../../lib/config'
 import { useUiStore } from '../../store/uiStore'
 import { writeToTerminal } from '../../lib/launchTerminal'
 import { buildPathlyContext, invalidatePathlyContext, subscribeToMenuUpdates, type PushedMenu } from '../../lib/pathlyContext'
@@ -227,7 +227,7 @@ export function useHQ() {
 
     function connect(): void {
       try {
-        const url = `http://127.0.0.1:8765/events/runner?topic=${encodeURIComponent(activeTopic ?? '')}`
+        const url = `${PATHLY_API_BASE}/events/runner?topic=${encodeURIComponent(activeTopic ?? '')}`
         es = new EventSource(url)
         es.onopen = () => { retryCountRef.current = 0; setRunnerState({ errorMessage: null }) }  // reset backoff + clear error banner on reconnect
         es.onmessage = (e: MessageEvent) => {

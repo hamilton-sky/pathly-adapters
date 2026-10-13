@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from pathly_orchestrator import eventlog as _eventlog
+from pathly_orchestrator.config import localize_fsm_urls
 
 from .state import RunnerState, logger
 from .registry import (
@@ -89,7 +90,7 @@ def _run_stage_via_terminal(
     # the invocation projection folds real cost/tokens onto the right AGENT_DONE exactly — instead
     # of the fragile (agent, conversation) match that orphaned billing into empty "agent" rows.
     if instructions:
-        instructions = instructions.replace("<run_id>", run_id or "")
+        instructions = localize_fsm_urls(instructions.replace("<run_id>", run_id or ""))
     # run-identity: one identity row per spawn (FSM stages, loop tasks, board runs all
     # pass through here with their own run_id); settled done/error in the finally below.
     _spawn_identity = _record_spawn_identity(state, run_id, adapter)

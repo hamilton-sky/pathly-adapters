@@ -1,4 +1,7 @@
-export const PATHLY_API_BASE = 'http://127.0.0.1:8765'
+// From the preload (PATHLY_FSM_HTTP_PORT), so Studio can run against a server on a port other
+// than 8765. Falls back to the default where there is no preload (vitest, a plain browser).
+export const PATHLY_API_BASE: string =
+  (typeof window !== 'undefined' && window.pathly?.shell?.apiBase) || 'http://127.0.0.1:8765'
 
 let _cachedSecret: string | null = null
 

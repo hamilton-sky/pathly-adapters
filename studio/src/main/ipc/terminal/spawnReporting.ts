@@ -7,7 +7,7 @@
 // Split out because this is reporting, not lifecycle: it runs once, at the end, and nothing in
 // the spawn path depends on its outcome (both POSTs are best-effort with a single retry).
 
-import { getApiSecret } from '@main/apiConfig'
+import { getApiBase, getApiSecret } from '@main/apiConfig'
 import * as path from 'path'
 import { parseClaudeJsonResult } from '../claudeJson'
 import { parseCodexResult } from '../codexJson'
@@ -65,7 +65,7 @@ export function reportRunFinished(opts: {
       user_initiated: userInitiated,
       adapter: runnerAdapter,
     })
-    const doPost = () => fetch('http://127.0.0.1:8765/runner/terminal/result', {
+    const doPost = () => fetch(`${getApiBase()}/runner/terminal/result`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Pathly-Secret': getApiSecret() },
       body: postBody,
@@ -105,7 +105,7 @@ export function reportRunFinished(opts: {
         summary: (oneShotParsed?.result ?? codex?.result ?? '').slice(0, 2000),
         wall_seconds: wallSeconds,
       })
-      const postInv = () => fetch('http://127.0.0.1:8765/db/invocation', {
+      const postInv = () => fetch(`${getApiBase()}/db/invocation`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Pathly-Secret': getApiSecret() },
         body: invBody,

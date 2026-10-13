@@ -5,7 +5,7 @@ import { useTerminalStore } from '../store/terminalStore'
 import { useToastStore } from '../store/toastStore'
 import { attachProgress } from './shared/RunPill/progress'
 import type { TerminalTab } from '../types/terminal'
-import { apiFetch } from '../lib/config'
+import { apiFetch, PATHLY_API_BASE } from '../lib/config'
 import * as xtermRegistry from './Terminal/xtermRegistry'
 
 /**
@@ -110,7 +110,7 @@ export function TerminalSpawnListener(): null {
 
     const connect = (): void => {
       try {
-        es = new EventSource('http://127.0.0.1:8765/events/spawn')
+        es = new EventSource(`${PATHLY_API_BASE}/events/spawn`)
         es.onopen = () => { retry = 0 }
         es.onmessage = (e: MessageEvent) => {
           try {

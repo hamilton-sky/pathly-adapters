@@ -7,6 +7,8 @@ import logging
 import signal
 import sys
 
+from pathly_orchestrator.config import fsm_port
+
 from .host import DEFAULT_MAX_CONCURRENT, SpawnHost
 
 
@@ -21,7 +23,12 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         ),
     )
     parser.add_argument("--host", default="127.0.0.1", help="FSM server host")
-    parser.add_argument("--port", type=int, default=8765, help="FSM server port")
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=fsm_port(),
+        help="FSM server port (default: $PATHLY_FSM_HTTP_PORT, else 8765)",
+    )
     parser.add_argument(
         "--max-concurrent",
         type=int,

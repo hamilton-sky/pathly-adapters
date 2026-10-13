@@ -203,6 +203,8 @@ declare global {
         openSlide: (filePath: string) => Promise<void>
         dsPort: () => Promise<number>
         apiConfig: () => Promise<{ base: string; secret: string }>
+        /** FSM server base URL (PATHLY_FSM_HTTP_PORT, else 8765), available synchronously. */
+        apiBase: string
       }
       fsm: {
         ping: () => Promise<boolean>

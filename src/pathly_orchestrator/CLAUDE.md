@@ -2,6 +2,17 @@
 
 Python package that implements the Pathly finite-state machine. Runs as both an MCP server (registered in `.claude/settings.json` as `pathly-fsm`) and an HTTP server on port **8765**.
 
+**Another port: `PATHLY_FSM_HTTP_PORT`.** The server binds to it (`config.Settings.from_env`), and
+the callers follow it through `config.fsm_port()` (the lenient read: unset or invalid means 8765):
+`fsm_http_client.DEFAULT_PORT` (the supervisor's own `/next_action` + `/complete_stage` calls and
+`pathly-fsm-call`), `RunnerState.fsm_port` (exported to workers by `isolation.py`) and
+`pathly-pty-host --port`. Skills and fragments keep their literal `http://127.0.0.1:8765` URLs;
+`config.localize_fsm_urls` rewrites them to the configured port where a prompt is handed to a CLI
+(`_run_stage_via_terminal`, next to the `<run_id>` substitution, and `adapters.resolve_command`
+for `pathly-run`). On the default port it is a no-op, so default prompts and the golden snapshots
+are byte-identical. Interactive `/pathly` skills installed under `~/.claude/skills` are not
+rewritten and still call 8765.
+
 ## Architecture at a glance — control and data flow
 
 Five views of the SAME system, verified against the code rather than reconstructed from the
