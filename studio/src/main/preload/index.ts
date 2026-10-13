@@ -193,6 +193,8 @@ contextBridge.exposeInMainWorld('pathly', {
     openSlide: (filePath: string): Promise<void> => ipcRenderer.invoke('shell:openSlide', filePath),
     dsPort: (): Promise<number> => ipcRenderer.invoke('shell:dsPort'),
     apiConfig: (): Promise<{ base: string; secret: string }> => ipcRenderer.invoke('shell:apiConfig'),
+    // Sync, unlike apiConfig: the renderer builds EventSource URLs from it at module load.
+    apiBase: `http://127.0.0.1:${process.env['PATHLY_FSM_HTTP_PORT'] || '8765'}`,
   },
   fsm: {
     ping: (): Promise<boolean> => ipcRenderer.invoke('fsm:ping'),

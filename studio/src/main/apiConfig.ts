@@ -4,7 +4,12 @@ import * as os from 'os'
 import * as crypto from 'crypto'
 
 let _apiSecret = ''
-let _apiBase = 'http://127.0.0.1:8765'
+
+/** The FSM server base URL: PATHLY_FSM_HTTP_PORT (the port the server is spawned on), else 8765. */
+function _baseFromEnv(): string {
+  return `http://127.0.0.1:${process.env['PATHLY_FSM_HTTP_PORT'] || '8765'}`
+}
+let _apiBase = _baseFromEnv()
 
 function _loadOrCreateSecret(): string {
   const secretFile = path.join(os.homedir(), '.pathly', 'server_secret.txt')
@@ -20,8 +25,7 @@ function _loadOrCreateSecret(): string {
 }
 
 export function initApiConfig(): void {
-  const port = process.env['PATHLY_FSM_HTTP_PORT'] ?? '8765'
-  _apiBase = `http://127.0.0.1:${port}`
+  _apiBase = _baseFromEnv()
   // Use || (not ??) so an empty-string env var falls back to the persisted file.
   _apiSecret = process.env['PATHLY_API_SECRET'] || _loadOrCreateSecret()
   // Mirror into process.env so the spawned FSM server AND any duplicated bundle
@@ -36,7 +40,9 @@ export function initApiConfig(): void {
 export function getApiSecret(): string {
   return process.env['PATHLY_API_SECRET'] || _apiSecret
 }
-export function getApiBase(): string { return _apiBase }
+// Same reasoning as getApiSecret: derive from process.env so a duplicated, never-initialized
+// bundle copy still reaches the configured port instead of a stale 8765.
+export function getApiBase(): string { return _baseFromEnv() || _apiBase }
 
 function apiHeaders(): Record<string, string> {
   return {

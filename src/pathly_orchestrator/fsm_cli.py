@@ -31,7 +31,10 @@ def _add_common_net_args(parser: argparse.ArgumentParser) -> None:
         "--host", default=DEFAULT_HOST, help="FSM host (default: 127.0.0.1)"
     )
     parser.add_argument(
-        "--port", type=int, default=DEFAULT_PORT, help="FSM port (default: 8765)"
+        "--port",
+        type=int,
+        default=DEFAULT_PORT,
+        help="FSM port (default: $PATHLY_FSM_HTTP_PORT, else 8765)",
     )
 
 

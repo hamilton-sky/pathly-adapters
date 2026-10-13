@@ -78,6 +78,15 @@ On every app launch, `index.ts` ensures a clean FSM server:
 
 This guarantees the new server always starts, even against old server versions that predate the `/shutdown` endpoint.
 
+**Another port: `PATHLY_FSM_HTTP_PORT`.** Steps 1–3 kill **whatever** holds the port, Pathly or
+not. To run Studio beside another server on 8765, launch it with `PATHLY_FSM_HTTP_PORT=<port>`.
+Every Studio call follows it: main reads it through `apiConfig.getApiBase()` (including the
+`/runner/terminal/result` and `/db/invocation` posts in `ipc/terminal/spawnReporting.ts`), the
+renderer's `PATHLY_API_BASE` (`lib/config.ts`) comes from the preload's synchronous
+`shell.apiBase`, the spawned server inherits it, and each agent PTY inherits it through
+`buildSpawnEnv`'s `...process.env`. Use `PATHLY_API_BASE`/`apiFetch` for any new renderer call,
+never a literal `127.0.0.1:8765`.
+
 ## Topbar and sidebar (redesigned)
 
 **Topbar** (`src/renderer/src/components/topbar/`):

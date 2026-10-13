@@ -11,6 +11,39 @@ from dataclasses import dataclass
 # the server beyond the current user's machine.
 _LOOPBACK_HOSTS: frozenset[str] = frozenset({"127.0.0.1", "::1", "localhost"})
 
+DEFAULT_FSM_PORT = 8765
+# The literal base URL the packaged skills and fragments write into their curl calls.
+_DEFAULT_FSM_BASE = f"http://127.0.0.1:{DEFAULT_FSM_PORT}"
+
+
+def fsm_port() -> int:
+    """The FSM server port from ``PATHLY_FSM_HTTP_PORT``; 8765 when unset or invalid.
+
+    The lenient twin of ``Settings.from_env``'s check: the server refuses to start on a bad
+    value, but a client or a spawned agent that only needs to REACH the server falls back
+    to the default instead of exiting.
+    """
+    raw = os.environ.get("PATHLY_FSM_HTTP_PORT", "").strip()
+    try:
+        port = int(raw)
+    except ValueError:
+        return DEFAULT_FSM_PORT
+    return port if 1 <= port <= 65535 else DEFAULT_FSM_PORT
+
+
+def localize_fsm_urls(text: str) -> str:
+    """Point the skills' literal ``http://127.0.0.1:8765`` at the configured port.
+
+    Skills and fragments are written against the default port, so a server started on
+    another ``PATHLY_FSM_HTTP_PORT`` (to sit beside something else on 8765) would send its
+    agents' board posts and AGENT_DONE events to whatever owns 8765. Applied where a prompt
+    is handed to a CLI; a no-op on the default port, so default prompts stay byte-identical.
+    """
+    port = fsm_port()
+    if not text or port == DEFAULT_FSM_PORT:
+        return text
+    return text.replace(_DEFAULT_FSM_BASE, f"http://127.0.0.1:{port}")
+
 
 def _load_or_create_secret() -> str:
     """Read the shared API secret from ~/.pathly/server_secret.txt, creating it if absent."""
