@@ -11,15 +11,21 @@ pieces.
 
 Add `src/pathly_orchestrator/runner/chief_argv.py` (pure, no I/O):
 
-- `chief_argv(engine, model, settings_path) -> list[str]`: claude → `["claude"]`, then
-  `["--model", model]` only when a model is given, then `["--settings", settings_path]`; codex →
+- `chief_argv(engine, model, settings_path, mcp_path) -> list[str]`: claude → `["claude"]`, then
+  `["--model", model]` only when a model is given, then `["--settings", settings_path,
+  "--mcp-config", mcp_path, "--strict-mcp-config"]`, where `mcp_path` holds
+  `{"mcpServers": {}}`, so the chief gets none of the user's or project's MCP servers (Serena's
+  edit tools, the `pathly-fsm` MCP); codex →
   `["codex", "--sandbox", "read-only", "--ask-for-approval", "on-request"]` plus the optional
   model pair (read-only: codex cannot edit files and asks before every command). Never a
   permission-bypass flag, never the prompt, never the token. Any other engine raises
   `ValueError`.
 - `claude_settings(hook_command) -> dict`: `permissions.allow = ["Bash(pathly *)"]`,
   `permissions.deny = ["Edit", "Write", "NotebookEdit", "Agent", "CronCreate", "Workflow",
-  "Read(~/.pathly/**)"]`, and one `UserPromptSubmit` command hook running `hook_command`.
+  "Read(~/.pathly/**)", "Bash(curl *)", "Bash(wget *)"]`, and one `UserPromptSubmit` command hook
+  running `hook_command`. Permission rules from every settings scope merge and deny wins, so the
+  two Bash denies hold even when the user's own settings allow curl: the chief cannot call the
+  API without its token through the common HTTP tools (other commands still ask the human).
 
 Add `src/pathly_orchestrator/supervisor/chief_session.py`:
 
@@ -35,7 +41,8 @@ Add `src/pathly_orchestrator/supervisor/chief_session.py`:
   point it elsewhere) holding `hook_secret` (a `secrets.token_urlsafe(32)`) and, for claude,
   `settings.json` from `claude_settings`, both written mode 0600, with the hook command
   `<sys.executable> -m pathly_hooks.chief_prompt --run-id <run_id> --secret-file <path> --port
-  <port>` (port from `config.Settings.from_env().port`, paths quoted for the shell); a
+  <port>` (port from `config.Settings.from_env().port`, paths quoted for the shell),
+  and for claude `mcp.json` holding `{"mcpServers": {}}`; a
   `chief_sessions` row with the secret's sha256; `create_run(run_id)`; then
   `broadcast_fn(topic, payload)` with the `TERMINAL_SPAWN` payload in spec.md § Interfaces
   (`topic = "chief:" + run_id`, `prompt` = `chief_tiers.strip_front_matter(prompt)`,
@@ -64,8 +71,10 @@ modes only when `os.name == "posix"`, inside the test, not with a skip marker.
   and covers: with a fake broadcaster, `open_chief` emits one `TERMINAL_SPAWN` with
   `interactive` true, `submit` false, the front matter stripped from `prompt`, and a `run_token`
   that `resolve_run_token` maps to role `chief`, board `project` and the session's run id; the
-  token appears in neither `prompt` nor `argv`; claude argv has `--settings` and no
-  `--dangerously-skip-permissions`; codex argv has `--sandbox read-only`; the settings file holds
+  token appears in neither `prompt` nor `argv`; claude argv has `--settings`,
+  `--strict-mcp-config` and an `--mcp-config` file with no servers, and no
+  `--dangerously-skip-permissions`; the settings allow list is exactly `["Bash(pathly *)"]` and
+  the deny list has `Bash(curl *)` and `Bash(wget *)`; codex argv has `--sandbox read-only`; the settings file holds
   the hook command with the run id and the deny list; a second open raises `ChiefAlreadyOpen`;
   `copilot` raises `ValueError`; after `mark_started()` and `mark_pty_result(...)` the token is
   revoked, the folder is gone and `get_run(run_id)` is None; with `start_timeout` near zero and no start, the session closes with
@@ -92,6 +101,8 @@ exit 0
   which is why the chief has its own builder)
 - `tests/comms_board/test_rrp_acceptance.py` (fake broadcaster that marks the run started and
   finished)
-- map.md § Decisions so far (docs: cli-reference, permissions, tools-reference)
+- map.md § Decisions so far (docs: cli-reference, permissions, tools-reference). Check
+  `--mcp-config` and `--strict-mcp-config` against `claude --help` on the installed claude before
+  writing the argv, and note what you find in `learnings.md`
 
 ## Answer

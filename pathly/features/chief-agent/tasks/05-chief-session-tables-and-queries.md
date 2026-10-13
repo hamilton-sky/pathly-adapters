@@ -17,7 +17,8 @@ of `migrations_incremental._add_additive_migrations`, next to `add_run_tokens(co
 - `chief_human_messages(id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT NOT NULL, project_root
   TEXT, kind TEXT NOT NULL, text TEXT NOT NULL, ts REAL NOT NULL)`, indexed on `run_id`.
 - `chief_citations(id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT NOT NULL, message_id
-  INTEGER NOT NULL, route TEXT NOT NULL, target TEXT, ts REAL NOT NULL)`.
+  INTEGER NOT NULL UNIQUE, route TEXT NOT NULL, target TEXT, ts REAL NOT NULL)`. `UNIQUE` makes
+  each human message citable once (ticket 10).
 
 Add `src/pathly_orchestrator/db/queries/chief.py`, every function taking `conn` first and writing
 under `_get_write_lock`:
@@ -33,7 +34,8 @@ under `_get_write_lock`:
 - `add_human_message(conn, run_id, project_root, text) -> dict`: the first message of a session is
   stored with `kind="style_prompt"`, every later one `kind="human"`; returns `{id, kind, ts}`.
 - `get_human_message(conn, message_id) -> dict | None`.
-- `record_citation(conn, run_id, message_id, route, target)`.
+- `record_citation(conn, run_id, message_id, route, target) -> bool`: False, and nothing written,
+  when the message was already cited (catch the `sqlite3.IntegrityError`).
 
 Add `run_tokens.lookup_run_token(conn, token) -> dict | None`: the row for a token's hash whether
 or not it is revoked (`resolve_run_token` keeps returning live rows only). The gate uses it to tell
@@ -53,7 +55,8 @@ Static SQL only (no f-strings, no `+`); `bandit` runs in Lint.
   `close_session` sets `closed_at`, revokes the minted token (`resolve_run_token` returns None)
   and returns False the second time; `close_stale_sessions` closes two open sessions and leaves a
   closed one alone; the first human message of a session is `style_prompt` and the second
-  `human`; `lookup_run_token` returns a revoked row with `revoked_at` set and None for an unknown
+  `human`; `record_citation` returns True once and False for a second citation of the same
+  message; `lookup_run_token` returns a revoked row with `revoked_at` set and None for an unknown
   token.
 - `bandit -q -r src/pathly_orchestrator/db -ll` exits 0.
 

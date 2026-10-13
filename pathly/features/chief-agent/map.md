@@ -9,11 +9,14 @@ interactive `TERMINAL_SPAWN` that asks the host to paste the prompt without send
 the tab or restarting the server revokes the token. A `before_request` chief gate refuses every
 call the session's tier does not allow, every unlisted write, any other project, and any revoked
 chief token. Human messages typed in a claude chief tab are recorded, and a chief-token answer to
-an agent must cite one. Binding directives keep reaching the prompts of the roles they target
-after an acknowledgement, and only a chief token may post one until the UI token exists. The three
-run-token holes are closed. The rest of the brief is outlined below as round two: the `pathly`
-command set, the overview and inbox calls, the built-in preset texts, Studio pasting without
-Enter, the Chief button replacing HQ, the inbox badge, the stale-directive re-queue and billing the
+an agent must cite one and relay it word for word, once. Binding directives keep reaching the
+prompts of the roles they target after an acknowledgement, in their own standing-orders block, and
+only a chief token may post or retire one until the UI token exists. A chief stays inside its
+project even on id-addressed calls and inside a per-session cost and run ceiling. The three
+run-token holes are closed. A `pathly api` command and three built-in style texts make the chief
+usable from a tab opened with `POST /chief/open`. The rest of the brief is outlined below as round
+two: the friendly `pathly` commands, the overview and inbox calls, Studio pasting without Enter,
+the Chief button replacing HQ, the inbox badge, the stale-directive re-queue and billing the
 chief's own session. The split follows the user's decision for rounds; § Brief coverage
 maps every In-scope line of the brief to where it is built.
 
@@ -22,8 +25,10 @@ passes with a fake spawn host: opening the chief mints a `chief` token for the c
 spawns an interactive tab with the style's prompt pasted and not sent; with the Operator style the
 chief's API calls create a goal and start a run that Pathly spawns through its normal spawn path;
 a Status-style token is refused on a write; an agent question is pending until it is answered with
-a cited human message, and an uncited one is refused; a binding decision reaches the next builder,
-reviewer and tester prompts after an acknowledgement; the raw run token no longer appears on
+a cited human message relayed word for word, and an uncited or reworded one is refused; a binding
+decision reaches the next builder, reviewer and tester prompts after an acknowledgement and no
+caller but the chief retires it; a run above the ceiling and a call on another project's run are
+refused; `pathly api` works from the chief's tab; the raw run token no longer appears on
 `/events/runner` or `/events/runs`. And `python -m pytest tests/ -q -p no:cacheprovider` passes in
 full. Ticket 13 runs both.
 
@@ -50,6 +55,21 @@ full. Ticket 13 runs both.
   json_each(?))`), never `# nosec`. The full suite runs on Python 3.11, 3.12 and 3.13.
 
 ## Decisions so far
+
+- Plan revised 2026-10-13 after an independent review of the merged plan
+  (`/mnt/project-files/chief-agent/independent-review-2026-10-13.md` in the project's shared
+  folder; the external assessment in this folder is a separate, earlier record). #63 (`b141dde`:
+  supersession, the human escalation gate, tier-then-recency governance) landed after the plan,
+  so: tickets 03, 11 and 12 re-measured (`messages_crud.py` 395 lines, `messages_write.py` 400,
+  `comms_context.py` 370) and 11 renders directives through `render_governance_lines` in their own
+  block; 08 classes a human-escalation acknowledgement as `answer` and refuses delete, hydrate,
+  task status and `force_past_gate`; 10 requires the cited words verbatim, single-use citations,
+  and a cite to close a human escalation; 06 adds `--strict-mcp-config` and curl/wget denies; new
+  tickets 14 (project binding by id), 15 (cost and run ceiling), 16 (only the chief retires a
+  directive; hydration cannot forge one) and 17 (`pathly api` and built-in texts). Round two
+  item 1 now builds on `pathly api`, and item 4 only adds paste-without-Enter, because Studio
+  already exports `PATHLY_RUN_TOKEN` for runner tabs
+  (`studio/src/renderer/src/components/TerminalSpawnListener.tsx`, `main/ipc/terminal/spawnEnv.ts`).
 
 - Plan — styles are three editable presets (Status, Planner, Operator) chosen in the existing
   shared picker (`PromptActionConfig` with `CliSelect`, `useMergedPresets`, library category
@@ -139,15 +159,17 @@ full. Ticket 13 runs both.
 Settled by the user on 2026-10-13 (the brief's Decided lines). Each line keeps the rejected option
 and what would change under it.
 
-- **Rounds.** A) This plan is round one: the 13 tickets here build the server core and prove the
+- **Rounds.** A) This plan is round one: the tickets here build the server core and prove the
   brief's bar. Round two (§ Round two) is planned as `pathly/features/chief-agent-round-two/` once
   round one is built, with its own map linking back, because its tickets build on round-one code
   that does not exist yet (the chief gate, the session tables, `_agent_question`, the `binding`
   column). Until then the user opens a chief with `POST /chief/open`, with no Chief button,
   `pathly` CLI, overview, inbox badge or re-queue. B) Plan round two now, in this folder, as
-  tickets 14 to 22, written against round-one interfaces that so far exist only on paper.
+  tickets numbered after round one's, written against round-one interfaces that so far exist
+  only on paper.
   Decided: A (also planning guide rule 11: past about 12 tickets, plan in rounds). Round one's
-  tickets are the same under both.
+  tickets are the same under both. (Round one grew to 17 tickets in the 2026-10-13 revision; the
+  four new ones close gaps in round one's own promises.)
 - **Directives from the UI.** A) Only a live chief token whose tier has `decide` may post a
   binding directive until the UI token (RRP-2b) exists. B) Also accept a caller that sends no run
   token and the matching `X-Pathly-Secret` (what Studio sends today), posted as `human` with
@@ -173,7 +195,11 @@ Not known yet (later tickets or round two settle them):
 
 - Codex human-message capture: codex has a UserPromptSubmit hook, but only through user or
   project config files with trust review. Until round two decides, a codex chief can open, read
-  and act, but every relayed answer is refused.
+  and act, but every relayed answer and every human-escalation acknowledgement is refused, and it
+  has no permission file like claude's (only its read-only sandbox). The launcher must say so when
+  it offers codex.
+- Whether `--strict-mcp-config` with an empty `--mcp-config` behaves as the docs suggest on the
+  installed claude: ticket 06 checks it and records the result in `learnings.md`.
 - A codex chief runs with `--sandbox read-only`, so each `pathly` command asks for approval; the
   docs do not say whether an approved command can reach `127.0.0.1`. Round two's CLI ticket checks
   it on a real codex before the launcher offers codex.
@@ -183,8 +209,10 @@ Not known yet (later tickets or round two settle them):
   recorded as human. Round two should check whether the hook input marks the source or whether
   cross-session messaging can be turned off for the chief session.
 - The UI token (RRP-2b) is still missing: a chief that drops its token is unrestricted on
-  loopback, `/events/spawn` still carries every spawn's token, and Studio cannot post a binding
-  directive until it lands.
+  loopback, `/events/spawn` still carries every spawn's token and needs no secret, and Studio
+  cannot post or retire a binding directive until it lands.
+- Still outside this plan from role-read-policy: agent curls to `/code/query` and
+  `/record_phase` send no token, and `provenance.stamp()` stores the role as given.
 - The stale-directive re-queue (round two) matches directives to roles by `_spawn_role`, which
   returns `build` for quick-fix/debug FIXING spawns while directives say `builder`
   (role-read-policy ticket 10 open item).
@@ -200,13 +228,13 @@ two numbers its own tickets from 01).
 | Brief, In scope | Round one (tickets) | Round two (items) |
 |---|---|---|
 | Chief button and tab replacing HQ; engine choice; style choice; prompt pasted, not sent | 06 interactive `TERMINAL_SPAWN` with `submit: false`, engines `claude` and `codex`; 07 `POST /chief/open` | R2-4 Studio pastes without Enter; R2-5 Chief button on `PromptActionConfig` replacing HQ, `chat_agent.py` fallback |
-| Chief styles: a preset plus the actions it may use, enforced through the token; Status, Planner, Operator | 04 tiers and preset-to-tier; 06 tier bound to the session; 08 the gate | R2-3 built-in preset texts; R2-5 `chief` Library category, saving `tier:` |
-| The chief's identity: `chief` token for the style, `PATHLY_RUN_TOKEN` only, revoked on close | 05 tables; 06 mint and close; 07 routes and restart cleanup | R2-4 Studio exports `PATHLY_RUN_TOKEN` in the chief tab |
-| Read side: `pathly` command set, one overview call through the role-read-policy for `chief` | 08 the chief may read every GET except `/events/*` and `/db/settings` | R2-1 `pathly`; R2-2 `GET /chief/overview` |
-| Write side: only existing routes, refused outside the style's list, never opens agent CLIs | 06 no spawn tools in the chief's settings; 08 deny by default; 13 scenario 2 | R2-1 the write commands |
+| Chief styles: a preset plus the actions it may use, enforced through the token; Status, Planner, Operator | 04 tiers and preset-to-tier; 06 tier bound to the session; 08 the gate; 17 built-in texts | R2-3 richer preset texts; R2-5 `chief` Library category, saving `tier:` |
+| The chief's identity: `chief` token for the style, `PATHLY_RUN_TOKEN` only, revoked on close | 05 tables; 06 mint and close; 07 routes and restart cleanup | R2-4 a vitest that the chief tab gets `PATHLY_RUN_TOKEN` (Studio already exports it for runner tabs) |
+| Read side: `pathly` command set, one overview call through the role-read-policy for `chief` | 08 the chief may read every GET except `/events/*` and `/db/settings`; 17 `pathly api` | R2-1 friendly `pathly` commands; R2-2 `GET /chief/overview` |
+| Write side: only existing routes, refused outside the style's list, never opens agent CLIs | 06 no spawn tools or MCP servers in the chief's settings; 08 deny by default; 14 project binding by id; 15 ceilings; 13 scenario 2 | R2-1 the write commands |
 | Agent questions and decisions: badge, inbox on open or when asked, no LLM turns while away | 10 the pending question kept on the run state | R2-2 `GET /chief/inbox`; R2-3 presets read the inbox on open; R2-6 badge |
-| Verifiable relayed answers | 09 human messages recorded; 10 the cite rule | none |
-| Standing directives: binding by role, survive acknowledgement, chief token (or the UI), re-queue | 11 injection by role; 12 `POST /comms/directives`, no edits | R2-7 re-queue; the UI path waits for RRP-2b (user's decision, § Open questions) |
+| Verifiable relayed answers | 09 human messages recorded; 10 the cite rule (verbatim, once, human escalations) | none |
+| Standing directives: binding by role, survive acknowledgement, chief token (or the UI), re-queue | 11 injection by role in a standing-orders block; 12 `POST /comms/directives`, no edits; 16 only the chief retires one, hydration cannot forge one | R2-7 re-queue; the UI path waits for RRP-2b (user's decision, § Open questions) |
 | The three run-token holes | 01 SSE; 02 `/db/query`; 03 `/comms/edit` | none |
 | The bar | 13 | R2-9 round-two acceptance |
 
@@ -215,21 +243,23 @@ two numbers its own tickets from 01).
 Planned as `pathly/features/chief-agent-round-two/` with its own map linking back here (the
 user's decision for rounds). Its items, in order:
 
-1. `pathly` command set: `pathly_orchestrator/chief_cli.py` and a `pathly` entry in
-   `[project.scripts]`, stdlib HTTP, sending `X-Pathly-Run-Token` from `PATHLY_RUN_TOKEN` and
-   refusing to run without it. Commands: `overview`, `inbox`, `goals`, `runs`, `board`, `search`,
+1. Friendly `pathly` commands on top of round one's `pathly api` (ticket 17, which already sends
+   the token and refuses to run without it). Commands: `overview`, `inbox`, `goals`, `runs`, `board`, `search`,
    `agents`, `goal create`, `decompose`, `start`, `stop`, `control`, `answer --cite`,
    `decide [--binding --to]`, `post`, `help`.
 2. `GET /chief/inbox` (pending agent questions from `RunnerState._agent_question`, pending
    decisions, open escalations, a count) and `GET /chief/overview` (agents and model policy,
    goals, running agents, features and tasks, inbox), board rows filtered through
    `read_policy.policy_predicate` for role `chief`.
-3. Built-in preset texts for Status, Planner and Operator, written against the `pathly` commands,
-   each telling the chief to read `pathly inbox` when it starts.
+3. Richer preset texts for Status, Planner and Operator (round one's ticket 17 has short ones
+   using `pathly api`), rewritten against the friendly commands, each telling the chief to read
+   `pathly inbox` when it starts.
 4. Studio paste-without-Enter: `TerminalSpawnListener` reads `submit === false` and passes a
    `pasteOnly` spawn meta through preload, `global.d.ts` and `terminal.ts` to
    `promptInjector.attachStartupHandling`, which pastes and sends no `\r`; a vitest with a fake
-   `IPty`, and one that `buildSpawnEnv` exports `PATHLY_RUN_TOKEN` for the interactive chief tab.
+   `IPty`, and one that `buildSpawnEnv` exports `PATHLY_RUN_TOKEN` for the interactive chief tab
+   (it already does for runner tabs; the test pins it). Also decide whether the chief tab counts
+   against the interactive cap of 5.
 5. Chief button and launcher replacing HQ: a `PromptActionConfig` host (pattern:
    `CommentConfigButton`), engines `claude` and `codex`, open / show tab on 409 / close, the tab
    label carrying the tier, "Save current as prompt" adding `tier:` front matter, `'chief'` in the
