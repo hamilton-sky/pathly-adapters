@@ -25,14 +25,17 @@ Add `POST /comms/directives` in a new `blueprints/comms/directives.py` (added to
   `stamp(caller_identity(request))`. Return 201 `{id}` and broadcast the same `COMMS_UPDATE` that
   `comms_post` sends for a new row, through `sse._broadcast_comms`.
 - A directive is replaced with the existing `/comms/supersede`, which the gate maps to `decide`.
+  Ticket 16 makes the chief the only caller that may retire one.
 
 Refuse in-place edits: `/comms/edit` on a row with `binding = 1` returns 409
 `{"error": "binding directives are superseded, not edited"}` and changes nothing.
-`messages_crud.py` is at 382 lines before ticket 03; keep it at or under 400 (put the check in the
-db layer, for example a `"binding"` result from `update_message_text`, if the route would grow
-too much).
+`messages_crud.py` is at 395 lines on master (#63) and ticket 03 keeps it there. Put the check in
+the db layer: `update_message_text` (or `comms_edit.py`, if ticket 03 moved it) returns
+`"binding"` for a binding row, and the route maps it to the 409 in the line it already uses for
+`not_found`, so the file does not grow.
 
 `/comms/post` keeps ignoring a `binding` field in its body; add a test that proves it.
+`messages_write.py` is at exactly 400 lines, so this ticket does not touch it.
 
 Living docs: `src/pathly_orchestrator/CLAUDE.md` lists `POST /comms/directives` under "Comms
 board endpoints" (chief token only) and the edit refusal; the root `CLAUDE.md` comms domain line
@@ -41,6 +44,8 @@ names `directives`.
 ## Not in this ticket
 
 - A path for Studio to post a binding directive: waits for the UI token (RRP-2b), a later plan.
+- Refusing supersede, delete and `supersedes` on binding rows for everyone but the chief, and
+  hydration: ticket 16.
 - The `pathly decide --binding` command: round two (map.md § Round two).
 
 ## Done when

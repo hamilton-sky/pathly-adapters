@@ -19,6 +19,11 @@ token exists. `comms_messages.py` is at 377 lines: if the change would take it p
 `update_message_text` to a new `db/queries/comms_edit.py` and re-export it from `comms_messages.py`
 and `db/queries/comms.py` so existing imports keep working.
 
+`messages_crud.py` is at 395 lines since #63 (`b141dde`), which added the human-gate and
+supersede refusals to it. The route may not grow past 400: move the stamping into a helper (for
+example `_helpers.edit_stamp(request)`, `_helpers.py` is at 261) or move `comms_edit` into its own
+blueprint file, so `comms_edit` itself gains at most one line.
+
 Living docs: the `POST /comms/edit` line under "Comms board endpoints" in
 `src/pathly_orchestrator/CLAUDE.md` says the edit re-stamps the row to the editor.
 

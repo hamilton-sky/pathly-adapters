@@ -6,7 +6,8 @@ Blocked by: 08, 09
 Test first: yes
 
 A pending agent question must only be answered by the chief with something the human typed in the
-same chief session after the question was asked. That timing is the user's decision for
+same chief session after the question was asked, relayed word for word, and each typed message can
+answer one question. That timing is the user's decision for
 cited answers; if the user later switches to "any human message of the session", drop the
 `asked_at` and `ts` comparisons below and keep the rest (spec.md § Decisions, "Where the
 cited-answer rule lives"; map.md § Open questions).
@@ -30,8 +31,29 @@ Add the cite rule to the chief gate for the `answer` action, in its own module (
   which already answers it);
 - for `/comms/answer`: was recorded at or after the `ts` of the `question_id` message.
 
+The cited message must also carry the answer, not just come after the question:
+
+- The body's `answer` must equal the cited message's `text` once both are stripped of surrounding
+  whitespace; otherwise 403 `{"error": "the answer must be the cited human message, verbatim"}`.
+  The chief relays the user's words; any explanation of its own goes on the board as a separate
+  `note`.
+- A chief-token `/comms/answer` that sends `option_id` is 403: the chief cannot pick an option on
+  the user's behalf, so the cited text is the whole answer.
+- A message can be cited once. `record_citation` returns False for a second use, and the gate
+  answers 403 `{"error": "that message was already cited"}`. To answer two questions, the user
+  types twice.
+
+Human escalations (#63): `/comms/acknowledge` on an escalation with `to_agent = "human"` is an
+`answer` call (ticket 08). It needs a `cite` naming a human message of the session recorded at or
+after the escalation's `ts`; the text-equality rule does not apply, because an acknowledgement
+carries no text. On success the gate records the citation and sets
+`flask.g.chief_cited_gate = message_id`, and `blueprints/comms/_helpers.refuse_agent_on_human_gate`
+lets a live chief token through only when that flag names the same id. Every other run token is
+refused as today. `/comms/delete` on a human escalation stays refused for the chief (ticket 08
+does not list it), and the FSM's `force_past_gate` stays a human-only affordance.
+
 On success the gate calls `queries.chief.record_citation(run_id, cite, route, topic or
-question_id)` and lets the route run. Callers without a chief token are unchanged. A codex chief
+question_id or message_id)` and lets the route run. Callers without a chief token are unchanged. A codex chief
 has no recorded human messages, so every answer it relays is refused; the 403 says so when the
 session's engine is not `claude`.
 
@@ -43,6 +65,9 @@ Living docs: the cited-answer rule in the "Chief gate" paragraph of
 - Listing pending questions for the chief (`GET /chief/inbox`): round two, which reads the
   `_agent_question` field added here.
 - Answer rules for non-chief callers: unchanged.
+- Proving the user meant the cited message as the answer to this particular question: the rule
+  binds the words, not the intent. A chief that cites an unrelated later message verbatim is
+  caught only by the user reading the board; the acceptance test documents this limit.
 
 ## Done when
 
@@ -51,9 +76,14 @@ Living docs: the cited-answer rule in the "Chief gate" paragraph of
   thread: while waiting, the state holds the question text and `asked_at`; an operator chief's
   `/runner/agent-answer` without `cite` is 403 and the thread is still waiting; citing the style
   prompt, a message from another session, or a human message recorded before the question is 403;
-  citing a human message recorded after it is 200, the thread returns that answer,
-  `_agent_question` is back to None and one `chief_citations` row exists; the same rules hold for
-  `/comms/answer` against a board `question` row; a request with no token answers as before.
+  citing a human message recorded after it with a different `answer` text is 403; citing it with
+  its own text is 200, the thread returns that answer, `_agent_question` is back to None and one
+  `chief_citations` row exists; citing the same message again for a second question is 403; the
+  same rules hold for `/comms/answer` against a board `question` row, and `option_id` from the
+  chief is 403; an operator chief acknowledges a `to_agent: "human"` escalation with a cite
+  recorded after it (200, the gate's flag lets it past `refuse_agent_on_human_gate`), and gets 403
+  without a cite and with a cite recorded before it; a builder token acknowledging the same
+  escalation is still 403; a request with no token answers as before.
 - `python -m pytest tests/runner_supervisor -q -x -p no:cacheprovider` still passes (about a
   minute).
 
@@ -71,7 +101,10 @@ prints passed
 - spec.md § Decisions ("Where the cited-answer rule lives"), § Edge cases
 - `src/pathly_orchestrator/supervisor/interactions.py`, `supervisor/api.py::supply_agent_answer`
 - `src/pathly_orchestrator/http_server/blueprints/runner/api_control.py::runner_agent_answer`
-  and `blueprints/comms/messages_crud.py::comms_answer` (read-only: the rule lives in the gate)
+  and `blueprints/comms/messages_crud.py::comms_answer`, `comms_acknowledge` (read-only: the rule
+  lives in the gate; `messages_crud.py` is at 395 lines)
+- `src/pathly_orchestrator/http_server/blueprints/comms/_helpers.py::refuse_agent_on_human_gate`
+  and `src/pathly_orchestrator/fsm_human_gate.py` (#63)
 - Do not patch the global `time.sleep` in these tests; `_await_agent_question` polls with it and
   the WAL checkpoint daemon shares it
 

@@ -48,10 +48,12 @@ The other option, planning round two now in this folder, is in `map.md` § Open 
   - with the Operator style, the chief's API calls create a goal and start a run that Pathly
     spawns through its normal spawn path;
   - a Status-style token is refused on a write;
-  - an agent question stays pending until it is answered with a cited human message, and an
-    uncited answer is refused;
+  - an agent question stays pending until it is answered with a cited human message, relayed word
+    for word, and an uncited or reworded answer is refused;
   - a binding decision reaches the next builder, reviewer and tester prompts after an
-    acknowledgement;
+    acknowledgement, and no caller but the chief can retire it;
+  - a run above the chief's cost ceiling and a call on another project's run are refused;
+  - `pathly api` works from the chief's tab with the chief's token;
   - the raw run token no longer appears on `/events/runner` or `/events/runs`.
 - `python -m pytest tests/ -q -p no:cacheprovider` passes in full.
 
@@ -98,7 +100,10 @@ questions without risk.
 
 - [ ] Every prompt the user submits in a claude chief tab is recorded by a hook.
 - [ ] A chief-token answer must cite a recorded human message from the same session, typed after
-      the question was asked; otherwise it is refused and the question stays pending.
+      the question was asked, and must be that message's text; otherwise it is refused and the
+      question stays pending.
+- [ ] Each typed message can be cited once.
+- [ ] The chief can close a human-addressed escalation only by citing a message typed after it.
 
 ### Standing orders
 
@@ -109,6 +114,19 @@ questions without risk.
       acknowledged, until it is superseded or deleted.
 - [ ] Only a chief token whose tier can `decide` may post one until the UI token exists; nothing
       else may. It cannot be edited in place.
+- [ ] Only the chief can supersede it; nobody can delete it; a mirror file cannot plant one.
+- [ ] It renders as a standing order that a newer ordinary decision does not outrank.
+
+### Bounded and usable
+
+**As a** user, **I want** the chief to stay inside my project and my budget, and to work from its
+tab on day one, **so that** I can leave it running without surprises.
+
+- [ ] A chief cannot act on a run or a board row of another project, even by id.
+- [ ] A chief run above `chief.max_cost_usd_per_run`, or past `chief.max_runs_per_session`
+      starts, is refused.
+- [ ] `pathly api` reaches every route with the chief's token and refuses to run without it;
+      the three styles have built-in texts.
 
 ## Scope
 
@@ -120,13 +138,17 @@ In (round one, this plan):
   `/chief/open|close|session`.
 - The chief gate (deny by default, tier-bound, project-bound) and `chief` as a project-board writer.
 - Human-message capture for claude (UserPromptSubmit hook) and the cited-answer rule.
-- Binding directives: the `binding` column, role-aware governance injection,
-  `POST /comms/directives`, edits refused on binding rows.
+- Binding directives: the `binding` column, role-aware governance injection in its own
+  standing-orders block, `POST /comms/directives`, edits refused on binding rows, supersede and
+  delete refused to everyone but the chief, hydration storing `binding = 0`.
+- Project binding for id-addressed calls; a cost and run ceiling per chief session.
+- The `pathly api` command and built-in Status, Planner and Operator texts, so round one can be
+  used from a tab opened with `POST /chief/open`.
 - The acceptance test, living docs and CHANGELOG.
 
 In (round two, per the user's decision for rounds; outlined in `map.md` § Round two): the
-`pathly` command set, `GET /chief/overview` and `GET /chief/inbox`, the built-in preset texts and
-the `chief` Library category, Studio paste-without-Enter, the Chief button on the shared
+friendly `pathly` commands on top of `pathly api`, `GET /chief/overview` and `GET /chief/inbox`,
+richer preset texts and the `chief` Library category, Studio paste-without-Enter, the Chief button on the shared
 `PromptActionConfig` picker replacing HQ (with `chat_agent.py` as the no-engine fallback), the
 inbox badge, the stale-directive re-queue, billing the chief's own session, and round two's
 acceptance and docs.
@@ -151,13 +173,15 @@ Not in scope:
    `interactive: true, submit: false` → Studio opens a "Chief · Operator" tab, exports
    `PATHLY_RUN_TOKEN`, pastes the prompt → the user sees the prompt waiting in the input.
 3. User presses Enter → the hook records the submission (first one = `style_prompt`) → the chief
-   reads `pathly inbox`, `pathly overview`.
+   reads the board and the open runs with `pathly api GET …` (round two adds `pathly inbox` and
+   `pathly overview`).
 4. User: "plan and build the export feature" → the chief posts a goal, decomposes it, starts a run
    (`POST /runs`) → the gate allows each call for `operator` → the server spawns the planner and
    builder tabs through `_run_stage_via_terminal` as usual.
 5. The builder asks a question → it is held pending → the chief reads it from the inbox and asks
    the user → the user types "use CSV" (hook records it as human message 41) → the chief answers
-   with `cite: 41` → the gate checks the citation and records it → the builder continues.
+   with `cite: 41` and the answer "use CSV" → the gate checks the citation, the words and that 41
+   was not cited before, and records it → the builder continues.
 6. User: "from now on, no new dependencies" → the chief posts a binding directive to `*` → every
    later builder, reviewer and tester prompt carries it, even after the decision is acknowledged.
 7. User closes the tab → Studio reports the result → the session closes and the token is revoked.
@@ -192,6 +216,20 @@ Not in scope:
 | `/comms/edit` on a binding row | 409 "supersede, don't edit" | 12 |
 | `/comms/post` body with `binding: 1` | ignored; only `/comms/directives` sets it | 12 |
 | Studio (no run token, server secret) posts to `/comms/directives` | 403 until the UI token exists | 12 |
+| Answer citing a later human message with different words, or `option_id` from the chief | 403, question stays pending | 10 |
+| Same human message cited for a second question | 403 "already cited" | 10 |
+| Chief acknowledges a `to_agent: "human"` escalation | needs a cite typed after it; without one 403 (#63's gate stays closed) | 10 |
+| Chief on `/comms/delete`, `/comms/hydrate`, `/comms/tasks/status`, `force_past_gate` | 403 | 08 |
+| Chief pauses, aborts or answers a run of another project by id | 403 | 14 |
+| Chief acknowledges or supersedes a row of another project by id | 403 | 14 |
+| Chief `POST /runs` above `chief.max_cost_usd_per_run` (default 10) | 403 with the ceiling | 15 |
+| Chief's 21st run start in one session (default limit 20) | 403 with the limit | 15 |
+| Project-board run posts `supersedes` naming a directive | post stored, directive skipped with reason `binding` | 16 |
+| `/comms/supersede` or `/comms/delete` on a directive without a chief token | 403 | 16 |
+| `BOARD.json` row with `binding: 1`, or a row for another board | hydrated with `binding = 0` and `author_source = "legacy"`, or skipped | 16 |
+| Newer ordinary decision on the same topic as a directive | listed below the standing-orders block; the directive still applies | 11 |
+| `pathly api` with `PATHLY_RUN_TOKEN` unset (or filtered by codex) | exit 2 naming the variable, no request | 17 |
+| `POST /chief/open` with a built-in preset and no `prompt` | the built-in text is pasted | 17 |
 | `WITH x AS (...) INSERT ...` on `/db/query` | 400, nothing written | 02 |
 | Studio renames a goal another role posted | stored text changes and the stamp becomes the editor's | 03 |
 
@@ -298,7 +336,7 @@ that closes the session when the result arrives.
   answer ahead of time for the chief to relay later. B drops two timestamp comparisons in ticket 10.
 - **Binding directives** — options: A) a new route `POST /comms/directives` that alone sets
   `binding = 1`; B) a `binding` field on `/comms/post`. Chosen: A. Why: `messages_write.py` sits at
-  390 lines and B would need a second permission check inside it.
+  400 lines since #63 and B would need a second permission check inside it.
 - **Who may post a directive** — options: A) only a live chief token whose tier has `decide`,
   until the UI token (RRP-2b) exists; B) that, or a caller that sends no run token and the matching
   server secret (what Studio sends today). Chosen: A, the user's decision for directives.
@@ -328,17 +366,53 @@ that closes the session when the result arrives.
   from editing files and makes it ask before each command, and the cited-answer rule fails closed
   when no human message exists.
 - **The chief's claude permissions** — options: A) the session settings file allows
-  `Bash(pathly *)` and denies `Edit`, `Write`, `NotebookEdit`, `Agent`, `CronCreate`, `Workflow`
-  and `Read(~/.pathly/**)`, with no permission-bypass flag; B) the same as CLI flags. Chosen: A.
-  Why: one file holds the hook and the rules; every other command asks the human.
+  `Bash(pathly *)` and denies `Edit`, `Write`, `NotebookEdit`, `Agent`, `CronCreate`, `Workflow`,
+  `Read(~/.pathly/**)`, `Bash(curl *)` and `Bash(wget *)`, with no permission-bypass flag, and the
+  chief starts with `--strict-mcp-config` and an empty MCP config; B) the same as CLI flags.
+  Chosen: A. Why: one file holds the hook and the rules; every other command asks the human. Deny
+  wins over allow rules in the user's own settings, so the chief cannot drop its token through
+  curl or wget, and no user or project MCP server (Serena's edit tools, the `pathly-fsm` MCP)
+  reaches it.
+
+- **What a citation proves** — options: A) the answer must be the cited message's text, verbatim,
+  each message citable once, no `option_id` from the chief; B) the cited message only has to exist
+  and come after the question. Chosen: A (revised after the independent review of 2026-10-13).
+  Why: under B a chief can cite the user's "ok" and relay any answer it likes, and reuse one
+  citation for every question. The cost: the user's words reach the agent as typed, and the user
+  types once per question.
+- **Human escalations** — options: A) a chief with `answer` may acknowledge a `to_agent: "human"`
+  escalation with a cite typed after it, through a flag the gate sets for
+  `refuse_agent_on_human_gate`; B) leave #63's refusal for every run token. Chosen: A. Why: under
+  B the chief cannot close the main way agents ask the human, and the user talks only to the
+  chief. Delete and `force_past_gate` stay refused.
+- **Who retires a directive** — options: A) only a chief token (supersede); nobody deletes one;
+  hydration stores `binding = 0`; B) keep #63's paths open to any project-board run and to
+  token-less callers. Chosen: A. Why: under B "only the chief posts a standing order" means
+  nothing, because any other caller can retire it the next minute.
+- **How directives render** — options: A) their own standing-orders block before the ranked
+  decisions; B) inside #63's tier-then-newest list. Chosen: A. Why: B tells the agent the newest
+  decision wins, so any later note outranks a standing order.
+- **Limits** — options: A) per-session ceilings in the gate (`chief.max_cost_usd_per_run` 10,
+  `chief.max_runs_per_session` 20, set by the user in app settings); B) none in round one.
+  Chosen: A. Why: an injected or confused chief can start runs in a loop while the user is away.
+- **Usable in round one** — options: A) a generic `pathly api` command and three short built-in
+  texts now, the friendly commands in round two; B) everything in round two. Chosen: A. Why:
+  under B round one ends with a chief that has no allowed way to call the API (curl is denied
+  and every other command asks).
 
 ## Interfaces
 
-- `POST /chief/open` `{project_root, engine: "claude"|"codex", model?, preset, prompt}` →
+- `POST /chief/open` `{project_root, engine: "claude"|"codex", model?, preset, prompt?}`
+  (`prompt` may be left out for a built-in preset) →
   201 `{run_id, tab_id, tier, engine}`; 409 `{error, run_id, tab_id}`; 400 bad input or engine;
   403 caller sent a live run token.
 - `POST /chief/close` `{project_root}` → 200 `{closed: true|false}`.
-- `GET /chief/session?project_root=` → `{open, run_id, tab_id, tier, engine, opened_at}`.
+- `GET /chief/session?project_root=` → `{open, run_id, tab_id, tier, engine, opened_at,
+  runs_started, max_runs_per_session, max_cost_usd_per_run}`.
+- `pathly api <METHOD> <path> [<json> | -]` → prints the body; exit 0 on 2xx, 1 otherwise, 2 on
+  usage or a missing `PATHLY_RUN_TOKEN`. `pathly help`.
+- Answers from a chief token carry `cite: <human message id>`, and `answer` equals that message's
+  text; `/comms/acknowledge` on a human escalation carries `cite`.
 - `POST /chief/human-messages` `{run_id, hook_secret, text}` → 201 `{id, kind}`; 403 bad secret;
   404 no open session; 400 bad text (empty, not a string, over 64 KiB).
 - `POST /comms/directives` `{project_root, to_agent: "*"|<role>, text}` → 201 `{id}`, posted on
@@ -355,7 +429,8 @@ that closes the session when the result arrives.
 - Tables: `chief_sessions(run_id PK, project_root, preset, tier, engine, tab_id,
   hook_secret_hash, settings_dir, opened_at, closed_at, close_reason)`,
   `chief_human_messages(id PK, run_id, project_root, kind, text, ts)`,
-  `chief_citations(id PK, run_id, message_id, route, target, ts)`;
+  `chief_citations(id PK, run_id, message_id UNIQUE, route, target, ts)`;
+  `chief_sessions.runs_started INTEGER NOT NULL DEFAULT 0`;
   `comms_messages.binding INTEGER NOT NULL DEFAULT 0`.
 - `retrieve_board_context(..., role="")` gains `role`; `board_context_for` and
   `fsm_compose.build_prompt` pass it.
@@ -369,7 +444,11 @@ that closes the session when the result arrives.
 - `/comms/edit`: the edited row's `author_*` becomes the editor's (`none` for Studio until RRP-2b).
 - Studio receives `submit: false` before it honours it (round two); until then nothing opens a
   chief except a direct `POST /chief/open`.
-- No change for callers that send no chief token.
+- `/comms/supersede` and `/comms/delete` on a binding row, and `supersedes` naming one, are
+  refused for every caller but the chief (no binding rows exist before this plan).
+- Hydration stores `binding = 0`, skips rows for another board and labels every hydrated stamp
+  `legacy`, so a fresh clone loses standing orders and the chief posts them again.
+- Otherwise no change for callers that send no chief token.
 
 ## Risks
 
@@ -388,6 +467,19 @@ decision for cost, round two gets a ticket that bills it (`map.md` § Round two)
 - A user-set codex `shell_environment_policy.ignore_default_excludes = false` strips
   `PATHLY_RUN_TOKEN` from codex's commands (docs: codex config). Mitigation: the `pathly` CLI
   (round two) reports the missing variable by name.
+
+- A chief that cites an unrelated later message word for word still passes ticket 10; the rule
+  binds the words, not the intent. Mitigation: the user sees every relayed answer on the board;
+  the acceptance test documents the limit.
+- Prompt injection: board text, artifacts and agent output reach the chief, and an Operator
+  chief can start runs. Mitigation: the built-in texts tell it to take orders only from the user
+  in the tab (ticket 17), and the ceilings in ticket 15 bound the damage.
+- Studio today auto-submits every pasted prompt and ignores `submit: false`
+  (`studio/src/main/ipc/terminal/promptInjector.ts`), so a chief opened before round two starts at
+  once with its style prompt; the hook still stores that first submission as `style_prompt`.
+  A chief tab also takes one of Studio's 5 interactive slots.
+- Any local process can post `/runner/terminal/result` for the chief's run id and close the
+  session. That only ends the chief early (fail closed).
 
 ## UI
 

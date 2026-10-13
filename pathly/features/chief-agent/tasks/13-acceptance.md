@@ -2,7 +2,7 @@
 
 Type: task
 Status: open
-Blocked by: 01, 02, 03, 04, 05, 06, 07, 08, 09, 10, 11, 12
+Blocked by: 01, 02, 03, 04, 05, 06, 07, 08, 09, 10, 11, 12, 14, 15, 16, 17
 Test first: no
 
 Write `tests/comms_board/test_chief_acceptance.py`: the brief's bar, run against the real Flask
@@ -23,24 +23,32 @@ worker `TERMINAL_SPAWN`, marks the run started and finished the way
 3. Status is read-only: close the operator, open with preset `status`; `GET /comms?feature=<f>`
    is 200 and `POST /comms/post` is 403.
 4. Cited answers: with a `RunnerState` waiting in `_await_agent_question`, an uncited chief answer
-   is 403 and the question stays pending; a human message posted through the hook route after the
-   question is cited and the answer is delivered.
+   is 403 and the question stays pending; an answer citing a later human message but with other
+   words is 403; citing that message with its own words delivers the answer, and citing it again
+   for a second question is 403. A `to_agent: "human"` escalation is acknowledged by the chief
+   only with a cite recorded after it.
 5. Binding directive: an operator chief posts a `*` directive, `/comms/acknowledge` marks it, and
    `fsm_compose.build_prompt` for the `team/build`, `team/review` and `team/test` agents of a
-   feature in the project carries its text.
-6. Token stays off the open streams: queues registered on `/events/runner` (the chief's topic and a
+   feature in the project carries its text in the standing-orders block. A project-board run
+   token's `supersedes` naming it, and a token-less `/comms/supersede` of it, leave it in place.
+6. Limits: an operator chief's `POST /runs` above `chief.max_cost_usd_per_run` is 403, and a run
+   control call on a run of another project is 403.
+7. Usable from the tab: `pathly api GET /chief/session?project_root=…`, run as a subprocess with
+   the chief's token in `PATHLY_RUN_TOKEN`, exits 0.
+8. Token stays off the open streams: queues registered on `/events/runner` (the chief's topic and a
    worker's) and on `/events/runs` receive the spawns without `run_token`; the `/events/spawn`
    queue receives it.
 
 Then the release notes: a CHANGELOG "Unreleased" entry whose heading ends in `(chief-agent)`, in
 the style of the role-read-policy entry: what exists, what is refused, the three holes closed,
 and the gaps that wait for round two and RRP-2b. Check every living doc touched by tickets 01 to
-12 against the code once more (verify-then-fix, do not rewrite).
+12 and 14 to 17 against the code once more (verify-then-fix, do not rewrite).
 Regenerate the test indexes and run the full suite.
 
 ## Not in this ticket
 
-- Studio, the `pathly` CLI, the overview and inbox calls, the badge and the re-queue: round two.
+- Studio, the friendly `pathly` commands, the overview and inbox calls, the badge and the
+  re-queue: round two.
 
 ## Done when
 
