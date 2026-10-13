@@ -37,7 +37,7 @@ Parse `$ARGUMENTS` for a plan folder name (FEATURE). If blank, use the auto-dete
 
 Check the build is complete before testing. Query the board task DAG:
 ```
-curl -s "http://127.0.0.1:8765/comms/tasks?feature=<feature>&scope=<feature>"
+curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" "http://127.0.0.1:8765/comms/tasks?feature=<feature>&scope=<feature>"
 ```
 If any task's `task_status` is not `done`, stop:
 
@@ -322,6 +322,7 @@ For each finding (one post per finding — not one per file line), POST to the b
 
 ```bash
 curl -s -X POST http://127.0.0.1:8765/comms/post \
+  -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "feature": "<feature>",
@@ -356,7 +357,7 @@ start the server or retry in a loop just to post.
     gloss. This is the catalog entry other agents scan, and it is embedded for **semantic
     retrieval**, so make it cover the real section topics.
   ```bash
-  curl -s -X POST http://127.0.0.1:8765/comms/post -H "Content-Type: application/json" -d '{
+  curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" -X POST http://127.0.0.1:8765/comms/post -H "Content-Type: application/json" -d '{
     "feature": "<feature>", "from": "<your-role>", "type": "artifact", "board": "<board>",
     "run_id": "<run_id>",
     "text": "<1-2 sentence description>", "summary": "<topic map, one line per section>",
@@ -390,6 +391,7 @@ So when your decision **replaces, resolves, or reverses** an earlier one, name i
 
 ```bash
 curl -s -X POST http://127.0.0.1:8765/comms/post \
+  -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "feature": "<feature>",
@@ -430,6 +432,7 @@ injected at the next `/next_action`. Never wait in a loop for the reply.
 
 ```bash
 curl -s -X POST http://127.0.0.1:8765/comms/post \
+  -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "feature": "<feature>",

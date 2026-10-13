@@ -35,6 +35,9 @@ def _patch_last_agent_done(
     knows it, the agent may not have reported it. The projection folds it onto the
     anchor AGENT_DONE **only when the anchor lacks one** (COALESCE — an agent-provided
     value is never overwritten).
+
+    ``cache_read_tokens``/``cache_write_tokens`` are the cached SUBSET of ``tokens_in``; the
+    projection passes them to the pricing estimate so cached input isn't billed at full rate.
     """
     # --- find last AGENT_DONE for agent/conv identification ---
     patched_agent: str | None = None
@@ -60,11 +63,9 @@ def _patch_last_agent_done(
         "cost_usd": cost_usd,
         "tokens_in": tokens_in,
         "tokens_out": tokens_out,
-        # Cache split rides alongside the lump — `tokens_in` still includes these.
-        # Consumers that want a priceable basis use tokens_in - cache_read - cache_write.
+        "total_tokens": tokens_in + tokens_out,
         "cache_read_tokens": int(cache_read_tokens or 0),
         "cache_write_tokens": int(cache_write_tokens or 0),
-        "total_tokens": tokens_in + tokens_out,
         "wall_seconds": wall_seconds,
         "tool_uses": tool_uses,
         "model": model or None,

@@ -6,6 +6,7 @@ import logging
 
 from flask import jsonify, request
 
+from pathly_orchestrator.runner.provenance import record_stage_provenance
 from ...sse import _broadcast_runner
 from ._runner_bp import _topic_from_body, _validate_stage_overrides, bp
 
@@ -19,8 +20,7 @@ def _write_stage_telemetry(
     AGENT_DONE event, and the universal projector (``invocation_projection`` via
     ``append_event``) derives the invocation row from that event stream, folding in
     the superseding BILLING_UPDATE. Writing an invocation here too would double-count.
-    This still writes the span so the trace tree is intact. It never raises —
-    telemetry must not break the terminal-result callback.
+    This still writes the span so the trace tree is intact; it never raises (telemetry must not break the terminal-result callback).
     """
     try:
         import json as _json
@@ -312,14 +312,13 @@ def runner_terminal_result():
                     # run_id, so the invocation projection folds the REAL cost/tokens onto this
                     # run's AGENT_DONE — overriding the agent's (often-wrong) self-estimate and
                     # NOT depending on the claude-only stop hook's "most recent feature" guess.
-                    # claude → real cost; codex → tokens (cost estimated downstream). Runs here
-                    # reliably even when the supervisor's own reconcile races run completion
-                    # (which is why the consultation planner/codex stages were $0). The
-                    # supervisor's _reconcile_billing_now is now a redundant belt (same values).
+                    # claude → real cost; codex → tokens + cached subset (priced cache-aware
+                    # downstream). Race-safe vs the supervisor (_reconcile_billing_now = belt).
                     _b_cost = float(parsed.get("cost_usd") or 0.0)
                     _b_tin = int(parsed.get("tokens_in") or 0)
                     _b_tout = int(parsed.get("tokens_out") or 0)
                     if _b_cost > 0 or (_b_tin + _b_tout) > 0:
+                        from pathly_orchestrator.db.pricing import cache_tokens_of
                         from pathly_orchestrator.runner import (
                             _patch_last_agent_done as _plad,
                         )
@@ -334,6 +333,7 @@ def runner_terminal_result():
                             int(parsed.get("tool_uses") or 0),
                             model=(next(iter(_mu), "") if _mu else ""),
                             run_id=run_id,
+                            **cache_tokens_of(parsed),
                         )
             except Exception as exc:
                 logging.getLogger("pathly.http").warning(
@@ -341,12 +341,12 @@ def runner_terminal_result():
                     exc,
                 )
 
-        # Fill the otel_spans + agent_invocations trace tables (one span + one invocation
-        # per completed stage). Best-effort — never blocks the result callback.
+        # Trace-table span + measured git provenance — both best-effort, non-blocking.
         if runner_state is not None:
             _write_stage_telemetry(
                 runner_state, parsed, agent_done, data.get("wall_seconds")
             )
+            record_stage_provenance(runner_state, run_id)
 
         tab_id = runner_state.active_tab_id if runner_state is not None else ""
         if tab_id and topic:

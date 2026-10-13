@@ -2,6 +2,7 @@
 
 ---
 # Conversation Prompts — chat-stop-proxy
+Send `-H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN"` on every board call below (the `POST /comms/tasks/complete` marks).
 
 ---
 

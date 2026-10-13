@@ -203,6 +203,8 @@ declare global {
         openSlide: (filePath: string) => Promise<void>
         dsPort: () => Promise<number>
         apiConfig: () => Promise<{ base: string; secret: string }>
+        /** FSM server base URL (PATHLY_FSM_HTTP_PORT, else 8765), available synchronously. */
+        apiBase: string
       }
       fsm: {
         ping: () => Promise<boolean>
@@ -230,7 +232,7 @@ declare global {
         queueControl: (action: QueueAction) => Promise<void>
         preflight: (force?: boolean) => Promise<EnginePreflight[]>
         getEngines: () => Promise<RunningEngine[]>
-        registerRunner: (tabId: string, topic: string, runId: string, label?: string, category?: 'flow' | 'loop' | 'single') => Promise<void>
+        registerRunner: (tabId: string, topic: string, runId: string, label?: string, category?: 'flow' | 'loop' | 'single', runToken?: string) => Promise<void>
         onStageResult: (cb: (tabId: string, data: Record<string, unknown>) => void) => () => void
       }
       setup: {

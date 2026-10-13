@@ -139,15 +139,23 @@ def _iter_json_objects(raw: str) -> Generator[dict[str, Any], None, None]:
 
 
 def _codex_usage(raw_output: str) -> tuple[int, int]:
+    """``(tokens_in, tokens_out)`` from codex ``exec --json`` output — see ``_codex_usage_full``."""
+    tokens_in, tokens_out, _cached = _codex_usage_full(raw_output)
+    return tokens_in, tokens_out
+
+
+def _codex_usage_full(raw_output: str) -> tuple[int, int, int]:
     """Scan codex `exec --json` JSONL output for a token-usage event.
 
     DEFENSIVE: codex's usage shape varies by CLI version (unconfirmed offline) — tolerate
     a top-level ``usage`` object, a nested ``info.total_token_usage``, or a typed
     ``token_count``/``token_usage`` event whose own fields ARE the usage. Field names are
     tried in both snake_case and camelCase. Keeps the LAST non-zero usage event seen
-    (later events carry the running/final total). Returns (0, 0) when none is found.
+    (later events carry the running/final total). Returns ``(tokens_in, tokens_out,
+    cached_input_tokens)`` — the cached count is a SUBSET of tokens_in, priced at the
+    cached-input rate downstream (db/pricing.py CACHE_RATES). Zeros when none is found.
     """
-    tokens_in = tokens_out = 0
+    tokens_in = tokens_out = cached = 0
     for obj in _iter_json_objects(raw_output):
         usage = obj.get("usage")
         if not isinstance(usage, dict):
@@ -179,9 +187,18 @@ def _codex_usage(raw_output: str) -> tuple[int, int]:
             or usage.get("outputTokens")
             or 0
         )
+        details = usage.get("input_tokens_details") or usage.get(
+            "prompt_tokens_details"
+        )
+        u_cached = int(
+            usage.get("cached_input_tokens")
+            or usage.get("cachedInputTokens")
+            or (details.get("cached_tokens") if isinstance(details, dict) else 0)
+            or 0
+        )
         if u_in or u_out:
-            tokens_in, tokens_out = u_in, u_out
-    return tokens_in, tokens_out
+            tokens_in, tokens_out, cached = u_in, u_out, min(u_cached, u_in)
+    return tokens_in, tokens_out, cached
 
 
 # ── TOKEN-COUNT STRATEGY REGISTRY (per adapter) — the ONE place token counting lives ──
@@ -189,54 +206,6 @@ def _codex_usage(raw_output: str) -> tuple[int, int]:
 # the cost registry). Each engine reports usage differently — or not at all (antigravity/agy) —
 # so extraction is a strategy per adapter. Adding a new engine = adding one entry to
 # _TOKEN_STRATEGIES below; nothing else changes.
-
-
-def extract_cache_tokens(payload: dict[str, Any]) -> tuple[int, int]:
-    """Return ``(cache_read_tokens, cache_write_tokens)`` from a result envelope.
-
-    ``tokens_in`` is a LUMP that folds cache reads/writes in with uncached input (see
-    ``_normalize_model_usage``). That is the right TOTAL but the wrong basis for pricing:
-    cache reads bill at 0.1x and cache writes at 1.25x/2x, so a lump priced at the plain
-    input rate overstates a cache-heavy run several-fold. ``agent_invocations`` has carried
-    ``cache_read_tokens``/``cache_write_tokens`` columns — and ``trends.py`` has SUMmed
-    them — since the schema was added, but nothing ever populated them, so every bucket
-    read 0. This is the missing producer.
-
-    Reads the top-level ``usage`` block first, falling back to summing ``modelUsage``.
-    Tolerant of camelCase/snake_case; never raises.
-    """
-    try:
-        usage = payload.get("usage") or payload.get("inputUsage") or {}
-        c_read = int(
-            usage.get("cache_read_input_tokens")
-            or usage.get("cacheReadInputTokens")
-            or 0
-        )
-        c_write = int(
-            usage.get("cache_creation_input_tokens")
-            or usage.get("cacheCreationInputTokens")
-            or 0
-        )
-        if c_read or c_write:
-            return c_read, c_write
-        raw_mu = payload.get("modelUsage") or payload.get("model_usage") or {}
-        if isinstance(raw_mu, dict):
-            for u in raw_mu.values():
-                if not isinstance(u, dict):
-                    continue
-                c_read += int(
-                    u.get("cacheReadInputTokens")
-                    or u.get("cache_read_input_tokens")
-                    or 0
-                )
-                c_write += int(
-                    u.get("cacheCreationInputTokens")
-                    or u.get("cache_creation_input_tokens")
-                    or 0
-                )
-        return c_read, c_write
-    except Exception:
-        return 0, 0
 
 
 def _claude_tokens(payload: dict[str, Any], raw_output: str) -> tuple[int, int]:
@@ -278,6 +247,42 @@ def _agy_tokens(payload: dict[str, Any], raw_output: str) -> tuple[int, int]:
     downstream). The prompt isn't in stdout, so input stays 0 until the gate threads it.
     """
     return 0, estimate_tokens_from_text(raw_output)
+
+
+def _sum_re(pattern: str, text: str) -> int:
+    return sum(int(x) for x in re.findall(pattern, text or ""))
+
+
+def extract_cache_tokens(
+    adapter: str, payload: dict[str, Any], raw_output: str
+) -> tuple[int, int]:
+    """``(cache_read_tokens, cache_write_tokens)`` — the cached SUBSET of ``tokens_in``, so
+    Strategy B can price it at the cache rate instead of the full input rate. claude reports
+    both (lump ``usage``, else summed ``modelUsage``, else regex over a truncated envelope);
+    codex reports cached input only (writes bill as ordinary input); others report none.
+    Never raises.
+    """
+    a = (adapter or "claude").strip().lower()
+    try:
+        if a == "codex":
+            return _codex_usage_full(raw_output)[2], 0
+        if a in ("antigravity", "agy", "gemini"):
+            return 0, 0
+        usage = payload.get("usage") or payload.get("inputUsage") or {}
+        read = int(usage.get("cache_read_input_tokens") or 0)
+        write = int(usage.get("cache_creation_input_tokens") or 0)
+        if not (read or write):
+            mu = payload.get("modelUsage") or payload.get("model_usage") or {}
+            for u in mu.values() if isinstance(mu, dict) else ():
+                if isinstance(u, dict):
+                    read += int(u.get("cacheReadInputTokens") or 0)
+                    write += int(u.get("cacheCreationInputTokens") or 0)
+        if not (read or write):
+            read = _sum_re(r'"cacheReadInputTokens"\s*:\s*([0-9]+)', raw_output)
+            write = _sum_re(r'"cacheCreationInputTokens"\s*:\s*([0-9]+)', raw_output)
+        return read, write
+    except Exception:
+        return 0, 0
 
 
 # adapter (lowercased) → token-extraction strategy. Unknown/unlisted → the claude/generic
@@ -358,6 +363,8 @@ def parse_result(adapter: str, raw_output: str) -> dict[str, Any]:
         if (tokens_in + tokens_out) == 0 and (_rin or _rout):
             tokens_in, tokens_out = _rin, _rout
 
+    cache_read, cache_write = extract_cache_tokens(adapter, payload, raw_output)
+
     messages = payload.get("messages", [])
     tool_uses = sum(
         1
@@ -368,12 +375,6 @@ def parse_result(adapter: str, raw_output: str) -> dict[str, Any]:
         if isinstance(block, dict) and block.get("type") == "tool_use"
     )
 
-    # Cache split — reported ALONGSIDE the lump, never instead of it. `tokens_in` keeps its
-    # existing cache-inclusive meaning so every downstream reader is unaffected; these two
-    # fields let the pricing path (db/pricing.py) charge cache reads at 0.1x and writes at
-    # 2.0x instead of billing the whole lump at the input rate.
-    cache_read_tokens, cache_write_tokens = extract_cache_tokens(payload)
-
     return {
         "cost_usd": cost_usd,
         "session_id": session_id or None,
@@ -381,8 +382,8 @@ def parse_result(adapter: str, raw_output: str) -> dict[str, Any]:
         "result": payload.get("result", ""),
         "tokens_in": tokens_in,
         "tokens_out": tokens_out,
-        "cache_read_tokens": cache_read_tokens,
-        "cache_write_tokens": cache_write_tokens,
+        "cache_read_tokens": cache_read,
+        "cache_write_tokens": cache_write,
         "tool_uses": tool_uses,
         "model_usage": model_usage,
         # Failure signal from the CLI's own result envelope. Surfaced so the downstream

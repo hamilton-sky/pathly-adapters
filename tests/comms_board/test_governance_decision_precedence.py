@@ -49,9 +49,14 @@ def test_newest_decision_renders_before_the_older_one(monkeypatch):
     """get_pending_decisions returns ts ASC; the block must invert it."""
     block = _render(
         monkeypatch,
-        [_decision(GATE, TS_GATE), _decision(UNBLOCK, TS_UNBLOCK)],  # ASC, as the query returns
+        [
+            _decision(GATE, TS_GATE),
+            _decision(UNBLOCK, TS_UNBLOCK),
+        ],  # ASC, as the query returns
     )
-    assert block.index(UNBLOCK) < block.index(GATE), "17:20 decision must precede the 15:05 one"
+    assert block.index(UNBLOCK) < block.index(
+        GATE
+    ), "17:20 decision must precede the 15:05 one"
 
 
 def test_newest_decision_is_marked_latest(monkeypatch):
@@ -107,7 +112,10 @@ def test_no_gate_warning_without_an_open_escalation(monkeypatch):
 def test_decision_missing_a_timestamp_does_not_crash_the_block(monkeypatch):
     block = _render(
         monkeypatch,
-        [{"id": "x", "text": "no timestamp", "board": "feature"}, _decision(UNBLOCK, TS_UNBLOCK)],
+        [
+            {"id": "x", "text": "no timestamp", "board": "feature"},
+            _decision(UNBLOCK, TS_UNBLOCK),
+        ],
     )
     assert "no timestamp" in block
     assert UNBLOCK in block
@@ -140,7 +148,9 @@ def test_board_info_with_no_governance_renders_nothing_for_it():
 
     assert _format_board_info(decisions=[], escalations=[], recent=[]) == ""
     only_recent = _format_board_info(
-        decisions=[], escalations=[], recent=[{"from_agent": "a", "type": "note", "text": "hi"}]
+        decisions=[],
+        escalations=[],
+        recent=[{"from_agent": "a", "type": "note", "text": "hi"}],
     )
     assert "Governance" not in only_recent
     assert "hi" in only_recent

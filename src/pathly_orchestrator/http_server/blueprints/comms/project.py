@@ -20,9 +20,9 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from flask import Blueprint, jsonify, request
-
+from flask import Blueprint, jsonify
 from ...sse import _broadcast_comms, _broadcast_runner
+from ._helpers import read_json_body
 
 bp = Blueprint("comms_project", __name__)
 
@@ -62,7 +62,7 @@ def comms_project_decompose():
     try:
         # silent=True: a missing/invalid body returns a clean 400, never a 500
         # (T3 contract: best-effort, never 500 on a malformed/absent request).
-        data = request.get_json(silent=True)
+        data = read_json_body()
         if not data:
             return (
                 jsonify({"error": "Missing JSON body", "reason": "missing_body"}),
@@ -147,7 +147,7 @@ def _dispatch_board_run(
     project-decompose. 'full' differs only by a deeper instruction.)
     """
     from pathly_orchestrator.db.connection import get_db as _get_db
-    from pathly_orchestrator.db.queries.comms import post_message as _post_message
+    from pathly_orchestrator.runner.provenance import post_system as _post_message
     from pathly_orchestrator.supervisor.board_run import start_board_run
 
     skill = "planning/project-decompose"
@@ -269,7 +269,7 @@ def _dispatch_consultation(
 ) -> tuple:
     """Dispatch a project-consultation FSM flow for the project."""
     from pathly_orchestrator.db.connection import get_db as _get_db
-    from pathly_orchestrator.db.queries.comms import post_message as _post_message
+    from pathly_orchestrator.runner.provenance import post_system as _post_message
     from pathly_orchestrator.supervisor import board_lock
     from pathly_orchestrator.supervisor.goal_executor import _safe_call
     from pathly_orchestrator.supervisor.registry import get_state

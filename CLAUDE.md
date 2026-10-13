@@ -38,12 +38,15 @@ User → /pathly <cmd>           skills (installed at ~/.claude/skills/pathly-*)
      → pathly/features/<feature>/  filesystem state (legacy: pathly/plans/<feature>/)
 
 Studio → Start button          FlowControlBar → POST /runner/start
-       → supervisor/            drives FSM + spawns agents as visible terminals
-       → TERMINAL_SPAWN SSE    Studio opens a PTY tab (node-pty) per pipeline stage
+       → supervisor/            drives FSM + delegates every agent spawn to the spawn host
+       → TERMINAL_SPAWN SSE    a SPAWN HOST opens a process per pipeline stage. Two implement the
+                               same contract: Studio (node-pty tab) and `pathly-pty-host`
+                               (src/pathly_orchestrator/pty_host/, plain pipes — server/CI, no
+                               desktop). Run exactly one; the supervisor can't tell them apart.
        → terminal:spawn IPC    argv injected from adapters.yaml headless template, e.g.
                                claude: ['claude', '-p', '{prompt}', '--model', '{model}', '--output-format', 'json', '--dangerously-skip-permissions']
                                codex:  ['codex', 'exec', '--skip-git-repo-check', '--json', '--sandbox', 'workspace-write', '--model', '{model}', '--', '{prompt}']
-       → PTY exits             POST /runner/terminal/result → FSM continues
+       → process exits         POST /runner/terminal/result → FSM continues
      → fsm_events (DB)      Claude writes AGENT_DONE with `summary` mid-run to the central DB; supervisor reads it after PTY exits as the authoritative semantic result (stdout only used for session_id + cost_usd); EVENTS.jsonl is a downstream DB→disk export
 ```
 
@@ -70,6 +73,18 @@ In runner mode Pathly is the single source of truth for skill content. The CLI r
 - `decision` — `"continue"` / `"block"` / `"escalate"` (automation gate)
 - `codex_subagent` — legacy compat field with frozen keys; new adapters should read `agent_hint`
 
+**Ground truth — `command_gate` measures what other gates take on trust.** Four of the five FSM
+transition gates read state an *agent produced*: `require_artifact` (a file exists), `verify_gate`
+(the file's line 1 is `RESULT: PASS`), `require_tasks_done` (tasks marked done), `scope_gate` (the
+git footprint matches the declared one). `command_gate` (`fsm/gates/command.py`) is the one that
+**executes** — it runs the project's own verify command, reads the process exit code, and routes the
+real stdout/stderr back as feedback. So a builder that writes `RESULT: PASS` over code that does not
+compile no longer advances the flow. Configure per project with `PUT /db/settings/verify.build` /
+`verify.test`; **unconfigured means the gate skips**, so it is inert until a project opts in. Wired
+into `team`/`team-build` at `BUILDING->REVIEWING` (`verify.build` → `BUILD_FAILURES.md`) and
+`TESTING->RETRO` (`verify.test` → `TEST_FAILURES.md`). Detail:
+[src/pathly_orchestrator/CLAUDE.md](src/pathly_orchestrator/CLAUDE.md).
+
 **Agent roles** (full definitions in `src/pathly_data/core/agents/`):
 
 | Role | Model | Job |
@@ -95,7 +110,7 @@ In runner mode Pathly is the single source of truth for skill content. The CLI r
 
 ## Comms board (orchestration substrate)
 
-A DB-backed message board (`comms_messages` + `comms_artifacts` tables, `/comms/*` routes) where agents and humans post decisions, discoveries, artifacts, and DAG tasks. It is the Studio **Command Center** surface and is injected into every agent prompt as governance + semantic context (`retrieve_board_context`). The **Board → Goals → per-goal Task-DAG → pluggable-executors** model is **live** (`goal_id`/`executor` columns; executors = `single`/`loop`/`team`, dispatched by `supervisor/goal_executor.py` (`goal_run.py` is a thin re-export shim; goals decompose via `goal_decomposer.py`); goals decompose via planner/consultation, run with a per-goal executor + CLI-engine selector, and stop via `/comms/goals/stop`). Also live: a **context-retrieval** layer (per-task `context_refs` manifest → `/comms/artifacts/<id>/section` hydration → Board Catalog → client-side AI-Router summaries) and a **memory-consolidation** layer (relevance-gated context channel, near-duplicate dedup + a manual reflection pass via `/comms/consolidate`). Only **P3** (parallel: across-goal lanes → worktree fan-in) remains. Design + roadmap live in `pathly/features/comms-board/` (see `ROADMAP.md`). Details: [src/pathly_orchestrator/CLAUDE.md](src/pathly_orchestrator/CLAUDE.md).
+A DB-backed message board (`comms_messages` + `comms_artifacts` tables, `/comms/*` routes) where agents and humans post decisions, discoveries, artifacts, and DAG tasks. It is the Studio **Command Center** surface and is injected into every agent prompt as governance + semantic context (`retrieve_board_context`). The **Board → Goals → per-goal Task-DAG → pluggable-executors** model is **live** (`goal_id`/`executor` columns; executors = `single`/`loop`/`team`, dispatched by `supervisor/goal_executor.py` (`goal_run.py` is a thin re-export shim; goals decompose via `goal_decomposer.py`); goals decompose via planner/consultation, run with a per-goal executor + CLI-engine selector, and stop via `/comms/goals/stop`). **Since fsm-fan-out Phase E, `loop` and `team` are both FSM runs** — `loop` runs the `goal-loop` flow (one fan-out `DRAINING` state; flat by design, no review/test round-trip), `team` runs `team-build` (reviewed); only `single` is agent-driven, via `development/drain-dag`. Also live: a **context-retrieval** layer (per-task `context_refs` manifest → `/comms/artifacts/<id>/section` hydration → Board Catalog → client-side AI-Router summaries) and a **memory-consolidation** layer (relevance-gated context channel, near-duplicate dedup + a manual reflection pass via `/comms/consolidate`). Only **P3** (parallel: across-goal lanes → worktree fan-in) remains. Design + roadmap live in `pathly/features/comms-board/` (see `ROADMAP.md`). Details: [src/pathly_orchestrator/CLAUDE.md](src/pathly_orchestrator/CLAUDE.md).
 
 ---
 
@@ -164,9 +179,13 @@ python scripts/gen_test_index.py    # regenerate tests/*/INDEX.md after adding/m
 # Install / propagate agent+skill changes to ~/.claude
 pathly-setup claude --apply           # first install
 pathly-setup claude --apply --repair  # update already-installed files (fragments, skills, agents)
+pathly-setup claude --list            # skills: default / installed / available (read-only)
+pathly-setup claude --remove <skill>  # drop an installed non-default skill (--dry-run to preview)
 ```
+Default install = 6 skills (`DEFAULT_EXPOSED_SKILLS`); `--export <skill>` adds more (pulling in what each `requires:`).
+Details + tests: [src/pathly_data/CLAUDE.md](src/pathly_data/CLAUDE.md) "Skill exposure".
 
-**Test layout:** tests live in domain folders under `tests/` (index: [tests/INDEX.md](tests/INDEX.md)), each with a generated `INDEX.md`. A new test goes in the matching domain folder. To locate a repo file, import `REPO_ROOT`/`SRC`/`SNAPSHOT_DIR` from `tests/_paths.py` (or use the `repo_root`/`snapshot_dir` fixtures) — never `Path(__file__).parent.parent`, which silently resolves to `tests/` once a file is nested. Rerun `scripts/gen_test_index.py` after adding, moving, or removing a test (`--check` fails if an index is stale).
+**Test layout:** tests live in domain folders under `tests/` (index: [tests/INDEX.md](tests/INDEX.md)), each with a generated `INDEX.md`. A new test goes in the matching domain folder. To locate a repo file, import `REPO_ROOT`/`SRC`/`SNAPSHOT_DIR` from `tests/_paths.py` (or use the `repo_root`/`snapshot_dir` fixtures) — never `Path(__file__).parent.parent`, which silently resolves to `tests/` once a file is nested. Rerun `scripts/gen_test_index.py` after adding, moving, or removing a test (`--check` fails if an index is stale). **Test file basenames must be unique across all domain folders** (no `__init__.py`, pytest's default import mode) — a clash (e.g. two `test_hooks.py`) only surfaces as a collection error in a *full* `pytest` run, never in a single-folder run, so run the whole suite before pushing.
 
 ---
 
@@ -192,7 +211,15 @@ the backend is off → then just use Grep/Read. (`pathly-fsm-call code-query --o
 is a shim, but the HTTP form passes `project_root`, which the proxy needs to resolve
 relative targets.)
 
-Two backends sit behind the one proxy — pick per request with `"engine": "graph" | "lsp" | "both"`
+**`codeintel` backend (sketch).** When the `codeintel` package is installed (`pip install codecortex`),
+`auto` resolves to it and `/code/query` hands the op to codeintel unchanged — real caller/callee/impact
+rows and semantic `search` (new ops: `callees`, `search`), instead of the per-file symbol-count block
+below. Pathly calls a running `codeintel serve-http` (`code_context.codeintel_url`, default
+`http://127.0.0.1:8766`; token via `CODEINTEL_TOKEN` or `code_context.codeintel_token`), else one-shot
+`codeintel query --json`. `engine` is forwarded to codeintel (`graph|lsp|semantic|both|all`);
+`engine: cli` still reaches the legacy graph. Prompt injection (`build_block`) still uses the `cli` block.
+
+Two legacy backends sit behind the one proxy — pick per request with `"engine": "graph" | "lsp" | "both"`
 (omit → the `code_context.backend` setting decides — default `auto` (detect the installed
 backend), else `off` | `cli` | `lsp` | `both`):
 
@@ -244,7 +271,7 @@ These rules apply to all Python in `src/pathly_orchestrator/` and all TypeScript
 - A module file owns exactly one concern (DB queries, embeddings, output parsing, …).
 - **Hard limit: 400 lines per file.** If a file approaches this, split it before adding more code.
 - **Gated in CI** by `scripts/check_file_size.py` (lint `consistency` job) as a *ratchet* against
-  `scripts/file_size_baseline.txt`: the 22 files already over the limit are frozen at their current
+  `scripts/file_size_baseline.txt`: the 19 files already over the limit are frozen at their current
   size and may only shrink. A NEW oversized file fails, and so does **growing an already-oversized
   one** — which is rule #2 mechanically enforced. Adding a new file is always allowed. When a
   baseline file drops to 400 or under, the check fails until you run
@@ -379,24 +406,6 @@ OTel **span** (for the Traces tab) — the invocation comes from the event proje
 same table), so the header total always equals the sum of the feature cards for that
 project.
 
-**Prompt-cache tokens are captured and priced at their own tier.** `tokens_in` is a LUMP that
-folds cache reads and cache creation in with uncached input — the right TOTAL, the wrong basis
-for pricing, since reads bill at 0.1x input and 1-hour cache writes at 2.0x. The
-`agent_invocations.cache_read_tokens`/`cache_write_tokens` columns (and `trends.py`'s SUMs over
-them) existed from the schema onward with no producer, so every bucket read 0 and any row the CLI
-did NOT price was billed lump-at-1x — ~3x over on a cache-heavy agent run. The producer is
-`runner/output.py::extract_cache_tokens`, threaded through `BILLING_UPDATE`
-(`runner/events.py::_patch_last_agent_done` → `supervisor/terminal_billing.py`) into the
-projection, where `db/pricing.py` carves the split OUT of the lump and re-prices it
-(`CACHE_READ_MULTIPLIER = 0.1`, `CACHE_WRITE_MULTIPLIER = 2.0`). `tokens_in` keeps its
-cache-inclusive meaning, and omitting the split reproduces the old cost exactly, so no existing
-reader shifts. The 2.0x write tier is measured, not the published 1.25x headline: on a real
-session log 100% of cache creation was `ephemeral_1h_input_tokens` and 0% was 5m. **Historical
-rows are not backfilled** — `telemetry.cache_split_since` (stamped once by
-`db/migrations_incremental.py::_stamp_cache_split_watermark`, surfaced on `/telemetry/trends`)
-marks where capture begins, so a consumer can render earlier buckets as "unavailable" instead of
-mistaking the fix date for the day caching started.
-
 **Two strategies: token-counting is universal, cost is per-provider.** Tracking every CLI
 spawn's usage splits into two independent layers so a rate change never disturbs token
 extraction and a new engine never disturbs pricing: **Strategy A — token counting**
@@ -423,7 +432,14 @@ pricing table/`PricingRegistry`/`estimate_cost`/`infer_provider` live in
 upward into `http_server/`); `http_server/telemetry_registry.py` re-exports them for
 back-compat. The projector applies a `_price_if_needed` chokepoint on every projected
 row (idempotent: only fires when `cost_usd==0` and `tokens_in+tokens_out>0`; a
-provider-reported or already-estimated cost is never re-priced). Per-adapter behavior:
+provider-reported or already-estimated cost is never re-priced). **Cache-aware:** both
+token strategies fold cached tokens INTO `tokens_in`, so `parse_result` also returns the
+cached subset (`cache_read_tokens`/`cache_write_tokens`, via `runner/output.py::extract_cache_tokens`
+— claude: `cache_read`/`cache_creation`; codex: `cached_input_tokens`), every billing path
+carries it on `BILLING_UPDATE` (`_patch_last_agent_done(..., **cache_tokens_of(parsed))`), and
+`PricingRegistry.compute` prices it at the `CACHE_RATES` multiple of the input rate (claude read
+0.1x / write 1.25x; GPT-5 family cached 0.1x). Without that a heavily-cached codex run was
+overstated ~3-4x; a model with no `CACHE_RATES` entry keeps the flat price. Per-adapter behavior:
 `codex exec --json` (JSONL events on stdout) never reports a dollar cost, so its token
 strategy (`runner/output.py::_codex_tokens` → `_codex_usage`) scans the stream for a
 token-usage event (defensive — the exact field shape is unconfirmed, several layouts are

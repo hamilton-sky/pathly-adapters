@@ -26,7 +26,7 @@ Do not write files; quick is read-only. The retro skill/orchestrator writes RETR
 
 After quick completes:
 - Write `<feature_path>/RETRO.md` with the summary provided.
-- Append any extracted lessons to `LESSONS_CANDIDATE.md` (project root or pathly/features/).
+- Append any extracted lessons to `pathly/lessons/LESSONS_CANDIDATE.md` (create the directory if needed).
 
 Parse the `<usage>` block from quick's response:
 - `total_tokens`: the number after `total_tokens:` (0 if absent)
@@ -75,7 +75,7 @@ Pipeline walkthrough written:
   pathly/pipeline-walkthrough/[feature]/01-PIPELINE-FLOW.md
   pathly/pipeline-walkthrough/[feature]/02-TOKEN-USAGE.md
   pathly/pipeline-walkthrough/[feature]/03-ARTIFACT-MAP.md
-Lessons appended to LESSONS_CANDIDATE.md (if any were extracted).
+Lessons appended to pathly/lessons/LESSONS_CANDIDATE.md (if any were extracted).
 Feature '[feature]' is DONE.
 
 To promote lessons to active memory: route to lessons
@@ -137,6 +137,7 @@ skip silently — the on-disk `<out_path>` file is the source of truth, and the 
 artifact reconciliation attaches it to the board from the FSM's own record after the stage.
 ```bash
 curl -s -X POST http://127.0.0.1:8765/comms/post \
+  -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"feature": "<feature>", "from": "<agent>", "type": "artifact", "board": "feature",
        "scope": "<feature>", "text": "<1-2 sentence description>",
@@ -170,6 +171,7 @@ For each finding (one post per finding — not one per file line), POST to the b
 
 ```bash
 curl -s -X POST http://127.0.0.1:8765/comms/post \
+  -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "feature": "<feature>",
@@ -204,7 +206,7 @@ start the server or retry in a loop just to post.
     gloss. This is the catalog entry other agents scan, and it is embedded for **semantic
     retrieval**, so make it cover the real section topics.
   ```bash
-  curl -s -X POST http://127.0.0.1:8765/comms/post -H "Content-Type: application/json" -d '{
+  curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" -X POST http://127.0.0.1:8765/comms/post -H "Content-Type: application/json" -d '{
     "feature": "<feature>", "from": "<your-role>", "type": "artifact", "board": "<board>",
     "run_id": "<run_id>",
     "text": "<1-2 sentence description>", "summary": "<topic map, one line per section>",
@@ -238,6 +240,7 @@ So when your decision **replaces, resolves, or reverses** an earlier one, name i
 
 ```bash
 curl -s -X POST http://127.0.0.1:8765/comms/post \
+  -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "feature": "<feature>",
@@ -278,6 +281,7 @@ injected at the next `/next_action`. Never wait in a loop for the reply.
 
 ```bash
 curl -s -X POST http://127.0.0.1:8765/comms/post \
+  -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "feature": "<feature>",

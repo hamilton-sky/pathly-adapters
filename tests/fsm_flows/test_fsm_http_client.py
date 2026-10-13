@@ -1,6 +1,8 @@
 import json
 import os
 import sys
+import threading
+import time
 from urllib.error import URLError
 
 import pytest
@@ -96,10 +98,19 @@ def test_poll_exits_early_on_first_healthy_response(monkeypatch, tmp_path):
         "pathly_orchestrator.fsm_http_client.subprocess.Popen",
         lambda *a, **k: _FakeProc(),
     )
-    monkeypatch.setattr(
-        "pathly_orchestrator.fsm_http_client.time.sleep",
-        lambda s: sleep_calls.append(s),
-    )
+    # fsm_http_client.time is the shared time module, so a daemon thread that wakes while
+    # this patch is active (db.connection's WAL checkpoint loop sleeps 300 s) would be
+    # recorded here too. Count only this thread's sleeps; others sleep for real.
+    real_sleep = time.sleep
+    test_thread = threading.get_ident()
+
+    def fake_sleep(seconds):
+        if threading.get_ident() == test_thread:
+            sleep_calls.append(seconds)
+        else:
+            real_sleep(seconds)
+
+    monkeypatch.setattr("pathly_orchestrator.fsm_http_client.time.sleep", fake_sleep)
     monkeypatch.setattr("pathly_orchestrator.fsm_http_client.urlopen", fake_urlopen)
 
     client.ensure_server_running()

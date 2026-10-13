@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import sqlite3
 import uuid
-from datetime import datetime, timezone
+
+from .migrations_provenance import add_comms_provenance, add_run_tokens
 
 
 def _backfill_comms_artifacts(conn: sqlite3.Connection) -> None:
@@ -175,39 +176,5 @@ def _add_additive_migrations(conn: sqlite3.Connection) -> None:
         conn.commit()
     except sqlite3.OperationalError:
         pass
-    _stamp_cache_split_watermark(conn)
-
-
-def _stamp_cache_split_watermark(conn: sqlite3.Connection) -> None:
-    """Record WHEN this database began capturing the prompt-cache token split.
-
-    ``agent_invocations.cache_read_tokens``/``cache_write_tokens`` existed (and were SUMmed
-    by trends.py) long before anything populated them, so every pre-fix row reads 0. Zero is
-    indistinguishable from "this run genuinely used no cache" — which on an agent workload is
-    almost never true — so a trend chart silently reports the fix date as the moment cache
-    usage began.
-
-    Deliberately a WATERMARK, not a backfill. Reconstructing the split for historical rows
-    means re-parsing archived stdout that in many cases was truncated by the PTY tail buffer
-    in the first place; the honest move is to say where the data starts, not to invent it.
-    Consumers read this off /telemetry/trends and render buckets before it as "unavailable"
-    rather than "zero".
-
-    Set exactly once — on an existing DB it marks the upgrade; on a fresh DB it marks
-    creation, and there are no rows before it either way.
-    """
-    try:
-        row = conn.execute(
-            "SELECT value FROM app_settings WHERE key='telemetry.cache_split_since'"
-        ).fetchone()
-        if row is not None:
-            return
-        now = datetime.now(timezone.utc).isoformat()
-        conn.execute(
-            "INSERT INTO app_settings (key, value, updated_at) "
-            "VALUES ('telemetry.cache_split_since', ?, ?)",
-            (now, now),
-        )
-        conn.commit()
-    except sqlite3.Error:
-        pass  # a telemetry watermark must never block DB startup
+    add_run_tokens(conn)
+    add_comms_provenance(conn)

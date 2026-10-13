@@ -193,6 +193,8 @@ contextBridge.exposeInMainWorld('pathly', {
     openSlide: (filePath: string): Promise<void> => ipcRenderer.invoke('shell:openSlide', filePath),
     dsPort: (): Promise<number> => ipcRenderer.invoke('shell:dsPort'),
     apiConfig: (): Promise<{ base: string; secret: string }> => ipcRenderer.invoke('shell:apiConfig'),
+    // Sync, unlike apiConfig: the renderer builds EventSource URLs from it at module load.
+    apiBase: `http://127.0.0.1:${process.env['PATHLY_FSM_HTTP_PORT'] || '8765'}`,
   },
   fsm: {
     ping: (): Promise<boolean> => ipcRenderer.invoke('fsm:ping'),
@@ -255,8 +257,8 @@ contextBridge.exposeInMainWorld('pathly', {
       ipcRenderer.invoke('terminal:preflight', force),
     getEngines: (): Promise<RunningEngine[]> =>
       ipcRenderer.invoke('terminal:get-engines'),
-    registerRunner: (tabId: string, topic: string, runId: string, label?: string, category?: 'flow' | 'loop' | 'single'): Promise<void> =>
-      ipcRenderer.invoke('terminal:register-runner', tabId, topic, runId, label, category),
+    registerRunner: (tabId: string, topic: string, runId: string, label?: string, category?: 'flow' | 'loop' | 'single', runToken?: string): Promise<void> =>
+      ipcRenderer.invoke('terminal:register-runner', tabId, topic, runId, label, category, runToken),
     onStageResult: (cb: (tabId: string, data: Record<string, unknown>) => void): (() => void) => {
       const listener = (_e: Electron.IpcRendererEvent, tabId: string, data: Record<string, unknown>): void => cb(tabId, data)
       ipcRenderer.on('terminal:stage-result', listener)

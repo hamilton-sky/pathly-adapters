@@ -13,6 +13,7 @@ them, in dependency order, until none remain — the board is the queue, not you
 
 Your task instructions name the **goal_id** and the **scope** (feature). Use them in
 every board call below. All calls go to `http://127.0.0.1:8765`.
+Send `-H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN"` on every call.
 
 ---
 

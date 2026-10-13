@@ -5,7 +5,7 @@
 # a listed file with no live marker warns (stale entry).
 
 # DB-first fallbacks (disk only when the DB has no row)
-src/pathly_orchestrator/fsm/engine_actions.py
+src/pathly_orchestrator/fsm/gates/scope.py
 src/pathly_orchestrator/fsm/engine_recover.py
 src/pathly_orchestrator/fsm/engine_transitions.py
 src/pathly_orchestrator/http_server/blueprints/ops/db_api_explorer.py

@@ -36,7 +36,7 @@ The retro seed is needed for future storm sessions.
 
 Check the feature's work is complete before archiving. Query the board task DAG:
 ```bash
-curl -s "http://127.0.0.1:8765/comms/tasks?feature=$FEATURE&scope=$FEATURE"
+curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" "http://127.0.0.1:8765/comms/tasks?feature=$FEATURE&scope=$FEATURE"
 ```
 If any task's `task_status` is not `done`: stop →
 ```
@@ -71,10 +71,10 @@ mv pathly/features/$FEATURE pathly/features/.archive/$FEATURE
 
 Before reporting, check for and promote any candidate lessons:
 
-1. Check if `LESSONS_CANDIDATE.md` exists at the project root.
+1. Check if `pathly/lessons/LESSONS_CANDIDATE.md` exists.
 2. If it exists and is non-empty, automatically invoke the `lessons` skill.
-3. This updates `LESSONS.md` with patterns from this and previous features.
-4. If `LESSONS_CANDIDATE.md` does not exist or is empty, skip silently.
+3. This updates `pathly/lessons/LESSONS.md` with patterns from this and previous features.
+4. If `pathly/lessons/LESSONS_CANDIDATE.md` does not exist or is empty, skip silently.
 
 ---
 

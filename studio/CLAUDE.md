@@ -78,6 +78,15 @@ On every app launch, `index.ts` ensures a clean FSM server:
 
 This guarantees the new server always starts, even against old server versions that predate the `/shutdown` endpoint.
 
+**Another port: `PATHLY_FSM_HTTP_PORT`.** Steps 1–3 kill **whatever** holds the port, Pathly or
+not. To run Studio beside another server on 8765, launch it with `PATHLY_FSM_HTTP_PORT=<port>`.
+Every Studio call follows it: main reads it through `apiConfig.getApiBase()` (including the
+`/runner/terminal/result` and `/db/invocation` posts in `ipc/terminal/spawnReporting.ts`), the
+renderer's `PATHLY_API_BASE` (`lib/config.ts`) comes from the preload's synchronous
+`shell.apiBase`, the spawned server inherits it, and each agent PTY inherits it through
+`buildSpawnEnv`'s `...process.env`. Use `PATHLY_API_BASE`/`apiFetch` for any new renderer call,
+never a literal `127.0.0.1:8765`.
+
 ## Topbar and sidebar (redesigned)
 
 **Topbar** (`src/renderer/src/components/topbar/`):
@@ -104,6 +113,7 @@ one concern each (split 2026-08-18 under the 400-line ratchet — the file was 1
 | `promptInjector.ts` | startup-gate answering + the interactive bracketed-paste injector |
 | `spawnReporting.ts` | the post-exit POSTs (`/runner/terminal/result`, `/db/invocation`) |
 | `preflight.ts` | is this engine installed? |
+| `spawnEnv.ts` | `buildSpawnEnv(cwd, meta)` — the PTY child env: project root, enriched PATH, and for a runner tab `PATHLY_GATE_BILLED` + `PATHLY_RUN_TOKEN` (the per-run token from the `TERMINAL_SPAWN` payload, via `terminal:register-runner`'s `runToken` arg; set only when present, never in `process.env`, never logged) |
 | `popout.ts` | detach a tab into its own BrowserWindow |
 | `log.ts` | `slog` |
 

@@ -4,7 +4,7 @@
 
 Comms board / message-board subsystem — messages, tasks, artifacts, goals, context retrieval & relevance, board mirror & hydration.
 
-43 test file(s).
+51 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -12,6 +12,7 @@ Comms board / message-board subsystem — messages, tasks, artifacts, goals, con
 | `test_board_closure.py` | Board closure — the write paths that let a resolution actually land | 19 |
 | `test_board_context_catalog.py` | Tests for board-context-pull Solution A — the 📚 Catalog channel | 3 |
 | `test_board_context_scope.py` | Tests for board_context_for — scope-aware context honoring the Reads toggle | 3 |
+| `test_board_context_settings.py` | Board-context size is configured and measured, not hardcoded | 16 |
 | `test_board_feed_and_archive_paths.py` | Board-feed structural inclusion (goals/tasks never evicted) + archive-artifacts repo-root path | 3 |
 | `test_board_lock.py` | Tests for the per-board run-lock (BOARD-RUNTIME-SPEC A2/D1) | 6 |
 | `test_board_mirror.py` | Board disk-mirror P0 — path resolver, atomic exporter, idempotent backfill | 19 |
@@ -23,7 +24,9 @@ Comms board / message-board subsystem — messages, tasks, artifacts, goals, con
 | `test_comms_answer.py` | Tests for POST /comms/answer — the chosen option + answered status must persist | 3 |
 | `test_comms_artifact_summary_writeback.py` | Conv 3 (unified-ai-routing): CLIENT writes its computed summary + per-artifact | 11 |
 | `test_comms_attach.py` | Tests for POST /comms/attach — real artifact attachment onto an existing | 5 |
+| `test_comms_body_encoding.py` | Every comms POST route must read a non-UTF-8 request body | 6 |
 | `test_comms_consolidate.py` | Deterministic memory consolidation — dedupe_board + /comms/consolidate | 9 |
+| `test_comms_context_budget.py` | Per-tier char budget on the Context channel (context_budget.py) | 7 |
 | `test_comms_context_channels.py` | Tests for Phase 1.4c — labeled governance/semantic channels | 12 |
 | `test_comms_context_refs.py` | Tests for Phase 2 — context_refs on the comms write path | 5 |
 | `test_comms_context_relevance.py` | Relevance gate on the Context channel (memory-consolidation phase) | 8 |
@@ -32,12 +35,14 @@ Comms board / message-board subsystem — messages, tasks, artifacts, goals, con
 | `test_comms_embed_curation.py` | Tests for Phase 1.4b — write-time embedding curation | 7 |
 | `test_comms_embed_persist.py` | Regression tests for the _VEC_AVAILABLE stale-binding bug (CT6) | 3 |
 | `test_comms_goal_executor.py` | Tests for Phase 0b — goal_id + executor on the comms write path | 5 |
-| `test_comms_goals_run.py` | Tests for Phase 1 — the goal executor dispatcher (start_goal_run + /comms/goals/run) | 34 |
+| `test_comms_goals_run.py` | Tests for Phase 1 — the goal executor dispatcher (start_goal_run + /comms/goals/run) | 37 |
 | `test_comms_goals_stop.py` | Tests for POST /comms/goals/stop | 6 |
 | `test_comms_hybrid.py` | Tests for Phase 11 — FTS5 virtual table + hybrid search helpers | 11 |
 | `test_comms_hydrate_paths.py` | Regression tests for CT5 — the authoritative-channel 'section not found' bug | 8 |
+| `test_comms_promote.py` | Tests for POST /comms/promote — cross-tier promotion of a decision/constraint | 19 |
+| `test_comms_provenance.py` | role-read-policy 09: the server stamps author_role / author_run_id / author_source on every | 58 |
 | `test_comms_refs_enforcement.py` | Tests for CT3 — context_refs enforcement + coverage + unverified auto-derive | 6 |
-| `test_comms_scope.py` | Tests for the /comms/scope board_scope endpoints | 6 |
+| `test_comms_scope.py` | Tests for the /comms/scope board_scope endpoints | 9 |
 | `test_comms_search_mode.py` | Tests for Phase 12 — mode param in /comms/search + hybrid default in retrieval | 21 |
 | `test_comms_sections.py` | Tests for comms-board context-retrieval (Phase 3 rigor gate) | 33 |
 | `test_comms_sections_fixes.py` | Regression tests for three confirmed defects fixed in Phase 3 comms-board context-retrieval | 13 |
@@ -51,3 +56,6 @@ Comms board / message-board subsystem — messages, tasks, artifacts, goals, con
 | `test_governance_decision_precedence.py` | Governance block ordering — decisions render newest-first with explicit precedence | 10 |
 | `test_phase_board_post.py` | unified-ai-routing Conv 6 — /record_phase mirrors phase boundaries onto the board | 3 |
 | `test_post_artifact_indexing.py` | Regression (unified-ai-routing review): /comms/post must call index_artifact_async | 1 |
+| `test_read_policy.py` | Read-policy core: row_allowed, policy_predicate and their agreement | 10 |
+| `test_read_policy_resolve.py` | resolve_read_policy: per-role row -> per-feature row -> built-in default -> allow all | 10 |
+| `test_rrp_acceptance.py` | Identity and provenance end to end: spawn token, stamped board post, reviewer wall | 7 |

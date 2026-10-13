@@ -94,6 +94,7 @@ def complete_stage(args: dict) -> dict:
                     feedback["target_agent"],
                     storage_path,
                     feedback_file=feedback["file"],
+                    retry_count=feedback.get("retry_count", 0),
                 )
                 result["instructions"] = instructions
                 result["agent_hint"] = _fops._agent_hint(
@@ -190,6 +191,7 @@ def complete_stage(args: dict) -> dict:
                     feedback["target_agent"],
                     storage_path,
                     feedback_file=feedback["file"],
+                    retry_count=feedback.get("retry_count", 0),
                 )
                 result["instructions"] = instructions
                 result["agent_hint"] = _fops._agent_hint(
@@ -216,7 +218,9 @@ def complete_stage(args: dict) -> dict:
     human_gates = open_human_gates(board, scope)
     if human_gates:
         if args.get("force_past_gate"):
-            record_gate_override(board, scope, human_gates, str(args.get("actor") or "human"))
+            record_gate_override(
+                board, scope, human_gates, str(args.get("actor") or "human")
+            )
         else:
             result = _fops._blocked_response(
                 {"target_agent": "human", "file": "HUMAN_QUESTIONS.md"},

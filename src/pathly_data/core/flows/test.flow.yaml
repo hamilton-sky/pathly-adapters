@@ -43,11 +43,22 @@ feedback_routing:
   PLAN_FEEDBACK: planner
   ARCH_FEEDBACK: architect
   DESIGN_FEEDBACK: designer
+  # The builder's [ARCH] blocker -> architect, the same in every flow (DESIGN_FEEDBACK
+  # above is the designer's separate UI/UX file).
   DESIGN_QUESTIONS: architect
   IMPL_QUESTIONS: planner
   REVIEW_FAILURES: builder
   TEST_FAILURES: builder
   ACCEPTANCE_QUESTION: po
+
+# 3-tier retry escalation (rounds 1-2 owner -> round 3 upstream specialist -> round 4+ human).
+# Mirrors team.flow.yaml/team-build.flow.yaml, which share the same team/review + team/test
+# skills — without this, a persistently failing review/test loop here routed back to
+# builder forever with no round-3 hand-off and no round-4 human escalation.
+escalation_routing:
+  REVIEW_FAILURES: planner
+  SCOPE_VIOLATION: planner
+  TEST_FAILURES: po
 
 feedback_priority:
   - HUMAN_QUESTIONS
@@ -72,7 +83,7 @@ transition_rules:
     default: TESTING
   TESTING:
     on_artifact:
-      TEST_FAILURES.md: TESTING
+      TEST_FAILURES.md: BUILDING
     default: DONE
 
 transition_actions:

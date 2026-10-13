@@ -48,8 +48,7 @@ def _collect_ids(data: dict) -> list[str]:
     if not isinstance(raw, list):
         return []
     ids = [v.strip() for v in raw if isinstance(v, str) and v.strip()]
-    seen: set[str] = set()
-    return [i for i in ids if not (i in seen or seen.add(i))]
+    return list(dict.fromkeys(ids))  # de-duplicated, order kept
 
 
 @bp.route("/comms/tasks/status", methods=["POST"])

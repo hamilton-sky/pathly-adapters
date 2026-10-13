@@ -45,9 +45,7 @@ def validate_supersedes(value: object) -> tuple[list[str] | None, str | None]:
     ids = [v.strip() for v in value if v.strip()]
     if len(ids) > MAX_SUPERSEDES:
         return None, f"Field 'supersedes' accepts at most {MAX_SUPERSEDES} ids"
-    seen: set[str] = set()
-    deduped = [i for i in ids if not (i in seen or seen.add(i))]
-    return deduped, None
+    return list(dict.fromkeys(ids)), None  # de-duplicated, order kept
 
 
 def apply_supersedes(conn, old_ids: list[str], new_id: str) -> dict:
@@ -65,7 +63,9 @@ def apply_supersedes(conn, old_ids: list[str], new_id: str) -> dict:
         from pathly_orchestrator.db.queries.comms import (
             supersede_message as _supersede,
         )
-    except Exception:  # pragma: no cover - import failure is not worth failing a post over
+    except (
+        Exception
+    ):  # pragma: no cover - import failure is not worth failing a post over
         logging.debug("supersede import failed", exc_info=True)
         return result
 
@@ -86,3 +86,16 @@ def apply_supersedes(conn, old_ids: list[str], new_id: str) -> dict:
         else:
             result["skipped"].append({"id": old_id, "reason": verdict})
     return result
+
+
+def response_fields(result: dict) -> dict:
+    """The keys a /comms/post response adds for its supersedes; none when it sent no ids.
+
+    Each named id lands in exactly one of the two lists, so both empty means none were sent.
+    """
+    fields: dict = {}
+    if result["superseded"] or result["skipped"]:
+        fields["superseded"] = result["superseded"]
+    if result["skipped"]:
+        fields["supersede_skipped"] = result["skipped"]
+    return fields

@@ -53,19 +53,7 @@ def trends_endpoint():
             buckets = get_daily_trends(conn, feature, days)
         else:
             buckets = get_daily_trends_all(conn, days, project_root)
-        # Buckets older than this watermark have cache_read/write_tokens = 0 because nothing
-        # CAPTURED the split yet, not because no cache was used. Without it a chart reads the
-        # fix date as the day prompt caching started. See _stamp_cache_split_watermark.
-        resp = {"trends": buckets}
-        try:
-            from pathly_orchestrator.db.queries.app_settings import get_setting
-
-            since = get_setting(conn, "telemetry.cache_split_since")
-            if since:
-                resp["cache_split_since"] = since
-        except Exception:
-            pass
-        return jsonify(resp), 200
+        return jsonify({"trends": buckets}), 200
     except Exception:
         logger.exception("trends_endpoint error")
         return jsonify({"trends": []}), 200

@@ -43,12 +43,30 @@ role_map:
   RESEARCHING: web-researcher
   DESIGNING: designer
   PLANNING: planner
+# Same per-stage CLI routing as consultation.flow.yaml (this flow is that flow lifted
+# one altitude up, per the header comment) — PO discussion + design run on codex.
+adapter_map:
+  default: claude
+  PO_DISCUSSING: codex
+  DESIGNING: codex
 feedback_routing:
   HUMAN_QUESTIONS: human
   BLOCKED_ON_HUMAN: human
   ARCH_QUESTION: architect
+  # utilities/meet.md's escalation writes feedback/ARCH_FEEDBACK.md (its option [1],
+  # "routes to architect") into ANY feature regardless of flow, and it is the canonical
+  # [ARCH] file in fragments/feedback-protocol.md. Unrouted here, it hit the
+  # "Unrecognized feedback file" fallback and reached a human as a generic
+  # review-manually note instead of the architect the user asked for.
+  ARCH_FEEDBACK: architect
   PO_QUESTIONS: po
-  DESIGN_QUESTIONS: designer
+  # DESIGN_QUESTIONS.md is the builder's [ARCH]-tagged technical blocker (written by
+  # team/build.md + development/build.md), so it resolves to the ARCHITECT in every
+  # flow. It used to route to `designer` here, contradicting both its writers' [ARCH]
+  # tag and utilities/meet.md's documented "-> routes to architect". DESIGN_FEEDBACK
+  # keeps the designer reachable, matching team.flow.yaml/team-build.flow.yaml.
+  DESIGN_QUESTIONS: architect
+  DESIGN_FEEDBACK: designer
   IMPL_QUESTIONS: planner
 # Each stage advances on its default edge once its artifact is written; the stage
 # skill calls `pathly-fsm-call complete-stage` to move on. Optional content gates

@@ -24,6 +24,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import os
+from typing import Any
 
 from flask import Blueprint, jsonify, request
 
@@ -38,7 +39,17 @@ _DEFAULT_BUDGET = 1500
 # Optional per-request ``engine`` → backend mapping. Lets ONE endpoint serve the
 # graph (codebase-memory-mcp, breadth), the LSP (Serena, always-fresh), or both.
 # Absent / unknown → fall through to the configured ``code_context.backend``.
-_ENGINE_TO_BACKEND = {"graph": "cli", "cli": "cli", "lsp": "lsp", "both": "both"}
+_ENGINE_TO_BACKEND = {
+    "graph": "cli",
+    "cli": "cli",
+    "lsp": "lsp",
+    "both": "both",
+    "codeintel": "codeintel",
+}
+
+# The codeintel backend returns real caller/impact rows rather than a per-file
+# summary, so it gets a larger default budget than the legacy block.
+_CODEINTEL_BUDGET = 6000
 
 # --- Role -> capability tiering (Approach C "code_intel.roles") ---------------
 # The gateway gates each query by the caller's role per the code-intel-proxy
@@ -49,11 +60,22 @@ _ENGINE_TO_BACKEND = {"graph": "cli", "cli": "cli", "lsp": "lsp", "both": "both"
 # defaults from the APPROACH.
 _TIER_OPS: dict[str, frozenset[str]] = {
     # full — impact + callers + chain (superset also covers the lookup ops)
-    "full": frozenset({"impact", "callers", "chain", "symbol", "context", "pattern"}),
+    "full": frozenset(
+        {
+            "impact",
+            "callers",
+            "callees",
+            "chain",
+            "symbol",
+            "context",
+            "pattern",
+            "search",
+        }
+    ),
     # chain — call-chain tracing only
     "chain": frozenset({"chain"}),
     # lookup — symbol + context only
-    "lookup": frozenset({"symbol", "context"}),
+    "lookup": frozenset({"symbol", "context", "search"}),
 }
 _ROLE_TIER: dict[str, str] = {
     "architect": "full",
@@ -161,6 +183,8 @@ def _log_query(
     try:
         from pathly_orchestrator.db.connection import get_db
         from pathly_orchestrator.db.queries.comms import post_message
+        from pathly_orchestrator.http_server.run_identity import caller_identity
+        from pathly_orchestrator.runner.provenance import stamp
 
         post_message(
             get_db(),
@@ -169,21 +193,60 @@ def _log_query(
             from_agent="code-intel",
             type="discovery",
             text=_query_log_text(op, target, role, backend, hit),
+            **stamp(caller_identity(request)),
         )
     except Exception:
         logger.debug("code_query: board logging failed", exc_info=True)
+
+
+def _codeintel_payload(
+    data: dict, op: str, target: str, role: str, scope: str, engine: str
+):
+    """Answer one query through the ``codeintel`` backend (op-aware, no gateway cache).
+
+    codeintel keeps its own freshness-keyed cache and reindexes itself, so the
+    content-hash cache and ``maybe_reindex`` used for the legacy backends are
+    skipped here. Its ``reason``/``hint``/``outcome`` pass through, so "repo not
+    indexed" stays distinguishable from "no callers".
+    """
+    from pathly_orchestrator.runner import code_context as _cc
+
+    try:
+        budget = int(data.get("budget") or _CODEINTEL_BUDGET)
+    except (TypeError, ValueError):
+        budget = _CODEINTEL_BUDGET
+    provider: Any = _cc.get_provider("codeintel")  # CodeintelProvider adds .query
+    block, meta = provider.query(
+        op, target, str(data.get("project_root") or ""), engine, budget
+    )
+    result = block or None
+    _log_query(scope, op.strip(), target.strip(), role, "codeintel", bool(result))
+    payload = {
+        "ok": True,
+        "op": op.strip(),
+        "target": target.strip(),
+        "result": result,
+        "backend": "codeintel",
+        "cached": False,
+        **{k: v for k, v in meta.items() if v not in (None, "")},
+    }
+    if result is None and meta.get("reason") == "backend-unavailable":
+        payload["missing"] = _cc.missing_dependencies("codeintel")
+    return payload
 
 
 @bp.route("/code/query", methods=["POST"])
 def code_query():
     """Proxy a ``{op, target}`` code-structure query to the shared backend.
 
-    Request body (JSON): ``{"op": "impact|callers|symbol|pattern",
+    Request body (JSON): ``{"op": "impact|callers|callees|chain|symbol|pattern|search",
     "target": "<path-or-symbol>", "role": "<agent-role>", "scope": "<feature>",
     "engine": "graph|lsp|both", "budget": <int>}``. ``op`` and ``target`` are
     required; the rest are optional. ``engine`` selects the backend for this
     request (graph = codebase-memory-mcp, lsp = Serena, both = merged); when
-    omitted the configured ``code_context.backend`` is used. Returns
+    omitted the configured ``code_context.backend`` is used. With the ``codeintel``
+    backend the op is answered as asked (real caller rows, semantic ``search``)
+    and ``engine`` is forwarded to codeintel. Returns
     ``{ok, op, target, result, backend}`` — ``result`` is the advisory block
     string, or ``null`` when the backend is off / has nothing.
     """
@@ -236,7 +299,22 @@ def code_query():
         # Effective backend for THIS request: an explicit `engine` wins, else the
         # persisted `code_context.backend` setting (off→none | cli | lsp | both),
         # read live so flipping it takes effect without a restart.
-        effective = backend_override or _cc._resolve_backend()
+        configured = _cc._resolve_backend()
+        # codeintel speaks its own engine vocabulary (graph|lsp|semantic|both|all), so
+        # when it is the configured backend an `engine` is forwarded to it rather than
+        # mapped onto a legacy backend; `engine: cli` still reaches the legacy graph.
+        from pathly_orchestrator.runner.code_context_codeintel import CODEINTEL_ENGINES
+
+        if backend_override == "codeintel" or (
+            configured == "codeintel" and (not engine or engine in CODEINTEL_ENGINES)
+        ):
+            ci_engine = "" if engine == "codeintel" else engine
+            return (
+                jsonify(_codeintel_payload(data, op, target, role, scope, ci_engine)),
+                200,
+            )
+
+        effective = backend_override or configured
         backend = _cc.get_provider(effective).name
 
         # On-demand freshness: fire a debounced background re-index so the graph keeps

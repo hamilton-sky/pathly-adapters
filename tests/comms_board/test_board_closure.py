@@ -36,15 +36,19 @@ def _post(client, **fields):
 
 
 def _decision(client, text, **extra):
-    return _post(client, **{"from": "architect", "type": "decision", "text": text, **extra})
+    return _post(
+        client, **{"from": "architect", "type": "decision", "text": text, **extra}
+    )
 
 
 def _superseded_by(message_id):
     from pathly_orchestrator.db.connection import get_db
 
-    row = get_db().execute(
-        "SELECT superseded_by FROM comms_messages WHERE id=?", (message_id,)
-    ).fetchone()
+    row = (
+        get_db()
+        .execute("SELECT superseded_by FROM comms_messages WHERE id=?", (message_id,))
+        .fetchone()
+    )
     return row["superseded_by"] if row else None
 
 
@@ -66,7 +70,9 @@ def test_superseded_decision_leaves_the_governance_block(client):
     from pathly_orchestrator.db.queries.comms import get_pending_decisions
 
     old = _decision(client, "GATE: do not build until the human answers")
-    new = _decision(client, "Gate resolved by the human.", supersedes=[old["message_id"]])
+    new = _decision(
+        client, "Gate resolved by the human.", supersedes=[old["message_id"]]
+    )
 
     live = get_pending_decisions(get_db(), boards=["feature"], scopes=["closure-demo"])
     live_ids = {m["id"] for m in live}
@@ -108,7 +114,9 @@ def test_a_message_cannot_supersede_itself(client):
     assert out["skipped"] == [{"id": posted["message_id"], "reason": "self_reference"}]
     live_ids = {
         m["id"]
-        for m in get_pending_decisions(get_db(), boards=["feature"], scopes=["closure-demo"])
+        for m in get_pending_decisions(
+            get_db(), boards=["feature"], scopes=["closure-demo"]
+        )
     }
     assert posted["message_id"] in live_ids
 
@@ -155,15 +163,20 @@ def test_supersedes_is_deduplicated_and_absent_field_stays_none():
 
 
 def _task(client, text, **extra):
-    return _post(client, **{"from": "planner", "type": "task", "text": text, "no_refs": "test", **extra})
+    return _post(
+        client,
+        **{"from": "planner", "type": "task", "text": text, "no_refs": "test", **extra},
+    )
 
 
 def _task_status(message_id):
     from pathly_orchestrator.db.connection import get_db
 
-    row = get_db().execute(
-        "SELECT task_status FROM comms_messages WHERE id=?", (message_id,)
-    ).fetchone()
+    row = (
+        get_db()
+        .execute("SELECT task_status FROM comms_messages WHERE id=?", (message_id,))
+        .fetchone()
+    )
     return row["task_status"] if row else None
 
 
@@ -172,7 +185,12 @@ def test_status_marks_a_batch_of_tasks_done_in_one_call(client):
     ids = [_task(client, f"task {i}")["message_id"] for i in range(3)]
     r = client.post(
         "/comms/tasks/status",
-        json={"task_ids": ids, "status": "done", "from": "evaluator", "reason": "resolved by ADR-007"},
+        json={
+            "task_ids": ids,
+            "status": "done",
+            "from": "evaluator",
+            "reason": "resolved by ADR-007",
+        },
     )
     assert r.status_code == 200, r.data
     assert set(json.loads(r.data)["updated"]) == set(ids)
@@ -190,10 +208,16 @@ def test_completing_a_dependency_reports_newly_ready_dependents(client):
 
 def test_failing_a_task_cascades_to_its_dependents(client):
     dep = _task(client, "will fail")
-    downstream = _task(client, "downstream of the failure", depends_on=[dep["message_id"]])
+    downstream = _task(
+        client, "downstream of the failure", depends_on=[dep["message_id"]]
+    )
     r = client.post(
         "/comms/tasks/status",
-        json={"task_ids": [dep["message_id"]], "status": "failed", "reason": "unbuildable"},
+        json={
+            "task_ids": [dep["message_id"]],
+            "status": "failed",
+            "reason": "unbuildable",
+        },
     )
     assert _task_status(dep["message_id"]) == "failed"
     assert downstream["message_id"] in json.loads(r.data)["blocked"]
@@ -213,7 +237,9 @@ def test_unknown_ids_are_reported_not_silently_dropped(client):
 def test_status_is_idempotent(client):
     tid = _task(client, "done twice")["message_id"]
     for _ in range(2):
-        r = client.post("/comms/tasks/status", json={"task_ids": [tid], "status": "done"})
+        r = client.post(
+            "/comms/tasks/status", json={"task_ids": [tid], "status": "done"}
+        )
         assert json.loads(r.data)["updated"] == [tid]
     assert _task_status(tid) == "done"
 
@@ -221,7 +247,9 @@ def test_status_is_idempotent(client):
 def test_reopening_a_task_is_refused(client):
     """An agent that can reopen its own failures can loop without anything closing."""
     tid = _task(client, "no reopening")["message_id"]
-    r = client.post("/comms/tasks/status", json={"task_ids": [tid], "status": "pending"})
+    r = client.post(
+        "/comms/tasks/status", json={"task_ids": [tid], "status": "pending"}
+    )
     assert r.status_code == 400
     assert "supervisory" in json.loads(r.data)["note"]
 
@@ -229,10 +257,10 @@ def test_reopening_a_task_is_refused(client):
 @pytest.mark.parametrize(
     "body",
     [
-        {"status": "done"},                      # no ids
-        {"task_ids": ["x"]},                     # no status
-        {"task_ids": [], "status": "done"},      # empty ids
-        {"task_ids": ["x"], "status": "banana"}, # unknown status
+        {"status": "done"},  # no ids
+        {"task_ids": ["x"]},  # no status
+        {"task_ids": [], "status": "done"},  # empty ids
+        {"task_ids": ["x"], "status": "banana"},  # unknown status
     ],
 )
 def test_status_rejects_malformed_requests(client, body):
@@ -249,7 +277,7 @@ def test_single_task_id_form_is_accepted(client):
 
 
 def test_write_state_stamps_the_flow_name(tmp_path, monkeypatch):
-    """"DONE" alone cannot distinguish consultation's DONE (decomposed, nothing built)
+    """ "DONE" alone cannot distinguish consultation's DONE (decomposed, nothing built)
     from team's DONE (shipped)."""
     from pathly_orchestrator import eventlog
 
@@ -260,8 +288,11 @@ def test_write_state_stamps_the_flow_name(tmp_path, monkeypatch):
         eventlog, "_write_state_db", lambda d, n, state: captured.update(state)
     )
 
-    flow = {"flow": "consultation", "states": ["PLANNING", "DONE"],
-            "transitions": {"PLANNING": ["DONE"], "DONE": []}}
+    flow = {
+        "flow": "consultation",
+        "states": ["PLANNING", "DONE"],
+        "transitions": {"PLANNING": ["DONE"], "DONE": []},
+    }
     eventlog.write_state(str(feature_dir), {"current": "DONE"}, flow)
     assert captured["current"] == "DONE"
     assert captured["flow"] == "consultation"
@@ -313,7 +344,9 @@ def test_wildcard_gates_survive_the_db_round_trip():
         "states": ["A", "DONE"],
         "transitions": {"A": ["DONE"], "DONE": []},
         "agent_map": {"A": "team/builder"},
-        "gates": {"->DONE": [{"type": "require_tasks_done", "on_fail": "INCOMPLETE_TASKS.md"}]},
+        "gates": {
+            "->DONE": [{"type": "require_tasks_done", "on_fail": "INCOMPLETE_TASKS.md"}]
+        },
     }
     flow_cfg, nodes, edges = _decompose_flow_dict(original)
     assembled = _assemble_from_parts(flow_cfg, nodes, edges)

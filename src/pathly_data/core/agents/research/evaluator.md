@@ -84,6 +84,7 @@ Then post an `artifact` to the board:
 
 ```bash
 curl -s -X POST http://127.0.0.1:8765/comms/post \
+  -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "feature": "<feature>",
@@ -121,6 +122,7 @@ Post each task:
 
 ```bash
 curl -s -X POST http://127.0.0.1:8765/comms/post \
+  -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "feature": "<feature>",

@@ -1,3 +1,5 @@
 skill: po
 filename: pathly-po/SKILL.md
 natural_language: "/pathly po, product owner, clarify requirements, po"
+# requires: skills this skill's own text tells the host to invoke (the user's next-step choice routes to go or storm)
+requires: [go, storm]

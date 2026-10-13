@@ -2,21 +2,15 @@
 
 Why this exists
 ---------------
-The real per-agent cost/tokens live in ``fsm_events`` — each agent writes an
-``AGENT_DONE`` (self-reported cost) via the log-agent-done skill, and the stop hook
-/ reconciliation window later appends a ``BILLING_UPDATE`` that *supersedes* it with
-the provider-accurate figure. The DB-explorer roll-up and cost chart, however, read
-``agent_invocations`` — which previously only captured supervised / board / editor
-runs, written at spawn time with ``cost_usd=0``. So the bulk of real work
-(interactive ``/pathly`` runs) never appeared, and even the rows that did were never
-reconciled to their real cost.
+The real per-agent cost/tokens live in ``fsm_events``: each agent writes an ``AGENT_DONE``
+(self-reported cost) and the stop hook / reconciliation window later appends a superseding
+``BILLING_UPDATE`` with the provider-accurate figure. The roll-ups and cost chart read
+``agent_invocations``, which used to miss interactive runs and never reconciled real cost.
 
-This module makes ``agent_invocations`` a faithful projection of that event stream:
-one row per ``AGENT_DONE``, keyed by its ``fsm_events.seq`` (``source_seq``), with the
-superseding ``BILLING_UPDATE`` folded in (billing wins when priced — matching the
-"supersedes for cost/token display" contract, so the 21 double-counted runs collapse
-to one). Editor/chat one-shots (posted via ``/db/invocation``, feature ``"(project)"``,
-no event) are a disjoint population with ``source_seq IS NULL`` and are left untouched.
+This module projects that stream: one row per ``AGENT_DONE``, keyed by its
+``fsm_events.seq`` (``source_seq``), with the superseding ``BILLING_UPDATE`` folded in
+(billing wins when priced, so a run is never double-counted). Editor/chat one-shots
+(``/db/invocation``, ``source_seq IS NULL``, no event) are disjoint and left untouched.
 
 Contracts
 ---------
@@ -36,12 +30,105 @@ import sqlite3
 
 from ..connection import _get_write_lock
 from .fsm_events import _board_scope_of
-# Pricing lives in its own module (400-line SOLID ratchet); aliased to the historical
-# private names so every call site below — and the tests — are untouched by the split.
-from .invocation_pricing import num as _num, price_if_needed as _price_if_needed
-from .invocation_record import _agent_done_rec, _tier_for
 
 _log = logging.getLogger("pathly.telemetry")
+
+
+def _num(v: object) -> float:
+    try:
+        return float(v or 0)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _price_if_needed(
+    cost: float,
+    cost_source: str,
+    model: str | None,
+    tokens_in: object,
+    tokens_out: object,
+    cache: dict | None = None,
+) -> tuple[float, str]:
+    """Estimate cost from tokens when the event stream reported none (``cache`` carries the
+    billing's cache_read/write_tokens so cached input is priced at the cache rate).
+
+    Idempotent chokepoint: only fires when ``cost`` is exactly 0 (a priced cost —
+    provider-reported OR an earlier estimate — is never re-priced/overwritten).
+    agy/gemini rows with tokens still 0 are marked 'unavailable' rather than left
+    'unpriced' — agy emits no usage telemetry at all, so there is nothing to estimate.
+    """
+    if cost and cost > 0:
+        return cost, cost_source
+    tin, tout = int(_num(tokens_in)), int(_num(tokens_out))
+    if tin + tout > 0:
+        from ..pricing import cache_tokens_of, estimate_cost  # intra-db, layer-safe
+
+        est, src = estimate_cost(model or "", tin, tout, **cache_tokens_of(cache))
+        if src == "estimated":
+            return est, "estimated"
+        return cost, cost_source
+    m = (model or "").lower()
+    if m.startswith("gemini-") or m in ("antigravity", "agy"):
+        return cost, "unavailable"
+    # A codex/openai stage bills LATE via the spawn-gate BILLING_UPDATE — its AGENT_DONE
+    # self-reports 0 tokens, so a 0-token/0-cost row here is AWAITING that reconciliation,
+    # not genuinely free. Mark it 'pending' (not a misleading 'unpriced $0'); when the
+    # BILLING_UPDATE folds in the real tokens this re-prices to 'estimated'.
+    if m.startswith(("gpt-", "gpt5", "o1", "o3", "o4")) or "codex" in m:
+        return cost, "pending"
+    return cost, cost_source
+
+
+def _tier_for(conn: sqlite3.Connection, project_root: str, feature: str) -> str:
+    """Best-effort board scope tier for (project_root, feature).
+
+    AGENT_DONE events carry no scope tier, so we recover it from a sibling fact that
+    does: a non-'feature' tier on any existing invocation or otel_span for this
+    (project_root, feature). Defaults to 'feature' (correct for interactive runs).
+    """
+    for table in ("agent_invocations", "otel_spans"):
+        try:
+            row = conn.execute(
+                f"SELECT scope_tier FROM {table} "  # nosec B608 - {table} is a hardcoded literal tuple; params are bound
+                "WHERE project_root=? AND feature=? AND scope_tier IS NOT NULL "
+                "AND scope_tier!='feature' LIMIT 1",
+                (project_root, feature),
+            ).fetchone()
+            if row and row[0]:
+                return str(row[0])
+        except sqlite3.OperationalError:
+            continue
+    return "feature"
+
+
+def _agent_done_rec(payload: dict) -> dict:
+    """Build the invocation fields an AGENT_DONE payload can supply."""
+    total_tok = int(_num(payload.get("total_tokens")))
+    # Run TYPE for the Monitor's RECENT bucketing. Guarded so an unsubstituted
+    # <run_category> placeholder (a raw/interactive skill that skipped injection) lands as
+    # NULL, not a junk bucket — the renderer then falls back to its scope_tier heuristic.
+    cat = payload.get("category")
+    if cat not in ("flow", "single", "loop"):
+        cat = None
+    return {
+        "agent_role": payload.get("agent") or "agent",
+        "conversation": payload.get("conversation"),
+        "category": cat,
+        # run-identity: the spawn-issued board scope, guarded like category (an
+        # unsubstituted <feature> placeholder lands as NULL, never a junk identity).
+        "board_scope": _board_scope_of(payload),
+        "cost_usd": _num(payload.get("cost_usd")),
+        # AGENT_DONE only ever carries total_tokens (never an in/out split); park the
+        # total in tokens_in so SUM(tokens_in+tokens_out) is the true total. A later
+        # BILLING_UPDATE overwrites both with the real split.
+        "tokens_in": int(_num(payload.get("tokens_in"))) or total_tok,
+        "tokens_out": int(_num(payload.get("tokens_out"))),
+        "tool_uses": int(_num(payload.get("tool_uses"))),
+        "summary": (payload.get("summary") or payload.get("result") or "")[:2000],
+        "provider": payload.get("model") or payload.get("adapter") or None,
+        "run_id": payload.get("run_id"),
+        "ts": payload.get("ts") or "",
+    }
 
 
 def _upsert_projected(
@@ -61,6 +148,7 @@ def _upsert_projected(
         rec.get("provider"),
         rec.get("tokens_in"),
         rec.get("tokens_out"),
+        rec,
     )
     with _get_write_lock(conn):
         conn.execute(
@@ -112,20 +200,12 @@ def _fold_billing(rec: dict, payload: dict) -> None:
     if (b_in + b_out) > 0:
         rec["tokens_in"] = b_in
         rec["tokens_out"] = b_out
+        for k in ("cache_read_tokens", "cache_write_tokens"):
+            rec[k] = int(_num(payload.get(k)))
     else:
         b_total = int(_num(payload.get("total_tokens")))
         if b_total > 0 and int(rec.get("tokens_in") or 0) == 0:
             rec["tokens_in"] = b_total
-    # Cache split (subset of tokens_in). Folded whenever billing reports it so the
-    # cache_read_tokens/cache_write_tokens columns — long present and long empty — get a
-    # producer. Guarded on > 0 so a billing event without the split cannot zero an
-    # anchor that already had one.
-    b_cread = int(_num(payload.get("cache_read_tokens")))
-    b_cwrite = int(_num(payload.get("cache_write_tokens")))
-    if b_cread > 0:
-        rec["cache_read_tokens"] = b_cread
-    if b_cwrite > 0:
-        rec["cache_write_tokens"] = b_cwrite
     if payload.get("tool_uses") is not None:
         rec["tool_uses"] = int(_num(payload.get("tool_uses")))
     # run-identity: billing may carry the spawn-issued board_scope the agent omitted.
@@ -321,8 +401,7 @@ def on_event_appended(
                 return
             anchor_seq = anchor[0]
             row = conn.execute(
-                "SELECT cost_usd, tokens_in, tokens_out, provider, run_id, "
-                "cache_read_tokens, cache_write_tokens "
+                "SELECT cost_usd, tokens_in, tokens_out, provider, run_id "
                 "FROM agent_invocations "
                 "WHERE project_root=? AND feature=? AND source_seq=?",
                 (project_root, anchor_feature, anchor_seq),
@@ -334,8 +413,6 @@ def on_event_appended(
                 "cost_usd": _num(row[0]) if row else 0.0,
                 "tokens_in": int(row[1]) if row and row[1] else 0,
                 "tokens_out": int(row[2]) if row and row[2] else 0,
-                "cache_read_tokens": int(row[5]) if row and row[5] else 0,
-                "cache_write_tokens": int(row[6]) if row and row[6] else 0,
             }
             _fold_billing(rec, event_dict)
             # BILLING_UPDATE carries the model/run_id the original AGENT_DONE couldn't
@@ -351,13 +428,11 @@ def on_event_appended(
                 model,
                 rec.get("tokens_in"),
                 rec.get("tokens_out"),
-                rec.get("cache_read_tokens"),
-                rec.get("cache_write_tokens"),
+                rec,
             )
             with _get_write_lock(conn):
                 conn.execute(
                     "UPDATE agent_invocations SET cost_usd=?, tokens_in=?, tokens_out=?, "
-                    "cache_read_tokens=?, cache_write_tokens=?, "
                     "cost_source=?, provider=COALESCE(?,provider), run_id=COALESCE(?,run_id), "
                     "board_scope=COALESCE(board_scope,?) "
                     "WHERE project_root=? AND feature=? AND source_seq=?",
@@ -365,8 +440,6 @@ def on_event_appended(
                         cost,
                         int(rec.get("tokens_in") or 0),
                         int(rec.get("tokens_out") or 0),
-                        int(rec.get("cache_read_tokens") or 0),
-                        int(rec.get("cache_write_tokens") or 0),
                         cost_source,
                         model,
                         run_id,

@@ -37,7 +37,10 @@ def test_team_build_flow_valid():
         ), f"agent_map[{state}]={skill!r} has no core skill file"
     fr = flow["feedback_routing"]
     assert fr["ARCH_QUESTION"] == "architect"
-    assert fr["DESIGN_QUESTIONS"] == "designer"
+    # architect, not designer: DESIGN_QUESTIONS.md is the builder's [ARCH] blocker and
+    # routes the same way in every flow. tests/fsm_flows/test_design_questions_routing.py
+    # pins that uniformly; this line just keeps the two assertions from drifting apart.
+    assert fr["DESIGN_QUESTIONS"] == "architect"
     assert fr["PO_QUESTIONS"] == "po"
     assert fr["IMPL_QUESTIONS"] == "planner"
     assert fr["REVIEW_FAILURES"] == "builder"

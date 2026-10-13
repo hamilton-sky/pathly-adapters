@@ -36,7 +36,7 @@ Run: `python -c "import time; print(int(time.time()))"` and note the integer as 
 
 **Board task DAG.** Check whether this goal/feature has a board DAG:
 ```
-curl -s "http://127.0.0.1:8765/comms/tasks?feature=[feature]&scope=[feature]"
+curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" "http://127.0.0.1:8765/comms/tasks?feature=[feature]&scope=[feature]"
 ```
 If the response is a non-empty list, the DAG is the authoritative work list — you test the whole
 goal ONCE, after every task is built and reviewed. Every task must be `task_status: done`. The

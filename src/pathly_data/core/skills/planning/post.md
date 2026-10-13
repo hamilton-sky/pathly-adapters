@@ -44,7 +44,7 @@ On approval, POST **once** — `from: "human"` (this came from an interactive hu
 the `$FEATURE` / `board` / `scope` from Step 2 and the type + fields from Step 1:
 
 ```bash
-curl -s -X POST http://127.0.0.1:8765/comms/post -H "Content-Type: application/json" -d '{
+curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" -X POST http://127.0.0.1:8765/comms/post -H "Content-Type: application/json" -d '{
   "feature": "<feature>", "from": "human", "type": "<type>",
   "board": "<board>", "scope": "<feature>",
   "text": "<self-contained 1-2 sentence text>"

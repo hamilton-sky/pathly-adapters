@@ -210,7 +210,15 @@ def test_no_detected_hosts_exits():
     assert exc.value.code == 1
 
 
-def test_dry_run_real_claude(capsys):
+@pytest.fixture()
+def fake_home(tmp_path, monkeypatch):
+    """Redirect ~ so a dry-run's manifest reads (prune preview) never touch the real install."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    return tmp_path
+
+
+def test_dry_run_real_claude(capsys, fake_home):
     """Integration smoke: pathly-setup claude --dry-run must not crash."""
     with patch.object(sys, "argv", ["pathly-setup", "claude", "--dry-run"]):
         main()  # no mocks — uses real adapter files
@@ -218,7 +226,7 @@ def test_dry_run_real_claude(capsys):
     assert "[claude]" in captured.out
 
 
-def test_dry_run_real_codex_includes_plugin_manifest(capsys):
+def test_dry_run_real_codex_includes_plugin_manifest(capsys, fake_home):
     """Codex dry-run reports the plugin bundle manifest, not only skills/templates."""
     with patch.object(sys, "argv", ["pathly-setup", "codex", "--dry-run"]):
         main()  # no mocks — uses real adapter files
@@ -485,7 +493,9 @@ def test_apply_hooks_dry_run_does_not_write(tmp_path, capsys):
 
 
 def test_apply_hooks_install_yaml_uses_module_notation():
-    """install.yaml stop hook must use 'python -m' to avoid shell backslash issues."""
+    """install.yaml stop hook is `{python} -m <module>`: module notation (no hardcoded
+    paths / shell backslash issues) on an interpreter the installer resolves — never a
+    bare `python`, which fails where only python3 exists."""
     import yaml as _yaml
 
     install_yaml = (
@@ -501,5 +511,5 @@ def test_apply_hooks_install_yaml_uses_module_notation():
     stop_cmds = cfg.get("hooks", {}).get("Stop", [])
     assert stop_cmds, "install.yaml must declare at least one Stop hook"
     assert all(
-        cmd.startswith("python -m") for cmd in stop_cmds
-    ), "Stop hook commands must use 'python -m' notation (no hardcoded paths)"
+        cmd.startswith("{python} -m ") for cmd in stop_cmds
+    ), "Stop hook commands must be '{python} -m <module>' (no bare python, no paths)"

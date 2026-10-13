@@ -155,9 +155,30 @@ pathly-state <feature>              # print current FSM state for a feature
 pathly-tokens                       # print token/cost summary across all pipeline runs
 pathly-validate-flow <flow.yaml>    # validate a flow YAML against the FSM schema
 pathly-studio                       # launch the local Pathly Studio desktop UI
+pathly-pty-host                     # run a pipeline's CLI agents headlessly (no Studio)
 ```
 
 `--dry-run` never writes. `--apply` is required for any writes.
+
+### Choosing which skills are installed
+
+`--apply` installs a small default set of skills — `pathly`, `help`, `create-feature`, `post`, `status`,
+`fsm-call` — because the headless app (Studio's **Start** button) injects every pipeline skill's prompt itself
+and never reads a skill file. Add or drop the rest on demand:
+
+```bash
+pathly-setup claude --list                       # every skill: default / installed / available
+pathly-setup claude --apply --export build       # add a skill (also installs the skills it requires)
+pathly-setup claude --remove build --dry-run     # preview a removal; drop --dry-run to apply it
+pathly-setup claude --apply --all-skills         # install every skill
+pathly-setup claude --apply --repair --export design   # exact set: defaults + design; everything else is pruned
+```
+
+`--remove` is refused while another installed skill requires the skill (it names the ones to remove with
+it); default skills can't be removed individually (`--uninstall` removes everything). A `--dry-run` that
+would delete files lists them, and a real repair prints what it removed. Skills are named by their `skill:`
+key (`build`, `team/build`) or directory name (`pathly-build`); the Studio **Settings → Export** picker does
+the same thing.
 
 ## Supported Hosts
 
@@ -177,7 +198,7 @@ pathly-studio                       # launch the local Pathly Studio desktop UI
 
 ## FSM HTTP Server
 
-Pathly skills communicate with the Python FSM engine over HTTP. The server runs locally on port 8765 and is auto-started by the `fsm-call` skill when needed - no manual setup required.
+Pathly skills communicate with the Python FSM engine over HTTP. The server runs locally on port 8765 and is auto-started by the `fsm-call` skill when needed - no manual setup required. To run it beside something else on 8765, set `PATHLY_FSM_HTTP_PORT` before launching Studio (or `pathly-fsm-http`); Studio, the supervisor and the headless agents it spawns all follow it.
 
 ```
 POST http://127.0.0.1:8765/next_action            ← get current state + agent instructions

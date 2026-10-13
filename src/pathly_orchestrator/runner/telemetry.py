@@ -137,9 +137,14 @@ def project_agent_done(
         if cost > 0:
             cost_source = "provider_reported"
         else:
-            from pathly_orchestrator.db.pricing import estimate_cost_for
+            from pathly_orchestrator.db.pricing import (
+                cache_tokens_of,
+                estimate_cost_for,
+            )
 
-            est, src = estimate_cost_for(adapter or "", tin, tout)
+            est, src = estimate_cost_for(
+                adapter or "", tin, tout, **cache_tokens_of(ad)
+            )
             if src == "estimated":
                 cost, cost_source = est, "estimated"
             elif (adapter or "").strip().lower() in ("agy", "antigravity"):

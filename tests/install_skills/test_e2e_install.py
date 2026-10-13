@@ -6,45 +6,9 @@ so that expanduser() resolves into the temp directory. No network calls.
 
 from __future__ import annotations
 
-import os
-import subprocess
-import sys
-from pathlib import Path
-
 import pytest
 
-from _paths import REPO_ROOT
-
-
-def _make_env(tmp_path: Path) -> dict[str, str]:
-    """Return an os.environ copy with HOME/USERPROFILE redirected to tmp_path."""
-    env = dict(os.environ)
-    env["HOME"] = str(tmp_path)
-    env["USERPROFILE"] = str(tmp_path)
-    env["APPDATA"] = str(tmp_path / "AppData" / "Roaming")
-    env["LOCALAPPDATA"] = str(tmp_path / "AppData" / "Local")
-    source_path = str(REPO_ROOT / "src")
-    env["PYTHONPATH"] = (
-        source_path + os.pathsep + env["PYTHONPATH"]
-        if env.get("PYTHONPATH")
-        else source_path
-    )
-    return env
-
-
-def _run_install_cli(args: list[str], tmp_path: Path) -> subprocess.CompletedProcess:
-    env = _make_env(tmp_path)
-    # Create ~/.claude so that detect_hosts() picks up the "claude" host
-    # and so that expanduser("~") resolves to our temp directory.
-    (tmp_path / ".claude").mkdir(parents=True, exist_ok=True)
-    return subprocess.run(
-        [sys.executable, "-m", "install_cli", *args],
-        capture_output=True,
-        text=True,
-        env=env,
-        cwd=str(REPO_ROOT),
-    )
-
+from _install_env import run_install_cli as _run_install_cli
 
 # ---------------------------------------------------------------------------
 # test_dry_run_exits_0
@@ -112,12 +76,28 @@ def test_apply_installs_only_tier1_by_default(tmp_path):
     result = _run_install_cli(["claude", "--apply"], tmp_path)
     assert result.returncode == 0, result.stderr
     skills = tmp_path / ".claude" / "skills"
-    # Tier-1: the two board on-ramps + dispatcher/help are always exposed.
-    for s in ("pathly-create-feature", "pathly-post", "pathly", "pathly-help"):
+    # Tier-1: board on-ramps + dispatcher/help + the status / fsm-call utilities.
+    for s in (
+        "pathly-create-feature",
+        "pathly-post",
+        "pathly",
+        "pathly-help",
+        "pathly-status",
+        "pathly-fsm-call",
+    ):
         assert (skills / s / "SKILL.md").exists(), f"{s} should install by default"
     # Tier-2 pipeline skills are export-only — absent from a default apply.
     for s in ("pathly-build", "pathly-goalize", "pathly-review"):
         assert not (skills / s).exists(), f"{s} should be export-only, not default"
+    # A fresh-HOME plain apply yields EXACTLY the default tier, nothing else.
+    assert {p.name for p in skills.glob("pathly*") if p.is_dir()} == {
+        "pathly",
+        "pathly-create-feature",
+        "pathly-fsm-call",
+        "pathly-help",
+        "pathly-post",
+        "pathly-status",
+    }
 
 
 @pytest.mark.slow
@@ -127,7 +107,9 @@ def test_export_installs_named_skill_plus_defaults(tmp_path):
     skills = tmp_path / ".claude" / "skills"
     assert (skills / "pathly-build" / "SKILL.md").exists()  # requested
     assert (skills / "pathly-post" / "SKILL.md").exists()  # default set still installed
-    assert not (skills / "pathly-review").exists()  # not requested
+    assert not (
+        skills / "pathly-goalize"
+    ).exists()  # not requested, not required by build
 
 
 @pytest.mark.slow

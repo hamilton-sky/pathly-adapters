@@ -219,12 +219,12 @@ def _inject_board_prompt_vars(
     """Substitute fragment placeholders in a board-run skill body.
 
     Board runs assemble the prompt HERE, bypassing ``fsm_compose.build_prompt`` — so fragment
-    placeholders (``<fsm_feature>``, ``<feature_path>``, ``<feature>``, ``<board>``, ``<agent>``)
-    arrive raw. ``completion-report`` writes its ``AGENT_DONE`` keyed by ``<fsm_feature>``; if that
-    stays the literal string the event (and its projected invocation) is mis-keyed, so the run has
-    no telemetry row — it vanishes from the Monitor's RECENT list and goes unbilled. Reuse the flow
-    path's injector so board and flow substitution never drift. (``<run_id>`` is substituted
-    downstream in ``_run_stage_via_terminal``.) Best-effort — a raw placeholder never blocks a run.
+    placeholders (``<fsm_feature>``, ``<feature_path>``, ``<feature>``, ``<board>``, ``<agent>``,
+    ``<search_tiers>``) arrive raw. ``completion-report`` writes its ``AGENT_DONE`` keyed by
+    ``<fsm_feature>``; if that stays literal the event (and its projected invocation) is mis-keyed,
+    so the run has no telemetry row — it vanishes from the Monitor's RECENT list and goes unbilled.
+    Reuse the flow path's injector so board and flow substitution never drift. (``<run_id>`` is
+    substituted downstream in ``_run_stage_via_terminal``.) Best-effort — never blocks a run.
     """
     try:
         from pathlib import Path
@@ -313,6 +313,7 @@ def start_board_run(
         or ``{"ok": False, "error": "board_busy", "holder": <run_id>}`` when the
         board is already locked.
     """
+    from pathly_orchestrator.runner.comms_context import board_context_for
     from pathly_orchestrator.supervisor import board_lock
 
     run_id = str(uuid.uuid4())
@@ -330,12 +331,11 @@ def start_board_run(
         agent = agent or "evaluator"
         skill = skill or "planning/evaluate"
 
-    # Scope-aware board context (governance + memory across the user's selected
-    # Reads tiers) — same source the FSM/team path uses, so single-agent and
-    # /comms/run agents are no longer blind to the board. Honors the Reads toggle.
-    from pathly_orchestrator.runner.comms_context import board_context_for
-
-    context = board_context_for(board, scope, project_root or "", instructions or "")
+    # Scope-aware board context — governance + memory across the Reads tiers enabled for THIS
+    # agent's role; same source the FSM/team path uses, so a board agent isn't blind to the board.
+    context = board_context_for(
+        board, scope, project_root or "", instructions or "", role=agent
+    )
     prompt_parts: list[str] = []
 
     def _inject(text: str) -> str:
@@ -407,7 +407,7 @@ def start_board_run(
         "the context below). Carry it out.\n\n"
         "IMPORTANT — this run is headless, so the human CANNOT see your terminal. Keep "
         "them in the loop by posting brief progress to the board as you go. POST to "
-        "http://127.0.0.1:8765/comms/post with a JSON body:\n"
+        "http://127.0.0.1:8765/comms/post with the header X-Pathly-Run-Token: $PATHLY_RUN_TOKEN and a JSON body:\n"
         f'  {{"feature": "{scope}", "from": "{_from}", "board": "{board}", "scope": "{scope}", '
         '"type": "status", "text": "<one or two sentences>"}\n'
         f"{cadence} Keep each post to one or two sentences — the board is the human's "
@@ -417,7 +417,7 @@ def start_board_run(
         "human can open it from the board. Provide TWO fields: text = a real 1-2 sentence "
         "description (what it is and why it matters, NOT a bare label); summary = a topic map of "
         "the file's sections (one line per heading) — this is the catalog entry other agents scan "
-        "and is embedded for semantic retrieval. Include artifact_path and artifact_type:\n"
+        "and is embedded for semantic retrieval. Include artifact_path and artifact_type, and send the same header:\n"
         f'  {{"feature": "{scope}", "from": "{_from}", "board": "{board}", "scope": "{scope}", '
         '"type": "artifact", "text": "<1-2 sentence description>", '
         '"summary": "<topic map of the file sections, one line per heading>", '

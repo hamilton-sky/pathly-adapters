@@ -47,7 +47,20 @@ class Isolation(Protocol):
 class LaneIsolation:
     """Same worktree, no merge. Concurrency safety comes from the scheduler's
     <=1-worker-per-lane rule (disjoint file sets per lane), NOT from per-task
-    workspaces. Every task gets the SHARED run cwd/db/port."""
+    workspaces. Every task gets the SHARED run cwd/db/port.
+
+    That rule is only a SAFETY rule while the "disjoint file sets per lane" premise
+    holds — it is a scheduling detail otherwise. Nothing here can check the premise
+    (this class sees lane NAMES, not footprints); ``lane_partition.AuditedLaneIsolation``
+    is the wrapper that does, and is what production should instantiate.
+
+    ``max_workers`` caps concurrency below the lane count — a flow's declared ceiling
+    (``parallel_states.<STATE>.max_workers``). None = uncapped, i.e. one worker per
+    active lane, which is what every pre-existing caller gets.
+    """
+
+    def __init__(self, max_workers: int | None = None) -> None:
+        self._max_workers = max_workers if (max_workers or 0) > 0 else None
 
     def acquire(self, task: dict, state) -> TaskWorkspace:
         return TaskWorkspace(
@@ -63,7 +76,8 @@ class LaneIsolation:
         return  # nothing to free; lane is freed by the scheduler, not here
 
     def max_concurrency(self, ready_lanes: set[str]) -> int:
-        return max(1, len(ready_lanes))  # one worker per active lane
+        lanes = max(1, len(ready_lanes))  # one worker per active lane
+        return min(lanes, self._max_workers) if self._max_workers else lanes
 
 
 class SerialIsolation:

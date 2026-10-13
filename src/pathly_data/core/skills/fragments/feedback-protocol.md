@@ -62,5 +62,6 @@ failure file and report blocked; the FSM routes it to the right role. (Log retry
 `python3 -c "from pathly_orchestrator.db import get_db; c=get_db(); print(c.execute(\"SELECT COUNT(*) FROM fsm_events WHERE feature=? AND event_type='RETRY' AND json_extract(payload,'$.key')=?\",('<feature>','conv-N:FILE.md')).fetchone()[0])"`)
 
 **Clarification** requests are exempt from tiering and always go to their owner:
-`IMPL_QUESTIONS.md → planner`, `DESIGN_QUESTIONS.md → designer/architect`,
+`IMPL_QUESTIONS.md → planner`, `DESIGN_QUESTIONS.md → architect` (it carries an `[ARCH]`
+technical blocker — `DESIGN_FEEDBACK.md → designer` is the separate UI/UX file),
 `ACCEPTANCE_QUESTION.md → po` (the tester asks whether the acceptance criteria themselves are right).

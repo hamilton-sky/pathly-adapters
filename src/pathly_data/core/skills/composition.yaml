@@ -65,6 +65,7 @@ skills:
       - consult
       - { name: spawn-rules, requires: can_spawn }
       - catalog-pull
+      - board-search
   team/review:
     fragments:
       - code-query
@@ -76,6 +77,7 @@ skills:
       - { name: spawn-rules, requires: can_spawn }
       - comms-post
       - catalog-pull
+      - board-search
   team/test:
     fragments:
       - code-query
@@ -93,6 +95,7 @@ skills:
       - scout-choreography
       - { name: spawn-rules, requires: can_spawn }
       - catalog-pull
+      - board-search
   development/review:
     fragments:
       - code-query
@@ -100,6 +103,7 @@ skills:
       - { name: spawn-rules, requires: can_spawn }
       - comms-post
       - catalog-pull
+      - board-search
   development/test:
     fragments:
       - code-query
@@ -116,6 +120,7 @@ skills:
       - { name: spawn-rules, requires: can_spawn }
       - comms-post
       - catalog-pull
+      - board-search
 
   debug/verify:
     fragments:

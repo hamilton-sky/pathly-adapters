@@ -4,7 +4,7 @@
 
 Database layer — schema/queries, connection isolation, write guard.
 
-12 test file(s).
+14 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -14,9 +14,11 @@ Database layer — schema/queries, connection isolation, write guard.
 | `test_db_isolation.py` | covers project root isolation; get db reopens connection when db path changes | 2 |
 | `test_db_write_guard.py` | Regression: a write that raises inside `_get_write_lock` must roll back and | 3 |
 | `test_event_mirror.py` | EventMirror — DB -> disk export for EVENTS.jsonl (state-one-authority, additive P1a) | 11 |
+| `test_provenance_backfill.py` | role-read-policy: author_role / author_run_id / author_source on comms_messages, and the | 13 |
 | `test_run_history_flow_kind.py` | FSM-flow parent-row identity in the run read-model (unified-control-plane spawn-tracking) | 6 |
 | `test_run_history_identity.py` | run-identity: run_history as the identity map run_id -> (project_root, slug, board_scope) | 6 |
 | `test_run_history_read.py` | Unified run read-model — _classify_kind / list_runs / get_run_detail / overlay_live_status | 9 |
 | `test_run_log.py` | run_log store — per-spawn Complete Run Record (unified-control-plane P0, ARCHITECTURE §8.1) | 5 |
+| `test_run_tokens.py` | role-read-policy: the run_tokens table and its mint / resolve / revoke queries | 5 |
 | `test_spawn_policy.py` | spawn-policy P0 — per-agent model + logging config (db/queries/app_settings) | 8 |
 | `test_stage_configs.py` | stage_configs query helpers — flow-phase-inspector (#5) per-stage selection persistence | 5 |

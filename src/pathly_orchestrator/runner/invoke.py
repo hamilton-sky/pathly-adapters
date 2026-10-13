@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import subprocess
 import sys
 import time
@@ -13,6 +14,7 @@ from typing import Any, Callable
 from .argv import resolve_argv
 from .output import parse_result
 from .events import _patch_last_agent_done
+from ..db.pricing import cache_tokens_of
 
 logger = logging.getLogger("pathly.runner")
 
@@ -49,6 +51,12 @@ def invoke_agent(
         cwd=project_root,
         stdout=subprocess.PIPE,
         stderr=sys.stderr,
+        # pathly-run has no gate-billing chokepoint (no /runner/terminal/result — it
+        # invokes the adapter directly, not via TERMINAL_SPAWN), so the interactive
+        # stop hook is this path's ONLY cost source. Without PATHLY_PROJECT_ROOT in the
+        # child env the hook can't find "the active feature" and silently bills nothing
+        # — the same env Studio already exports for every interactive tab (terminal.ts).
+        env={**os.environ, "PATHLY_PROJECT_ROOT": project_root},
     )
 
     if proc_callback is not None:
@@ -113,6 +121,7 @@ def invoke_agent(
     tokens_out = 0
     tool_uses = 0
     session_id_out: str | None = None
+    parsed: dict = {}
     try:
         raw_text = stdout_bytes.decode("utf-8", errors="replace")
         parsed = parse_result(adapter, raw_text)
@@ -143,7 +152,13 @@ def invoke_agent(
 
     if storage_path:
         _patch_last_agent_done(
-            storage_path, cost_usd, tokens_in, tokens_out, wall_seconds, tool_uses
+            storage_path,
+            cost_usd,
+            tokens_in,
+            tokens_out,
+            wall_seconds,
+            tool_uses,
+            **cache_tokens_of(parsed),
         )
 
     return {"cost_usd": cost_usd, "session_id": session_id_out}

@@ -360,7 +360,14 @@ def route_feedback(
         target = _resolve_feedback_target(
             filename, agent, counts.get(filename, 0), escalation_routing
         )
-        result = {"file": filename, "target_agent": target}
+        # retry_count feeds the retry ladder (fsm_compose.build_prompt_for_agent): how many
+        # times THIS file has already been retried, so round 2+ can carry that context —
+        # separate from escalation_routing's own use of the same count to pick `target`.
+        result = {
+            "file": filename,
+            "target_agent": target,
+            "retry_count": counts.get(filename, 0),
+        }
         if target == "human" or filename in human_files:
             try:
                 result["instructions"] = (feedback_dir / filename).read_text(

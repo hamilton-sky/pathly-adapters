@@ -4,8 +4,10 @@
 
 _(no purpose registered — add one in scripts/gen_test_index.py)_
 
-1 test file(s).
+3 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
+| `test_fragments_run_token.py` | Every board call in the core skills, fragments and agents sends the run token | 12 |
+| `test_lessons_paths.py` | The cross-feature lessons pipeline must agree on ONE path | 4 |
 | `test_no_mirror_reads.py` | Run the state-one-authority mirror-read gate inside pytest too | 2 |

@@ -33,6 +33,8 @@ from __future__ import annotations
 
 import logging
 
+from pathly_orchestrator.db.provenance_values import SYSTEM_ROLE
+
 _log = logging.getLogger("pathly.fsm")
 
 # The escalation must be addressed to a human to gate. "*" (broadcast) does NOT gate — it is
@@ -52,7 +54,9 @@ def open_human_gates(board: str, scope: str) -> list[dict]:
         from pathly_orchestrator.db.connection import get_db
         from pathly_orchestrator.db.queries.comms import get_active_escalations
 
-        rows = get_active_escalations(get_db(), boards=[board or "feature"], scopes=[scope])
+        rows = get_active_escalations(
+            get_db(), boards=[board or "feature"], scopes=[scope]
+        )
     except Exception:
         _log.debug("open_human_gates read failed — failing open", exc_info=True)
         return []
@@ -60,6 +64,13 @@ def open_human_gates(board: str, scope: str) -> list[dict]:
     gates: list[dict] = []
     for row in rows:
         if str(row.get("to_agent") or "").strip().lower() not in _HUMAN_TARGETS:
+            continue
+        # A row the server wrote itself (the park notice for a headless human checkpoint, a
+        # task out of retries) announces a checkpoint the engine already enforces through a
+        # feedback file or require_tasks_done. Gating on it too double-gates: a resumed parked
+        # run would meet the escalation its own park posted and park again. The role comes
+        # from the provenance stamp, which a request body cannot set.
+        if row.get("author_role") == SYSTEM_ROLE:
             continue
         # acknowledged_by is JSON text; a non-empty list means a human has seen it. The
         # status='pending' filter upstream already implies this, but an acknowledge that
@@ -92,6 +103,7 @@ def record_gate_override(
     try:
         from pathly_orchestrator.db.connection import get_db
         from pathly_orchestrator.db.queries.comms import post_message
+        from pathly_orchestrator.runner.provenance import system_stamp
 
         listed = "; ".join(f"{g['text'][:80]} [{g['id']}]" for g in gates)
         post_message(
@@ -104,6 +116,8 @@ def record_gate_override(
                 f"GATE OVERRIDE — advanced past {len(gates)} unacknowledged human "
                 f"escalation(s) without answering them: {listed}"
             ),
+            # The server writes this row; the caller's identity is not known here.
+            **system_stamp(),
         )
     except Exception:
         _log.debug("record_gate_override failed", exc_info=True)

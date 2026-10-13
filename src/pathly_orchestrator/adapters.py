@@ -8,6 +8,8 @@ from typing import Optional
 
 import yaml
 
+from pathly_orchestrator.config import localize_fsm_urls
+
 # The prompt is substituted into the headless argv. For claude it lands as a bare
 # positional after -p/--print, so a prompt starting with "--" is parsed as an
 # unknown option ("error: unknown option '---...'"). Strip a leading
@@ -120,7 +122,7 @@ def resolve_command(
     supports_resume = resume_cfg is not None
     terminal_kind = cfg.get("terminal_kind", adapter)
 
-    prompt = _dash_safe_prompt(prompt)
+    prompt = localize_fsm_urls(_dash_safe_prompt(prompt))
     model = (model or "").strip()
     tokens = [str(t) for t in headless]
     argv: list[str] = []
