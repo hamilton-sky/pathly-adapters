@@ -171,6 +171,10 @@ Not in scope:
   (RRP-2b), warn/enforce rollout (`pathly/features/role-read-policy/map.md`).
 - Multi-user.
 - Human-message capture for codex (round one opens codex chiefs without it; see Open questions).
+- Any change to HQ, in either round (the user's decision, 2026-10-14). HQ's chat panel, its
+  top-bar toggle, `components/HQ/` (`useHQ`, `AgentQuestionCard`, `ChatHeader` and the rest),
+  `chatStore` and `chat_agent.py` stay exactly as they are; the Chief is added beside HQ, never
+  in place of it or inside it.
 
 ## Happy path
 

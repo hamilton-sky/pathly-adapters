@@ -58,6 +58,10 @@ no:cacheprovider` passes in full. Ticket 13 runs both.
   `python scripts/gen_test_index.py` after adding tests. CI also runs `bandit -r src/ -ll -x
   src/pathly_data/`: no f-string or `+` SQL building in new code (use `IN (SELECT value FROM
   json_each(?))`), never `# nosec`. The full suite runs on Python 3.11, 3.12 and 3.13.
+- Do not touch HQ, in either round (the user's decision, 2026-10-14): not
+  `studio/src/renderer/src/components/HQ/`, not HQ's top-bar toggle (`topbar-chat-toggle`), not
+  `chatStore`, not `src/pathly_orchestrator/chat_agent.py`. The Chief is added beside HQ. A
+  ticket that seems to need an HQ change stops and asks the user.
 
 ## Decisions so far
 
