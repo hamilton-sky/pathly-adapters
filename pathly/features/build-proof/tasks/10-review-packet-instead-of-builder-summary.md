@@ -1,7 +1,7 @@
 # Give the reviewer the task and the diff instead of the builder's summary
 
 Type: task
-Status: resolved
+Status: open
 Blocked by: 02, 03
 Test first: yes
 
@@ -233,3 +233,31 @@ called `_packet` straight after `_build`; no case was dropped or loosened (30 ca
   question in map.md (interactive runs have no `SPAWN_WINDOW`) can diff from it. Not done here.
 - `review_base` is the last BUILDING's base only: after a `REVIEWING->BUILDING` round the packet shows
   that round's changes, not the whole feature. Ticket 14's acceptance run should expect that.
+
+## Review findings (round 1, spec review)
+
+SPEC
+- `python -m pytest tests/fsm_flows/test_review_packet.py -q -p no:cacheprovider` passes, with the REVIEWING / BUILDING / 200 KiB coverage: MET. It printed `13 passed in 15.11s`. I read the tests and they cover each listed case:
+  - The REVIEWING prompt has `## Review packet`, `FROZEN-TASK-TEXT` and the `src/app.py` diff line, and lacks `BUILDER-SAYS-ALL-GOOD`.
+  - The BUILDING prompt keeps `## Pipeline History`.
+  - A 200 KiB diff is clipped to at most 48 KiB.
+- `team/review.md` no longer asks anyone to run `git diff HEAD~1 HEAD` (the `python -c` check): MET. It printed `clean`.
+- `python -m pytest tests/install_skills/test_compose.py tests/fsm_flows/test_runner_contract_shared.py -q -p no:cacheprovider` passes: MET. It printed `105 passed in 11.35s`.
+- scope: NOT OK. These two files are outside what the ticket calls for:
+  - `src/pathly_data/core/skills/team/build.md` gained an "Interactive `/pathly` only" blockquote.
+  - `tests/snapshots/team__build.claude.md` was regenerated to match it.
+
+  The ticket's skill section covers only `team/review.md`, and Done when names one snapshot, `team__review.claude.md`. The ticket says the single `RUNNER_CONTRACT_BLOCK` sentence is what stops the fixers in `team/build.md` and `team/review.md` from running headless and leaves them for interactive use. spec.md § Decisions chose that sentence alone (option A). It did not choose editing the skills. Nothing in the ticket's Not-in-this-ticket list rules the edit out, but nothing calls for it either. The same unrequested note also went into `team/review.md` under "Feedback routing after reviewer", outside the Phase 1 / Phase 3 edits the ticket specifies. It is in a file the ticket does name, so it is borderline.
+
+  The extra edits are carried into other files:
+  - A parametrized test in `tests/fsm_flows/test_review_packet_notes.py` pins the notes.
+  - Both CLAUDE.md files describe them.
+
+  Fix: drop the `team/build.md` hunk and the `team__build` snapshot hunk. Also drop the matching test case and doc sentences, and probably the review.md routing note. Or have the ticket amended to call for them.
+- Files I checked and treated as in scope: `fsm_compose_review.py`, `fsm_ops.py`, `fsm_ops_complete.py`, `fsm_compose.py`, `team/review.md` Phase 1 / Phase 3, `team__review.claude.md`, the three new test files and the test indexes, the two CLAUDE.md files, and the `learnings.md` / `map.md` lines, which match earlier tickets' pattern.
+- Range: I reviewed `74c85cf..2d0decb`. `2d0decb` is HEAD and also the newest commit touching the ticket, so no later commits were excluded. The working tree was clean.
+- test first: OK. Commit `345e54b` added `tests/fsm_flows/test_review_packet.py` before the production commit. Without the change, `fsm_compose_review` does not exist and the REVIEWING prompt carries no `## Review packet`, so the file's tests would fail.
+
+Behaviours checked against the ticket text, with no deviation from the ticket: `unified` was already on `diff_text` at base, and `next_action` adds `tree` only when git can snapshot. `complete_stage` rebuilds `review_base` on every transition out of BUILDING. A build with no tree leaves no `review_base`, a reasonable reading of "overwriting the previous one". The `RUNNER_CONTRACT_BLOCK` sentence contains no braces.
+
+REVIEW: FAIL
