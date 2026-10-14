@@ -869,6 +869,19 @@ argv array instead, for exact control on any platform — **required on Windows 
 `goals/<slug>` run resolves the same root the event log keys off) and `PATHLY_VERIFY_GATE=1` in the
 environment. Failure output is clipped head+tail (3000/5000 chars) — compilers put the first error at
 the top, test runners put the summary at the bottom, so tailing alone loses half the signal.
+The splitting, the run and the clipping live in `proof/command.py` (`to_argv`, `run_command`,
+`clip`), the one command runner the gate and task check blocks share.
+
+**Task check blocks (`proof/checks.py`).** A task's text can carry ```` ```check ```` fences;
+every one anywhere in the text counts. Inside a fence: `$ <command>` starts a check, `exit <N>`
+or `exit nonzero` sets the exit code it must give (default `exit 0`), each `prints <text>` names a
+substring its output must contain, and `#` comments and blank lines are ignored. A command that
+needs `&&` is written as two `$` lines, because each runs through `run_command` (no shell).
+`checks_in(text)` raises `ParseError` on a line it cannot read (a `prints` before any `$`, a
+second `exit`, an unclosed fence). `run_checks(checks, cwd, timeout)` runs every check, not
+stopping at the first failure, and returns `(ok, report)`: one block per failing check with the
+command, `wanted:`, `got:` (`exit <N>`, `timed out after <N>s` or `could not run: <error>`) and
+the clipped output. Nothing runs them yet.
 
 Events: `GATE_PASSED` (command, `exit_code`, `duration_ms`) on success — the objective evidence on
 the run's record — and `GATE_FAILED` (with `reason`, `command`, `exit_code`) on failure.
