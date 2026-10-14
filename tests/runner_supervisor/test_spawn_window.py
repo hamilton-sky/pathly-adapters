@@ -212,11 +212,14 @@ def test_outside_a_git_repo_writes_none_and_returns_the_result(tmp_path):
     assert _windows(_storage(root)) == []
 
 
-def test_a_snapshot_failure_is_swallowed(repo, monkeypatch):
-    def broken_snapshot(root):
-        raise OSError("git exploded")
+@pytest.mark.parametrize(
+    "module, name", [(tree, "snapshot"), (eventlog, "append_event")]
+)
+def test_a_snapshot_or_event_failure_is_swallowed(repo, monkeypatch, module, name):
+    def broken(*args, **kwargs):
+        raise OSError("git exploded, or the database is locked")
 
-    monkeypatch.setattr(tree, "snapshot", broken_snapshot)
+    monkeypatch.setattr(module, name, broken)
     calls: list = []
     spawn, expected = _editing_spawn(repo, calls)
 
@@ -227,22 +230,6 @@ def test_a_snapshot_failure_is_swallowed(repo, monkeypatch):
     assert result is expected
     assert calls == [1]
     assert _windows(_storage(repo)) == []
-
-
-def test_an_event_write_failure_is_swallowed(repo, monkeypatch):
-    def broken_append(*args, **kwargs):
-        raise RuntimeError("database is locked")
-
-    monkeypatch.setattr(eventlog, "append_event", broken_append)
-    calls: list = []
-    spawn, expected = _editing_spawn(repo, calls)
-
-    result = spawn_window.observe(
-        _state(repo), FLOOR_FLOW, "builder", "demo-1-1", spawn
-    )
-
-    assert result is expected
-    assert calls == [1]
 
 
 def test_without_a_storage_path_the_window_lands_in_the_topic_dir(repo):
@@ -296,32 +283,15 @@ def test_fan_out_run_stage_on_team_build_records_builder_for_building(
 
     monkeypatch.setattr(_sup, "_run_stage_via_terminal", fake_spawn)
     state = _state(repo)
+    args = ("build it", "claude", "claude-sonnet-4-6", "demo-1-300", None)
+    flow = _team_build_with_a_floor_gate()
 
     result = fan_out.run_stage(
-        state,
-        _team_build_with_a_floor_gate(),
-        "BUILDING",
-        "build it",
-        "claude",
-        "claude-sonnet-4-6",
-        "demo-1-300",
-        None,
-        session="s-1",
-        autonomy=False,
+        state, flow, "BUILDING", *args, session="s-1", autonomy=False
     )
 
     assert result is returned
-    assert calls == [
-        (
-            state,
-            "build it",
-            "claude",
-            "claude-sonnet-4-6",
-            "demo-1-300",
-            None,
-            {"session": "s-1", "autonomy": False},
-        )
-    ]
+    assert calls == [(state, *args, {"session": "s-1", "autonomy": False})]
     (window,) = _windows(_storage(repo))
     assert window["role"] == "builder"
     assert window["state"] == "BUILDING"
@@ -329,18 +299,6 @@ def test_fan_out_run_stage_on_team_build_records_builder_for_building(
     assert tree.changes(repo, window["before"], window["after"]) == [
         ("M", "src/app.py")
     ]
-
-
-class _FakeFhc:
-    """``complete_stage`` answers from a script: blocked on the planner's file, then advance."""
-
-    def __init__(self, answers: list[dict]) -> None:
-        self.answers = list(answers)
-        self.calls: list[dict] = []
-
-    def complete_stage(self, payload: dict) -> dict:
-        self.calls.append(payload)
-        return self.answers.pop(0)
 
 
 def test_the_feedback_spawn_records_its_target_as_the_role(repo, monkeypatch):
@@ -388,17 +346,18 @@ def test_the_feedback_spawn_records_its_target_as_the_role(repo, monkeypatch):
         current_adapter="claude",
         storage_path=str(_storage(repo)),
     )
-    fhc = _FakeFhc(
-        [
-            {
-                "blocked": True,
-                "target_agent": "planner",
-                "file": "IMPL_QUESTIONS.md",
-                "instructions": "Answer the builder's question in the plan.",
-            },
-            {"next_state": "TESTING"},
-        ]
-    )
+    # complete_stage answers from a script: blocked on the planner's file, then advance.
+    answers = [
+        {
+            "blocked": True,
+            "target_agent": "planner",
+            "file": "IMPL_QUESTIONS.md",
+            "instructions": "Answer the builder's question in the plan.",
+        },
+        {"next_state": "TESTING"},
+    ]
+    payloads: list = []
+    fhc = SimpleNamespace(complete_stage=lambda p: payloads.append(p) or answers.pop(0))
 
     result = _resolve_stage_supervised(
         state, "team-build", "demo", str(repo), "claude-sonnet-4-6", None, fhc
@@ -418,4 +377,4 @@ def test_the_feedback_spawn_records_its_target_as_the_role(repo, monkeypatch):
     assert tree.changes(repo, window["before"], window["after"]) == [
         ("M", "pathly/features/demo/IMPLEMENTATION_PLAN.md")
     ]
-    assert fhc.calls[1]["resolved_files"] == ["IMPL_QUESTIONS.md"]
+    assert payloads[1]["resolved_files"] == ["IMPL_QUESTIONS.md"]

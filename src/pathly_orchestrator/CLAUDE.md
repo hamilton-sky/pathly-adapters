@@ -739,6 +739,9 @@ pathly_orchestrator/
                            #   Phase E: the ONLY drain — `executor: loop` reaches it as the
                            #   goal-loop flow's DRAINING state. Frontier scope = the run's
                            #   BOARD scope, not state.topic (a goal run's topic is its own slug).
+    spawn_window.py        # observe — wraps the single-path spawns (run_stage's and the feedback
+                           #   spawn): a SPAWN_WINDOW event (role, tree + HEAD before/after) when
+                           #   the flow has a floor/scope/reviewer gate (see "Spawn windows" below)
     orchestrator_session.py # resolve_session — same-adapter session reuse + the SESSION event
     api.py                 # start_run, pause_run, resume_run, abort_run, supply_decision, reroute_run
     goal_run.py            # thin re-export shim (start_goal_run / start_goal_decompose) → the two modules below
@@ -941,6 +944,47 @@ root is not the top folder of a git work tree (a project inside a larger repo in
 fails or is missing; each git call has a 60 s timeout and drops inherited `GIT_DIR`-style and
 pathspec variables (`GIT_LITERAL_PATHSPECS`, …). Snapshot objects are unreachable, so `git gc`
 prunes them later. Nothing calls the scan yet.
+
+**Spawn windows and stage writes (`supervisor/spawn_window.py`, `fsm/gates/_proof.py`).** The
+floor, scope and reviewer gates must tell who wrote a file: in `team`/`team-build` a planner or
+architect routed a feedback file may edit `IMPLEMENTATION_PLAN.md` while the FSM is still in
+BUILDING, and a reviewer may write `REVIEW.md` and nothing else. So when a flow's `gates` hold a
+`floor_gate`, `scope_gate` or `reviewer_unchanged` (`spawn_window.wants_windows`),
+`spawn_window.observe` takes `proof.tree.snapshot` and `proof.tree.head` before and after a
+single-path spawn and appends `SPAWN_WINDOW {role, run_id, state, before, after, head_before,
+head_after}` to the run's event log (`state.storage_path`, else
+`fsm_ops._resolve_storage_path(None, project_root, topic)`; `state` is the FSM state). Two spawns
+record it, each passing its role explicitly: `fan_out.run_stage`'s single spawn (the flow's
+`role_map[state]`) and the feedback spawn in `orchestrator_stage._resolve_stage_supervised` (the
+feedback's `target_agent`, so a builder or planner routed a file inside REVIEWING is not recorded
+as the `reviewer` that `terminal_identity._spawn_role` would mint). A fan-out drain records none.
+The spawn's result comes back unchanged; an exception from it propagates and no window is written;
+outside a git repo, or when a snapshot or the event write fails, there is no window and a log line.
+No packaged flow has one of those gates yet, so no run records windows until they land.
+
+What each role may change (`_proof.stage_writes(storage_path, role)`, a predicate over
+repo-relative POSIX paths). `<storage>` is the run's storage dir; the *board home*
+(`_proof.board_home`) is `pathly/features/<feature>/` for a feature storage dir or anything nested
+in one (a goal's `goals/<slug>`), else the storage dir itself (`pathly/plans/<name>/`,
+`pathly/project/...`):
+
+| Role | May change |
+|---|---|
+| every role | `<storage>/feedback/**`; `STATE.json`, `BOARD.json` and `EVENTS.jsonl` anywhere under `pathly/` (the server rewrites them during a run, and a user project may not gitignore them); any `*.tsbuildinfo` |
+| `builder` | also `<storage>/VERIFY.md` |
+| `reviewer` | also `<storage>/REVIEW.md` |
+| `po`, `planner`, `architect`, `designer` (the keys of `fsm_compose_tables._FIX_MODE_ARTIFACT`), `retro` | also any file directly inside `<storage>` or the board home (the plan documents) |
+
+`_proof.explained(project_root, path, now_tree, windows, storage_path)` is true when a window whose
+role may write `path` changed it and left it at the blob it has in `now_tree` (`proof.tree.blob`; a
+deletion matches a deletion). A window that never touched the path excuses nothing, so a builder's
+plan edit made before a planner ran stays the builder's. `_proof.windows_since(storage_path,
+since=None, roles=None)` returns the `SPAWN_WINDOW` events with `ts >= since`, oldest first,
+comparing parsed times (an event `ts` ends in `Z` and has whole seconds, while `since` stamps are
+`isoformat()` with an offset, so `since` is cut to its second), and raises `ValueError` when
+`since` is not a time. `_proof.floor_enabled()` reads the `floor.enabled` app setting: on unless it
+is `false`, `0` or `off`. `_proof` never imports `supervisor` and imports `db` lazily. No gate reads
+the windows yet.
 
 Events: `GATE_PASSED` (command, `exit_code`, `duration_ms`) on success — the objective evidence on
 the run's record — and `GATE_FAILED` (with `reason`, `command`, `exit_code`) on failure.

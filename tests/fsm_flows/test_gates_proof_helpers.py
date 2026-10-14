@@ -110,6 +110,8 @@ def test_other_roles_may_not_write_the_plan(tmp_path, role):
     assert may(PLAN) is False
     assert may("pathly/features/demo/USER_STORIES.md") is False
     assert may("src/app.py") is False
+    # A file named like the feedback dir is not inside it.
+    assert may("pathly/features/demo/feedback") is False
 
 
 @pytest.mark.parametrize("role", ["builder", "reviewer", "tester", "planner", "", None])
@@ -123,7 +125,6 @@ def test_every_role_may_write_feedback_exports_and_tsbuildinfo(tmp_path, role):
     assert may("studio/tsconfig.node.tsbuildinfo") is True
     assert may("src/STATE.json") is False
     assert may("pathly/features/other/feedback/X.md") is False
-    assert may("pathly/features/demo/feedback") is False
 
 
 def test_a_goal_run_writes_its_own_dir_and_the_board_home(tmp_path):
