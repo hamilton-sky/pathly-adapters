@@ -1,7 +1,7 @@
 # Port the floor guard over git working-tree snapshots
 
 Type: task
-Status: resolved
+Status: open
 Blocked by: —
 Test first: yes
 Floor: allow skip, suppress, empty-catch, threshold, trivial-assert
@@ -238,3 +238,21 @@ collection with `ImportError: cannot import name 'tree'` / `'floor' from
   None` (both deleted) as explained only when both trees exist.
 - The `task-edit` category is accepted by `parse_allow` and dropped by `allow`, but `scan`
   never produces it: tickets 05/06 add it themselves, after checking `allow`.
+
+## Review findings (round 1, quality review)
+
+Scope: I reviewed 97a7b6eb..6a81d1b. 6a81d1b is the newest commit that touches the ticket, and it is also HEAD, so no later commits were left out. I read the ticket as it was at the base commit. I never read the `## Answer`, from the ticket or from its hunk, and only grepped the hunk's Status line (open -> resolved). Working tree is clean.
+
+What I ran:
+- Both Done when commands pass (13 passed, 23 passed).
+- I also ran black, mypy and bandit on `proof/`, plus `check_file_size.py` and `gen_test_index.py --check`. All clean.
+- I tested edge cases with throwaway scripts outside the repo. They are still at `/tmp/claude-0/-home-claude-pathly-adapters/336d5e39-1571-55c5-869b-9ea565351722/scratchpad/probe02/probe.py` and `probe2.py`; the temp git repos they made were cleaned up.
+
+QUALITY
+1. major /home/claude/pathly-adapters/src/pathly_orchestrator/proof/tree.py: `snapshot` can miss a real working-tree change. It copies the index with `shutil.copyfile`, which gives the copy a new mtime. Git uses the index file's mtime to spot "racily clean" entries: a file edited in the same second the index was last written, with its size unchanged. With a newer mtime on the copy, `git add -A` treats that file as unchanged and the tree records the old blob. Reproduced on git 2.43, both in a fresh repo and in one with commits: write `f.py` as `aaaa`, `git add -A`, rewrite it as `bbbb` in the same second, then snapshot 2 s later. The snapshot holds `aaaa` while `git status` shows the file modified. Doing the same with `shutil.copy2` gives `bbbb`. A same-size edit like `assert a == b` -> `assert a == a` (a trivial-assert) would be invisible to the after-snapshot. Index writes are frequent here: `git status` runs in the agent, in an IDE, and in Pathly's own provenance capture and scope gate. Tickets 04, 05, 06 and 09 all build on this snapshot - use `shutil.copy2` so the copy keeps the real index's mtime, and add a test that does the same-second, same-size edit and checks the snapshot holds the new blob.
+2. minor /home/claude/pathly-adapters/src/pathly_orchestrator/proof/tree.py: `_git` strips `GIT_DIR`/`GIT_INDEX_FILE`/etc. but not the pathspec variables. With `GIT_LITERAL_PATHSPECS=1` inherited, `:(exclude)pathly/` is read as a literal path name, so `diff_text` comes back empty and `floor.scan` silently reports no pattern or content-rule findings. Reproduced: one `# noqa` edit is found normally and gives `[]` with the variable set - add `GIT_LITERAL_PATHSPECS`, `GIT_GLOB_PATHSPECS`, `GIT_NOGLOB_PATHSPECS` and `GIT_ICASE_PATHSPECS` to the stripped variables.
+3. minor /home/claude/pathly-adapters/src/pathly_orchestrator/proof/floor.py: `_diff_path` does not undo git's C-style quoting of `---`/`+++` names, which `core.quotepath=off` does not turn off for `"`, `\` or control characters. The quoted name then never matches the unquoted `-z` path from `changes`, so the content rules lose their hunks and added lines. Reproduced: adding `collect_ignore` to `tests/we"ird/conftest.py` gives no `config` finding - unquote quoted header names, or key the per-file diffs on something that matches `changes()`.
+4. minor /home/claude/pathly-adapters/tests/fsm_flows/test_proof_floor.py: two parser branches have no test. One is the "names only before the first `@@`" rule: an added line `++ x` prints as `+++ x`. The other is stripping the TAB git puts after a name containing a space. Both work (I checked by hand), but nothing would catch a regression - add one test per case.
+5. minor /home/claude/pathly-adapters/src/pathly_orchestrator/proof/floor.py: `scan` cannot tell "git failed" from "nothing found". `diff_text` turns a git failure (for example the 60 s timeout on a huge diff) into `""` and `changes` into `[]`, so the report is just clean. The spec's edge-case table asks for a `GATE_SKIPPED`/log line when git fails, and ticket 06's `floor_gate` will have nothing to base it on once both snapshots have succeeded - let `FloorReport` carry a skipped/error flag, or let `scan` return `None` when a git call fails.
+
+REVIEW: FAIL
