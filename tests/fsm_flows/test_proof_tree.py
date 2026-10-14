@@ -6,8 +6,10 @@ tree without touching the repo's index or HEAD", which a mock cannot show.
 
 from __future__ import annotations
 
+import os
 import subprocess
 import tempfile
+import time
 from pathlib import Path
 
 import pytest
@@ -134,6 +136,32 @@ def test_snapshot_works_over_an_index_with_unmerged_entries(repo):
     assert _index_bytes(repo) == index_before
 
 
+def test_snapshot_sees_a_same_size_edit_made_in_the_second_the_index_was_written(
+    tmp_path,
+):
+    """git re-reads an entry only when it is as new as the index file; else it trusts stat.
+
+    The edit keeps the file's size and mtime second, as an edit made in the same second as the
+    last index write does. The mtimes are pinned with ``os.utime`` and ctime is set aside
+    (``core.trustctime=false``), so the test does not depend on the clock.
+    """
+    root = _init(tmp_path / "racy")
+    _git(root, "config", "core.trustctime", "false")
+    stamp = int(time.time()) - 1000
+    _write(root, "f.py", "aaaa\n")
+    os.utime(root / "f.py", (stamp, stamp))
+    _git(root, "add", "-A")
+    os.utime(root / ".git" / "index", (stamp, stamp))
+    _write(root, "f.py", "bbbb\n")
+    os.utime(root / "f.py", (stamp, stamp))
+
+    snap = tree.snapshot(root)
+
+    assert snap is not None
+    assert tree.read(root, snap, "f.py") == "bbbb\n"
+    assert tree.blob(root, snap, "f.py") == _git(root, "hash-object", "f.py")
+
+
 # ── head, blob, changes, diff_text ────────────────────────────────────────────
 
 
@@ -181,6 +209,63 @@ def test_diff_text_has_no_context_lines_by_default(repo):
     assert "-    return a + b" in lines
     assert "+    return b + a" in lines
     assert not [line for line in lines if line.startswith(" ")]
+
+
+@pytest.mark.parametrize(
+    "variable",
+    [
+        "GIT_LITERAL_PATHSPECS",
+        "GIT_GLOB_PATHSPECS",
+        "GIT_NOGLOB_PATHSPECS",
+        "GIT_ICASE_PATHSPECS",
+    ],
+)
+def test_an_inherited_pathspec_setting_does_not_change_the_diff(
+    repo, monkeypatch, variable
+):
+    """``GIT_LITERAL_PATHSPECS=1`` would read ``:(exclude)pathly/`` as a file name."""
+    monkeypatch.setenv(variable, "1")
+    base = tree.snapshot(repo)
+    _write(repo, "src/app.py", "def add(a, b):\n    return b + a\n")
+    _write(repo, "pathly/features/demo/PLAN.md", "# Plan, edited\n")
+    after = tree.snapshot(repo)
+
+    outside = tree.diff_text(repo, base, after, exclude=["pathly/"])
+
+    assert "+++ b/src/app.py" in outside
+    assert "pathly/" not in outside
+    assert tree.changes(repo, base, after, paths=["pathly/"]) == [
+        ("M", "pathly/features/demo/PLAN.md")
+    ]
+
+
+@pytest.mark.parametrize(
+    "printed, name",
+    [
+        ('"b/we\\"ird/conftest.py"', 'b/we"ird/conftest.py'),
+        ('"b/back\\\\slash.py"', "b/back\\slash.py"),
+        ('"b/tab\\there.py"', "b/tab\there.py"),
+        ('"b/del\\177.py"', "b/del\x7f.py"),
+        ('"b/caf\\303\\251.py"', "b/café.py"),
+        ("b/plain name.py", "b/plain name.py"),
+        ('"', '"'),
+    ],
+)
+def test_unquote_path_reads_gits_c_style_quoting(printed, name):
+    assert tree.unquote_path(printed) == name
+
+
+def test_the_or_none_variants_tell_a_git_failure_from_no_change(repo):
+    snap = tree.snapshot(repo)
+
+    assert tree.changes_or_none(repo, snap, snap) == []
+    assert tree.diff_text_or_none(repo, snap, snap) == ""
+    missing = "0" * 40
+    assert tree.changes_or_none(repo, snap, missing) is None
+    assert tree.diff_text_or_none(repo, snap, missing) is None
+    assert tree.changes(repo, snap, missing) == []
+    assert tree.diff_text(repo, snap, missing) == ""
+    assert tree.changes_or_none(repo / "src", snap, snap) is None
 
 
 # ── fail open ─────────────────────────────────────────────────────────────────

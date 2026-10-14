@@ -228,6 +228,97 @@ def test_package_json_counts_when_a_guarded_key_changes(repo):
     assert _scan(repo, edit).findings == []
 
 
+# ── Reading git's patch ───────────────────────────────────────────────────────
+
+
+def test_an_added_line_that_starts_with_two_pluses_is_still_scanned(repo):
+    """git prints the added line ``++ y`` as ``+++ y``, which is not a file name there."""
+    report = _scan(repo, _append("src/app.py", "++ y  # noqa\n"))
+    assert report.findings == ["suppress: src/app.py: ++ y  # noqa"]
+
+
+def _two_test_files(folder: str) -> Callable[[Path], None]:
+    def edit(repo: Path) -> None:
+        _write(repo, folder + "/conftest.py", 'collect_ignore = ["test_a.py"]\n')
+        _write(repo, folder + "/test_a.py", "@pytest.mark.skip\ndef test_a():\n")
+
+    return edit
+
+
+def test_a_name_with_a_space_is_read_without_the_tab_git_ends_it_with(repo):
+    report = _scan(repo, _two_test_files("tests/my dir"))
+    assert sorted(report.findings) == [
+        "config: tests/my dir/conftest.py: lint, test or CI config was changed",
+        "skip: tests/my dir/test_a.py: @pytest.mark.skip",
+    ]
+
+
+def test_a_name_git_quotes_is_read_unquoted(repo):
+    """git C-quotes a name holding ``"``, ``\\`` or a control character even with
+    ``core.quotepath=off``. DEL is one of them, and Windows allows it in a file name too.
+    """
+    report = _scan(repo, _two_test_files("tests/odd\x7fdir"))
+    assert sorted(report.findings) == [
+        "config: tests/odd\x7fdir/conftest.py: lint, test or CI config was changed",
+        "skip: tests/odd\x7fdir/test_a.py: @pytest.mark.skip",
+    ]
+
+
+# ── A scan git could not finish ───────────────────────────────────────────────
+
+
+def _fail_git(monkeypatch, command: str) -> None:
+    """Make every ``git <command>`` call of ``proof/tree.py`` fail, as a timeout does."""
+    real = tree._git
+
+    def git(root, *args, **kwargs):
+        return None if args[:1] == (command,) else real(root, *args, **kwargs)
+
+    monkeypatch.setattr(tree, "_git", git)
+
+
+def test_scan_reports_an_error_when_git_cannot_diff_the_snapshots(repo, monkeypatch):
+    base = tree.snapshot(repo)
+    _replace("src/app.py", "a + b", "a + b  # noqa")(repo)
+    (repo / "tests" / "test_x.py").unlink()
+    after = tree.snapshot(repo)
+    assert base and after
+
+    full = floor.scan(repo, base, after)
+    assert full.error is None
+    assert _categories(full) == ["suppress", "test-delete"]
+
+    _fail_git(monkeypatch, "diff")
+    report = floor.scan(repo, base, after)
+    assert report.findings == []
+    assert report.error is not None
+    assert "diff" in report.error
+
+
+def test_scan_keeps_what_it_found_when_one_git_call_fails(repo, monkeypatch):
+    edit = _replace("pyproject.toml", 'addopts = "-q"', 'addopts = "-q -x"')
+    base = tree.snapshot(repo)
+    edit(repo)
+    (repo / "tests" / "test_x.py").unlink()
+    after = tree.snapshot(repo)
+    assert base and after
+
+    _fail_git(monkeypatch, "cat-file")
+    report = floor.scan(repo, base, after)
+    assert _categories(report) == ["test-delete"]
+    assert report.error is not None
+    assert "pyproject.toml" in report.error
+
+
+def test_scan_without_two_snapshots_reports_an_error(repo, tmp_path):
+    snap = tree.snapshot(repo)
+    assert floor.scan(repo, None, snap).error is not None
+    assert floor.scan(repo, snap, snap).error is None
+    plain = tmp_path / "plain"
+    plain.mkdir()
+    assert floor.scan(plain, snap, snap).error is not None
+
+
 # ── Allow lists, pathly/ prose, may_change, warnings ──────────────────────────
 
 
@@ -244,6 +335,14 @@ def test_a_skip_written_under_pathly_is_not_a_skip(repo):
         "pathly/features/demo/notes.md", "Never add @pytest.mark.skip  # noqa\n"
     )
     assert _scan(repo, edit).findings == []
+
+
+def test_an_inherited_literal_pathspec_setting_does_not_hide_a_finding(
+    repo, monkeypatch
+):
+    monkeypatch.setenv("GIT_LITERAL_PATHSPECS", "1")
+    report = _scan(repo, _replace("src/app.py", "a + b", "a + b  # noqa"))
+    assert report.findings == ["suppress: src/app.py: return a + b  # noqa"]
 
 
 def test_may_change_clears_a_plan_edit(repo):

@@ -16,6 +16,7 @@ Snapshot objects are unreachable, so ``git gc`` prunes them after its grace peri
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -23,14 +24,28 @@ from pathlib import Path
 
 TIMEOUT_SECONDS = 60
 
-# Variables that point git at another repo or index. One inherited from the caller (a git hook,
-# say) must not override the repo that ``cwd=root`` names.
-_REPO_ENV = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR")
+# Variables that point git at another repo or index, or change how it reads a pathspec. One
+# inherited from the caller (a git hook, say) must not override the repo that ``cwd=root``
+# names, or turn ``:(exclude)pathly/`` into a literal file name.
+_REPO_ENV = (
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_INDEX_FILE",
+    "GIT_COMMON_DIR",
+    "GIT_LITERAL_PATHSPECS",
+    "GIT_GLOB_PATHSPECS",
+    "GIT_NOGLOB_PATHSPECS",
+    "GIT_ICASE_PATHSPECS",
+)
 
 # Explicit diff settings, so a user's git config (external diff tools, textconv filters,
 # no-prefix) cannot change the text callers parse.
 _DIFF_FLAGS = ("--no-color", "--no-ext-diff", "--no-textconv", "--no-renames")
 _PREFIXES = ("--src-prefix=a/", "--dst-prefix=b/")
+
+# One escape in a name git C-quotes: an octal byte or a single character.
+_ESCAPE = re.compile(rb"\\([0-3][0-7]{2}|.)", re.DOTALL)
+_C_ESCAPES = {b"a": 7, b"b": 8, b"t": 9, b"n": 10, b"v": 11, b"f": 12, b"r": 13}
 
 
 def _git(root: str | Path, *args: str, index: str | None = None) -> str | None:
@@ -86,10 +101,13 @@ def snapshot(root: str | Path) -> str | None:
         prefix="pathly-snapshot-", ignore_cleanup_errors=True
     ) as scratch:
         # git refuses an empty index file, so with no index the copy is simply absent.
+        # copy2 keeps the index's mtime: git re-reads an entry as new as the index file and
+        # trusts the stat data of an older one, so a fresh mtime on the copy would hide a
+        # same-size edit made in the second the index was last written.
         private = os.path.join(scratch, "index")
         if os.path.isfile(real_index):
             try:
-                shutil.copyfile(real_index, private)
+                shutil.copy2(real_index, private)
             except OSError:
                 return None
         if _git(root, "add", "-A", index=private) is None:
@@ -109,13 +127,20 @@ def changes(
     root: str | Path, a: str, b: str, paths: list[str] | None = None
 ) -> list[tuple[str, str]]:
     """``(status, path)`` for each path that differs between trees a and b (no renames)."""
+    return changes_or_none(root, a, b, paths) or []
+
+
+def changes_or_none(
+    root: str | Path, a: str, b: str, paths: list[str] | None = None
+) -> list[tuple[str, str]] | None:
+    """As :func:`changes`, but None when git cannot diff, so a caller can tell that apart."""
     if not (a and b) or not _is_top(root):
-        return []
+        return None
     out = _git(
         root, "diff", "--name-status", "--no-renames", "-z", a, b, "--", *(paths or [])
     )
-    if not out:
-        return []
+    if out is None:
+        return None
     fields = out.split("\0")
     return [
         (fields[i], fields[i + 1])
@@ -137,10 +162,22 @@ def diff_text(
     Each ``exclude`` entry becomes a ``:(exclude)<path>`` pathspec; with exclusions only, git
     diffs every other path.
     """
+    return diff_text_or_none(root, a, b, paths, exclude, unified) or ""
+
+
+def diff_text_or_none(
+    root: str | Path,
+    a: str,
+    b: str,
+    paths: list[str] | None = None,
+    exclude: list[str] | None = None,
+    unified: int = 0,
+) -> str | None:
+    """As :func:`diff_text`, but None when git cannot diff, so a caller can tell that apart."""
     if not (a and b) or not _is_top(root):
-        return ""
+        return None
     pathspecs = [*(paths or []), *(":(exclude)" + path for path in exclude or [])]
-    out = _git(
+    return _git(
         root,
         "diff",
         *_DIFF_FLAGS,
@@ -151,7 +188,6 @@ def diff_text(
         "--",
         *pathspecs,
     )
-    return out or ""
 
 
 def blob(root: str | Path, tree: str, path: str) -> str | None:
@@ -168,3 +204,23 @@ def read(root: str | Path, tree: str, path: str) -> str | None:
     if not tree or not _is_top(root):
         return None
     return _git(root, "cat-file", "blob", "%s:%s" % (tree, path))
+
+
+def unquote_path(name: str) -> str:
+    """A path as git prints it in a patch header, without git's C-style quotes.
+
+    git quotes a name that holds ``"``, ``\\`` or a control character even with
+    ``core.quotepath=off`` (``"a/we\\"ird.py"``, octal for a byte). Other names come back as
+    they are.
+    """
+    if len(name) < 2 or name[0] != '"' or name[-1] != '"':
+        return name
+
+    def one(match: re.Match[bytes]) -> bytes:
+        code = match.group(1)
+        if len(code) == 3:
+            return bytes([int(code, 8)])
+        return bytes([_C_ESCAPES.get(code, code[0])])
+
+    raw = name[1:-1].encode("utf-8", "surrogateescape")
+    return _ESCAPE.sub(one, raw).decode("utf-8", "surrogateescape")

@@ -15,7 +15,8 @@ rules for config files are copied; its CLI and its ticket rules are not. A findi
 - ``plan-edit``: a path under a ``protected`` prefix changed and ``may_change`` did not excuse it.
 - ``task-edit``: listed so an allow list can name it; its callers check it (they hold the rows).
 
-Fewer assertion lines added than removed in test files is a warning, not a finding.
+Fewer assertion lines added than removed in test files is a warning, not a finding. A git
+call that fails or times out sets the report's ``error`` instead of passing as a clean scan.
 """
 
 from __future__ import annotations
@@ -97,10 +98,15 @@ _CHANGED = {"A": "added", "D": "deleted"}
 
 @dataclass(frozen=True)
 class FloorReport:
-    """``findings`` block the work; ``warnings`` are worth a look but block nothing."""
+    """``findings`` block the work; ``warnings`` are worth a look but block nothing.
+
+    ``error`` says what could not be checked (a snapshot is missing, or a git call failed or
+    timed out). The findings are still real, but a report with an error is incomplete.
+    """
 
     findings: list[str]
     warnings: list[str]
+    error: str | None = None
 
 
 @dataclass
@@ -145,23 +151,31 @@ def scan(
 ) -> FloorReport:
     """Diff snapshot ``base`` to ``after`` and report each way it weakens the bar.
 
-    Fails open: when git cannot diff the two trees, the report is empty.
+    Fails open: what git cannot diff or read is not judged, and ``error`` says so.
     """
+    if not (base and after):
+        return FloorReport(findings=[], warnings=[], error="no snapshot to diff")
     allowed = frozenset(allow)
     findings: list[str] = []
+    errors: list[str] = []
 
     def add(category: str, path: str, text: str) -> None:
         if category not in allowed:
             findings.append("%s: %s: %s" % (category, path, text))
 
-    diff = tree.diff_text(root, base, after, exclude=[PLAN_ROOT])
-    files = _file_diffs(diff)
+    diff = tree.diff_text_or_none(root, base, after, exclude=[PLAN_ROOT])
+    if diff is None:
+        errors.append("git could not diff the two snapshots")
+    files = _file_diffs(diff or "")
     for part in files:
         for line in part.added:
             for category in _line_categories(part.new, line):
                 add(category, part.new, line.lstrip(" \t")[:100])
 
-    rows = tree.changes(root, base, after)
+    rows = tree.changes_or_none(root, base, after)
+    if rows is None:
+        errors.append("git could not list the changed paths")
+        rows = []
     outside = [
         (status, path) for status, path in rows if not path.startswith(PLAN_ROOT)
     ]
@@ -169,7 +183,7 @@ def scan(
         if status == "D" and DELETED_TEST.search(path):
             add("test-delete", path, "a test file was deleted")
     makes = any(MAKE_COMMAND.match(str(command)) for command in config_commands)
-    for path in _config_paths(root, base, after, outside, files, makes):
+    for path in _config_paths(root, (base, after), outside, files, makes, errors):
         add("config", path, "lint, test or CI config was changed")
 
     prefixes = [p.rstrip("/") for p in protected if p.rstrip("/")]
@@ -181,13 +195,13 @@ def scan(
             add("plan-edit", path, "a protected plan file was %s" % word)
 
     warnings: list[str] = []
-    removed, added = count_assertions(diff)
+    removed, added = count_assertions(diff or "")
     if removed > added:
         warnings.append(
             "%d assertion line(s) removed, %d added. check that no test got weaker."
             % (removed, added)
         )
-    return FloorReport(findings=findings, warnings=warnings)
+    return FloorReport(findings, warnings, error="; ".join(errors) or None)
 
 
 def count_assertions(diff: str) -> tuple[int, int]:
@@ -220,32 +234,30 @@ def _line_categories(path: str, line: str) -> list[str]:
 
 def _config_paths(
     root: str | Path,
-    base: str,
-    after: str,
+    trees: tuple[str, str],
     outside: list[tuple[str, str]],
     files: list[_FileDiff],
     makes: bool,
+    errors: list[str],
 ) -> list[str]:
     """Changed paths that are lint, test or CI config: by name, else by what changed in them."""
     by_path = {part.new or part.old: part for part in files}
     found: list[str] = []
-    for _status, path in outside:
+    for status, path in outside:
         name = path.rsplit("/", 1)[-1]
         part = by_path.get(path, _FileDiff())
         if CONFIG.search(path):
             found.append(path)
-        elif name in ("pyproject.toml", "setup.cfg"):
-            sections = (
-                PYPROJECT_SECTIONS if name == "pyproject.toml" else SETUP_SECTIONS
-            )
-            old = tree.read(root, base, path) or ""
-            new = tree.read(root, after, path) or ""
-            if _guarded_toml(old, new, part.hunks, sections):
-                found.append(path)
-        elif name == "package.json":
-            old = tree.read(root, base, path) or ""
-            new = tree.read(root, after, path) or ""
-            if _package_json_changed(old, new):
+        elif name in ("pyproject.toml", "setup.cfg", "package.json"):
+            # Added files have no old side and deleted files no new side.
+            old = _read_side(root, trees[0], path, status != "A", errors)
+            new = _read_side(root, trees[1], path, status != "D", errors)
+            if name == "package.json":
+                changed = _package_json_changed(old, new)
+            else:
+                sections = SETUP_SECTIONS if name == "setup.cfg" else PYPROJECT_SECTIONS
+                changed = _guarded_toml(old, new, part.hunks, sections)
+            if changed:
                 found.append(path)
         elif name == "conftest.py":
             if any(word in line for line in part.added for word in CONFTEST_WORDS):
@@ -253,6 +265,18 @@ def _config_paths(
         elif name == "Makefile" and makes:
             found.append(path)
     return found
+
+
+def _read_side(
+    root: str | Path, tree_id: str, path: str, present: bool, errors: list[str]
+) -> str:
+    """The file's text in one snapshot, "" where it is absent. A failed read is an error."""
+    if not present:
+        return ""
+    text = tree.read(root, tree_id, path)
+    if text is None:
+        errors.append("git could not read %s" % path)
+    return text or ""
 
 
 def _section_of(lines: list[str], number: int, name_pattern: re.Pattern[str]) -> bool:
@@ -311,9 +335,10 @@ def _records(text: str) -> list[str]:
 def _diff_path(text: str, prefix: str) -> str:
     """The path on a ``---``/``+++`` header line, or "" for /dev/null.
 
-    git ends a name that holds a space with a tab, so the tab goes.
+    git ends a name that holds a space with a tab, so the tab goes, and C-quotes a name that
+    holds ``"``, ``\\`` or a control character, so the quotes go.
     """
-    text = text.rstrip("\t")
+    text = tree.unquote_path(text.rstrip("\t"))
     if text == "/dev/null":
         return ""
     return text[len(prefix) :] if text.startswith(prefix) else text
