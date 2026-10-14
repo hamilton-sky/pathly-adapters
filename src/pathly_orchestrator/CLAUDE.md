@@ -883,6 +883,30 @@ stopping at the first failure, and returns `(ok, report)`: one block per failing
 command, `wanted:`, `got:` (`exit <N>`, `timed out after <N>s` or `could not run: <error>`) and
 the clipped output. Nothing runs them yet.
 
+**Floor guard (`proof/floor.py` over `proof/tree.py`).** Ported from feature-flow's
+`floorguard.py` (MIT): its regexes and config-file content rules, not its CLI. It looks for a build
+that got green by weakening the bar. `scan(root, base, after, *, allow, protected, may_change,
+config_commands)` diffs two snapshots and returns `FloorReport(findings, warnings)`, each finding
+`"<category>: <path>: <line>"`. Categories (`CATEGORIES`, read by `parse_allow`, which raises
+`ValueError` on an unknown name): `skip` (skip/xfail markers, and focused tests in test files),
+`suppress` (`noqa`, `type: ignore`, `eslint-disable`, …), `empty-catch` (a one-line
+`except …: pass` or `catch {}`), `threshold` (`fail_under` and kin), `trivial-assert` (an assertion
+that cannot fail, in a test file), `test-delete`, `config` (lint/test/CI config by file name, plus
+the guarded sections of `pyproject.toml`/`setup.cfg`, the test keys of `package.json`, collection
+words added to `conftest.py`, and a `Makefile` when a verify command starts with `make`),
+`plan-edit` (a path under a `protected` prefix that `may_change` does not excuse) and `task-edit`
+(checked by the callers, which hold the task rows). The pattern categories, `test-delete` and
+`config` apply only **outside `pathly/`**, so plan docs may mention `@pytest.mark.skip` in prose;
+plan files are judged by `plan-edit`. Fewer assertion lines added than removed in test files is a
+warning, not a finding; categories in `allow` are dropped. The snapshot (`tree.snapshot`) copies
+the file `git rev-parse --git-path index` names to a temp file, points `GIT_INDEX_FILE` at it,
+runs `git add -A` and `git write-tree`: a tree id for tracked and untracked (not ignored) files,
+with the repo's real index and `HEAD` untouched. `head`, `changes`, `diff_text` (with
+`:(exclude)<path>` pathspecs), `blob` and `read` work on those tree ids. Every `tree` function
+fails open (`None` or empty) when the root is not the top folder of a git work tree (a project
+inside a larger repo included), or git fails or is missing; each git call has a 60 s timeout.
+Snapshot objects are unreachable, so `git gc` prunes them later. Nothing calls the scan yet.
+
 Events: `GATE_PASSED` (command, `exit_code`, `duration_ms`) on success — the objective evidence on
 the run's record — and `GATE_FAILED` (with `reason`, `command`, `exit_code`) on failure.
 

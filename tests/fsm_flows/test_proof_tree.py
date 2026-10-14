@@ -177,8 +177,10 @@ def test_diff_text_has_no_context_lines_by_default(repo):
     _write(repo, "src/app.py", "def add(a, b):\n    return b + a\n")
     after = tree.snapshot(repo)
 
-    body = tree.diff_text(repo, base, after).split("@@", 2)[2]
-    assert "def add" not in body
+    lines = tree.diff_text(repo, base, after).splitlines()
+    assert "-    return a + b" in lines
+    assert "+    return b + a" in lines
+    assert not [line for line in lines if line.startswith(" ")]
 
 
 # ── fail open ─────────────────────────────────────────────────────────────────

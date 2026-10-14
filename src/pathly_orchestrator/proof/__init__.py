@@ -1,1 +1,4 @@
-"""Proof helpers: run commands and task check blocks. Stdlib only, no Pathly imports."""
+"""Proof helpers: commands, task check blocks, git tree snapshots and the floor scan.
+
+Stdlib only, no Pathly imports.
+"""
