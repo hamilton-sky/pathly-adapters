@@ -128,6 +128,13 @@ gates:
     - type: command_gate
       command_key: build
       on_fail: BUILD_FAILURES.md
+    # The builder stays inside its declared scope: the `files` of the tasks it claimed in this
+    # BUILDING plus the paths IMPLEMENTATION_PLAN.md names. Its own feedback files and
+    # VERIFY.md are allowed; a plan edit only when a planner/architect SPAWN_WINDOW explains it.
+    # Skips when nothing is declared. SCOPE_VIOLATION.md -> builder.
+    - type: scope_gate
+      scope_file: IMPLEMENTATION_PLAN.md
+      on_fail: SCOPE_VIOLATION.md
   REVIEWING->TESTING:
     # The reviewer writes REVIEW.md (RESULT: PASS) ONLY on a clean pass; a failing review leaves
     # REVIEW_FAILURES.md instead (and deletes any stale REVIEW.md). If REVIEW.md is missing/not-PASS

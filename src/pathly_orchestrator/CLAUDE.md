@@ -874,7 +874,7 @@ module, never another `elif`**. Each check returns `None` to allow the transitio
 | `require_artifact` | `artifact.py` | an agent wrote a file | `artifact` |
 | `verify_gate` | `artifact.py` | an agent wrote `pass_marker` on line 1 | `artifact`, `pass_marker` |
 | `require_tasks_done` | `tasks.py` | the board DAG has no unfinished task (goal-scoped when `goal_id` is set, else feature-scoped) | — |
-| `scope_gate` | `scope.py` | the builder stayed inside its declared footprint (git diff ∪ untracked vs. `scope_file`) | `scope_file` |
+| `scope_gate` | `scope.py` | the builder stayed inside its declared footprint (git diff ∪ untracked vs. the paths in `scope_file` ∪ the claimed tasks' `files`; see "Scope gate" below) | `scope_file` (optional); flow-level `scope_gate.exempt_prefixes` |
 | `command_gate` | `command.py` | **the project's own verify command exits 0** | `command_key` (+ optional `command`, `timeout`) |
 
 **The first four read state that agents produced; only `command_gate` executes something.** That
@@ -960,7 +960,8 @@ feedback's `target_agent`, so a builder or planner routed a file inside REVIEWIN
 as the `reviewer` that `terminal_identity._spawn_role` would mint). A fan-out drain records none.
 The spawn's result comes back unchanged; an exception from it propagates and no window is written;
 outside a git repo, or when a snapshot or the event write fails, there is no window and a log line.
-No packaged flow has one of those gates yet, so no run records windows until they land.
+`team` and `team-build` carry a `scope_gate`, so their runs record windows; `goal-loop` carries
+none of the three yet.
 
 What each role may change (`_proof.stage_writes(storage_path, role)`, a predicate over
 repo-relative POSIX paths). `<storage>` is the run's storage dir; the *board home*
@@ -983,8 +984,31 @@ since=None, roles=None)` returns the `SPAWN_WINDOW` events with `ts >= since`, o
 comparing parsed times (an event `ts` ends in `Z` and has whole seconds, while `since` stamps are
 `isoformat()` with an offset, so `since` is cut to its second), and raises `ValueError` when
 `since` is not a time. `_proof.floor_enabled()` reads the `floor.enabled` app setting: on unless it
-is `false`, `0` or `off`. `_proof` never imports `supervisor` and imports `db` lazily. No gate reads
-the windows yet.
+is `false`, `0` or `off`. `_proof` never imports `supervisor` and imports `db` lazily. `scope_gate`
+reads the windows (below).
+
+**Scope gate (`fsm/gates/scope.py`).** Did the builder stay inside what it declared? The
+*declared scope* is the union of the backtick paths in the gate's `scope_file` (optional; read from
+the storage dir when the file exists) and the `files` of the board tasks claimed since
+`build_baseline.started_at` (`task_proof.tasks_claimed_since`, goal-scoped when the run has a
+`goal_id`, else `(board, scope)`). An entry that names a directory covers everything under it, with
+or without a trailing `/`. The *changed paths* are `git diff --name-only HEAD` plus every untracked
+file (`git status --untracked-files=all`, so a new folder is listed file by file), minus
+`build_baseline.preexisting_dirty` (where a collapsed `dir/` entry covers the files under it).
+*Exempt*: what the builder stage may write (`_proof.stage_writes(storage, "builder")`: its feedback
+files, `VERIFY.md`, the server's exports, any `*.tsbuildinfo`), the flow's
+`scope_gate.exempt_prefixes`, and a path `_proof.explained` attributes to a `SPAWN_WINDOW` since
+`build_baseline.started_at` (a planner routed `IMPL_QUESTIONS.md` inside BUILDING edits the plan).
+The working-tree snapshot for that is taken only when some window's role may write a remaining
+path. The old blanket `pathly/features/` and `pathly/plans/` exemption is gone, so a builder edit to
+`USER_STORIES.md` or `IMPLEMENTATION_PLAN.md` fails, and the scope file never covers its own edit
+(a builder cannot widen its scope by adding a path to it). `SCOPE_VIOLATION.md` names the paths
+outside the scope (at most 20, then a count). It skips (`GATE_SKIPPED`, fail open) with no
+`build_baseline`, when nothing is declared (`no_declared_scope`), and when git, the claimed tasks
+(`tasks_unreadable`), the windows (`spawn_windows_unreadable`) or the snapshot (`snapshot_failed`)
+cannot be read; a truncated baseline is `GATE_DEGRADED`. Wired as the last gate of
+`BUILDING->REVIEWING` in `team` and `team-build` (`scope_file: IMPLEMENTATION_PLAN.md`,
+`SCOPE_VIOLATION.md` → builder); not in `goal-loop`.
 
 Events: `GATE_PASSED` (command, `exit_code`, `duration_ms`) on success — the objective evidence on
 the run's record — and `GATE_FAILED` (with `reason`, `command`, `exit_code`) on failure.
@@ -1824,8 +1848,8 @@ Two things make this correct rather than superficially similar to `scope_gate`'s
 - **Untracked files are included.** `git diff HEAD` alone only covers tracked paths — a brand new
   file (the most common thing a builder does) never appears in it. `files_changed`/`diff_stat`
   fold in `git status --porcelain`'s `??` lines too.
-- **The whole `pathly/` tree is exempt**, wider than `scope_gate`'s `pathly/features/`/
-  `pathly/plans/` prefix check. `pathly/` is entirely Pathly's own storage substrate (features/,
+- **The whole `pathly/` tree is exempt**, wider than `scope_gate`, which under `pathly/` exempts
+  only what the builder stage may write. `pathly/` is entirely Pathly's own storage substrate (features/,
   project/, board-artifacts/, lessons/, the legacy plans/ — never builder code), and on a brand
   new project's very first feature git collapses an entirely-untracked tree to its SHALLOWEST
   boundary (`?? pathly/`, not the deeper `?? pathly/features/<f>/`) — a narrower prefix check

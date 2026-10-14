@@ -51,6 +51,11 @@ gates:
   - command_key: build
     on_fail: BUILD_FAILURES.md
     type: command_gate
+  # See team.flow.yaml: the builder's changes must stay inside the claimed tasks' files and
+  # the paths the plan names; its own feedback files and VERIFY.md are allowed.
+  - on_fail: SCOPE_VIOLATION.md
+    scope_file: IMPLEMENTATION_PLAN.md
+    type: scope_gate
   REVIEWING->TESTING:
   - artifact: REVIEW.md
     on_fail: REVIEW_INCOMPLETE.md

@@ -107,6 +107,14 @@ def _claimed_task(files, *, scope: str = "demo", goal_id=None) -> str:
     return task_id
 
 
+def _build(repo: Path, files=("src/app.py",), preexisting=(), **flow_kw) -> dict:
+    """A started build with one task claimed in it that declares ``files``."""
+    flow = _flow(**flow_kw)
+    _start_build(repo, flow, preexisting)
+    _claimed_task(list(files) if files is not None else None)
+    return flow
+
+
 def _gate(repo: Path, flow: dict, **kw):
     kw.setdefault("feature_scope", "demo")
     return run_gates(flow, "BUILDING", "REVIEWING", _storage(repo), "demo", 1, **kw)
@@ -133,9 +141,7 @@ def _failed(result) -> bool:
 
 
 def test_a_change_inside_a_claimed_tasks_files_passes(repo):
-    flow = _flow()
-    _start_build(repo, flow)
-    _claimed_task(["src/app.py"])
+    flow = _build(repo)
     _write(repo, "src/app.py")
 
     assert _gate(repo, flow) is None
@@ -143,9 +149,7 @@ def test_a_change_inside_a_claimed_tasks_files_passes(repo):
 
 
 def test_a_change_outside_the_claimed_files_fails_naming_the_path(repo):
-    flow = _flow()
-    _start_build(repo, flow)
-    _claimed_task(["src/app.py"])
+    flow = _build(repo)
     _write(repo, "src/app.py")
     _write(repo, "src/other.py")
 
@@ -158,9 +162,7 @@ def test_a_change_outside_the_claimed_files_fails_naming_the_path(repo):
 
 
 def test_the_scope_file_paths_and_the_task_files_are_one_union(repo):
-    flow = _flow()
-    _start_build(repo, flow)
-    _claimed_task(["src/app.py"])
+    flow = _build(repo)
     _write(repo, "src/app.py")
     _write(repo, "lib/helper.py")  # named in IMPLEMENTATION_PLAN.md
     assert _gate(repo, flow) is None
@@ -201,9 +203,7 @@ def test_a_goal_run_reads_the_goals_claimed_tasks(repo):
 
 @pytest.mark.parametrize("entry", ["src/pkg", "src/pkg/"])
 def test_a_declared_directory_covers_the_files_under_it(repo, entry):
-    flow = _flow()
-    _start_build(repo, flow)
-    _claimed_task([entry])
+    flow = _build(repo, [entry])
     _write(repo, "src/pkg/a.py")
     _write(repo, "src/pkg/sub/b.py")
 
@@ -211,9 +211,7 @@ def test_a_declared_directory_covers_the_files_under_it(repo, entry):
 
 
 def test_a_declared_directory_does_not_cover_a_sibling_sharing_its_prefix(repo):
-    flow = _flow()
-    _start_build(repo, flow)
-    _claimed_task(["src/pkg"])
+    flow = _build(repo, ["src/pkg"])
     _write(repo, "src/pkg/a.py")
     _write(repo, "src/pkgextra.py")
 
@@ -225,9 +223,7 @@ def test_a_declared_directory_does_not_cover_a_sibling_sharing_its_prefix(repo):
 
 def test_declared_files_in_a_new_untracked_directory_pass(repo):
     """git lists a new folder as one ``?? src/newpkg/`` line unless asked for every file."""
-    flow = _flow()
-    _start_build(repo, flow)
-    _claimed_task(["src/newpkg/a.py", "src/newpkg/b.py"])
+    flow = _build(repo, ["src/newpkg/a.py", "src/newpkg/b.py"])
     _write(repo, "src/newpkg/a.py")
     _write(repo, "src/newpkg/b.py")
     assert _gate(repo, flow) is None
@@ -239,10 +235,8 @@ def test_declared_files_in_a_new_untracked_directory_pass(repo):
 
 def test_a_preexisting_untracked_directory_covers_the_files_under_it(repo):
     """``git status`` names an untracked folder as ``scratch/`` in the baseline."""
-    flow = _flow()
     _write(repo, "scratch/notes.txt", "mine\n")
-    _start_build(repo, flow, preexisting=["scratch/"])
-    _claimed_task(["src/app.py"])
+    flow = _build(repo, preexisting=["scratch/"])
     _write(repo, "src/app.py")
 
     assert _gate(repo, flow) is None
@@ -252,9 +246,7 @@ def test_a_preexisting_untracked_directory_covers_the_files_under_it(repo):
 
 
 def test_a_builder_edit_to_the_user_stories_fails(repo):
-    flow = _flow()
-    _start_build(repo, flow)
-    _claimed_task(["src/app.py"])
+    flow = _build(repo)
     _write(repo, "src/app.py")
     _write(repo, STORIES, "# Stories\n\nRewritten by the builder.\n")
 
@@ -280,9 +272,7 @@ def _planner_window(repo: Path, before: str | None, after: str | None) -> None:
 
 
 def test_the_same_edit_explained_by_a_planner_window_passes(repo):
-    flow = _flow()
-    _start_build(repo, flow)
-    _claimed_task(["src/app.py"])
+    flow = _build(repo)
     _write(repo, "src/app.py")
     before = tree.snapshot(repo)
     _write(repo, STORIES, "# Stories\n\nClarified by the planner.\n")
@@ -293,9 +283,7 @@ def test_the_same_edit_explained_by_a_planner_window_passes(repo):
 
 
 def test_a_builder_edit_after_the_planners_window_fails(repo):
-    flow = _flow()
-    _start_build(repo, flow)
-    _claimed_task(["src/app.py"])
+    flow = _build(repo)
     before = tree.snapshot(repo)
     _write(repo, STORIES, "# Stories\n\nClarified by the planner.\n")
     after = tree.snapshot(repo)
@@ -307,9 +295,7 @@ def test_a_builder_edit_after_the_planners_window_fails(repo):
 
 
 def test_the_scope_file_cannot_widen_the_scope_to_cover_its_own_edit(repo):
-    flow = _flow()
-    _start_build(repo, flow)
-    _claimed_task(["src/app.py"])
+    flow = _build(repo)
     _write(repo, PLAN, "# Plan\n\n**File:** `lib/helper.py`\n**File:** `pathly/`\n")
 
     assert _failed(_gate(repo, flow))
@@ -317,9 +303,7 @@ def test_the_scope_file_cannot_widen_the_scope_to_cover_its_own_edit(repo):
 
 
 def test_the_builders_feedback_files_and_verify_pass(repo):
-    flow = _flow()
-    _start_build(repo, flow)
-    _claimed_task(["src/app.py"])
+    flow = _build(repo)
     _write(repo, "src/app.py")
     _write(repo, FEATURE + "/feedback/IMPL_QUESTIONS.md", "[REQ] which one?\n")
     _write(repo, FEATURE + "/VERIFY.md", "RESULT: PASS\n")
@@ -328,9 +312,7 @@ def test_the_builders_feedback_files_and_verify_pass(repo):
 
 
 def test_tsbuildinfo_and_the_flows_exempt_prefixes_pass(repo):
-    flow = _flow(exempt=["docs/"])
-    _start_build(repo, flow)
-    _claimed_task(["src/app.py"])
+    flow = _build(repo, exempt=["docs/"])
     _write(repo, "docs/guide.md")
     _write(repo, "studio/tsconfig.tsbuildinfo")
 
@@ -341,9 +323,7 @@ def test_tsbuildinfo_and_the_flows_exempt_prefixes_pass(repo):
 
 
 def test_no_scope_file_and_no_task_files_skips(repo):
-    flow = _flow(scope_file=None)
-    _start_build(repo, flow)
-    _claimed_task(None)
+    flow = _build(repo, None, scope_file=None)
     _write(repo, "src/other.py")
 
     assert _gate(repo, flow) is None
@@ -355,9 +335,7 @@ def test_unreadable_spawn_windows_fail_open(repo, monkeypatch):
         raise RuntimeError("db is gone")
 
     monkeypatch.setattr(_proof, "windows_since", broken)
-    flow = _flow()
-    _start_build(repo, flow)
-    _claimed_task(["src/app.py"])
+    flow = _build(repo)
     _write(repo, STORIES, "# Stories\n\nRewritten.\n")
 
     assert _gate(repo, flow) is None
@@ -367,9 +345,7 @@ def test_unreadable_spawn_windows_fail_open(repo, monkeypatch):
 
 
 def test_the_failure_names_at_most_twenty_paths_then_a_count(repo):
-    flow = _flow()
-    _start_build(repo, flow)
-    _claimed_task(["src/app.py"])
+    flow = _build(repo)
     for i in range(25):
         _write(repo, "src/extra_%02d.py" % i)
 
