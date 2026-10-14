@@ -4,7 +4,7 @@
 
 FSM engine, gates, transitions, flow definitions, feedback protocol & fix-routing.
 
-31 test file(s).
+32 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -20,6 +20,7 @@ FSM engine, gates, transitions, flow definitions, feedback protocol & fix-routin
 | `test_fsm_http_client.py` | covers next action auto starts server and posts json; poll exits early on first healthy response; poll exhausted raises runtime error; … | 8 |
 | `test_fsm_ops.py` | Integration tests for fsm_ops.py (next_action, complete_stage) | 36 |
 | `test_gates.py` | Unit and integration tests for run_gates() — Conv 1 and Conv 2 (scope_gate) | 31 |
+| `test_gates_proof_helpers.py` | The shared helpers of the proof gates (``fsm/gates/_proof.py``, build-proof 04) | 17 |
 | `test_goal_id_prompt_var.py` | Phase 0 hygiene fix — team/build's board query was unscoped by goal_id | 3 |
 | `test_golden_path.py` | T1 — the end-to-end GOLDEN-PATH smoke test (production-readiness P0) | 7 |
 | `test_hooks.py` | End-to-end tests for hook scripts via subprocess | 11 |
