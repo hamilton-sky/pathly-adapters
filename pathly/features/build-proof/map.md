@@ -138,6 +138,7 @@ And `python -m pytest tests/ -q -p no:cacheprovider` passes in full, with the Li
   pyproject/setup.cfg/package.json/conftest/Makefile content rules, `count_assertions`),
   `feature_flow/proof.py` (`checks_in`, `run_checks`), `feature_flow/conductor.py` (`run_limit`,
   `judge_review`, `run_smoke`), `guides/debug.md`. Local, MIT licensed.
+- 01 — `proof/command.py` (`to_argv`, `clip`, `run_command` -> `CommandResult`, never raises) is the one command runner; `command_gate` uses it with unchanged feedback. `proof/checks.py` parses every ```check fence anywhere in task text (feature-flow grammar and messages) and `run_checks(checks, cwd, timeout)` runs all of them, no shell, timeout in seconds.
 
 ## Open questions
 

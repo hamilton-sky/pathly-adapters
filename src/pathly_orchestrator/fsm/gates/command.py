@@ -36,17 +36,16 @@ with the extension: ``["npm.cmd", "test"]``.
 from __future__ import annotations
 
 import json
-import os
-import shlex
-import subprocess
 import time
 from pathlib import Path
+
+from pathly_orchestrator.proof.command import clip as _clip
+from pathly_orchestrator.proof.command import run_command
+from pathly_orchestrator.proof.command import to_argv as _to_argv
 
 from ._helpers import append_event, gate_failed, gate_skipped, project_root_of
 
 _DEFAULT_TIMEOUT = 600
-_HEAD_CHARS = 3000
-_TAIL_CHARS = 5000
 
 
 def _get_setting(key: str) -> str | None:
@@ -81,32 +80,6 @@ def _resolve_timeout(gate: dict) -> int:
         if value > 0:
             return value
     return _DEFAULT_TIMEOUT
-
-
-def _to_argv(command: str) -> list[str]:
-    """Split a configured command into argv. A JSON array is taken verbatim."""
-    if command.startswith("["):
-        parsed = json.loads(command)
-        if not isinstance(parsed, list) or not parsed:
-            raise ValueError("JSON command must be a non-empty array")
-        return [str(part) for part in parsed]
-    argv = shlex.split(command)
-    if not argv:
-        raise ValueError("command is empty after splitting")
-    return argv
-
-
-def _clip(text: str) -> str:
-    """Bound the captured output, keeping BOTH ends.
-
-    Compilers put the first error at the top; test runners put the summary at the bottom.
-    Tailing alone loses the former, so keep a head and a tail with the middle elided.
-    """
-    text = text.strip()
-    if len(text) <= _HEAD_CHARS + _TAIL_CHARS:
-        return text
-    elided = len(text) - _HEAD_CHARS - _TAIL_CHARS
-    return f"{text[:_HEAD_CHARS]}\n\n… [{elided} characters elided] …\n\n{text[-_TAIL_CHARS:]}"
 
 
 def _failure_reason(
@@ -158,17 +131,8 @@ def check_command_gate(
     cwd = project_root_of(storage_path)
     started = time.monotonic()
 
-    try:
-        completed = subprocess.run(
-            argv,
-            cwd=str(cwd),
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            env={**os.environ, "PATHLY_VERIFY_GATE": "1"},
-        )
-    except subprocess.TimeoutExpired as exc:
-        output = _decode(exc.stdout) + _decode(exc.stderr)
+    completed = run_command(argv, cwd, timeout, extra_env={"PATHLY_VERIFY_GATE": "1"})
+    if completed.timed_out:
         return gate_failed(
             storage_path,
             gate,
@@ -176,11 +140,14 @@ def check_command_gate(
             prev_state,
             next_state,
             _failure_reason(
-                command, None, output, f" after {timeout}s (killed by the gate)"
+                command,
+                None,
+                completed.output,
+                f" after {timeout}s (killed by the gate)",
             ),
             extra={"reason": "command_timeout", "command": command},
         )
-    except (OSError, ValueError) as exc:
+    if completed.code is None:
         # Not-found / not-executable is a CONFIG error, and it fails closed on purpose:
         # a verify command that never runs would silently pass every gate forever.
         return gate_failed(
@@ -193,16 +160,16 @@ def check_command_gate(
                 command,
                 None,
                 "",
-                f" — the command could not be executed ({exc}). "
+                f" — the command could not be executed ({completed.error}). "
                 f"Check the `{setting_key}` setting and that the tool is installed.",
             ),
             extra={"reason": "command_not_executable", "command": command},
         )
 
     duration_ms = int((time.monotonic() - started) * 1000)
-    output = (completed.stdout or "") + (completed.stderr or "")
+    output = completed.output
 
-    if completed.returncode == 0:
+    if completed.code == 0:
         append_event(
             storage_path,
             {
@@ -222,17 +189,11 @@ def check_command_gate(
         "command_gate",
         prev_state,
         next_state,
-        _failure_reason(command, completed.returncode, output, ""),
+        _failure_reason(command, completed.code, output, ""),
         extra={
-            "reason": f"`{command}` exited {completed.returncode}",
+            "reason": f"`{command}` exited {completed.code}",
             "command": command,
-            "exit_code": completed.returncode,
+            "exit_code": completed.code,
             "duration_ms": duration_ms,
         },
     )
-
-
-def _decode(raw: object) -> str:
-    if isinstance(raw, bytes):
-        return raw.decode("utf-8", "replace")
-    return raw if isinstance(raw, str) else ""
