@@ -44,6 +44,7 @@ role_map:
 feedback_routing:
   HUMAN_QUESTIONS: human
   BLOCKED_ON_HUMAN: human
+  REVIEWER_CHANGED_FILES: human  # reviewer_unchanged gate: a reviewer spawn changed files or committed -> a human decides
   REQUIREMENT_GAP: po
   PLAN_FEEDBACK: planner
   ARCH_FEEDBACK: architect
@@ -73,6 +74,7 @@ escalation_routing:
 feedback_priority:
   - HUMAN_QUESTIONS
   - BLOCKED_ON_HUMAN
+  - REVIEWER_CHANGED_FILES
   - REQUIREMENT_GAP
   - PLAN_FEEDBACK
   - ARCH_FEEDBACK
@@ -135,6 +137,11 @@ gates:
     - type: scope_gate
       scope_file: IMPLEMENTATION_PLAN.md
       on_fail: SCOPE_VIOLATION.md
+  # The same check on the failed-review edge, so a reviewer that edited code and then failed the
+  # review does not hand that edit to the builder unseen.
+  REVIEWING->BUILDING:
+    - type: reviewer_unchanged
+      on_fail: REVIEWER_CHANGED_FILES.md
   REVIEWING->TESTING:
     # The reviewer writes REVIEW.md (RESULT: PASS) ONLY on a clean pass; a failing review leaves
     # REVIEW_FAILURES.md instead (and deletes any stale REVIEW.md). If REVIEW.md is missing/not-PASS
@@ -149,6 +156,12 @@ gates:
     # so the gate is feature-scoped (board+scope), matching team/build's ready-task fetch.
     - type: require_tasks_done
       on_fail: INCOMPLETE_TASKS.md
+    # A reviewer judges; it does not edit. Measured from the reviewer's SPAWN_WINDOWs since the
+    # run last entered REVIEWING: a changed file other than REVIEW.md / feedback files, or a
+    # moved HEAD, parks the run for a human (REVIEWER_CHANGED_FILES.md -> human). Builder fix
+    # rounds inside REVIEWING may change code, so only reviewer windows count.
+    - type: reviewer_unchanged
+      on_fail: REVIEWER_CHANGED_FILES.md
   TESTING->RETRO:
     # The tester agent REPORTS that acceptance criteria pass; this gate MEASURES it by
     # running the project's own test command. A non-zero exit routes the real output to

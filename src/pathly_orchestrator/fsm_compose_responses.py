@@ -104,6 +104,14 @@ def _exit_requirement(flow_config: dict | None, state_name: str) -> str | None:
                     f"nothing), and your own feedback files and `VERIFY.md`. Any other "
                     f"change, a plan file included, fails the scope gate (→ {target})."
                 )
+            elif t == "reviewer_unchanged":
+                rule = (
+                    "In REVIEWING, change no file except `REVIEW.md` and feedback "
+                    "files, and do not commit: a reviewer judges, it does not edit. "
+                    "Any other change parks the run for a human."
+                )
+                if rule not in lines:
+                    lines.append(rule)
             elif t == "command_gate":
                 lines.append(
                     f"The project's `{chk.get('command_key')}` verification command must "

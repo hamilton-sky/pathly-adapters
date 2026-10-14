@@ -16,6 +16,7 @@ escalation_routing:
 feedback_priority:
 - HUMAN_QUESTIONS
 - BLOCKED_ON_HUMAN
+- REVIEWER_CHANGED_FILES
 - REQUIREMENT_GAP
 - PLAN_FEEDBACK
 - ARCH_FEEDBACK
@@ -41,6 +42,7 @@ feedback_routing:
   PO_QUESTIONS: po
   REFLECT_CRITIQUE: builder
   REQUIREMENT_GAP: po
+  REVIEWER_CHANGED_FILES: human
   REVIEW_FAILURES: builder
   REVIEW_INCOMPLETE: reviewer
   SCOPE_VIOLATION: builder
@@ -56,6 +58,11 @@ gates:
   - on_fail: SCOPE_VIOLATION.md
     scope_file: IMPLEMENTATION_PLAN.md
     type: scope_gate
+  # See team.flow.yaml: a reviewer judges, it does not edit. Either way out of REVIEWING is
+  # checked, since a failed review leaves through REVIEWING->BUILDING.
+  REVIEWING->BUILDING:
+  - on_fail: REVIEWER_CHANGED_FILES.md
+    type: reviewer_unchanged
   REVIEWING->TESTING:
   - artifact: REVIEW.md
     on_fail: REVIEW_INCOMPLETE.md
@@ -63,6 +70,8 @@ gates:
     type: verify_gate
   - on_fail: INCOMPLETE_TASKS.md
     type: require_tasks_done
+  - on_fail: REVIEWER_CHANGED_FILES.md
+    type: reviewer_unchanged
   TESTING->RETRO:
   - command_key: test
     on_fail: TEST_FAILURES.md

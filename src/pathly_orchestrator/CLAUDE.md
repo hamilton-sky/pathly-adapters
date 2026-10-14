@@ -876,11 +876,14 @@ module, never another `elif`**. Each check returns `None` to allow the transitio
 | `require_tasks_done` | `tasks.py` | the board DAG has no unfinished task (goal-scoped when `goal_id` is set, else feature-scoped) | — |
 | `scope_gate` | `scope.py` | the builder stayed inside its declared footprint (git diff ∪ untracked vs. the paths in `scope_file` ∪ the claimed tasks' `files`; see "Scope gate" below) | `scope_file` (optional); flow-level `scope_gate.exempt_prefixes` |
 | `command_gate` | `command.py` | **the project's own verify command exits 0** | `command_key` (+ optional `command`, `timeout`) |
+| `reviewer_unchanged` | `reviewer.py` | a reviewer spawn changed no file and made no commit (the supervisor's `SPAWN_WINDOW` events; see "Reviewer gate" below) | — |
 
 **The first four read state that agents produced; only `command_gate` executes something.** That
 distinction is the point of it: `verify_gate` is satisfied by an agent writing `RESULT: PASS`, so
 the FSM's pass/fail signal was, end to end, an agent's opinion of its own work. `command_gate`
 re-derives the answer from a process exit code and routes the real stdout/stderr back as feedback.
+`reviewer_unchanged` reads what the supervisor measured around the reviewer's spawn, not what the
+reviewer reported.
 
 **Command resolution** (highest precedence first): `gate["command"]` literal → app-setting
 `verify.<command_key>` → **skip**. Configure a project with
@@ -1028,6 +1031,32 @@ BUILDING (the `force_past_gate` limit). And a planner or architect sub-agent tha
 itself (`team/build.md`'s "Feedback routing after builder", for `IMPL_QUESTIONS.md` or
 `DESIGN_QUESTIONS.md`) writes inside the builder's window, so its plan edit counts as the
 builder's.
+
+**Reviewer gate (`fsm/gates/reviewer.py`).** A reviewer judges; it does not edit. The gate finds
+when the run last entered REVIEWING (the newest `STATE_TRANSITION` event with `to == "REVIEWING"`),
+takes the `SPAWN_WINDOW`s of the `reviewer` role since then (`_proof.windows_since(...,
+roles={"reviewer"})`) and reports, per window, a moved `HEAD` ("HEAD moved from a to b (the
+reviewer committed)") and every path `proof.tree.changes` shows between its two trees that
+`_proof.stage_writes(storage, "reviewer")` does not allow (`<status> <path>`: `REVIEW.md` and the
+feedback files are allowed, so anything else is not). Only reviewer windows count: a builder fix
+round inside REVIEWING may change code, and a feedback spawn routed to the reviewer
+(`REVIEW_INCOMPLETE.md`) is a reviewer window too. On a finding the gate writes
+`REVIEWER_CHANGED_FILES.md` listing each change and fails with `GATE_FAILED {gate, transition,
+run_ids}`. The flows route that file to `human` (and rank it right after `BLOCKED_ON_HUMAN`), so the
+supervisor takes its existing human-checkpoint path: it posts an escalation and parks the run
+(`human_checkpoint`). The human decides whether to keep or revert the changes (nothing is reverted),
+deletes the file and resumes the run (`POST /runner/resume-parked`); the next reviewer spawn then
+runs and is judged on its own window. A window whose `run_id` an earlier `reviewer_unchanged`
+`GATE_FAILED` event named is left out, so a window the human already resolved is not reported again
+(a window without a `run_id` is named by its event seq). With no reviewer window (an interactive
+`/pathly` run records none, and neither does a project outside a git repo) the gate skips
+(`GATE_SKIPPED`, `no_reviewer_window`). It also skips, fail open, when the windows cannot be read
+(`windows_unreadable`) or git cannot diff a window's trees (`git_diff_failed`); a moved `HEAD` is
+read from the window itself, so it still fails. Wired as the last gate of `REVIEWING->TESTING` and
+the only gate of `REVIEWING->BUILDING` in `team` and `team-build` (`REVIEWER_CHANGED_FILES.md` →
+human); the REVIEWING exit requirement tells the reviewer to change nothing but `REVIEW.md` and
+feedback files and not to commit. Limit: with early advance the window's closing snapshot is taken
+at the reviewer's `AGENT_DONE`, so a write after its completion report can land outside the window.
 
 Events: `GATE_PASSED` (command, `exit_code`, `duration_ms`) on success — the objective evidence on
 the run's record — and `GATE_FAILED` (with `reason`, `command`, `exit_code`) on failure.
