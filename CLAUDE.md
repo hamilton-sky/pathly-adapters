@@ -87,7 +87,10 @@ into `team`/`team-build` at `BUILDING->REVIEWING` (`verify.build` → `BUILD_FAI
 `HEAD` the supervisor recorded around each reviewer spawn, so a reviewer that changes a file other
 than `REVIEW.md` or its feedback files, or commits, parks the run for a human
 (`REVIEWER_CHANGED_FILES.md`) whatever it reports. Wired into `team`/`team-build` at
-`REVIEWING->TESTING` and `REVIEWING->BUILDING`. Detail:
+`REVIEWING->TESTING` and `REVIEWING->BUILDING`. A red base is caught the same way: before the
+first spawn of `team`, `team-build` or `goal-loop` the supervisor runs `verify.smoke` (else
+`verify.build`), and a failure parks the run (`base_red`) with a human escalation before any
+agent is spawned. Detail:
 [src/pathly_orchestrator/CLAUDE.md](src/pathly_orchestrator/CLAUDE.md).
 
 **Agent roles** (full definitions in `src/pathly_data/core/agents/`):

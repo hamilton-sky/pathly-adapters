@@ -787,6 +787,10 @@ pathly_orchestrator/
                            #   answerable instead of failing silently.
     slug.py                # scope / slug helpers for goal + board addressing
     orchestrator_stage.py  # single-stage resolution helpers split out of orchestrator.py
+    human_escalation.py    # post_human_escalation(state, text) — the one writer of a to_agent='human'
+                           #   escalation for a parked run (a human checkpoint, a red base)
+    base_smoke.py          # check_base — smoke the base before the first spawn (see "Run guard rails")
+    run_budget.py          # refresh — raise a goal run's max_iterations from its DAG (see "Run guard rails")
     board_run.py           # start_board_run: board-lock + skill compose + async spawn helper
     board_lock.py          # Per-board/scope advisory lock (acquire/release/holder)
   http_server/             # Flask HTTP server: FSM endpoints + SSE + runner routes
@@ -894,7 +898,8 @@ reviewer reported.
 **Command resolution** (highest precedence first): `gate["command"]` literal → app-setting
 `verify.<command_key>` → **skip**. Configure a project with
 `PUT /db/settings/verify.test {"value": "python -m pytest -q"}` (also `verify.build`, `verify.lint`,
-and `verify.timeout_seconds`; default timeout 600s).
+and `verify.timeout_seconds`; default timeout 600s). `verify.smoke` is read by no gate: only the
+run-start base smoke does (see "Run guard rails").
 
 **Fail-open on absent config, fail-closed on everything else.** No configured command → `GATE_SKIPPED`
 (`no_command_configured`), so adding the gate to a shared flow never breaks a project that has not
@@ -1128,7 +1133,7 @@ rather than reviving this one.
 
 **Why this is safe to resume, not just "not an error":** parking never touches the FSM's own
 state — `fsm_state` still sits exactly where the checkpoint left it, waiting on whatever
-feedback file `target_agent == "human"` named. `_post_human_escalation` posts an answerable
+feedback file `target_agent == "human"` named. `human_escalation.post_human_escalation` posts an answerable
 `type="escalation"` board message naming that file and `POST /runner/resume-parked`. A human
 (or an agent proxying for one) edits the file to resolve it; `POST /runner/resume-parked
 {"topic": ...}` → `supervisor.resume_parked_run` reads the parked `RunnerState`'s
@@ -1146,6 +1151,43 @@ stop as `"finished"`; a parked run without this would have been silently reporte
 `result["status"]` still reads `"parked"` for a caller that wants to distinguish resumable
 from dead — `goals.py`'s board-message wording does not yet make that distinction (falls
 into the generic "goal run failed" text), a known cosmetic gap, not a correctness one.
+
+## Run guard rails — base smoke and iteration budget (build-proof)
+
+**Base smoke (`supervisor/base_smoke.py`).** A run that starts on a red base spends its budget on
+a failure it did not cause and blames the builder for it. `api.start_run(..., smoke_base=True)`
+calls `base_smoke.check_base(state, broadcast_fn)` inside `_run_and_finalize`, before `_loop`:
+
+- It applies only to a flow whose `gates` include a `command_gate` with `command_key: build`
+  (`team`, `team-build`, `goal-loop`; read with `fan_out.load_flow_config`). Any other flow, and
+  the `single` executor, board runs and consultations, are not smoked.
+- The command is the app setting `verify.smoke`, else `verify.build`; with neither the check is
+  skipped, as `command_gate` is. It runs through `proof/command.py::run_command` in
+  `state.project_root`, with the `verify.timeout_seconds` timeout (default 600) and
+  `PATHLY_VERIFY_GATE=1`.
+- Exit 0 lets the run go on. A non-zero exit, a timeout or a command that cannot run posts a
+  `to_agent='human'` escalation (`human_escalation.post_human_escalation`: the command, the exit
+  code or timeout, the clipped output, and `POST /runner/resume-parked {"topic": …}`), sets
+  `error_kind = "base_red"`, parks the run and broadcasts `RUNNER_PARKED {kind: "base_red"}`.
+  Nothing was spawned, and `_run_and_finalize` still calls `on_done` with `status: parked`,
+  `error: base_red`. The escalation is server-written (`system` stamp), so `fsm_human_gate` does
+  not block the resumed run on it.
+- It fails open: if the check itself raises, the run goes on and a warning is logged.
+- `resume_parked_run` passes `smoke_base=(prior.error_kind == "base_red")`: after a `base_red` park
+  the smoke runs again (still red, it parks again under a new run id); after a `human_checkpoint`
+  park it does not, so red work in progress on that run does not re-park it.
+
+**Iteration budget (`supervisor/run_budget.py`).** `run_budget.refresh(state)` is called at the top
+of `orchestrator_stage._resolve_stage_supervised`, which runs after every stage, so the budget
+follows the DAG as decomposition adds tasks. For a run with a `goal_id` it sets
+`state.max_iterations` to the larger of its current value and
+`count_tasks_for_goal × task_retry.resolve_max_attempts() × (MAX_FEEDBACK_ROUNDS + 1)` (under
+`registry._lock`): a goal with 5 tasks and `goal.task_max_attempts` 3 gets `5 × 3 × 4 = 60`, one
+task gets 12, no tasks yet leaves the caller's 10. It logs when it raises the cap, never lowers
+it (deleting tasks does not cut a running run short) and never raises. A run without a `goal_id`
+keeps the caller's `max_iterations`. `iterations` counts the loop's stage passes (a fan-out drain
+is one). The cost cap and the `cap_exceeded` handling are unchanged, and `resume_parked_run`
+carries the raised cap over.
 
 ## Goal cost cap (`supervisor/cost_cap.py`)
 

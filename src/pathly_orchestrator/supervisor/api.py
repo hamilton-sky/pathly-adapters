@@ -6,6 +6,7 @@ import secrets
 import threading
 from typing import Callable, Optional
 
+from . import base_smoke
 from .state import RunnerState, logger
 from .registry import _lock, _record_run_history, _registry, _write_mirror
 
@@ -25,6 +26,7 @@ def start_run(
     on_done: Optional[Callable] = None,
     stage_overrides: Optional[dict] = None,
     event_broadcast_fn: Optional[Callable] = None,
+    smoke_base: bool = True,
 ) -> RunnerState:
     """Start a new supervised run for *topic*.  Raises ValueError if already active.
 
@@ -41,6 +43,9 @@ def start_run(
         per-task task_claimed/task_done COMMS_UPDATEs through it, which is how the board and
         Studio's toasts see progress inside one stage. Best-effort: without one those events
         are simply not sent.
+    smoke_base: run ``base_smoke.check_base`` before the first spawn. A red base parks the
+        run (``error_kind="base_red"``) with nothing spawned. ``resume_parked_run`` turns it
+        off unless the run was parked for exactly that.
     """
     import uuid as _uuid
 
@@ -99,6 +104,8 @@ def start_run(
         # fire on_done once, so a decompose/goal run always reports completion even when
         # _loop returns via an error path (otherwise the board's timer never stops).
         try:
+            if smoke_base and not base_smoke.check_base(state, broadcast_fn):
+                return
             _loop(state, broadcast_fn)
         finally:
             if on_done is not None:
@@ -160,6 +167,10 @@ def resume_parked_run(
 
     Cost/iteration counters restart at zero under the SAME caps (a fresh run_id, like
     every other start_run call) rather than carrying over the parked run's partial spend.
+
+    The base smoke runs again only after a ``base_red`` park: a run parked on a human
+    checkpoint mid-build has red work in progress that is its own, and must not be re-parked
+    by it.
     """
     with _lock:
         prior = _registry.get(topic)
@@ -176,6 +187,7 @@ def resume_parked_run(
             prior.timeout,
         )
         max_iterations, max_cost_usd = prior.max_iterations, prior.max_cost_usd
+        smoke_base = prior.error_kind == "base_red"
         autonomy, interactive, goal_id = (
             dict(prior.autonomy),
             prior.interactive,
@@ -195,6 +207,7 @@ def resume_parked_run(
         interactive=interactive,
         goal_id=goal_id,
         on_done=on_done,
+        smoke_base=smoke_base,
     )
 
 
