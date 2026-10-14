@@ -85,7 +85,10 @@ RUNNER_CONTRACT_BLOCK = (
     "`team <feature> …`). The supervisor advances the flow automatically once your artifact "
     "exists — any transition you trigger yourself causes a double-advance or a 404 loop. "
     "(Any `FSM operations` / `complete-stage` / `route back` instructions in the skill above "
-    "apply ONLY to interactive `/pathly` use and must be ignored here.)\n"
+    "apply ONLY to interactive `/pathly` use and must be ignored here.) "
+    "In any stage, never spawn another Pathly role (planner, architect, po, designer, builder) "
+    "to resolve a feedback file, whatever the skill above says: write the feedback file and "
+    "stop, and the supervisor routes it to the role that owns it.\n"
 )
 
 
@@ -226,7 +229,16 @@ def build_prompt(
     # pathly/plans/<feature> path, which both used the legacy base AND flattened a nested
     # goal/consultation storage dir it was already handed correctly.)
     feature_dir = str(storage_path)
-    history = build_pipeline_history_block(feature_dir)
+    if agent_role == "reviewer":
+        # A reviewer judges the diff against the task, not the builder's own account: the
+        # Review packet takes the place of the history block (the builder's AGENT_DONE summaries).
+        from pathly_orchestrator.fsm_compose_review import review_packet
+
+        history = review_packet(
+            storage_path, project_root, board_tier, board_scope, goal_id
+        )
+    else:
+        history = build_pipeline_history_block(feature_dir)
 
     board_block = ""
     try:

@@ -4,7 +4,7 @@
 
 FSM engine, gates, transitions, flow definitions, feedback protocol & fix-routing.
 
-35 test file(s).
+38 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -31,6 +31,9 @@ FSM engine, gates, transitions, flow definitions, feedback protocol & fix-routin
 | `test_proof_floor.py` | The floor scan over two working-tree snapshots (``proof/floor.py``) | 30 |
 | `test_proof_tree.py` | Git working-tree snapshots and the diffs between them (``proof/tree.py``) | 17 |
 | `test_retry_ladder.py` | Retry ladder: what varies by ATTEMPT, not just who owns it | 14 |
+| `test_review_base_state.py` | build-proof 10: the diff base for the Review packet lives in STATE | 6 |
+| `test_review_packet.py` | build-proof 10: the REVIEWING prompt carries a Review packet, not the builder's summary | 13 |
+| `test_review_packet_notes.py` | build-proof 10: the Review packet's supervisor notes, the runner-contract sentence, the skills | 7 |
 | `test_reviewer_unchanged_gate.py` | ``reviewer_unchanged`` fails the review stage when a reviewer spawn changed files (build-proof 09) | 17 |
 | `test_rollback.py` | covers no orphans after mid install failure; failed install leaves no manifest; uninstall without manifest returns empty; … | 4 |
 | `test_runner_contract_shared.py` | One runner contract, two prompt paths — fsm-fan-out Phase A | 5 |

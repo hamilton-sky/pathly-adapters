@@ -54,6 +54,20 @@ log-phase PHASE_START review
 
 Run: `python -c "import time; print(int(time.time()))"` and note the printed integer as `REVIEW_START`.
 
+### What the reviewer is given
+
+The `reviewer` has no Bash, so it cannot run `git diff`: **you** hand it the change. Your prompt
+carries a `## Review packet` section holding `### The task` (the task text as it was claimed)
+and `### The diff` (everything the build changed outside `pathly/`). Paste those two sections
+verbatim into the reviewer's prompt below, where `[Review packet: The task and The diff]` stands.
+
+When there is no packet — the section says "No review packet for this run", or is absent (an
+interactive run) — run `git diff HEAD` yourself (you have Bash) and paste its output as the diff,
+with the task you are reviewing as the task.
+
+Never pass the builder's report, its `AGENT_DONE` summary or `VERIFY.md` to the reviewer: it
+judges the diff against the task, not the builder's account of it.
+
 ## Phase 1 — Analyze
 
 log-phase PHASE_START analyze
@@ -62,7 +76,9 @@ log-phase PHASE_START analyze
 ```
 phase: analyze
 Conv N of [feature] — scan the diff to identify what context you need before reviewing.
-Run: git diff HEAD~1 HEAD
+
+[Review packet: The task and The diff]
+
 Read <feature_path>/ARCHITECTURE_PROPOSAL.md if it exists.
 List what you need — output NEEDS_CONTEXT block only.
 
@@ -87,21 +103,26 @@ log-phase PHASE_DONE scout
 
 log-phase PHASE_START review
 
+If the task being reviewed has `context_refs`, **you** hydrate them before this spawn (the
+reviewer has no Bash): for each `{artifact, anchor}` call
+  GET /comms/artifacts/section?scope=$SCOPE&artifact=<artifact>&anchor=<anchor>
+and keep the returned `text` field (the full advisory spec — edge cases / happy flow for the
+phase the builder implemented). The `summary` is a pointer, not the spec — use `text`. These are
+the same refs the builder hydrated; the reviewer reviews against the same spec.
+Send `-H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN"` on that call.
+
 **Spawn** `reviewer` with `phase: review` and scout findings injected:
 ```
 phase: review
 Review the changes from conversation N of [feature].
-Run: git diff HEAD~1 HEAD (or git diff --staged if not yet committed).
+
+[Review packet: The task and The diff]
 
 ## Applicable Rules and Context (from pre-review scout)
 [compressed findings]
 
-If the task being reviewed has `context_refs`, for each `{artifact, anchor}` call:
-  GET /comms/artifacts/section?scope=$SCOPE&artifact=<artifact>&anchor=<anchor>
-and read the returned `text` field (the full advisory spec — edge cases / happy flow
-for the phase the builder implemented). The `summary` is a pointer, not the spec —
-read `text`. These are the same refs the builder hydrated; review against the same spec.
-Send `-H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN"` on that call.
+## Referenced spec (only if the task has `context_refs`)
+[the `text` of each hydrated ref, from above]
 
 Check against these rules and <feature_path>/ARCHITECTURE_PROPOSAL.md. Classify each
 violation by ROOT CAUSE and write it into the matching file (see Feedback protocol —

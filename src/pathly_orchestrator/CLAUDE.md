@@ -850,7 +850,7 @@ import, so no call site moved:
 
 | Entry point | Now delegates to |
 |---|---|
-| `fsm_compose.py` (298) — keeps `build_prompt` / `build_prompt_for_agent` / `_load_agent_text` | `fsm_compose_tables` (lookup tables) · `fsm_compose_vars` (`_inject_prompt_vars` + its inputs) · `fsm_compose_paths` (`resolve_stage_out_path`, `resolve_board_scope`) · `fsm_compose_stage` (section drops, stage overrides, adapter choice) · `fsm_compose_hints` (`_agent_hint`) |
+| `fsm_compose.py` (298) — keeps `build_prompt` / `build_prompt_for_agent` / `_load_agent_text` | `fsm_compose_tables` (lookup tables) · `fsm_compose_vars` (`_inject_prompt_vars` + its inputs) · `fsm_compose_paths` (`resolve_stage_out_path`, `resolve_board_scope`) · `fsm_compose_stage` (section drops, stage overrides, adapter choice) · `fsm_compose_hints` (`_agent_hint`) · `fsm_compose_review` (the reviewer's Review packet) |
 | `skills/compose.py` (197) — keeps the resolver | `compose_base` (constants + `_strip_leading_frontmatter`) · `compose_resources` (manifest/skill/fragment I/O) · `compose_caps` · `compose_segments` · `compose_validate` |
 | `supervisor/terminal.py` (390) — keeps the spawn | `terminal_argv` · `terminal_identity` · `terminal_reconcile` · `terminal_billing` · `terminal_phase` |
 | `fsm/engine_actions.py` (204) — keeps `run_transition_actions` | `fsm/gates/` — one module per gate type (`artifact` · `tasks` · `scope` · `command`) behind the `run_gates` dispatcher in `gates/__init__.py`; `_helpers` owns `append_event` / `_write_gate_feedback` / `gate_failed` / `project_root_of` |
@@ -1029,8 +1029,9 @@ uncommitted plan edit goes unseen. A task posted without a run token is stamped 
 human's is, so a builder that drops its token can post a task whose `files` count in a later
 BUILDING (the `force_past_gate` limit). And a planner or architect sub-agent that a builder spawns
 itself (`team/build.md`'s "Feedback routing after builder", for `IMPL_QUESTIONS.md` or
-`DESIGN_QUESTIONS.md`) writes inside the builder's window, so its plan edit counts as the
-builder's.
+`DESIGN_QUESTIONS.md`) would write inside the builder's window, so its plan edit would count as the
+builder's; in a headless run `RUNNER_CONTRACT_BLOCK` forbids that spawn (see "Review packet"), and
+an interactive run records no windows at all.
 
 **Reviewer gate (`fsm/gates/reviewer.py`).** A reviewer judges; it does not edit. The gate finds
 when the run last entered REVIEWING (the newest `STATE_TRANSITION` event with `to == "REVIEWING"`),
@@ -1057,6 +1058,51 @@ the only gate of `REVIEWING->BUILDING` in `team` and `team-build` (`REVIEWER_CHA
 human); the REVIEWING exit requirement tells the reviewer to change nothing but `REVIEW.md` and
 feedback files and not to commit. Limit: with early advance the window's closing snapshot is taken
 at the reviewer's `AGENT_DONE`, so a write after its completion report can land outside the window.
+
+**Review packet (`fsm_compose_review.py`) — the reviewer's view.** A reviewer judges a diff
+against a task, not against the builder's account of its work. The reviewer has no Bash, so it
+could not run the `git diff HEAD~1 HEAD` that `team/review.md` told it to, and its prompt carried the
+builder's `AGENT_DONE` summaries (the pipeline history block). `build_prompt` now puts
+`review_packet(storage_path, project_root, board, board_scope, goal_id)` in place of that block
+whenever the stage's role is `reviewer` (`team/review` maps to it in `_SKILL_AGENT_ROLE`); every
+other role keeps the history block. The diff's base lives in STATE: `next_action` adds `tree`
+(`proof.tree.snapshot(project_root)`; left out when git cannot snapshot) to the `build_baseline` it
+stamps on entering BUILDING, and `complete_stage` copies `{tree, started_at}` into `review_base` on
+every transition out of BUILDING, overwriting the last build's (a build with no tree leaves none,
+not a stale one). `review_base` then survives REVIEWING, a builder fix round inside it and the later
+states. The packet is a `## Review packet` section:
+
+- `### The task` — `claimed_text` (else `text`) of the tasks claimed since `review_base.started_at`
+  (`task_proof.tasks_claimed_since`, goal-scoped when the run has a `goal_id`, else `(board, scope)`),
+  at most 16 KiB;
+- `### The diff` — `proof.tree.diff_text(root, review_base.tree, <snapshot now>,
+  exclude=["pathly/"], unified=3)`: everything the last build changed outside `pathly/`, in a code
+  fence one backtick longer than any run inside it (a context line `` ``` `` from a markdown file
+  would close a three-backtick fence), clipped head and tail to 48 KiB in all, since the prompt is
+  one argv string and Linux caps an argument at 128 KiB;
+- `### Supervisor notes` — per claimed task its latest `TASK_PROOF` event since the build began
+  (checks passed, failed, or "no check block: review its acceptance by reading the code") and the
+  warnings of the latest `FLOOR_CHECKED` event (at most 20), else `none recorded`. Those events
+  belong to the task-check and floor gates of the same feature; nothing writes them yet.
+
+With no `review_base` (the FSM never stamped BUILDING for the run, as in an interactive session,
+or git is missing) or no snapshot now, it returns a short section saying so, and `team/review.md`'s
+interactive branch applies: the stage orchestrator, which has Bash, runs `git diff HEAD` itself.
+Otherwise the orchestrator pastes `### The task` and `### The diff` verbatim into the reviewer
+sub-agent's prompt and hydrates the task's `context_refs` itself; it never passes the builder's
+report or `VERIFY.md`. It never raises: a packet that cannot be built is that short section.
+
+`RUNNER_CONTRACT_BLOCK` gained one sentence: in any headless stage, never spawn another Pathly role
+(planner, architect, po, designer, builder) to resolve a feedback file; write the file and stop,
+and the supervisor routes it. A sub-agent spawned that way has no `SPAWN_WINDOW` of its own, so its
+plan edit would be blamed on the stage's role. The sub-agent fixers in `team/build.md` and
+`team/review.md` stay for interactive `/pathly`; the flows' `feedback_routing` does the routing.
+
+Limits: a same-adapter REVIEWING stage still resumes the builder's CLI session (and so its
+transcript); the packet changes only the prompt. The retry-ladder block that
+`build_prompt_for_agent` adds for a role routed a feedback file (`REVIEW_INCOMPLETE.md` sends one to
+the reviewer) still lists the `AGENT_DONE` summaries. The diff covers the last build only: after a
+`REVIEWING->BUILDING` round it is that round's changes, not the feature's.
 
 Events: `GATE_PASSED` (command, `exit_code`, `duration_ms`) on success — the objective evidence on
 the run's record — and `GATE_FAILED` (with `reason`, `command`, `exit_code`) on failure.
