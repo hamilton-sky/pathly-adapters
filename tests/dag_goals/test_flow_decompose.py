@@ -334,7 +334,9 @@ def test_feedback_priority_absent_is_absent_after_round_trip():
 
 def test_team_and_test_flows_declare_feedback_priority():
     """team.flow.yaml / test.flow.yaml carry the canonical upstream-first order
-    (smart-fix-routing DESIGN.md ss1.5)."""
+    (smart-fix-routing DESIGN.md ss1.5). team.flow.yaml also ranks REVIEWER_CHANGED_FILES
+    (the reviewer_unchanged gate's human checkpoint, build-proof 09) right after
+    BLOCKED_ON_HUMAN."""
     canonical = [
         "HUMAN_QUESTIONS",
         "BLOCKED_ON_HUMAN",
@@ -352,4 +354,7 @@ def test_team_and_test_flows_declare_feedback_priority():
             .read_text(encoding="utf-8")
         )
         flow = yaml.safe_load(text)
-        assert flow["feedback_priority"] == canonical, flow_name
+        expected = list(canonical)
+        if flow_name == "team":
+            expected.insert(2, "REVIEWER_CHANGED_FILES")
+        assert flow["feedback_priority"] == expected, flow_name
