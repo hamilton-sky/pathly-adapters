@@ -363,7 +363,8 @@ def test_check_base_fails_open_when_it_cannot_decide(tmp_path):
 
 
 def test_check_base_clips_a_huge_output(tmp_path):
-    _set("verify.build", _command(tmp_path / "smoke.log", 1, "x" * 50000))
+    flood = "import sys; print('x' * 50000); sys.exit(1)"
+    _set("verify.build", json.dumps([sys.executable, "-c", flood]))
     state = _state(tmp_path)
 
     assert base_smoke.check_base(state, None) is False

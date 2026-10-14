@@ -93,7 +93,7 @@ def post_gate_failure_escalation(
     The loop executor has no FSM-style feedback routing to re-drive a fix automatically,
     so the failure surfaces where a human (or another agent) will see it: an answerable
     escalation on the goal's own board, the same mechanism a headless human checkpoint
-    uses (`orchestrator_stage.py::_post_human_escalation`).
+    uses (`human_escalation.py::post_human_escalation`).
     """
     try:
         from pathly_orchestrator.db.connection import get_db
