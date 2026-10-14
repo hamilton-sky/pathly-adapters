@@ -4,7 +4,7 @@
 
 FSM engine, gates, transitions, flow definitions, feedback protocol & fix-routing.
 
-28 test file(s).
+29 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -26,6 +26,7 @@ FSM engine, gates, transitions, flow definitions, feedback protocol & fix-routin
 | `test_human_escalation_gate.py` | Human escalation gate — an open gate addressed to a human blocks the transition | 12 |
 | `test_orchestrator.py` | Tests for Conv 2: STATE.json schema validation, state/transition enforcement, concurrency | 17 |
 | `test_parallel_states_schema.py` | The `parallel_states` flow-YAML key — fsm-fan-out Phase B (schema only, inert) | 11 |
+| `test_proof_checks.py` | Task check blocks (``proof/checks.py``) and the shared command runner (``proof/command.py``) | 16 |
 | `test_retry_ladder.py` | Retry ladder: what varies by ATTEMPT, not just who owns it | 14 |
 | `test_rollback.py` | covers no orphans after mid install failure; failed install leaves no manifest; uninstall without manifest returns empty; … | 4 |
 | `test_runner_contract_shared.py` | One runner contract, two prompt paths — fsm-fan-out Phase A | 5 |
