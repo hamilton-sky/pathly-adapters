@@ -215,8 +215,9 @@ Telemetry is a **projection**, not a second write path:
                           <fsm_feature> <feature_path> <feature> <board> <run_category>
                                            |
                                            v
+                              + results of the tasks it depends on  (DAG task only; before the contract)
                               + RUNNER_CONTRACT_BLOCK  (one constant, all headless paths)
-                              + retry ladder (attempt >= 2)
+                              + retry ladder (attempt >= 2) + the root-cause-debug guide
                               + board context (governance + semantic, per-tier budget)
 ```
 
@@ -676,6 +677,7 @@ pathly_orchestrator/
       comms_messages.py    # board message CRUD; goal_id/executor columns back the Goals->Task-DAG model
       comms_artifacts.py   # artifact metadata CRUD (attach, list, section index, update_summary)
       comms_tasks.py       # task DAG operations (get_ready, complete, claim, fail, reclaim, goal_refs_coverage)
+      task_results.py      # build-proof: latest_task_summaries(conn, task_ids) — the newest AGENT_DONE `summary` of each task's `sched-<id>#<n>` runs (a dependent task's prompt shows it)
       task_proof.py        # build-proof task reads: get_task, tasks_claimed_since / tasks_completed_since (goal- else (board, scope)-scoped, parsed-time window), set_floor_allow (the human-set floor_allow JSON list; refreeze re-copies text into claimed_text)
       comms_embeddings.py  # embedding storage + hybrid/semantic search; search_by_embedding() merges parent+child vectors, deduplicates by message_id, returns _matched_chunk for subtopic surfacing; store_chunk_embeddings() writes to comms_chunk_embeddings; SEMANTIC_DISTANCE_CEILING (0.72) + opt-in max_distance= floor scored hits for /comms/search (BM25 hits bypass; comms_context.py keeps its own per-tier gates); _fts_query() quotes each token so raw FTS5 operators (code:query, a OR b, unbalanced ") match literally instead of reparsing; search_by_hybrid() tags each row _match_source (keyword|semantic) for client grouping
       comms_counts.py      # count_goals_for_feature / count_features_for_project — gate the consultation flows' seed thresholds
@@ -759,7 +761,11 @@ pathly_orchestrator/
     task_prompt.py         # build_task_prompt — ONE assembly of a DAG task's prompt: the composed
                            #   development/execute-task body with its fragment placeholders
                            #   SUBSTITUTED (the DAG path had no injector at all — see Phase E),
-                           #   plus the runner contract, retry ladder and board context
+                           #   plus the dependency-results block, the runner contract, the retry
+                           #   ladder (+ the root-cause-debug guide) and board context
+    task_dependencies.py   # dependency_results_block(task) — `## Results of the tasks this one
+                           #   depends on`: per direct depends_on id a `### <its first text line>`
+                           #   heading and its latest AGENT_DONE summary (see "Dependency results")
     drain.py               # drain_frontier — the ONE scheduler_loop call site. Owns the cost
                            #   tracker (wrapping spawn_fn exactly once) and folds the cap into
                            #   abort_check, so neither fan_out nor goal_executor can forget it.
@@ -1235,6 +1241,18 @@ normal stage-advance path already uses, so no second history mechanism exists. *
 (`retry_count == 0`, the default) is byte-identical to before this** — every existing caller
 that never threads the new parameter, and every golden snapshot, is unaffected.
 
+**The root-cause guide rides on a builder feedback prompt.** The same function appends
+`fragments/root-cause-debug.md` (`## Root-cause debugging`: read every failure, reproduce it with
+the exact command, isolate the cause, fix it without weakening a check, prove it; stop after two
+failed fixes of the same error) when `agent_name == "builder"` and a `feedback_file` is given, whatever
+`retry_count` says. A headless run never writes `retry_count_by_key` to STATE, so the ladder above
+never climbs there; and a builder handed a feedback file is, by definition, on a second attempt at
+its stage. The guide is read at call time by `skills/compose_resources.root_cause_guide()` (empty
+and logged when the file is unreadable), is not in `composition.yaml` (so no golden snapshot
+moves), and does not contain the words "Retry attempt" that `tests/fsm_flows/test_retry_ladder.py`
+uses to tell attempts apart. A builder prompt with no feedback file, and every other role, is
+byte-identical to before. The DAG-task twin is in "Phase 1: per-task retry" below.
+
 ## FSM/DAG convergence — Phase 0 hygiene fixes
 
 Four small, independent fixes surfaced while researching converging the FSM engine and the
@@ -1310,7 +1328,25 @@ on a failed task, and owns the FULL side-effect set for whichever branch it pick
 second attempt on — mirrors `fsm_compose._retry_ladder_block`'s "what varies by ATTEMPT, not
 just who owns it": the attempt number and the previous failure's reason, so a retry doesn't
 repeat the identical blind prompt. A first attempt (`attempts == 0`) is unaffected — byte-
-identical to before this feature.
+identical to before this feature. The `root-cause-debug` guide (see "Retry ladder" above) is
+appended after the failure block, so a retried task prompt ends with the failure it was told to
+read and then the method for reading it.
+
+**Dependency results (`task_dependencies.py`, `db/queries/task_results.py`).** A DAG task used to
+see only its own text. `build_task_prompt` now puts `## Results of the tasks this one depends on`
+after the task body and before the runner contract: one `### <first line of the dependency's
+text>` heading per **direct** `depends_on` id (not transitive ones), in `depends_on` order,
+followed by that dependency's latest result or `(no result recorded)`. The result is the
+`summary` of the newest `AGENT_DONE` event whose payload `run_id` matches `sched-<id>#%`
+(`latest_task_summaries`: one fixed `json_extract(payload, '$.run_id') LIKE ?` query per id, newest
+`seq` first, so a retried dependency's last attempt wins). `supervisor/terminal.py` substitutes
+`<run_id>` for the spawn's run id, so a task agent's `AGENT_DONE` carries it. No result column and
+no migration. Each summary is clipped to 2000 characters and the whole block to 8000 (the prompt
+is one argv string); a task without `depends_on`, or one whose results cannot be read, gets no
+block and an unchanged prompt. `development/execute-task` asks the agent for a completion summary
+that says what was built, which files changed, any shortcut and what a later task needs to know.
+`fsm_events` has no index on `run_id`, so each lookup scans it newest-first until a match (the
+whole table for a dependency with no result).
 
 **`detect_deadlocks`** is `scheduler.py`'s former loop-only postscript (any task still `pending`
 after a normal drain has an unsatisfiable dependency — a cycle, or a `depends_on` that will

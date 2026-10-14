@@ -163,14 +163,17 @@ def test_build_prompt_for_agent_fix_mode_role_artifact_map(tmp_path, role, artif
 
 
 def test_build_prompt_for_agent_builder_path_unchanged(tmp_path):
-    """The builder path is byte-identical whether or not feedback_file is passed —
-    the hard regression constraint (task requirement #1)."""
+    """The builder path gains nothing from feedback_file but the root-cause guide
+    (build-proof 11: a builder handed a feedback file is on a second attempt) —
+    byte-identical otherwise, the hard regression constraint (task requirement #1)."""
+    from pathly_orchestrator.skills.compose_resources import root_cause_guide
+
     storage_path = _feature_storage(tmp_path)
     without_feedback = build_prompt_for_agent("builder", storage_path)
     with_feedback = build_prompt_for_agent(
         "builder", storage_path, feedback_file="REVIEW_FAILURES.md"
     )
-    assert without_feedback == with_feedback
+    assert with_feedback == f"{without_feedback}\n{root_cause_guide()}\n"
     assert "Fix mode" not in with_feedback
 
 

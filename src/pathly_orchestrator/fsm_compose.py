@@ -366,6 +366,14 @@ def build_prompt_for_agent(
             f"4. Delete {feature_path}/feedback/{feedback_file} when your artifact is corrected.\n"
             f"5. Report what changed. Do NOT run pathly-fsm-call / complete-stage (supervisor owns the FSM).\n"
         )
+    # A builder given a feedback file is on a second attempt at its stage, though a headless
+    # run never climbs retry_count (build-proof): it gets the root-cause guide.
+    if agent_name == "builder" and feedback_file:
+        from pathly_orchestrator.skills.compose_resources import root_cause_guide
+
+        guide = root_cause_guide()
+        if guide:
+            prompt += f"\n{guide}\n"
     return prompt
 
 
