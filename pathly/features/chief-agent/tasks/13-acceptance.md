@@ -13,8 +13,10 @@ worker `TERMINAL_SPAWN`, marks the run started and finished the way
 
 1. Open: `POST /chief/open` with engine `claude`, preset `operator` and a prompt that starts with
    front matter → 201 with `tier: "operator"`; the recorded `TERMINAL_SPAWN` has
-   `interactive: true` and `submit: false`, its `prompt` is the text without front matter and
-   contains no token, and its `run_token` resolves to role `chief` with the session's run id.
+   `interactive: true` and `submit: false`, its `prompt` is the text without front matter
+   followed by the `chief-connect` fragment and contains no token, its `argv` starts claude in
+   restricted mode with `--session-id`, and its `run_token` resolves to role `chief` with the
+   session's run id.
 2. Operator acts through the API: with that token, `POST /comms/post` creates a `goal` on the
    project board, and `POST /runs` starts a single run; the fake host sees a second
    `TERMINAL_SPAWN` whose token resolves to the worker's role (not `chief`), proving the run went
@@ -23,10 +25,12 @@ worker `TERMINAL_SPAWN`, marks the run started and finished the way
 3. Status is read-only: close the operator, open with preset `status`; `GET /comms?feature=<f>`
    is 200 and `POST /comms/post` is 403.
 4. Cited answers: with a `RunnerState` waiting in `_await_agent_question`, an uncited chief answer
-   is 403 and the question stays pending; an answer citing a later human message but with other
-   words is 403; citing that message with its own words delivers the answer, and citing it again
-   for a second question is 403. A `to_agent: "human"` escalation is acknowledged by the chief
-   only with a cite recorded after it.
+   is 403 and the question stays pending; a chief answer that cites a later human message but
+   carries its own `answer` text is 403; citing that message alone delivers the message's text
+   to the agent, and citing it again for a second question is 403. A `to_agent: "human"`
+   escalation is acknowledged by the chief only with a cite recorded after it. The test states
+   the limit in a comment: Pathly relays the user's real words, but to the question the chief
+   picked.
 5. Binding directive: an operator chief posts a `*` directive, `/comms/acknowledge` marks it, and
    `fsm_compose.build_prompt` for the `team/build`, `team/review` and `team/test` agents of a
    feature in the project carries its text in the standing-orders block. A project-board run

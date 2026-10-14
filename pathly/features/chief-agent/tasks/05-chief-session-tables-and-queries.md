@@ -12,8 +12,11 @@ Add `src/pathly_orchestrator/db/migrations_chief.py::add_chief_tables(conn)` (id
 of `migrations_incremental._add_additive_migrations`, next to `add_run_tokens(conn)`:
 
 - `chief_sessions(run_id TEXT PRIMARY KEY, project_root TEXT NOT NULL, preset TEXT, tier TEXT NOT
-  NULL, engine TEXT NOT NULL, tab_id TEXT, hook_secret_hash TEXT, settings_dir TEXT, opened_at
-  REAL NOT NULL, closed_at REAL, close_reason TEXT)`, indexed on `project_root`.
+  NULL, engine TEXT NOT NULL, tab_id TEXT, cli_session_id TEXT, hook_secret_hash TEXT,
+  settings_dir TEXT, opened_at REAL NOT NULL, closed_at REAL, close_reason TEXT)`, indexed on
+  `project_root`. `cli_session_id` is the claude session id the server chose for the chief
+  (ticket 06 passes it as `--session-id`; NULL for codex): ticket 09 checks hook posts against
+  it, and round two finds the chief's transcript by it to bill the session.
 - `chief_human_messages(id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT NOT NULL, project_root
   TEXT, kind TEXT NOT NULL, text TEXT NOT NULL, ts REAL NOT NULL)`, indexed on `run_id`.
 - `chief_citations(id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT NOT NULL, message_id
@@ -23,16 +26,18 @@ of `migrations_incremental._add_additive_migrations`, next to `add_run_tokens(co
 Add `src/pathly_orchestrator/db/queries/chief.py`, every function taking `conn` first and writing
 under `_get_write_lock`:
 
-- `create_session(conn, *, run_id, project_root, preset, tier, engine, tab_id, hook_secret_hash,
-  settings_dir)`; `get_session(conn, run_id)`; `open_session_for_project(conn, project_root)`
+- `create_session(conn, *, run_id, project_root, preset, tier, engine, tab_id, cli_session_id,
+  hook_secret_hash, settings_dir)`; `get_session(conn, run_id)`; `open_session_for_project(conn, project_root)`
   (the one with `closed_at IS NULL`, or None).
 - `close_session(conn, run_id, reason) -> bool`: sets `closed_at` and `close_reason` once and
   revokes the run's tokens with `run_tokens.revoke_run_tokens`; returns False when it was already
   closed.
 - `close_stale_sessions(conn) -> list[str]`: closes every open session (reason `server restart`)
   and returns their run ids.
-- `add_human_message(conn, run_id, project_root, text) -> dict`: the first message of a session is
-  stored with `kind="style_prompt"`, every later one `kind="human"`; returns `{id, kind, ts}`.
+- `add_human_message(conn, run_id, project_root, text, *, relayed=False) -> dict`: the first
+  message of a session is stored with `kind="style_prompt"`, every later one `kind="human"`, or
+  `kind="relayed"` when `relayed` is true (a prompt ticket 09 can tell came from another session;
+  ticket 10 never accepts it as a citation); returns `{id, kind, ts}`.
 - `get_human_message(conn, message_id) -> dict | None`.
 - `record_citation(conn, run_id, message_id, route, target) -> bool`: False, and nothing written,
   when the message was already cited (catch the `sqlite3.IntegrityError`).
@@ -54,8 +59,9 @@ Static SQL only (no f-strings, no `+`); `bandit` runs in Lint.
   migration runs twice without error; create, get and `open_session_for_project` round trip;
   `close_session` sets `closed_at`, revokes the minted token (`resolve_run_token` returns None)
   and returns False the second time; `close_stale_sessions` closes two open sessions and leaves a
-  closed one alone; the first human message of a session is `style_prompt` and the second
-  `human`; `record_citation` returns True once and False for a second citation of the same
+  closed one alone; `cli_session_id` round trips and may be NULL; the first human message of a
+  session is `style_prompt`, the second `human`, and one added with `relayed=True` is `relayed`;
+  `record_citation` returns True once and False for a second citation of the same
   message; `lookup_run_token` returns a revoked row with `revoked_at` set and None for an unknown
   token.
 - `bandit -q -r src/pathly_orchestrator/db -ll` exits 0.

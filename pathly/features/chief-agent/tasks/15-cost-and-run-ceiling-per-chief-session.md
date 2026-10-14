@@ -23,9 +23,16 @@ Count in a new column `chief_sessions.runs_started INTEGER NOT NULL DEFAULT 0` (
 `migrations_chief.add_chief_tables`). Increment it with a conditional `UPDATE ... SET runs_started
 = runs_started + 1 WHERE run_id = ? AND runs_started < ?` under `_get_write_lock` and refuse when
 no row changed, so two concurrent calls cannot both take the last slot. The count is taken when
-the gate allows the call, not when the run succeeds; a failed start still uses a slot (fail
-closed). Put the check in its own module (for example `http_server/chief_budget.py`), called from
-`chief_gate` after the action and project checks.
+the gate allows the call, so two racing starts cannot both get past it. When the route then
+answers with a 4xx (bad body, unknown goal, no ready task: nothing was started, nothing spent),
+the slot is given back: the gate sets `flask.g.chief_run_slot = run_id`, and an `after_request`
+function registered with the gate runs `UPDATE ... SET runs_started = runs_started - 1 WHERE
+run_id = ? AND runs_started > 0` for a response with status 400 to 499. A 2xx keeps the slot, even
+if the run fails later (it may already have spent), and so does a 5xx (fail closed: the server
+cannot tell whether work started). Without the refund, a chief whose start calls keep failing
+validation would use up its limit on calls that started nothing. Put the check and the refund in
+their own module (for example `http_server/chief_budget.py`), called from `chief_gate` after the
+action and project checks.
 
 `GET /chief/session` gains `runs_started`, `max_runs_per_session` and `max_cost_usd_per_run`, so
 the chief can tell the user why it stopped.
@@ -42,7 +49,8 @@ Living docs: the two settings in the "Chief gate" paragraph of `src/pathly_orche
 - `python -m pytest tests/http_api/test_chief_budget.py -q -p no:cacheprovider` passes and
   covers: an operator chief's `POST /runs` with `max_cost_usd` 11 is 403 with `ceiling: 10.0` and
   with 5 passes the gate; with `chief.max_runs_per_session` set to 2, two run starts pass and the
-  third is 403; a decompose call does not count; a builder token and no token are unaffected; the
+  third is 403; a run start the route answers with 400 (for example a missing field) leaves
+  `runs_started` where it was, and a 2xx start counts; a decompose call does not count; a builder token and no token are unaffected; the
   migration runs twice; `GET /chief/session` reports the counts.
 - `bandit -q -r src/pathly_orchestrator -ll` exits 0.
 

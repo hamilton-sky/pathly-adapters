@@ -51,6 +51,10 @@ URL rule before any hook runs (map.md § Decisions so far, docs: Flask `before_r
    (`fsm_compose.resolve_board_scope("project", value, "")`) must equal the session's, else 403.
    On `/comms/post`, a `from` other than `chief` is 403.
 
+Keep the action table as data the test can import (rule string and method → action), not as
+branches spread through the gate, so the property test below can tell listed rules from unlisted
+ones.
+
 Read the body with `blueprints/comms/_helpers.read_json_body({})`. It reads `request.get_data()`,
 which Werkzeug caches by default, and `get_json()` reads through that same cache, so the route
 still gets the body (map.md § Decisions so far, docs: Werkzeug `get_data`). Keep the route table
@@ -91,7 +95,11 @@ board row, and who may read it", listing the tiers and actions.
   acknowledging a `to_agent: "human"` escalation is classed `answer` (a status token gets the 403
   with `action: "answer"`); a revoked chief token gets 401 on
   `GET /comms?feature=<f>`; a status token on an unknown path gets 404; a builder token and no
-  token are unaffected.
+  token are unaffected. The refusal of unlisted routes is tested as a property, not only for the
+  routes named here: the test walks `app.url_map.iter_rules()`, and for every non-GET method of
+  every rule the gate's table does not list (path converters filled with dummy values such as
+  `x`), an operator token gets the gate's 403. A route added later is then refused to the chief
+  until someone lists it, and the test fails if the table lists a rule that no longer exists.
 - `python -m pytest tests/comms_board/test_comms_write_perm.py -q -p no:cacheprovider` still
   passes.
 

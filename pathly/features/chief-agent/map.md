@@ -5,32 +5,35 @@
 Round one (this plan) leaves the chief's server core in place and proven. `POST /chief/open`
 resolves a tier from the chosen preset, mints a `chief` run token, writes the session's claude
 settings (a UserPromptSubmit hook and permission rules), registers the session and sends an
-interactive `TERMINAL_SPAWN` that asks the host to paste the prompt without sending it; closing
-the tab or restarting the server revokes the token. A `before_request` chief gate refuses every
-call the session's tier does not allow, every unlisted write, any other project, and any revoked
-chief token. Human messages typed in a claude chief tab are recorded, and a chief-token answer to
-an agent must cite one and relay it word for word, once. Binding directives keep reaching the
-prompts of the roles they target after an acknowledgement, in their own standing-orders block, and
-only a chief token may post or retire one until the UI token exists. A chief stays inside its
-project even on id-addressed calls and inside a per-session cost and run ceiling. The three
-run-token holes are closed. A `pathly api` command and three built-in style texts make the chief
-usable from a tab opened with `POST /chief/open`. The rest of the brief is outlined below as round
-two: the friendly `pathly` commands, the overview and inbox calls, Studio pasting without Enter,
-the Chief button replacing HQ, the inbox badge, the stale-directive re-queue and billing the
-chief's own session. The split follows the user's decision for rounds; § Brief coverage
-maps every In-scope line of the brief to where it is built.
+interactive `TERMINAL_SPAWN` that asks the host to paste the prompt without sending it; closing the
+tab or restarting the server revokes the token. A `before_request` chief gate refuses every call
+the session's tier does not allow, every unlisted write, any other project, and any revoked chief
+token. Human messages typed in a claude chief tab are recorded, and a chief-token answer to an
+agent must cite one, once; Pathly relays that message's own text, so the chief never words an
+answer. The chief's claude starts in restricted mode with its own session id, so none of the user's
+or project's settings reach it, and every chief prompt ends with the un-editable `chief-connect`
+fragment. Binding directives keep reaching the prompts of the roles they target after an
+acknowledgement, in their own standing-orders block, and only a chief token may post or retire one
+until the UI token exists. A chief stays inside its project even on id-addressed calls and inside a
+per-session cost and run ceiling. The three run-token holes are closed. A `pathly api` command,
+three built-in style texts and the `chief-connect` fragment make the chief usable from a tab opened
+with `POST /chief/open`. The rest of the brief is outlined below as round two: the friendly
+`pathly` commands, the overview and inbox calls, Studio pasting without Enter, the Chief button
+next to HQ, the inbox badge, the stale-directive re-queue and billing the chief's own session. The
+split follows the user's decision for rounds; § Brief coverage maps every In-scope line of the
+brief to where it is built.
 
 **The bar.** `python -m pytest tests/comms_board/test_chief_acceptance.py -q -p no:cacheprovider`
 passes with a fake spawn host: opening the chief mints a `chief` token for the chosen style and
 spawns an interactive tab with the style's prompt pasted and not sent; with the Operator style the
-chief's API calls create a goal and start a run that Pathly spawns through its normal spawn path;
-a Status-style token is refused on a write; an agent question is pending until it is answered with
-a cited human message relayed word for word, and an uncited or reworded one is refused; a binding
-decision reaches the next builder, reviewer and tester prompts after an acknowledgement and no
-caller but the chief retires it; a run above the ceiling and a call on another project's run are
-refused; `pathly api` works from the chief's tab; the raw run token no longer appears on
-`/events/runner` or `/events/runs`. And `python -m pytest tests/ -q -p no:cacheprovider` passes in
-full. Ticket 13 runs both.
+chief's API calls create a goal and start a run that Pathly spawns through its normal spawn path; a
+Status-style token is refused on a write; an agent question is pending until the chief cites a
+human message and Pathly relays that message's text, and an uncited answer, or one with the chief's
+own words, is refused; a binding decision reaches the next builder, reviewer and tester prompts
+after an acknowledgement and no caller but the chief retires it; a run above the ceiling and a call
+on another project's run are refused; `pathly api` works from the chief's tab; the raw run token no
+longer appears on `/events/runner` or `/events/runs`. And `python -m pytest tests/ -q -p
+no:cacheprovider` passes in full. Ticket 13 runs both.
 
 ## How to work this
 
@@ -45,6 +48,8 @@ full. Ticket 13 runs both.
   on demand).
 - Commands live in `commands.md` (frozen). Lessons live in `learnings.md` (append only).
 - Status lives only in the ticket files. This map never repeats it.
+- `round-two-drafts/` holds work drafted for round two (§ Round two). The flow scripts read only
+  `tasks/`, so nothing there is claimed or built in round one.
 - Design is in `spec.md`. The previous chief plan (git `72292b35:pathly/features/chief-agent/`) is
   superseded; its directive, answer-relay and project-writer parts are reused here.
 - Hard rules from `CLAUDE.md`: 400-line ratchet (`scripts/check_file_size.py`), layer rule
@@ -53,6 +58,10 @@ full. Ticket 13 runs both.
   `python scripts/gen_test_index.py` after adding tests. CI also runs `bandit -r src/ -ll -x
   src/pathly_data/`: no f-string or `+` SQL building in new code (use `IN (SELECT value FROM
   json_each(?))`), never `# nosec`. The full suite runs on Python 3.11, 3.12 and 3.13.
+- Do not touch HQ, in either round (the user's decision, 2026-10-14): not
+  `studio/src/renderer/src/components/HQ/`, not HQ's top-bar toggle (`topbar-chat-toggle`), not
+  `chatStore`, not `src/pathly_orchestrator/chat_agent.py`. The Chief is added beside HQ. A
+  ticket that seems to need an HQ change stops and asks the user.
 
 ## Decisions so far
 
@@ -70,6 +79,28 @@ full. Ticket 13 runs both.
   item 1 now builds on `pathly api`, and item 4 only adds paste-without-Enter, because Studio
   already exports `PATHLY_RUN_TOKEN` for runner tabs
   (`studio/src/renderer/src/components/TerminalSpawnListener.tsx`, `main/ipc/terminal/spawnEnv.ts`).
+
+- Plan revised 2026-10-14 after a third review (`review-2026-10-14.md` in this folder; it verified
+  the plan's code references against `0c3aba1c` and the installed claude 2.1.292). Ticket 06 starts
+  claude with `--restricted` (or `--setting-sources` with no sources) and `--tools
+  Bash,Read,Glob,Grep`, because allow rules from the user's and project's settings files would
+  otherwise merge into the chief's and let it call the server without its token; it also passes a
+  server-chosen `--session-id`, stored as `chief_sessions.cli_session_id` (ticket 05). Ticket 09
+  refuses hook posts from any other session id and measures whether a message another session sends
+  into the chief can be labelled `relayed`. That session id binds the process, not the typist, so
+  it does not by itself settle the cross-session open question. Ticket 10 drops the word-for-word
+  rule: the chief sends only `cite`, and Pathly relays the cited text (the chief retyping the
+  user's words in shell-quoted JSON would refuse honest answers); it also keeps every question of a
+  multi-question ask. Ticket 08 tests the default refusal of unlisted routes as a property of
+  `app.url_map`. Ticket 15 gives a run slot back when the route answers 4xx. Ticket 17 moves the
+  fixed rules into a `chief-connect` fragment appended to every style. Round two's billing item now
+  reads the claude transcript, because an interactive tab prints no cost summary. Draft ticket 18
+  (daycap spend) moved to `round-two-drafts/daycap-spend-report.md`, ticket 19 (daycap guard spike)
+  stays, and round two is outlined as two parts, 2a and 2b.
+
+- Plan — the Chief button goes in the top bar next to the HQ toggle, and HQ stays as it is (the
+  user's decision, 2026-10-14; § Open questions, "Chief and HQ"; spec.md § UI). The brief had the
+  Chief replace HQ; round one is the same either way.
 
 - Plan — styles are three editable presets (Status, Planner, Operator) chosen in the existing
   shared picker (`PromptActionConfig` with `CliSelect`, `useMergedPresets`, library category
@@ -92,6 +123,14 @@ full. Ticket 13 runs both.
   prompt; it also fires on a scheduled task, a background subagent reporting back, and a message
   another session sends; pasted text arrives expanded in `prompt`; the default timeout is 30 s;
   hooks inherit the parent environment.
+- measured: `claude --help` on claude 2.1.292 (2026-10-14) — `--restricted` "ignores user,
+  project and local settings files (managed settings and --settings still apply; add
+  --strict-mcp-config to skip MCP servers too)", removes the tools that run commands and
+  `WebFetch` unless `--tools` names them, confines the file tools to the working directories and
+  refuses `bypassPermissions`; `--tools` sets the list of built-in tools (`""` for none);
+  `--setting-sources` takes a comma-separated list of `user`, `project`, `local`;
+  `--session-id <uuid>` sets the conversation's session id. Not yet measured: whether the
+  `--settings` hook fires under `--restricted` (ticket 06).
 - docs: https://code.claude.com/docs/en/cli-reference — `--settings` takes a settings file or JSON
   string; `--model`, `--allowedTools` and `--disallowedTools` exist; `claude` alone starts an
   interactive session.
@@ -180,7 +219,9 @@ and what would change under it.
 - **Chief session billing.** The chief tab is a runner tab (`PATHLY_GATE_BILLED` set), so the stop
   hook skips it, and the result callback finds no `RunnerState` for `chief:<run_id>`. A) Round one
   leaves it unbilled and round two gets a ticket that bills it (§ Round two, item 8). B) Leave the
-  chief unbilled with no ticket. Decided: A. No round-one ticket depends on it.
+  chief unbilled with no ticket. Decided: A. No round-one ticket depends on it. (2026-10-14: round
+  two bills it from the claude transcript that `cli_session_id` locates, not from the tab's output,
+  which carries no cost summary for an interactive session.)
 - **Planner style.** A) The Planner may post goals and tasks and call the three decompose routes,
   which start plan-only planner or consultation agents, but a body with `prompt_override` or
   `stage_overrides` also needs `run`; it never starts build runs or run control. B) The Planner
@@ -190,6 +231,10 @@ and what would change under it.
   after the agent asked the question. B) Any human message of the same session, so the user can
   answer ahead of time for the chief to relay. Decided: A (ticket 10). Under B, ticket 10 drops
   its two timestamp comparisons.
+- **Chief and HQ.** A) The Chief button sits in the top bar next to the HQ toggle, and HQ stays
+  as it is. B) The Chief replaces HQ, which survives only as the no-engine fallback (the brief's
+  line). Decided: A (2026-10-14). Round one is the same under both. Under B, round two would also
+  route the HQ toggle to the Chief and decide where HQ's `AgentQuestionCard` goes.
 
 Not known yet (later tickets or round two settle them):
 
@@ -203,11 +248,14 @@ Not known yet (later tickets or round two settle them):
 - A codex chief runs with `--sandbox read-only`, so each `pathly` command asks for approval; the
   docs do not say whether an approved command can reach `127.0.0.1`. Round two's CLI ticket checks
   it on a real codex before the launcher offers codex.
-- UserPromptSubmit also fires on scheduled tasks, background subagents reporting back and messages
-  another session sends. Denying `Agent`, `CronCreate` and `Workflow` removes the first two; a
-  cross-session message from another claude session (for example a worker) would still be
-  recorded as human. Round two should check whether the hook input marks the source or whether
-  cross-session messaging can be turned off for the chief session.
+- UserPromptSubmit also fires on scheduled tasks, background subagents reporting back and
+  messages another session sends. The chief's `--tools` list leaves out `Agent`, `CronCreate`
+  and `Workflow`, which removes the first two, and the session id check (ticket 09) keeps any
+  other process from recording. A message another claude session (for example a worker) sends
+  into the chief still arrives in the chief's own process with the chief's session id. Ticket 09
+  measures whether the hook input tells it apart; if it does, it is stored as `relayed` and can
+  never be cited; if not, it is recorded as human and this question stays open (can
+  cross-session messaging be turned off for the chief?).
 - The UI token (RRP-2b) is still missing: a chief that drops its token is unrestricted on
   loopback, `/events/spawn` still carries every spawn's token and needs no secret, and Studio
   cannot post or retire a binding directive until it lands.
@@ -216,9 +264,7 @@ Not known yet (later tickets or round two settle them):
 - The stale-directive re-queue (round two) matches directives to roles by `_spawn_role`, which
   returns `build` for quick-fix/debug FIXING spawns while directives say `builder`
   (role-read-policy ticket 10 open item).
-- When the Chief button replaces HQ, where do HQ's `AgentQuestionCard` and `FlowControlBar` live?
-  Round two keeps HQ reachable as the no-engine fallback; whether they also move elsewhere is a
-  round-two decision.
+
 
 ## Brief coverage
 
@@ -227,13 +273,13 @@ two numbers its own tickets from 01).
 
 | Brief, In scope | Round one (tickets) | Round two (items) |
 |---|---|---|
-| Chief button and tab replacing HQ; engine choice; style choice; prompt pasted, not sent | 06 interactive `TERMINAL_SPAWN` with `submit: false`, engines `claude` and `codex`; 07 `POST /chief/open` | R2-4 Studio pastes without Enter; R2-5 Chief button on `PromptActionConfig` replacing HQ, `chat_agent.py` fallback |
-| Chief styles: a preset plus the actions it may use, enforced through the token; Status, Planner, Operator | 04 tiers and preset-to-tier; 06 tier bound to the session; 08 the gate; 17 built-in texts | R2-3 richer preset texts; R2-5 `chief` Library category, saving `tier:` |
+| Chief button and tab replacing HQ; engine choice; style choice; prompt pasted, not sent | 06 interactive `TERMINAL_SPAWN` with `submit: false`, engines `claude` and `codex`; 07 `POST /chief/open` | R2-4 Studio pastes without Enter; R2-5 Chief button next to the HQ toggle, hosting `PromptActionConfig` (HQ stays: § Open questions, "Chief and HQ") |
+| Chief styles: a preset plus the actions it may use, enforced through the token; Status, Planner, Operator | 04 tiers and preset-to-tier; 06 tier bound to the session; 08 the gate; 17 built-in texts and the un-editable `chief-connect` fragment | R2-3 richer preset texts; R2-5 `chief` Library category, saving `tier:` |
 | The chief's identity: `chief` token for the style, `PATHLY_RUN_TOKEN` only, revoked on close | 05 tables; 06 mint and close; 07 routes and restart cleanup | R2-4 a vitest that the chief tab gets `PATHLY_RUN_TOKEN` (Studio already exports it for runner tabs) |
 | Read side: `pathly` command set, one overview call through the role-read-policy for `chief` | 08 the chief may read every GET except `/events/*` and `/db/settings`; 17 `pathly api` | R2-1 friendly `pathly` commands; R2-2 `GET /chief/overview` |
-| Write side: only existing routes, refused outside the style's list, never opens agent CLIs | 06 no spawn tools or MCP servers in the chief's settings; 08 deny by default; 14 project binding by id; 15 ceilings; 13 scenario 2 | R2-1 the write commands |
+| Write side: only existing routes, refused outside the style's list, never opens agent CLIs | 06 restricted start: no user or project settings, tools limited to Bash, Read, Glob and Grep, no MCP servers; 08 deny by default, tested over every route; 14 project binding by id; 15 ceilings; 13 scenario 2 | R2-1 the write commands |
 | Agent questions and decisions: badge, inbox on open or when asked, no LLM turns while away | 10 the pending question kept on the run state | R2-2 `GET /chief/inbox`; R2-3 presets read the inbox on open; R2-6 badge |
-| Verifiable relayed answers | 09 human messages recorded; 10 the cite rule (verbatim, once, human escalations) | none |
+| Verifiable relayed answers | 09 human messages recorded from the chief's own session; 10 the cite rule (Pathly relays the cited text, once; human escalations) | none |
 | Standing directives: binding by role, survive acknowledgement, chief token (or the UI), re-queue | 11 injection by role in a standing-orders block; 12 `POST /comms/directives`, no edits; 16 only the chief retires one, hydration cannot forge one | R2-7 re-queue; the UI path waits for RRP-2b (user's decision, § Open questions) |
 | The three run-token holes | 01 SSE; 02 `/db/query`; 03 `/comms/edit` | none |
 | The bar | 13 | R2-9 round-two acceptance |
@@ -241,7 +287,17 @@ two numbers its own tickets from 01).
 ## Round two (outlined; planned once round one is built)
 
 Planned as `pathly/features/chief-agent-round-two/` with its own map linking back here (the
-user's decision for rounds). Its items, in order:
+user's decision for rounds), in two parts, each with its own acceptance, so neither grows past
+about 12 tickets (planning guide rule 11):
+
+- **2a, the chief's hands and signal (server and CLI):** items 1, 2, 3, 8 and 10. At the end of
+  2a the chief is fully usable from a tab opened with `POST /chief/open`, sees its inbox, is
+  billed, and can report spend.
+- **2b, Studio (the launcher and the button):** items 4, 5, 6 and 7. At the end of 2b the user
+  opens the chief from the Chief button and never needs `POST /chief/open`.
+- Item 9 splits: 2a's acceptance and docs close 2a; 2b's close 2b.
+
+Items, numbered as § Brief coverage cites them:
 
 1. Friendly `pathly` commands on top of round one's `pathly api` (ticket 17, which already sends
    the token and refuses to run without it). Commands: `overview`, `inbox`, `goals`, `runs`, `board`, `search`,
@@ -253,24 +309,44 @@ user's decision for rounds). Its items, in order:
    `read_policy.policy_predicate` for role `chief`.
 3. Richer preset texts for Status, Planner and Operator (round one's ticket 17 has short ones
    using `pathly api`), rewritten against the friendly commands, each telling the chief to read
-   `pathly inbox` when it starts.
+   `pathly inbox` when it starts. The fixed rules stay in the `chief-connect` fragment, which is
+   rewritten against the friendly commands too; the style texts carry only the style.
 4. Studio paste-without-Enter: `TerminalSpawnListener` reads `submit === false` and passes a
    `pasteOnly` spawn meta through preload, `global.d.ts` and `terminal.ts` to
    `promptInjector.attachStartupHandling`, which pastes and sends no `\r`; a vitest with a fake
    `IPty`, and one that `buildSpawnEnv` exports `PATHLY_RUN_TOKEN` for the interactive chief tab
    (it already does for runner tabs; the test pins it). Also decide whether the chief tab counts
    against the interactive cap of 5.
-5. Chief button and launcher replacing HQ: a `PromptActionConfig` host (pattern:
-   `CommentConfigButton`), engines `claude` and `codex`, open / show tab on 409 / close, the tab
-   label carrying the tier, "Save current as prompt" adding `tier:` front matter, `'chief'` in the
-   Library `FIXED_CATEGORIES` and its Python mirror `skills/prompt_files.CATEGORIES` (the server
-   already reads and writes any `<category>/<name>`), and HQ (`chat_agent.py`) as the fallback when
-   `terminal:preflight` finds no engine.
+5. Chief button and launcher, next to HQ, which stays as it is (§ Open questions, "Chief and HQ").
+   The button goes in `studio/src/renderer/src/components/topbar/index.tsx`'s right group, between
+   the CLI Engines button (`cliMonitorWrap`) and the HQ toggle (`topbar-chat-toggle`). It shows
+   "Chief" and the inbox count (item 6). Below `TOPBAR_COMPACT_BREAKPOINT` (1060 px; the same
+   `compact` flag `ProjectSelector` gets) it shows only its icon and the count. The count badge
+   follows the CLI Engines dot (`cliMonitorWrap`/`cliDot` in `TopBar.module.css`). The button hosts
+   the launcher: a `PromptActionConfig` (pattern: `CommentConfigButton`), engines `claude` and
+   `codex`, open / show tab on 409 / close, the tab label carrying the tier, "Save current as
+   prompt" adding `tier:` front matter, `'chief'` in the Library `FIXED_CATEGORIES` and its Python
+   mirror `skills/prompt_files.CATEGORIES` (the server already reads and writes any
+   `<category>/<name>`). When `terminal:preflight` finds no engine, the launcher says so and points
+   to HQ. HQ, its toggle and `chat_agent.py` do not change. Before opening, the launcher shows what
+   the chief will be: the tier as a badge, the style text, and the `chief-connect` fragment folded
+   under one line (the 2026-10-14 external assessment, § 3).
 6. Inbox badge on the Chief button (polls `/chief/inbox`; no LLM turns).
 7. Stale-directive re-queue: `supervisor/directive_requeue.py`, called from the single-spawn branch
    of `fan_out.run_stage`, re-runs a stage once per binding directive newer than its spawn
    (at most twice) instead of advancing.
-8. Bill the chief's own session: the result handler (`blueprints/runner/api_lifecycle.py`) parses
-   the chief tab's output for `chief:<run_id>` and writes its cost, since the stop hook skips runner
-   tabs (the user's decision for cost).
-9. Round-two acceptance, `studio/CLAUDE.md`, `README.md` and `docs/WHAT_IS_PATHLY.md`.
+8. Bill the chief's own session (the user's decision for cost). Not from the tab's output: an
+   interactive claude tab prints no JSON cost summary, only screen output. And not from the
+   user's stop hook, which skips runner tabs (`PATHLY_GATE_BILLED`) and which restricted mode
+   does not load. Read the claude transcript instead: ticket 06 stored `cli_session_id`, so the
+   file is `~/.claude/projects/<cwd slug>/<cli_session_id>.jsonl`. Sum `usage` over assistant
+   messages, counting each message id once (one message can span several lines), price it with
+   `db/pricing.py`, and write an `AGENT_DONE` plus `BILLING_UPDATE` keyed by the chief's `run_id`
+   at close. For a running total while the chief is open, add a Stop hook to the chief's own
+   settings file that posts the same sum. Check the transcript's field names on the installed
+   claude first; they are not a documented contract. A codex chief needs its own source.
+9. Round-two acceptance, `studio/CLAUDE.md`, `README.md` and `docs/WHAT_IS_PATHLY.md` (one
+   acceptance for 2a, one for 2b).
+10. Report daycap's machine-wide daily spend (`pathly spend` over a read-only route): the draft
+    in `round-two-drafts/daycap-spend-report.md` (round-one ticket 18 until 2026-10-14), with the
+    corrections at its top. Round one's ticket 19 settles what daycap can enforce first.

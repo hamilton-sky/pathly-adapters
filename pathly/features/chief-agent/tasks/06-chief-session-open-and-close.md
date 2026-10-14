@@ -11,21 +11,34 @@ pieces.
 
 Add `src/pathly_orchestrator/runner/chief_argv.py` (pure, no I/O):
 
-- `chief_argv(engine, model, settings_path, mcp_path) -> list[str]`: claude → `["claude"]`, then
-  `["--model", model]` only when a model is given, then `["--settings", settings_path,
-  "--mcp-config", mcp_path, "--strict-mcp-config"]`, where `mcp_path` holds
-  `{"mcpServers": {}}`, so the chief gets none of the user's or project's MCP servers (Serena's
-  edit tools, the `pathly-fsm` MCP); codex →
-  `["codex", "--sandbox", "read-only", "--ask-for-approval", "on-request"]` plus the optional
-  model pair (read-only: codex cannot edit files and asks before every command). Never a
-  permission-bypass flag, never the prompt, never the token. Any other engine raises
-  `ValueError`.
+- `chief_argv(engine, model, settings_path, mcp_path, session_id) -> list[str]`: claude →
+  `["claude", "--restricted", "--tools", "Bash,Read,Glob,Grep", "--settings", settings_path,
+  "--mcp-config", mcp_path, "--strict-mcp-config", "--session-id", session_id]`, then
+  `["--model", model]` only when a model is given. `mcp_path` holds `{"mcpServers": {}}`, so the
+  chief gets none of the user's or project's MCP servers (Serena's edit tools, the `pathly-fsm`
+  MCP). codex → `["codex", "--sandbox", "read-only", "--ask-for-approval", "on-request"]` plus the
+  optional model pair (read-only: codex cannot edit files and asks before every command;
+  `session_id` is ignored). Never a permission-bypass flag, never the prompt, never the token.
+  Any other engine raises `ValueError`.
+- Why `--restricted` and `--tools`: permission rules from every settings file claude loads
+  merge, so a user or project allow rule such as `Bash(python3 *)` or `WebFetch` would otherwise
+  let the chief reach the server without its token, and anonymous loopback callers are
+  unrestricted until RRP-2b. On claude 2.1.292, `claude --help` says `--restricted` ignores user,
+  project and local settings files while managed settings and `--settings` still apply, removes
+  the tools that run commands and `WebFetch` unless `--tools` names them, confines the file tools
+  to the working directories and refuses `bypassPermissions`; `--tools` sets the built-in tool
+  list. So the chief has Bash (for `pathly`), Read, Glob and Grep, and nothing else. Check on the
+  installed claude that the `UserPromptSubmit` hook from `--settings` still fires under
+  `--restricted`. If it does not, drop `--restricted` and pass `--setting-sources` with an empty
+  value instead (it also skips the user, project and local files) and keep `--tools`; the deny
+  list below already covers `WebFetch` and `WebSearch` for that case. Write what you found in
+  `learnings.md`.
 - `claude_settings(hook_command) -> dict`: `permissions.allow = ["Bash(pathly *)"]`,
   `permissions.deny = ["Edit", "Write", "NotebookEdit", "Agent", "CronCreate", "Workflow",
-  "Read(~/.pathly/**)", "Bash(curl *)", "Bash(wget *)"]`, and one `UserPromptSubmit` command hook
-  running `hook_command`. Permission rules from every settings scope merge and deny wins, so the
-  two Bash denies hold even when the user's own settings allow curl: the chief cannot call the
-  API without its token through the common HTTP tools (other commands still ask the human).
+  "WebFetch", "WebSearch", "Read(~/.pathly/**)", "Bash(curl *)", "Bash(wget *)"]`, and one
+  `UserPromptSubmit` command hook running `hook_command`. Most of these tools are already absent
+  under `--tools`; the denies stay so the rules still hold if a claude version reads `--tools`
+  differently. Every Bash command other than `pathly …` asks the human.
 
 Add `src/pathly_orchestrator/supervisor/chief_session.py`:
 
@@ -42,8 +55,9 @@ Add `src/pathly_orchestrator/supervisor/chief_session.py`:
   `settings.json` from `claude_settings`, both written mode 0600, with the hook command
   `<sys.executable> -m pathly_hooks.chief_prompt --run-id <run_id> --secret-file <path> --port
   <port>` (port from `config.Settings.from_env().port`, paths quoted for the shell),
-  and for claude `mcp.json` holding `{"mcpServers": {}}`; a
-  `chief_sessions` row with the secret's sha256; `create_run(run_id)`; then
+  and for claude `mcp.json` holding `{"mcpServers": {}}`; for claude a `cli_session_id =
+  str(uuid.uuid4())`, passed to `chief_argv` (codex: None); a `chief_sessions` row with the
+  secret's sha256 and the `cli_session_id`; `create_run(run_id)`; then
   `broadcast_fn(topic, payload)` with the `TERMINAL_SPAWN` payload in spec.md § Interfaces
   (`topic = "chief:" + run_id`, `prompt` = `chief_tiers.strip_front_matter(prompt)`,
   `interactive: True`, `submit: False`, `label: "Chief · " + tier title`). Start a daemon watcher
@@ -72,9 +86,12 @@ modes only when `os.name == "posix"`, inside the test, not with a skip marker.
   `interactive` true, `submit` false, the front matter stripped from `prompt`, and a `run_token`
   that `resolve_run_token` maps to role `chief`, board `project` and the session's run id; the
   token appears in neither `prompt` nor `argv`; claude argv has `--settings`,
-  `--strict-mcp-config` and an `--mcp-config` file with no servers, and no
-  `--dangerously-skip-permissions`; the settings allow list is exactly `["Bash(pathly *)"]` and
-  the deny list has `Bash(curl *)` and `Bash(wget *)`; codex argv has `--sandbox read-only`; the settings file holds
+  `--strict-mcp-config`, an `--mcp-config` file with no servers, `--tools` with exactly
+  `Bash,Read,Glob,Grep`, either `--restricted` or `--setting-sources` with an empty value, and
+  `--session-id` with the UUID stored as the session's `cli_session_id`, and no
+  `--dangerously-skip-permissions`; codex argv has no `--session-id` and its session's
+  `cli_session_id` is None; the settings allow list is exactly `["Bash(pathly *)"]` and
+  the deny list has `Bash(curl *)`, `Bash(wget *)` and `WebFetch`; codex argv has `--sandbox read-only`; the settings file holds
   the hook command with the run id and the deny list; a second open raises `ChiefAlreadyOpen`;
   `copilot` raises `ValueError`; after `mark_started()` and `mark_pty_result(...)` the token is
   revoked, the folder is gone and `get_run(run_id)` is None; with `start_timeout` near zero and no start, the session closes with
@@ -101,8 +118,12 @@ exit 0
   which is why the chief has its own builder)
 - `tests/comms_board/test_rrp_acceptance.py` (fake broadcaster that marks the run started and
   finished)
-- map.md § Decisions so far (docs: cli-reference, permissions, tools-reference). Check
-  `--mcp-config` and `--strict-mcp-config` against `claude --help` on the installed claude before
-  writing the argv, and note what you find in `learnings.md`
+- map.md § Decisions so far (docs: cli-reference, permissions, tools-reference; claude 2.1.292
+  `--help` for `--restricted`, `--tools`, `--setting-sources` and `--session-id`). Check
+  `--mcp-config`, `--strict-mcp-config`, `--restricted` (with the `--settings` hook) and
+  `--session-id` against `claude --help` and one real start on the installed claude before
+  writing the argv, and note what you find in `learnings.md`. If the installed claude lacks
+  `--restricted` and `--setting-sources`, stop and ask: without them the chief inherits the
+  user's allow rules
 
 ## Answer
