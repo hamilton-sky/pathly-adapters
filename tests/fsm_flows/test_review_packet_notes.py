@@ -2,8 +2,8 @@
 
 The notes list each claimed task's latest ``TASK_PROOF`` and the warnings of the latest
 ``FLOOR_CHECKED`` since the build began. ``RUNNER_CONTRACT_BLOCK`` tells every headless stage not
-to spawn another Pathly role for a feedback file, and ``team/build`` and ``team/review`` say their
-fixer spawns are interactive only. Setup is in ``review_packet_support``.
+to spawn another Pathly role for a feedback file, and ``team/review`` pastes the packet instead of
+asking the reviewer to run anything. Setup is in ``review_packet_support``.
 """
 
 from __future__ import annotations
@@ -115,14 +115,6 @@ def test_the_runner_contract_forbids_spawning_a_role_for_a_feedback_file():
         "the supervisor routes it",
     ):
         assert part in RUNNER_CONTRACT_BLOCK, part
-
-
-@pytest.mark.parametrize("skill", ["team/build", "team/review"])
-def test_the_team_skills_leave_feedback_spawns_to_interactive_runs(skill):
-    text = (SKILLS / (skill + ".md")).read_text(encoding="utf-8")
-
-    assert "Interactive `/pathly` only" in text
-    assert "feedback file" in text.split("Interactive `/pathly` only")[1][:600]
 
 
 def test_team_review_pastes_the_packet_and_never_asks_the_reviewer_to_run_anything():

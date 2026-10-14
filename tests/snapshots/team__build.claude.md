@@ -147,11 +147,6 @@ log-phase PHASE_DONE implement
 
 ### Feedback routing after builder
 
-> **Interactive `/pathly` only.** The spawns below resolve a feedback file in an interactive
-> session. A headless run (the Runner contract in your prompt) never spawns another Pathly role
-> for it: write the feedback file, report blocked and stop, and the supervisor routes the file to
-> the role that owns it.
-
 Feedback file priority, the feedback-open guard, and the retry-count guard are defined in the
 Feedback protocol fragment. Route the highest-priority open file to the agent below.
 

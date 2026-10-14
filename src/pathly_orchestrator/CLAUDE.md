@@ -1095,8 +1095,8 @@ report or `VERIFY.md`. It never raises: a packet that cannot be built is that sh
 `RUNNER_CONTRACT_BLOCK` gained one sentence: in any headless stage, never spawn another Pathly role
 (planner, architect, po, designer, builder) to resolve a feedback file; write the file and stop,
 and the supervisor routes it. A sub-agent spawned that way has no `SPAWN_WINDOW` of its own, so its
-plan edit would be blamed on the stage's role. `team/build.md` and `team/review.md` mark their
-fixer spawns "Interactive `/pathly` only"; the flows' `feedback_routing` does the routing.
+plan edit would be blamed on the stage's role. The sub-agent fixers in `team/build.md` and
+`team/review.md` stay for interactive `/pathly`; the flows' `feedback_routing` does the routing.
 
 Limits: a same-adapter REVIEWING stage still resumes the builder's CLI session (and so its
 transcript); the packet changes only the prompt. The retry-ladder block that

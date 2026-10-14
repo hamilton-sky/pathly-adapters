@@ -220,11 +220,8 @@ Phase 1 and Phase 3 prompts told it to `Run: git diff HEAD~1 HEAD` and to call
 the change: it pastes the prompt's Review packet `### The task` and `### The diff` sections
 verbatim (headless, built by `fsm_compose_review`), or runs `git diff HEAD` itself when there is no
 packet (interactive), and it hydrates the task's `context_refs` itself. It never passes the
-builder's report or `VERIFY.md`. `team/build.md` and `team/review.md` also mark their
-planner/architect/po/designer/builder fixer spawns "Interactive `/pathly` only": headless, the
-runner contract tells the agent to write the feedback file and stop, and the supervisor routes it.
-`development/review.md` (run by the user's own session, which has Bash) is unchanged. The golden
-snapshots `tests/snapshots/team__review.claude.md` and `team__build.claude.md` pin the text.
+builder's report or `VERIFY.md`. `development/review.md` (run by the user's own session, which has
+Bash) is unchanged. The golden snapshot `tests/snapshots/team__review.claude.md` pins the text.
 
 **Composition contract:**
 

@@ -141,11 +141,6 @@ log-phase PHASE_DONE review
 
 ## Feedback routing after reviewer
 
-> **Interactive `/pathly` only.** The spawns below resolve a feedback file in an interactive
-> session. A headless run (the Runner contract in your prompt) never spawns another Pathly role
-> for it: the reviewer has written the feedback file, so report and stop, and the supervisor
-> routes the file to the role that owns it.
-
 Apply the Feedback protocol retry-count guard before routing each file (escalate to
 HUMAN_QUESTIONS.md when the retry limit is exceeded). Route the HIGHEST-PRIORITY open
 file first (see Feedback protocol — priority order): `REQUIREMENT_GAP.md` >
