@@ -4,13 +4,14 @@
 
 Goal/DAG decomposition & scheduling — feature/flow/project decompose, goals read-model, PRD import.
 
-14 test file(s).
+16 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
 | `test_cost_cap.py` | Tests for supervisor/cost_cap.py — aggregate cost enforcement for the loop executor | 14 |
 | `test_dag_scheduler.py` | Tests for supervisor/scheduler.py — DAG frontier loop (Phase 2a) | 4 |
 | `test_dag_scheduler_db.py` | Tests for P2 DAG scheduler DB layer | 9 |
+| `test_dependency_results.py` | A DAG task's prompt carries what the tasks it depends on produced (build-proof 11) | 17 |
 | `test_drain_shared.py` | ONE drain — `supervisor/drain.py` (fan-out convergence) | 10 |
 | `test_feature_decompose.py` | Feature-decompose ladder (planner-hierarchy T5): route dispatch, goal-count gate, flow, skill | 9 |
 | `test_flow_decompose.py` | Tests for flow decompose/assemble round-trip and DB idempotency | 19 |
@@ -21,4 +22,5 @@ Goal/DAG decomposition & scheduling — feature/flow/project decompose, goals re
 | `test_prd_import_new.py` | Board-native PRD import contract (planner-hierarchy G3) | 8 |
 | `test_project_decompose.py` | Project-decompose ladder (planner-hierarchy G2): route dispatch, feature-count gate, flow, skill | 11 |
 | `test_project_goal_decompose.py` | Tests for T6: goal-slug routing at goal call sites | 6 |
+| `test_retry_debug_guide.py` | A second attempt carries the root-cause debugging guide (build-proof 11) | 15 |
 | `test_task_retry.py` | Tests for supervisor/task_retry.py — per-task retry/escalation + deadlock detection | 19 |

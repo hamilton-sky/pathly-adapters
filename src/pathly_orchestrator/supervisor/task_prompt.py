@@ -31,6 +31,7 @@ import logging
 from typing import Optional
 
 from . import task_retry as _task_retry
+from .task_dependencies import dependency_results_block
 from ..fsm_compose import RUNNER_CONTRACT_BLOCK
 
 logger = logging.getLogger("pathly.task_prompt")
@@ -96,9 +97,10 @@ def build_task_prompt(
     1. the composed ``development/execute-task`` body (progress logging, comms-post,
        completion-report) with its placeholders substituted — falling back to the raw task
        text when composition is unavailable;
-    2. the runner contract, so a task agent never tries to advance the FSM itself;
-    3. the retry ladder, from the second attempt on;
-    4. the scope-aware board context.
+    2. the results of the tasks it depends on (none for a task without dependencies);
+    3. the runner contract, so a task agent never tries to advance the FSM itself;
+    4. the retry ladder, from the second attempt on;
+    5. the scope-aware board context.
 
     The runner contract is appended AFTER the compose try/except deliberately: the raw-text
     fallback is the path where the agent has the LEAST guidance, so it must not be the one
@@ -125,6 +127,7 @@ def build_task_prompt(
     except Exception:
         instructions = task_text
 
+    instructions += dependency_results_block(task)
     instructions += f"\n\n{RUNNER_CONTRACT_BLOCK}"
     instructions += _task_retry.build_retry_context(task)
 
