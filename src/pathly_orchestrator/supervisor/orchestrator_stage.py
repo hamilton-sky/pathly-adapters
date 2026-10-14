@@ -220,16 +220,26 @@ def _resolve_stage_supervised(
 
             fb_adapter = state.current_adapter or "claude"
             fb_model = effective_model(target, fb_adapter, model)
+            # build-proof: record what the feedback agent changed, as ITS role (target), not
+            # the state's — a planner routed a file inside BUILDING may edit the plan.
+            from pathly_orchestrator.supervisor import fan_out, spawn_window
+
             try:
-                _run_stage_via_terminal(
+                spawn_window.observe(
                     state,
-                    fb_instructions,
-                    fb_adapter,
-                    fb_model,
+                    fan_out.load_flow_config(flow, project_root),
+                    target,
                     fb_run_id,
-                    broadcast_fn,
-                    session=None,
-                    autonomy=autonomy_for_adapter,
+                    lambda: _run_stage_via_terminal(
+                        state,
+                        fb_instructions,
+                        fb_adapter,
+                        fb_model,
+                        fb_run_id,
+                        broadcast_fn,
+                        session=None,
+                        autonomy=autonomy_for_adapter,
+                    ),
                 )
             except RuntimeError as exc:
                 _fail("spawn_failed", str(exc))

@@ -251,7 +251,9 @@ def run_stage(
     """ONE call site for executing an FSM stage.
 
     No ``parallel_states`` entry -> delegates to ``_run_stage_via_terminal`` with the
-    identical arguments, so the single-spawn path is byte-for-byte what it was.
+    identical arguments, so the single-spawn path is byte-for-byte what it was. That spawn
+    goes through ``spawn_window.observe`` with the flow's ``role_map`` role for the state,
+    which records a ``SPAWN_WINDOW`` when the flow has a gate that reads one.
     Entry present -> drains the state's ready tasks and returns a merged result in the
     SAME shape, so ``_loop``'s downstream handling is untouched.
 
@@ -259,17 +261,25 @@ def run_stage(
     the join.
     """
     import pathly_orchestrator.supervisor as _sup
+    from pathly_orchestrator.supervisor.spawn_window import observe
 
     config = parallel_config(flow_config, state_name)
     if config is None:
-        return _sup._run_stage_via_terminal(
+        role = ((flow_config or {}).get("role_map") or {}).get(state_name) or ""
+        return observe(
             state,
-            instructions,
-            adapter,
-            model,
+            flow_config,
+            role,
             run_id,
-            broadcast_fn,
-            session=session,
-            autonomy=autonomy,
+            lambda: _sup._run_stage_via_terminal(
+                state,
+                instructions,
+                adapter,
+                model,
+                run_id,
+                broadcast_fn,
+                session=session,
+                autonomy=autonomy,
+            ),
         )
     return _drain(state, config, state_name, broadcast_fn, autonomy)
