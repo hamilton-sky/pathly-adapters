@@ -354,6 +354,7 @@ POST /comms/answer          ← answer a posted question
 GET  /comms/tasks           ← list DAG tasks
 POST /comms/tasks/complete  ← mark a task complete
 POST /comms/tasks/status    ← BULK terminal write-back (done|failed) for a resolving agent: `{task_ids,status,reason,from}`; reports updated/newly_ready/blocked/unknown. Re-opening (→pending) is deliberately NOT offered — that is a supervisory act
+POST /comms/tasks/floor-allow ← HUMAN only (403 for a live run token): set one task's floor allow list `{message_id, allow:[…], refreeze}`; `refreeze` re-copies the live text into `claimed_text` (see "Frozen task text" below)
 POST /comms/tasks/run       ← run ONE task headlessly: claim it, spawn a builder on its prompt, complete on success
 POST /comms/tasks/stop      ← stop a single-task run: kill its board run and revert the task to pending
 POST /comms/attach          ← attach an artifact to a message
@@ -432,6 +433,33 @@ human checkpoints to `DONE`.
   be read is reported absent rather than blocking every transition in the product.
 - Studio has no dedicated force-advance button yet; today the override is the `complete_stage`
   field. Acknowledging from the board clears the gate through the existing UI.
+
+**Frozen task text and the human-only floor allow list (build-proof).** Two additive
+`comms_messages` columns (`db/migrations_incremental.py`); a task claimed before them reads
+`NULL` in both.
+
+- **`claimed_text`** — `claim_task` sets `claimed_text = COALESCE(claimed_text, text)` in its one
+  `UPDATE`, so the first claim freezes the task's text, and with it any ```` ```check ```` block. A retry
+  (`task_retry.retry_task` back to pending, then a new claim) keeps the first copy, so a builder
+  that edits its own task between attempts does not change what it is proven against. Every
+  claim goes through `claim_task`: the scheduler's `sched-<id>#<n>` claims,
+  `POST /comms/tasks/claim` (team-flow builders claim with `run_id: "build"`) and
+  `/comms/tasks/run`.
+- **`floor_allow`** — a JSON list of `proof.floor.CATEGORIES` names a human allowed for that one
+  task. Its only writer is `POST /comms/tasks/floor-allow` (`blueprints/comms/tasks_floor.py`),
+  body `{message_id, allow: [...], refreeze: false}` → 200 `{ok: true, allow: [...]}` (sorted).
+  403 when the caller sends a live run token (the `force_past_gate` rule); 400 for an unknown
+  category (the error names the valid ones, from `proof.floor.parse_allow`), a malformed body or
+  a row that is not a task; 404 for a missing row. `refreeze: true` also copies the live `text`
+  into `claimed_text`: how a human corrects a broken check without allowing `task-edit`. Task
+  text is agent-written, so an allow line there would let the planner excuse the builder.
+- **Limit:** as for `force_past_gate`, a caller with no token (or an unknown or revoked one) is
+  treated as a human. Studio has no control for the list yet; set it with `curl` from a shell.
+- Reads live in `db/queries/task_proof.py`: `get_task` (any live row; the caller checks the
+  type), `tasks_claimed_since` / `tasks_completed_since` (goal-scoped when `goal_id` is given,
+  else `(board, scope)`, as `require_tasks_done` scopes; the window compares parsed times, since
+  claims stamp `+00:00` and event `ts` values end in `Z`) and `set_floor_allow`. Nothing reads
+  `claimed_text` or `floor_allow` during proof yet.
 
 ### Request bodies — one lenient reader for every comms route (`_helpers.read_json_body`)
 
@@ -648,6 +676,7 @@ pathly_orchestrator/
       comms_messages.py    # board message CRUD; goal_id/executor columns back the Goals->Task-DAG model
       comms_artifacts.py   # artifact metadata CRUD (attach, list, section index, update_summary)
       comms_tasks.py       # task DAG operations (get_ready, complete, claim, fail, reclaim, goal_refs_coverage)
+      task_proof.py        # build-proof task reads: get_task, tasks_claimed_since / tasks_completed_since (goal- else (board, scope)-scoped, parsed-time window), set_floor_allow (the human-set floor_allow JSON list; refreeze re-copies text into claimed_text)
       comms_embeddings.py  # embedding storage + hybrid/semantic search; search_by_embedding() merges parent+child vectors, deduplicates by message_id, returns _matched_chunk for subtopic surfacing; store_chunk_embeddings() writes to comms_chunk_embeddings; SEMANTIC_DISTANCE_CEILING (0.72) + opt-in max_distance= floor scored hits for /comms/search (BM25 hits bypass; comms_context.py keeps its own per-tier gates); _fts_query() quotes each token so raw FTS5 operators (code:query, a OR b, unbalanced ") match literally instead of reparsing; search_by_hybrid() tags each row _match_source (keyword|semantic) for client grouping
       comms_counts.py      # count_goals_for_feature / count_features_for_project — gate the consultation flows' seed thresholds
       comms_goals_read.py  # get_goals_with_rollup() — backs GET /comms/goals
