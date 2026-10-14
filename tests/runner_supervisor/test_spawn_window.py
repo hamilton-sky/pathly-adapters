@@ -254,14 +254,14 @@ def test_without_a_storage_path_the_window_lands_in_the_topic_dir(repo):
 def _team_build_with_a_floor_gate() -> dict:
     """The packaged team-build flow plus the floor gate ticket 06 adds at BUILDING->REVIEWING.
 
-    The packaged flow carries none of the three window gates until tickets 06, 08 and 09, so
-    without one a window is (correctly) not recorded at all.
+    Since ticket 08 the packaged flow ends BUILDING->REVIEWING with a ``scope_gate``, so it
+    records windows on its own; the added floor gate keeps this test independent of that.
     """
     from pathly_orchestrator.fsm_ops import _load_flow
 
     flow = copy.deepcopy(_load_flow("team-build"))
     assert flow["role_map"]["BUILDING"] == "builder"
-    assert spawn_window.wants_windows(flow) is False
+    assert spawn_window.wants_windows(flow) is True
     flow["gates"]["BUILDING->REVIEWING"].append(
         {"type": "floor_gate", "on_fail": "FLOOR_FAILURES.md"}
     )

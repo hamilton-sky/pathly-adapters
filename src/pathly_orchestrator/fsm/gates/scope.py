@@ -1,17 +1,39 @@
 """Scope-containment gate — ``scope_gate``.
 
-Compares the builder's actual git footprint against the paths it declared in its scope
-file. Fail-open on every read/exec problem (no baseline, no declared scope, git error):
-the gate exists to catch a builder that wandered, not to wedge a run on a git hiccup.
+Compares the builder's actual git footprint against its declared scope: the backtick paths in
+the gate's ``scope_file`` (optional) plus the ``files`` of the board tasks claimed since
+``build_baseline.started_at`` that were posted before it, not by a builder. A declared
+directory covers everything under it. Exempt: what the builder stage may write
+(``_proof.stage_writes``: its feedback files, ``VERIFY.md``, the server's exports,
+``*.tsbuildinfo``), the flow's ``scope_gate.exempt_prefixes``, and a path a ``SPAWN_WINDOW``
+explains (a planner routed a feedback file edits the plan). The rest of ``pathly/`` is not
+exempt, so a builder that rewrites its own plan fails, even an uncommitted one: a path already
+dirty when the build began is judged by its content since the first window.
+
+Fail-open on read/exec problems (no baseline, no declared scope, git error, unreadable tasks,
+windows or tree): the gate exists to catch a builder that wandered, not to wedge a run on a git
+hiccup. A changed path no window could ever explain still fails when only the windows or the
+tree cannot be read.
 """
 
 from __future__ import annotations
 
 import json
+import logging
 import subprocess
+from collections.abc import Callable, Iterable
 from pathlib import Path
 
+from pathly_orchestrator.proof import tree
+
+from . import _proof
 from ._helpers import append_event, gate_failed, gate_skipped, project_root_of
+from ._scope_tasks import claimed_files
+
+logger = logging.getLogger("pathly.gates.scope")
+
+# The failure text names at most this many paths, then a count of the rest.
+_MAX_NAMED = 20
 
 
 def _declared_paths(scope_path: Path) -> set[str]:
@@ -33,8 +55,21 @@ def _declared_paths(scope_path: Path) -> set[str]:
     return declared
 
 
+def _covered(path: str, entries: Iterable[str]) -> bool:
+    """True when an entry names ``path`` or a directory above it (trailing ``/`` or not)."""
+    for entry in entries:
+        name = entry.strip().replace("\\", "/").rstrip("/")
+        if name and (path == name or path.startswith(name + "/")):
+            return True
+    return False
+
+
 def _git_dirty(project_root: Path, storage_path: Path) -> set[str] | None:
-    """Tracked-modified ∪ untracked paths, or None when git could not be read."""
+    """Tracked-modified ∪ untracked paths, or None when git could not be read.
+
+    Untracked files are listed one by one (``--untracked-files=all``): git otherwise names a
+    new folder as one ``dir/`` line, which no declared file inside it would match.
+    """
     try:
         diff_result = subprocess.run(
             ["git", "diff", "--name-only", "HEAD"],
@@ -53,7 +88,7 @@ def _git_dirty(project_root: Path, storage_path: Path) -> set[str] | None:
 
     try:
         status_result = subprocess.run(
-            ["git", "status", "--porcelain=v1"],
+            ["git", "status", "--porcelain=v1", "--untracked-files=all"],
             cwd=str(project_root),
             capture_output=True,
             text=True,
@@ -74,43 +109,186 @@ def _git_dirty(project_root: Path, storage_path: Path) -> set[str] | None:
     return {p for p in diff_result.stdout.splitlines() if p.strip()} | untracked
 
 
+def _exemption(
+    storage_path: Path, declared: set[str], flow: dict | None, scope_file: str | None
+) -> Callable[[str], bool]:
+    """A predicate: is this changed path declared, or exempt from the scope?
+
+    The scope file never covers its own edit, so a builder cannot widen its scope by rewriting
+    it.
+    """
+    extra = ((flow or {}).get("scope_gate") or {}).get("exempt_prefixes") or []
+    builder_may_write = _proof.stage_writes(storage_path, "builder")
+    rel = _proof.storage_rel(storage_path)
+    own_scope_file = "/".join(p for p in (rel, scope_file) if p) if scope_file else None
+
+    def allowed(path: str) -> bool:
+        if builder_may_write(path) or any(path.startswith(x) for x in extra):
+            return True
+        return path != own_scope_file and _covered(path, declared)
+
+    return allowed
+
+
+def _sure_or_skip(
+    storage_path: Path,
+    paths: list[str],
+    explainable: Callable[[str], bool],
+    reason: str,
+) -> list[str] | None:
+    """When the windows or the tree cannot be read: the paths no window could explain, if any.
+
+    Otherwise the gate cannot judge what is left, so it skips.
+    """
+    sure = [p for p in paths if not explainable(p)]
+    if sure:
+        return sure
+    gate_skipped(storage_path, "scope_gate", reason)
+    return None
+
+
+def _unexplained(
+    storage_path: Path,
+    project_root: Path,
+    fresh: list[str],
+    preexisting: set[str],
+    allowed: Callable[[str], bool],
+    since: str | None,
+) -> list[str] | None:
+    """The out-of-scope changes no ``SPAWN_WINDOW`` since ``since`` explains; None to skip.
+
+    ``fresh`` holds the out-of-scope paths git shows changed that were clean at the baseline. A
+    path in ``preexisting`` counts when its content now differs from the first window's
+    ``before`` tree, which is where this build began; with no window (an interactive run) it
+    is not judged. The working tree is snapshotted only when a window's role may write a path,
+    or a preexisting path needs it.
+    """
+    try:
+        windows = _proof.windows_since(storage_path, since)
+    except Exception:
+        logger.warning("scope_gate could not read the spawn windows", exc_info=True)
+        return _sure_or_skip(
+            storage_path,
+            fresh,
+            _proof.any_role_writes(storage_path),
+            "spawn_windows_unreadable",
+        )
+    writers = [
+        _proof.stage_writes(storage_path, role)
+        for role in {window.get("role") for window in windows}
+    ]
+
+    def explainable(path: str) -> bool:
+        return any(may_write(path) for may_write in writers)
+
+    base = next((w.get("before") for w in windows if w.get("before")), None)
+    judge_old = bool(preexisting and base)
+    if not judge_old and not any(explainable(p) for p in fresh):
+        return fresh
+    now = tree.snapshot(project_root)
+    if now is None:
+        return _sure_or_skip(storage_path, fresh, explainable, "snapshot_failed")
+    old: set[str] | None = set()
+    if judge_old:
+        diff = tree.changes_or_none(project_root, base, now)
+        if diff is None:
+            logger.warning("scope_gate could not diff the tree since the build began")
+        old = (
+            None
+            if diff is None
+            else {p for _, p in diff if _covered(p, preexisting) and not allowed(p)}
+        )
+    outside = sorted(
+        p
+        for p in set(fresh) | (old or set())
+        if not explainable(p)
+        or not _proof.explained(project_root, p, now, windows, storage_path)
+    )
+    if old is None and not outside:
+        gate_skipped(storage_path, "scope_gate", "git_diff_failed")
+        return None
+    return outside
+
+
+def _out_of_scope(
+    storage_path: Path,
+    declared: set[str],
+    preexisting_dirty: set[str] | None,
+    flow: dict | None = None,
+    since: str | None = None,
+    scope_file: str | None = None,
+) -> list[str] | None:
+    """Changed paths outside the declared scope, sorted; None when the gate must skip.
+
+    A path clean when the build started counts when git shows it changed. One that was dirty
+    (``preexisting_dirty``, where a ``dir/`` entry covers the files under it) is judged by its
+    content in :func:`_unexplained`, so an uncommitted plan is not the builder's to edit.
+    """
+    project_root = project_root_of(storage_path)
+    all_dirty = _git_dirty(project_root, storage_path)
+    if all_dirty is None:
+        return None
+    preexisting = set(preexisting_dirty or ())
+    allowed = _exemption(storage_path, declared, flow, scope_file)
+    fresh = sorted(p for p in all_dirty if not (_covered(p, preexisting) or allowed(p)))
+    if not (fresh or preexisting):
+        return []
+    return _unexplained(storage_path, project_root, fresh, preexisting, allowed, since)
+
+
 def _scope_clean(
     storage_path: Path,
     scope_file: str,
     preexisting_dirty: set[str] | None,
     flow: dict | None = None,
 ) -> bool:
+    """The gate's rule as a yes/no, with ``scope_file``'s paths as the whole declared scope.
+
+    Skips (True) when the file declares nothing or a read fails.
+    """
     declared = _declared_paths(storage_path / scope_file)
     if not declared:
         gate_skipped(storage_path, "scope_gate", "no_declared_scope")
         return True
+    outside = _out_of_scope(
+        storage_path, declared, preexisting_dirty, flow=flow, scope_file=scope_file
+    )
+    return not outside
 
-    all_dirty = _git_dirty(project_root_of(storage_path), storage_path)
-    if all_dirty is None:
-        return True
 
-    builder_touched = all_dirty - (preexisting_dirty or set())
-
-    extra_prefixes: list[str] = []
-    if flow:
-        extra_prefixes = flow.get("scope_gate", {}).get("exempt_prefixes", []) or []
-
-    def _is_exempt(p: str) -> bool:
-        # A feature's own storage tree is exempt from the builder scope gate: the flat home
-        # (pathly/features/<name>/) and the legacy base (pathly/plans/<name>/) both count.
-        if (
-            p.startswith("pathly/features/")
-            or p.startswith("pathly/plans/")
-            or p.endswith(".tsbuildinfo")
-        ):
-            return True
-        return any(p.startswith(prefix) for prefix in extra_prefixes)
-
-    for path in builder_touched:
-        if not _is_exempt(path) and path not in declared:
-            return False
-
-    return True
+def _failure_text(
+    outside: list[str],
+    scope_file: str | None,
+    named_in_file: bool,
+    tasks_declared: bool,
+) -> str:
+    sources = []
+    if named_in_file:
+        sources.append(f"the paths named in `{scope_file}`")
+    if tasks_declared:
+        sources.append(
+            "the `files` of the planned tasks claimed since this build started"
+        )
+    listed = [f"- {path}" for path in outside[:_MAX_NAMED]]
+    if len(outside) > _MAX_NAMED:
+        listed.append(f"- ... and {len(outside) - _MAX_NAMED} more")
+    return "\n".join(
+        [
+            f"Scope gate failed: {len(outside)} changed path(s) are outside the declared "
+            "scope.",
+            "",
+            "Declared scope: " + " and ".join(sources) + ". Your feedback files and "
+            "`VERIFY.md` are always allowed; plan files are not.",
+            "",
+            "Outside it:",
+            *listed,
+            "",
+            "Undo these changes. If the work really needs one of them, do not edit the plan "
+            "or a task yourself: write feedback/IMPL_QUESTIONS.md so the planner can widen "
+            "the scope.",
+            "",
+        ]
+    )
 
 
 def _read_build_baseline(storage_path: Path) -> dict | None:
@@ -139,9 +317,12 @@ def check_scope_gate(
     prev_state: str,
     next_state: str,
     flow: dict | None = None,
+    goal_id: str | None = None,
+    feature_scope: str | None = None,
+    board: str = "feature",
     **_: object,
 ) -> dict | None:
-    scope_file = gate["scope_file"]
+    scope_file = gate.get("scope_file")
     build_baseline = _read_build_baseline(storage_path)
     if build_baseline is None:
         gate_skipped(storage_path, "scope_gate", "no_build_baseline")
@@ -160,7 +341,22 @@ def check_scope_gate(
         )
         return None
     preexisting = set(build_baseline.get("preexisting_dirty", []))
-    if _scope_clean(storage_path, scope_file, preexisting, flow=flow):
+    since = build_baseline.get("started_at")
+
+    named = _declared_paths(storage_path / scope_file) if scope_file else set()
+    task_files = claimed_files(since, goal_id, feature_scope, board)
+    if task_files is None:
+        gate_skipped(storage_path, "scope_gate", "tasks_unreadable")
+        return None
+    declared = named | task_files
+    if not declared:
+        gate_skipped(storage_path, "scope_gate", "no_declared_scope")
+        return None
+
+    outside = _out_of_scope(
+        storage_path, declared, preexisting, flow, since=since, scope_file=scope_file
+    )
+    if not outside:
         return None
     return gate_failed(
         storage_path,
@@ -168,5 +364,5 @@ def check_scope_gate(
         "scope_gate",
         prev_state,
         next_state,
-        f"Scope gate failed: changes outside declared scope in {scope_file}",
+        _failure_text(outside, scope_file, bool(named), bool(task_files)),
     )

@@ -32,7 +32,7 @@ def get_task(conn: sqlite3.Connection, message_id: str) -> dict | None:
     return dict(row) if row is not None else None
 
 
-def _instant(value: str | datetime | None) -> datetime | None:
+def instant(value: str | datetime | None) -> datetime | None:
     """``value`` as an aware datetime (naive means UTC); ``None`` when it is not a time."""
     if isinstance(value, datetime):
         when = value
@@ -47,12 +47,12 @@ def _instant(value: str | datetime | None) -> datetime | None:
 
 
 def _since(rows: list[sqlite3.Row], column: str, since: str | datetime) -> list[dict]:
-    start = _instant(since)
+    start = instant(since)
     if start is None:
         raise ValueError("since is not an ISO 8601 time: %r" % (since,))
     kept: list[tuple[datetime, dict]] = []
     for row in rows:
-        when = _instant(row[column])
+        when = instant(row[column])
         if when is not None and when >= start:
             kept.append((when, dict(row)))
     kept.sort(key=lambda pair: pair[0])

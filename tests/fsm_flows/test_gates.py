@@ -447,16 +447,10 @@ def test_no_gates_on_transition(tmp_path):
     assert result is None
 
 
-# ── plan-file exemption tests ─────────────────────────────────────────────────
+# ── plan-file tests (build-proof 08: only what the builder may write is exempt) ──
 
 
-def test_scope_gate_plan_files_exempt(tmp_path, monkeypatch):
-    """Builder edits CONVERSATION_PROMPTS.md and PROGRESS.md only — gate passes, no GATE_FAILED."""
-    import pathly_orchestrator.fsm as fsm_mod
-
-    storage = _storage(tmp_path)
-    # Declared scope references a codebase file, but builder only touched plan files.
-    (storage / "SCOPE.md").write_text("Files:\n- `src/app.py`\n", encoding="utf-8")
+def _write_build_baseline(storage: Path) -> None:
     (storage / "STATE.json").write_text(
         json.dumps(
             {
@@ -470,60 +464,62 @@ def test_scope_gate_plan_files_exempt(tmp_path, monkeypatch):
         encoding="utf-8",
     )
 
+
+def _fake_diff(monkeypatch, changed: list[str]) -> None:
+    """``git diff`` reports ``changed``; ``git status`` reports nothing untracked."""
+    import pathly_orchestrator.fsm as fsm_mod
+
     def fake_run(args, **kwargs):
         if "diff" in args:
             return type(
                 "R",
                 (),
-                {
-                    "returncode": 0,
-                    "stdout": "pathly/plans/test-feature/CONVERSATION_PROMPTS.md\npathly/plans/test-feature/PROGRESS.md\n",
-                    "stderr": "",
-                },
+                {"returncode": 0, "stdout": "\n".join(changed) + "\n", "stderr": ""},
             )()
         return type("R", (), {"returncode": 0, "stdout": "", "stderr": ""})()
 
     monkeypatch.setattr(fsm_mod.subprocess, "run", fake_run)
+
+
+def test_scope_gate_plan_files_edited_by_the_builder_fail(tmp_path, monkeypatch):
+    """A builder edit to plan files in its own storage fails: the storage is no longer exempt."""
+    storage = _storage(tmp_path)
+    (storage / "SCOPE.md").write_text("Files:\n- `src/app.py`\n", encoding="utf-8")
+    _write_build_baseline(storage)
+    _fake_diff(
+        monkeypatch,
+        [
+            "src/app.py",
+            "pathly/plans/test-feature/CONVERSATION_PROMPTS.md",
+            "pathly/plans/test-feature/PROGRESS.md",
+        ],
+    )
 
     flow = _make_flow_with_scope_gate()
     result = run_gates(flow, "A", "B", storage, "test-feature", 1)
-    assert result is None
-    assert not (storage / "feedback" / "SCOPE_VIOLATION.md").exists()
+    assert result == {
+        "gate_failed": "scope_gate",
+        "feedback_file": "SCOPE_VIOLATION.md",
+    }
+    text = (storage / "feedback" / "SCOPE_VIOLATION.md").read_text(encoding="utf-8")
+    assert "pathly/plans/test-feature/CONVERSATION_PROMPTS.md" in text
+    assert "pathly/plans/test-feature/PROGRESS.md" in text
+    assert "src/app.py" not in text
 
 
-def test_scope_gate_plan_files_with_declared_codebase_pass(tmp_path, monkeypatch):
-    """Builder edits declared codebase files AND plan files — gate still passes."""
-    import pathly_orchestrator.fsm as fsm_mod
-
+def test_scope_gate_plan_files_feedback_and_verify_pass(tmp_path, monkeypatch):
+    """The builder's own writes in its storage (feedback/, VERIFY.md) stay allowed."""
     storage = _storage(tmp_path)
     (storage / "SCOPE.md").write_text("Files:\n- `src/app.py`\n", encoding="utf-8")
-    (storage / "STATE.json").write_text(
-        json.dumps(
-            {
-                "current": "A",
-                "build_baseline": {
-                    "started_at": "2025-01-01T00:00:00Z",
-                    "preexisting_dirty": [],
-                },
-            }
-        ),
-        encoding="utf-8",
+    _write_build_baseline(storage)
+    _fake_diff(
+        monkeypatch,
+        [
+            "src/app.py",
+            "pathly/plans/test-feature/feedback/IMPL_QUESTIONS.md",
+            "pathly/plans/test-feature/VERIFY.md",
+        ],
     )
-
-    def fake_run(args, **kwargs):
-        if "diff" in args:
-            return type(
-                "R",
-                (),
-                {
-                    "returncode": 0,
-                    "stdout": "src/app.py\npathly/plans/test-feature/CONVERSATION_PROMPTS.md\npathly/plans/test-feature/PROGRESS.md\n",
-                    "stderr": "",
-                },
-            )()
-        return type("R", (), {"returncode": 0, "stdout": "", "stderr": ""})()
-
-    monkeypatch.setattr(fsm_mod.subprocess, "run", fake_run)
 
     flow = _make_flow_with_scope_gate()
     result = run_gates(flow, "A", "B", storage, "test-feature", 1)
@@ -532,45 +528,26 @@ def test_scope_gate_plan_files_with_declared_codebase_pass(tmp_path, monkeypatch
 
 
 def test_scope_gate_plan_files_do_not_mask_undeclared_codebase(tmp_path, monkeypatch):
-    """Plan-file edits are exempt, but an undeclared codebase file still triggers GATE_FAILED."""
-    import pathly_orchestrator.fsm as fsm_mod
-
+    """Allowed storage writes do not hide an undeclared codebase file: GATE_FAILED names it."""
     storage = _storage(tmp_path)
     (storage / "SCOPE.md").write_text("Files:\n- `src/app.py`\n", encoding="utf-8")
-    (storage / "STATE.json").write_text(
-        json.dumps(
-            {
-                "current": "A",
-                "build_baseline": {
-                    "started_at": "2025-01-01T00:00:00Z",
-                    "preexisting_dirty": [],
-                },
-            }
-        ),
-        encoding="utf-8",
+    _write_build_baseline(storage)
+    _fake_diff(
+        monkeypatch,
+        [
+            "src/app.py",
+            "src/out_of_scope.py",
+            "pathly/plans/test-feature/VERIFY.md",
+        ],
     )
-
-    def fake_run(args, **kwargs):
-        if "diff" in args:
-            return type(
-                "R",
-                (),
-                {
-                    "returncode": 0,
-                    # src/out_of_scope.py is not declared — should still fail
-                    "stdout": "src/app.py\nsrc/out_of_scope.py\npathly/plans/test-feature/PROGRESS.md\n",
-                    "stderr": "",
-                },
-            )()
-        return type("R", (), {"returncode": 0, "stdout": "", "stderr": ""})()
-
-    monkeypatch.setattr(fsm_mod.subprocess, "run", fake_run)
 
     flow = _make_flow_with_scope_gate()
     result = run_gates(flow, "A", "B", storage, "test-feature", 1)
     assert result is not None
     assert result["gate_failed"] == "scope_gate"
-    assert (storage / "feedback" / "SCOPE_VIOLATION.md").exists()
+    text = (storage / "feedback" / "SCOPE_VIOLATION.md").read_text(encoding="utf-8")
+    assert "src/out_of_scope.py" in text
+    assert "pathly/plans/test-feature/VERIFY.md" not in text
 
 
 # ── on_board_count gate tests ─────────────────────────────────────────────────
