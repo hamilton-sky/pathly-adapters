@@ -145,7 +145,7 @@ def claim_task(conn: sqlite3.Connection, message_id: str, run_id: str) -> bool:
         cur = conn.execute(
             "UPDATE comms_messages "
             "SET task_status='in_progress', claimed_at=?, claimed_by=?, "
-            "    attempts=COALESCE(attempts, 0)+1 "
+            "    attempts=COALESCE(attempts, 0)+1, claimed_text=COALESCE(claimed_text, text) "
             "WHERE id=? AND task_status='pending' AND deleted_at IS NULL",
             (now, run_id, message_id),
         )

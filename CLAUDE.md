@@ -299,7 +299,7 @@ blueprints/
   flows/      defs (flow CRUD), stage_configs (per-stage overrides)
   catalog/    items (file-tree catalog)
   skills/     editor (skill notebook routes)
-  comms/      messages, tasks, tasks_status, artifacts, runs, goals, settings, context (board subsystems)
+  comms/      messages, tasks, tasks_status, tasks_floor, artifacts, runs, goals, settings, context (board subsystems)
   ops/        telemetry, menu, db_api, chat, export (operational/infra)
   code/       query (codebase-intelligence query)
   control/    runs_read (unified run read API: GET /runs, /runs/<id>) · runs_control (POST /runs/<id>/stop — run_id-addressed stop · POST /runs/<id>/<action> for pause|resume|advance|reroute|retry|abort — run_id-addressed control, mirrors /runner/* — board-lock runs support only abort)
