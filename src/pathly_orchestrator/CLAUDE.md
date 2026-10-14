@@ -987,28 +987,47 @@ comparing parsed times (an event `ts` ends in `Z` and has whole seconds, while `
 is `false`, `0` or `off`. `_proof` never imports `supervisor` and imports `db` lazily. `scope_gate`
 reads the windows (below).
 
-**Scope gate (`fsm/gates/scope.py`).** Did the builder stay inside what it declared? The
-*declared scope* is the union of the backtick paths in the gate's `scope_file` (optional; read from
-the storage dir when the file exists) and the `files` of the board tasks claimed since
-`build_baseline.started_at` (`task_proof.tasks_claimed_since`, goal-scoped when the run has a
-`goal_id`, else `(board, scope)`). An entry that names a directory covers everything under it, with
-or without a trailing `/`. The *changed paths* are `git diff --name-only HEAD` plus every untracked
-file (`git status --untracked-files=all`, so a new folder is listed file by file), minus
-`build_baseline.preexisting_dirty` (where a collapsed `dir/` entry covers the files under it).
-*Exempt*: what the builder stage may write (`_proof.stage_writes(storage, "builder")`: its feedback
-files, `VERIFY.md`, the server's exports, any `*.tsbuildinfo`), the flow's
+**Scope gate (`fsm/gates/scope.py`, `_scope_tasks.py`).** Did the builder stay inside what it
+declared? The *declared scope* is the union of the backtick paths in the gate's `scope_file`
+(optional; read from the storage dir when the file exists) and the `files` of the board tasks
+claimed since `build_baseline.started_at` (`task_proof.tasks_claimed_since`, goal-scoped when the
+run has a `goal_id`, else `(board, scope)`). Only a task posted before that stamp (its server `ts`)
+and not stamped `author_role: builder` counts, so a builder cannot widen its scope by posting a task
+and claiming it. An entry that names a directory covers everything under it, with or without a
+trailing `/`. The *changed paths* are `git diff --name-only HEAD` plus every untracked file
+(`git status --untracked-files=all`, so a new folder is listed file by file). A path in
+`build_baseline.preexisting_dirty` (dirty when BUILDING began; a collapsed `dir/` entry covers the
+files under it) is judged by content instead: it counts when its blob now differs from the
+`before` tree of the first `SPAWN_WINDOW` since `started_at`, which is where the build began (a
+deletion counts too). That is the usual case for the plan: `pathly.auto_commit` is off by default
+and nothing commits before BUILDING, so `git status` names the plan files, or all of `pathly/`, in
+the baseline. *Exempt*: what the builder stage may write (`_proof.stage_writes(storage, "builder")`:
+its feedback files, `VERIFY.md`, the server's exports, any `*.tsbuildinfo`), the flow's
 `scope_gate.exempt_prefixes`, and a path `_proof.explained` attributes to a `SPAWN_WINDOW` since
 `build_baseline.started_at` (a planner routed `IMPL_QUESTIONS.md` inside BUILDING edits the plan).
-The working-tree snapshot for that is taken only when some window's role may write a remaining
-path. The old blanket `pathly/features/` and `pathly/plans/` exemption is gone, so a builder edit to
-`USER_STORIES.md` or `IMPLEMENTATION_PLAN.md` fails, and the scope file never covers its own edit
-(a builder cannot widen its scope by adding a path to it). `SCOPE_VIOLATION.md` names the paths
-outside the scope (at most 20, then a count). It skips (`GATE_SKIPPED`, fail open) with no
-`build_baseline`, when nothing is declared (`no_declared_scope`), and when git, the claimed tasks
-(`tasks_unreadable`), the windows (`spawn_windows_unreadable`) or the snapshot (`snapshot_failed`)
-cannot be read; a truncated baseline is `GATE_DEGRADED`. Wired as the last gate of
-`BUILDING->REVIEWING` in `team` and `team-build` (`scope_file: IMPLEMENTATION_PLAN.md`,
-`SCOPE_VIOLATION.md` → builder); not in `goal-loop`.
+The working-tree snapshot is taken only when some window's role may write a remaining path or a
+baseline path must be judged. The old blanket `pathly/features/` and `pathly/plans/` exemption is
+gone, so in a headless run a builder edit to `USER_STORIES.md` or `IMPLEMENTATION_PLAN.md` fails,
+committed or not, and the scope file never covers its own edit (a builder cannot widen its scope by
+adding a path to it). `SCOPE_VIOLATION.md` names the paths outside the scope (at most 20, then a
+count). It skips (`GATE_SKIPPED`, fail open) with no `build_baseline`, when nothing is declared
+(`no_declared_scope`), and when git or the claimed tasks (`tasks_unreadable`) cannot be read; a
+truncated baseline is `GATE_DEGRADED`. When the windows (`spawn_windows_unreadable`), the snapshot
+(`snapshot_failed`) or the tree diff since the build began (`git_diff_failed`) cannot be read, it
+still fails on the changed paths no window could explain (with unreadable windows, those no role
+may write, `_proof.any_role_writes`: a code file outside the scope; otherwise those no recorded
+window's role may write) and skips only when nothing like that is left. A baseline path is not
+judged then. Wired as the last gate of `BUILDING->REVIEWING` in `team` and `team-build`
+(`scope_file: IMPLEMENTATION_PLAN.md`, `SCOPE_VIOLATION.md` → builder); not in `goal-loop`.
+
+Limits of the scope gate: a run with no `SPAWN_WINDOW` (an interactive `/pathly` run; only the
+supervisor records them) cannot judge a path that was dirty at the baseline, so there an
+uncommitted plan edit goes unseen. A task posted without a run token is stamped `none`, as a
+human's is, so a builder that drops its token can post a task whose `files` count in a later
+BUILDING (the `force_past_gate` limit). And a planner or architect sub-agent that a builder spawns
+itself (`team/build.md`'s "Feedback routing after builder", for `IMPL_QUESTIONS.md` or
+`DESIGN_QUESTIONS.md`) writes inside the builder's window, so its plan edit counts as the
+builder's.
 
 Events: `GATE_PASSED` (command, `exit_code`, `duration_ms`) on success — the objective evidence on
 the run's record — and `GATE_FAILED` (with `reason`, `command`, `exit_code`) on failure.

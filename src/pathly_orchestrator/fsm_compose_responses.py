@@ -100,9 +100,9 @@ def _exit_requirement(flow_config: dict | None, state_name: str) -> str | None:
                 named = f"the paths named in `{scope_file}` plus " if scope_file else ""
                 lines.append(
                     f"Keep changes within the declared scope: {named}the `files` of the "
-                    f"board tasks you claimed, and your own feedback files and "
-                    f"`VERIFY.md`. Any other change, a plan file included, fails the scope "
-                    f"gate (→ {target})."
+                    f"planned board tasks you claimed (a task you post yourself declares "
+                    f"nothing), and your own feedback files and `VERIFY.md`. Any other "
+                    f"change, a plan file included, fails the scope gate (→ {target})."
                 )
             elif t == "command_gate":
                 lines.append(

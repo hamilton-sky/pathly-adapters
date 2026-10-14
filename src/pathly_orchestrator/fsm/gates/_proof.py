@@ -39,7 +39,7 @@ _OWN_FILE = {"builder": "VERIFY.md", "reviewer": "REVIEW.md"}
 _EPOCH = datetime.min.replace(tzinfo=timezone.utc)
 
 
-def _storage_rel(storage_path: str | Path) -> str:
+def storage_rel(storage_path: str | Path) -> str:
     """The storage dir relative to the project root the gates use, as a POSIX path."""
     storage = Path(storage_path)
     try:
@@ -56,7 +56,7 @@ def board_home(storage_path: str | Path) -> str:
     run's ``goals/<slug>``), else the storage dir itself (``pathly/plans/<name>/``,
     ``pathly/project/...``). Empty when the storage dir is the project root.
     """
-    rel = _storage_rel(storage_path)
+    rel = storage_rel(storage_path)
     parts = rel.split("/") if rel else []
     if len(parts) >= 3 and parts[0] == "pathly" and parts[1] == "features":
         return "pathly/features/%s/" % parts[2]
@@ -71,7 +71,7 @@ def stage_writes(storage_path: str | Path, role: str | None) -> Callable[[str], 
     ``reviewer`` also ``<storage>/REVIEW.md``. ``po``, ``planner``, ``architect``,
     ``designer`` and ``retro`` also any file directly inside the storage dir or the board home.
     """
-    storage = _storage_rel(storage_path)
+    storage = storage_rel(storage_path)
     home = board_home(storage_path).rstrip("/")
     name = (role or "").strip().lower()
     feedback = storage + "/feedback/" if storage else None
@@ -93,6 +93,12 @@ def stage_writes(storage_path: str | Path, role: str | None) -> Callable[[str], 
     return may_write
 
 
+def any_role_writes(storage_path: str | Path) -> Callable[[str], bool]:
+    """A predicate: may a spawn of some role change this path, so a window could explain it?"""
+    checks = [stage_writes(storage_path, role) for role in PLAN_ROLES | set(_OWN_FILE)]
+    return lambda path: any(may_write(path) for may_write in checks)
+
+
 def windows_since(
     storage_path: str | Path,
     since: str | datetime | None = None,
@@ -105,12 +111,12 @@ def windows_since(
     ``since`` is cut to its second: a window stamped in that second is kept, one a second or
     more earlier is dropped. Raises ``ValueError`` when ``since`` is not a time.
     """
-    from pathly_orchestrator.db.queries.task_proof import _instant
+    from pathly_orchestrator.db.queries.task_proof import instant
     from pathly_orchestrator.eventlog import read_events
 
     start = None
     if since is not None:
-        start = _instant(since)
+        start = instant(since)
         if start is None:
             raise ValueError("since is not an ISO 8601 time: %r" % (since,))
         start = start.replace(microsecond=0)
@@ -121,7 +127,7 @@ def windows_since(
             continue
         if wanted is not None and event.get("role") not in wanted:
             continue
-        when = _instant(event.get("ts"))
+        when = instant(event.get("ts"))
         if start is not None and (when is None or when < start):
             continue
         kept.append((when or _EPOCH, event))
