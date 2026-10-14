@@ -246,7 +246,8 @@ def test_scope_clean_exempt_prefixes_absent_unchanged(tmp_path, monkeypatch):
 
 
 def test_scope_clean_hardcoded_defaults_still_exempt(tmp_path, monkeypatch):
-    """pathly/plans/ and .tsbuildinfo remain exempt even when exempt_prefixes is empty."""
+    """With exempt_prefixes empty, the server's exports under pathly/ and .tsbuildinfo stay
+    exempt; a plan file under pathly/plans/ does not (build-proof 08)."""
     import pathly_orchestrator.fsm as fsm_mod
     from pathly_orchestrator.fsm import _scope_clean
 
@@ -256,6 +257,8 @@ def test_scope_clean_hardcoded_defaults_still_exempt(tmp_path, monkeypatch):
     scope_md = storage / "SCOPE.md"
     scope_md.write_text("Files:\n- `src/app.py`\n", encoding="utf-8")
 
+    diff = ["src/app.py", "pathly/plans/feat/EVENTS.jsonl", "studio/build.tsbuildinfo"]
+
     def fake_run(args, **_):
         if "diff" in args:
             return type(
@@ -263,7 +266,7 @@ def test_scope_clean_hardcoded_defaults_still_exempt(tmp_path, monkeypatch):
                 (),
                 {
                     "returncode": 0,
-                    "stdout": "src/app.py\npathly/plans/feat/EVENTS.jsonl\nstudio/build.tsbuildinfo\n",
+                    "stdout": "".join(path + "\n" for path in diff),
                     "stderr": "",
                 },
             )()
@@ -274,3 +277,7 @@ def test_scope_clean_hardcoded_defaults_still_exempt(tmp_path, monkeypatch):
     flow_with_empty = {"scope_gate": {"exempt_prefixes": []}}
     result = _scope_clean(storage, "SCOPE.md", set(), flow=flow_with_empty)
     assert result is True
+
+    diff.append("pathly/plans/feat/PROGRESS.md")
+    result = _scope_clean(storage, "SCOPE.md", set(), flow=flow_with_empty)
+    assert result is False

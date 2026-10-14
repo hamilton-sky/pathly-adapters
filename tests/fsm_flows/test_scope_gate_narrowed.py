@@ -1,13 +1,13 @@
 """``scope_gate`` judges only what the builder may write (build-proof 08).
 
 The declared scope is the backtick paths in the gate's ``scope_file`` (optional) plus the
-``files`` of the board tasks claimed since ``build_baseline.started_at``. Exempt: what the
-builder stage may write (``_proof.stage_writes(storage, "builder")``: feedback files,
-``VERIFY.md``, the server's exports, ``*.tsbuildinfo``), the flow's
-``scope_gate.exempt_prefixes``, and a path a ``SPAWN_WINDOW`` explains. The blanket
-``pathly/features/`` and ``pathly/plans/`` exemption is gone, so a builder edit to its own plan
-fails. Every case runs the real gate in a ``git init`` repo under ``tmp_path`` against the
-isolated test DB.
+``files`` of the board tasks claimed since ``build_baseline.started_at`` (and posted before it,
+not by a builder). Exempt: what the builder stage may write
+(``_proof.stage_writes(storage, "builder")``: feedback files, ``VERIFY.md``, the server's
+exports, ``*.tsbuildinfo``), the flow's ``scope_gate.exempt_prefixes``, and a path a
+``SPAWN_WINDOW`` explains. The blanket ``pathly/features/`` and ``pathly/plans/`` exemption is
+gone, so a builder edit to its own plan fails. Every case runs the real gate in a ``git init``
+repo under ``tmp_path`` against the isolated test DB.
 """
 
 from __future__ import annotations
@@ -92,6 +92,7 @@ def _start_build(repo: Path, flow: dict, preexisting=()) -> None:
 
 
 def _claimed_task(files, *, scope: str = "demo", goal_id=None) -> str:
+    """A task the planner posted in PLANNING, before the build began, claimed now."""
     conn = get_db()
     task_id = post_message(
         conn,
@@ -103,6 +104,8 @@ def _claimed_task(files, *, scope: str = "demo", goal_id=None) -> str:
         files=files,
         goal_id=goal_id,
     )
+    conn.execute("UPDATE comms_messages SET ts=? WHERE id=?", (LONG_AGO, task_id))
+    conn.commit()
     assert claim_task(conn, task_id, "build")
     return task_id
 
