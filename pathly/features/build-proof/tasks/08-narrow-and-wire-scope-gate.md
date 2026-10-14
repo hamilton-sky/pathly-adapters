@@ -1,7 +1,7 @@
 # Narrow scope_gate to what a stage may write and wire it into the team flows
 
 Type: task
-Status: resolved
+Status: open
 Blocked by: 03, 04
 Test first: yes
 
@@ -239,3 +239,31 @@ plan-edit case passed the gate and the codebase case's text did not name `src/ou
 - 14: in the acceptance run, "a builder that edits the plan is caught" is the floor gate's job
   when the plan was already dirty at BUILDING entry (see the first shortcut); the scope gate
   catches it when the plan was committed.
+
+## Review findings (round 1, quality review)
+
+Quality pass for build-proof 08, base 7639838573d67ac9eff6aeb31f20046349a12eba. The review stops at dafa863 (END is HEAD), so it covers every commit after the base. I read the ticket at the base commit (its Answer section was empty there) and the diff with the tasks folder held back. The Answer did not reach me. The ticket's Status changed from open to resolved.
+
+I re-ran all three Done when commands with the dev venv on PATH, and all pass:
+- `test_scope_gate_narrowed.py`: 22 passed
+- `test_gates.py`: 31 passed
+- `tests/fsm_flows`: 518 passed, 9 skipped
+
+The full `tests/` suite also passes (2560 passed, 14 skipped). So do `check_file_size`, `gen_test_index --check`, `check_no_mirror_reads` and `lint-imports`. The working tree is still clean; pytest made temp dirs only under the system temp dir.
+
+QUALITY
+1. major src/pathly_orchestrator/fsm/gates/scope.py: The gate still lets the builder rewrite its own plan in an ordinary headless `team` run.
+   - `_in_scope` checks `_covered(path, preexisting_dirty)` first, and a `dir/` baseline entry now covers its whole subtree.
+   - In `team`, the planner writes USER_STORIES.md and IMPLEMENTATION_PLAN.md during PLANNING. Nothing commits before BUILDING: `pathly.auto_commit` is off by default, and the only commit action is on BUILDING->REVIEWING.
+   - So when `fsm_ops.next_action` takes the BUILDING baseline, those files show as `?? pathly/` or `?? pathly/features/<f>/`, or as ` M <file>`. Every later builder edit to them is exempt as "preexisting".
+   - That includes adding a path to the scope file, so the builder can widen its own scope. This defeats the rule "the scope file never covers its own edit".
+   - The new tests commit the plan files in the `repo` fixture before the build, so this case is never exercised.
+   - Fix: decide by content, not by whether the file was dirty at the baseline. One way is to count a path as the builder's when a builder `SPAWN_WINDOW` since `started_at` changed its blob (team flows now record windows); another is to compare blobs against a tree stamped in `build_baseline`. At least do this for paths under the storage dir and board home. Add a test where the plan files are untracked when the baseline is taken.
+2. major src/pathly_orchestrator/CLAUDE.md: The new "Scope gate" paragraph says without condition that "a builder edit to `USER_STORIES.md` or `IMPLEMENTATION_PLAN.md` fails" and that "the scope file never covers its own edit". Per finding 1, neither holds in the default team run, and agents and humans read this doc as the contract. Make the claim true (fix finding 1), or state the limitation and record it under map.md's Open questions.
+3. minor src/pathly_orchestrator/fsm/gates/scope.py (`_claimed_files`): The declared scope counts the `files` of any task claimed since `started_at`, whoever posted it. A builder can POST a new task with `files: [...]` to its own feature board, claim it, and widen its scope. Fix: ignore tasks whose stamped `author_role` is `builder`, or tasks created after `started_at`.
+4. minor src/pathly_orchestrator/fsm/gates/scope.py (`_unexplained`): When the spawn windows can't be read, the whole gate skips, even for out-of-scope paths outside `pathly/` that no role's `stage_writes` could ever cover (so no window could explain them). Fix: skip only when an affected path is one that a window could have explained.
+5. minor tests/telemetry/test_observability.py and src/pathly_orchestrator/runner/provenance.py: The `test_scope_clean_hardcoded_defaults_still_exempt` docstring still says "pathly/plans/ ... remain exempt". The test now passes only because `EVENTS.jsonl` is an export file. The `_is_own_storage` docstring in provenance.py still says the scope gate exempts `pathly/features/` and `pathly/plans/`. Update both: make the test assert that a plan file fails, and fix the docstring.
+6. minor src/pathly_data/core/skills/team/build.md, a risk to the wiring: team/build tells the builder stage to spawn `planner`/`architect` itself when IMPL_QUESTIONS.md or DESIGN_QUESTIONS.md is open. An in-process subagent has no `SPAWN_WINDOW` of its own; its plan edit lands inside the builder's window. So once the plan is clean (or finding 1 is fixed), that edit is blamed on the builder. The SCOPE_VIOLATION text then tells the builder to undo the planner's clarifications. Fix: say in the runner prompt that feedback routing is the supervisor's job, or attribute subagent writes some other way.
+7. minor src/pathly_orchestrator/fsm/gates/scope.py: `_out_of_scope` reaches into the private `_proof._storage_rel`. Expose a public helper instead.
+
+REVIEW: FAIL
