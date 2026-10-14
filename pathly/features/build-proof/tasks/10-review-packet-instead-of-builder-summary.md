@@ -1,7 +1,7 @@
 # Give the reviewer the task and the diff instead of the builder's summary
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 02, 03
 Test first: yes
 
@@ -104,3 +104,132 @@ prints passed
 - `src/pathly_data/core/skills/team/review.md` (Phase 1, Phase 3)
 
 ## Answer
+
+Work started at commit `74c85cf05fe47e841af07d432c207dcdba95d37a`. Test-only commit: `345e54b`
+(`test(build-proof): 10 failing test`). At that commit `python -m pytest
+tests/fsm_flows/test_review_packet.py -q -p no:cacheprovider` gave `28 failed, 2 passed` (exit 1)
+for the right reasons: `KeyError: 'tree'` / `'review_base'` (nothing stamped yet),
+`ModuleNotFoundError: No module named 'pathly_orchestrator.fsm_compose_review'`, `assert '## Review
+packet' in <the REVIEWING prompt>`, and `AssertionError: never spawn another Pathly role` (the
+contract sentence). The 2 passes hold before and after: a project outside git gets no tree, and a
+BUILDING prompt keeps the history block. The code commit splits that file into four (see Built),
+because one file ran to 547 lines, and adds the missing `complete_stage` step to 8 cases that
+called `_packet` straight after `_build`; no case was dropped or loosened (30 cases before and after).
+
+**Built**
+
+- `src/pathly_orchestrator/fsm_compose_review.py` (new, 235 lines): `review_packet(storage_path,
+  project_root, board, board_scope, goal_id) -> str`. `## Review packet` with the one-line intro,
+  `### The task` (`claimed_text` else `text` of `task_proof.tasks_claimed_since` since
+  `review_base.started_at`, 16 KiB at most), `### The diff` (`tree.diff_text_or_none(root,
+  review_base.tree, <snapshot now>, exclude=["pathly/"], unified=3)` in a fence one backtick longer
+  than any run inside it, head and tail clipped to 48 KiB in all, heading and fences included) and
+  `### Supervisor notes` (the latest `TASK_PROOF` per claimed task, the warnings of the latest
+  `FLOOR_CHECKED`, both since the build began, else `none recorded`). Without a `review_base` tree,
+  without a snapshot now, or on any exception it returns a short "No review packet for this run"
+  section that tells the stage orchestrator to run `git diff HEAD` itself. It never raises.
+- `src/pathly_orchestrator/fsm_ops.py` (+6): `next_action` adds `"tree": proof.tree.snapshot(...)` to
+  the `build_baseline` stamp, left out when the snapshot is `None`.
+- `src/pathly_orchestrator/fsm_ops_complete.py` (+9): on a transition out of BUILDING,
+  `{tree, started_at}` of the popped `build_baseline` becomes `review_base`; the previous one is
+  dropped first, so a build with no tree leaves none.
+- `src/pathly_orchestrator/fsm_compose.py` (+11): `build_prompt` uses `review_packet(...)` in place
+  of the history block when `agent_role == "reviewer"`; `RUNNER_CONTRACT_BLOCK` has one more
+  sentence: in any stage never spawn another Pathly role (planner, architect, po, designer,
+  builder) to resolve a feedback file, write the file and stop, the supervisor routes it. No braces.
+- `src/pathly_data/core/skills/team/review.md`: a "What the reviewer is given" section (paste the
+  packet's `### The task` and `### The diff` verbatim; no packet means `git diff HEAD` run by the
+  orchestrator; never pass the builder's report, its `AGENT_DONE` summary or `VERIFY.md`); Phase 1
+  and Phase 3 carry `[Review packet: The task and The diff]` instead of `Run: git diff HEAD~1 HEAD`;
+  the orchestrator hydrates `context_refs` itself; the "Feedback routing after reviewer" section is
+  marked "Interactive `/pathly` only". `team/build.md`: the same note on "Feedback routing after
+  builder". Snapshots `tests/snapshots/team__review.claude.md` and `team__build.claude.md`
+  regenerated from `compose_skill(<skill>, "claude")`.
+- Living docs: `src/pathly_orchestrator/CLAUDE.md` (a "Review packet" paragraph after the reviewer
+  gate, the `fsm_compose_review` entry in the split-module table, and the scope gate's sub-agent
+  limit reworded), `src/pathly_data/CLAUDE.md` (the `team/review` contradiction fix).
+- Tests: `tests/fsm_flows/test_review_packet.py` (13 cases: prompt, packet, diff, clipping),
+  `test_review_base_state.py` (6: `build_baseline.tree`, `review_base`), `test_review_packet_notes.py`
+  (11: supervisor notes, the contract sentence, the skill text), `review_packet_support.py`
+  (shared fixtures and helpers, not a test), regenerated `tests/INDEX.md` and
+  `tests/fsm_flows/INDEX.md`.
+
+**Proof** (each run fresh after the last code edit)
+
+- `python -m pytest tests/fsm_flows/test_review_packet.py -q -p no:cacheprovider`: `13 passed in
+  14.62s`, exit 0. On a `git init` project through `team-build`'s real `next_action` and
+  `complete_stage`, with the builder changing `src/app.py` and writing an `AGENT_DONE` with summary
+  `BUILDER-SAYS-ALL-GOOD`: the REVIEWING prompt (from `complete_stage` and from `build_prompt`)
+  contains `## Review packet`, the frozen task text and the `src/app.py` diff line, and neither
+  `BUILDER-SAYS-ALL-GOOD` nor `## Pipeline History`; the BUILDING prompt still has the history
+  block and the summary; a 200 KiB addition to `src/big.py` gives a diff section of at most 48 KiB
+  that keeps `value_0` and `value_3999` and drops `value_2000`, with an "omitted" marker. The same
+  file also covers the frozen text beating a later edit, only tasks claimed since the build began
+  and in this scope, the `pathly/` exclusion, three lines of context, a markdown fence not closing
+  the packet's fence, an unreadable diff, an empty diff, and no `review_base`.
+  `test_review_base_state.py` and `test_review_packet_notes.py`: `6 passed` and `11 passed`.
+- `python -c "...print('clean' if 'git diff HEAD~1 HEAD' not in t else 'still there')"`: prints
+  `clean`, exit 0.
+- `python -m pytest tests/install_skills/test_compose.py tests/fsm_flows/test_runner_contract_shared.py
+  -q -p no:cacheprovider`: `105 passed in 10.98s`, exit 0 (regenerated snapshots match; the contract
+  is still shared and still one copy in each prompt path).
+- The ```check block: the same three commands, each exit 0, printing `13 passed`, `clean` and
+  `105 passed`.
+- Lint (the full chain from `commands.md`): exit 0. black `513 files would be left unchanged`; mypy
+  `Success: no issues found in 288 source files`; file size `OK: 948 source files checked; 19 known
+  over 400 lines, none new, none grown`; mirror reads OK; `All test INDEX.md files up to date.`;
+  lint-imports `Contracts: 1 kept, 0 broken.`; bandit no findings; adapters OK; entry points OK.
+- Smoke: exit 0. Build (`python -m build --wheel`): `Successfully built
+  pathly_adapters-2.24.1-py3-none-any.whl`, exit 0; the wheel lists `fsm_compose_review.py`.
+- Test (`python -m pytest tests/ -q -x -p no:cacheprovider`): `2621 passed, 14 skipped in 444.40s
+  (0:07:24)`, exit 0.
+
+**Decisions**
+
+- `diff_text` already had `unified` (ticket 02 added it with default 0), so `proof/tree.py` is
+  untouched. The packet calls `diff_text_or_none` (same text) so that a git failure or a pruned
+  snapshot reads "The diff could not be read" instead of looking like an empty diff.
+- A build whose baseline has no tree removes `review_base` rather than keeping the previous build's:
+  a stale base would show the reviewer a diff of the wrong build.
+- The ticket says Phase 1 and Phase 3 "no longer tell the reviewer to run anything", and Phase 3 also
+  had the reviewer `GET /comms/artifacts/section` for `context_refs`, which it cannot do without
+  Bash. The stage orchestrator now hydrates the refs and pastes their `text` under `## Referenced
+  spec`. The run-token instruction line for that call stays in the file (the consistency test needs it).
+- Caps the ticket did not name, for the argv limit: the task section is clipped to 16 KiB, floor
+  warnings to 20 lines of 300 characters. The diff clip counts bytes, not characters, and cuts at
+  line boundaries when it can.
+- Events are read from `review_base.started_at` on (cut to its second, as `windows_since` does), so a
+  `TASK_PROOF` or `FLOOR_CHECKED` from an earlier build is not shown; a task with no `TASK_PROOF` gets
+  no line, and when nothing is left the section says `none recorded`.
+- The reviewer role gets the packet section even when it is the "No review packet" one, so it never
+  receives the builder's `AGENT_DONE` summaries.
+- The contract sentence says "In any stage ... whatever the skill above says" and the "Interactive
+  `/pathly` only" note is on both `team/build.md` and `team/review.md`, because a planner or architect
+  sub-agent has no `SPAWN_WINDOW` of its own in any stage (the reviews of 08 and 09 both raised it).
+
+**Shortcuts taken**
+
+- `build_prompt_for_agent`'s retry-ladder block (a feedback prompt from retry round 2, e.g. a
+  reviewer routed `REVIEW_INCOMPLETE.md`) still lists the `AGENT_DONE` summaries, the builder's
+  included. The ticket scopes the change to `build_prompt`. It stops at a reviewer's retry prompts;
+  worth closing when ticket 16 touches the reviewer's session, by dropping other roles' summaries
+  for the reviewer role.
+- The notes read `TASK_PROOF {task_id, checks}` and `FLOOR_CHECKED {warnings}` by the field names in
+  spec.md § Interfaces. Nothing writes either event yet (tickets 05 to 07 do), so the tests append
+  them by hand. A writer that spells a field differently makes the notes say `none recorded` or a
+  raw `checks: <value>` line instead of failing; those tickets' tests should pin the packet.
+- The test split uses a shared non-test module `review_packet_support.py` that three test files
+  import from (pytest puts `tests/fsm_flows/` on `sys.path`); a conftest would have been config.
+
+**For later tickets**
+
+- 05 to 07: the notes need `TASK_PROOF.task_id`, `TASK_PROOF.checks` in `passed|failed|none|error`
+  and `FLOOR_CHECKED.warnings` as a list of strings. When they exist, edit the sentence "nothing writes
+  them yet" in `src/pathly_orchestrator/CLAUDE.md` (the "Review packet" paragraph).
+- 16: this ticket changes only the prompt. A same-adapter REVIEWING stage still resumes the builder's
+  session; the packet's "left out" is honest only once ticket 16 opens a fresh one.
+- Any ticket that touches `team/review.md` or `team/build.md` regenerates both golden snapshots.
+- `build_baseline.tree` now exists for every BUILDING the FSM server stamps, so the scope gate's open
+  question in map.md (interactive runs have no `SPAWN_WINDOW`) can diff from it. Not done here.
+- `review_base` is the last BUILDING's base only: after a `REVIEWING->BUILDING` round the packet shows
+  that round's changes, not the whole feature. Ticket 14's acceptance run should expect that.

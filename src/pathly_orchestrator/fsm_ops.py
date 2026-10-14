@@ -16,6 +16,7 @@ from pathly_orchestrator.fsm import (
     run_gates,
     run_transition_actions,
 )
+from pathly_orchestrator.proof import tree as _proof_tree
 from pathly_orchestrator.storage_paths import _safe_topic
 from pathly_orchestrator.fsm_compose import (
     _SCHEMA_VERSION,
@@ -215,6 +216,11 @@ def next_action(args: dict) -> dict:
         }
         if truncated:
             baseline["truncated"] = True
+        # The working tree as it is before the builder starts: the base of the Review
+        # packet's diff (fsm_compose_review). Left out when git cannot snapshot it.
+        tree_id = _proof_tree.snapshot(project_root)
+        if tree_id:
+            baseline["tree"] = tree_id
         stamped_state["build_baseline"] = baseline
         needs_write = True
 

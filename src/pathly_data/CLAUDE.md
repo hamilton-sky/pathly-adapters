@@ -213,6 +213,19 @@ resolver plus a re-export surface; the pieces live beside it — `compose_base` 
 
 **Run token on every board call.** Every `curl` to `http://127.0.0.1:8765/comms` under `core/` (skills, fragments, `agents/research/evaluator.md`) sends `-H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN"`, so the server resolves the caller from the run's token (role-read-policy SPEC C4); an interactive run has no token and sends an empty header (resolves to `anonymous`). `tests/consistency/test_fragments_run_token.py` fails on any board `curl` without it. Bare pseudo-request lines (`GET|POST|PUT|PATCH|DELETE [http://127.0.0.1:8765]/comms/…`, written in ten skill and fragment `.md` files such as `development/drain-dag.md`, `team/build.md` and `fragments/consult.md`) are not commands: the agent turns them into calls itself, so each such file carries one instruction line, outside any curl, telling it to send the same header, and the test fails on a `.md` file with such a line but no instruction line. A new fragment that adds either shape must follow it. The scan is textual: a curl to a shell-variable URL, or a call written without a verb and a `/comms` path, is not seen. Composed-skill snapshots under `tests/snapshots/` pin the header and instruction lines.
 
+**`team/review` never asks the reviewer to run anything.** The `reviewer` agent has no Bash
+(`adapters/claude/_meta/reviewer.yaml`; its contract says "Do not run Bash"), yet the skill's
+Phase 1 and Phase 3 prompts told it to `Run: git diff HEAD~1 HEAD` and to call
+`GET /comms/artifacts/section`. The stage orchestrator, which does have Bash, now hands the reviewer
+the change: it pastes the prompt's Review packet `### The task` and `### The diff` sections
+verbatim (headless, built by `fsm_compose_review`), or runs `git diff HEAD` itself when there is no
+packet (interactive), and it hydrates the task's `context_refs` itself. It never passes the
+builder's report or `VERIFY.md`. `team/build.md` and `team/review.md` also mark their
+planner/architect/po/designer/builder fixer spawns "Interactive `/pathly` only": headless, the
+runner contract tells the agent to write the feedback file and stop, and the supervisor routes it.
+`development/review.md` (run by the user's own session, which has Bash) is unchanged. The golden
+snapshots `tests/snapshots/team__review.claude.md` and `team__build.claude.md` pin the text.
+
 **Composition contract:**
 
 ```

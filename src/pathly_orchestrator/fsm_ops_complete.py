@@ -270,7 +270,16 @@ def complete_stage(args: dict) -> dict:
 
     prior_state = _elog_ws.read_state(str(storage_path)) or dict(state_before or {})
     prior_state.pop("conv_start_sha", None)
-    prior_state.pop("build_baseline", None)
+    baseline = prior_state.pop("build_baseline", None)
+    if state_info["current_state"] == "BUILDING":
+        # The last build's base, for the Review packet's diff: it outlives the baseline and
+        # the next build overwrites it (a build with no tree leaves none, not a stale one).
+        prior_state.pop("review_base", None)
+        if isinstance(baseline, dict) and baseline.get("tree"):
+            prior_state["review_base"] = {
+                "tree": baseline["tree"],
+                "started_at": baseline.get("started_at"),
+            }
     _elog_ws.write_state(
         str(storage_path), {**prior_state, "current": next_state}, flow_config
     )
