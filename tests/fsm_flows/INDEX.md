@@ -4,7 +4,7 @@
 
 FSM engine, gates, transitions, flow definitions, feedback protocol & fix-routing.
 
-44 test file(s).
+45 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -18,6 +18,7 @@ FSM engine, gates, transitions, flow definitions, feedback protocol & fix-routin
 | `test_feedback_protocol.py` | Adapters side of the feedback protocol contract | 4 |
 | `test_fix_routing.py` | Smart fix-routing (pathly/features/.archive/smart-fix-routing/DESIGN.md) | 11 |
 | `test_floor_gate.py` | ``floor_gate`` sends a build that weakened the bar back to the builder (build-proof 06) | 18 |
+| `test_floor_gate_no_windows.py` | ``floor_gate`` in a run that recorded no spawn windows (build-proof 17) | 6 |
 | `test_fsm.py` | Unit tests for pathly_orchestrator.fsm functions | 35 |
 | `test_fsm_http_client.py` | covers next action auto starts server and posts json; poll exits early on first healthy response; poll exhausted raises runtime error; … | 8 |
 | `test_fsm_ops.py` | Integration tests for fsm_ops.py (next_action, complete_stage) | 36 |
