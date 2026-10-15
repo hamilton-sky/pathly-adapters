@@ -1154,8 +1154,12 @@ transition, and a back-edge or a resumed run still sees the whole run. The scan'
   `_proof.stage_writes(storage, "builder")` allows it, or when `_proof.explained` finds a
   `SPAWN_WINDOW` since the base whose role may write it and left it at its current content
   (so the reviewer's `REVIEW.md` and a planner's routed plan edit are not blamed on the builder).
-  The windows are read once, on the first path that needs them. If they cannot be read, a path
-  some role may write is excused and `FLOOR_CHECKED` carries a warning.
+  The windows are read once, on the first path that needs them. If they cannot be read, or the
+  run recorded none since the base (an interactive `/pathly` run records none), a path some role
+  may write is excused and `FLOOR_CHECKED` carries a warning saying which (`spawn windows
+  unreadable` or `the run recorded no spawn windows`); a path no role may write is still a
+  finding. With one window or more, only a window that explains the path excuses it, whichever
+  roles the windows belong to.
 - **`config_commands`** are the `verify.build`, `verify.test`, `verify.lint` and `verify.smoke`
   settings, so a `Makefile` counts as config when the project builds with make.
 
@@ -1183,9 +1187,12 @@ weakening an earlier failed task attempt left in place. Each flow routes `FLOOR_
 
 Limits: the guard raises the cost of weakening the bar, it does not make it impossible (a builder
 with a shell can reach the DB and the git object store). An interactive `/pathly` run records no
-`SPAWN_WINDOW`, so a plan file another role wrote there (the reviewer's `REVIEW.md`) is not
-explained and reads as a `plan-edit`; set `floor.enabled` to `false` for such a run. A test or
-tester edit in TESTING that trips the floor goes to the builder, who did not make it.
+`SPAWN_WINDOW`, so there the gate cannot tell which role wrote a plan file: the reviewer's
+`REVIEW.md` or a planner's edit is excused (with the `FLOOR_CHECKED` warning above) and so is a
+plan edit by the builder, which goes unseen, as for `scope_gate`. Every other category is judged
+as in a supervised run. A goal-loop drain records no window either; its tasks' own plan edits are
+caught by the per-task proof (`protected=[board home]`). A test or tester edit in TESTING that
+trips the floor goes to the builder, who did not make it.
 
 **Task checks gate (`fsm/gates/task_checks.py`).** In `team` and `team-build` the builder claims a
 board task and completes it itself (`POST /comms/tasks/complete`), so the supervisor never sees

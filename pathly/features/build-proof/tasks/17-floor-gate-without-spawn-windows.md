@@ -1,7 +1,7 @@
 # Do not read another role's plan-file write as the builder's when a run recorded no spawn windows
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: —
 Test first: yes
 
@@ -116,3 +116,75 @@ prints clean
 - map.md § Decisions so far (06), § Open questions
 
 ## Answer
+
+**Built**
+
+- `src/pathly_orchestrator/fsm/gates/floor.py`: in `_may_change`, `windows()` now adds one note
+  ("the run recorded no spawn windows: plan files a role may write were not judged") when the
+  windows were read and are empty, and `may_change` returns `any_role(path)` for both an
+  unreadable (`None`) and an empty window list (`if not found`). The unreadable note is unchanged
+  and distinct. With one window or more, `_proof.explained` decides as before. The function
+  docstring and the third bullet of the module docstring say so.
+- `src/pathly_orchestrator/CLAUDE.md`: the `plan-edit` bullet of "Floor gate" (what happens with
+  no windows, the two warning texts, windows decide once one exists) and the Limits paragraph
+  (the stale "set `floor.enabled` to `false` for such a run" sentence is gone; the remaining
+  limit is a builder's plan edit going unseen in a run with no windows, as for `scope_gate`; the
+  goal-loop drain case).
+- `CHANGELOG.md`: the last "Known limits" sentence of the build-proof entry now names
+  `floor_gate`'s plan files.
+- `tests/fsm_flows/test_floor_gate_no_windows.py` (new, 169 lines) plus the regenerated
+  `tests/INDEX.md` and `tests/fsm_flows/INDEX.md`. Test-only commit 19f743a ("test(build-proof):
+  17 failing test"): 3 of its 6 tests failed there (the three "no windows, not a plan-edit"
+  cases, each at its `next_state == "TESTING"` assertion); for the `REVIEW.md` case I read the
+  block itself: `floor_gate` failed with `plan-edit: pathly/features/demo/REVIEW.md: a protected
+  plan file was changed`, the right reason. The other 3 pin what must not change and passed at
+  that commit.
+
+**Proof**
+
+- `python -m pytest tests/fsm_flows/test_floor_gate_no_windows.py -q -p no:cacheprovider`: exit 0,
+  `6 passed`. The cases: `REVIEW.md` written, `USER_STORIES.md` edited and both together (one
+  note, not two) pass with the note and no `FLOOR_FAILURES.md` and no `SPAWN_WINDOW`; the deleted
+  committed test is blocked with `test-delete: tests/test_calc.py`; a file one folder below the
+  board home (`pathly/features/demo/notes/NOTES.md`) is blocked with `plan-edit`; with one builder
+  window recorded (`_as`), a plan file edited outside any window is blocked with `plan-edit` and
+  `FLOOR_CHECKED` carries no "no spawn windows" note.
+- `python -m pytest tests/fsm_flows/test_floor_gate.py tests/fsm_flows/test_proof_base.py tests/dag_goals -q -p no:cacheprovider`:
+  exit 0, `285 passed in 77.40s`. The two tests the ticket names
+  (`test_a_plan_edit_blocks_unless_a_planner_window_explains_it`,
+  `test_a_builder_edit_after_the_planner_is_still_a_plan_edit`) are in that run, unchanged.
+- `python scripts/check_file_size.py`: exit 0 (`19 known over 400 lines, none new, none grown`);
+  `python scripts/gen_test_index.py --check`: exit 0 (`All test INDEX.md files up to date.`).
+- The stale-sentence one-liner prints `clean`, exit 0.
+- Beyond the Done when: the full Test command (`python -m pytest tests/ -q -x -p no:cacheprovider`)
+  exit 0, `2924 passed, 14 skipped in 535.96s` (the 14 skips are existing tests); the whole Lint
+  chain from `commands.md` exit 0 (black, mypy, file size, mirror reads, test index, lint-imports,
+  bandit, adapters, entry points).
+
+**Decisions**
+
+- The no-windows note is added lazily, inside `windows()`, so it appears only when some path
+  needed the windows (a plan file a role may write changed). A run with no windows and no changed
+  plan file gets no note, which matches the existing unreadable note and keeps
+  `test_a_clean_build_passes_and_records_the_check` (`warnings == []`) true.
+- "No windows" means none since the base (`windows_since(storage, started_at)`), as the ticket
+  says; a window recorded before the base does not count.
+- The test fixture commits a passing `REVIEW.md` so that `verify_gate` passes without a
+  `REVIEW.md` change, which isolates case 2 (the stories edit) from case 1 (the review write).
+  Cases 1, 2 and 3-5 write files directly with `_write`; only case 5 uses `_as`.
+
+**Shortcuts taken**
+
+none.
+
+**For later tickets**
+
+- No other gate blocked `REVIEWING->TESTING` for a reason of its own in a run with no windows:
+  `reviewer_unchanged` has no reviewer window to judge and `task_checks` finds no block. One
+  correction to the ticket text: the task `_claim()` posts declares no `files`, so at
+  `BUILDING->REVIEWING` `scope_gate` skips with `no_declared_scope` (and `command_gate` with
+  `no_command_configured`); the BUILDING edit of `src/app.py` is not judged against a scope.
+- The remaining limit, now written in the Limits paragraph: in a run with no windows (an
+  interactive `/pathly` run, a goal-loop drain's join) a plan edit by the builder itself goes
+  unseen by `floor_gate`, as `scope_gate` already says for its own case.
+- Ticket 18 is independent of this one. No later ticket becomes wrong.

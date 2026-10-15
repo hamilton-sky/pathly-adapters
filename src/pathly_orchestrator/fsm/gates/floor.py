@@ -13,7 +13,9 @@ transition, whichever stage it ran in. ``proof.floor.scan`` does the judging.
   allows ``task-edit``.
 * A file under the run's board home is a ``plan-edit`` unless the builder stage may write it
   (``_proof.stage_writes``) or a ``SPAWN_WINDOW`` of a role that may write it explains it, so a
-  planner's routed edit or the reviewer's ``REVIEW.md`` is not blamed on the builder.
+  planner's routed edit or the reviewer's ``REVIEW.md`` is not blamed on the builder. A run with
+  no window at all (an interactive run) cannot attribute a plan file, so there a path some role
+  may write is excused, with a note in ``FLOOR_CHECKED``; a path no role may write still counts.
 
 ``FLOOR_CHECKED {warnings}`` is appended whenever a scan ran (the reviewer's packet reads it).
 Fail-open: the gate skips (``GATE_SKIPPED``) when the guard is off, the run has no base, no
@@ -100,8 +102,10 @@ def _may_change(
 
     True for what the builder stage may write, else for a path a ``SPAWN_WINDOW`` since the base
     explains. The windows are read once, on the first path that needs them. When they cannot be
-    read, a path some role may write is excused (and ``notes`` says so), so a DB hiccup does not
+    read, or were read and there are none (an interactive run records none), a path some role may
+    write is excused (and ``notes`` says which), so a DB hiccup or a run without windows does not
     blame the builder for the reviewer's ``REVIEW.md``; a path no role may write still counts.
+    With at least one window, only an explaining window excuses a path.
     """
     builder = _proof.stage_writes(storage_path, "builder")
     any_role = _proof.any_role_writes(storage_path)
@@ -117,13 +121,19 @@ def _may_change(
                     "spawn windows unreadable: plan files a role may write were not judged"
                 )
                 loaded.append(None)
+            else:
+                if not loaded[0]:
+                    notes.append(
+                        "the run recorded no spawn windows: plan files a role may write "
+                        "were not judged"
+                    )
         return loaded[0]
 
     def may_change(path: str) -> bool:
         if builder(path):
             return True
         found = windows()
-        if found is None:
+        if not found:
             return any_role(path)
         return _proof.explained(root, path, now_tree, found, storage_path)
 
