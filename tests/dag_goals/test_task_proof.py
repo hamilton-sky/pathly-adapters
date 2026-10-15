@@ -120,6 +120,29 @@ def test_a_project_outside_git_still_runs_the_checks_and_records_floor_off(tmp_p
     assert {p["floor"] for p in proofs(state)} == {"off"}
 
 
+def test_the_whole_report_survives_into_the_retry_prompt_and_the_final_failure(
+    tmp_path,
+):
+    repo = make_repo(tmp_path)
+    state = State(repo)
+    set_app_setting("goal.task_max_attempts", "2")
+    noisy = "import sys; print('x' * 3000 + 'EN' + 'D-MARKER'); sys.exit(2)"
+    tid = add_task(f'Greet.\n\n```check\n$ python -c "{noisy}"\n```\n')
+    seen: dict = {}
+
+    def second_attempt(repo: Path) -> None:
+        seen["fail_reason"] = row(tid)["fail_reason"]
+
+    agent = Agent(repo, {tid: [lambda repo: None, second_attempt]})
+
+    drain(state, agent)
+
+    assert 3000 < len(seen["fail_reason"]) <= 4000
+    assert seen["fail_reason"].rstrip().endswith("END-MARKER")
+    assert "END-MARKER" in agent.prompts[tid][1]
+    assert row(tid)["fail_reason"].rstrip().endswith("END-MARKER")
+
+
 # ── The floor guard ──────────────────────────────────────────────────────────
 
 

@@ -171,7 +171,7 @@ def fail_task(conn: sqlite3.Connection, message_id: str, reason: str = "") -> li
         conn.execute(
             "UPDATE comms_messages SET task_status='failed', failed_at=?, fail_reason=? "
             "WHERE id=?",
-            (now, reason[:500], message_id),
+            (now, reason[:4000], message_id),
         )
         conn.commit()
 

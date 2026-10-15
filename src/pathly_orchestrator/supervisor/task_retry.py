@@ -59,7 +59,7 @@ def retry_task(conn: sqlite3.Connection, task_id: str, reason: str) -> None:
         conn.execute(
             "UPDATE comms_messages SET task_status='pending', claimed_by=NULL, "
             "fail_reason=? WHERE id=?",
-            (reason[:500], task_id),
+            (reason[:4000], task_id),
         )
         conn.commit()
 
@@ -79,7 +79,7 @@ def build_retry_context(task: dict) -> str:
         f"\n\n## Retry attempt {prior_attempts + 1} — the previous attempt failed\n\n"
         "What was tried before did not satisfy this task. Read the failure below "
         "before deciding what to change — repeating the same approach will fail "
-        f"the same way.\n\n```\n{str(reason)[:2000]}\n```\n"
+        f"the same way.\n\n```\n{str(reason)[:4000]}\n```\n"
     )
     # The root-cause guide follows the failure it tells the agent to read (build-proof).
     from pathly_orchestrator.skills.compose_resources import root_cause_guide
