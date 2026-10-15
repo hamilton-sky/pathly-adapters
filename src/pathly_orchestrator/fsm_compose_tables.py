@@ -57,6 +57,13 @@ _SKILL_AGENT_ROLE: dict[str, str] = {
     "team/retro": "planner",
 }
 
+
+def agent_role_of(agent: str) -> str:
+    """The role an ``agent_map`` entry runs as: its ``_SKILL_AGENT_ROLE`` entry, else
+    its last ``/`` segment (``quality/reviewer`` is ``reviewer``)."""
+    return _SKILL_AGENT_ROLE.get(agent) or agent.split("/")[-1]
+
+
 # Smart fix-routing (fix mode) — role -> the artifact that role corrects when routed a
 # feedback file. Only these four are "root-cause" roles: they own a decision artifact
 # upstream of the code, so a routed hand-off means "fix your artifact, then hand off to
