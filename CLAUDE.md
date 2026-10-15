@@ -302,6 +302,7 @@ blueprints/
   comms/      messages, tasks, tasks_status, artifacts, runs, goals, settings, context (board subsystems)
   ops/        telemetry, menu, db_api, chat, export (operational/infra)
   code/       query (codebase-intelligence query)
+  hq/         context (GET /hq/context — board packet, for inspection) · prompt (POST /hq/prompt — the HQ copilot's model turn: system prompt + board packet + message, or a redirect for an action request; with enabled_actions, the operator turn + the function definitions offered) · actions (GET /hq/actions catalog, PUT /hq/actions/available) · actions_run (POST /hq/actions/check|run|report — operator proposals → confirm cards → execution through the real routes + audit)
   control/    runs_read (unified run read API: GET /runs, /runs/<id>) · runs_control (POST /runs/<id>/stop — run_id-addressed stop · POST /runs/<id>/<action> for pause|resume|advance|reroute|retry|abort — run_id-addressed control, mirrors /runner/* — board-lock runs support only abort)
 ```
 A new endpoint goes into the matching domain file. If no domain matches, create a new domain file — do not add it to an unrelated file.
@@ -477,3 +478,7 @@ robust server parser (`runner/output.py::parse_result`) and PREFERS it over the 
 cost/tokens (kept only as a fallback). So the same parser (incl. truncation recovery) now backs
 BOTH the runner path (`/runner/terminal/result`) and the one-shot path (`/db/invocation`); the
 Studio parsers remain for the live terminal display.
+
+<!-- codeintel-map-start -->
+@AGENTS.md
+<!-- codeintel-map-end -->

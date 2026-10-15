@@ -43,6 +43,10 @@ FOLDER_PURPOSE: dict[str, str] = {
     "db": "Database layer — schema/queries, connection isolation, write guard.",
     "http_api": "HTTP server surface — Flask app & endpoints, chat handler, "
     "Settings.from_env, prompt-event contract.",
+    "hq_copilot": "HQ copilot — board context packet, HQ model turn & read-only "
+    "guardrails, model eligibility, /hq/* endpoints.",
+    "local_operator": "HQ operator actions — action catalog & availability, "
+    "operator turn, proposal check, confirmed execution through real routes, audit.",
 }
 
 _ACRONYMS = {"db": "DB", "http": "HTTP", "api": "API", "fsm": "FSM", "dag": "DAG", "lsp": "LSP"}

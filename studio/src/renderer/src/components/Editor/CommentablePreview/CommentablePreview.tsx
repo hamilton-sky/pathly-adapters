@@ -133,7 +133,7 @@ export const CommentablePreview = forwardRef<CommentablePreviewHandle, Props>(
         onClick={handleClick}
         tabIndex={0}
       >
-        <MarkdownPreview content={content} />
+        <MarkdownPreview content={content} images />
         <CommentGutter
           containerRef={containerRef}
           comments={unresolvedComments}

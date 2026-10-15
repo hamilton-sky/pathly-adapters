@@ -361,3 +361,17 @@ def get_logging_config(conn: sqlite3.Connection) -> dict:
 def set_logging_board_enabled(conn: sqlite3.Connection, enabled: bool) -> None:
     """Turn agent BOARD narration on/off. Does NOT touch the always-on cost/monitor spine."""
     set_setting(conn, _LOGGING_BOARD_KEY, "true" if enabled else "false")
+
+
+# HQ copilot settings live in hq_settings.py (this file sits on the 400-line
+# ratchet); re-exported here so `from ...app_settings import get_hq_budget_tokens`
+# keeps working — same split+re-export pattern as comms_hydrate.
+from .hq_settings import (  # noqa: F401,E402
+    HQ_DEFAULT_BUDGET_TOKENS,
+    HQ_DEFAULT_MODEL,
+    HQ_DEFAULT_PACKET_ORDER,
+    get_hq_budget_tokens,
+    get_hq_default_model,
+    get_hq_packet_order,
+    set_hq_packet_order,
+)

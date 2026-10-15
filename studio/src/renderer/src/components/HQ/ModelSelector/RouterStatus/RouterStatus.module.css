@@ -1,0 +1,12 @@
+.status {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  padding: 0 2px;
+  overflow-wrap: anywhere;
+}
+
+.status[data-state='routing'],
+.status[data-state='loading'] {
+  color: var(--accent);
+}

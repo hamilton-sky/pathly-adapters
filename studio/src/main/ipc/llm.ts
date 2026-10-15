@@ -9,6 +9,8 @@
 import { ipcMain, app } from 'electron'
 import * as fs from 'fs'
 import * as path from 'path'
+import { createProposalRecorder, recordingFunctions, type HqToolSpec, type ToolProposal } from './llmProposals'
+import { stripThinkTags } from './llmText'
 
 interface ModelInfo {
   uri: string
@@ -20,13 +22,18 @@ const MODEL_REGISTRY: Record<string, ModelInfo> = {
     uri: 'hf:unsloth/Qwen3-4B-GGUF/Qwen3-4B-Q4_K_M.gguf',
     filename: 'Qwen3-4B-Q4_K_M.gguf',
   },
+  'qwen3-8b': {
+    uri: 'hf:unsloth/Qwen3-8B-GGUF/Qwen3-8B-Q4_K_M.gguf',
+    filename: 'Qwen3-8B-Q4_K_M.gguf',
+  },
   'qwen2.5-coder-7b': {
     uri: 'hf:bartowski/Qwen2.5-Coder-7B-Instruct-GGUF/Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf',
     filename: 'Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf',
   },
   'phi-4-mini': {
-    // bartowski uses org_model-GGUF naming convention for Microsoft models
-    uri: 'hf:bartowski/Phi-4-mini-instruct-GGUF/Phi-4-mini-instruct-Q4_K_M.gguf',
+    // NOT bartowski/Phi-4-mini-instruct-GGUF — that repo does not exist (HF 401s);
+    // bartowski's copy is microsoft_-prefixed. unsloth keeps this exact filename.
+    uri: 'hf:unsloth/Phi-4-mini-instruct-GGUF/Phi-4-mini-instruct-Q4_K_M.gguf',
     filename: 'Phi-4-mini-instruct-Q4_K_M.gguf',
   },
   'deepseek-r1-1.5b': {
@@ -135,6 +142,10 @@ export function registerLlmHandlers(): void {
     const downloader = await mod.createModelDownloader({
       modelUri: info.uri,
       dirPath: getModelsDir(),
+      // Pin the name: node-llama-cpp otherwise saves `hf_<user>_<file>`, which
+      // getModelPath / llm:listCached never find — the download "succeeds" and
+      // the model can never be loaded or shown as cached.
+      fileName: info.filename,
       skipExisting: true,
       onProgress: (status: { downloadedSize: number; totalSize: number }) => {
         const pct = status.totalSize > 0
@@ -165,32 +176,69 @@ export function registerLlmHandlers(): void {
 
   ipcMain.handle('llm:chat', async (
     event,
-    { prompt, systemPrompt, modelId }: { prompt: string; systemPrompt: string; modelId: string }
-  ): Promise<void> => {
+    { prompt, systemPrompt, modelId, maxTokens, contextSize, thoughtBudget, showReasoning, tools }: {
+      prompt: string; systemPrompt: string; modelId: string
+      maxTokens?: number; contextSize?: number; thoughtBudget?: number; showReasoning?: boolean
+      tools?: HqToolSpec[]  // HQ operator: offered as record-only functions (llmProposals.ts)
+    }
+  ): Promise<{ proposals: ToolProposal[] }> => {
     const { LlamaChatSession } = await loadLlamaCpp()
     const model = await ensureModel(modelId, (pct, text) => {
       event.sender.send('llm:load-progress', { pct, text })
     })
-    const context = await model.createContext()
+    // An HQ board turn asks for exactly what it needs (~16k). Without a max,
+    // node-llama-cpp grows to the model's full window (41k for Qwen3) — ~3.5 GB
+    // more KV cache per answer; without a min it could start too small.
+    const context = await model.createContext(
+      contextSize ? { contextSize: { min: contextSize, max: contextSize } } : undefined,
+    )
     const session = new LlamaChatSession({ contextSequence: context.getSequence(), systemPrompt })
     activeAbortController = new AbortController()
     let fullText = ''
+    let inThought = false
+    const recorder = createProposalRecorder(tools ?? [])
+    const emit = (text: string): void => {
+      fullText += text
+      event.sender.send('llm:token', text)
+    }
+    const closeThought = (): void => {
+      if (inThought) { emit('</think>'); inThought = false }
+    }
     try {
       await session.prompt(prompt, {
         signal: activeAbortController.signal,
-        maxTokens: 512,
+        maxTokens: maxTokens ?? 512,
+        // Qwen3 reasons in a separate "thought" segment whose tokens count
+        // against maxTokens (measured 552 thought + 469 answer = cut off at
+        // 1024). The budget caps it; 0 turns reasoning off (Fast mode).
+        ...(thoughtBudget !== undefined ? { budgets: { thoughtTokens: thoughtBudget } } : {}),
         temperature: 0.7,
-        onToken: (tokens: unknown[]) => {
-          const text: string = model.detokenize(tokens)
-          fullText += text
-          event.sender.send('llm:token', text)
-        },
+        ...(tools?.length ? { functions: recordingFunctions(tools, recorder) } : {}),
+        // Deep mode streams the reasoning wrapped in <think>…</think> — the
+        // format ThinkingBlock already renders for Ollama. Otherwise onToken
+        // streams the answer only (thought segments are not passed to it).
+        ...(showReasoning
+          ? {
+              onResponseChunk: (chunk: { type?: string; segmentType?: string; text: string }) => {
+                if (chunk.type === 'segment') {
+                  if (chunk.segmentType !== 'thought' || !chunk.text) return
+                  if (!inThought) { emit('<think>'); inThought = true }
+                  emit(chunk.text)
+                } else {
+                  closeThought()
+                  emit(stripThinkTags(chunk.text))
+                }
+              },
+            }
+          : { onToken: (tokens: unknown[]) => emit(stripThinkTags(model.detokenize(tokens))) }),
       })
+      closeThought()
       event.sender.send('llm:done', fullText)
     } catch (err: unknown) {
       const isAbort = err instanceof Error &&
         (err.name === 'AbortError' || err.message.toLowerCase().includes('abort'))
       if (isAbort) {
+        closeThought()
         event.sender.send('llm:done', fullText)
       } else {
         event.sender.send('llm:error', err instanceof Error ? err.message : String(err))
@@ -199,6 +247,7 @@ export function registerLlmHandlers(): void {
       try { await context.dispose() } catch { /* ignore */ }
       activeAbortController = null
     }
+    return { proposals: recorder.proposals }
   })
 
   ipcMain.handle('llm:abort', (): void => {
@@ -263,16 +312,25 @@ export function registerLlmHandlers(): void {
 
   ipcMain.handle('llm:ollamaChat', async (
     event,
-    { prompt, systemPrompt, modelId, think }: { prompt: string; systemPrompt: string; modelId: string; think?: boolean }
+    { prompt, systemPrompt, modelId, think, numCtx }: {
+      prompt: string; systemPrompt: string; modelId: string; think?: boolean; numCtx?: number
+    }
   ): Promise<void> => {
     activeAbortController = new AbortController()
     let fullText = ''
     let inThinking = false
     try {
+      // Without num_ctx Ollama uses its small default window and silently
+      // truncates the START of a longer prompt — the HQ board packet.
       const res = await fetch('http://localhost:11434/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: modelId, prompt, system: systemPrompt, stream: true, ...(think ? { think: true } : {}) }),
+        body: JSON.stringify({
+          model: modelId, prompt, system: systemPrompt, stream: true,
+          // Fast sends think:false — omitted, a thinking model (qwen3) reasons anyway.
+          ...(think !== undefined ? { think } : {}),
+          ...(numCtx ? { options: { num_ctx: numCtx } } : {}),
+        }),
         signal: activeAbortController.signal,
       })
       if (!res.ok) throw new Error(`Ollama error ${res.status}: ${await res.text()}`)

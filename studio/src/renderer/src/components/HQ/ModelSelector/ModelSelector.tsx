@@ -7,6 +7,7 @@ import { useBrightskyStore } from '../../../store/brightskyStore'
 import { brightskyClient } from '../../../lib/brightskyClient'
 import { BrightskyCard } from './BrightskyCard'
 import { ModelCard } from './ModelCard'
+import { RouterStatus } from './RouterStatus/RouterStatus'
 import styles from './ModelSelector.module.css'
 
 export function ModelSelector(): JSX.Element {
@@ -223,6 +224,7 @@ export function ModelSelector(): JSX.Element {
               Deep
             </button>
           </div>
+          <RouterStatus />
           {!ollamaAvailable && llmAvailable !== true && (
             <div className={styles.noBackendNote}>
               <strong>No AI backend detected.</strong>

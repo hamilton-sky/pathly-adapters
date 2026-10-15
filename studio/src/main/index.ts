@@ -18,6 +18,7 @@ import { registerAutomationHandlers } from './ipc/automation'
 import { registerLlmHandlers } from './ipc/llm'
 import { registerBrightskyHandlers } from './ipc/brightsky'
 import { registerDbHandlers } from './ipc/db'
+import { guardAppWindow } from './windowSecurity'
 import { autoUpdater } from 'electron-updater'
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
@@ -182,6 +183,7 @@ function createWindow(projectPath?: string): BrowserWindow {
     }
   })
   Menu.setApplicationMenu(null)
+  guardAppWindow(win)
 
   if (isDev) {
     const devServerUrl = process.env['ELECTRON_RENDERER_URL'] ?? 'http://localhost:5173'

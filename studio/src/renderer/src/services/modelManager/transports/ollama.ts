@@ -9,6 +9,7 @@
 // avoids threading a one-shot flag through the streaming IPC channel.
 
 import type { RunResult } from './types'
+import { oneShotGeneration } from './gguf'
 
 const OLLAMA_GENERATE_URL = 'http://127.0.0.1:11434/api/generate'
 
@@ -24,7 +25,12 @@ export async function runOllama(ollamaTag: string, prompt: string): Promise<RunR
   const res = await fetch(OLLAMA_GENERATE_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: ollamaTag, prompt, stream: false }),
+    // think:false — omitted, qwen3 reasons anyway; num_ctx sized to the prompt —
+    // unset, Ollama silently drops the START of a long prompt (the document).
+    body: JSON.stringify({
+      model: ollamaTag, prompt, stream: false, think: false,
+      options: { num_ctx: oneShotGeneration(prompt).contextSize },
+    }),
   })
   if (!res.ok) {
     throw new Error(`Ollama error ${res.status}: ${await res.text()}`)

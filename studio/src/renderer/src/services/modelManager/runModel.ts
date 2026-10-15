@@ -13,6 +13,7 @@ import { BRIGHTSKY_ID, getModelById } from './catalog'
 import { runOllama } from './transports/ollama'
 import { runGguf } from './transports/gguf'
 import { runBrightsky } from './transports/brightsky'
+import { getCachedModelIds } from '../../lib/llmBridge'
 import type { RunResult } from './transports/types'
 
 export type { RunResult }
@@ -51,6 +52,13 @@ export async function runModel(id: string, prompt: string): Promise<RunResult> {
   }
 
   if (state.cachedModelIds.includes(id)) {
+    return runGguf(id, prompt)
+  }
+  // The cached list is filled by HQ's model picker on mount — with HQ closed it is
+  // empty. Ask the disk before calling a downloaded model unavailable.
+  const onDisk = await getCachedModelIds().catch(() => [] as string[])
+  if (onDisk.includes(id)) {
+    useModelStore.getState().setCached(onDisk)
     return runGguf(id, prompt)
   }
 

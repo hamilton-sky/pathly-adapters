@@ -8,7 +8,7 @@
 // mechanism proven in MarkdownEditor/.../useEditorAgentActions.ts: subscribe to
 // terminal.onExit BEFORE spawning, only react to our own tabId, unsubscribe once.
 
-import { runModel } from './modelManager'
+import { runModel, RECOMMENDED_MODEL_ID } from './modelManager'
 import { buildHeadlessArgv, type CliAdapter } from './cliEngine'
 import { effectiveModel } from './spawnPolicy'
 import { useProjectStore } from '../store/projectStore'
@@ -26,6 +26,11 @@ export interface AiResult {
   text: string
   cost_usd?: number
 }
+
+/** The summary target when none is saved: the built-in local model — free, no
+ *  CLI spawn. A CLI engine (claude / codex) is the user's explicit pick, in
+ *  Settings → Intelligence → Summaries, per board, or per artifact. */
+export const DEFAULT_SUMMARY_SELECTION: AiSelection = { type: 'model', id: RECOMMENDED_MODEL_ID }
 
 /**
  * Sentinel meaning "no AI target". AiTargetSelector emits this when allowOff is

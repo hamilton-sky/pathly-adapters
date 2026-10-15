@@ -157,6 +157,114 @@ Queue management IPC: `terminal:queue-control` accepts `pause | resume | cancel 
 
 **RunDetailPage** (`src/renderer/src/components/RunDetailPage/`, unified-control-plane P0e): a shared full-page run view keyed by `run_id`, data via `useRunDetail` → `GET /runs/<id>`, polled every 8s AND live-refreshed (unified-control-plane T4) via an `EventSource` subscription to `GET /events/runs?run_id=<id>` — any runner/comms event tagged with the run_id triggers an immediate re-fetch so the Logs/Board tabs update without waiting on the poll; no auth header is sent (the server's secret middleware exempts every `/events/*` path), mirroring the same localhost-open `EventSource` pattern as `useCommsPanel`/`pathlyContext.subscribeToMenuUpdates`; the 8s poll keeps running as a fallback if the stream errors, closes, or is unavailable. Shell mirrors DBExplorerRedesign's `FeatureDetailPage` (back · header `KindBadge`/`AdapterBadge`/`StatusBadge` + **`RunControls`** (`RunDetailPage/RunControls/`, T2) · `refresh` · big-stats · tab bar · body); tabs = **Stages · Phases · Logs · Board · Cost** (each its own component; stages/cost reconcile from `agent_invocations`). The **Phases** tab (`PhasesTab`) is a timeline of the run's PHASE_START/DONE markers — `type='phase'` board posts filtered OUT of the Board tab (which keeps decisions/discoveries/artifacts); they stream in live now that `_phase_board.post_phase_to_board` stamps the live run's run_id (`run_history.latest_running_run_id_for_feature`) so the T3 per-run feed tees them. `KindBadge`/`StatusBadge` are LOCAL — they carry `decompose`/`error`/`aborted`, which Monitor's `EngineCategory`/`EngineStatus` unions don't (AC-7: don't touch Monitor). **`RunControls`** (unified-control-plane T2) is capability-gated by `run.kind` + `run.status`: a **■ Stop** button for any active run (running/paused/awaiting_decision) → `apiStopRun` → `POST /runs/<id>/stop`; for a `kind==='flow'` run only, additional pause/resume/advance/reroute/retry buttons → the new `apiRunAction(runId, action, body?)` → `POST /runs/<id>/<action>` (single/loop/other kinds see only Stop — the server's board-lock resolver supports no other action). Which flow buttons show is a pure, unit-tested gate (`runControlsUtils.ts::visibleFlowActions`) mirroring the server's own ACTIVE_STATUSES gate: running → Pause+Reroute, paused → Resume+Advance+Reroute, awaiting_decision → Reroute, finished (done/aborted/error) → Retry (defaults `max_iterations`/`max_cost_usd` to `apiStartFlow`'s own 50/$10 — RunDetail doesn't carry the original run's caps — and reads the flow name off `run.adapter`, which IS the flow name for a `kind==='flow'` row per run-identity). Reroute opens a local `RerouteMenu` adapter picker (mirrors `HQ/FlowControlBar`'s `ReroutePopover`: same `ADAPTERS` source, outside-click/Escape dismiss) instead of acting immediately. Every action funnels through one `pending`-state dispatch hook (`hooks/useRunControls.ts`) and calls `refresh` after it lands. **Entrance #1 is wired:** `EngineDetailModal` gained an `Open run →` button (`onOpenRun`, threaded `MonitorBoard` → `Monitor/index.tsx`), and `Monitor` swaps its panel body to `RunDetailPage` when `detailRunId` is set (the app shell stays). A 404 (`run_id` not yet in `run_history` — e.g. a live flow stage whose card id is a tabId, or a run predating tracking) renders a friendly not-found state. **Entrance #2 is built** as a **Live / Runs** mode toggle in the Monitor board header (`MonitorBoardHeader`'s `SegmentedControl`, extracted so `MonitorBoard` stays within the size cap): Runs mode renders `RunList` (`Monitor/RunList/`) — the folded one-row-per-top-level-run list from `useRuns` → `GET /runs` (lazy-polled only while Runs mode is open), honoring the header's **grid/rows layout toggle** (now un-gated to apply to BOTH modes, not Live-only): `banner` → `RunRow` list, `grid` → `RunCard` responsive card grid (mirrors the Live board's RECENT cards) — both reuse `KindBadge`/`StatusBadge` and open `RunDetailPage`. Category/adapter/scope filters + their counts recompute from the ACTIVE mode's rows; the status pill flips to `polls · 8s` (the P0 run list is DB-on-mount, never SSE) and a note points queued items back to the Live board (the gate queue has no `run_history` row). `Monitor/index.tsx` now always mounts `MonitorBoard` (so the toggle is reachable with nothing live, and each mode owns its empty state). **The P2 launcher is built** (unified-control-plane T6): Runs mode shows a **New run** button (`Monitor/RunList/NewRunButton/` — `NewRunButton` → `NewRunModal` → `NewRunForm` + `hooks/useNewRunForm.ts`) opening a modal to pick a RunSpec `{kind (flow|single|evaluator|goal), board, scope, flow?, goal_id?}` → `apiCreateRun` (`store/commsApi.ts`) → `POST /runs` (the T5 launcher, which routes to the existing `start_run`/`start_board_run`/`start_goal_run` facades). `useNewRunForm`'s `canSubmit` mirrors the server's per-kind requirements (flow → scope+flow, single/evaluator → scope, goal → goal_id) so Start stays disabled instead of round-tripping a 400; on success `useRuns` gained a `refetch()` (nonce bump) so the just-started run appears without waiting for the 8s poll.
 
+## HQ copilot — the local model answers from the board (`components/HQ/hqCopilot.ts`)
+
+When HQ has a board (`resolveHqBoard`: the board the user is looking at in the Command Center —
+the main board tab if its section is open, else any open feature board — then `activeTopic` (only
+when it names a known feature board: it can hold a goal run's slug), then the last main board; never the runner's topic, which can be a goal run's slug rather than a board),
+HQ's free local model (node-llama-cpp in `main/ipc/llm.ts`, or Ollama) answers from a live board
+packet the **server** builds — Studio never assembles it.
+`useHQ.handleSend` calls `fetchHqTurn` → `POST /hq/prompt`, which returns either a read-only
+`redirect` (an action request — shown as-is, the model is never called) or the exact
+`system_prompt` + `prompt` to send, the `manifest` of what the packet holds, and
+`context_tokens`. The manifest is attached to the answer BEFORE streaming, so the collapsible
+context line (`HQ/ContextManifest/`) shows what the model actually saw. Routing
+(`shouldUseHqCopilot`): no board → the old Conductor prompt; a confident skill match (≥ 0.65), or a
+≥ 0.4 match not phrased as a question → the skill flow (with operator actions enabled, that plain
+match goes to the copilot too: "pause the builder" is an action to propose); everything else → the
+copilot. A failed fetch degrades to the Conductor prompt plus the amber "board context unavailable"
+note.
+
+`context_tokens` MUST reach the runtime: Ollama's `num_ctx` (`llm:ollamaChat` `numCtx`) — unset,
+Ollama silently drops the *start* of a long prompt, i.e. the highest-priority packet sections —
+and node-llama-cpp's context (`llm:chat` `contextSize`, allocated as exactly that: uncapped it grows
+to the model's full 41k window, ~3.5 GB more per answer). The read-only copilot gets no tools;
+only the operator turn below offers any.
+
+**Fast / Deep** (the model picker's switch, `localGeneration`): Deep = `thoughtBudget` 768 within
+`maxTokens` 2048 and `showReasoning` — `llm:chat` streams node-llama-cpp's thought segments wrapped
+in `<think>…</think>` (via `onResponseChunk`; `onToken` never sees them), which ThinkingBlock
+renders as "Reasoning". Fast = `thoughtBudget: 0` (no reasoning; measured 2.4 s vs 18 s on the same
+board question). Qwen3's reasoning counts against `maxTokens` (552 thought + 469 answer = cut off at
+1024), hence the budget. Ollama gets `think: true|false` explicitly — omitted, qwen3 reasons anyway.
+
+**Composer scope (`HQ/ComposerScope/`).** Two chips above the HQ input — `[▤ Context 5/6 ▾]` and
+`[⚡ Actions 3/8 ▾]` — open ONE popover (`ScopePopover`: a segmented tab switch styled like the
+Fast/Deep toggle, width `min(280px, 100%)`, Escape/outside-click close and return focus to the
+chip) with one shared `TokenMeter` (the ticked sections' sizes from the latest manifest — the server
+reports per-section `tokens` — plus the enabled actions' `schema_tokens`). Chips collapse to icon +
+count in a narrow row (container query `hqscope`). Open state is `store/hqComposerStore.ts` (not
+persisted) so an answer's context line can open it. **Context tab** (`ContextTab/`): a checkbox per
+board section (`store/hqContextStore.ts`, saved) → `sections` on the next `POST /hq/prompt`;
+artifact summaries are opt-in. Each answer's context line (`HQ/ContextManifest/`) is a read-only
+record ("· N actions" when it offered any); the latest one has an "Adjust for next question" link
+that opens the Context tab. The MiniLM router status moved into the model popover
+(`ModelSelector/RouterStatus/`).
+
+**Actions — the local operator (pathly/features/local-operator).** The **Actions tab**
+(`ActionsTab/`, state `hooks/useActionSelection.ts`) lists the catalog actions Settings allows
+(`GET /hq/actions`, refetched on open), grouped Runs / Board / Artifacts with the risk in words,
+presets, and a polite "N of 8 enabled" live region. Ticks are `store/hqActionsStore.ts`
+(localStorage `pathly-hq-actions`, global, off by default, at most `MAX_HQ_ACTIONS` = 8: at the cap
+an unticked row is `aria-disabled` + `aria-describedby` the reason — never auto-untick). Only the
+built-in runtime acts (`hqOperator.operatorActions`); with Ollama/Brightsky HQ stays read-only and
+the tab says so. **Settings → Intelligence → HQ actions** (`Settings/HqActionsSettings/`) chooses
+which catalog actions HQ may use at all (`PUT /hq/actions/available`, server-enforced); the catalog
+is curated in code (`hq_actions.py`), never raw API access.
+
+The turn: `fetchHqTurn(..., enabledActions)` → the server returns the operator turn + `tools`;
+`hqOperator.askLocalTurn` → `askLlmWithTools` → `llm:chat` `tools` → `main/ipc/llmProposals.ts`
+offers them as node-llama-cpp session functions whose handlers only RECORD the call (cap 8, unknown
+names refused) and tell the model it has not run; `llm:chat` resolves `{proposals}`. Proposals →
+`POST /hq/actions/check` → `Message.actionCards` (`store/chatStore.ts` `HqActionCard`) rendered by
+`HQ/ActionCards/` under the answer: verb + target, risk, **Run / Cancel** (Run never auto-focused,
+no Enter binding; cards run in order — a later Run is `aria-disabled` until the earlier card
+settles). `actionCards.runActionCard` → `POST /hq/actions/run` (server revalidates; changed board →
+`stale`); diagram actions come back `approved` and run in Studio (`studioActions.ts`, reusing
+`MarkdownEditor/EditorHeader/hooks/diagramRun.ts::startDiagramRun` — the editor's own Diagram
+one-shot, extracted from `useEditorDiagramAction` — and `addDiagramToBoard`), then report for the
+audit. Each card ends as a one-line record (done / failed / cancelled / not run). Cancel makes no
+request.
+
+**Answers render as Markdown** through `lib/safeMarkdown.ts` (see "Markdown and untrusted HTML"
+under the UI rules) — the text is model output built from board text.
+
+**Chat history is per project** (`store/hqHistoryStore.ts` + `HQ/useHqHistory.ts`, localStorage):
+the open chat autosaves under its project (once an answer settles), reopens after a reload, and
+switching projects swaps both the chat on screen and the header's history list. New chat / opening
+a saved chat first stops an answer in flight; the stream writes by message id
+(`useAssistantStream.beginStream`), so a late token never lands in another chat.
+
+**Local models.** Default model is **Qwen3 8B** (`RECOMMENDED_MODEL_ID`, matches the server's
+`hq.default_model`); Phi-4 Mini is the lighter fallback. `modelStore` persist v1 migrates a saved
+v0 `phi-4-mini` (the old implicit default) once. `llm:download` passes `fileName: info.filename` —
+node-llama-cpp otherwise saves `hf_<user>_<file>.gguf`, which `getModelPath`/`llm:listCached` never
+find, so the download "succeeds" and the model can never load. Measured on a 24 GB M-series Mac
+(Metal): Qwen3 8B answers a real board in 16–23 s.
+
+**One local call at a time (`lib/localModelQueue.ts`).** The built-in runtime streams every answer
+on the same untagged `llm:token`/`llm:done` events, so two calls in flight would read each other's
+text. Every built-in call — HQ's answer (`askLlm`), the operator turn (`askLlmWithTools`) and
+background one-shots (`askLlmBackground`: artifact summaries) — goes through `runLocal`, FIFO.
+`abortLlm` (HQ's Stop) ends only HQ's answer: the running one via `llm:abort`, or a queued one
+before it starts; a summary in progress is never stopped by it. Main strips literal `<think>` /
+`</think>` from ANSWER text (`main/ipc/llmText.ts`): real reasoning arrives as thought segments,
+and Qwen3 sometimes ends an answer after a function call with a bare `</think>` (seen in-app).
+
+**Artifact summaries default to the local model.** The summary target (`AiTargetSelector`, used by
+Settings → Intelligence → Summaries, the board's summary config and each card's Re-summarize menu)
+lists local models (greyed "Not downloaded" until they are — `useModelReadiness`) beside the CLI
+engines; with nothing saved the target is `aiRouter.DEFAULT_SUMMARY_SELECTION` = the built-in
+`RECOMMENDED_MODEL_ID` (Qwen3 8B). A model target runs the bare `summaryPrompt.buildSummarizePrompt`
+through `runModel` → `transports/gguf.ts` (`askLlmBackground` on THAT model id, no reasoning,
+`maxTokens` 1024, context sized to the prompt — `oneShotGeneration`; Ollama gets `think:false` +
+`num_ctx`) and returns text — free, no CLI spawn, so it is not a Pipeline run. A CLI engine (claude /
+codex) is the explicit pick and still spawns through the gate (composed depth skill, sidecar
+`.summary` file, run_id + cost + model policy). A model that isn't ready fails with a toast naming
+the fix — never a silent fallback to a paid CLI run. `runModel` asks the disk for downloaded models
+when the store's list is empty (HQ's picker fills it only on mount). Measured (Qwen3 8B, Fast, ~4k
+context): a real spec summarized in ~3.5 s in the `## Description` / `## Summary` shape.
+
 ## Dash-safe prompt (`src/renderer/src/services/cliEngine.ts`)
 
 `dashSafePrompt(prompt)` strips any leading YAML frontmatter block (`---…---`) from a prompt before it is passed to a CLI as a positional argument. Without this, `claude -p '---...'` is parsed as an unknown option and errors. Applied in `buildHeadlessArgv` before constructing argv. Mirrors `_dash_safe_prompt` in `src/pathly_orchestrator/adapters.py`.
@@ -217,7 +325,8 @@ cached policy (`warmModelPolicy`, warmed on module load + re-warmed by `useModel
 resolution is synchronous at spawn). Threaded into all five one-shot spawn sites: editor **Split**
 (`useEditorAgentActions`, role `split`), **Analyze** (`analyze`), **Diagram** (`diagram`), **Comment**
 (`CommentsPanel`, `comment`) via `editorCli.buildCliArgv(cli, prompt, model)`, and artifact
-**summaries** (`aiRouter` engine path, role `summarize`). No policy → no `--model` (engine default),
+**summaries** when a CLI engine is the target (`aiRouter` engine path, role `summarize`; the default
+local-model target spawns nothing). No policy → no `--model` (engine default),
 byte-identical to before. (These roles match the Models UI "Editor / one-shot" group.) Each site
 also stamps `telemetry.feature = featureFromPath(<file>)` (`utils/featureFromPath` → the slug under
 `pathly/features/<slug>/`) so the one-shot **attributes to its feature board** in the Pipeline
@@ -301,6 +410,14 @@ Every component and every button must resize gracefully as its container changes
 - **Every panel layout must be verified at ≤200px wide** — use `overflow: hidden` on section containers so nothing escapes the panel bounds.
 - **Never use `overflow: visible` on a scroll container** — use `overflow: hidden` or `overflow: auto`.
 
+### Panel top banners — one height
+Every panel's top banner (the bar with the bottom border directly under the TopBar: Command
+Center, HQ, Markdown Editor, Editor, Flow editor Visual/YAML, Plan board, Settings, Skill
+Composition) sets `height: var(--panel-header-height)` (46px, `styles/tokens.css`) with
+vertical padding 0, so panels side by side (the board and HQ) have their bottom borders on one
+line. Keep the banner to one line; a subtitle goes inline and ellipsizes. A new panel's banner
+uses the token, never its own height or padding-driven height.
+
 ### No inline styles
 Never use `style={{ ... }}` props. All styling goes in the component's `.module.css` file.
 
@@ -379,6 +496,27 @@ Use `aria-expanded`, `aria-label`, and other ARIA attributes on interactive elem
 
 ### External links
 Any `<a target="_blank">` must include `rel="noopener noreferrer"`.
+
+### Markdown and untrusted HTML
+Every app window loads the renderer **with the preload**, so injected HTML can reach
+`window.pathly` (terminal spawn, fs). Board posts, artifacts, goals, agent results, composed
+prompts and model answers are all written by agents or anyone who can post. So:
+
+- **Every Markdown sink renders through `lib/safeMarkdown.ts::renderSafeMarkdown`**, never plain
+  `marked()` (v18 sanitizes nothing). It escapes raw HTML, keeps only http(s)/mailto links, and
+  shows images as alt text. `lib/safeMarkdown.ts` is the only file that may import `marked`
+  (`safeMarkdown.test.ts` fails otherwise).
+  Options: `breaks` (default `true`, chat style; the non-HQ sinks pass `false` to keep marked's
+  line handling) and `images` (http(s) / raster `data:` only, never svg). Only the user's own open
+  document opts into images: the Markdown Editor `BodyCell` and the `Editor` previews. Agent
+  analyses, board text and prompts stay alt-text.
+- Shared wrappers: `shared/MarkdownRenderer` (board cards, artifacts, goals, tasks, prompts; prop
+  `images`) and `Editor/MarkdownPreview` (prop `images`). Use them rather than a new sink.
+- **Links never load inside an app window.** `main/windowSecurity.ts::guardAppWindow` (applied to
+  the main, board-popout and terminal-popout windows; apply it to any new preload window) denies
+  `window.open`/`target=_blank` and blocks off-origin navigation; http(s)/mailto go to the system
+  browser via `shell.openExternal`, everything else is dropped. The pure policy is
+  `main/navigationPolicy.ts` (unit-tested).
 
 ### Timestamps — one shared util, never hand-rolled
 Every rendered timestamp goes through `src/renderer/src/utils/timestamp.ts` or the

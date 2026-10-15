@@ -249,7 +249,7 @@ export default function BodyCell({
           </div>
           <div className={styles.splitDivider} />
           <div className={styles.splitPreview}>
-            <MarkdownRenderer content={draft} />
+            <MarkdownRenderer content={draft} images />
           </div>
         </div>
       ) : (
@@ -270,7 +270,7 @@ export default function BodyCell({
             </>
           ) : (
             <>
-              <MarkdownRenderer content={preview} />
+              <MarkdownRenderer content={preview} images />
               {isLong && (
                 <button type="button" className={styles.toggle} onClick={() => setExpanded(v => !v)}>
                   {expanded ? '▴ Collapse' : '▾ Show full content'}

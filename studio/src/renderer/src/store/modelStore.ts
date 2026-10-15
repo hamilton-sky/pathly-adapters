@@ -4,6 +4,19 @@ import { RECOMMENDED_MODEL_ID, MODEL_CATALOG, BRIGHTSKY_ID } from '../services/m
 
 const VALID_IDS = new Set([...MODEL_CATALOG.map((m) => m.id), BRIGHTSKY_ID])
 
+/** The default before v1. persist() saves the default as if it were a choice, so
+ *  a saved v0 'phi-4-mini' is almost always "never picked" — move it to the new
+ *  default (qwen3-8b) once. Anyone who really wants Phi-4 Mini re-picks it. */
+const V0_DEFAULT_MODEL_ID = 'phi-4-mini'
+
+export function migrateModelSelection(persisted: unknown, version: number): unknown {
+  const s = (persisted ?? {}) as { selectedModelId?: string }
+  if (version < 1 && s.selectedModelId === V0_DEFAULT_MODEL_ID) {
+    return { ...s, selectedModelId: RECOMMENDED_MODEL_ID }
+  }
+  return persisted
+}
+
 export interface ModelStore {
   selectedModelId: string
   responseMode: 'fast' | 'deep'
@@ -46,6 +59,8 @@ export const useModelStore = create<ModelStore>()(
     }),
     {
       name: 'pathly-model-id',
+      version: 1,
+      migrate: (persisted, version) => migrateModelSelection(persisted, version) as ModelStore,
       partialize: (s) => ({ selectedModelId: s.selectedModelId, responseMode: s.responseMode }),
       // Migrate old MLC model IDs (e.g. 'Phi-4-mini-instruct-q4f16_1-MLC') to new short IDs
       merge: (persisted, current) => {

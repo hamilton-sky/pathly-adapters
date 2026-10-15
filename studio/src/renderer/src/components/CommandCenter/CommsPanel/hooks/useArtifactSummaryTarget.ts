@@ -7,19 +7,15 @@ import {
   SUMMARY_STYLE_DEFAULT,
   type SummaryStyle,
 } from '../../../../store/commsApi'
-import { type AiSelection } from '../../../../services/aiRouter'
+import { DEFAULT_SUMMARY_SELECTION, type AiSelection } from '../../../../services/aiRouter'
 
 // useArtifactSummaryTarget — owns the artifact-summary AI target AND depth for the panel.
 //
 // Seeds from the app-defaults (apiGetDefaultSelection / apiGetDefaultStyle); when the
-// target is unset it falls back to a built-in CLI engine (claude) rather than a local
-// model — an engine self-auths and is always available, so summaries work out-of-the-box.
-// The depth falls back to topic-map. Persists every change back as the app default so the
-// choices survive reloads. The dropped/uploaded summary flow reads `selection` + `style`
+// target is unset it falls back to the built-in local model (DEFAULT_SUMMARY_SELECTION —
+// free; a CLI engine is the user's explicit pick). The depth falls back to topic-map.
+// Persists every change back as the app default so the choices survive reloads. The dropped/uploaded summary flow reads `selection` + `style`
 // from here; the ArtifactsView toolbar drives `setSelection` / `setStyle`.
-
-/** Built-in fallback when no app-default is stored yet: a CLI engine, always available. */
-const BUILTIN_DEFAULT: AiSelection = { type: 'engine', id: 'claude' }
 
 export function useArtifactSummaryTarget(): {
   selection: AiSelection
@@ -27,7 +23,7 @@ export function useArtifactSummaryTarget(): {
   style: SummaryStyle
   setStyle: (style: SummaryStyle) => void
 } {
-  const [selection, setSel] = useState<AiSelection>(BUILTIN_DEFAULT)
+  const [selection, setSel] = useState<AiSelection>(DEFAULT_SUMMARY_SELECTION)
   const [style, setStyleState] = useState<SummaryStyle>(SUMMARY_STYLE_DEFAULT)
 
   useEffect(() => {

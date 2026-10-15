@@ -540,7 +540,7 @@ export function Editor({ path: pathOverride, embedded }: { path?: string | null;
             </div>
             <div className={styles.splitDivider} />
             <div className={styles.half}>
-              <MarkdownPreview content={body} />
+              <MarkdownPreview content={body} images />
             </div>
           </div>
         )}

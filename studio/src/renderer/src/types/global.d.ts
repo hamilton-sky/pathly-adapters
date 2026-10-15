@@ -1,6 +1,10 @@
 export {}
 
 declare global {
+  /** HQ operator: a function the local model may call (POST /hq/prompt's `tools`). */
+  interface HqToolSpec { name: string; description: string; parameters: Record<string, unknown> }
+  /** A recorded call — becomes one confirm card; it has not run. */
+  interface HqToolProposal { name: string; args: Record<string, unknown> }
   interface SpawnCaps { global: number; headless: number; interactive: number }
   /** One identified live CLI engine (PTY spawned, not yet exited). Carries enough to render a
    *  monitor row without the renderer's terminalStore, which a window reload would wipe. */
@@ -264,7 +268,8 @@ declare global {
         download: (modelId: string) => Promise<void>
         delete: (modelId: string) => Promise<void>
         load: (modelId: string) => Promise<void>
-        chat: (prompt: string, systemPrompt: string, modelId: string) => Promise<void>
+        /** opts: maxTokens (answer cap incl. thinking, default 512), contextSize (exact context to allocate), thoughtBudget (cap on a thinking model's reasoning tokens; 0 = no reasoning), showReasoning (stream the reasoning as <think>…</think>), tools (HQ operator: offered as record-only functions — resolves with the calls the model proposed, none executed). */
+        chat: (prompt: string, systemPrompt: string, modelId: string, opts?: { maxTokens?: number; contextSize?: number; thoughtBudget?: number; showReasoning?: boolean; tools?: HqToolSpec[] }) => Promise<{ proposals: HqToolProposal[] }>
         abort: () => Promise<void>
         onToken: (cb: (token: string) => void) => () => void
         onDone: (cb: (fullText: string) => void) => () => void
@@ -274,7 +279,7 @@ declare global {
         ollamaAvailable: () => Promise<{ available: boolean; models: string[] }>
         ollamaPull: (ollamaId: string) => Promise<void>
         ollamaDelete: (ollamaId: string) => Promise<void>
-        ollamaChat: (prompt: string, systemPrompt: string, modelId: string, think?: boolean) => Promise<void>
+        ollamaChat: (prompt: string, systemPrompt: string, modelId: string, think?: boolean, numCtx?: number) => Promise<void>
       }
       brightsky: {
         login: (baseUrl: string) => Promise<void>

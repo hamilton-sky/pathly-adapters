@@ -10,18 +10,20 @@
   font-family: 'Geist', system-ui, sans-serif;
 }
 
+/* One line, the shared panel-header height (was a two-line ~65px banner). */
 .header {
   flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 14px 20px 13px;
+  height: var(--panel-header-height);
+  padding: 0 20px;
   background: var(--bg-mantle);
   border-bottom: 1px solid var(--border-color);
 }
-.headText { display: flex; flex-direction: column; gap: 2px; }
-.title { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -0.01em; color: var(--text-primary); }
-.subtitle { font-size: 12px; color: var(--text-muted); }
+.headText { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.title { margin: 0; flex-shrink: 0; font-size: 15px; font-weight: 600; letter-spacing: -0.01em; color: var(--text-primary); }
+.subtitle { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--text-muted); }
 .spacer { flex: 1; }
 .live {
   display: inline-flex; align-items: center; gap: 8px;

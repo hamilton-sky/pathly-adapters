@@ -11,6 +11,8 @@ interface SessionSummary {
   title: string
   messageCount: number
   lastActivity: string
+  /** The chat on screen right now. */
+  current?: boolean
 }
 
 interface ChatHeaderProps {
@@ -130,9 +132,9 @@ export function ChatHeader({ hasClaudeTab, hasCodexTab, hasShellTab, hasAntigrav
             <div className={styles.sessionsHeader}>Conversations</div>
             {sessions.length === 0 ? (
               <div className={styles.sessionsEmpty}>
-                No sessions yet.
+                No saved chats yet.
                 <br />
-                <span className={styles.sessionsEmptyHint}>Connect Brightsky to see history.</span>
+                <span className={styles.sessionsEmptyHint}>Each HQ chat is saved here as you go.</span>
               </div>
             ) : (
               <div className={styles.sessionsList}>
@@ -141,6 +143,7 @@ export function ChatHeader({ hasClaudeTab, hasCodexTab, hasShellTab, hasAntigrav
                     key={s.id}
                     type="button"
                     className={styles.sessionItem}
+                    data-current={s.current ? 'true' : 'false'}
                     onClick={() => { onSelectSession?.(s.id); setSessionsOpen(false) }}
                   >
                     <span className={styles.sessionTitle}>{s.title}</span>

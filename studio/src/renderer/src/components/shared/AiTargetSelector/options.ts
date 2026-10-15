@@ -38,14 +38,14 @@ export function decode(value: string): AiSelection {
  *  `preflight` (optional, keyed by adapter id) greys out engines that are not installed
  *  on this machine — without it every engine reads as usable and picking a missing one
  *  fails only at spawn time. Omitting it preserves the previous behavior exactly.
- *  `allowLocalModels` (default false) shows the local-model group. Local models are a SEPARATE
- *  system (chat uses them via modelStore); the summary target — the only user of this selector —
- *  is CLI-engine-only, so every summary spawn goes through the one gate (run_id + cost + policy).
- *  A caller opts into local models explicitly. */
+ *  `allowLocalModels` shows the local-model group — the summary target's default is the
+ *  built-in local model (free, no spawn); a CLI engine runs through the gate (run_id + cost +
+ *  policy). `modelReason(id)` greys a model that can't run yet (not downloaded, not signed in). */
 export function buildGroups(
   allowOff: boolean,
   preflight?: Record<string, EnginePreflight>,
   allowLocalModels = false,
+  modelReason?: (id: string) => string | undefined,
 ): AiOptionGroup[] {
   const groups: AiOptionGroup[] = []
   if (allowOff) {
@@ -53,10 +53,10 @@ export function buildGroups(
   }
   if (allowLocalModels) {
     groups.push({
-      heading: 'Models',
+      heading: 'Local models',
       options: [
-        ...MODEL_CATALOG.map((m) => ({ value: `model:${m.id}`, label: m.name })),
-        { value: `model:${BRIGHTSKY_ID}`, label: 'Brightsky' },
+        ...MODEL_CATALOG.map((m) => ({ value: `model:${m.id}`, label: m.name, disabledReason: modelReason?.(m.id) })),
+        { value: `model:${BRIGHTSKY_ID}`, label: 'Brightsky', disabledReason: modelReason?.(BRIGHTSKY_ID) },
       ],
     })
   }

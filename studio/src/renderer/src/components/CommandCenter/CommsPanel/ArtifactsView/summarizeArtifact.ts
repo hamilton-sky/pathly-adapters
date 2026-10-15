@@ -92,10 +92,8 @@ export async function summarizeArtifactById(
   note?: string,
 ): Promise<boolean> {
   if (isOff(selection)) return false
-  // Local models are a separate system (chat only). A summary must run on a CLI agent so it goes
-  // through the ONE gate (run_id + cost + policy) — the selector no longer offers local models for
-  // summaries, and any stale stored local-model target is coerced to the default CLI adapter here.
-  if (selection.type === 'model') selection = { type: 'engine', id: 'claude' }
+  // A local MODEL target (the default) runs free on the built-in runtime and returns text; a
+  // CLI ENGINE target spawns through the gate (run_id + cost + policy) and writes a file.
   const name = artifactPath.split(/[/\\]/).pop() ?? artifactPath
   if (!isSummarizable(undefined, name)) return false
 
@@ -158,7 +156,11 @@ export async function summarizeArtifactById(
     // Surface the reason instead of failing silently — common causes: a local model that
     // isn't installed (Ollama not running), or the engine not writing the summary file.
     const msg = err instanceof Error ? err.message : String(err)
-    useToastStore.getState().push(`Summary failed: ${msg}`, 'error', { category: 'agent_done' })
+    // A local model that isn't ready: say where to fix it — never fall back to a paid CLI run.
+    const hint = selection.type === 'model'
+      ? ' — download it in HQ\'s model menu, or pick a CLI engine in Settings → Intelligence → Summaries'
+      : ''
+    useToastStore.getState().push(`Summary failed: ${msg}${hint}`, 'error', { category: 'agent_done' })
     return false
   }
 }
