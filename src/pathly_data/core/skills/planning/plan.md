@@ -235,15 +235,29 @@ For each phase in `IMPLEMENTATION_PLAN.md`, include:
 - Purpose: why this phase exists in the user-facing feature.
 - Depends on: earlier phase/conversation, existing code path, or external setup.
 - Enables: what later phase or acceptance criterion this unlocks.
-- Verify: a runnable command or manual check (standard/strict only; omit in lite).
+- Check: a ```check block holding the commands that prove the phase is done (required at standard and strict, optional in lite).
 - Rollback: how to undo if this phase goes wrong (strict only).
 
 `File` and `Done when` are mandatory at every rigor level. They let the builder jump directly to the right file and know exactly when to stop — eliminating orientation tool calls on every run.
 
+The supervisor runs a phase's `Check:` block after the builder reports the phase done, and the phase fails if a command does not give the result the block asks for. Write commands that show the phase's `Done when` (this example uses pytest; use the project's own):
+
+```check
+$ python -m pytest tests/test_widget.py -q
+exit 0
+prints passed
+```
+
+- One item per line: `$ <command>` starts a check; `exit <N>` (or `exit nonzero`) is the exit code it must give, `exit 0` when left out; `prints <text>` requires the output to contain that text (repeatable); `#` lines and blank lines are ignored.
+- Commands are read-only (they run tests, linters or inspect; they never edit files, install, migrate or commit) and run from the repo root, so paths are relative to it.
+- No shell runs them: one `$` line per command, never `&&`, `|`, `;`, redirects or `$VARIABLES`. Two commands are two `$` lines.
+- Use the project's real commands, taken from its CI config, Makefile, package.json or CLAUDE.md, never a guess.
+- When no command can show the phase is done, write `Check: none - <why>` on one line instead of a block. The reviewer then reads the code.
+
 Keep decomposition small enough for builder reliability:
 
 - Lite: 1-2 conversations, 1 phase per file touched — one File + Done when per phase.
-- Standard/strict: up to 4 conversations, 3-6 phases per conversation, each with File + Done when + Verify.
+- Standard/strict: up to 4 conversations, 3-6 phases per conversation, each with File + Done when + Check.
 - If dependency chains exceed 4 conversations, split the feature into follow-up
   plan folders instead of creating a giant plan.
 ## Conversation Splitting Rules
@@ -271,7 +285,7 @@ Keep decomposition small enough for builder reliability:
 - `IMPLEMENTATION_PLAN.md` has no more than 4 conversations' worth of phases (split the feature if more are needed).
 - Phase numbers are consistent across all created files.
 - Every phase in `IMPLEMENTATION_PLAN.md` has a `File:` field and a `Done when:` field — all rigor levels.
-- Verify commands use correct project commands (standard/strict only).
+- Every phase has a `Check:` block (or a one-line `Check: none - <why>`) at standard and strict; its commands are the project's real commands, one `$` line each, with no shell features (standard/strict only).
 - If `rigor = strict`, every acceptance criterion has an explicit verification mapping and rollback note.
 
 ## Step 6: Post Tasks to Comms Board

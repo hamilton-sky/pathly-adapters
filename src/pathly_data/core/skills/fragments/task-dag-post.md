@@ -34,6 +34,31 @@ curl -s -X POST http://127.0.0.1:8765/comms/post \
   }'
 ```
 
+### `text` carries the phase's check block
+
+Put the phase's ```check block (its `Check:` field in `IMPLEMENTATION_PLAN.md`) at the end of
+the task `text`, verbatim. After the task reports success the supervisor runs the block and
+fails the task if a command does not give the result the block asks for. It runs the block
+from the `text` as it was when the task was claimed, so an edit made after the claim does not
+count: the block must be right before you post. A phase marked `Check: none` posts no block.
+
+The block is one `$ <command>` line per command, each with optional `exit <N>` (or
+`exit nonzero`) and `prints <text>` lines. Commands are read-only, run from the repo root and
+use no shell features (no `&&` or pipes):
+
+```check
+$ python -m pytest tests/test_widget.py -q
+exit 0
+prints passed
+```
+
+The curl body holds the text as one JSON string, so its newlines are written `\n` (and a `"`
+inside a command is written `\"`):
+
+```json
+"text": "Phase 2: add the widget parser.\nFile: src/widget.py\nDone when: parse() returns a list.\n\n```check\n$ python -m pytest tests/test_widget.py -q\nexit 0\nprints passed\n```"
+```
+
 ### `lane` and `files` — what the scheduler may run at once
 
 These two fields are what let a build run tasks in parallel safely. Get them wrong and two
@@ -49,6 +74,9 @@ agents edit the same file at the same time, so declare them honestly:
   `docs`); the name is just an identity, but a meaningful one makes the plan readable.
 
 The rule in one line: **same files ⇒ same lane; disjoint files ⇒ different lanes.**
+
+`files` also sets the task's scope for `scope_gate`, which sends the builder back when it
+changes a path no task declared, so list every path the task writes.
 
 Omitting both is allowed and safe — a task with no declared footprint is treated as
 touching everything, so the drain falls back to one task at a time. That costs wall-clock,
