@@ -1,7 +1,7 @@
 # Name the feedback file, and show its text, in a feedback spawn's prompt
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: —
 Test first: yes
 
@@ -130,13 +130,14 @@ prints clean
 - Tests: new `tests/fsm_flows/test_feedback_prompt_names_file.py` (23 tests: the seven listed cases, plus an empty file, a file that is not UTF-8, a text without backticks, a run of four backticks, and `read_feedback` / `feedback_block` on their own); updated `tests/fsm_flows/test_retry_ladder.py`, `tests/fsm_flows/test_fix_routing.py` and `assert_sent_back` in `tests/fsm_flows/test_build_proof_acceptance.py`; regenerated `tests/INDEX.md` and `tests/fsm_flows/INDEX.md`. These went in the test-only commit `58b71df`.
 - Docs: the "Retry ladder" section and the `fsm_compose` row of the split-modules table in `src/pathly_orchestrator/CLAUDE.md`; the build-proof "Known limits" paragraph in `CHANGELOG.md`.
 
-**Proof** (each run fresh, after the last edit; venv on PATH)
+**Proof** (each run fresh, after the last edit; venv on PATH; the first four bullets were re-run in round 2, after the review fix)
 
-- `python -m pytest tests/fsm_flows/test_feedback_prompt_names_file.py -q -p no:cacheprovider`: `23 passed in 0.59s`, exit 0. At the test-only commit it failed: 14 of the 23 (the rest pin behaviour that did not change).
-- `python -m pytest tests/fsm_flows tests/dag_goals tests/runner_supervisor -q -p no:cacheprovider`: `1212 passed, 9 skipped in 258.47s`, exit 0 (the updated tests and the acceptance test included; none of the 9 skips is in a file this ticket changed).
+- `python -m pytest tests/fsm_flows/test_feedback_prompt_names_file.py -q -p no:cacheprovider`: `23 passed in 0.54s`, exit 0. At the test-only commit it failed: 14 of the 23 (the rest pin behaviour that did not change).
+- `python -m pytest tests/fsm_flows tests/dag_goals tests/runner_supervisor -q -p no:cacheprovider`: `1212 passed, 9 skipped in 239.92s`, exit 0 (the updated tests and the acceptance test included; none of the 9 skips is in a file this ticket changed).
 - `python scripts/check_file_size.py`: `OK: 1009 source files checked; 19 known over 400 lines, none new, none grown.`, exit 0. `python scripts/gen_test_index.py --check`: `All test INDEX.md files up to date.`, exit 0.
 - The `CHANGELOG.md` one-liner printed `clean`, exit 0.
-- The full Test command `python -m pytest tests/ -q -x -p no:cacheprovider`: `2947 passed, 14 skipped in 558.03s`, exit 0. The Lint chain: `black --check src/ tests/` (568 files unchanged), `mypy` (no issues in 313 files), `check_no_mirror_reads`, `lint-imports` (1 kept, 0 broken), `bandit -q -r src/ -ll -x src/pathly_data/` (exit 0), `check_adapters`, `check_entry_points` all exit 0. Build `python -m build --wheel`: built `pathly_adapters-2.24.1-py3-none-any.whl`, exit 0.
+- Round 1 (before the review fix, which changed only sample text in one test file): the full Test command `python -m pytest tests/ -q -x -p no:cacheprovider`: `2947 passed, 14 skipped in 558.03s`, exit 0. The Lint chain: `black --check src/ tests/` (568 files unchanged), `mypy` (no issues in 313 files), `check_no_mirror_reads`, `lint-imports` (1 kept, 0 broken), `bandit -q -r src/ -ll -x src/pathly_data/` (exit 0), `check_adapters`, `check_entry_points` all exit 0. Build `python -m build --wheel`: built `pathly_adapters-2.24.1-py3-none-any.whl`, exit 0.
+- Round 2: `black --check src/ tests/` (568 files unchanged), exit 0; `python3 scripts/floor-guard.py build-proof 18 e6062970b7b649177d8c850bbd24111a0c228b5f` at `727c500`: `floor guard: clean`, exit 0 (before the fix it printed the three `skip:` lines of the finding, exit 1).
 - At the test-only commit `assert_sent_back` failed on `'## Feedback to resolve' in spawn.instructions` in both acceptance tests that use it; it passes now.
 
 **Decisions**
@@ -153,6 +154,10 @@ prints clean
 
 - The clip is a plain cut at 4000 characters with no marker, as the ladder's was. A feedback file longer than that shows its head only, and the prompt does not say it was cut. Worth a marker if a gate's report is ever found cut mid-section (`task_checks` already clips its own sections to 4000).
 - `feedback_block` does not tell the agent whether to delete the file; for a builder the gate that wrote it rewrites or removes it when it re-runs, and the block says nothing about it either way.
+
+**Review fixes**
+
+- Floor guard, three `skip:` findings in `tests/fsm_flows/test_feedback_prompt_names_file.py`: the builder test used a floor finding that quoted a pytest skip marker as the sample text of a `FLOOR_FAILURES.md` (one write, two asserts), and the guard reads a skip marker on any changed test line, even inside a string. Reproduced with the guard's own command (same three lines, exit 1). Changed the sample to `floor: tests/test_app.py: a finding the gate quoted` in all three places (black then wrapped the `_write` call); no assertion removed or loosened, nothing in `src/` touched. Re-ran the new tests (23 passed), the wider suite (1212 passed, 9 skipped), the guard (clean), and grepped the file for `pytest.mark.skip`, `xfail`, `noqa`, `type: ignore` (none). The ticket has no `Floor:` line and none was added.
 
 **For later tickets**
 
