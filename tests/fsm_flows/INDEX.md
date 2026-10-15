@@ -4,7 +4,7 @@
 
 FSM engine, gates, transitions, flow definitions, feedback protocol & fix-routing.
 
-38 test file(s).
+39 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -27,6 +27,7 @@ FSM engine, gates, transitions, flow definitions, feedback protocol & fix-routin
 | `test_human_escalation_gate.py` | Human escalation gate — an open gate addressed to a human blocks the transition | 12 |
 | `test_orchestrator.py` | Tests for Conv 2: STATE.json schema validation, state/transition enforcement, concurrency | 17 |
 | `test_parallel_states_schema.py` | The `parallel_states` flow-YAML key — fsm-fan-out Phase B (schema only, inert) | 11 |
+| `test_proof_base.py` | build-proof 15: the run-wide ``proof_base`` and the ``TASK_PROOF`` records | 28 |
 | `test_proof_checks.py` | Task check blocks (``proof/checks.py``) and the shared command runner (``proof/command.py``) | 16 |
 | `test_proof_floor.py` | The floor scan over two working-tree snapshots (``proof/floor.py``) | 30 |
 | `test_proof_tree.py` | Git working-tree snapshots and the diffs between them (``proof/tree.py``) | 17 |
