@@ -1,5 +1,6 @@
 import { ipcMain, BrowserWindow, app } from 'electron'
 import { join } from 'path'
+import { guardAppWindow } from '../windowSecurity'
 
 interface BoardPopoutOpts {
   scope: 'feature' | 'project' | 'global'
@@ -45,6 +46,7 @@ export function registerBoardHandlers(): void {
       },
     })
     win.setMenu(null)
+    guardAppWindow(win)
     win.once('ready-to-show', () => { win.show(); win.focus() })
 
     const query = { board: scope, feature, project, name: safeName }

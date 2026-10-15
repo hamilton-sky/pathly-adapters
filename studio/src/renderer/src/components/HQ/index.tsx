@@ -1,13 +1,12 @@
 import { useHQ } from './useHQ'
+import { useHqHistory } from './useHqHistory'
 import { ChatHeader } from './ChatHeader/ChatHeader'
-import { SkillsPanel } from './SkillsPanel/SkillsPanel'
 import { MessageList } from './MessageList/MessageList'
 import { ChatInput } from './ChatInput/ChatInput'
 import { MatchCard } from './MatchCard/MatchCard'
 import { PathlyMenuCard } from './PathlyMenuCard/PathlyMenuCard'
 import { AutomationCard } from './AutomationCard/AutomationCard'
 import { StepQueue } from './StepQueue/StepQueue'
-import { StageStatusStrip } from './StageStatusStrip/StageStatusStrip'
 import { RunnerLogCard } from './RunnerLogCard/RunnerLogCard'
 import { AgentQuestionCard } from './AgentQuestionCard/AgentQuestionCard'
 import { useRunnerStore } from '../../store/runnerStore'
@@ -16,6 +15,7 @@ import styles from './index.module.css'
 
 export function HQ(): JSX.Element {
   const chat = useHQ()
+  const history = useHqHistory({ project: chat.projectPath ?? '', stop: chat.handleStop, reset: chat.handleClearAll })
   const thinkingLabel = useBrightskyStore((s) => s.thinkingLabel)
   const toolCallInProgress = useBrightskyStore((s) => s.toolCallInProgress)
   const runHistory = useRunnerStore((s) => s.runHistory)
@@ -29,8 +29,7 @@ export function HQ(): JSX.Element {
       {/* Left-edge drag handle — lives outside panelInner so overflow:hidden doesn't clip it */}
       <div className={styles.resizeHandle} onMouseDown={chat.onDragStart} />
       <div className={styles.panelInner}>
-      <ChatHeader hasClaudeTab={chat.hasClaudeTab} hasCodexTab={chat.hasCodexTab} hasShellTab={chat.hasShellTab} hasAntigravityTab={chat.hasAntigravityTab} targetKind={chat.targetKind} onSetTarget={chat.setTargetKind} onToggleChat={chat.toggleChat} onClearChat={chat.handleClearAll} sessions={chat.brightskyAuthenticated ? [] : undefined} onSelectSession={(id) => useBrightskyStore.getState().setSessionId(id)} />
-      <StageStatusStrip />
+      <ChatHeader hasClaudeTab={chat.hasClaudeTab} hasCodexTab={chat.hasCodexTab} hasShellTab={chat.hasShellTab} hasAntigravityTab={chat.hasAntigravityTab} targetKind={chat.targetKind} onSetTarget={chat.setTargetKind} onToggleChat={chat.toggleChat} onClearChat={history.newChat} sessions={history.sessions} onSelectSession={history.openChat} />
       <RunnerLogCard docked />
       {agentQuestion && (
         <AgentQuestionCard question={agentQuestion} onAnswer={chat.handleAgentAnswer} />
@@ -38,9 +37,6 @@ export function HQ(): JSX.Element {
       {runHistory.map((run, i) => (
         <RunnerLogCard key={`hist-${i}`} historicalRun={run} onDismiss={() => useRunnerStore.getState().removeHistoricalRun(i)} />
       ))}
-      <SkillsPanel onSkillClick={chat.handleSkillClick} />
-      {/* Pipeline menu — permanent, FSM-state-driven */}
-      {chat.menuVisible ? <PathlyMenuCard menu={chat.activeMenu!} onSelect={chat.handleMenuSelect} isOpen={chat.menuCardOpen} onToggle={() => chat.setMenuCardOpen((v) => !v)} /> : null}
       {/* Pushed menu — transient, skill-triggered with TTL progress bar */}
       {chat.pushedMenu ? (
         <PathlyMenuCard

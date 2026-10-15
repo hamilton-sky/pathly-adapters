@@ -14,7 +14,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 0 12px;
-  height: 42px;
+  height: var(--panel-header-height);
   background: var(--bg-mantle);
   border-bottom: 1px solid var(--bg-surface0);
   flex-shrink: 0;

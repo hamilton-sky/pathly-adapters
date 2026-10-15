@@ -1,11 +1,13 @@
+/* Same height and background as the Command Center header beside it. */
 .header {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
+  height: var(--panel-header-height);
+  padding: 0 12px;
   flex-shrink: 0;
   border-bottom: var(--border);
-  background: var(--bg-surface0);
+  background: var(--bg-mantle);
 }
 
 .titleRow {
@@ -199,6 +201,10 @@
   cursor: pointer;
   transition: var(--transition-fast);
   color: var(--text-primary);
+}
+
+.sessionItem[data-current='true'] {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
 .sessionItem:hover {

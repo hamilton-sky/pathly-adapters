@@ -814,6 +814,18 @@ pathly_orchestrator/
       comms/               # board + goals/DAG, split by domain: messages*.py, tasks.py, artifacts*.py, runs.py, goals.py, goals_read.py (GET /comms/goals rollup), settings.py, context.py, features.py (/comms/features/decompose), project.py (/comms/project/decompose) (+ _helpers.py); see "Comms board endpoints" above
       ops/                 # telemetry*.py (/record_activity, /record_phase*, /telemetry/*); menu.py (/menu, /metrics); db_api*.py (/db/* read API); chat.py (/chat); export.py
       code/                # query.py (POST /code/query — codebase-intelligence)
+      hq/                  # the HQ copilot (pathly/features/hq-copilot, local-operator): prompt.py
+                           # (POST /hq/prompt — the model turn Studio sends its LOCAL model:
+                           # hq_prompt.prepare_hq_turn, or hq_operator.prepare_operator_turn when
+                           # enabled_actions survive → {redirect | system_prompt + prompt,
+                           # manifest, context_tokens, tools, actions}); context.py (GET
+                           # /hq/context — the same packet for inspection; 404 unknown board);
+                           # actions.py (GET /hq/actions, PUT /hq/actions/available — the operator
+                           # catalog and what Settings allows); actions_run.py (POST
+                           # /hq/actions/check|run|report — proposals → cards → execution);
+                           # _action_targets (resolve + fingerprint), _action_exec (in-process
+                           # dispatch to the real route), _action_audit (local-operator board
+                           # line); _helpers.manifest / available_actions.
       control/             # runs_read.py (GET /runs, /runs/<run_id> — unified run read API; P0);
                            # runs_control.py (POST /runs — the unified launcher: a thin RunSpec
                            # {kind, board, scope, flow?, goal_id?, adapter?, model?} validated
@@ -2321,3 +2333,61 @@ both now land as columns instead of being re-derived. The pieces:
   `run_id`) keep the exact old feature-key behavior — a fallback, not a guess.
 - (Residual: `PHASE_SUMMARY`/OTel spans still key by the full `state.topic` path — a non-cost
   display nuance, explicitly out of run-identity's gate.)
+
+## HQ copilot (`hq_context.py`, `hq_prompt.py`, `hq_models.py`)
+
+Studio's HQ panel answers board questions with a FREE local model that runs Studio-side, so the
+server never calls a model — it builds the turn (`POST /hq/prompt`, `blueprints/hq/`). Three
+modules, one concern each:
+
+- `hq_context.assemble_packet` — board state → a `<pathly-context>` packet, token-budgeted
+  (`hq.context_budget_tokens`, chars/4), whole sections dropped lowest-priority-first
+  (`hq.packet_order`), 5s deadline, `HQContextUnavailable` rather than a partial packet. The
+  caller picks sections (`sections=`, from `SECTION_NAMES`; unchosen → cut_reason `off`; each
+  section reports its estimated `tokens` — what it took, or would have when cut over budget — which
+  Studio's composer meter estimates the next question from;
+  `SECTION_DEFAULTS` leaves the opt-in `summaries` section — artifact AI summaries — off). Runs
+  are project-wide (the fleet view), so each run line names its board. Question options are
+  read as agents post them — `{id, label, description}` objects — a plain-string-only reader
+  raised on the first real question and dropped the whole packet.
+- `hq_prompt` — `HQ_SYSTEM_PROMPT` (fixed, not user-editable), `build_hq_turn` (packet +
+  message), `prepare_hq_turn` (the route's entry point: an action request returns
+  `HQ_READONLY_REDIRECT` without the packet or model). The redirect matches IMPERATIVES only —
+  a clause that opens with an action verb and names a target — so "why did the build stop?"
+  still reaches the model. `HQ_TOOL_SCHEMAS = ()` is asserted empty on every build.
+- `hq_models` — `MODEL_CONTEXT_WINDOWS` (fail closed for unknown ids) and
+  `hq_required_context(budget) = 2*budget + 4000`: ONE number that both gates eligibility and is
+  the context size Studio requests from the runtime.
+
+Read-only by construction; `tests/hq_copilot/test_acceptance.py` diffs every row of the touched
+tables around the full path.
+
+**Operator actions (pathly/features/local-operator).** With `enabled_actions` on `POST /hq/prompt`
+(the composer's Actions tab, at most `hq_actions.MAX_ENABLED` = 8, else 400) the turn becomes the
+OPERATOR turn — but only for the actions Settings makes available (`hq.actions.available`,
+`hq_settings.get/set_hq_available_actions`; unset = `hq_actions.default_available()`: run control +
+`post_note`). Zero survivors = the read-only turn above, unchanged.
+
+- `hq_actions` — the curated catalog (9 actions: pause/resume/retry/stop_run, run_goal, plan_goal,
+  post_note, diagram_artifact, add_diagram_to_board), each with domain, risk words, model-facing
+  description, JSON-schema params (every one required — node-llama-cpp ignores `required`; optional
+  = a bare enum with `null`), `runs_on` server|studio. `NEVER_OFFERED` (answer_question,
+  directives, settings, secrets, files, shell) can never be in it. Pure.
+- `hq_operator` — `OPERATOR_SYSTEM_PROMPT` (propose, never claim it ran, never compose — propose
+  `plan_goal`), `operator_refusal_redirect` (imperatives for never-offered things → the right
+  surface, before the packet or model), `prepare_operator_turn` (packet built `with_ids=True`: goal
+  and artifact lines carry `(id 1a2b3c4d)` so the model can name them; `HQTurn.tools` = the
+  enabled actions' function definitions).
+- The model only PROPOSES. Studio's record-only handlers (`main/ipc/llmProposals.ts`) return the
+  calls; `POST /hq/actions/check` turns them into cards (not enabled ∩ available → dropped; bad
+  args or a target in the wrong state → an `invalid` record) with a fingerprint of the state
+  shown. `POST /hq/actions/run` (the Run click) resolves again — a changed fingerprint is `stale`,
+  nothing runs — then executes a server action by dispatching IN-PROCESS to the route a human click
+  uses (`_action_exec`: `/runs/<id>/pause|resume|retry|stop`, `/comms/goals/run`,
+  `/comms/goals/decompose` mode=planner, `/comms/post` as the human's note), so validation,
+  refusals (a busy board) and broadcasts are the route's own; one attempt, no retry loop. A
+  Studio-run action (diagrams) returns `approved` + its resolved target; Studio runs it and reports
+  (`/hq/actions/report`).
+- Audit: every EXECUTED action (done or failed) writes one `status` post from `local-operator` on
+  the HQ board, server-stamped (`author_source=system`) — never written by the model; proposals,
+  cancels and stale cards write nothing. Tests: `tests/local_operator/`.

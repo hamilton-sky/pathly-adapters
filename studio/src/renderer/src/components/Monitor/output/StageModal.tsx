@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { marked } from 'marked'
+import { renderSafeMarkdown } from '../../../lib/safeMarkdown'
 import type { StageLogEntry } from '../../../store/runnerStore'
 import styles from './StageModal.module.css'
 
@@ -48,7 +48,7 @@ export function StageModal({ entry, onClose }: Props): JSX.Element {
               </div>
               {resultView === 'raw'
                 ? <div className={styles.resultBox}>{entry.result}</div>
-                : <div className={styles.resultPreview} dangerouslySetInnerHTML={{ __html: marked(entry.result) as string }} />
+                : <div className={styles.resultPreview} dangerouslySetInnerHTML={{ __html: renderSafeMarkdown(entry.result, { breaks: false }) }} />
               }
             </>
           ) : (
@@ -75,7 +75,7 @@ export function StageModal({ entry, onClose }: Props): JSX.Element {
                 )}
               </div>
               {promptOpen && promptView === 'raw' && <div className={styles.promptBox}>{entry.prompt}</div>}
-              {promptOpen && promptView === 'preview' && <div className={styles.promptPreview} dangerouslySetInnerHTML={{ __html: marked(entry.prompt) as string }} />}
+              {promptOpen && promptView === 'preview' && <div className={styles.promptPreview} dangerouslySetInnerHTML={{ __html: renderSafeMarkdown(entry.prompt, { breaks: false }) }} />}
             </>
           )}
         </div>

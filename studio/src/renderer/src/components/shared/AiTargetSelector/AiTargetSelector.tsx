@@ -3,6 +3,7 @@ import { ChevronDown } from 'lucide-react'
 import { type AiSelection } from '../../../services/aiRouter'
 import { useEnginePreflight } from '../../../hooks/useEnginePreflight'
 import { buildGroups, encode, decode, labelForValue } from './options'
+import { useModelReadiness } from './useModelReadiness'
 import s from './AiTargetSelector.module.css'
 
 // Custom dropdown (button trigger + panel) emitting an AiSelection — a local model
@@ -18,8 +19,8 @@ interface Props {
   onChange: (sel: AiSelection) => void
   /** When true, adds an "Off" row that emits AI_SELECTION_OFF (consumers skip the run). */
   allowOff?: boolean
-  /** When true, also lists LOCAL models (a separate system used by chat). Default false: this
-   *  selector (the summary target) is CLI-engine-only so every summary spawn goes through the gate. */
+  /** Lists LOCAL models (default true): the summary target's default is the built-in local
+   *  model — free, no spawn. A model that can't run yet is greyed with the reason. */
   allowLocalModels?: boolean
   id?: string
   ariaLabel?: string
@@ -31,7 +32,7 @@ export function AiTargetSelector({
   value,
   onChange,
   allowOff = false,
-  allowLocalModels = false,
+  allowLocalModels = true,
   id,
   ariaLabel = 'AI target',
   disabled = false,
@@ -45,7 +46,8 @@ export function AiTargetSelector({
   // Engines that are not installed on this machine are greyed with their install command,
   // reusing the same disabledReason channel as noHeadless rather than a parallel mechanism.
   const { byAdapter } = useEnginePreflight()
-  const groups = buildGroups(allowOff, byAdapter, allowLocalModels)
+  const modelReason = useModelReadiness()
+  const groups = buildGroups(allowOff, byAdapter, allowLocalModels, modelReason)
   const current = encode(value)
   const triggerLabel = current === '' ? 'Select AI target…' : labelForValue(current, groups)
 

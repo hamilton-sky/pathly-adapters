@@ -52,23 +52,22 @@ beforeEach(() => {
 })
 
 describe('summarizeArtifact', () => {
-  it('coerces a stale local-model target to the CLI default, runs it, and writes back', async () => {
-    // Summaries are CLI-only: a stale stored local-model target is coerced to {engine, claude}
-    // (summarizeArtifact.ts). So the run + the persisted selection use the coerced target.
-    const selection = { type: 'model' as const, id: 'phi-4-mini' }
-    const coerced = { type: 'engine' as const, id: 'claude' }
+  it('a local-model target runs the bare prompt on the model (no CLI spawn) and writes back', async () => {
+    // The default summary target is the built-in local model: free, returns text directly.
+    const selection = { type: 'model' as const, id: 'qwen3-8b' }
     const ok = await summarizeArtifact({
       messageId: 'msg-1', path: '/p/DOC.md', atype: 'md', selection, cwd: 'C:/proj',
     })
     expect(ok).toBe(true)
     expect(readFile).toHaveBeenCalledWith('/p/DOC.md')
+    expect(composeClientSkill).not.toHaveBeenCalled() // no CLI skill, no sidecar file
     expect(runJob).toHaveBeenCalledTimes(1)
     const [job, sel] = runJob.mock.calls[0]
     expect(job.kind).toBe('summarize')
-    expect(job.cwd).toBe('C:/proj')
-    expect(sel).toEqual(coerced)
+    expect(job.prompt).toContain('## Description')
+    expect(sel).toEqual(selection)
     expect(apiEditMessage).toHaveBeenCalledWith('msg-1', 'What it is. Why it matters.')
-    expect(apiSetArtifactSummary).toHaveBeenCalledWith('art-1', '- Storage\n- API', coerced)
+    expect(apiSetArtifactSummary).toHaveBeenCalledWith('art-1', '- Storage\n- API', selection)
   })
 
   it('engine target composes the depth skill and reads the file-captured summary', async () => {

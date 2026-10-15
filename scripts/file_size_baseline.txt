@@ -3,7 +3,7 @@
 # These may only SHRINK. Regenerate with: python3 scripts/check_file_size.py --update
 
 studio/src/renderer/src/store/commsStore.ts:883
-studio/src/renderer/src/components/HQ/useHQ.tsx:874
+studio/src/renderer/src/components/HQ/useHQ.tsx:824
 studio/src/renderer/src/components/MarkdownEditor/EditorHeader/EditorHeader.tsx:617
 studio/src/renderer/src/components/Editor/index.tsx:576
 src/pathly_orchestrator/http_server/blueprints/comms/settings.py:521

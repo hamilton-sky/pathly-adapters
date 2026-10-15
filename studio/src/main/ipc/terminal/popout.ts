@@ -5,6 +5,7 @@
 
 import { BrowserWindow, app, type IpcMainInvokeEvent } from 'electron'
 import { join } from 'path'
+import { guardAppWindow } from '../../windowSecurity'
 import { activePtys, ptyOwners, ptyWindows } from './ptyRegistry'
 
 export function openTerminalPopout(event: IpcMainInvokeEvent, tabId: string, label: string): void {
@@ -27,6 +28,8 @@ export function openTerminalPopout(event: IpcMainInvokeEvent, tabId: string, lab
       sandbox: false,
     },
   })
+
+  guardAppWindow(popupWin)
 
   popupWin.once('ready-to-show', () => {
     popupWin.show()

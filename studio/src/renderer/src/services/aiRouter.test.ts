@@ -3,6 +3,7 @@ import { vi, describe, it, expect, beforeEach } from 'vitest'
 // Mock the two leaf services so we can assert exactly how aiRouter dispatches.
 vi.mock('./modelManager', () => ({
   runModel: vi.fn().mockResolvedValue({ text: 'model-result', cost_usd: 0.01 }),
+  RECOMMENDED_MODEL_ID: 'qwen3-8b',
 }))
 vi.mock('./cliEngine', async () => {
   const actual = await vi.importActual<typeof import('./cliEngine')>('./cliEngine')

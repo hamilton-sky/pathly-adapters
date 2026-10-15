@@ -1,0 +1,17 @@
+/* Anchor for the popover, and the `hqscope` container ScopeChip collapses on. */
+.row {
+  position: relative;
+  /* Container queries add layout containment (its own stacking context):
+     lift the row so the popover paints above the message list. */
+  z-index: 30;
+  min-width: 0;
+  container: hqscope / inline-size;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}

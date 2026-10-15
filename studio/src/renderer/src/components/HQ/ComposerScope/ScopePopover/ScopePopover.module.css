@@ -1,0 +1,72 @@
+/* Anchored to the chip row. min(280px, 100%) — never wider than the composer,
+   so the panel still fits at <=200px (the model picker's fixed 280px does not). */
+.popover {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  width: min(280px, 100%);
+  box-sizing: border-box;
+  max-height: 420px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  background: var(--bg-base);
+  border: var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  z-index: 200;
+}
+
+.popover:focus {
+  outline: none;
+}
+
+/* Same look as ModelSelector's Fast/Deep .modeToggle. */
+.tabs {
+  display: grid;
+  grid-auto-columns: 1fr;
+  grid-auto-flow: column;
+  gap: 4px;
+  padding: 2px;
+  background: var(--bg-surface0);
+  border: var(--border);
+  border-radius: 7px;
+}
+
+.tab {
+  min-width: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-xs);
+  padding: 5px 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab[data-active='true'] {
+  background: rgba(56, 189, 248, 0.16);
+  color: #38BDF8;
+}
+
+.tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.heading {
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.panel {
+  min-width: 0;
+}
