@@ -4,7 +4,7 @@
 
 Goal/DAG decomposition & scheduling — feature/flow/project decompose, goals read-model, PRD import.
 
-16 test file(s).
+18 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -23,4 +23,6 @@ Goal/DAG decomposition & scheduling — feature/flow/project decompose, goals re
 | `test_project_decompose.py` | Project-decompose ladder (planner-hierarchy G2): route dispatch, feature-count gate, flow, skill | 11 |
 | `test_project_goal_decompose.py` | Tests for T6: goal-slug routing at goal call sites | 6 |
 | `test_retry_debug_guide.py` | A second attempt carries the root-cause debugging guide (build-proof 11) | 15 |
+| `test_task_proof.py` | A goal-loop task is proven after it reports success (build-proof 05) | 10 |
+| `test_task_proof_window.py` | `supervisor/task_proof.wrap` on its own (build-proof 05) | 6 |
 | `test_task_retry.py` | Tests for supervisor/task_retry.py — per-task retry/escalation + deadlock detection | 19 |

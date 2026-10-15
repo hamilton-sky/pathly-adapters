@@ -106,7 +106,7 @@ def build_task_prompt(
     fallback is the path where the agent has the LEAST guidance, so it must not be the one
     path that loses the contract.
     """
-    task_text = task.get("text", "") or ""
+    task_text = task.get("claimed_text") or task.get("text") or ""
 
     try:
         from pathly_orchestrator.skills.compose import compose_skill

@@ -459,8 +459,8 @@ human checkpoints to `DONE`.
 - Reads live in `db/queries/task_proof.py`: `get_task` (any live row; the caller checks the
   type), `tasks_claimed_since` / `tasks_completed_since` (goal-scoped when `goal_id` is given,
   else `(board, scope)`, as `require_tasks_done` scopes; the window compares parsed times, since
-  claims stamp `+00:00` and event `ts` values end in `Z`) and `set_floor_allow`. Nothing reads
-  `claimed_text` or `floor_allow` during proof yet.
+  claims stamp `+00:00` and event `ts` values end in `Z`) and `set_floor_allow`. The goal-loop
+  task proof reads both ("Task proof in the goal-loop drain"); no gate does yet.
 
 ### Request bodies — one lenient reader for every comms route (`_helpers.read_json_body`)
 
@@ -769,6 +769,10 @@ pathly_orchestrator/
     drain.py               # drain_frontier — the ONE scheduler_loop call site. Owns the cost
                            #   tracker (wrapping spawn_fn exactly once) and folds the cap into
                            #   abort_check, so neither fan_out nor goal_executor can forget it.
+                           #   Wraps the spawn with task_proof.wrap inside the tracker.
+    task_proof.py          # wrap(spawn_fn) — proves each DAG task after it reports success:
+                           #   floor scan, frozen task text, check blocks, TASK_PROOF (see "Task
+                           #   proof in the goal-loop drain")
     isolation.py           # lane / serial isolation strategies for the frontier loop
     file_claims.py         # CROSS-FEATURE file-claim registry (feature A vs feature B) —
                            #   wired in goal_executor only; scheduler_loop never calls it, so it
@@ -927,7 +931,7 @@ needs `&&` is written as two `$` lines, because each runs through `run_command` 
 second `exit`, an unclosed fence). `run_checks(checks, cwd, timeout)` runs every check, not
 stopping at the first failure, and returns `(ok, report)`: one block per failing check with the
 command, `wanted:`, `got:` (`exit <N>`, `timed out after <N>s` or `could not run: <error>`) and
-the clipped output. Nothing runs them yet.
+the clipped output. `supervisor/task_proof.py` runs them for a goal-loop task; no gate does yet.
 
 **Floor guard (`proof/floor.py` over `proof/tree.py`).** Ported from feature-flow's
 `floorguard.py` (MIT): its regexes and config-file content rules, not its CLI. It looks for a build
@@ -957,7 +961,7 @@ name git C-quotes in a patch header. Every `tree` function fails open (`None` or
 root is not the top folder of a git work tree (a project inside a larger repo included), or git
 fails or is missing; each git call has a 60 s timeout and drops inherited `GIT_DIR`-style and
 pathspec variables (`GIT_LITERAL_PATHSPECS`, …). Snapshot objects are unreachable, so `git gc`
-prunes them later. Nothing calls the scan yet.
+prunes them later. `supervisor/task_proof.py` calls the scan for a goal-loop task; no gate does yet.
 
 **Proof base and task proofs (`fsm/gates/_proof_record.py`).** The floor and task-check gates
 judge the whole run, not one stage: a builder fix round runs inside REVIEWING, TESTING, RETRO or
@@ -987,7 +991,8 @@ current `claimed_at`, `checks` is `passed` or `none` and `floor` is not `failed`
 human re-open claims the task again (a new `claimed_at`), so the earlier record stops counting,
 and a failed proof is run again. It reads the whole event log on each call and is false when
 the events cannot be read (the checks then run again). No packaged flow declares a `floor_gate`
-or `task_checks` gate yet and nothing writes `TASK_PROOF`, so a real run stamps no base yet.
+or `task_checks` gate yet, so a real run stamps no base yet. The only writer of `TASK_PROOF` is the
+goal-loop drain's task proof ("Task proof in the goal-loop drain").
 
 **Spawn windows and stage writes (`supervisor/spawn_window.py`, `fsm/gates/_proof.py`).** The
 floor, scope and reviewer gates must tell who wrote a file: in `team`/`team-build` a planner or
@@ -1390,7 +1395,9 @@ on a failed task, and owns the FULL side-effect set for whichever branch it pick
 - **Retry** (`current_attempt < goal.task_max_attempts`, default 3): `retry_task` reverts the
   task to `pending` — the frontier's next poll re-schedules it — and stamps the failure reason
   into the existing `fail_reason` column (no new column: `get_ready_tasks`' `SELECT *` already
-  returns it, so the NEXT attempt's `task` dict carries it for free).
+  returns it, so the NEXT attempt's `task` dict carries it for free). Up to 4000 characters are
+  kept (`retry_task`, `fail_task`, the two `reason` lines in `scheduler.py` and the retry prompt
+  block), so a task proof's report survives into the next prompt.
 - **Escalate** (attempt `>= goal.task_max_attempts`): the original behavior, delayed until
   retries are exhausted — `fail_task`'s cascade-to-blocked, plus a board `escalation` message
   (mirrors `goal_verify.post_gate_failure_escalation`) so a human/agent sees it instead of a
@@ -1454,6 +1461,55 @@ hyphens only). Every place that previously parsed a bare task_id back out of a `
 (`test_dag_scheduler.py`, `test_golden_path.py`, `test_comms_goals_run.py`) now also strips the
 `#<attempt>` suffix; production code was already unaffected since it only ever checked the
 `sched-` PREFIX (`run_history_read._classify_kind`/`_is_parent`), never parsed the remainder.
+
+## Task proof in the goal-loop drain (`supervisor/task_proof.py`, build-proof)
+
+A DAG task used to pass on its own `AGENT_DONE` outcome. `drain.drain_frontier` now builds its
+spawn as `tracker.wrap(task_proof.wrap(spawn_fn))`, so every task of a fan-out drain (the
+`goal-loop` flow's `DRAINING`) is proven after it reports success. Any run id that is not
+`sched-<task_id>#<n>` passes straight through, and `spawn_fn=None` resolves
+`supervisor._run_stage_via_terminal` each time the wrapper is called (a test that patches it
+still works). A project root that is not a directory is not proven.
+
+1. **Before the spawn:** read the task (`task_proof.get_task`), register it in a lock-guarded
+   in-flight registry with its declared `files`, and `proof.tree.snapshot` the project root.
+2. **The spawn runs.** If it raised, or `scheduler._outcome_is_failure(outcome)` already holds,
+   the result is returned as is: nothing is proven and no `TASK_PROOF` is written.
+3. **After it returns**, a second snapshot, then in order:
+   - *Floor guard* (skipped when `floor.enabled` is off or either snapshot is `None`):
+     `proof.floor.scan(root, before, after, allow=<the task's floor_allow>, protected=[board
+     home], may_change=<builder stage writes>, config_commands=<verify.build/test/smoke>)`.
+     The paths declared in the `files` of every task whose window overlapped this one are left
+     out (a directory covers its subtree): two windows overlap when both were registered, in
+     the same project root, at the same time. A path nobody declared counts against every
+     overlapping task.
+   - *Task text:* a `claimed_text` that differs from the live `text` is a `task-edit` finding,
+     unless a human allowed `task-edit` for the task.
+   - *Checks:* `proof.checks.checks_in(claimed_text or text)` run with
+     `proof.checks.run_checks` in the project root (`verify.timeout_seconds`, default 600). A
+     `ParseError` is a failure that quotes the error; no block is not a failure.
+4. **Record** `TASK_PROOF {task_id, claimed_at, run_id, checks, floor, warnings}` in the run's
+   storage dir (`_proof_record.record_task_proof`): `checks` is `passed`, `failed`, `none` or
+   `error` (an unreadable block), `floor` is `off` when the scan was skipped, `failed` on any
+   floor or `task-edit` finding, else `clean`. The join's `task_checks` gate (planned) does not
+   run a proven task's checks again.
+
+On any finding or failing check the outcome comes back as a copy with `outcome: "failed"` and an
+`error` of one short heading per failing part (`## Floor guard`, `## Task text`, `## Checks`)
+and its report, in at most 4000 characters (the checks part gets what the others leave, head and
+tail). `scheduler_loop` sees a failure and `task_retry.resolve_task_failure` retries it (the
+report is the next prompt's failure block, with the root-cause guide, and the prompt shows the
+text frozen at the claim: `build_task_prompt` uses `claimed_text` before `text`) or, past
+`goal.task_max_attempts`, fails it and posts the escalation. The copy keeps `cost_usd`, so the
+cost tracker outside the wrapper still counts a failed attempt.
+
+Fails open on what the proof cannot do: no git (the floor is `off`, the checks still run), an
+unreadable task, or an unexpected error is logged and the outcome returned unchanged. Limits:
+each attempt is judged on its own diff, so a weakening an earlier failed attempt left in place
+is not seen again (the retry prompt carries the finding, and the floor gate at the goal-loop
+join is meant to re-check the whole run); lane-parallel tasks share one working tree, so an
+undeclared path is blamed on every overlapping task (`WorktreeIsolation` is still a stub); and
+the checks run in the project root with the server's account, as a builder's commands do.
 
 ## FSM/DAG convergence — more Phase-0-style fixes found while researching Phase 2 readiness
 
