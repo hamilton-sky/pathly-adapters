@@ -76,7 +76,9 @@ unreachable objects in `.git/objects` until `git gc`. A fresh reviewer session c
 Headless runs never write `retry_count_by_key`, so the FSM retry ladder never climbs and a builder
 feedback prompt does not name the feedback file it is handed. Studio has no control for the allow
 list yet (use `curl`). An interactive `/pathly` run records no `SPAWN_WINDOW`, so `scope_gate`
-cannot judge a path that was dirty when BUILDING began and `reviewer_unchanged` skips there.
+cannot judge a path that was dirty when BUILDING began, `reviewer_unchanged` skips there, and
+`floor_gate` cannot tell which role wrote a plan file: it excuses one a role may write (with a
+`FLOOR_CHECKED` warning), so a plan edit by the builder goes unseen in such a run.
 
 ### Board — run identity and authorship provenance (role-read-policy)
 
