@@ -148,6 +148,11 @@ def _add_additive_migrations(conn: sqlite3.Connection) -> None:
         # un-backfilled — legacy/human/non-poster posts legitimately carry NULL. RunDetail's Board
         # tab joins run_id-when-present, time-window-when-NULL (P1 threads it into make_board_posters).
         ("comms_messages", "run_id", "TEXT"),
+        # build-proof: the task text frozen at its first claim (claim_task COALESCE), and
+        # the floor categories a human allowed for the task (a JSON list). NULL = a task
+        # claimed before this feature / no allow list.
+        ("comms_messages", "claimed_text", "TEXT"),
+        ("comms_messages", "floor_allow", "TEXT"),
     ]:
         try:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {ctype}")

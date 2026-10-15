@@ -166,8 +166,8 @@ def _is_own_storage(path: str) -> bool:
     Pathly's own storage substrate (features/, project/, board-artifacts/, lessons/,
     the legacy plans/, …; see CLAUDE.md's storage layout), never builder-authored code.
 
-    Matches the WHOLE ``pathly/`` prefix, not just ``pathly/features/``/``pathly/plans/``
-    (which is as far as `fsm/gates/scope.py::_scope_clean`'s narrower exemption goes):
+    Matches the WHOLE ``pathly/`` prefix, wider than `fsm/gates/scope.py`, which under
+    ``pathly/`` exempts only what the builder stage may write (``_proof.stage_writes``):
     when a project's `pathly/` directory has never been committed at all — a brand new
     project's very first feature — git collapses an entirely-untracked tree to its
     SHALLOWEST boundary in `git status --porcelain` (``?? pathly/``, not the deeper

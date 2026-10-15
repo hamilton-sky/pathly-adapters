@@ -73,16 +73,31 @@ In runner mode Pathly is the single source of truth for skill content. The CLI r
 - `decision` — `"continue"` / `"block"` / `"escalate"` (automation gate)
 - `codex_subagent` — legacy compat field with frozen keys; new adapters should read `agent_hint`
 
-**Ground truth — `command_gate` measures what other gates take on trust.** Four of the five FSM
-transition gates read state an *agent produced*: `require_artifact` (a file exists), `verify_gate`
-(the file's line 1 is `RESULT: PASS`), `require_tasks_done` (tasks marked done), `scope_gate` (the
-git footprint matches the declared one). `command_gate` (`fsm/gates/command.py`) is the one that
+**Ground truth — `command_gate` measures what other gates take on trust.** The FSM transition gates
+`require_artifact` (a file exists), `verify_gate` (the file's line 1 is `RESULT: PASS`),
+`require_tasks_done` (tasks marked done) and `scope_gate` (the git footprint matches the declared
+one) read state an *agent produced*. `command_gate` (`fsm/gates/command.py`) is the one that
 **executes** — it runs the project's own verify command, reads the process exit code, and routes the
 real stdout/stderr back as feedback. So a builder that writes `RESULT: PASS` over code that does not
 compile no longer advances the flow. Configure per project with `PUT /db/settings/verify.build` /
 `verify.test`; **unconfigured means the gate skips**, so it is inert until a project opts in. Wired
 into `team`/`team-build` at `BUILDING->REVIEWING` (`verify.build` → `BUILD_FAILURES.md`) and
-`TESTING->RETRO` (`verify.test` → `TEST_FAILURES.md`). Detail:
+`TESTING->RETRO` (`verify.test` → `TEST_FAILURES.md`). `reviewer_unchanged`
+(`fsm/gates/reviewer.py`) also measures instead of trusting: it compares the git working tree and
+`HEAD` the supervisor recorded around each reviewer spawn, so a reviewer that changes a file other
+than `REVIEW.md` or its feedback files, or commits, parks the run for a human
+(`REVIEWER_CHANGED_FILES.md`) whatever it reports. Wired into `team`/`team-build` at
+`REVIEWING->TESTING` and `REVIEWING->BUILDING`. `floor_gate` (`fsm/gates/floor.py`) measures the
+diff instead of trusting the agent too: it scans everything the run changed since a run-wide
+`proof_base` for skipped or deleted tests, silenced linters, lowered thresholds, edited
+lint/test/CI config, edited task text and plan edits, so a builder that gets green by weakening
+the bar is sent back (`FLOOR_FAILURES.md`) whatever it reports. Wired into `team`/`team-build` at
+`BUILDING->REVIEWING`, `REVIEWING->TESTING`, `TESTING->RETRO` and `->DONE`, and into `goal-loop` at
+`DRAINING->DONE`; a human can allow a category for one task (`POST /comms/tasks/floor-allow`) or
+set `floor.enabled` to `false`. A red base is caught the same way: before the
+first spawn of `team`, `team-build` or `goal-loop` the supervisor runs `verify.smoke` (else
+`verify.build`), and a failure parks the run (`base_red`) with a human escalation before any
+agent is spawned. Detail:
 [src/pathly_orchestrator/CLAUDE.md](src/pathly_orchestrator/CLAUDE.md).
 
 **Agent roles** (full definitions in `src/pathly_data/core/agents/`):
@@ -110,7 +125,7 @@ into `team`/`team-build` at `BUILDING->REVIEWING` (`verify.build` → `BUILD_FAI
 
 ## Comms board (orchestration substrate)
 
-A DB-backed message board (`comms_messages` + `comms_artifacts` tables, `/comms/*` routes) where agents and humans post decisions, discoveries, artifacts, and DAG tasks. It is the Studio **Command Center** surface and is injected into every agent prompt as governance + semantic context (`retrieve_board_context`). The **Board → Goals → per-goal Task-DAG → pluggable-executors** model is **live** (`goal_id`/`executor` columns; executors = `single`/`loop`/`team`, dispatched by `supervisor/goal_executor.py` (`goal_run.py` is a thin re-export shim; goals decompose via `goal_decomposer.py`); goals decompose via planner/consultation, run with a per-goal executor + CLI-engine selector, and stop via `/comms/goals/stop`). **Since fsm-fan-out Phase E, `loop` and `team` are both FSM runs** — `loop` runs the `goal-loop` flow (one fan-out `DRAINING` state; flat by design, no review/test round-trip), `team` runs `team-build` (reviewed); only `single` is agent-driven, via `development/drain-dag`. Also live: a **context-retrieval** layer (per-task `context_refs` manifest → `/comms/artifacts/<id>/section` hydration → Board Catalog → client-side AI-Router summaries) and a **memory-consolidation** layer (relevance-gated context channel, near-duplicate dedup + a manual reflection pass via `/comms/consolidate`). Only **P3** (parallel: across-goal lanes → worktree fan-in) remains. Design + roadmap live in `pathly/features/comms-board/` (see `ROADMAP.md`). Details: [src/pathly_orchestrator/CLAUDE.md](src/pathly_orchestrator/CLAUDE.md).
+A DB-backed message board (`comms_messages` + `comms_artifacts` tables, `/comms/*` routes) where agents and humans post decisions, discoveries, artifacts, and DAG tasks. It is the Studio **Command Center** surface and is injected into every agent prompt as governance + semantic context (`retrieve_board_context`). The **Board → Goals → per-goal Task-DAG → pluggable-executors** model is **live** (`goal_id`/`executor` columns; executors = `single`/`loop`/`team`, dispatched by `supervisor/goal_executor.py` (`goal_run.py` is a thin re-export shim; goals decompose via `goal_decomposer.py`); goals decompose via planner/consultation, run with a per-goal executor + CLI-engine selector, and stop via `/comms/goals/stop`). **Since fsm-fan-out Phase E, `loop` and `team` are both FSM runs** — `loop` runs the `goal-loop` flow (one fan-out `DRAINING` state; flat by design, no review/test round-trip), `team` runs `team-build` (reviewed); only `single` is agent-driven, via `development/drain-dag`. Each `loop` task is proven after it reports success (floor scan of its own diff, frozen task text, its own check blocks); a failure goes through the existing per-task retry with the real output. Also live: a **context-retrieval** layer (per-task `context_refs` manifest → `/comms/artifacts/<id>/section` hydration → Board Catalog → client-side AI-Router summaries) and a **memory-consolidation** layer (relevance-gated context channel, near-duplicate dedup + a manual reflection pass via `/comms/consolidate`). Only **P3** (parallel: across-goal lanes → worktree fan-in) remains. Design + roadmap live in `pathly/features/comms-board/` (see `ROADMAP.md`). Details: [src/pathly_orchestrator/CLAUDE.md](src/pathly_orchestrator/CLAUDE.md).
 
 ---
 
@@ -299,7 +314,7 @@ blueprints/
   flows/      defs (flow CRUD), stage_configs (per-stage overrides)
   catalog/    items (file-tree catalog)
   skills/     editor (skill notebook routes)
-  comms/      messages, tasks, tasks_status, artifacts, runs, goals, settings, context (board subsystems)
+  comms/      messages, tasks, tasks_status, tasks_floor, artifacts, runs, goals, settings, context (board subsystems)
   ops/        telemetry, menu, db_api, chat, export (operational/infra)
   code/       query (codebase-intelligence query)
   hq/         context (GET /hq/context — board packet, for inspection) · prompt (POST /hq/prompt — the HQ copilot's model turn: system prompt + board packet + message, or a redirect for an action request; with enabled_actions, the operator turn + the function definitions offered) · actions (GET /hq/actions catalog, PUT /hq/actions/available) · actions_run (POST /hq/actions/check|run|report — operator proposals → confirm cards → execution through the real routes + audit)

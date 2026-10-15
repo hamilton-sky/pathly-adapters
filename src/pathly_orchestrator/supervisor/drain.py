@@ -57,11 +57,13 @@ def drain_frontier(
     accumulator.
 
     ``spawn_fn`` is wrapped with the tracker here — never wrap it before calling, or each
-    task's cost is counted twice. ``abort_check`` supplies only the caller's OWN reason to
-    stop; ``tracker.exceeded()`` is OR-ed in, so the cost cap applies to every drain by
-    construction rather than by each caller remembering it.
+    task's cost is counted twice. Inside the tracker it is wrapped with ``task_proof.wrap``,
+    which proves each DAG task after it reports success (build-proof 05). ``abort_check``
+    supplies only the caller's OWN reason to stop; ``tracker.exceeded()`` is OR-ed in, so the
+    cost cap applies to every drain by construction rather than by each caller remembering it.
     """
     from pathly_orchestrator.supervisor.cost_cap import init_cost_tracker
+    from pathly_orchestrator.supervisor import task_proof
     from pathly_orchestrator.supervisor.scheduler import scheduler_loop
 
     if tracker is None:
@@ -85,7 +87,7 @@ def drain_frontier(
         isolation=isolation,
         broadcast_fn=broadcast_fn,
         event_broadcast_fn=event_broadcast_fn,
-        spawn_fn=tracker.wrap(spawn_fn),
+        spawn_fn=tracker.wrap(task_proof.wrap(spawn_fn)),
         abort_check=_abort,
         goal_id=goal_id,
     )

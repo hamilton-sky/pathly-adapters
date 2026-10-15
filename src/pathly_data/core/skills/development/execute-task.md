@@ -16,6 +16,8 @@ board context appended below carries what you need to know.
   supervisor owns the queue. Do NOT run the planning workflow or invent scope beyond the task.
 - If the task is blocked by something genuinely missing, say so clearly in your result rather
   than guessing.
+- Make your completion summary say what was built, which files changed, any shortcut taken,
+  and anything a later task needs to know, because dependent tasks read it.
 
 When the task is finished, stop. Progress narration, posting findings/artifacts to the board,
 and the completion report are handled by the protocol sections appended below — follow them.

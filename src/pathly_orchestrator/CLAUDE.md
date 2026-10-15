@@ -111,8 +111,8 @@ path entirely (see its own section below).
                                          |
                                          v
                       run_gates(STATE -> next)   <- THE JOIN, once
-                      (goal-loop's: require_tasks_done + command_gate build + test;
-                       each flow declares its own under `gates:`)
+                      (goal-loop's: require_tasks_done + command_gate build + test
+                       + floor_gate; each flow declares its own under `gates:`)
 ```
 
 `fsm_state.current` stays the **scalar** `"DRAINING"` for the whole drain. The parallelism is
@@ -215,8 +215,9 @@ Telemetry is a **projection**, not a second write path:
                           <fsm_feature> <feature_path> <feature> <board> <run_category>
                                            |
                                            v
+                              + results of the tasks it depends on  (DAG task only; before the contract)
                               + RUNNER_CONTRACT_BLOCK  (one constant, all headless paths)
-                              + retry ladder (attempt >= 2)
+                              + retry ladder (attempt >= 2) + the root-cause-debug guide
                               + board context (governance + semantic, per-tier budget)
 ```
 
@@ -354,6 +355,7 @@ POST /comms/answer          ← answer a posted question
 GET  /comms/tasks           ← list DAG tasks
 POST /comms/tasks/complete  ← mark a task complete
 POST /comms/tasks/status    ← BULK terminal write-back (done|failed) for a resolving agent: `{task_ids,status,reason,from}`; reports updated/newly_ready/blocked/unknown. Re-opening (→pending) is deliberately NOT offered — that is a supervisory act
+POST /comms/tasks/floor-allow ← HUMAN only (403 for a live run token): set one task's floor allow list `{message_id, allow:[…], refreeze}`; `refreeze` re-copies the live text into `claimed_text` (see "Frozen task text" below)
 POST /comms/tasks/run       ← run ONE task headlessly: claim it, spawn a builder on its prompt, complete on success
 POST /comms/tasks/stop      ← stop a single-task run: kill its board run and revert the task to pending
 POST /comms/attach          ← attach an artifact to a message
@@ -432,6 +434,33 @@ human checkpoints to `DONE`.
   be read is reported absent rather than blocking every transition in the product.
 - Studio has no dedicated force-advance button yet; today the override is the `complete_stage`
   field. Acknowledging from the board clears the gate through the existing UI.
+
+**Frozen task text and the human-only floor allow list (build-proof).** Two additive
+`comms_messages` columns (`db/migrations_incremental.py`); a task claimed before them reads
+`NULL` in both.
+
+- **`claimed_text`** — `claim_task` sets `claimed_text = COALESCE(claimed_text, text)` in its one
+  `UPDATE`, so the first claim freezes the task's text, and with it any ```` ```check ```` block. A retry
+  (`task_retry.retry_task` back to pending, then a new claim) keeps the first copy, so a builder
+  that edits its own task between attempts does not change what it is proven against. Every
+  claim goes through `claim_task`: the scheduler's `sched-<id>#<n>` claims,
+  `POST /comms/tasks/claim` (team-flow builders claim with `run_id: "build"`) and
+  `/comms/tasks/run`.
+- **`floor_allow`** — a JSON list of `proof.floor.CATEGORIES` names a human allowed for that one
+  task. Its only writer is `POST /comms/tasks/floor-allow` (`blueprints/comms/tasks_floor.py`),
+  body `{message_id, allow: [...], refreeze: false}` → 200 `{ok: true, allow: [...]}` (sorted).
+  403 when the caller sends a live run token (the `force_past_gate` rule); 400 for an unknown
+  category (the error names the valid ones, from `proof.floor.parse_allow`), a malformed body or
+  a row that is not a task; 404 for a missing row. `refreeze: true` also copies the live `text`
+  into `claimed_text`: how a human corrects a broken check without allowing `task-edit`. Task
+  text is agent-written, so an allow line there would let the planner excuse the builder.
+- **Limit:** as for `force_past_gate`, a caller with no token (or an unknown or revoked one) is
+  treated as a human. Studio has no control for the list yet; set it with `curl` from a shell.
+- Reads live in `db/queries/task_proof.py`: `get_task` (any live row; the caller checks the
+  type), `tasks_claimed_since` / `tasks_completed_since` (goal-scoped when `goal_id` is given,
+  else `(board, scope)`, as `require_tasks_done` scopes; the window compares parsed times, since
+  claims stamp `+00:00` and event `ts` values end in `Z`) and `set_floor_allow`. The goal-loop
+  task proof reads both ("Task proof in the goal-loop drain"); no gate does yet.
 
 ### Request bodies — one lenient reader for every comms route (`_helpers.read_json_body`)
 
@@ -648,6 +677,8 @@ pathly_orchestrator/
       comms_messages.py    # board message CRUD; goal_id/executor columns back the Goals->Task-DAG model
       comms_artifacts.py   # artifact metadata CRUD (attach, list, section index, update_summary)
       comms_tasks.py       # task DAG operations (get_ready, complete, claim, fail, reclaim, goal_refs_coverage)
+      task_results.py      # build-proof: latest_task_summaries(conn, task_ids) — the newest AGENT_DONE `summary` of each task's `sched-<id>#<n>` runs (a dependent task's prompt shows it)
+      task_proof.py        # build-proof task reads: get_task, tasks_claimed_since / tasks_completed_since (goal- else (board, scope)-scoped, parsed-time window), set_floor_allow (the human-set floor_allow JSON list; refreeze re-copies text into claimed_text)
       comms_embeddings.py  # embedding storage + hybrid/semantic search; search_by_embedding() merges parent+child vectors, deduplicates by message_id, returns _matched_chunk for subtopic surfacing; store_chunk_embeddings() writes to comms_chunk_embeddings; SEMANTIC_DISTANCE_CEILING (0.72) + opt-in max_distance= floor scored hits for /comms/search (BM25 hits bypass; comms_context.py keeps its own per-tier gates); _fts_query() quotes each token so raw FTS5 operators (code:query, a OR b, unbalanced ") match literally instead of reparsing; search_by_hybrid() tags each row _match_source (keyword|semantic) for client grouping
       comms_counts.py      # count_goals_for_feature / count_features_for_project — gate the consultation flows' seed thresholds
       comms_goals_read.py  # get_goals_with_rollup() — backs GET /comms/goals
@@ -710,6 +741,9 @@ pathly_orchestrator/
                            #   Phase E: the ONLY drain — `executor: loop` reaches it as the
                            #   goal-loop flow's DRAINING state. Frontier scope = the run's
                            #   BOARD scope, not state.topic (a goal run's topic is its own slug).
+    spawn_window.py        # observe — wraps the single-path spawns (run_stage's and the feedback
+                           #   spawn): a SPAWN_WINDOW event (role, tree + HEAD before/after) when
+                           #   the flow has a floor/scope/reviewer gate (see "Spawn windows" below)
     orchestrator_session.py # resolve_session — same-adapter session reuse + the SESSION event
     api.py                 # start_run, pause_run, resume_run, abort_run, supply_decision, reroute_run
     goal_run.py            # thin re-export shim (start_goal_run / start_goal_decompose) → the two modules below
@@ -727,10 +761,18 @@ pathly_orchestrator/
     task_prompt.py         # build_task_prompt — ONE assembly of a DAG task's prompt: the composed
                            #   development/execute-task body with its fragment placeholders
                            #   SUBSTITUTED (the DAG path had no injector at all — see Phase E),
-                           #   plus the runner contract, retry ladder and board context
+                           #   plus the dependency-results block, the runner contract, the retry
+                           #   ladder (+ the root-cause-debug guide) and board context
+    task_dependencies.py   # dependency_results_block(task) — `## Results of the tasks this one
+                           #   depends on`: per direct depends_on id a `### <its first text line>`
+                           #   heading and its latest AGENT_DONE summary (see "Dependency results")
     drain.py               # drain_frontier — the ONE scheduler_loop call site. Owns the cost
                            #   tracker (wrapping spawn_fn exactly once) and folds the cap into
                            #   abort_check, so neither fan_out nor goal_executor can forget it.
+                           #   Wraps the spawn with task_proof.wrap inside the tracker.
+    task_proof.py          # wrap(spawn_fn) — proves each DAG task after it reports success:
+                           #   floor scan, frozen task text, check blocks, TASK_PROOF (see "Task
+                           #   proof in the goal-loop drain")
     isolation.py           # lane / serial isolation strategies for the frontier loop
     file_claims.py         # CROSS-FEATURE file-claim registry (feature A vs feature B) —
                            #   wired in goal_executor only; scheduler_loop never calls it, so it
@@ -749,6 +791,10 @@ pathly_orchestrator/
                            #   answerable instead of failing silently.
     slug.py                # scope / slug helpers for goal + board addressing
     orchestrator_stage.py  # single-stage resolution helpers split out of orchestrator.py
+    human_escalation.py    # post_human_escalation(state, text) — the one writer of a to_agent='human'
+                           #   escalation for a parked run (a human checkpoint, a red base)
+    base_smoke.py          # check_base — smoke the base before the first spawn (see "Run guard rails")
+    run_budget.py          # refresh — raise a goal run's max_iterations from its DAG (see "Run guard rails")
     board_run.py           # start_board_run: board-lock + skill compose + async spawn helper
     board_lock.py          # Per-board/scope advisory lock (acquire/release/holder)
   http_server/             # Flask HTTP server: FSM endpoints + SSE + runner routes
@@ -830,7 +876,7 @@ import, so no call site moved:
 
 | Entry point | Now delegates to |
 |---|---|
-| `fsm_compose.py` (298) — keeps `build_prompt` / `build_prompt_for_agent` / `_load_agent_text` | `fsm_compose_tables` (lookup tables) · `fsm_compose_vars` (`_inject_prompt_vars` + its inputs) · `fsm_compose_paths` (`resolve_stage_out_path`, `resolve_board_scope`) · `fsm_compose_stage` (section drops, stage overrides, adapter choice) · `fsm_compose_hints` (`_agent_hint`) |
+| `fsm_compose.py` (298) — keeps `build_prompt` / `build_prompt_for_agent` / `_load_agent_text` | `fsm_compose_tables` (lookup tables) · `fsm_compose_vars` (`_inject_prompt_vars` + its inputs) · `fsm_compose_paths` (`resolve_stage_out_path`, `resolve_board_scope`) · `fsm_compose_stage` (section drops, stage overrides, adapter choice) · `fsm_compose_hints` (`_agent_hint`) · `fsm_compose_review` (the reviewer's Review packet) |
 | `skills/compose.py` (197) — keeps the resolver | `compose_base` (constants + `_strip_leading_frontmatter`) · `compose_resources` (manifest/skill/fragment I/O) · `compose_caps` · `compose_segments` · `compose_validate` |
 | `supervisor/terminal.py` (390) — keeps the spawn | `terminal_argv` · `terminal_identity` · `terminal_reconcile` · `terminal_billing` · `terminal_phase` |
 | `fsm/engine_actions.py` (204) — keeps `run_transition_actions` | `fsm/gates/` — one module per gate type (`artifact` · `tasks` · `scope` · `command`) behind the `run_gates` dispatcher in `gates/__init__.py`; `_helpers` owns `append_event` / `_write_gate_feedback` / `gate_failed` / `project_root_of` |
@@ -854,18 +900,23 @@ module, never another `elif`**. Each check returns `None` to allow the transitio
 | `require_artifact` | `artifact.py` | an agent wrote a file | `artifact` |
 | `verify_gate` | `artifact.py` | an agent wrote `pass_marker` on line 1 | `artifact`, `pass_marker` |
 | `require_tasks_done` | `tasks.py` | the board DAG has no unfinished task (goal-scoped when `goal_id` is set, else feature-scoped) | — |
-| `scope_gate` | `scope.py` | the builder stayed inside its declared footprint (git diff ∪ untracked vs. `scope_file`) | `scope_file` |
+| `scope_gate` | `scope.py` | the builder stayed inside its declared footprint (git diff ∪ untracked vs. the paths in `scope_file` ∪ the claimed tasks' `files`; see "Scope gate" below) | `scope_file` (optional); flow-level `scope_gate.exempt_prefixes` |
 | `command_gate` | `command.py` | **the project's own verify command exits 0** | `command_key` (+ optional `command`, `timeout`) |
+| `reviewer_unchanged` | `reviewer.py` | a reviewer spawn changed no file and made no commit (the supervisor's `SPAWN_WINDOW` events; see "Reviewer gate" below) | — |
+| `floor_gate` | `floor.py` | **the run's diff since the `proof_base` weakens no test, check, config or plan** (`proof.floor.scan` over two working-tree snapshots; see "Floor gate" below) | — (app setting `floor.enabled`) |
 
 **The first four read state that agents produced; only `command_gate` executes something.** That
 distinction is the point of it: `verify_gate` is satisfied by an agent writing `RESULT: PASS`, so
 the FSM's pass/fail signal was, end to end, an agent's opinion of its own work. `command_gate`
 re-derives the answer from a process exit code and routes the real stdout/stderr back as feedback.
+`reviewer_unchanged` reads what the supervisor measured around the reviewer's spawn, not what the
+reviewer reported. `floor_gate` reads the git working tree itself, not what the builder reported.
 
 **Command resolution** (highest precedence first): `gate["command"]` literal → app-setting
 `verify.<command_key>` → **skip**. Configure a project with
 `PUT /db/settings/verify.test {"value": "python -m pytest -q"}` (also `verify.build`, `verify.lint`,
-and `verify.timeout_seconds`; default timeout 600s).
+and `verify.timeout_seconds`; default timeout 600s). `verify.smoke` is read by no gate: only the
+run-start base smoke does (see "Run guard rails").
 
 **Fail-open on absent config, fail-closed on everything else.** No configured command → `GATE_SKIPPED`
 (`no_command_configured`), so adding the gate to a shared flow never breaks a project that has not
@@ -881,6 +932,291 @@ argv array instead, for exact control on any platform — **required on Windows 
 `goals/<slug>` run resolves the same root the event log keys off) and `PATHLY_VERIFY_GATE=1` in the
 environment. Failure output is clipped head+tail (3000/5000 chars) — compilers put the first error at
 the top, test runners put the summary at the bottom, so tailing alone loses half the signal.
+The splitting, the run and the clipping live in `proof/command.py` (`to_argv`, `run_command`,
+`clip`), the one command runner the gate and task check blocks share.
+
+**Task check blocks (`proof/checks.py`).** A task's text can carry ```` ```check ```` fences;
+every one anywhere in the text counts. Inside a fence: `$ <command>` starts a check, `exit <N>`
+or `exit nonzero` sets the exit code it must give (default `exit 0`), each `prints <text>` names a
+substring its output must contain, and `#` comments and blank lines are ignored. A command that
+needs `&&` is written as two `$` lines, because each runs through `run_command` (no shell).
+`checks_in(text)` raises `ParseError` on a line it cannot read (a `prints` before any `$`, a
+second `exit`, an unclosed fence). `run_checks(checks, cwd, timeout)` runs every check, not
+stopping at the first failure, and returns `(ok, report)`: one block per failing check with the
+command, `wanted:`, `got:` (`exit <N>`, `timed out after <N>s` or `could not run: <error>`) and
+the clipped output. `supervisor/task_proof.py` runs them for a goal-loop task; no gate does yet.
+
+**Floor guard (`proof/floor.py` over `proof/tree.py`).** Ported from feature-flow's
+`floorguard.py` (MIT): its regexes and config-file content rules, not its CLI. It looks for a build
+that got green by weakening the bar. `scan(root, base, after, *, allow, protected, may_change,
+config_commands)` diffs two snapshots and returns `FloorReport(findings, warnings, error)`, each
+finding `"<category>: <path>: <line>"`. `error` is set when a snapshot is missing or a git call
+failed or timed out: the findings it holds are real, but the scan is incomplete, so a caller can
+log a skip instead of reading it as clean. Categories (`CATEGORIES`, read by `parse_allow`, which raises
+`ValueError` on an unknown name): `skip` (skip/xfail markers, and focused tests in test files),
+`suppress` (`noqa`, `type: ignore`, `eslint-disable`, …), `empty-catch` (a one-line
+`except …: pass` or `catch {}`), `threshold` (`fail_under` and kin), `trivial-assert` (an assertion
+that cannot fail, in a test file), `test-delete`, `config` (lint/test/CI config by file name, plus
+the guarded sections of `pyproject.toml`/`setup.cfg`, the test keys of `package.json`, collection
+words added to `conftest.py`, and a `Makefile` when a verify command starts with `make`),
+`plan-edit` (a path under a `protected` prefix that `may_change` does not excuse) and `task-edit`
+(checked by the callers, which hold the task rows). The pattern categories, `test-delete` and
+`config` apply only **outside `pathly/`**, so plan docs may mention `@pytest.mark.skip` in prose;
+plan files are judged by `plan-edit`. Fewer assertion lines added than removed in test files is a
+warning, not a finding; categories in `allow` are dropped. The snapshot (`tree.snapshot`) copies
+the file `git rev-parse --git-path index` names to a temp file, keeping its mtime (git re-reads an
+entry as new as the index file, so a fresh mtime would hide a same-second, same-size edit), points
+`GIT_INDEX_FILE` at it, runs `git add -A` and `git write-tree`: a tree id for tracked and untracked
+(not ignored) files, with the repo's real index and `HEAD` untouched. `head`, `changes`,
+`diff_text` (with `:(exclude)<path>` pathspecs), `blob` and `read` work on those tree ids;
+`changes_or_none` and `diff_text_or_none` return `None` when git fails, and `unquote_path` reads a
+name git C-quotes in a patch header. Every `tree` function fails open (`None` or empty) when the
+root is not the top folder of a git work tree (a project inside a larger repo included), or git
+fails or is missing; each git call has a 60 s timeout and drops inherited `GIT_DIR`-style and
+pathspec variables (`GIT_LITERAL_PATHSPECS`, …). Snapshot objects are unreachable, so `git gc`
+prunes them later. `supervisor/task_proof.py` calls the scan for a goal-loop task and `floor_gate`
+calls it for the whole run ("Floor gate").
+
+**Proof base and task proofs (`fsm/gates/_proof_record.py`).** The floor and task-check gates
+judge the whole run, not one stage: a builder fix round runs inside REVIEWING, TESTING, RETRO or
+after a goal-loop drain, and `build_baseline` is popped on every transition. So STATE carries a
+run-wide `proof_base {tree, started_at}`:
+
+- **Stamped** by `fsm_ops.next_action` (`stamp_proof_base`, right after the `build_baseline`
+  stamp) the first time the run is in a state `wants_proof_base` accepts, and only when STATE has
+  none. A state qualifies when a gate list on an edge out of it holds a `floor_gate` or
+  `task_checks` gate; the edges are the `<state>-><X>` keys and the wildcard `-><X>` keys for
+  every `X` in the flow's `transitions[state]`. `tree` is `proof.tree.snapshot(project_root)`,
+  `None` outside a git repo; `started_at` (`datetime.now(timezone.utc).isoformat()`) is always
+  set, because the task-check gate needs it without git.
+- **Kept** across every transition, and dropped only on the one into `DONE`
+  (`fsm_ops_complete` pops it when `next_state == "DONE"`), so a back-edge (`REVIEWING->BUILDING`)
+  and a resumed run keep the first base. `build_baseline` (per BUILDING, popped on leaving it)
+  and `review_base` (the Review packet's diff base) are separate and unchanged.
+- **Read** by `read_proof_base(storage_path)` through `eventlog.read_state` (the DB; no
+  `STATE.json` fallback), `None` when absent or unreadable.
+
+`TASK_PROOF {task_id, claimed_at, run_id, checks, floor, warnings}` says a task completion was
+proven. `record_task_proof(storage_path, task, run_id, checks, floor, warnings=())` appends it
+with `claimed_at` copied from the task row (`checks`: `passed` | `failed` | `none` | `error`;
+`floor`: `clean` | `failed` | `off` | `n/a`; anything else raises `ValueError`).
+`task_proven(storage_path, task)` is true when the newest `TASK_PROOF` for the task carries its
+current `claimed_at`, `checks` is `passed` or `none` and `floor` is not `failed`: a retry or a
+human re-open claims the task again (a new `claimed_at`), so the earlier record stops counting,
+and a failed proof is run again. It reads the whole event log on each call and is false when
+the events cannot be read (the checks then run again). `team`, `team-build` and `goal-loop`
+declare a `floor_gate`, so their runs stamp a base on first entry to BUILDING (`team`,
+`team-build`) or DRAINING (`goal-loop`); no flow declares a `task_checks` gate yet. The only
+writer of `TASK_PROOF` is the goal-loop drain's task proof ("Task proof in the goal-loop drain").
+
+**Spawn windows and stage writes (`supervisor/spawn_window.py`, `fsm/gates/_proof.py`).** The
+floor, scope and reviewer gates must tell who wrote a file: in `team`/`team-build` a planner or
+architect routed a feedback file may edit `IMPLEMENTATION_PLAN.md` while the FSM is still in
+BUILDING, and a reviewer may write `REVIEW.md` and nothing else. So when a flow's `gates` hold a
+`floor_gate`, `scope_gate` or `reviewer_unchanged` (`spawn_window.wants_windows`),
+`spawn_window.observe` takes `proof.tree.snapshot` and `proof.tree.head` before and after a
+single-path spawn and appends `SPAWN_WINDOW {role, run_id, state, before, after, head_before,
+head_after}` to the run's event log (`state.storage_path`, else
+`fsm_ops._resolve_storage_path(None, project_root, topic)`; `state` is the FSM state). Two spawns
+record it, each passing its role explicitly: `fan_out.run_stage`'s single spawn (the flow's
+`role_map[state]`) and the feedback spawn in `orchestrator_stage._resolve_stage_supervised` (the
+feedback's `target_agent`, so a builder or planner routed a file inside REVIEWING is not recorded
+as the `reviewer` that `terminal_identity._spawn_role` would mint). A fan-out drain records none.
+The spawn's result comes back unchanged; an exception from it propagates and no window is written;
+outside a git repo, or when a snapshot or the event write fails, there is no window and a log line.
+`team` and `team-build` carry a `scope_gate`, and all three flows carry a `floor_gate`, so their
+runs record windows (in `goal-loop` only for the feedback spawns of a builder fix round, since a
+fan-out drain records none).
+
+What each role may change (`_proof.stage_writes(storage_path, role)`, a predicate over
+repo-relative POSIX paths). `<storage>` is the run's storage dir; the *board home*
+(`_proof.board_home`) is `pathly/features/<feature>/` for a feature storage dir or anything nested
+in one (a goal's `goals/<slug>`), else the storage dir itself (`pathly/plans/<name>/`,
+`pathly/project/...`):
+
+| Role | May change |
+|---|---|
+| every role | `<storage>/feedback/**`; `STATE.json`, `BOARD.json` and `EVENTS.jsonl` anywhere under `pathly/` (the server rewrites them during a run, and a user project may not gitignore them); any `*.tsbuildinfo` |
+| `builder` | also `<storage>/VERIFY.md` |
+| `reviewer` | also `<storage>/REVIEW.md` |
+| `po`, `planner`, `architect`, `designer` (the keys of `fsm_compose_tables._FIX_MODE_ARTIFACT`), `retro` | also any file directly inside `<storage>` or the board home (the plan documents) |
+
+`_proof.explained(project_root, path, now_tree, windows, storage_path)` is true when a window whose
+role may write `path` changed it and left it at the blob it has in `now_tree` (`proof.tree.blob`; a
+deletion matches a deletion). A window that never touched the path excuses nothing, so a builder's
+plan edit made before a planner ran stays the builder's. `_proof.windows_since(storage_path,
+since=None, roles=None)` returns the `SPAWN_WINDOW` events with `ts >= since`, oldest first,
+comparing parsed times (an event `ts` ends in `Z` and has whole seconds, while `since` stamps are
+`isoformat()` with an offset, so `since` is cut to its second), and raises `ValueError` when
+`since` is not a time. `_proof.floor_enabled()` reads the `floor.enabled` app setting: on unless it
+is `false`, `0` or `off`. `_proof` never imports `supervisor` and imports `db` lazily. `scope_gate`
+reads the windows (below).
+
+**Scope gate (`fsm/gates/scope.py`, `_scope_tasks.py`).** Did the builder stay inside what it
+declared? The *declared scope* is the union of the backtick paths in the gate's `scope_file`
+(optional; read from the storage dir when the file exists) and the `files` of the board tasks
+claimed since `build_baseline.started_at` (`task_proof.tasks_claimed_since`, goal-scoped when the
+run has a `goal_id`, else `(board, scope)`). Only a task posted before that stamp (its server `ts`)
+and not stamped `author_role: builder` counts, so a builder cannot widen its scope by posting a task
+and claiming it. An entry that names a directory covers everything under it, with or without a
+trailing `/`. The *changed paths* are `git diff --name-only HEAD` plus every untracked file
+(`git status --untracked-files=all`, so a new folder is listed file by file). A path in
+`build_baseline.preexisting_dirty` (dirty when BUILDING began; a collapsed `dir/` entry covers the
+files under it) is judged by content instead: it counts when its blob now differs from the
+`before` tree of the first `SPAWN_WINDOW` since `started_at`, which is where the build began (a
+deletion counts too). That is the usual case for the plan: `pathly.auto_commit` is off by default
+and nothing commits before BUILDING, so `git status` names the plan files, or all of `pathly/`, in
+the baseline. *Exempt*: what the builder stage may write (`_proof.stage_writes(storage, "builder")`:
+its feedback files, `VERIFY.md`, the server's exports, any `*.tsbuildinfo`), the flow's
+`scope_gate.exempt_prefixes`, and a path `_proof.explained` attributes to a `SPAWN_WINDOW` since
+`build_baseline.started_at` (a planner routed `IMPL_QUESTIONS.md` inside BUILDING edits the plan).
+The working-tree snapshot is taken only when some window's role may write a remaining path or a
+baseline path must be judged. The old blanket `pathly/features/` and `pathly/plans/` exemption is
+gone, so in a headless run a builder edit to `USER_STORIES.md` or `IMPLEMENTATION_PLAN.md` fails,
+committed or not, and the scope file never covers its own edit (a builder cannot widen its scope by
+adding a path to it). `SCOPE_VIOLATION.md` names the paths outside the scope (at most 20, then a
+count). It skips (`GATE_SKIPPED`, fail open) with no `build_baseline`, when nothing is declared
+(`no_declared_scope`), and when git or the claimed tasks (`tasks_unreadable`) cannot be read; a
+truncated baseline is `GATE_DEGRADED`. When the windows (`spawn_windows_unreadable`), the snapshot
+(`snapshot_failed`) or the tree diff since the build began (`git_diff_failed`) cannot be read, it
+still fails on the changed paths no window could explain (with unreadable windows, those no role
+may write, `_proof.any_role_writes`: a code file outside the scope; otherwise those no recorded
+window's role may write) and skips only when nothing like that is left. A baseline path is not
+judged then. Wired as the last gate of `BUILDING->REVIEWING` in `team` and `team-build`
+(`scope_file: IMPLEMENTATION_PLAN.md`, `SCOPE_VIOLATION.md` → builder); not in `goal-loop`.
+
+Limits of the scope gate: a run with no `SPAWN_WINDOW` (an interactive `/pathly` run; only the
+supervisor records them) cannot judge a path that was dirty at the baseline, so there an
+uncommitted plan edit goes unseen. A task posted without a run token is stamped `none`, as a
+human's is, so a builder that drops its token can post a task whose `files` count in a later
+BUILDING (the `force_past_gate` limit). And a planner or architect sub-agent that a builder spawns
+itself (`team/build.md`'s "Feedback routing after builder", for `IMPL_QUESTIONS.md` or
+`DESIGN_QUESTIONS.md`) would write inside the builder's window, so its plan edit would count as the
+builder's; in a headless run `RUNNER_CONTRACT_BLOCK` forbids that spawn (see "Review packet"), and
+an interactive run records no windows at all.
+
+**Reviewer gate (`fsm/gates/reviewer.py`).** A reviewer judges; it does not edit. The gate finds
+when the run last entered REVIEWING (the newest `STATE_TRANSITION` event with `to == "REVIEWING"`),
+takes the `SPAWN_WINDOW`s of the `reviewer` role since then (`_proof.windows_since(...,
+roles={"reviewer"})`) and reports, per window, a moved `HEAD` ("HEAD moved from a to b (the
+reviewer committed)") and every path `proof.tree.changes` shows between its two trees that
+`_proof.stage_writes(storage, "reviewer")` does not allow (`<status> <path>`: `REVIEW.md` and the
+feedback files are allowed, so anything else is not). Only reviewer windows count: a builder fix
+round inside REVIEWING may change code, and a feedback spawn routed to the reviewer
+(`REVIEW_INCOMPLETE.md`) is a reviewer window too. On a finding the gate writes
+`REVIEWER_CHANGED_FILES.md` listing each change and fails with `GATE_FAILED {gate, transition,
+run_ids}`. The flows route that file to `human` (and rank it right after `BLOCKED_ON_HUMAN`), so the
+supervisor takes its existing human-checkpoint path: it posts an escalation and parks the run
+(`human_checkpoint`). The human decides whether to keep or revert the changes (nothing is reverted),
+deletes the file and resumes the run (`POST /runner/resume-parked`); the next reviewer spawn then
+runs and is judged on its own window. A window whose `run_id` an earlier `reviewer_unchanged`
+`GATE_FAILED` event named is left out, so a window the human already resolved is not reported again
+(a window without a `run_id` is named by its event seq). With no reviewer window (an interactive
+`/pathly` run records none, and neither does a project outside a git repo) the gate skips
+(`GATE_SKIPPED`, `no_reviewer_window`). It also skips, fail open, when the windows cannot be read
+(`windows_unreadable`) or git cannot diff a window's trees (`git_diff_failed`); a moved `HEAD` is
+read from the window itself, so it still fails. Wired as the last gate of `REVIEWING->TESTING` and
+the only gate of `REVIEWING->BUILDING` in `team` and `team-build` (`REVIEWER_CHANGED_FILES.md` →
+human); the REVIEWING exit requirement tells the reviewer to change nothing but `REVIEW.md` and
+feedback files and not to commit. Limit: with early advance the window's closing snapshot is taken
+at the reviewer's `AGENT_DONE`, so a write after its completion report can land outside the window.
+
+**Floor gate (`fsm/gates/floor.py`).** Did the run get green by weakening the bar? The gate takes
+a working-tree snapshot now and runs `proof.floor.scan` against the run-wide `proof_base.tree`
+(not the stage's `build_baseline`), so a builder fix round that ran inside REVIEWING, TESTING or
+RETRO, or after a goal-loop drain, while the FSM stayed in the state, is judged at the next
+transition, and a back-edge or a resumed run still sees the whole run. The scan's inputs:
+
+- **allow** is the union of the `floor_allow` lists a human set on the tasks claimed since
+  `proof_base.started_at` (`task_proof.tasks_claimed_since`, goal-scoped when the run has a
+  `goal_id`, else `(board, scope)`). A category allowed for one task is therefore also excused in a
+  fix round or in another task's file at these gates; the per-task proof in the drain uses each
+  task's own list.
+- **`task-edit`**: a claimed task whose `claimed_text` differs from its live `text` is a finding
+  (`task-edit: task <id>: its text was changed after the claim`) unless that task allows
+  `task-edit`. A human clears it by allowing the category or by `refreeze` (both in
+  `POST /comms/tasks/floor-allow`).
+- **`plan-edit`**: `protected` is `_proof.board_home(storage)`. A changed path under it passes when
+  `_proof.stage_writes(storage, "builder")` allows it, or when `_proof.explained` finds a
+  `SPAWN_WINDOW` since the base whose role may write it and left it at its current content
+  (so the reviewer's `REVIEW.md` and a planner's routed plan edit are not blamed on the builder).
+  The windows are read once, on the first path that needs them. If they cannot be read, a path
+  some role may write is excused and `FLOOR_CHECKED` carries a warning.
+- **`config_commands`** are the `verify.build`, `verify.test`, `verify.lint` and `verify.smoke`
+  settings, so a `Makefile` counts as config when the project builds with make.
+
+A finding writes `FLOOR_FAILURES.md` (it starts "Floor guard: the diff weakens the bar instead of
+meeting it", lists each finding, says a human can allow a category for a claimed task through
+`POST /comms/tasks/floor-allow` or turn the guard off with the `floor.enabled` setting, and ends
+with the fix: undo the weakening and fix the cause) and fails with `GATE_FAILED {gate, transition,
+findings, count}`; the flows route the file to `builder`. `FLOOR_CHECKED {warnings}` is appended
+whenever a scan ran, pass or fail (the Review packet's supervisor notes read it). It skips
+(`GATE_SKIPPED` with a reason, fail open) when `floor.enabled` is `false`, `0` or `off`
+(`floor_disabled`), the run has no `proof_base` (`no_proof_base`), the base has no tree
+(`no_snapshot`, not a git repo top), the snapshot now fails (`snapshot_failed`), the claimed tasks
+cannot be read (`tasks_unreadable`), an unexpected error stops the scan (`scan_failed`), or git
+could not diff and nothing else was found (`scan_incomplete`; the warning stays in `FLOOR_CHECKED`).
+
+Wired in `core/flows/team.flow.yaml` and `team-build.flow.yaml` at `BUILDING->REVIEWING`
+(after `command_gate`, before `scope_gate`, which stays last), `REVIEWING->TESTING` (before
+`reviewer_unchanged`, which stays last), `TESTING->RETRO` and the wildcard `->DONE` (it covers an
+`INCOMPLETE_TASKS` builder fix round inside RETRO, which no other floor gate sees), and in
+`goal-loop.flow.yaml` at `DRAINING->DONE` after the two `command_gate`s: a builder fix round after
+the drain (`BUILD_FAILURES`, `TEST_FAILURES` or `INCOMPLETE_TASKS` routed to `builder`) is a plain
+feedback spawn, not a `sched-<id>#<n>` task spawn, so only this gate sees it, and it also sees a
+weakening an earlier failed task attempt left in place. Each flow routes `FLOOR_FAILURES` to
+`builder`. `fsm_compose_responses._exit_requirement` tells the stage's agent the diff is scanned.
+
+Limits: the guard raises the cost of weakening the bar, it does not make it impossible (a builder
+with a shell can reach the DB and the git object store). An interactive `/pathly` run records no
+`SPAWN_WINDOW`, so a plan file another role wrote there (the reviewer's `REVIEW.md`) is not
+explained and reads as a `plan-edit`; set `floor.enabled` to `false` for such a run. A test or
+tester edit in TESTING that trips the floor goes to the builder, who did not make it.
+
+**Review packet (`fsm_compose_review.py`) — the reviewer's view.** A reviewer judges a diff
+against a task, not against the builder's account of its work. The reviewer has no Bash, so it
+could not run the `git diff HEAD~1 HEAD` that `team/review.md` told it to, and its prompt carried the
+builder's `AGENT_DONE` summaries (the pipeline history block). `build_prompt` now puts
+`review_packet(storage_path, project_root, board, board_scope, goal_id)` in place of that block
+whenever the stage's role is `reviewer` (`team/review` maps to it in `_SKILL_AGENT_ROLE`); every
+other role keeps the history block. The diff's base lives in STATE: `next_action` adds `tree`
+(`proof.tree.snapshot(project_root)`; left out when git cannot snapshot) to the `build_baseline` it
+stamps on entering BUILDING, and `complete_stage` copies `{tree, started_at}` into `review_base` on
+every transition out of BUILDING, overwriting the last build's (a build with no tree leaves none,
+not a stale one). `review_base` then survives REVIEWING, a builder fix round inside it and the later
+states. The packet is a `## Review packet` section:
+
+- `### The task` — `claimed_text` (else `text`) of the tasks claimed since `review_base.started_at`
+  (`task_proof.tasks_claimed_since`, goal-scoped when the run has a `goal_id`, else `(board, scope)`),
+  at most 16 KiB;
+- `### The diff` — `proof.tree.diff_text(root, review_base.tree, <snapshot now>,
+  exclude=["pathly/"], unified=3)`: everything the last build changed outside `pathly/`, in a code
+  fence one backtick longer than any run inside it (a context line `` ``` `` from a markdown file
+  would close a three-backtick fence), clipped head and tail to 48 KiB in all, since the prompt is
+  one argv string and Linux caps an argument at 128 KiB;
+- `### Supervisor notes` — per claimed task its latest `TASK_PROOF` event since the build began
+  (checks passed, failed, or "no check block: review its acceptance by reading the code") and the
+  warnings of the latest `FLOOR_CHECKED` event (at most 20), else `none recorded`. Those events
+  belong to the task-check and floor gates of the same feature; nothing writes them yet.
+
+With no `review_base` (the FSM never stamped BUILDING for the run, as in an interactive session,
+or git is missing) or no snapshot now, it returns a short section saying so, and `team/review.md`'s
+interactive branch applies: the stage orchestrator, which has Bash, runs `git diff HEAD` itself.
+Otherwise the orchestrator pastes `### The task` and `### The diff` verbatim into the reviewer
+sub-agent's prompt and hydrates the task's `context_refs` itself; it never passes the builder's
+report or `VERIFY.md`. It never raises: a packet that cannot be built is that short section.
+
+`RUNNER_CONTRACT_BLOCK` gained one sentence: in any headless stage, never spawn another Pathly role
+(planner, architect, po, designer, builder) to resolve a feedback file; write the file and stop,
+and the supervisor routes it. A sub-agent spawned that way has no `SPAWN_WINDOW` of its own, so its
+plan edit would be blamed on the stage's role. The sub-agent fixers in `team/build.md` and
+`team/review.md` stay for interactive `/pathly`; the flows' `feedback_routing` does the routing.
+
+Limits: a same-adapter REVIEWING stage still resumes the builder's CLI session (and so its
+transcript); the packet changes only the prompt. The retry-ladder block that
+`build_prompt_for_agent` adds for a role routed a feedback file (`REVIEW_INCOMPLETE.md` sends one to
+the reviewer) still lists the `AGENT_DONE` summaries. The diff covers the last build only: after a
+`REVIEWING->BUILDING` round it is that round's changes, not the feature's.
 
 Events: `GATE_PASSED` (command, `exit_code`, `duration_ms`) on success — the objective evidence on
 the run's record — and `GATE_FAILED` (with `reason`, `command`, `exit_code`) on failure.
@@ -900,7 +1236,7 @@ rather than reviving this one.
 
 **Why this is safe to resume, not just "not an error":** parking never touches the FSM's own
 state — `fsm_state` still sits exactly where the checkpoint left it, waiting on whatever
-feedback file `target_agent == "human"` named. `_post_human_escalation` posts an answerable
+feedback file `target_agent == "human"` named. `human_escalation.post_human_escalation` posts an answerable
 `type="escalation"` board message naming that file and `POST /runner/resume-parked`. A human
 (or an agent proxying for one) edits the file to resolve it; `POST /runner/resume-parked
 {"topic": ...}` → `supervisor.resume_parked_run` reads the parked `RunnerState`'s
@@ -918,6 +1254,43 @@ stop as `"finished"`; a parked run without this would have been silently reporte
 `result["status"]` still reads `"parked"` for a caller that wants to distinguish resumable
 from dead — `goals.py`'s board-message wording does not yet make that distinction (falls
 into the generic "goal run failed" text), a known cosmetic gap, not a correctness one.
+
+## Run guard rails — base smoke and iteration budget (build-proof)
+
+**Base smoke (`supervisor/base_smoke.py`).** A run that starts on a red base spends its budget on
+a failure it did not cause and blames the builder for it. `api.start_run(..., smoke_base=True)`
+calls `base_smoke.check_base(state, broadcast_fn)` inside `_run_and_finalize`, before `_loop`:
+
+- It applies only to a flow whose `gates` include a `command_gate` with `command_key: build`
+  (`team`, `team-build`, `goal-loop`; read with `fan_out.load_flow_config`). Any other flow, and
+  the `single` executor, board runs and consultations, are not smoked.
+- The command is the app setting `verify.smoke`, else `verify.build`; with neither the check is
+  skipped, as `command_gate` is. It runs through `proof/command.py::run_command` in
+  `state.project_root`, with the `verify.timeout_seconds` timeout (default 600) and
+  `PATHLY_VERIFY_GATE=1`.
+- Exit 0 lets the run go on. A non-zero exit, a timeout or a command that cannot run posts a
+  `to_agent='human'` escalation (`human_escalation.post_human_escalation`: the command, the exit
+  code or timeout, the clipped output, and `POST /runner/resume-parked {"topic": …}`), sets
+  `error_kind = "base_red"`, parks the run and broadcasts `RUNNER_PARKED {kind: "base_red"}`.
+  Nothing was spawned, and `_run_and_finalize` still calls `on_done` with `status: parked`,
+  `error: base_red`. The escalation is server-written (`system` stamp), so `fsm_human_gate` does
+  not block the resumed run on it.
+- It fails open: if the check itself raises, the run goes on and a warning is logged.
+- `resume_parked_run` passes `smoke_base=(prior.error_kind == "base_red")`: after a `base_red` park
+  the smoke runs again (still red, it parks again under a new run id); after a `human_checkpoint`
+  park it does not, so red work in progress on that run does not re-park it.
+
+**Iteration budget (`supervisor/run_budget.py`).** `run_budget.refresh(state)` is called at the top
+of `orchestrator_stage._resolve_stage_supervised`, which runs after every stage, so the budget
+follows the DAG as decomposition adds tasks. For a run with a `goal_id` it sets
+`state.max_iterations` to the larger of its current value and
+`count_tasks_for_goal × task_retry.resolve_max_attempts() × (MAX_FEEDBACK_ROUNDS + 1)` (under
+`registry._lock`): a goal with 5 tasks and `goal.task_max_attempts` 3 gets `5 × 3 × 4 = 60`, one
+task gets 12, no tasks yet leaves the caller's 10. It logs when it raises the cap, never lowers
+it (deleting tasks does not cut a running run short) and never raises. A run without a `goal_id`
+keeps the caller's `max_iterations`. `iterations` counts the loop's stage passes (a fan-out drain
+is one). The cost cap and the `cap_exceeded` handling are unchanged, and `resume_parked_run`
+carries the raised cap over.
 
 ## Goal cost cap (`supervisor/cost_cap.py`)
 
@@ -1013,6 +1386,18 @@ normal stage-advance path already uses, so no second history mechanism exists. *
 (`retry_count == 0`, the default) is byte-identical to before this** — every existing caller
 that never threads the new parameter, and every golden snapshot, is unaffected.
 
+**The root-cause guide rides on a builder feedback prompt.** The same function appends
+`fragments/root-cause-debug.md` (`## Root-cause debugging`: read every failure, reproduce it with
+the exact command, isolate the cause, fix it without weakening a check, prove it; stop after two
+failed fixes of the same error) when `agent_name == "builder"` and a `feedback_file` is given, whatever
+`retry_count` says. A headless run never writes `retry_count_by_key` to STATE, so the ladder above
+never climbs there; and a builder handed a feedback file is, by definition, on a second attempt at
+its stage. The guide is read at call time by `skills/compose_resources.root_cause_guide()` (empty
+and logged when the file is unreadable), is not in `composition.yaml` (so no golden snapshot
+moves), and does not contain the words "Retry attempt" that `tests/fsm_flows/test_retry_ladder.py`
+uses to tell attempts apart. A builder prompt with no feedback file, and every other role, is
+byte-identical to before. The DAG-task twin is in "Phase 1: per-task retry" below.
+
 ## FSM/DAG convergence — Phase 0 hygiene fixes
 
 Four small, independent fixes surfaced while researching converging the FSM engine and the
@@ -1078,7 +1463,9 @@ on a failed task, and owns the FULL side-effect set for whichever branch it pick
 - **Retry** (`current_attempt < goal.task_max_attempts`, default 3): `retry_task` reverts the
   task to `pending` — the frontier's next poll re-schedules it — and stamps the failure reason
   into the existing `fail_reason` column (no new column: `get_ready_tasks`' `SELECT *` already
-  returns it, so the NEXT attempt's `task` dict carries it for free).
+  returns it, so the NEXT attempt's `task` dict carries it for free). Up to 4000 characters are
+  kept (`retry_task`, `fail_task`, the two `reason` lines in `scheduler.py` and the retry prompt
+  block), so a task proof's report survives into the next prompt.
 - **Escalate** (attempt `>= goal.task_max_attempts`): the original behavior, delayed until
   retries are exhausted — `fail_task`'s cascade-to-blocked, plus a board `escalation` message
   (mirrors `goal_verify.post_gate_failure_escalation`) so a human/agent sees it instead of a
@@ -1088,7 +1475,25 @@ on a failed task, and owns the FULL side-effect set for whichever branch it pick
 second attempt on — mirrors `fsm_compose._retry_ladder_block`'s "what varies by ATTEMPT, not
 just who owns it": the attempt number and the previous failure's reason, so a retry doesn't
 repeat the identical blind prompt. A first attempt (`attempts == 0`) is unaffected — byte-
-identical to before this feature.
+identical to before this feature. The `root-cause-debug` guide (see "Retry ladder" above) is
+appended after the failure block, so a retried task prompt ends with the failure it was told to
+read and then the method for reading it.
+
+**Dependency results (`task_dependencies.py`, `db/queries/task_results.py`).** A DAG task used to
+see only its own text. `build_task_prompt` now puts `## Results of the tasks this one depends on`
+after the task body and before the runner contract: one `### <first line of the dependency's
+text>` heading per **direct** `depends_on` id (not transitive ones), in `depends_on` order,
+followed by that dependency's latest result or `(no result recorded)`. The result is the
+`summary` of the newest `AGENT_DONE` event whose payload `run_id` matches `sched-<id>#%`
+(`latest_task_summaries`: one fixed `json_extract(payload, '$.run_id') LIKE ?` query per id, newest
+`seq` first, so a retried dependency's last attempt wins). `supervisor/terminal.py` substitutes
+`<run_id>` for the spawn's run id, so a task agent's `AGENT_DONE` carries it. No result column and
+no migration. Each summary is clipped to 2000 characters and the whole block to 8000 (the prompt
+is one argv string); a task without `depends_on`, or one whose results cannot be read, gets no
+block and an unchanged prompt. `development/execute-task` asks the agent for a completion summary
+that says what was built, which files changed, any shortcut and what a later task needs to know.
+`fsm_events` has no index on `run_id`, so each lookup scans it newest-first until a match (the
+whole table for a dependency with no result).
 
 **`detect_deadlocks`** is `scheduler.py`'s former loop-only postscript (any task still `pending`
 after a normal drain has an unsatisfiable dependency — a cycle, or a `depends_on` that will
@@ -1124,6 +1529,55 @@ hyphens only). Every place that previously parsed a bare task_id back out of a `
 (`test_dag_scheduler.py`, `test_golden_path.py`, `test_comms_goals_run.py`) now also strips the
 `#<attempt>` suffix; production code was already unaffected since it only ever checked the
 `sched-` PREFIX (`run_history_read._classify_kind`/`_is_parent`), never parsed the remainder.
+
+## Task proof in the goal-loop drain (`supervisor/task_proof.py`, build-proof)
+
+A DAG task used to pass on its own `AGENT_DONE` outcome. `drain.drain_frontier` now builds its
+spawn as `tracker.wrap(task_proof.wrap(spawn_fn))`, so every task of a fan-out drain (the
+`goal-loop` flow's `DRAINING`) is proven after it reports success. Any run id that is not
+`sched-<task_id>#<n>` passes straight through, and `spawn_fn=None` resolves
+`supervisor._run_stage_via_terminal` each time the wrapper is called (a test that patches it
+still works). A project root that is not a directory is not proven.
+
+1. **Before the spawn:** read the task (`task_proof.get_task`), register it in a lock-guarded
+   in-flight registry with its declared `files`, and `proof.tree.snapshot` the project root.
+2. **The spawn runs.** If it raised, or `scheduler._outcome_is_failure(outcome)` already holds,
+   the result is returned as is: nothing is proven and no `TASK_PROOF` is written.
+3. **After it returns**, a second snapshot, then in order:
+   - *Floor guard* (skipped when `floor.enabled` is off or either snapshot is `None`):
+     `proof.floor.scan(root, before, after, allow=<the task's floor_allow>, protected=[board
+     home], may_change=<builder stage writes>, config_commands=<verify.build/test/smoke>)`.
+     The paths declared in the `files` of every task whose window overlapped this one are left
+     out (a directory covers its subtree): two windows overlap when both were registered, in
+     the same project root, at the same time. A path nobody declared counts against every
+     overlapping task.
+   - *Task text:* a `claimed_text` that differs from the live `text` is a `task-edit` finding,
+     unless a human allowed `task-edit` for the task.
+   - *Checks:* `proof.checks.checks_in(claimed_text or text)` run with
+     `proof.checks.run_checks` in the project root (`verify.timeout_seconds`, default 600). A
+     `ParseError` is a failure that quotes the error; no block is not a failure.
+4. **Record** `TASK_PROOF {task_id, claimed_at, run_id, checks, floor, warnings}` in the run's
+   storage dir (`_proof_record.record_task_proof`): `checks` is `passed`, `failed`, `none` or
+   `error` (an unreadable block), `floor` is `off` when the scan was skipped, `failed` on any
+   floor or `task-edit` finding, else `clean`. The join's `task_checks` gate (planned) does not
+   run a proven task's checks again.
+
+On any finding or failing check the outcome comes back as a copy with `outcome: "failed"` and an
+`error` of one short heading per failing part (`## Floor guard`, `## Task text`, `## Checks`)
+and its report, in at most 4000 characters (the checks part gets what the others leave, head and
+tail). `scheduler_loop` sees a failure and `task_retry.resolve_task_failure` retries it (the
+report is the next prompt's failure block, with the root-cause guide, and the prompt shows the
+text frozen at the claim: `build_task_prompt` uses `claimed_text` before `text`) or, past
+`goal.task_max_attempts`, fails it and posts the escalation. The copy keeps `cost_usd`, so the
+cost tracker outside the wrapper still counts a failed attempt.
+
+Fails open on what the proof cannot do: no git (the floor is `off`, the checks still run), an
+unreadable task, or an unexpected error is logged and the outcome returned unchanged. Limits:
+each attempt is judged on its own diff, so a weakening an earlier failed attempt left in place
+is not seen again (the retry prompt carries the finding, and the floor gate at the goal-loop
+join re-checks the whole run); lane-parallel tasks share one working tree, so an
+undeclared path is blamed on every overlapping task (`WorktreeIsolation` is still a stub); and
+the checks run in the project root with the server's account, as a builder's commands do.
 
 ## FSM/DAG convergence — more Phase-0-style fixes found while researching Phase 2 readiness
 
@@ -1540,6 +1994,7 @@ gates:
     - {type: require_tasks_done, on_fail: INCOMPLETE_TASKS.md}
     - {type: command_gate, command_key: build, on_fail: BUILD_FAILURES.md}
     - {type: command_gate, command_key: test,  on_fail: TEST_FAILURES.md}
+    - {type: floor_gate, on_fail: FLOOR_FAILURES.md}   # build-proof 06: the whole run's diff
 ```
 
 `goal_executor._run_loop` is now a delegation to `_run_team(flow="goal-loop")` — no
@@ -1720,8 +2175,8 @@ Two things make this correct rather than superficially similar to `scope_gate`'s
 - **Untracked files are included.** `git diff HEAD` alone only covers tracked paths — a brand new
   file (the most common thing a builder does) never appears in it. `files_changed`/`diff_stat`
   fold in `git status --porcelain`'s `??` lines too.
-- **The whole `pathly/` tree is exempt**, wider than `scope_gate`'s `pathly/features/`/
-  `pathly/plans/` prefix check. `pathly/` is entirely Pathly's own storage substrate (features/,
+- **The whole `pathly/` tree is exempt**, wider than `scope_gate`, which under `pathly/` exempts
+  only what the builder stage may write. `pathly/` is entirely Pathly's own storage substrate (features/,
   project/, board-artifacts/, lessons/, the legacy plans/ — never builder code), and on a brand
   new project's very first feature git collapses an entirely-untracked tree to its SHALLOWEST
   boundary (`?? pathly/`, not the deeper `?? pathly/features/<f>/`) — a narrower prefix check

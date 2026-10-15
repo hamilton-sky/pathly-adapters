@@ -4,7 +4,7 @@
 
 Database layer — schema/queries, connection isolation, write guard.
 
-14 test file(s).
+15 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -22,3 +22,4 @@ Database layer — schema/queries, connection isolation, write guard.
 | `test_run_tokens.py` | role-read-policy: the run_tokens table and its mint / resolve / revoke queries | 5 |
 | `test_spawn_policy.py` | spawn-policy P0 — per-agent model + logging config (db/queries/app_settings) | 8 |
 | `test_stage_configs.py` | stage_configs query helpers — flow-phase-inspector (#5) per-stage selection persistence | 5 |
+| `test_task_claim_snapshot.py` | build-proof 03: a task's text is frozen at its first claim, and its floor allow list is stored | 14 |

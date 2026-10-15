@@ -44,6 +44,7 @@ role_map:
 feedback_routing:
   HUMAN_QUESTIONS: human
   BLOCKED_ON_HUMAN: human
+  REVIEWER_CHANGED_FILES: human  # reviewer_unchanged gate: a reviewer spawn changed files or committed -> a human decides
   REQUIREMENT_GAP: po
   PLAN_FEEDBACK: planner
   ARCH_FEEDBACK: architect
@@ -60,6 +61,7 @@ feedback_routing:
   ACCEPTANCE_QUESTION: po
   INCOMPLETE_TASKS: builder     # REVIEWING->TESTING gate: require_tasks_done -> finish remaining board tasks
   BUILD_FAILURES: builder       # BUILDING->REVIEWING gate: command_gate (verify.build) exited non-zero
+  FLOOR_FAILURES: builder       # floor_gate: the run's diff weakens a test, a check, the config or the plan
 # 3-tier retry escalation (rounds 1-2 owner -> round 3 upstream specialist -> round 4+ human).
 # Mirrors team-build.flow.yaml, which shares the same team/review + team/test skills.
 escalation_routing:
@@ -73,6 +75,7 @@ escalation_routing:
 feedback_priority:
   - HUMAN_QUESTIONS
   - BLOCKED_ON_HUMAN
+  - REVIEWER_CHANGED_FILES
   - REQUIREMENT_GAP
   - PLAN_FEEDBACK
   - ARCH_FEEDBACK
@@ -128,6 +131,26 @@ gates:
     - type: command_gate
       command_key: build
       on_fail: BUILD_FAILURES.md
+    # Ground truth for "did it get green honestly": scan the whole run's diff (since the
+    # run-wide proof_base) for skipped or deleted tests, silenced linters, lowered thresholds,
+    # edited lint/test/CI config and plan edits. FLOOR_FAILURES.md -> builder. The same gate
+    # sits on every edge out of REVIEWING, TESTING and into DONE, because a builder fix round
+    # runs inside those states while the FSM stays put. A human can allow a category for one
+    # claimed task (POST /comms/tasks/floor-allow) or turn it off (setting floor.enabled=false).
+    - type: floor_gate
+      on_fail: FLOOR_FAILURES.md
+    # The builder stays inside its declared scope: the `files` of the tasks it claimed in this
+    # BUILDING plus the paths IMPLEMENTATION_PLAN.md names. Its own feedback files and
+    # VERIFY.md are allowed; a plan edit only when a planner/architect SPAWN_WINDOW explains it.
+    # Skips when nothing is declared. SCOPE_VIOLATION.md -> builder.
+    - type: scope_gate
+      scope_file: IMPLEMENTATION_PLAN.md
+      on_fail: SCOPE_VIOLATION.md
+  # The same check on the failed-review edge, so a reviewer that edited code and then failed the
+  # review does not hand that edit to the builder unseen.
+  REVIEWING->BUILDING:
+    - type: reviewer_unchanged
+      on_fail: REVIEWER_CHANGED_FILES.md
   REVIEWING->TESTING:
     # The reviewer writes REVIEW.md (RESULT: PASS) ONLY on a clean pass; a failing review leaves
     # REVIEW_FAILURES.md instead (and deletes any stale REVIEW.md). If REVIEW.md is missing/not-PASS
@@ -142,6 +165,15 @@ gates:
     # so the gate is feature-scoped (board+scope), matching team/build's ready-task fetch.
     - type: require_tasks_done
       on_fail: INCOMPLETE_TASKS.md
+    # See BUILDING->REVIEWING: a fix round inside REVIEWING is judged here.
+    - type: floor_gate
+      on_fail: FLOOR_FAILURES.md
+    # A reviewer judges; it does not edit. Measured from the reviewer's SPAWN_WINDOWs since the
+    # run last entered REVIEWING: a changed file other than REVIEW.md / feedback files, or a
+    # moved HEAD, parks the run for a human (REVIEWER_CHANGED_FILES.md -> human). Builder fix
+    # rounds inside REVIEWING may change code, so only reviewer windows count.
+    - type: reviewer_unchanged
+      on_fail: REVIEWER_CHANGED_FILES.md
   TESTING->RETRO:
     # The tester agent REPORTS that acceptance criteria pass; this gate MEASURES it by
     # running the project's own test command. A non-zero exit routes the real output to
@@ -149,6 +181,10 @@ gates:
     - type: command_gate
       command_key: test
       on_fail: TEST_FAILURES.md
+    # See BUILDING->REVIEWING: a fix round inside TESTING is judged here, so a skipped test
+    # cannot turn the command_gate above green.
+    - type: floor_gate
+      on_fail: FLOOR_FAILURES.md
   # A DELIVERY flow's DONE is a claim that the feature shipped, so it must not be reachable
   # while board tasks are unfinished. The REVIEWING->TESTING gate above does not cover this:
   # TESTING and RETRO can both post new tasks (a failing acceptance criterion becomes work),
@@ -160,4 +196,8 @@ gates:
   ->DONE:
     - type: require_tasks_done
       on_fail: INCOMPLETE_TASKS.md
+    # See BUILDING->REVIEWING: an INCOMPLETE_TASKS builder fix round inside RETRO is seen by
+    # no other floor_gate.
+    - type: floor_gate
+      on_fail: FLOOR_FAILURES.md
 _comments: []

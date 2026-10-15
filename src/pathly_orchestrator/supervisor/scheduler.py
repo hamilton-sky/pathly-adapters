@@ -302,13 +302,13 @@ def scheduler_loop(
         succeeded = exc is None and not _outcome_is_failure(outcome)
         if not succeeded:
             if exc is not None:
-                reason = str(exc)[:500]
+                reason = str(exc)[:4000]
             else:
                 reason = str(
                     outcome.get("error")
                     or outcome.get("outcome")
                     or "task reported failure"
-                )[:500]
+                )[:4000]
             current_attempt = task_attempts.pop(task_id, 0) + 1
             decision, blocked_ids = _task_retry.resolve_task_failure(
                 conn,

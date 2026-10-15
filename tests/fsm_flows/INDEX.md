@@ -4,7 +4,7 @@
 
 FSM engine, gates, transitions, flow definitions, feedback protocol & fix-routing.
 
-28 test file(s).
+40 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -16,19 +16,31 @@ FSM engine, gates, transitions, flow definitions, feedback protocol & fix-routin
 | `test_feedback_file_reachability.py` | A feedback file a flow can actually produce must be ROUTED by that flow | 4 |
 | `test_feedback_protocol.py` | Adapters side of the feedback protocol contract | 4 |
 | `test_fix_routing.py` | Smart fix-routing (pathly/features/.archive/smart-fix-routing/DESIGN.md) | 11 |
+| `test_floor_gate.py` | ``floor_gate`` sends a build that weakened the bar back to the builder (build-proof 06) | 18 |
 | `test_fsm.py` | Unit tests for pathly_orchestrator.fsm functions | 35 |
 | `test_fsm_http_client.py` | covers next action auto starts server and posts json; poll exits early on first healthy response; poll exhausted raises runtime error; … | 8 |
 | `test_fsm_ops.py` | Integration tests for fsm_ops.py (next_action, complete_stage) | 36 |
 | `test_gates.py` | Unit and integration tests for run_gates() — Conv 1 and Conv 2 (scope_gate) | 31 |
+| `test_gates_proof_helpers.py` | The shared helpers of the proof gates (``fsm/gates/_proof.py``, build-proof 04) | 17 |
 | `test_goal_id_prompt_var.py` | Phase 0 hygiene fix — team/build's board query was unscoped by goal_id | 3 |
 | `test_golden_path.py` | T1 — the end-to-end GOLDEN-PATH smoke test (production-readiness P0) | 7 |
 | `test_hooks.py` | End-to-end tests for hook scripts via subprocess | 11 |
 | `test_human_escalation_gate.py` | Human escalation gate — an open gate addressed to a human blocks the transition | 12 |
 | `test_orchestrator.py` | Tests for Conv 2: STATE.json schema validation, state/transition enforcement, concurrency | 17 |
 | `test_parallel_states_schema.py` | The `parallel_states` flow-YAML key — fsm-fan-out Phase B (schema only, inert) | 11 |
+| `test_proof_base.py` | build-proof 15: the run-wide ``proof_base`` and the ``TASK_PROOF`` records | 28 |
+| `test_proof_checks.py` | Task check blocks (``proof/checks.py``) and the shared command runner (``proof/command.py``) | 16 |
+| `test_proof_floor.py` | The floor scan over two working-tree snapshots (``proof/floor.py``) | 30 |
+| `test_proof_tree.py` | Git working-tree snapshots and the diffs between them (``proof/tree.py``) | 17 |
 | `test_retry_ladder.py` | Retry ladder: what varies by ATTEMPT, not just who owns it | 14 |
+| `test_review_base_state.py` | build-proof 10: the diff base for the Review packet lives in STATE | 6 |
+| `test_review_packet.py` | build-proof 10: the REVIEWING prompt carries a Review packet, not the builder's summary | 13 |
+| `test_review_packet_notes.py` | build-proof 10: the Review packet's supervisor notes, the runner-contract sentence, the skills | 7 |
+| `test_reviewer_unchanged_gate.py` | ``reviewer_unchanged`` fails the review stage when a reviewer spawn changed files (build-proof 09) | 17 |
 | `test_rollback.py` | covers no orphans after mid install failure; failed install leaves no manifest; uninstall without manifest returns empty; … | 4 |
 | `test_runner_contract_shared.py` | One runner contract, two prompt paths — fsm-fan-out Phase A | 5 |
+| `test_scope_gate_dirty_baseline.py` | ``scope_gate`` judges a path by its content, not by whether it was dirty at the baseline | 11 |
+| `test_scope_gate_narrowed.py` | ``scope_gate`` judges only what the builder may write (build-proof 08) | 20 |
 | `test_small_flow_escalation.py` | debug + quick-fix carry the same 3-tier retry ladder as the team flows | 5 |
 | `test_stage_override.py` | flow-gate-preview (P2) — the transient per-run, per-stage prompt override channel | 5 |
 | `test_stage_selection_apply.py` | flow-phase-inspector (#5) apply-at-spawn: build_prompt applies a stage's saved selection | 7 |

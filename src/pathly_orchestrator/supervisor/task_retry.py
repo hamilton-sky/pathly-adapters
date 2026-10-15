@@ -59,7 +59,7 @@ def retry_task(conn: sqlite3.Connection, task_id: str, reason: str) -> None:
         conn.execute(
             "UPDATE comms_messages SET task_status='pending', claimed_by=NULL, "
             "fail_reason=? WHERE id=?",
-            (reason[:500], task_id),
+            (reason[:4000], task_id),
         )
         conn.commit()
 
@@ -69,17 +69,23 @@ def build_retry_context(task: dict) -> str:
     ``fsm_compose._retry_ladder_block``: only appended from the SECOND attempt on
     (``task["attempts"]`` is the count BEFORE this claim — 0 on a task's first
     attempt), so a first attempt's prompt is byte-identical to before this feature.
+    The ``root-cause-debug`` guide follows the failure block.
     """
     prior_attempts = int(task.get("attempts") or 0)
     reason = task.get("fail_reason")
     if prior_attempts <= 0 or not reason:
         return ""
-    return (
+    block = (
         f"\n\n## Retry attempt {prior_attempts + 1} — the previous attempt failed\n\n"
         "What was tried before did not satisfy this task. Read the failure below "
         "before deciding what to change — repeating the same approach will fail "
-        f"the same way.\n\n```\n{str(reason)[:2000]}\n```\n"
+        f"the same way.\n\n```\n{str(reason)[:4000]}\n```\n"
     )
+    # The root-cause guide follows the failure it tells the agent to read (build-proof).
+    from pathly_orchestrator.skills.compose_resources import root_cause_guide
+
+    guide = root_cause_guide()
+    return f"{block}\n{guide}\n" if guide else block
 
 
 def resolve_task_failure(

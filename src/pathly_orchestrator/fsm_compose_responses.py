@@ -96,9 +96,30 @@ def _exit_requirement(flow_config: dict | None, state_name: str) -> str | None:
                     f"Produce `{chk.get('artifact')}` before advancing (→ {target})."
                 )
             elif t == "scope_gate":
+                scope_file = chk.get("scope_file")
+                named = f"the paths named in `{scope_file}` plus " if scope_file else ""
                 lines.append(
-                    f"Keep changes within the scope declared in `{chk.get('scope_file')}`."
+                    f"Keep changes within the declared scope: {named}the `files` of the "
+                    f"planned board tasks you claimed (a task you post yourself declares "
+                    f"nothing), and your own feedback files and `VERIFY.md`. Any other "
+                    f"change, a plan file included, fails the scope gate (→ {target})."
                 )
+            elif t == "reviewer_unchanged":
+                rule = (
+                    "In REVIEWING, change no file except `REVIEW.md` and feedback "
+                    "files, and do not commit: a reviewer judges, it does not edit. "
+                    "Any other change parks the run for a human."
+                )
+                if rule not in lines:
+                    lines.append(rule)
+            elif t == "floor_gate":
+                rule = (
+                    "The run's diff is scanned for weakened tests, silenced checks and "
+                    "plan edits: it is run, not self-reported. Fix the cause instead of "
+                    "skipping, deleting or loosening a test, a check or the plan."
+                )
+                if rule not in lines:
+                    lines.append(rule)
             elif t == "command_gate":
                 lines.append(
                     f"The project's `{chk.get('command_key')}` verification command must "

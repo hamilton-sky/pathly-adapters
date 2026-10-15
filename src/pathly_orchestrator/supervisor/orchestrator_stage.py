@@ -5,8 +5,25 @@ from __future__ import annotations
 import time
 from typing import Callable, Optional
 
+from . import run_budget
+from .human_escalation import post_human_escalation
 from .registry import _lock, _set_status
 from .state import MAX_FEEDBACK_ROUNDS, RunnerState, logger
+
+
+def _checkpoint_text(topic: str, file_name: str, res: dict) -> str:
+    """The board text of a headless human checkpoint: the file to resolve, how to resume, and
+    the question the FSM already put in the result (so no feedback-file read is needed).
+    """
+    content = res.get("instructions") or res.get("message") or ""
+    body = (
+        f"Human checkpoint required — {file_name}\n\n"
+        f"Resolve it (edit the named feedback file with your answer), then resume this "
+        f'run: `POST /runner/resume-parked {{"topic": {topic!r}}}`.'
+    )
+    if content:
+        body += f"\n\n{content}"
+    return body
 
 
 def _resolve_stage_supervised(
@@ -25,6 +42,7 @@ def _resolve_stage_supervised(
     """
     import pathly_orchestrator.supervisor as _sup
 
+    run_budget.refresh(state)
     _run_stage_via_terminal = _sup._run_stage_via_terminal
 
     resolved: list[str] = []
@@ -71,41 +89,6 @@ def _resolve_stage_supervised(
                 "kind": reason,
             }
         )
-
-    def _post_human_escalation(file_name: str, res: dict) -> None:
-        """Surface a headless human-checkpoint on the board as an answerable escalation.
-
-        Otherwise a human gate just parks the run silently and writes a feedback file nobody
-        sees. Best-effort (never blocks the still-parking run) and layer-legal — the supervisor
-        posts directly via db.comms_messages. Uses the question text the FSM already put in the
-        result, so no feedback-file read is needed.
-        """
-        try:
-            from pathly_orchestrator.db.connection import get_db
-            from pathly_orchestrator.db.queries.comms_messages import post_message
-            from pathly_orchestrator.runner.provenance import system_stamp
-
-            content = res.get("instructions") or res.get("message") or ""
-            body = (
-                f"Human checkpoint required — {file_name}\n\n"
-                f"Resolve it (edit the named feedback file with your answer), then resume this "
-                f'run: `POST /runner/resume-parked {{"topic": {topic!r}}}`.'
-            )
-            if content:
-                body += f"\n\n{content}"
-            post_message(
-                get_db(),
-                board="feature",
-                scope=topic,
-                from_agent="system",
-                to_agent="human",
-                type="escalation",
-                text=body,
-                goal_id=state.goal_id or None,
-                **system_stamp(),
-            )
-        except Exception as exc:
-            logger.warning("human escalation post failed: %s", exc)
 
     while True:
         # Abort check before each FSM call
@@ -191,7 +174,7 @@ def _resolve_stage_supervised(
             file_ = result.get("file", "")
 
             if target == "human":
-                _post_human_escalation(file_, result)
+                post_human_escalation(state, _checkpoint_text(topic, file_, result))
                 _park("human_checkpoint", f"Human checkpoint required: {file_}")
                 return None
 
@@ -220,16 +203,26 @@ def _resolve_stage_supervised(
 
             fb_adapter = state.current_adapter or "claude"
             fb_model = effective_model(target, fb_adapter, model)
+            # build-proof: record what the feedback agent changed, as ITS role (target), not
+            # the state's — a planner routed a file inside BUILDING may edit the plan.
+            from pathly_orchestrator.supervisor import fan_out, spawn_window
+
             try:
-                _run_stage_via_terminal(
+                spawn_window.observe(
                     state,
-                    fb_instructions,
-                    fb_adapter,
-                    fb_model,
+                    fan_out.load_flow_config(flow, project_root),
+                    target,
                     fb_run_id,
-                    broadcast_fn,
-                    session=None,
-                    autonomy=autonomy_for_adapter,
+                    lambda: _run_stage_via_terminal(
+                        state,
+                        fb_instructions,
+                        fb_adapter,
+                        fb_model,
+                        fb_run_id,
+                        broadcast_fn,
+                        session=None,
+                        autonomy=autonomy_for_adapter,
+                    ),
                 )
             except RuntimeError as exc:
                 _fail("spawn_failed", str(exc))

@@ -4,10 +4,11 @@
 
 Runner control loop, supervisor, spawn channel, lane/worktree isolation, file-claim registry, services facade.
 
-17 test file(s).
+20 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
+| `test_base_smoke.py` | supervisor/base_smoke.py — a red base parks a run before it spawns anything (build-proof 12) | 19 |
 | `test_fan_out.py` | supervisor/fan_out.py — the DAG scheduler as an FSM stage executor (fan-out Phase C) | 19 |
 | `test_file_claims.py` | Unit tests for the cross-feature file-claim overlap registry | 6 |
 | `test_fsm_port_config.py` | PATHLY_FSM_HTTP_PORT reaches every caller, so Pathly can run beside another server on 8765 | 7 |
@@ -15,6 +16,7 @@ Runner control loop, supervisor, spawn channel, lane/worktree isolation, file-cl
 | `test_park_resume.py` | Tests for the human-checkpoint "parked" status and its resume path | 8 |
 | `test_pty_host.py` | Tests for the headless spawn host (``pathly-pty-host``) | 19 |
 | `test_pty_host_e2e.py` | End-to-end: a supervisor spawn wait satisfied WITHOUT Studio | 5 |
+| `test_run_budget.py` | supervisor/run_budget.py — a goal run's iteration cap follows its DAG (build-proof 12) | 15 |
 | `test_run_identity_stamps.py` | run-identity: server-side run_id + board_scope stamping (supervisor guarantee) | 6 |
 | `test_run_log_seams.py` | run_log write seams — best-effort spawn + result persistence (unified-control-plane P0, | 2 |
 | `test_runner.py` | Unit tests for pathly_orchestrator.runner | 22 |
@@ -24,4 +26,5 @@ Runner control loop, supervisor, spawn channel, lane/worktree isolation, file-cl
 | `test_services.py` | Tests for the services layer. No fixture declarations needed — conftest._isolate_db is autouse | 10 |
 | `test_spawn_channel.py` | The topic-independent terminal spawn channel | 4 |
 | `test_spawn_run_token.py` | A spawn mints a run token, sends it in TERMINAL_SPAWN, and revokes it when the spawn ends | 5 |
+| `test_spawn_window.py` | supervisor/spawn_window.py — a ``SPAWN_WINDOW`` event per single-path stage spawn (build-proof 04) | 11 |
 | `test_supervisor.py` | Tests for pathly_orchestrator.supervisor (Conv 2 — Phases 5-7) | 28 |

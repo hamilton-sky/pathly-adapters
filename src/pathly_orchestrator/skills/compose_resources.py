@@ -6,10 +6,13 @@ from the DB (``load_effective_manifest``). Everything here is I/O; no assembly h
 
 from __future__ import annotations
 
+import logging
 from importlib.resources import files
 from typing import Any
 
 import yaml
+
+logger = logging.getLogger("pathly.compose_resources")
 
 
 def _skills_root():
@@ -91,6 +94,20 @@ def _read_fragment(fragments_dir: str, name: str) -> str:
         .joinpath(f"{fragments_dir}/{name}.md")
         .read_text(encoding="utf-8")
     )
+
+
+def root_cause_guide() -> str:
+    """The ``root-cause-debug`` fragment, read from the packaged skills at call time.
+
+    It is not in ``composition.yaml``: the retry prompts append it by hand, so no composed
+    skill and no golden snapshot carries it. Empty when the file cannot be read, because the
+    callers build a prompt on a scheduler worker thread that must not die over a guide.
+    """
+    try:
+        return _read_fragment("fragments", "root-cause-debug").strip()
+    except OSError:
+        logger.warning("root-cause-debug fragment is unreadable", exc_info=True)
+        return ""
 
 
 def _known_fragments(fragments_dir: str) -> set[str]:
