@@ -195,7 +195,7 @@ def _loop(state: RunnerState, broadcast_fn: Optional[Callable]) -> None:
 
             # ── Session continuity ────────────────────────────────────────────
             session_id, autonomy_for_adapter, adapter_supports_resume = resolve_session(
-                state, topic, preferred_adapter, _broadcast
+                state, topic, preferred_adapter, _broadcast, response.get("agent", "")
             )
 
             with _lock:

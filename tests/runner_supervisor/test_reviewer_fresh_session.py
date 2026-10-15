@@ -173,7 +173,11 @@ def test_resolve_session_gives_an_independent_role_no_session():
 def test_resolve_session_keeps_degraded_for_an_adapter_that_cannot_resume():
     sent: list[dict] = []
     session_id, _, resumable = resolve_session(
-        _state_with_open_session("codex"), "t", "codex", sent.append, "quality/reviewer"
+        _state_with_open_session("copilot"),
+        "t",
+        "copilot",
+        sent.append,
+        "quality/reviewer",
     )
 
     assert session_id is None

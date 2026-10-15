@@ -61,14 +61,14 @@ def _spawn_role(state: RunnerState, run_id: str) -> Optional[str]:
             from .task_prompt import _TASK_ROLE
 
             return _TASK_ROLE
-        from pathly_orchestrator.fsm_compose_tables import _SKILL_AGENT_ROLE
+        from pathly_orchestrator.fsm_compose_tables import agent_role_of
         from pathly_orchestrator.fsm_ops import _load_flow
 
         flow = _load_flow(state.flow or "team", state.project_root or None) or {}
         agent = (flow.get("agent_map") or {}).get(state.current_state)
         if not agent:
             return None
-        return _SKILL_AGENT_ROLE.get(agent) or agent.split("/")[-1]
+        return agent_role_of(agent)
     except Exception:
         logger.debug("_spawn_role skipped", exc_info=True)
         return None

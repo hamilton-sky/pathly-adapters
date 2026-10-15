@@ -45,7 +45,7 @@ of how it got here; these are the map.
     |  1. abort? pause? caps?  (iterations, max_cost_usd)                   |
     |  2. POST /next_action  ->  {current_state, agent_hint.instructions,   |
     |                             preferred_adapter, decision}              |
-    |  3. resolve_session()  ->  reuse session_id iff same adapter          |
+    |  3. resolve_session()  ->  reuse iff same adapter; reviewer: fresh    |
     |  4. fan_out.run_stage(...)          <- THE one stage call site        |
     |  5. POST /complete_stage  -> run_gates() -> next_state | blocked      |
     +------------------------------------+---------------------------------+
@@ -570,7 +570,7 @@ first) is a later plan.
 |---|---|---|
 | `RUN_STARTED` | `topic`, `run_id` | pipeline run began |
 | `TERMINAL_SPAWN` | `tab_id`, `run_id`, `run_token`, `label`, `cwd`, `argv[]`, `adapter` | Studio should open a new terminal tab and spawn the PTY. `run_token` is the spawn's identity token, sent raw: `_broadcast_runner` delivers the whole payload to the topic's `/events/runner` clients, to every `/events/spawn` client and to the `/events/runs` clients of that `run_id`, so a client subscribed to any of them when the spawn starts can read the token and use it until the spawn settles (`None` when the best-effort mint failed) |
-| `SESSION` | `kind` (new/continue), `session_id` | adapter session continuity signal |
+| `SESSION` | `topic`, `adapter`, `kind` (`opened`/`continued`), `degraded` (the adapter cannot resume), `independent` | adapter session continuity signal. `independent` is true for a stage whose role is in `orchestrator_session.INDEPENDENT_ROLES` (the reviewer): `kind` is then always `opened`, whatever the open session is |
 | `RUNNER_WARNING` | `message` | non-fatal warning to surface as a toast |
 | `RUNNER_STATUS` | `status`, `topic` | status change + periodic state sync (`running`/`paused`/`done`/`aborted`/`error`) — `supervisor/registry.py` `_set_status` |
 
@@ -745,7 +745,9 @@ pathly_orchestrator/
     spawn_window.py        # observe — wraps the single-path spawns (run_stage's and the feedback
                            #   spawn): a SPAWN_WINDOW event (role, tree + HEAD before/after) when
                            #   the flow has a floor/scope/reviewer gate (see "Spawn windows" below)
-    orchestrator_session.py # resolve_session — same-adapter session reuse + the SESSION event
+    orchestrator_session.py # resolve_session — same-adapter session reuse + the SESSION event; a stage whose
+                           #   role is in INDEPENDENT_ROLES ({reviewer}, by fsm_compose_tables.agent_role_of)
+                           #   always opens a fresh session (never --resume's the builder's transcript)
     api.py                 # start_run, pause_run, resume_run, abort_run, supply_decision, reroute_run
     goal_run.py            # thin re-export shim (start_goal_run / start_goal_decompose) → the two modules below
     goal_executor.py       # Board→Goals→Task-DAG executor dispatcher:
@@ -1265,8 +1267,8 @@ and the supervisor routes it. A sub-agent spawned that way has no `SPAWN_WINDOW`
 plan edit would be blamed on the stage's role. The sub-agent fixers in `team/build.md` and
 `team/review.md` stay for interactive `/pathly`; the flows' `feedback_routing` does the routing.
 
-Limits: a same-adapter REVIEWING stage still resumes the builder's CLI session (and so its
-transcript); the packet changes only the prompt. The retry-ladder block that
+Limits: the packet changes the prompt, and the reviewer's CLI session is fresh too ("Visible
+runner" below). The retry-ladder block that
 `build_prompt_for_agent` adds for a role routed a feedback file (`REVIEW_INCOMPLETE.md` sends one to
 the reviewer) still lists the `AGENT_DONE` summaries. The diff covers the last build only: after a
 `REVIEWING->BUILDING` round it is that round's changes, not the feature's.
@@ -2134,7 +2136,16 @@ task writing outside its declared set stays invisible to it, which needs `Worktr
 5. PTY exits → `terminal.ts` POSTs `/runner/terminal/result` with exit code and stdout tail
 6. Supervisor receives the result, calls `/complete_stage`, advances to next stage
 
-Same-adapter consecutive stages share a `session_id`. Cross-adapter transitions start a new session.
+Same-adapter consecutive stages share a `session_id`. Cross-adapter transitions start a new
+session, and so does a reviewer stage: `resolve_session` is given the `/next_action` `agent`, and when
+`fsm_compose_tables.agent_role_of` names a role in `INDEPENDENT_ROLES` (`team/review` and
+`quality/reviewer` are `reviewer`) it returns no session id, so the reviewer never `--resume`s the
+builder's conversation (a resumed claude session restores all of it, tool calls and results included,
+whatever the prompt leaves out). The same helper picks the stage that gets the Review packet, so the
+two cannot disagree. `_loop` still stores the reviewer's own session as `open_session`: the next
+same-adapter stage (TESTING, or the next task's BUILDING) continues the reviewer's session, not the
+builder's. The question-answer re-spawn inside a stage resumes that stage's own session, and feedback
+spawns pass no session. Only the reviewer is independent; every other role keeps same-adapter continuity.
 
 On Windows, the argv is passed to PowerShell via `-EncodedCommand` (base64 UTF-16LE) to handle arbitrary prompt content safely.
 

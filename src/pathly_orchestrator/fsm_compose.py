@@ -13,6 +13,7 @@ from .fsm_compose_tables import (
     _SCHEMA_VERSION,
     _SKILL_AGENT_ROLE,
     _FIX_MODE_ARTIFACT,
+    agent_role_of,
 )
 from .fsm_compose_vars import (
     _inject_prompt_vars,
@@ -110,12 +111,7 @@ def build_prompt(
     # every other run stays 'feature' — also the value /comms/post coerces any unknown board to,
     # so an unsubstituted <board> can never mis-post.
     board_tier = "project" if feature == "project" else "feature"
-    _role = _SKILL_AGENT_ROLE.get(agent)
-    agent_role: str = (
-        _role
-        if _role is not None
-        else (agent.split("/")[-1] if "/" in agent else agent)
-    )
+    agent_role: str = agent_role_of(agent)
 
     # ONE predicate for "an override is in effect", used both to swap the body (below) and to
     # skip the persistent stage-selection (R4). A whitespace-only override counts as absent for
