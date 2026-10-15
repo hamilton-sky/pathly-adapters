@@ -2,6 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import { MessageSquare } from 'lucide-react'
 import { useChatStore } from '../../../store/chatStore'
 import { ThinkingBlock } from '../ThinkingBlock/ThinkingBlock'
+import { ContextManifest, ContextUnavailableNote } from '../ContextManifest/ContextManifest'
+import { ActionCards } from '../ActionCards/ActionCards'
+import { BOARD_CONTEXT_UNAVAILABLE_MARKER, stripUnavailableMarker } from '../ContextManifest/manifestUtils'
+import { renderSafeMarkdown } from '../../../lib/safeMarkdown'
 import styles from './MessageList.module.css'
 
 function StreamingTimer({ status }: { status: string }): JSX.Element | null {
@@ -37,6 +41,9 @@ export function MessageList(): JSX.Element {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  // Only the latest answer's context line links to the next-question choice.
+  const latestManifestId = [...messages].reverse().find((m) => m.contextManifest)?.id
+
   if (messages.length === 0) {
     return (
       <div className={styles.empty}>
@@ -64,9 +71,27 @@ export function MessageList(): JSX.Element {
           {msg.role === 'assistant' && msg.status === 'streaming' && !msg.content && !msg.thinking
             ? <><ThinkingDots /><StreamingTimer status={msg.status} /></>
             : msg.content
-              ? <span className={styles.content}>{msg.content}</span>
+              ? msg.role === 'assistant'
+                // Answers are Markdown from a model fed untrusted board text — rendered
+                // through the escaping renderer, never raw marked().
+                ? <div className={styles.markdown} dangerouslySetInnerHTML={{ __html: renderSafeMarkdown(stripUnavailableMarker(msg.content)) }} />
+                : <span className={styles.content}>{stripUnavailableMarker(msg.content)}</span>
               : null
           }
+          {/* HQ operator: the actions this answer proposed, each run only on its Run click. */}
+          {msg.role === 'assistant' && msg.actionCards && msg.actionCards.length > 0 && (
+            <ActionCards messageId={msg.id} cards={msg.actionCards} />
+          )}
+          {/* HQ context manifest: collapsible read-only line under local-model answers. */}
+          {msg.role === 'assistant' && msg.contextManifest && (
+            <ContextManifest manifest={msg.contextManifest} latest={msg.id === latestManifestId} />
+          )}
+          {/* The server's [board context unavailable] marker renders as a visible amber note. */}
+          {msg.role === 'assistant'
+            && msg.content.includes(BOARD_CONTEXT_UNAVAILABLE_MARKER)
+            && !(msg.contextManifest && msg.contextManifest.unavailable) && (
+            <ContextUnavailableNote />
+          )}
         </div>
       ))}
       <div ref={bottomRef} />

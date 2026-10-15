@@ -4,7 +4,8 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px;
+  height: var(--panel-header-height);
+  padding: 0 12px;
   background: var(--bg-mantle);
   border-bottom: 1px solid var(--bg-surface0);
   flex-shrink: 0;

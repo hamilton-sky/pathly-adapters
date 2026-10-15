@@ -11,14 +11,17 @@ import { useStore } from '../../store'
 import { apiFetch, PATHLY_API_BASE } from '../../lib/config'
 import { useUiStore } from '../../store/uiStore'
 import { writeToTerminal } from '../../lib/launchTerminal'
-import { buildPathlyContext, invalidatePathlyContext, subscribeToMenuUpdates, type PushedMenu } from '../../lib/pathlyContext'
+import { buildPathlyContext, subscribeToMenuUpdates, type PushedMenu } from '../../lib/pathlyContext'
 import { useToastStore } from '../../store/toastStore'
 import type { PushOpts } from '../../store/toastStore'
 import { hasEmbeddedSkills, matchIntent, matchIntentByName, preEmbedSkills } from '../../lib/embedRouter'
-import { askLlm, getEngine, askOllama, abortLlm } from '../../lib/llmBridge'
-import { splitThinkingContent } from '../../lib/thinkingParser'
+import { getEngine, askOllama, abortLlm } from '../../lib/llmBridge'
+import { useAssistantStream } from './useAssistantStream'
+import { fetchHqTurn, resolveHqBoard, shouldUseHqCopilot, localGeneration } from './hqCopilot'
+import { askLocalTurn, operatorActions, operatorTurn, PROPOSED_ONLY_NOTE } from './hqOperator'
 import { useModelStore } from '../../store/modelStore'
 import { WEB_LLM_MODELS } from '../../data/models'
+import { ollamaHasTag } from '../../lib/ollamaTag'
 import { loadSkills } from '../../lib/skillsManifest'
 import { MiniTerminalCard } from './MiniTerminalCard/MiniTerminalCard'
 import { useChatResize } from './useChatResize'
@@ -29,14 +32,12 @@ import type { PathlyMenuItem } from '../../lib/pathlyContext'
 export function useHQ() {
   const [inputValue, setInputValue] = useState('')
   const [llmAvailable, setLlmAvailable] = useState<boolean | null>(null)
-  const [pathlyContext, setPathlyContext] = useState<Awaited<ReturnType<typeof buildPathlyContext>> | null>(null)
   const [hiddenMiniCards, setHiddenMiniCards] = useState<Record<'claude' | 'codex' | 'shell' | 'antigravity', boolean>>({
     claude: false,
     codex: false,
     shell: false,
     antigravity: false,
   })
-  const [menuCardOpen, setMenuCardOpen] = useState(true)
   const [pushedMenu, setPushedMenu] = useState<PushedMenu | null>(null)
   const [pushedMenuOpen, setPushedMenuOpen] = useState(true)
 
@@ -107,36 +108,10 @@ export function useHQ() {
   const hasCodexTab = tabs.some((tab) => tab.kind === 'codex')
   const hasShellTab = tabs.some((tab) => tab.kind === 'shell')
   const hasAntigravityTab = tabs.some((tab) => tab.kind === 'antigravity')
-  const activeMenu = pathlyContext?.menu ?? null
-  const menuKey = activeMenu ? `${activeMenu.state}:${activeMenu.feature}` : null
-  const [menuDismissedKey, setMenuDismissedKey] = useState<string | null>(null)
-  const menuVisible = activeMenu !== null && menuKey !== menuDismissedKey
 
   const terminalBuffers = useRef<Record<string, string>>({ claude: '', codex: '', shell: '', antigravity: '' })
   const idleTimers = useRef<Record<string, ReturnType<typeof setTimeout> | null>>({ claude: null, codex: null, shell: null, antigravity: null })
-  const streamTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const streamPending = useRef<ReturnType<typeof splitThinkingContent> | null>(null)
-
-  function queueAssistantStream(fullText: string): void {
-    streamPending.current = splitThinkingContent(fullText)
-    if (streamTimer.current) return
-    streamTimer.current = setTimeout(() => {
-      const pending = streamPending.current
-      streamTimer.current = null
-      streamPending.current = null
-      if (pending) updateLastMessage({ content: pending.content, thinking: pending.thinking, status: 'streaming' })
-    }, 60)
-  }
-
-  function finishAssistantStream(fullText: string, fallback: string): void {
-    if (streamTimer.current) {
-      clearTimeout(streamTimer.current)
-      streamTimer.current = null
-    }
-    streamPending.current = null
-    const { thinking, content } = splitThinkingContent(fullText)
-    updateLastMessage({ content: content || fallback, thinking, status: 'done' })
-  }
+  const { beginStream, queueAssistantStream, finishAssistantStream, cancelStream } = useAssistantStream()
 
   useEffect(() => {
     const kinds = ['claude', 'codex', 'shell', 'antigravity'] as const
@@ -188,29 +163,9 @@ export function useHQ() {
   }, [setOllama])
 
   useEffect(() => {
-    let cancelled = false
-
-    const fetchContext = (): void => {
-      buildPathlyContext(projectPath ?? undefined, activeTopic ?? undefined)
-        .then((ctx) => { if (!cancelled) setPathlyContext(ctx) })
-        .catch(() => { if (!cancelled) setPathlyContext(null) })
-    }
-
-    invalidatePathlyContext(projectPath ?? undefined)
-    fetchContext()
-
-    const interval = window.setInterval(fetchContext, 5000)
-
-    return () => {
-      cancelled = true
-      window.clearInterval(interval)
-    }
-  }, [projectPath, activeTopic])
-
-  useEffect(() => {
     const unsubscribe = subscribeToMenuUpdates(
       projectPath ?? '',
-      (menu) => setPathlyContext((prev) => prev ? { ...prev, menu } : null),
+      () => undefined, // the permanent FSM menu card was removed; only pushed menus show
       (pushed) => { setPushedMenu(pushed); setPushedMenuOpen(true) },
       () => setPushedMenu(null),
     )
@@ -408,11 +363,7 @@ export function useHQ() {
 
   function handleStop(): void {
     abortLlm()
-    if (streamTimer.current) {
-      clearTimeout(streamTimer.current)
-      streamTimer.current = null
-    }
-    streamPending.current = null
+    cancelStream()
     updateLastMessage({ status: 'done' })
     setLoading(false)
   }
@@ -512,6 +463,7 @@ export function useHQ() {
       status: 'streaming' as const,
     }
     addMessage(assistantMsg)
+    beginStream(assistantMsg.id) // writes go to THIS message, even if the chat is switched mid-answer
     setLoading(true)
 
     {
@@ -542,11 +494,7 @@ export function useHQ() {
       const selectedModelName = selectedModel?.name ?? selectedModelId
 
       const ollamaTag = selectedModel?.ollamaId ?? ''
-      const ollamaBase = ollamaTag.split(':')[0]
-      const currentOllamaModels = useModelStore.getState().ollamaModelIds
-      const ollamaHasModel = currentOllamaModels.some(
-        (m) => m === ollamaTag || m.startsWith(ollamaBase + ':') || m.startsWith(ollamaBase + '-')
-      )
+      const ollamaHasModel = ollamaHasTag(ollamaTag, useModelStore.getState().ollamaModelIds)
 
       const localModelCached = useModelStore.getState().cachedModelIds.includes(selectedModelId)
       const localAvailable = llmAvailable === true && localModelCached
@@ -555,13 +503,27 @@ export function useHQ() {
         ? `Skill: ${topMatch.command}\nDescription: ${topMatch.description}\n\nBased only on the description above, explain this skill in one sentence, then say "Click **Run** to execute."`
         : text
 
+      // Board open → the server-built board packet IS the turn (hq-copilot); an
+      // action request gets the read-only redirect and never reaches the model.
+      const hqBoard = ollamaHasModel || localAvailable ? resolveHqBoard(activeTopic, projectPath) : null
+      const hq = hqBoard && shouldUseHqCopilot(true, text, topMatch?.confidence ?? null, operatorActions(!ollamaHasModel).length > 0)
+        ? await fetchHqTurn(text, hqBoard.board, hqBoard.projectRoot, selectedModelId, undefined, operatorActions(!ollamaHasModel))
+        : null
+      if (hq?.redirect) {
+        useChatStore.getState().updateMessage(assistantMsg.id, { content: hq.redirect, status: 'done' })
+        setLoading(false)
+        return
+      }
+      if (hq?.manifest) useChatStore.getState().updateMessage(assistantMsg.id, { contextManifest: hq.manifest })
+      const [turnPrompt, turnSystem] = [hq?.prompt ?? llmPrompt, hq?.systemPrompt ?? systemPrompt]
+
       if (ollamaHasModel) {
         try {
           let fullText = ''
-          await askOllama(llmPrompt, systemPrompt, ollamaTag, (chunk) => {
+          await askOllama(turnPrompt, turnSystem, ollamaTag, (chunk) => {
             fullText += chunk
             queueAssistantStream(fullText)
-          }, responseMode === 'deep' && selectedModel?.thinking === true)
+          }, selectedModel?.thinking ? responseMode === 'deep' : undefined, hq?.contextTokens || undefined)
           finishAssistantStream(fullText, '_(empty response - try a different model)_')
         } catch (err) {
           console.error('[Ollama] chat error:', err)
@@ -573,11 +535,11 @@ export function useHQ() {
         try {
           await getEngine(selectedModelId)
           let fullText = ''
-          await askLlm(llmPrompt, systemPrompt, (chunk) => {
+          const proposed = await askLocalTurn(turnPrompt, turnSystem, (chunk) => {
             fullText += chunk
             queueAssistantStream(fullText)
-          })
-          finishAssistantStream(fullText, 'The model returned an empty response. Try re-downloading or switching to Phi-4 Mini.')
+          }, localGeneration(responseMode, hq?.prompt ? hq.contextTokens : undefined), operatorTurn(hq, hqBoard, assistantMsg.id))
+          finishAssistantStream(fullText, proposed ? PROPOSED_ONLY_NOTE : 'The model returned an empty response. Try re-downloading or switching to Phi-4 Mini.')
         } catch (err) {
           console.error('[LLM] chat error:', err)
           showSkillFallback('\n\n_(Local AI unavailable — upgrade Electron to 33+ for local inference.)_')
@@ -636,10 +598,6 @@ export function useHQ() {
   function handleStepByStep(): void {
     useAutomationStore.getState().setMode('staged')
     useAutomationStore.getState().setStatus('running')
-  }
-
-  function handleSkillClick(command: string): void {
-    setInputValue(command)
   }
 
   async function handleRun(): Promise<void> {
@@ -775,7 +733,6 @@ export function useHQ() {
 
   function handleMenuSelect(item: PathlyMenuItem): void {
     if (!projectPath) return
-    setMenuDismissedKey(menuKey)
     const kind = item.terminal_kind ?? 'claude'
     setCommandRunning(kind, true)
     setHiddenMiniCards((s) => ({ ...s, [kind]: false }))
@@ -804,11 +761,8 @@ export function useHQ() {
     inputValue,
     setInputValue,
     llmAvailable,
-    pathlyContext,
     hiddenMiniCards,
     setHiddenMiniCards,
-    menuCardOpen,
-    setMenuCardOpen,
     pushedMenu,
     setPushedMenu,
     pushedMenuOpen,
@@ -846,9 +800,6 @@ export function useHQ() {
     hasCodexTab,
     hasShellTab,
     hasAntigravityTab,
-    activeMenu,
-    menuVisible,
-    menuDismissedKey,
     automationStatus,
     automationMessages,
     setTargetKind,
@@ -857,7 +808,6 @@ export function useHQ() {
     handleSend,
     handleRunAll,
     handleStepByStep,
-    handleSkillClick,
     handleRun,
     handleReject,
     handleSelectAlt,

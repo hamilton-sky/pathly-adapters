@@ -91,18 +91,6 @@
   justify-content: space-between;
 }
 
-.modelPill {
-  font-size: var(--font-size-xs);
-  padding: 2px 7px;
-  border-radius: var(--radius-lg);
-  background: var(--bg-surface1);
-  color: var(--text-muted);
-}
-
-.modelPillActive {
-  color: var(--accent);
-}
-
 .sendButtonStop {
   background: #EAB308;
   color: #000;

@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
+import type { HqToolSpec, ToolProposal } from '../ipc/llmProposals'
 
 // Mirrored in studio/src/renderer/src/types/global.d.ts — keep in sync
 interface SpawnCaps { global: number; headless: number; interactive: number }
@@ -296,8 +297,8 @@ contextBridge.exposeInMainWorld('pathly', {
       ipcRenderer.invoke('llm:delete', modelId),
     load: (modelId: string): Promise<void> =>
       ipcRenderer.invoke('llm:load', modelId),
-    chat: (prompt: string, systemPrompt: string, modelId: string): Promise<void> =>
-      ipcRenderer.invoke('llm:chat', { prompt, systemPrompt, modelId }),
+    chat: (prompt: string, systemPrompt: string, modelId: string, opts?: { maxTokens?: number; contextSize?: number; thoughtBudget?: number; showReasoning?: boolean; tools?: HqToolSpec[] }): Promise<{ proposals: ToolProposal[] }> =>
+      ipcRenderer.invoke('llm:chat', { prompt, systemPrompt, modelId, ...opts }),
     abort: (): Promise<void> =>
       ipcRenderer.invoke('llm:abort'),
     onToken: (cb: (token: string) => void): (() => void) => {
@@ -332,8 +333,8 @@ contextBridge.exposeInMainWorld('pathly', {
       ipcRenderer.invoke('llm:ollamaPull', ollamaId),
     ollamaDelete: (ollamaId: string): Promise<void> =>
       ipcRenderer.invoke('llm:ollamaDelete', ollamaId),
-    ollamaChat: (prompt: string, systemPrompt: string, modelId: string, think?: boolean): Promise<void> =>
-      ipcRenderer.invoke('llm:ollamaChat', { prompt, systemPrompt, modelId, think }),
+    ollamaChat: (prompt: string, systemPrompt: string, modelId: string, think?: boolean, numCtx?: number): Promise<void> =>
+      ipcRenderer.invoke('llm:ollamaChat', { prompt, systemPrompt, modelId, think, numCtx }),
   },
   brightsky: {
     login: (baseUrl: string): Promise<void> => ipcRenderer.invoke('brightsky:login', baseUrl),

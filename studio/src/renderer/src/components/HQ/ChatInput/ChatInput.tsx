@@ -2,6 +2,7 @@
 import { Send, Square, TerminalSquare, ChevronUp } from 'lucide-react'
 import { useChatStore } from '../../../store/chatStore'
 import { ModelSelector } from '../ModelSelector/ModelSelector'
+import { ComposerScope } from '../ComposerScope/ComposerScope'
 import { TERMINAL_OPTIONS } from '../../../lib/terminalOptions'
 import styles from './ChatInput.module.css'
 
@@ -20,7 +21,6 @@ interface ChatInputProps {
 }
 
 export function ChatInput({ value, onChange, onSend, disabled, isLoading, onStop, onToggleMiniTerminal, onLaunchMiniTerminal, miniTerminalActive, miniTerminalKind }: ChatInputProps): JSX.Element {
-  const isEmbedding = useChatStore((s) => s.isEmbedding)
   const embedReady = useChatStore((s) => s.embedReady)
   const embedProgress = useChatStore((s) => s.embedProgress)
   const [dropdownOpen, setDropdownOpen] = useState(false)
@@ -47,11 +47,9 @@ export function ChatInput({ value, onChange, onSend, disabled, isLoading, onStop
     }
   }
 
-  const pillIsActive = isEmbedding || isRouterLoading
-
   return (
     <div className={styles.container}>
-      {/* Model loading bar â€” shown from first mount until model is ready */}
+      {/* Model loading bar — shown from first mount until model is ready */}
       {isRouterLoading && (
         <div className={styles.downloadBar}>
           <div className={styles.downloadLabel}>
@@ -66,6 +64,8 @@ export function ChatInput({ value, onChange, onSend, disabled, isLoading, onStop
           />
         </div>
       )}
+
+      <ComposerScope />
 
       <textarea
         className={styles.textarea}
@@ -123,17 +123,6 @@ export function ChatInput({ value, onChange, onSend, disabled, isLoading, onStop
           </button>
         </div>
         <ModelSelector />
-        <span
-          className={`${styles.modelPill} ${pillIsActive ? styles.modelPillActive : ''}`}
-        >
-          {isEmbedding
-            ? '◈ Routing…'
-            : isRouterLoading
-            ? `◈ ${embedProgress}%`
-            : embedReady
-            ? '◈ MiniLM'
-            : '◈ Loading…'}
-        </span>
         {isLoading ? (
           <button
             type="button"

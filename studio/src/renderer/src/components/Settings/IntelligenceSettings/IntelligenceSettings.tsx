@@ -1,6 +1,7 @@
 import { AiTargetSelector } from '../../shared/AiTargetSelector/AiTargetSelector'
 import { useDefaultSummaryTarget } from '../hooks/useDefaultSummaryTarget'
 import { CodeIntelligenceSettings } from '../CodeIntelligenceSettings'
+import { HqActionsSettings } from '../HqActionsSettings/HqActionsSettings'
 import s from '../Settings.module.css'
 
 export function IntelligenceSettings(): JSX.Element {
@@ -21,6 +22,8 @@ export function IntelligenceSettings(): JSX.Element {
           />
         </div>
       </div>
+
+      <HqActionsSettings />
 
       <CodeIntelligenceSettings />
     </>

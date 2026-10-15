@@ -3,7 +3,7 @@ import { useProjectStore } from '../../../../store/projectStore'
 import { useElapsedProgress, type ActionProgress } from '../../../shared/RunPill/progress'
 import type { PillState } from '../../../shared/RunPill/RunPill'
 import type { AiSelection } from '../../../../services/aiRouter'
-import { runJobWithAbort, isOff } from '../../../../services/aiRouter'
+import { runJobWithAbort, isOff, DEFAULT_SUMMARY_SELECTION } from '../../../../services/aiRouter'
 import { buildSummarizePrompt, parseStructuredSummary } from '../../../../services/summaryPrompt'
 import { composeClientSkill } from '../../../../services/skillCompose'
 import { readFile, deleteFile } from '../../../../services/pathlyApi'
@@ -27,8 +27,6 @@ import { resolveArtifactPath } from '../artifactPath'
 // State for the ResummarizeButton pill (used on artifact cards and in the ArtifactModal
 // footer). Owns: per-artifact selection (seeded from artifact row → app default),
 // PillState, elapsed-progress timer, abort handle, and gear popover toggle.
-
-const BUILTIN_DEFAULT: AiSelection = { type: 'engine', id: 'claude' }
 
 export interface ResummarizeHook {
   pillState: PillState
@@ -58,7 +56,7 @@ export function useResummarize(messageId: string): ResummarizeHook {
   const [configOpen, setConfigOpen] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [preview, setPreview] = useState<{ prompt: string; fileName: string } | null>(null)
-  const [selection, setSelectionState] = useState<AiSelection>(BUILTIN_DEFAULT)
+  const [selection, setSelectionState] = useState<AiSelection>(DEFAULT_SUMMARY_SELECTION)
   const [style, setStyleState] = useState<SummaryStyle>(SUMMARY_STYLE_DEFAULT)
   const [note, setNoteState] = useState('')
   // run() reads the note from a ref so a value set on the textarea's blur (which fires on
@@ -77,15 +75,10 @@ export function useResummarize(messageId: string): ResummarizeHook {
       if (!row) return
       if (row.summary_style) setStyleState(row.summary_style)
       if (row.summary_note) { setNoteState(row.summary_note); noteRef.current = row.summary_note }
-      // Local models are a separate system (chat only) — a summary always runs on a CLI agent so it
-      // goes through the gate. Coerce any stored local-model target to the default CLI adapter
-      // (Off is preserved). New picks are already CLI-only (the selector no longer lists locals).
-      const cliOnly = (sel: AiSelection): AiSelection =>
-        sel.type === 'model' && !isOff(sel) ? { type: 'engine', id: 'claude' } : sel
       const saved = parseSelection(row.summary_selection)
-      if (saved) { setSelectionState(cliOnly(saved)); return }
+      if (saved) { setSelectionState(saved); return }
       const def = await apiGetDefaultSelection()
-      if (alive && def) setSelectionState(cliOnly(def))
+      if (alive && def) setSelectionState(def)
     })
     return () => { alive = false }
   }, [messageId])

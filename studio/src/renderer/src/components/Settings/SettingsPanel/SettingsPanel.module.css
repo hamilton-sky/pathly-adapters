@@ -10,7 +10,10 @@
 }
 
 .header {
-  padding: 20px 32px;
+  display: flex;
+  align-items: center;
+  height: var(--panel-header-height);
+  padding: 0 32px;
   border-bottom: 1px solid var(--theme-bg-surface0);
   font-size: 18px;
   font-weight: 600;

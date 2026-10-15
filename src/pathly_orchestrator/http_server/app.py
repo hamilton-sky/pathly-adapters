@@ -27,6 +27,7 @@ from .blueprints.catalog.registry import bp as registry_bp
 from .blueprints.skills.editor import bp as skills_bp
 from .blueprints.comms import all_blueprints as comms_blueprints
 from .blueprints.control import all_blueprints as control_blueprints
+from .blueprints.hq import all_blueprints as hq_blueprints
 from .blueprints.ops.telemetry import bp as telemetry_bp
 from .blueprints.ops.menu import bp as menu_bp
 from .blueprints.ops.db_api import bp as db_api_bp
@@ -59,6 +60,8 @@ for _comms_bp in comms_blueprints:
     app.register_blueprint(_comms_bp)
 for _control_bp in control_blueprints:
     app.register_blueprint(_control_bp)
+for _hq_bp in hq_blueprints:
+    app.register_blueprint(_hq_bp)
 
 # Register request/response hooks
 app.before_request(_log_request)

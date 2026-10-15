@@ -13,7 +13,9 @@ export interface Model {
   ollamaId: string
 }
 
-export const RECOMMENDED_MODEL_ID = 'phi-4-mini'
+// The default HQ model (matches the server's hq.default_model). Phi-4 Mini is
+// the lighter fallback for machines with less memory.
+export const RECOMMENDED_MODEL_ID = 'qwen3-8b'
 
 // IDs must match the keys in MODEL_REGISTRY in studio/src/main/ipc/llm.ts
 export const WEB_LLM_MODELS: Model[] = [
@@ -29,6 +31,18 @@ export const WEB_LLM_MODELS: Model[] = [
     ollamaId: 'qwen3:4b',
   },
   {
+    id: 'qwen3-8b',
+    name: 'Qwen3 8B',
+    description: 'Best for HQ board questions — enough context and reasoning to answer from a full board snapshot. Needs ~16 GB+ RAM.',
+    useCase: 'HQ board copilot',
+    system: 'CPU / GPU',
+    storage: '~5.0 GB',
+    speed: 'Slow',
+    recommended: true,
+    thinking: true,
+    ollamaId: 'qwen3:8b',
+  },
+  {
     id: 'qwen2.5-coder-7b',
     name: 'Qwen2.5 Coder 7B',
     description: 'Best code quality — optimized for code generation, review, and debugging tasks.',
@@ -41,12 +55,11 @@ export const WEB_LLM_MODELS: Model[] = [
   {
     id: 'phi-4-mini',
     name: 'Phi-4 Mini',
-    description: 'Fast and light — lower memory usage with strong instruction following. No reasoning mode.',
+    description: 'Fast and light — lower memory usage with strong instruction following. No reasoning mode. The fallback when Qwen3 8B is too heavy for the machine.',
     useCase: 'Quick responses',
     system: 'CPU / GPU',
     storage: '~2.5 GB',
     speed: 'Fast',
-    recommended: true,
     ollamaId: 'phi4-mini:latest',
   },
   {

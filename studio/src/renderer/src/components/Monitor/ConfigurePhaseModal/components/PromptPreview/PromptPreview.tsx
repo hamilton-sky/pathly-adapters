@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Edit2, Copy } from 'lucide-react'
-import { marked } from 'marked'
+import { escapeHtml, renderSafeMarkdown } from '../../../../../lib/safeMarkdown'
 import { SegmentedControl } from '../SegmentedControl/SegmentedControl'
 import { IconButton } from '../IconButton/IconButton'
 import styles from './PromptPreview.module.css'
@@ -129,7 +129,8 @@ export function PromptPreview({
           aria-label="Edit prompt text"
         />
       ) : (
-        // Content is trusted internal skill/agent markdown — not user input.
+        // A composed stage prompt embeds board context anyone can post, so it is
+        // escaped through renderSafeMarkdown like any other untrusted text.
         // eslint-disable-next-line react/no-danger
         <div className={styles.body} dangerouslySetInnerHTML={{ __html: renderMarkdown(text) }} />
       )}
@@ -139,9 +140,8 @@ export function PromptPreview({
 
 function renderMarkdown(text: string): string {
   try {
-    const result = marked.parse(text)
-    return typeof result === 'string' ? result : String(result)
+    return renderSafeMarkdown(text, { breaks: false })
   } catch {
-    return `<pre>${text.replace(/</g, '&lt;')}</pre>`
+    return `<pre>${escapeHtml(text)}</pre>`
   }
 }

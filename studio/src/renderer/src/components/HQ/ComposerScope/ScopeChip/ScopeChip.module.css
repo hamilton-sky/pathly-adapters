@@ -1,0 +1,65 @@
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 2px 7px;
+  background: var(--bg-surface0);
+  border: var(--border);
+  border-radius: var(--radius-lg);
+  color: var(--text-secondary);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  transition: var(--transition-base);
+}
+
+.chip:hover {
+  color: var(--text-primary);
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.chip[data-open='true'] {
+  color: #38BDF8;
+  background: rgba(56, 189, 248, 0.12);
+}
+
+.icon {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.count {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.chip[data-open='true'] .count {
+  color: inherit;
+}
+
+.chevron {
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+/* The row (ComposerScope) is the `hqscope` container: when it gets narrow
+   each chip collapses to icon + count, the label still spoken via aria-label. */
+@container hqscope (max-width: 230px) {
+  .label,
+  .chevron {
+    display: none;
+  }
+}
