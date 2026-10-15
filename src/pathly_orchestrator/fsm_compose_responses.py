@@ -120,6 +120,14 @@ def _exit_requirement(flow_config: dict | None, state_name: str) -> str | None:
                 )
                 if rule not in lines:
                     lines.append(rule)
+            elif t == "task_checks":
+                rule = (
+                    "Each completed task's check block is run by the supervisor; a "
+                    "self-reported pass does not count. Complete a task only once its "
+                    "checks pass."
+                )
+                if rule not in lines:
+                    lines.append(rule)
             elif t == "command_gate":
                 lines.append(
                     f"The project's `{chk.get('command_key')}` verification command must "

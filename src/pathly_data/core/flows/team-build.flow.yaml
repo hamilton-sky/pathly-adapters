@@ -47,6 +47,7 @@ feedback_routing:
   REVIEW_FAILURES: builder
   REVIEW_INCOMPLETE: reviewer
   SCOPE_VIOLATION: builder
+  TASK_CHECK_FAILURES: builder
   TEST_FAILURES: builder
 flow: team-build
 gates:
@@ -59,6 +60,10 @@ gates:
   # into DONE, because a builder fix round runs inside those states while the FSM stays put.
   - on_fail: FLOOR_FAILURES.md
     type: floor_gate
+  # See team.flow.yaml: each task a builder completed has its check block run from the text
+  # frozen at the claim; a task already proven is not run again.
+  - on_fail: TASK_CHECK_FAILURES.md
+    type: task_checks
   # See team.flow.yaml: the builder's changes must stay inside the claimed tasks' files and
   # the paths the plan names; its own feedback files and VERIFY.md are allowed.
   - on_fail: SCOPE_VIOLATION.md
@@ -78,6 +83,8 @@ gates:
     type: require_tasks_done
   - on_fail: FLOOR_FAILURES.md
     type: floor_gate
+  - on_fail: TASK_CHECK_FAILURES.md
+    type: task_checks
   - on_fail: REVIEWER_CHANGED_FILES.md
     type: reviewer_unchanged
   TESTING->RETRO:
@@ -92,6 +99,8 @@ gates:
     type: require_tasks_done
   - on_fail: FLOOR_FAILURES.md
     type: floor_gate
+  - on_fail: TASK_CHECK_FAILURES.md
+    type: task_checks
 role_map:
   BUILDING: builder
   RETRO: retro

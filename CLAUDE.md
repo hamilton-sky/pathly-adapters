@@ -76,13 +76,19 @@ In runner mode Pathly is the single source of truth for skill content. The CLI r
 **Ground truth — `command_gate` measures what other gates take on trust.** The FSM transition gates
 `require_artifact` (a file exists), `verify_gate` (the file's line 1 is `RESULT: PASS`),
 `require_tasks_done` (tasks marked done) and `scope_gate` (the git footprint matches the declared
-one) read state an *agent produced*. `command_gate` (`fsm/gates/command.py`) is the one that
-**executes** — it runs the project's own verify command, reads the process exit code, and routes the
+one) read state an *agent produced*. `command_gate` (`fsm/gates/command.py`) **executes** — it
+runs the project's own verify command, reads the process exit code, and routes the
 real stdout/stderr back as feedback. So a builder that writes `RESULT: PASS` over code that does not
 compile no longer advances the flow. Configure per project with `PUT /db/settings/verify.build` /
 `verify.test`; **unconfigured means the gate skips**, so it is inert until a project opts in. Wired
 into `team`/`team-build` at `BUILDING->REVIEWING` (`verify.build` → `BUILD_FAILURES.md`) and
-`TESTING->RETRO` (`verify.test` → `TEST_FAILURES.md`). `reviewer_unchanged`
+`TESTING->RETRO` (`verify.test` → `TEST_FAILURES.md`). `task_checks` (`fsm/gates/task_checks.py`)
+**executes** too: it runs each completed task's `check` block, from the text frozen at the claim
+(`claimed_text`), with the same runner as `command_gate` (`proof/command.py`), so a builder that
+completes a task whose checks fail is sent back (`TASK_CHECK_FAILURES.md`) whatever it reports. Each
+completion is run once (a task an earlier gate or the goal-loop drain proved is skipped). Wired into
+`team`/`team-build` at `BUILDING->REVIEWING`, `REVIEWING->TESTING` and `->DONE`, and into `goal-loop`
+at `DRAINING->DONE`. `reviewer_unchanged`
 (`fsm/gates/reviewer.py`) also measures instead of trusting: it compares the git working tree and
 `HEAD` the supervisor recorded around each reviewer spawn, so a reviewer that changes a file other
 than `REVIEW.md` or its feedback files, or commits, parks the run for a human

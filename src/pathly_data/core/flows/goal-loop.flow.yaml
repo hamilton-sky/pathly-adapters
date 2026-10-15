@@ -72,6 +72,11 @@ adapter_map:
 #                       builder, a plain feedback spawn the per-task proof never sees) and a
 #                       weakening an earlier failed attempt left in place. After the command
 #                       gates, so a skipped test cannot turn them green unseen.
+#   task_checks         the check block of every completed task whose newest TASK_PROOF does
+#                       not prove its current claim. The drain proves each task it runs
+#                       (a proven task is skipped here); a task a builder fix round completed
+#                       (INCOMPLETE_TASKS) has no proof, so this gate runs its checks, from
+#                       the text frozen at the claim. Last, so the diff gates judge first.
 gates:
   DRAINING->DONE:
     - type: require_tasks_done
@@ -84,6 +89,8 @@ gates:
       on_fail: TEST_FAILURES.md
     - type: floor_gate
       on_fail: FLOOR_FAILURES.md
+    - type: task_checks
+      on_fail: TASK_CHECK_FAILURES.md
 
 feedback_priority:
   - HUMAN_QUESTIONS
@@ -102,6 +109,7 @@ feedback_routing:
   FLOOR_FAILURES: builder
   HUMAN_QUESTIONS: human
   INCOMPLETE_TASKS: builder
+  TASK_CHECK_FAILURES: builder
   TEST_FAILURES: builder
 
 # 3-tier ladder: rounds 1-2 the builder, round 3 an upstream specialist, round 4+ human.
