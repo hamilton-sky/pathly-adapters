@@ -107,6 +107,31 @@ def record_task_proof(
     )
 
 
+def _newest_proofs(storage_path: str | Path) -> dict[str, dict] | None:
+    """The newest ``TASK_PROOF`` event of each task id; ``None`` when the events cannot be read."""
+    from pathly_orchestrator.eventlog import read_events
+
+    try:
+        events = read_events(str(storage_path))
+    except Exception:
+        logger.warning("TASK_PROOF is unreadable for %s", storage_path, exc_info=True)
+        return None
+    newest: dict[str, dict] = {}
+    for event in events:
+        if event.get("type") == "TASK_PROOF":
+            newest[event.get("task_id")] = event
+    return newest
+
+
+def _proves(newest: dict | None, task: dict) -> bool:
+    return (
+        newest is not None
+        and newest.get("claimed_at") == task.get("claimed_at")
+        and newest.get("checks") in ("passed", "none")
+        and newest.get("floor") != "failed"
+    )
+
+
 def task_proven(storage_path: str | Path, task: dict) -> bool:
     """True when the newest ``TASK_PROOF`` for ``task`` proved its current claim.
 
@@ -115,20 +140,16 @@ def task_proven(storage_path: str | Path, task: dict) -> bool:
     and ``floor`` is not ``failed``. False too when the events cannot be read: the checks then
     run again.
     """
-    from pathly_orchestrator.eventlog import read_events
+    newest = _newest_proofs(storage_path)
+    return newest is not None and _proves(newest.get(task["id"]), task)
 
-    try:
-        events = read_events(str(storage_path))
-    except Exception:
-        logger.warning("TASK_PROOF is unreadable for %s", storage_path, exc_info=True)
-        return False
-    newest = None
-    for event in events:
-        if event.get("type") == "TASK_PROOF" and event.get("task_id") == task["id"]:
-            newest = event
-    return (
-        newest is not None
-        and newest.get("claimed_at") == task.get("claimed_at")
-        and newest.get("checks") in ("passed", "none")
-        and newest.get("floor") != "failed"
-    )
+
+def unproven(storage_path: str | Path, tasks: list[dict]) -> list[dict]:
+    """The ``tasks`` for which :func:`task_proven` is false, reading the event log once.
+
+    All of them when the events cannot be read: the checks then run again.
+    """
+    newest = _newest_proofs(storage_path)
+    if newest is None:
+        return list(tasks)
+    return [task for task in tasks if not _proves(newest.get(task["id"]), task)]

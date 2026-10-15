@@ -16,6 +16,7 @@ from pathlib import Path
 
 _HEAD_CHARS = 3000
 _TAIL_CHARS = 5000
+_CLIPPED = "\n... (clipped) ...\n"
 
 
 @dataclass(frozen=True)
@@ -56,6 +57,16 @@ def clip(text: str) -> str:
         return text
     elided = len(text) - _HEAD_CHARS - _TAIL_CHARS
     return f"{text[:_HEAD_CHARS]}\n\n… [{elided} characters elided] …\n\n{text[-_TAIL_CHARS:]}"
+
+
+def clip_to(text: str, limit: int) -> str:
+    """Head and tail of ``text`` in ``limit`` characters (a command's summary is at its end)."""
+    if len(text) <= limit:
+        return text
+    room = max(limit - len(_CLIPPED), 0)
+    head = room // 3
+    tail = room - head
+    return text[:head] + _CLIPPED + (text[len(text) - tail :] if tail else "")
 
 
 def run_command(
