@@ -139,6 +139,7 @@ def test_the_team_flows_carry_the_gate_on_every_edge_out_of_a_stage(name):
     assert [g["type"] for g in flow["gates"]["->DONE"]] == [
         "require_tasks_done",
         "floor_gate",
+        "task_checks",
     ]
 
 
@@ -149,8 +150,9 @@ def test_goal_loop_carries_the_gate_after_the_command_gates():
         "command_gate",
         "command_gate",
         "floor_gate",
+        "task_checks",
     ]
-    assert flow["gates"]["DRAINING->DONE"][-1]["on_fail"] == "FLOOR_FAILURES.md"
+    assert flow["gates"]["DRAINING->DONE"][3]["on_fail"] == "FLOOR_FAILURES.md"
     assert flow["feedback_routing"]["FLOOR_FAILURES"] == "builder"
 
 

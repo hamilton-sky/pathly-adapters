@@ -4,7 +4,7 @@
 
 FSM engine, gates, transitions, flow definitions, feedback protocol & fix-routing.
 
-40 test file(s).
+42 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -44,6 +44,8 @@ FSM engine, gates, transitions, flow definitions, feedback protocol & fix-routin
 | `test_small_flow_escalation.py` | debug + quick-fix carry the same 3-tier retry ladder as the team flows | 5 |
 | `test_stage_override.py` | flow-gate-preview (P2) — the transient per-run, per-stage prompt override channel | 5 |
 | `test_stage_selection_apply.py` | flow-phase-inspector (#5) apply-at-spawn: build_prompt applies a stage's saved selection | 7 |
+| `test_task_checks_edges.py` | ``task_checks``: wiring, report shape, re-runs and fail-open (build-proof 07) | 12 |
+| `test_task_checks_gate.py` | ``task_checks`` runs each completed task's check block at the joins (build-proof 07) | 8 |
 | `test_team_build_per_task.py` | team-build per-task loop + goal-DAG completeness gate | 9 |
 | `test_test_flow_failure_routing.py` | Phase 0 hygiene fix — test.flow.yaml routed TEST_FAILURES.md to TESTING (a | 5 |
 | `test_transition_actions.py` | Tests for get_transition_actions() and validate_flow_cli() in state.py | 21 |
