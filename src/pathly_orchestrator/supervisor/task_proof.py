@@ -35,7 +35,8 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Optional
 
 from pathly_orchestrator.proof import floor, tree
-from pathly_orchestrator.proof.checks import ParseError, checks_in, run_checks
+from pathly_orchestrator.proof.checks import run_task_checks
+from pathly_orchestrator.proof.command import clip_to
 
 from .scheduler import _outcome_is_failure
 from .spawn_window import _storage_path
@@ -49,7 +50,6 @@ _ERROR_LIMIT = 4000
 _FLOOR_LIMIT = 1200
 _TEXT_LIMIT = 400
 _MAX_FINDINGS = 20
-_CLIPPED = "\n... (clipped) ...\n"
 
 _LOCK = threading.Lock()
 # run_id -> the window of a task whose spawn is in flight now.
@@ -217,32 +217,8 @@ def _text_findings(task: dict, allow: frozenset[str]) -> list[str]:
     return ["task-edit: task %s: its text was changed after the claim" % task["id"]]
 
 
-def _run_task_checks(task: dict, root: str) -> tuple[str, str]:
-    """``(result, report)``: result is ``passed``, ``failed``, ``none`` or ``error``."""
-    from pathly_orchestrator.fsm.gates.command import _resolve_timeout
-
-    try:
-        found = checks_in(task.get("claimed_text") or task.get("text") or "")
-    except ParseError as exc:
-        return "error", "The check block in this task cannot be read: %s" % exc
-    if not found:
-        return "none", ""
-    ok, report = run_checks(found, root, _resolve_timeout({}))
-    return ("passed", "") if ok else ("failed", report)
-
-
-def _clip(text: str, limit: int) -> str:
-    """Head and tail of ``text`` in ``limit`` characters (a command's summary is at its end)."""
-    if len(text) <= limit:
-        return text
-    room = max(limit - len(_CLIPPED), 0)
-    head = room // 3
-    tail = room - head
-    return text[:head] + _CLIPPED + (text[len(text) - tail :] if tail else "")
-
-
 def _section(heading: str, body: str, limit: int) -> str:
-    return "## %s\n%s" % (heading, _clip(body, limit - len(heading) - 4))
+    return "## %s\n%s" % (heading, clip_to(body, limit - len(heading) - 4))
 
 
 def _error_text(floor_lines: list[str], text_lines: list[str], report: str) -> str:
@@ -278,6 +254,7 @@ def _judge(
 ) -> _Verdict:
     from pathly_orchestrator.db.connection import get_db
     from pathly_orchestrator.db.queries.task_proof import get_task
+    from pathly_orchestrator.fsm.gates.command import _resolve_timeout
 
     root = str(state.project_root)
     storage = _storage_path(state)
@@ -286,7 +263,7 @@ def _judge(
     scanned = _scan(root, storage, before, after, allow, others)
     floor_lines, warnings = scanned if scanned is not None else ([], [])
     text_lines = _text_findings(task, allow)
-    checks, report = _run_task_checks(task, root)
+    checks, report = run_task_checks(task, root, _resolve_timeout({}))
     if floor_lines or text_lines:
         floor_result = "failed"
     else:

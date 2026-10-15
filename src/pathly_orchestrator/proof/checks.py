@@ -140,3 +140,22 @@ def run_checks(
             % (check.command, _wanted(check), got, clip(output) or "(no output)")
         )
     return not failures, "\n".join(failures)
+
+
+def run_task_checks(task: dict, cwd: str | Path, timeout: float) -> tuple[str, str]:
+    """``(result, report)`` for a task's check blocks; result is passed, failed, none or error.
+
+    The blocks are read from the text the task had when it was claimed (``claimed_text``), else
+    its live ``text`` for a task claimed before that column existed. A block that cannot be
+    parsed is ``error`` and the report quotes the parser's message; a task without a block is
+    ``none``. The goal-loop drain's task proof and the ``task_checks`` gate both judge a task
+    through this one function, so they cannot disagree about what a pass means.
+    """
+    try:
+        found = checks_in(task.get("claimed_text") or task.get("text") or "")
+    except ParseError as exc:
+        return "error", "The check block in this task cannot be read: %s" % exc
+    if not found:
+        return "none", ""
+    ok, report = run_checks(found, cwd, timeout)
+    return ("passed", "") if ok else ("failed", report)

@@ -182,10 +182,12 @@ def test_a_second_next_action_keeps_the_first_base(repo, flow, floored, monkeypa
 def test_no_base_is_stamped_without_a_floor_or_task_checks_gate(
     repo, flow, monkeypatch
 ):
-    # The packaged flow carries a floor_gate since ticket 06, so take it out.
+    # The packaged flow carries a floor_gate and a task_checks gate, so take them out.
     bare = copy.deepcopy(flow)
     for edge, gates in bare["gates"].items():
-        bare["gates"][edge] = [g for g in gates if g["type"] != "floor_gate"]
+        bare["gates"][edge] = [
+            g for g in gates if g["type"] not in ("floor_gate", "task_checks")
+        ]
     _patched(monkeypatch, bare)
 
     _enter_building(repo, flow)

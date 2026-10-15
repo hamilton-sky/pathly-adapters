@@ -112,7 +112,7 @@ path entirely (see its own section below).
                                          v
                       run_gates(STATE -> next)   <- THE JOIN, once
                       (goal-loop's: require_tasks_done + command_gate build + test
-                       + floor_gate; each flow declares its own under `gates:`)
+                       + floor_gate + task_checks; each flow declares its own under `gates:`)
 ```
 
 `fsm_state.current` stays the **scalar** `"DRAINING"` for the whole drain. The parallelism is
@@ -460,7 +460,8 @@ human checkpoints to `DONE`.
   type), `tasks_claimed_since` / `tasks_completed_since` (goal-scoped when `goal_id` is given,
   else `(board, scope)`, as `require_tasks_done` scopes; the window compares parsed times, since
   claims stamp `+00:00` and event `ts` values end in `Z`) and `set_floor_allow`. The goal-loop
-  task proof reads both ("Task proof in the goal-loop drain"); no gate does yet.
+  task proof reads both ("Task proof in the goal-loop drain"); `floor_gate`, `scope_gate` and the
+  Review packet read the claimed ones, `task_checks` the completed ones.
 
 ### Request bodies — one lenient reader for every comms route (`_helpers.read_json_body`)
 
@@ -904,13 +905,15 @@ module, never another `elif`**. Each check returns `None` to allow the transitio
 | `command_gate` | `command.py` | **the project's own verify command exits 0** | `command_key` (+ optional `command`, `timeout`) |
 | `reviewer_unchanged` | `reviewer.py` | a reviewer spawn changed no file and made no commit (the supervisor's `SPAWN_WINDOW` events; see "Reviewer gate" below) | — |
 | `floor_gate` | `floor.py` | **the run's diff since the `proof_base` weakens no test, check, config or plan** (`proof.floor.scan` over two working-tree snapshots; see "Floor gate" below) | — (app setting `floor.enabled`) |
+| `task_checks` | `task_checks.py` | **each completed task's `check` block exits as it says**, run from the text frozen at the claim, once per completion (the tasks completed since the `proof_base`, minus those whose newest `TASK_PROOF` proves their current claim; see "Task checks gate" below) | — |
 
-**The first four read state that agents produced; only `command_gate` executes something.** That
-distinction is the point of it: `verify_gate` is satisfied by an agent writing `RESULT: PASS`, so
+**The first four read state that agents produced; `command_gate` and `task_checks` execute
+something.** That distinction is the point of it: `verify_gate` is satisfied by an agent writing `RESULT: PASS`, so
 the FSM's pass/fail signal was, end to end, an agent's opinion of its own work. `command_gate`
 re-derives the answer from a process exit code and routes the real stdout/stderr back as feedback.
-`reviewer_unchanged` reads what the supervisor measured around the reviewer's spawn, not what the
-reviewer reported. `floor_gate` reads the git working tree itself, not what the builder reported.
+`task_checks` does the same for a task's own check block. `reviewer_unchanged` reads what the
+supervisor measured around the reviewer's spawn, not what the reviewer reported. `floor_gate`
+reads the git working tree itself, not what the builder reported.
 
 **Command resolution** (highest precedence first): `gate["command"]` literal → app-setting
 `verify.<command_key>` → **skip**. Configure a project with
@@ -933,7 +936,8 @@ argv array instead, for exact control on any platform — **required on Windows 
 environment. Failure output is clipped head+tail (3000/5000 chars) — compilers put the first error at
 the top, test runners put the summary at the bottom, so tailing alone loses half the signal.
 The splitting, the run and the clipping live in `proof/command.py` (`to_argv`, `run_command`,
-`clip`), the one command runner the gate and task check blocks share.
+`clip`, and `clip_to(text, limit)`, head and tail in a character limit), the one command runner
+the gate and task check blocks share.
 
 **Task check blocks (`proof/checks.py`).** A task's text can carry ```` ```check ```` fences;
 every one anywhere in the text counts. Inside a fence: `$ <command>` starts a check, `exit <N>`
@@ -944,7 +948,11 @@ needs `&&` is written as two `$` lines, because each runs through `run_command` 
 second `exit`, an unclosed fence). `run_checks(checks, cwd, timeout)` runs every check, not
 stopping at the first failure, and returns `(ok, report)`: one block per failing check with the
 command, `wanted:`, `got:` (`exit <N>`, `timed out after <N>s` or `could not run: <error>`) and
-the clipped output. `supervisor/task_proof.py` runs them for a goal-loop task; no gate does yet.
+the clipped output. `run_task_checks(task, cwd, timeout)` judges one task: it reads the blocks of
+`claimed_text` (else `text`) and returns `(result, report)` with `result` `passed`, `failed`, `none`
+or `error` (a `ParseError`, quoted in the report). `supervisor/task_proof.py` calls it for a
+goal-loop task, and the `task_checks` gate for a task a builder completed ("Task checks gate"), so
+the two cannot disagree about what a pass means.
 
 **Floor guard (`proof/floor.py` over `proof/tree.py`).** Ported from feature-flow's
 `floorguard.py` (MIT): its regexes and config-file content rules, not its CLI. It looks for a build
@@ -1004,10 +1012,13 @@ with `claimed_at` copied from the task row (`checks`: `passed` | `failed` | `non
 current `claimed_at`, `checks` is `passed` or `none` and `floor` is not `failed`: a retry or a
 human re-open claims the task again (a new `claimed_at`), so the earlier record stops counting,
 and a failed proof is run again. It reads the whole event log on each call and is false when
-the events cannot be read (the checks then run again). `team`, `team-build` and `goal-loop`
+the events cannot be read (the checks then run again); `unproven(storage_path, tasks)` is the
+batch form (the tasks `task_proven` would reject, one read of the log, all of them when it cannot
+be read). `team`, `team-build` and `goal-loop`
 declare a `floor_gate`, so their runs stamp a base on first entry to BUILDING (`team`,
-`team-build`) or DRAINING (`goal-loop`); no flow declares a `task_checks` gate yet. The only
-writer of `TASK_PROOF` is the goal-loop drain's task proof ("Task proof in the goal-loop drain").
+`team-build`) or DRAINING (`goal-loop`); all three also declare a `task_checks` gate. `TASK_PROOF`
+is written by the goal-loop drain's task proof ("Task proof in the goal-loop drain") and by the
+`task_checks` gate ("Task checks gate").
 
 **Spawn windows and stage writes (`supervisor/spawn_window.py`, `fsm/gates/_proof.py`).** The
 floor, scope and reviewer gates must tell who wrote a file: in `team`/`team-build` a planner or
@@ -1173,6 +1184,47 @@ with a shell can reach the DB and the git object store). An interactive `/pathly
 explained and reads as a `plan-edit`; set `floor.enabled` to `false` for such a run. A test or
 tester edit in TESTING that trips the floor goes to the builder, who did not make it.
 
+**Task checks gate (`fsm/gates/task_checks.py`).** In `team` and `team-build` the builder claims a
+board task and completes it itself (`POST /comms/tasks/complete`), so the supervisor never sees
+per-task success, and a builder fix round (`INCOMPLETE_TASKS` routed to it in REVIEWING, RETRO or
+after a goal-loop drain) completes tasks the same way. The gate runs at every join such a
+completion can precede and executes the task's `check` block, so a self-reported pass does not
+count:
+
+- **Which tasks:** `task_proof.tasks_completed_since` from `proof_base.started_at` (goal-scoped when
+  the run has a `goal_id`, else `(board, scope)`), minus every task for which
+  `_proof_record.task_proven` is true (`_proof_record.unproven` does this for the whole list with
+  one read of the event log). So each completion is checked once: a task an earlier gate
+  or the goal-loop drain proved is not run again, a task whose newest `TASK_PROOF` failed is run
+  again, and so is a task claimed again since (a new `claimed_at`). A task completed before the
+  base is not touched.
+- **Which text:** `claimed_text`, the text frozen at the claim (`text` for a task claimed before
+  that column existed), so editing the live task text changes nothing; the report says so.
+- **How:** `proof.checks.run_task_checks` (`checks_in` then `run_checks`) in the project root with
+  the `verify.timeout_seconds` timeout, the same runner as `command_gate`. A `ParseError` fails and
+  the report quotes the parser's message (`TASK_PROOF checks: "error"`); a task without a block
+  passes (`checks: "none"`). Every task run writes `TASK_PROOF` with `run_id` `gate:<transition>`
+  and `floor: "n/a"` (the floor gate judges the diff).
+- **Failure:** `TASK_CHECK_FAILURES.md`, one `## Task <id>: <first line>` section per failing task
+  (at most 8, each clipped to 4000 characters, then a count) and a note that the supervisor ran the
+  frozen text; `GATE_FAILED {gate, transition, tasks, count}`. The flows route it to `builder`. A
+  human fixes a broken check by editing the task text and re-freezing it with
+  `POST /comms/tasks/floor-allow` (`refreeze: true`); an agent cannot. So the file ends with an
+  action line per kind of failure: a failing check is to be fixed in the code, while a block that
+  cannot be read (`error`) sends the builder to write `HUMAN_QUESTIONS.md` and stop, since neither
+  a code change nor a text edit can help it.
+- **Skips** (`GATE_SKIPPED`, fail open): the run has no `proof_base` (`no_proof_base`), or the
+  completed tasks cannot be read, including a base whose `started_at` is not a time
+  (`tasks_unreadable`). It needs no git: `started_at` is set even outside a repo.
+
+Wired in `core/flows/team.flow.yaml` and `team-build.flow.yaml` at `BUILDING->REVIEWING` (after
+`floor_gate`, before `scope_gate`, which stays last), `REVIEWING->TESTING` (after `floor_gate`,
+before `reviewer_unchanged`, which stays last) and the wildcard `->DONE` (last), and in
+`goal-loop.flow.yaml` at `DRAINING->DONE` (last). Each flow routes `TASK_CHECK_FAILURES` to
+`builder`. `fsm_compose_responses._exit_requirement` tells the stage's agent that each completed
+task's check block is run by the supervisor. Limit: a regression after a task's checks passed is
+left to `command_gate test`, which runs the whole suite at `TESTING->RETRO` and `DRAINING->DONE`.
+
 **Review packet (`fsm_compose_review.py`) — the reviewer's view.** A reviewer judges a diff
 against a task, not against the builder's account of its work. The reviewer has no Bash, so it
 could not run the `git diff HEAD~1 HEAD` that `team/review.md` told it to, and its prompt carried the
@@ -1196,8 +1248,9 @@ states. The packet is a `## Review packet` section:
   one argv string and Linux caps an argument at 128 KiB;
 - `### Supervisor notes` — per claimed task its latest `TASK_PROOF` event since the build began
   (checks passed, failed, or "no check block: review its acceptance by reading the code") and the
-  warnings of the latest `FLOOR_CHECKED` event (at most 20), else `none recorded`. Those events
-  belong to the task-check and floor gates of the same feature; nothing writes them yet.
+  warnings of the latest `FLOOR_CHECKED` event (at most 20), else `none recorded`. `TASK_PROOF` is
+  written by the `task_checks` gate and the goal-loop drain's task proof, `FLOOR_CHECKED` by the
+  floor gate.
 
 With no `review_base` (the FSM never stamped BUILDING for the run, as in an interactive session,
 or git is missing) or no snapshot now, it returns a short section saying so, and `team/review.md`'s
@@ -1553,13 +1606,14 @@ still works). A project root that is not a directory is not proven.
      overlapping task.
    - *Task text:* a `claimed_text` that differs from the live `text` is a `task-edit` finding,
      unless a human allowed `task-edit` for the task.
-   - *Checks:* `proof.checks.checks_in(claimed_text or text)` run with
-     `proof.checks.run_checks` in the project root (`verify.timeout_seconds`, default 600). A
-     `ParseError` is a failure that quotes the error; no block is not a failure.
+   - *Checks:* `proof.checks.run_task_checks` (the blocks of `claimed_text or text`, run with
+     `run_checks`) in the project root (`verify.timeout_seconds`, default 600), the function the
+     `task_checks` gate uses too. A `ParseError` is a failure that quotes the error; no block is
+     not a failure.
 4. **Record** `TASK_PROOF {task_id, claimed_at, run_id, checks, floor, warnings}` in the run's
    storage dir (`_proof_record.record_task_proof`): `checks` is `passed`, `failed`, `none` or
    `error` (an unreadable block), `floor` is `off` when the scan was skipped, `failed` on any
-   floor or `task-edit` finding, else `clean`. The join's `task_checks` gate (planned) does not
+   floor or `task-edit` finding, else `clean`. The join's `task_checks` gate does not
    run a proven task's checks again.
 
 On any finding or failing check the outcome comes back as a copy with `outcome: "failed"` and an
@@ -1995,6 +2049,7 @@ gates:
     - {type: command_gate, command_key: build, on_fail: BUILD_FAILURES.md}
     - {type: command_gate, command_key: test,  on_fail: TEST_FAILURES.md}
     - {type: floor_gate, on_fail: FLOOR_FAILURES.md}   # build-proof 06: the whole run's diff
+    - {type: task_checks, on_fail: TASK_CHECK_FAILURES.md}   # build-proof 07: unproven tasks' checks
 ```
 
 `goal_executor._run_loop` is now a delegation to `_run_team(flow="goal-loop")` — no

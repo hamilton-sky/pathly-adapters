@@ -1,7 +1,7 @@
 # Run task check blocks at every join where a builder may have completed a task
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 01, 03, 15
 Test first: yes
 
@@ -113,3 +113,224 @@ prints docs current
   ("Transition gates")
 
 ## Answer
+
+Work started at commit `6699655ecb52741010ae5700b248a746a03bce3f`. Test-only commit: `5824678`
+(`test(build-proof): 07 failing test`). At that commit `test_task_checks_gate.py` and
+`test_task_checks_edges.py` give `21 failed, 1 passed`: the gate module is missing
+(`ModuleNotFoundError: No module named 'pathly_orchestrator.fsm.gates.task_checks'`), the flows
+carry no `task_checks` gate (`'task_checks' is not in list`, the goal-loop gate list), and every
+scenario advances instead of blocking (`AssertionError: {... 'current_state': 'REVIEWING' ...}`
+where the test wants `blocked`). The one pass is "goal-loop join passes when every task is proven
+or passes", which the absent gate also satisfies.
+
+Review round 1 (quality review, three findings) started at `fa3ea051596a7bfad36482b466f898823a8fd058`.
+Its test-only commit is `e9e7cd3` (`test(build-proof): 07 failing test`): `test_task_checks_shared.py`
+gives `13 failed, 2 passed`. The failures are `AttributeError: module 'pathly_orchestrator.proof.checks'
+has no attribute 'run_task_checks'` (and the same for `clip_to` on `proof.command`, and for both
+names on `task_checks`), `assert 'HUMAN_QUESTIONS.md' in "Task checks: a completed task's check
+block failed. ..."` for an unreadable block, and `read the event log 3 times for 3 tasks`. The two
+passes pin behaviour that already held (a failing check says to fix the code; unreadable events
+run the checks again).
+
+**Built**
+
+- `src/pathly_orchestrator/fsm/gates/task_checks.py` (new, now 164 lines): `check_task_checks`.
+  - Reads `_proof_record.read_proof_base`; none gives `GATE_SKIPPED` `no_proof_base`.
+  - Tasks: `db.queries.task_proof.tasks_completed_since(get_db(), board, scope, goal_id,
+    proof_base.started_at)` (lazy import, so a test can patch it); any exception (a base whose
+    `started_at` is not a time included) gives `GATE_SKIPPED` `tasks_unreadable`. It then keeps the
+    tasks `_proof_record.unproven(storage, tasks)` returns (one read of the event log).
+  - Per remaining task: `proof.checks.run_task_checks(task, project_root_of(storage),
+    command._resolve_timeout({}))` (the blocks of `claimed_text or text`; a `ParseError` is `error`
+    with the report `The check block in this task cannot be read: <parser message>`; no block is
+    `none`). Each result is written with `_proof_record.record_task_proof(storage, task,
+    "gate:<prev>-><next>", result, "n/a")` (a failed write is logged, not raised).
+  - Any `failed`/`error` task: `gate_failed` with `on_fail` and `extra {tasks, count}`. The file starts
+    "Task checks: a completed task's check block failed.", says the supervisor ran each block "from
+    the text the task had when it was claimed, so editing the task text now changes nothing", then has
+    one `## Task <id>: <first line>` section per failing task (at most 8, each clipped head and tail
+    to 4000 characters, then "... and N more failing tasks"), and ends with one action line per kind
+    of failure. A failing check: fix the code, and a human can correct and `refreeze` the text. A block
+    that cannot be read: a human must fix it, so the builder writes `HUMAN_QUESTIONS.md` next to the
+    file and stops.
+- `src/pathly_orchestrator/proof/checks.py`: new `run_task_checks(task, cwd, timeout) -> (result,
+  report)`, the one function that judges a task's check blocks (round 1 fix).
+- `src/pathly_orchestrator/proof/command.py`: new `clip_to(text, limit)` (head and tail in `limit`
+  characters) next to `clip` (round 1 fix).
+- `src/pathly_orchestrator/fsm/gates/_proof_record.py`: `_newest_proofs` / `_proves` factored out of
+  `task_proven` (same result), and a new batch form `unproven(storage_path, tasks)` (round 1 fix).
+- `src/pathly_orchestrator/supervisor/task_proof.py`: its `_run_task_checks`, `_clip` and `_CLIPPED`
+  are gone; `_judge` calls `run_task_checks(task, root, _resolve_timeout({}))` and `_section` calls
+  `clip_to` (round 1 fix).
+- `src/pathly_orchestrator/fsm/gates/__init__.py`: import, `_CHECKS["task_checks"]`, and the module
+  docstring's table row and its "only `command_gate` executes" sentence.
+- `src/pathly_data/core/flows/team.flow.yaml` and `team-build.flow.yaml`: `task_checks` /
+  `TASK_CHECK_FAILURES.md` right after `floor_gate` on `BUILDING->REVIEWING` (before `scope_gate`) and
+  `REVIEWING->TESTING` (before `reviewer_unchanged`), and last on the wildcard `->DONE`;
+  `TASK_CHECK_FAILURES: builder` in `feedback_routing`. `goal-loop.flow.yaml`: last gate of
+  `DRAINING->DONE`, plus the routing line and a header comment. `feedback_priority` is untouched.
+- `src/pathly_orchestrator/fsm_compose_responses.py`: a `task_checks` branch in `_exit_requirement`
+  ("Each completed task's check block is run by the supervisor; a self-reported pass does not count.
+  Complete a task only once its checks pass.").
+- Living docs: root `CLAUDE.md` ("Ground truth" paragraph) and `src/pathly_orchestrator/CLAUDE.md`
+  (see Decisions; round 1 also updated the lines the shared runner, `clip_to`, `unproven` and the
+  human-bound action line made stale).
+- Tests: `tests/fsm_flows/test_task_checks_gate.py` (8 tests, every Done-when case),
+  `tests/fsm_flows/test_task_checks_edges.py` (14: flow wiring, exit requirement, report shape, re-runs,
+  fail-open), `tests/fsm_flows/test_task_checks_shared.py` (15, round 1: one runner and clip, the
+  action lines, one event read), `tests/fsm_flows/task_checks_support.py` (helpers), regenerated
+  `tests/INDEX.md` and `tests/fsm_flows/INDEX.md`. Three existing tests changed on purpose (the
+  first test-only commit): the `->DONE` list and goal-loop gate list in `test_floor_gate.py` (ticket
+  06 said they would), `test_proof_base.py::test_no_base_is_stamped_without_a_floor_or_task_checks_gate`
+  (it stripped `floor_gate` from the packaged flow; now strips `task_checks` too), and the goal-loop
+  gate-type set in `tests/comms_board/test_comms_goals_run.py`.
+
+**Proof** (each run fresh, after the last code edit; the venv from the operator note on PATH)
+
+- `python -m pytest tests/fsm_flows/test_task_checks_gate.py -q -p no:cacheprovider`: `8 passed in
+  11.37s`, exit 0. On a `git init` feature under `tmp_path`, through the real `next_action` and
+  `complete_stage` over the packaged `team-build` and `goal-loop` flows, it covers:
+  - a completed task whose check exits 1 blocks BUILDING->REVIEWING; `TASK_CHECK_FAILURES.md` holds
+    `got: exit 1`, the output marker, the task id and "text the task had when it was claimed"; the
+    result is `blocked`, `target_agent == "builder"`, `file == "TASK_CHECK_FAILURES.md"`; the
+    `TASK_PROOF` is `failed` / `n/a` with run id `gate:BUILDING->REVIEWING`. The live `text` is then
+    rewritten to a passing check (and `task-edit` allowed, so `floor_gate` lets it through): the
+    gate blocks again with `got: exit 1`;
+  - a failing task completed in REVIEWING (after BUILDING->REVIEWING passed with nothing to run)
+    blocks REVIEWING->TESTING, and one completed in RETRO blocks RETRO->DONE (and then a human fix
+    plus `refreeze` lets it reach `{"done": True}`, with proofs `["failed", "passed"]`);
+  - a counting check (appends a character to a log outside the repo) passes at BUILDING->REVIEWING and
+    the log still reads `x` after REVIEWING->TESTING; exactly one `TASK_PROOF` exists for it;
+  - goal-loop DRAINING->DONE: a task with a passing `TASK_PROOF` for its current `claimed_at` is not
+    run (its log is never created, one proof only), a task completed without a proof is run and
+    blocks the join (`gate:DRAINING->DONE`);
+  - no block records `checks: "none"` with the join passing; a malformed block fails with
+    `str(ParseError)` in the file and `checks: "error"`; a task completed before `proof_base.started_at`
+    is not run (no `TASK_PROOF`).
+- `python -m pytest tests/fsm_flows tests/comms_board/test_comms_goals_run.py -q -p no:cacheprovider`:
+  `705 passed, 9 skipped in 141.88s`, exit 0 (round 1 read 690 passed; the 15 new tests are the
+  difference).
+- The docs command printed `docs current`, exit 0.
+- Round 1 targeted runs: `python -m pytest tests/fsm_flows/test_task_checks_shared.py
+  tests/fsm_flows/test_task_checks_gate.py tests/fsm_flows/test_task_checks_edges.py -q
+  -p no:cacheprovider` gave `37 passed in 17.37s`, exit 0; `python -m pytest tests/dag_goals -q
+  -p no:cacheprovider` (the goal-loop task proof tests, since `task_proof.py` changed) gave `231
+  passed in 46.76s`, exit 0.
+- Beyond the Done when: Test (`python -m pytest tests/ -q -x -p no:cacheprovider`) `2802 passed, 14
+  skipped in 484.40s`, exit 0. The Lint chain from `commands.md` run as one `&&` command: exit 0
+  (black unchanged; mypy clean; file size `none new, none grown`; mirror reads OK; test INDEX up to
+  date; lint-imports; bandit; adapters OK; entry points OK). Smoke exit 0. `python -m build --wheel`
+  exit 0.
+
+**Decisions**
+
+- The ticket's `tasks_completed_since(board, feature_scope, goal_id, started_at)` has a `conn` first
+  argument in the code (`tasks_completed_since(conn, board, scope, goal_id, since)`); the gate calls it
+  with `get_db()`, `board or "feature"` and `feature_scope or ""`. With neither `goal_id` nor a scope the
+  query returns `[]` and the gate passes.
+- A base with no `tree` does not skip the gate (unlike `floor_gate`): task checks need `started_at`
+  only, and `started_at` is set outside git too.
+- One gate run records a `TASK_PROOF` for a task that fails and for one that passes, so the next join
+  runs only what is not proven. A failed record stays unproven (`task_proven` is false for it), so a
+  fix round that completes the task again, with no new claim, is run again.
+- Failure text caps: 8 tasks, 4000 characters each. `run_checks` clips each failing check's output to
+  8000 characters but has no cap on a whole report (ticket 01's note), and the feedback file ends up in
+  a builder prompt, which is one argv string.
+- `task_checks` sits after `floor_gate` and before `scope_gate` / `reviewer_unchanged` as spec.md §
+  Migration gives. Because `floor_gate` runs first, a builder that edits a task's live text trips
+  `task-edit` (FLOOR_FAILURES.md) before the checks run; the test reaches the gate by allowing
+  `task-edit` for that task.
+- The shared runner takes the timeout as an argument and lives in `proof/`, which imports nothing
+  internal, so each caller still resolves `verify.timeout_seconds` itself (`_resolve_timeout({})`, one
+  line each in the gate and in `task_proof._judge`). `clip_to` is a new function next to `clip`, because
+  `clip` has fixed 3000/5000 limits that the failure sections cannot use.
+- The human-bound action line asks the builder to write `HUMAN_QUESTIONS.md`: every flow routes it to
+  `human` and ranks it first in `feedback_priority`, so the supervisor parks the run for a person. A
+  run with both kinds of failure gets both action lines.
+- `unproven` falls back to "every task is unproven" when the event log cannot be read, which is what
+  `task_proven` already did per task (the checks run again).
+- Docs. Root `CLAUDE.md`: "Four of the five" was already gone (ticket 06 reworded the paragraph), so
+  only `command_gate ... is the one that **executes**` was stale; it now says `command_gate`
+  "**executes**" and a new `task_checks` sentence says it also executes (frozen text, same runner,
+  once per completion, where wired). `src/pathly_orchestrator/CLAUDE.md`: the `task_checks` table row,
+  the "first four read state ...; `command_gate` and `task_checks` execute something" sentence, a "Task
+  checks gate" section after the Floor gate section, and the places the new gate made false: "no gate
+  does yet" (twice: the `*_since` reads, the check-block paragraph), "no flow declares a `task_checks`
+  gate yet / the only writer of `TASK_PROOF`", the Review packet's "nothing writes them yet", the drain
+  section's "(planned)", and the gate lists in the architecture diagram and the Phase E flow excerpt.
+  Round 1 fixed the sentence "`task_proven` reads the event log once per task", and named
+  `run_task_checks`, `clip_to` and `unproven` where the file described the helpers.
+
+**Shortcuts taken**
+
+- `task_proven` and `unproven` read the whole event log, now once per gate run instead of once per
+  completed task. The read still grows with the number of events. Worth upgrading (a `TASK_PROOF`-only
+  query) if the gate shows up in a profile on a long run.
+- The checks run one task after another in the gate's own process, in the project root, with the
+  server's account and no extra environment (`command_gate` sets `PATHLY_VERIFY_GATE=1`; `run_checks`
+  has no `extra_env`). A join with many tasks and slow checks holds the `complete_stage` call for the
+  sum of their times (each command is bounded by `verify.timeout_seconds`).
+- A passing run appends no event of its own beyond each `TASK_PROOF`; there is no `GATE_PASSED` for the
+  gate and no record that it ran when there was nothing to run.
+
+**Review fixes** (round 1, quality review)
+
+1. major, duplicated helpers: fixed. `run_task_checks(task, cwd, timeout)` is now in `proof/checks.py`
+   and `clip_to(text, limit)` in `proof/command.py`; `task_checks.py` and `supervisor/task_proof.py`
+   both import them, and `_run_checks_of`, `_run_task_checks`, `_clip` and `_CLIPPED` are deleted from
+   both. `test_the_gate_and_the_drain_proof_share_one_runner_and_one_clip` asserts the two modules hold
+   the very same function objects, and the `run_task_checks` / `clip_to` unit tests cover the frozen
+   text, the live-text fallback, `none`, `error` with the parser's message, and the clip's limit. The
+   goal-loop task proof tests (`tests/dag_goals`, 231) still pass, so the drain's behaviour is unchanged.
+2. minor, action line for an unparsable block: fixed. `_failure_text` now takes `(task, result, report)`
+   and adds `_FIX_THE_CODE` only when a task `failed` and `_ASK_A_HUMAN` only when one is `error`; the
+   latter sends the builder to write `HUMAN_QUESTIONS.md` and stop, so a human can re-freeze the text.
+   Three tests pin a failing check (fix the code, no `HUMAN_QUESTIONS.md`), an unreadable block
+   (`HUMAN_QUESTIONS.md` and `refreeze`, no "fixing the code") and one of each (both).
+3. minor, event log read per task: fixed. `_proof_record.unproven(storage_path, tasks)` reads the log
+   once and the gate calls it; `task_proven` keeps its behaviour on the same two helpers. A test counts
+   `eventlog.read_events` calls during one gate run over three tasks: 3 before the fix, 1 after. A
+   second test makes the read raise and checks the checks still run and are recorded.
+
+**For later tickets**
+
+- Ticket 14 (acceptance): the checks run in the project root before `scope_gate` on
+  BUILDING->REVIEWING and before the next `floor_gate` scan, so a check that writes into the repo (a
+  build output, a log, a cache that the project's `.gitignore` does not cover) shows up as the
+  builder's change. Keep scripted check commands read-only, or write outside the repo as the tests do.
+  `fsm_ops` stamps the proof base on the first `next_action` of BUILDING, so a task claimed and
+  completed before that is outside the window.
+- `tests/fsm_flows/task_checks_support.py` has the helpers (`red`/`green`/`counting` task texts,
+  `drained_goal_loop`, `to_retro`, `claim_again`, `blocked`); import `flow`, `repo` from it as the other
+  support module does.
+- Anything else that judges a task's check blocks should call `proof.checks.run_task_checks`, and
+  anything that needs to know which tasks are already proven should call `_proof_record.unproven`
+  rather than `task_proven` in a loop.
+- `src/pathly_orchestrator/CLAUDE.md`: its one-line `fsm/gates/` module list under "Modules split
+  under the 400-line ratchet" (`artifact` · `tasks` · `scope` · `command`) predates tickets 06 to 09 and
+  does not name `floor`, `reviewer` or `task_checks`; I left that line alone.
+
+## Review findings (round 1, quality review)
+
+QUALITY
+1. major src/pathly_orchestrator/fsm/gates/task_checks.py: `_clip`, `_CLIPPED` and `_run_checks_of` are verbatim copies of `_clip`, `_CLIPPED` and `_run_task_checks` in `src/pathly_orchestrator/supervisor/task_proof.py` (lines ~52, ~236-241 and ~220-231). The "cannot be read" message and the `checks_in(claimed_text or text)` / `run_checks(..., _resolve_timeout({}))` logic are copied too. Root CLAUDE.md rule 5 says "Never duplicate a helper across files". The two copies must agree, because the join relies on the drain's proof and its own proof meaning the same thing for `task_proven`. Fix any change to one (fallback to `text`, timeout, error wording) by hand in the other, or the two will diverge. - Keep one copy. `supervisor/task_proof.py` already lazily imports from `fsm.gates`, so it can call the gate module's runner. Alternatively move a `run_task_checks(task, cwd, timeout)` into `proof/checks.py` and a head-and-tail clip into `proof/command.py` (next to `clip`) and use them from both places. Delete the copies.
+2. minor src/pathly_orchestrator/fsm/gates/task_checks.py: `_failure_text` always says "make each failing check pass by fixing the code". For an `error` result (an unparsable block in the frozen text) the builder cannot do that, and only a human re-freeze helps. - Give the unparsable-block case its own action line that sends the builder to ask for a human.
+3. minor src/pathly_orchestrator/fsm/gates/task_checks.py: `_proof_record.task_proven` reads the whole event log once per completed task, so the cost is tasks times events at every join. The new doc admits this. - Read the events once per gate run and test membership in memory, or add a batch helper to `_proof_record`.
+
+Notes
+- The last commit touching the ticket is 454ac2c, which is `HEAD`. There are no later commits that I skipped.
+- I did not read the ticket's `## Answer`. I read the ticket at 6699655 and the diff with `pathly/features/build-proof/tasks/` excluded.
+- Done when, re-run with the dev venv:
+  - `tests/fsm_flows/test_task_checks_gate.py` and `test_task_checks_edges.py`: 22 passed.
+  - `tests/fsm_flows` plus `tests/comms_board/test_comms_goals_run.py`: 690 passed, 9 skipped.
+  - The docs command printed `docs current`.
+- Extra checks:
+  - `check_file_size.py` reported no new or grown oversized file.
+  - `gen_test_index.py --check` reported the indexes up to date.
+  - `lint-imports` reported the contracts kept.
+  - mypy was clean on `task_checks.py`.
+  - `ruff format --check` was clean on the new files.
+- The edits to existing tests (`test_floor_gate.py`, `test_proof_base.py`, `test_comms_goals_run.py`) only follow the deliberate gate-set and ordering change. No check was weakened.
+- I left no files behind.
+
+REVIEW: FAIL

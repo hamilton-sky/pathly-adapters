@@ -13,9 +13,10 @@ dict to block it and route feedback.
 | ``command_gate`` | ``command`` | **the project's own verify command exits 0** |
 | ``reviewer_unchanged`` | ``reviewer`` | a reviewer spawn changed no file and made no commit |
 | ``floor_gate`` | ``floor`` | **the run's diff weakens no test, check, config or plan** |
+| ``task_checks`` | ``task_checks`` | **each completed task's ``check`` block exits as it says** |
 
-The first four read state that agents produced; only ``command_gate`` executes something
-and reads a real exit code. Reach for it whenever a claim can be measured.
+The first four read state that agents produced; ``command_gate`` and ``task_checks`` execute
+something and read a real exit code. Reach for them whenever a claim can be measured.
 """
 
 from __future__ import annotations
@@ -35,6 +36,7 @@ from .command import check_command_gate
 from .floor import check_floor_gate
 from .reviewer import check_reviewer_unchanged
 from .scope import _scope_clean, check_scope_gate
+from .task_checks import check_task_checks
 from .tasks import check_require_tasks_done
 
 # Every check takes (gate, storage_path, prev_state, next_state) plus the shared keyword
@@ -49,6 +51,7 @@ _CHECKS: dict[str, _GateCheck] = {
     "command_gate": check_command_gate,
     "reviewer_unchanged": check_reviewer_unchanged,
     "floor_gate": check_floor_gate,
+    "task_checks": check_task_checks,
 }
 
 __all__ = [
