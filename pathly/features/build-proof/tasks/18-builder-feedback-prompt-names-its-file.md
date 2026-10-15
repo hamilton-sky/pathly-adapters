@@ -1,7 +1,7 @@
 # Name the feedback file, and show its text, in a feedback spawn's prompt
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: —
 Test first: yes
 
@@ -122,3 +122,40 @@ prints clean
 - map.md § Open questions (the last item), learnings.md (14)
 
 ## Answer
+
+**Built**
+
+- `src/pathly_orchestrator/fsm_compose_feedback.py` (new, 53 lines): `read_feedback(storage_path, feedback_file)` (the file's text, stripped, clipped to 4000 characters, `""` when it cannot be read or is only whitespace) and `feedback_block(storage_path, feedback_file)` (the `## Feedback to resolve` section).
+- `src/pathly_orchestrator/fsm_compose.py` (386 -> 384 lines): `_retry_ladder_block` calls `read_feedback` in place of its inline read; `build_prompt_for_agent` adds `feedback_block` in an `elif` after the ladder, when `feedback_file` is given and `agent_name` is not in `_FIX_MODE_ARTIFACT`, so it sits right after `## Current task` and before Fix mode and the root-cause guide. The three callers are untouched.
+- Tests: new `tests/fsm_flows/test_feedback_prompt_names_file.py` (23 tests: the seven listed cases, plus an empty file, a file that is not UTF-8, a text without backticks, a run of four backticks, and `read_feedback` / `feedback_block` on their own); updated `tests/fsm_flows/test_retry_ladder.py`, `tests/fsm_flows/test_fix_routing.py` and `assert_sent_back` in `tests/fsm_flows/test_build_proof_acceptance.py`; regenerated `tests/INDEX.md` and `tests/fsm_flows/INDEX.md`. These went in the test-only commit `58b71df`.
+- Docs: the "Retry ladder" section and the `fsm_compose` row of the split-modules table in `src/pathly_orchestrator/CLAUDE.md`; the build-proof "Known limits" paragraph in `CHANGELOG.md`.
+
+**Proof** (each run fresh, after the last edit; venv on PATH)
+
+- `python -m pytest tests/fsm_flows/test_feedback_prompt_names_file.py -q -p no:cacheprovider`: `23 passed in 0.59s`, exit 0. At the test-only commit it failed: 14 of the 23 (the rest pin behaviour that did not change).
+- `python -m pytest tests/fsm_flows tests/dag_goals tests/runner_supervisor -q -p no:cacheprovider`: `1212 passed, 9 skipped in 258.47s`, exit 0 (the updated tests and the acceptance test included; none of the 9 skips is in a file this ticket changed).
+- `python scripts/check_file_size.py`: `OK: 1009 source files checked; 19 known over 400 lines, none new, none grown.`, exit 0. `python scripts/gen_test_index.py --check`: `All test INDEX.md files up to date.`, exit 0.
+- The `CHANGELOG.md` one-liner printed `clean`, exit 0.
+- The full Test command `python -m pytest tests/ -q -x -p no:cacheprovider`: `2947 passed, 14 skipped in 558.03s`, exit 0. The Lint chain: `black --check src/ tests/` (568 files unchanged), `mypy` (no issues in 313 files), `check_no_mirror_reads`, `lint-imports` (1 kept, 0 broken), `bandit -q -r src/ -ll -x src/pathly_data/` (exit 0), `check_adapters`, `check_entry_points` all exit 0. Build `python -m build --wheel`: built `pathly_adapters-2.24.1-py3-none-any.whl`, exit 0.
+- At the test-only commit `assert_sent_back` failed on `'## Feedback to resolve' in spawn.instructions` in both acceptance tests that use it; it passes now.
+
+**Decisions**
+
+- The block goes in an `elif` after the ladder, not under `retry_count == 0`: a retry count that is not above zero (never produced; a negative one would be a bug) gets the block, not nothing.
+- `read_feedback` catches `UnicodeError` as well as `OSError`. The old inline read caught only `OSError`, so a feedback file that was not UTF-8 raised inside `_retry_ladder_block` (the callers catch it and the spawn then has no prompt). "Cannot be read" covers it, and the block says so.
+- An empty or whitespace-only file gets the "could not be read (the file is missing, unreadable or empty)" block, since showing an empty fence says nothing.
+- Wording of the block: "`<path>` is what the gate or reviewer wrote when this stage was sent back. Fix the cause it describes, not the file." The path is `storage_path.as_posix().rstrip("/") + "/feedback/" + file`, the same expression the Fix mode block uses.
+- The ladder keeps its own fixed three-backtick fence (the ticket changes only its read); only the new block uses the longer-fence rule.
+- `test_build_prompt_for_agent_builder_path_unchanged` was renamed to `..._gains_only_the_block_and_the_guide` because "unchanged" is no longer true; it now asserts `with_feedback == without_feedback + feedback_block(...) + "\n" + guide + "\n"`, one block, the text once, no Fix mode. I added assertions to the other round-1 tests (retry ladder: the block is there once, the text once; round 2: no block) and removed none.
+- The `fsm_compose` row of the split-modules table said `(298)`; it is 384 now, so I wrote the real number while adding `fsm_compose_feedback` to it. I also changed the guide paragraph's last sentence ("every other role is byte-identical to before") because a reviewer or tester given a feedback file now gets the block.
+
+**Shortcuts taken**
+
+- The clip is a plain cut at 4000 characters with no marker, as the ladder's was. A feedback file longer than that shows its head only, and the prompt does not say it was cut. Worth a marker if a gate's report is ever found cut mid-section (`task_checks` already clips its own sections to 4000).
+- `feedback_block` does not tell the agent whether to delete the file; for a builder the gate that wrote it rewrites or removes it when it re-runs, and the block says nothing about it either way.
+
+**For later tickets**
+
+- No open ticket depends on this. The first open question in map.md is the one left: a headless run still never writes `retry_count_by_key`, so the ladder (with its `AGENT_DONE` history block) and `escalation_routing` never climb; the new block covers what the prompt shows, not the escalation.
+- The last item of map.md § Open questions (a builder feedback prompt does not name its feedback file) is resolved by this ticket; I left the map's text as it is.
+- A reviewer's or tester's round-1 feedback prompt now holds the file's text, so a test that pins "the reviewer's prompt has no X" for a spawn with a feedback file should expect the block.
