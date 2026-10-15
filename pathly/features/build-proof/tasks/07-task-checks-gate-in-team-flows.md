@@ -1,7 +1,7 @@
 # Run task check blocks at every join where a builder may have completed a task
 
 Type: task
-Status: resolved
+Status: open
 Blocked by: 01, 03, 15
 Test first: yes
 
@@ -254,3 +254,28 @@ or passes", which the absent gate also satisfies.
 - `src/pathly_orchestrator/CLAUDE.md`: its one-line `fsm/gates/` module list under "Modules split
   under the 400-line ratchet" (`artifact` · `tasks` · `scope` · `command`) predates tickets 06 to 09 and
   does not name `floor`, `reviewer` or `task_checks`; I left that line alone.
+
+## Review findings (round 1, quality review)
+
+QUALITY
+1. major src/pathly_orchestrator/fsm/gates/task_checks.py: `_clip`, `_CLIPPED` and `_run_checks_of` are verbatim copies of `_clip`, `_CLIPPED` and `_run_task_checks` in `src/pathly_orchestrator/supervisor/task_proof.py` (lines ~52, ~236-241 and ~220-231). The "cannot be read" message and the `checks_in(claimed_text or text)` / `run_checks(..., _resolve_timeout({}))` logic are copied too. Root CLAUDE.md rule 5 says "Never duplicate a helper across files". The two copies must agree, because the join relies on the drain's proof and its own proof meaning the same thing for `task_proven`. Fix any change to one (fallback to `text`, timeout, error wording) by hand in the other, or the two will diverge. - Keep one copy. `supervisor/task_proof.py` already lazily imports from `fsm.gates`, so it can call the gate module's runner. Alternatively move a `run_task_checks(task, cwd, timeout)` into `proof/checks.py` and a head-and-tail clip into `proof/command.py` (next to `clip`) and use them from both places. Delete the copies.
+2. minor src/pathly_orchestrator/fsm/gates/task_checks.py: `_failure_text` always says "make each failing check pass by fixing the code". For an `error` result (an unparsable block in the frozen text) the builder cannot do that, and only a human re-freeze helps. - Give the unparsable-block case its own action line that sends the builder to ask for a human.
+3. minor src/pathly_orchestrator/fsm/gates/task_checks.py: `_proof_record.task_proven` reads the whole event log once per completed task, so the cost is tasks times events at every join. The new doc admits this. - Read the events once per gate run and test membership in memory, or add a batch helper to `_proof_record`.
+
+Notes
+- The last commit touching the ticket is 454ac2c, which is `HEAD`. There are no later commits that I skipped.
+- I did not read the ticket's `## Answer`. I read the ticket at 6699655 and the diff with `pathly/features/build-proof/tasks/` excluded.
+- Done when, re-run with the dev venv:
+  - `tests/fsm_flows/test_task_checks_gate.py` and `test_task_checks_edges.py`: 22 passed.
+  - `tests/fsm_flows` plus `tests/comms_board/test_comms_goals_run.py`: 690 passed, 9 skipped.
+  - The docs command printed `docs current`.
+- Extra checks:
+  - `check_file_size.py` reported no new or grown oversized file.
+  - `gen_test_index.py --check` reported the indexes up to date.
+  - `lint-imports` reported the contracts kept.
+  - mypy was clean on `task_checks.py`.
+  - `ruff format --check` was clean on the new files.
+- The edits to existing tests (`test_floor_gate.py`, `test_proof_base.py`, `test_comms_goals_run.py`) only follow the deliberate gate-set and ordering change. No check was weakened.
+- I left no files behind.
+
+REVIEW: FAIL
