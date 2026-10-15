@@ -4,7 +4,7 @@
 
 FSM engine, gates, transitions, flow definitions, feedback protocol & fix-routing.
 
-45 test file(s).
+46 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -15,6 +15,7 @@ FSM engine, gates, transitions, flow definitions, feedback protocol & fix-routin
 | `test_design_questions_routing.py` | DESIGN_QUESTIONS.md routes to the architect in EVERY flow that routes it at all | 3 |
 | `test_feedback_escalation.py` | 3-tier feedback escalation (fsm.engine.route_feedback) | 11 |
 | `test_feedback_file_reachability.py` | A feedback file a flow can actually produce must be ROUTED by that flow | 4 |
+| `test_feedback_prompt_names_file.py` | A feedback spawn's prompt names the feedback file it is handed and shows its text (build-proof 18) | 16 |
 | `test_feedback_protocol.py` | Adapters side of the feedback protocol contract | 4 |
 | `test_fix_routing.py` | Smart fix-routing (pathly/features/.archive/smart-fix-routing/DESIGN.md) | 11 |
 | `test_floor_gate.py` | ``floor_gate`` sends a build that weakened the bar back to the builder (build-proof 06) | 18 |
