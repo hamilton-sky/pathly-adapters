@@ -8,8 +8,10 @@ what an earlier attempt on this stage reported. This covers the fix:
 
   1. route_feedback now returns retry_count alongside target_agent.
   2. build_prompt_for_agent(retry_count=...) appends a retry-ladder block from round 2 on
-     — round 1 (retry_count==0, the default) is asserted BYTE-IDENTICAL to before this,
-     since that is the one guarantee every existing caller/snapshot depends on.
+     — round 1 (retry_count==0, the default) has no ladder: it carries the
+     ``## Feedback to resolve`` block (build-proof 18) in the ladder's place, and a call
+     with no feedback file is still BYTE-IDENTICAL to before, since that is the guarantee
+     every existing caller/snapshot depends on.
 """
 
 from __future__ import annotations
@@ -58,13 +60,15 @@ def test_retry_count_and_role_escalation_move_together(tmp_path):
 
 
 def test_first_attempt_gets_no_retry_block(tmp_path):
-    """retry_count defaults to 0 — every EXISTING caller that never passes it (there
-    were none before this feature) gets the byte-identical prompt it always did."""
+    """retry_count defaults to 0 — no ladder; the file is named and its text shown once,
+    in the ``## Feedback to resolve`` block that takes the ladder's place."""
     _write(tmp_path, "REVIEW_FAILURES.md", "the build broke")
     prompt = build_prompt_for_agent(
         "builder", tmp_path, feedback_file="REVIEW_FAILURES.md"
     )
     assert "Retry attempt" not in prompt
+    assert prompt.count("## Feedback to resolve") == 1
+    assert prompt.count("the build broke") == 1
 
 
 def test_explicit_zero_also_gets_no_retry_block(tmp_path):
@@ -73,12 +77,15 @@ def test_explicit_zero_also_gets_no_retry_block(tmp_path):
         "builder", tmp_path, feedback_file="REVIEW_FAILURES.md", retry_count=0
     )
     assert "Retry attempt" not in prompt
+    assert prompt.count("## Feedback to resolve") == 1
+    assert prompt.count("the build broke") == 1
 
 
 def test_no_feedback_file_means_no_retry_block_even_with_a_count(tmp_path):
     """retry_count without a feedback_file is meaningless — there is nothing to retry."""
     prompt = build_prompt_for_agent("builder", tmp_path, retry_count=2)
     assert "Retry attempt" not in prompt
+    assert "## Feedback to resolve" not in prompt
 
 
 # ── build_prompt_for_agent: round 2+ carries the ladder ───────────────────────
@@ -91,6 +98,7 @@ def test_second_attempt_names_the_attempt_number(tmp_path):
     )
     assert "Retry attempt 2" in prompt
     assert "unresolved after 1 prior attempt" in prompt
+    assert "## Feedback to resolve" not in prompt  # the ladder carries the text
 
 
 def test_retry_block_inlines_the_current_feedback_content(tmp_path):

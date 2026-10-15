@@ -61,14 +61,16 @@ def gates_failed(run: Run) -> list[tuple[str, str]]:
 def assert_sent_back(spawn, h, name: str) -> None:
     """The spawn is a builder feedback spawn, made while the gate's feedback file is open.
 
-    The builder's feedback prompt (``build_prompt_for_agent``) names the storage path, whose
-    ``feedback/`` folder holds the file, and not the file itself; ``spawn.feedback`` is what
-    that folder held when the supervisor spawned the agent.
+    ``spawn.feedback`` is what the ``feedback/`` folder held when the supervisor spawned the
+    agent. The builder's feedback prompt (``build_prompt_for_agent``) names that file in its
+    ``## Feedback to resolve`` block and shows its text.
     """
     assert spawn.kind == "feedback"
     assert spawn.feedback == [name]
     assert spawn.instructions.startswith("# builder\n")
     assert "Storage path: %s\n" % h.storage in spawn.instructions
+    assert "## Feedback to resolve" in spawn.instructions
+    assert "%s/feedback/%s" % (h.storage.as_posix(), name) in spawn.instructions
 
 
 def test_1_floor_gate_sends_a_skipping_builder_back_in_team_build(projects):

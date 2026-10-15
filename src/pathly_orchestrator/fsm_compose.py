@@ -23,6 +23,7 @@ from .fsm_compose_vars import (
 from .fsm_compose_paths import resolve_stage_out_path, resolve_board_scope
 from .fsm_compose_stage import _drop_sections, _apply_stage_selection, _resolve_adapter
 from .fsm_compose_hints import _codex_subagent_hint, _agent_hint
+from .fsm_compose_feedback import feedback_block, read_feedback
 
 __all__ = [
     "RUNNER_CONTRACT_BLOCK",
@@ -299,17 +300,10 @@ def _retry_ladder_block(
         "Whatever was tried before did not satisfy the gate. Repeating the same approach "
         "will fail the same way — read what follows before deciding what to change.\n"
     ]
-    try:
-        feedback_text = (
-            (storage_path / "feedback" / feedback_file)
-            .read_text(encoding="utf-8")
-            .strip()
-        )
-    except OSError:
-        feedback_text = ""
+    feedback_text = read_feedback(storage_path, feedback_file)
     if feedback_text:
         parts.append(
-            f"\n### The current feedback ({feedback_file})\n\n```\n{feedback_text[:4000]}\n```\n"
+            f"\n### The current feedback ({feedback_file})\n\n```\n{feedback_text}\n```\n"
         )
     try:
         from pathly_orchestrator.runner import build_pipeline_history_block
@@ -339,6 +333,10 @@ def build_prompt_for_agent(
     prompt = agent_text + context
     if retry_count > 0 and feedback_file:
         prompt += _retry_ladder_block(storage_path, feedback_file, retry_count)
+    elif feedback_file and agent_name not in _FIX_MODE_ARTIFACT:
+        # Round 1 (a headless run never climbs retry_count): name the file and show its text
+        # before the root-cause guide below, whose first step says "Read every failure above".
+        prompt += feedback_block(storage_path, feedback_file)
     # Fix mode (smart-fix-routing DESIGN.md ss3.1): only appended when the routed target is
     # a root-cause role (po/planner/architect/designer) AND a feedback file was supplied —
     # the builder/reviewer/human path stays byte-identical to before this feature.

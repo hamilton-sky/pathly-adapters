@@ -879,7 +879,7 @@ import, so no call site moved:
 
 | Entry point | Now delegates to |
 |---|---|
-| `fsm_compose.py` (298) — keeps `build_prompt` / `build_prompt_for_agent` / `_load_agent_text` | `fsm_compose_tables` (lookup tables) · `fsm_compose_vars` (`_inject_prompt_vars` + its inputs) · `fsm_compose_paths` (`resolve_stage_out_path`, `resolve_board_scope`) · `fsm_compose_stage` (section drops, stage overrides, adapter choice) · `fsm_compose_hints` (`_agent_hint`) · `fsm_compose_review` (the reviewer's Review packet) |
+| `fsm_compose.py` (384) — keeps `build_prompt` / `build_prompt_for_agent` / `_load_agent_text` | `fsm_compose_tables` (lookup tables) · `fsm_compose_vars` (`_inject_prompt_vars` + its inputs) · `fsm_compose_paths` (`resolve_stage_out_path`, `resolve_board_scope`) · `fsm_compose_stage` (section drops, stage overrides, adapter choice) · `fsm_compose_hints` (`_agent_hint`) · `fsm_compose_review` (the reviewer's Review packet) · `fsm_compose_feedback` (`read_feedback`, `feedback_block`: what a feedback prompt shows of its file) |
 | `skills/compose.py` (197) — keeps the resolver | `compose_base` (constants + `_strip_leading_frontmatter`) · `compose_resources` (manifest/skill/fragment I/O) · `compose_caps` · `compose_segments` · `compose_validate` |
 | `supervisor/terminal.py` (390) — keeps the spawn | `terminal_argv` · `terminal_identity` · `terminal_reconcile` · `terminal_billing` · `terminal_phase` |
 | `fsm/engine_actions.py` (204) — keeps `run_transition_actions` | `fsm/gates/` — one module per gate type (`artifact` · `tasks` · `scope` · `command` · `reviewer` · `floor` · `task_checks`) behind the `run_gates` dispatcher in `gates/__init__.py`; `_helpers` owns `append_event` / `_write_gate_feedback` / `gate_failed` / `project_root_of`; `_proof` (stage writes, spawn windows), `_proof_record` (`proof_base`, `TASK_PROOF`) and `_scope_tasks` are shared by the build-proof gates |
@@ -1446,8 +1446,21 @@ round 2 on (`retry_count > 0`): the attempt number, the feedback file's CURRENT 
 fresh at call time (capped, so a pathological feedback file can't blow up the prompt), and
 `build_pipeline_history_block` — the SAME recent-`AGENT_DONE`-summaries helper `build_prompt`'s
 normal stage-advance path already uses, so no second history mechanism exists. **Round 1
-(`retry_count == 0`, the default) is byte-identical to before this** — every existing caller
-that never threads the new parameter, and every golden snapshot, is unaffected.
+(`retry_count == 0`, the default) has no ladder.** Every existing caller that never threads
+the new parameter, and every golden snapshot, is unaffected; but a headless run never climbs
+`retry_count`, so it would never have shown the file at all. So a round-1 prompt for a role
+outside `_FIX_MODE_ARTIFACT` (builder, reviewer, tester) that is given a `feedback_file` carries a
+`## Feedback to resolve` block (`fsm_compose_feedback.feedback_block`), in the ladder's place,
+right after the `## Current task` context: the file's path (`<storage>/feedback/<file>`, the
+one the Fix mode block uses), a sentence saying the gate or reviewer wrote it and that the cause,
+not the file, is to be fixed, and the file's text in a code fence one backtick longer than any run
+of backticks in it (these files quote failing command output). The text is `read_feedback`'s:
+stripped and clipped to 4000 characters, the same read the ladder uses; a file that is missing,
+not text or empty gets a block that still names it and says its text could not be read. From
+round 2 the ladder already carries the text, so the block is not added a second time. A call with
+no `feedback_file`, and the four Fix mode roles (po, planner, architect, designer: Fix mode tells
+them to read the file), are byte-identical to before. All three callers (`fsm_ops_complete` twice,
+`fsm_ops.next_action` once) get it through `build_prompt_for_agent`.
 
 **The root-cause guide rides on a builder feedback prompt.** The same function appends
 `fragments/root-cause-debug.md` (`## Root-cause debugging`: read every failure, reproduce it with
@@ -1455,11 +1468,14 @@ the exact command, isolate the cause, fix it without weakening a check, prove it
 failed fixes of the same error) when `agent_name == "builder"` and a `feedback_file` is given, whatever
 `retry_count` says. A headless run never writes `retry_count_by_key` to STATE, so the ladder above
 never climbs there; and a builder handed a feedback file is, by definition, on a second attempt at
-its stage. The guide is read at call time by `skills/compose_resources.root_cause_guide()` (empty
+its stage. The guide comes after the feedback: the round-1 `## Feedback to resolve` block, or the ladder's
+current feedback from round 2, so its first step ("Read every failure above") has something above
+it. It is read at call time by `skills/compose_resources.root_cause_guide()` (empty
 and logged when the file is unreadable), is not in `composition.yaml` (so no golden snapshot
 moves), and does not contain the words "Retry attempt" that `tests/fsm_flows/test_retry_ladder.py`
-uses to tell attempts apart. A builder prompt with no feedback file, and every other role, is
-byte-identical to before. The DAG-task twin is in "Phase 1: per-task retry" below.
+uses to tell attempts apart. A builder prompt with no feedback file, and every other role, gets no
+guide (a reviewer or tester given a feedback file gets only the feedback block). The DAG-task twin
+is in "Phase 1: per-task retry" below.
 
 ## FSM/DAG convergence — Phase 0 hygiene fixes
 

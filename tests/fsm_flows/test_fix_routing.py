@@ -162,18 +162,30 @@ def test_build_prompt_for_agent_fix_mode_role_artifact_map(tmp_path, role, artif
     assert f"Correct YOUR artifact: {artifact}" in prompt
 
 
-def test_build_prompt_for_agent_builder_path_unchanged(tmp_path):
-    """The builder path gains nothing from feedback_file but the root-cause guide
-    (build-proof 11: a builder handed a feedback file is on a second attempt) —
-    byte-identical otherwise, the hard regression constraint (task requirement #1)."""
+def test_build_prompt_for_agent_builder_path_gains_only_the_block_and_the_guide(
+    tmp_path,
+):
+    """The builder path gains nothing from feedback_file but the ``## Feedback to resolve``
+    block (build-proof 18: it names the file and shows its text) and then the root-cause
+    guide (build-proof 11: a builder handed a feedback file is on a second attempt), in that
+    order, each once, right after the task context. No Fix mode."""
+    from pathly_orchestrator.fsm_compose_feedback import feedback_block
     from pathly_orchestrator.skills.compose_resources import root_cause_guide
 
     storage_path = _feature_storage(tmp_path)
+    (storage_path / "feedback").mkdir()
+    (storage_path / "feedback" / "REVIEW_FAILURES.md").write_text(
+        "the build broke", encoding="utf-8"
+    )
     without_feedback = build_prompt_for_agent("builder", storage_path)
     with_feedback = build_prompt_for_agent(
         "builder", storage_path, feedback_file="REVIEW_FAILURES.md"
     )
-    assert with_feedback == f"{without_feedback}\n{root_cause_guide()}\n"
+    block = feedback_block(storage_path, "REVIEW_FAILURES.md")
+    assert "the build broke" in block
+    assert with_feedback == f"{without_feedback}{block}\n{root_cause_guide()}\n"
+    assert with_feedback.count("## Feedback to resolve") == 1
+    assert with_feedback.count("the build broke") == 1
     assert "Fix mode" not in with_feedback
 
 
@@ -185,6 +197,10 @@ def test_build_prompt_for_agent_reviewer_and_human_never_get_fix_mode(tmp_path):
         "reviewer", storage_path, feedback_file="REVIEW_INCOMPLETE.md"
     )
     assert "Fix mode" not in reviewer_prompt
+    # What a reviewer gets instead (build-proof 18): the file named, once, and no guide.
+    assert reviewer_prompt.count("## Feedback to resolve") == 1
+    assert "feedback/REVIEW_INCOMPLETE.md" in reviewer_prompt
+    assert "## Root-cause debugging" not in reviewer_prompt
 
 
 def test_build_prompt_for_agent_no_feedback_file_is_unchanged_for_any_role(tmp_path):

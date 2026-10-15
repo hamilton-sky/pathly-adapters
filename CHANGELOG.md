@@ -73,12 +73,13 @@ server's account; a task's checks run once per completion, so a later regression
 `command_gate test`. The whole-run floor gates take the union of the claimed tasks' allow lists,
 and a test edit by the tester that trips the floor goes to the builder. Snapshots leave
 unreachable objects in `.git/objects` until `git gc`. A fresh reviewer session costs tokens.
-Headless runs never write `retry_count_by_key`, so the FSM retry ladder never climbs and a builder
-feedback prompt does not name the feedback file it is handed. Studio has no control for the allow
-list yet (use `curl`). An interactive `/pathly` run records no `SPAWN_WINDOW`, so `scope_gate`
-cannot judge a path that was dirty when BUILDING began, `reviewer_unchanged` skips there, and
-`floor_gate` cannot tell which role wrote a plan file: it excuses one a role may write (with a
-`FLOOR_CHECKED` warning), so a plan edit by the builder goes unseen in such a run.
+Headless runs never write `retry_count_by_key`, so the FSM retry ladder never climbs (a first-round
+feedback prompt names its file and shows its text in a `## Feedback to resolve` block instead).
+Studio has no control for the allow list yet (use `curl`). An interactive `/pathly` run records no
+`SPAWN_WINDOW`, so `scope_gate` cannot judge a path that was dirty when BUILDING began,
+`reviewer_unchanged` skips there, and `floor_gate` cannot tell which role wrote a plan file: it
+excuses one a role may write (with a `FLOOR_CHECKED` warning), so a plan edit by the builder goes
+unseen in such a run.
 
 ### Board — run identity and authorship provenance (role-read-policy)
 
