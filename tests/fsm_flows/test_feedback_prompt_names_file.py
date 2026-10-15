@@ -34,7 +34,11 @@ def _block_of(prompt):
 
 
 def test_a_builder_is_told_the_file_and_shown_its_text_before_the_guide(tmp_path):
-    _write(tmp_path, "FLOOR_FAILURES.md", "skip: tests/test_app.py: @pytest.mark.skip")
+    _write(
+        tmp_path,
+        "FLOOR_FAILURES.md",
+        "floor: tests/test_app.py: a finding the gate quoted",
+    )
 
     prompt = build_prompt_for_agent(
         "builder", tmp_path, feedback_file="FLOOR_FAILURES.md"
@@ -42,11 +46,11 @@ def test_a_builder_is_told_the_file_and_shown_its_text_before_the_guide(tmp_path
 
     assert prompt.count(HEADING) == 1
     assert _path(tmp_path, "FLOOR_FAILURES.md") in _block_of(prompt)
-    assert "skip: tests/test_app.py: @pytest.mark.skip" in _block_of(prompt)
+    assert "floor: tests/test_app.py: a finding the gate quoted" in _block_of(prompt)
     # In the place the ladder takes: after the task context, before the guide.
     assert prompt.index("## Current task") < prompt.index(HEADING)
     assert prompt.index(HEADING) < prompt.index(GUIDE_HEADING)
-    assert prompt.count("skip: tests/test_app.py: @pytest.mark.skip") == 1
+    assert prompt.count("floor: tests/test_app.py: a finding the gate quoted") == 1
 
 
 def test_the_block_says_what_the_file_is_and_to_fix_the_cause(tmp_path):
