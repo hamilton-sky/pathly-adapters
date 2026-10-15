@@ -10,13 +10,13 @@ Every case drives the real ``next_action`` and ``complete_stage`` over the packa
 from __future__ import annotations
 
 from importlib.resources import files
-from types import SimpleNamespace
 
 import pytest
 import yaml
 from review_packet_support import (
     FEATURE,
     _args,
+    _as,
     _claim,
     _enter_building,
     _git,
@@ -32,7 +32,6 @@ from pathly_orchestrator.db.queries.app_settings import set_setting
 from pathly_orchestrator.db.queries.comms import post_message
 from pathly_orchestrator.db.queries.comms_tasks import claim_task, complete_task
 from pathly_orchestrator.db.queries.task_proof import set_floor_allow
-from pathly_orchestrator.supervisor import spawn_window
 
 TESTS = "tests/test_calc.py"
 STORIES = FEATURE + "/USER_STORIES.md"
@@ -63,17 +62,6 @@ def _load(name: str) -> dict:
 
 def _complete(repo, name: str = "team-build", **extra) -> dict:
     return fsm_ops.complete_stage({**_args(repo), "flow": name, **extra})
-
-
-def _as(repo, flow, role: str, state: str, work) -> None:
-    """Run ``work()`` as a spawn of ``role`` in ``state``, recording its SPAWN_WINDOW."""
-    ns = SimpleNamespace(
-        project_root=str(repo),
-        topic="demo",
-        storage_path=str(_storage(repo)),
-        current_state=state,
-    )
-    spawn_window.observe(ns, flow, role, "run-%s-%s" % (role, state), work)
 
 
 def _edit(repo, rel: str, text: str):

@@ -160,7 +160,7 @@ def test_the_goal_loop_flow_is_flat_not_a_reviewed_pipeline():
     assert "parallel_states" in flow, "the drain must be a fan-out state"
     # The join still runs the ground-truth checks verify_clean_drain used to run by hand.
     gate_types = {g["type"] for g in flow["gates"]["DRAINING->DONE"]}
-    assert gate_types == {"require_tasks_done", "command_gate"}
+    assert gate_types == {"require_tasks_done", "command_gate", "floor_gate"}
 
 
 def test_dispatch_loop_creates_nested_goal_dir(tmp_path):

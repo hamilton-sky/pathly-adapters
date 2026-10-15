@@ -87,7 +87,14 @@ into `team`/`team-build` at `BUILDING->REVIEWING` (`verify.build` → `BUILD_FAI
 `HEAD` the supervisor recorded around each reviewer spawn, so a reviewer that changes a file other
 than `REVIEW.md` or its feedback files, or commits, parks the run for a human
 (`REVIEWER_CHANGED_FILES.md`) whatever it reports. Wired into `team`/`team-build` at
-`REVIEWING->TESTING` and `REVIEWING->BUILDING`. A red base is caught the same way: before the
+`REVIEWING->TESTING` and `REVIEWING->BUILDING`. `floor_gate` (`fsm/gates/floor.py`) measures the
+diff instead of trusting the agent too: it scans everything the run changed since a run-wide
+`proof_base` for skipped or deleted tests, silenced linters, lowered thresholds, edited
+lint/test/CI config, edited task text and plan edits, so a builder that gets green by weakening
+the bar is sent back (`FLOOR_FAILURES.md`) whatever it reports. Wired into `team`/`team-build` at
+`BUILDING->REVIEWING`, `REVIEWING->TESTING`, `TESTING->RETRO` and `->DONE`, and into `goal-loop` at
+`DRAINING->DONE`; a human can allow a category for one task (`POST /comms/tasks/floor-allow`) or
+set `floor.enabled` to `false`. A red base is caught the same way: before the
 first spawn of `team`, `team-build` or `goal-loop` the supervisor runs `verify.smoke` (else
 `verify.build`), and a failure parks the run (`base_red`) with a human escalation before any
 agent is spawned. Detail:

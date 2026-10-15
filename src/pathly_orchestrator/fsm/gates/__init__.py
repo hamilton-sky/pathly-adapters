@@ -12,6 +12,7 @@ dict to block it and route feedback.
 | ``scope_gate`` | ``scope`` | the builder stayed inside its declared footprint |
 | ``command_gate`` | ``command`` | **the project's own verify command exits 0** |
 | ``reviewer_unchanged`` | ``reviewer`` | a reviewer spawn changed no file and made no commit |
+| ``floor_gate`` | ``floor`` | **the run's diff weakens no test, check, config or plan** |
 
 The first four read state that agents produced; only ``command_gate`` executes something
 and reads a real exit code. Reach for it whenever a claim can be measured.
@@ -31,6 +32,7 @@ from ._helpers import (
 )
 from .artifact import _verify_passed, check_require_artifact, check_verify_gate
 from .command import check_command_gate
+from .floor import check_floor_gate
 from .reviewer import check_reviewer_unchanged
 from .scope import _scope_clean, check_scope_gate
 from .tasks import check_require_tasks_done
@@ -46,6 +48,7 @@ _CHECKS: dict[str, _GateCheck] = {
     "scope_gate": check_scope_gate,
     "command_gate": check_command_gate,
     "reviewer_unchanged": check_reviewer_unchanged,
+    "floor_gate": check_floor_gate,
 }
 
 __all__ = [
