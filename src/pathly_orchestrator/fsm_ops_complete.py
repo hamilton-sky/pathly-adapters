@@ -271,6 +271,9 @@ def complete_stage(args: dict) -> dict:
     prior_state = _elog_ws.read_state(str(storage_path)) or dict(state_before or {})
     prior_state.pop("conv_start_sha", None)
     baseline = prior_state.pop("build_baseline", None)
+    if next_state == "DONE":
+        # The run-wide proof base lasts until DONE: back-edges and resumed runs keep it.
+        prior_state.pop("proof_base", None)
     if state_info["current_state"] == "BUILDING":
         # The last build's base, for the Review packet's diff: it outlives the baseline and
         # the next build overwrites it (a build with no tree leaves none, not a stale one).

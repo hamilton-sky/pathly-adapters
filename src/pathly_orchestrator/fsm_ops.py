@@ -16,6 +16,7 @@ from pathly_orchestrator.fsm import (
     run_gates,
     run_transition_actions,
 )
+from pathly_orchestrator.fsm.gates._proof_record import stamp_proof_base
 from pathly_orchestrator.proof import tree as _proof_tree
 from pathly_orchestrator.storage_paths import _safe_topic
 from pathly_orchestrator.fsm_compose import (
@@ -222,6 +223,14 @@ def next_action(args: dict) -> dict:
         if tree_id:
             baseline["tree"] = tree_id
         stamped_state["build_baseline"] = baseline
+        needs_write = True
+
+    # The run-wide base the floor and task-check gates judge from: stamped once, kept until DONE.
+    proof_base = stamp_proof_base(
+        prior_state, flow_config, state_info["current_state"], project_root
+    )
+    if proof_base is not None:
+        stamped_state["proof_base"] = proof_base
         needs_write = True
 
     if needs_write:

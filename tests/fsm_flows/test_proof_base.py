@@ -74,6 +74,7 @@ def _post_pending() -> None:
         from_agent="planner",
         type="task",
         text="Still to do.\n",
+        goal_id="g1",
     )
 
 
@@ -146,7 +147,7 @@ def test_stamp_is_a_tree_and_the_time(repo):
     stamp = proof_record.stamp_proof_base({}, flow_config, "A", str(repo))
 
     assert re.fullmatch(r"[0-9a-f]{40,64}", stamp["tree"])
-    assert tree.blob(repo, stamp["tree"], "src/app.py") == "x = 1\ny = 2\n"
+    assert tree.read(repo, stamp["tree"], "src/app.py") == "x = 1\ny = 2\n"
     assert datetime.fromisoformat(stamp["started_at"]).tzinfo is not None
 
 
@@ -242,7 +243,7 @@ def test_a_back_edge_keeps_the_base(repo, flow):
     _post_pending()
 
     # A task still ready sends REVIEWING back to BUILDING (on_board_count).
-    fsm_ops.complete_stage(_args(repo))
+    fsm_ops.complete_stage({**_args(repo), "goal_id": "g1"})
 
     state = _state(repo)
     assert state["current"] == "BUILDING"

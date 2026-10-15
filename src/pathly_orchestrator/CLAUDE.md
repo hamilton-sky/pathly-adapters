@@ -959,6 +959,36 @@ fails or is missing; each git call has a 60 s timeout and drops inherited `GIT_D
 pathspec variables (`GIT_LITERAL_PATHSPECS`, …). Snapshot objects are unreachable, so `git gc`
 prunes them later. Nothing calls the scan yet.
 
+**Proof base and task proofs (`fsm/gates/_proof_record.py`).** The floor and task-check gates
+judge the whole run, not one stage: a builder fix round runs inside REVIEWING, TESTING, RETRO or
+after a goal-loop drain, and `build_baseline` is popped on every transition. So STATE carries a
+run-wide `proof_base {tree, started_at}`:
+
+- **Stamped** by `fsm_ops.next_action` (`stamp_proof_base`, right after the `build_baseline`
+  stamp) the first time the run is in a state `wants_proof_base` accepts, and only when STATE has
+  none. A state qualifies when a gate list on an edge out of it holds a `floor_gate` or
+  `task_checks` gate; the edges are the `<state>-><X>` keys and the wildcard `-><X>` keys for
+  every `X` in the flow's `transitions[state]`. `tree` is `proof.tree.snapshot(project_root)`,
+  `None` outside a git repo; `started_at` (`datetime.now(timezone.utc).isoformat()`) is always
+  set, because the task-check gate needs it without git.
+- **Kept** across every transition, and dropped only on the one into `DONE`
+  (`fsm_ops_complete` pops it when `next_state == "DONE"`), so a back-edge (`REVIEWING->BUILDING`)
+  and a resumed run keep the first base. `build_baseline` (per BUILDING, popped on leaving it)
+  and `review_base` (the Review packet's diff base) are separate and unchanged.
+- **Read** by `read_proof_base(storage_path)` through `eventlog.read_state` (the DB; no
+  `STATE.json` fallback), `None` when absent or unreadable.
+
+`TASK_PROOF {task_id, claimed_at, run_id, checks, floor, warnings}` says a task completion was
+proven. `record_task_proof(storage_path, task, run_id, checks, floor, warnings=())` appends it
+with `claimed_at` copied from the task row (`checks`: `passed` | `failed` | `none` | `error`;
+`floor`: `clean` | `failed` | `off` | `n/a`; anything else raises `ValueError`).
+`task_proven(storage_path, task)` is true when the newest `TASK_PROOF` for the task carries its
+current `claimed_at`, `checks` is `passed` or `none` and `floor` is not `failed`: a retry or a
+human re-open claims the task again (a new `claimed_at`), so the earlier record stops counting,
+and a failed proof is run again. It reads the whole event log on each call and is false when
+the events cannot be read (the checks then run again). No packaged flow declares a `floor_gate`
+or `task_checks` gate yet and nothing writes `TASK_PROOF`, so a real run stamps no base yet.
+
 **Spawn windows and stage writes (`supervisor/spawn_window.py`, `fsm/gates/_proof.py`).** The
 floor, scope and reviewer gates must tell who wrote a file: in `team`/`team-build` a planner or
 architect routed a feedback file may edit `IMPLEMENTATION_PLAN.md` while the FSM is still in
