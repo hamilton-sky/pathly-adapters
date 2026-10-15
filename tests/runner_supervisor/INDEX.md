@@ -4,7 +4,7 @@
 
 Runner control loop, supervisor, spawn channel, lane/worktree isolation, file-claim registry, services facade.
 
-20 test file(s).
+21 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -16,6 +16,7 @@ Runner control loop, supervisor, spawn channel, lane/worktree isolation, file-cl
 | `test_park_resume.py` | Tests for the human-checkpoint "parked" status and its resume path | 8 |
 | `test_pty_host.py` | Tests for the headless spawn host (``pathly-pty-host``) | 19 |
 | `test_pty_host_e2e.py` | End-to-end: a supervisor spawn wait satisfied WITHOUT Studio | 5 |
+| `test_reviewer_fresh_session.py` | A reviewer stage opens a fresh CLI session instead of resuming the builder's | 7 |
 | `test_run_budget.py` | supervisor/run_budget.py — a goal run's iteration cap follows its DAG (build-proof 12) | 15 |
 | `test_run_identity_stamps.py` | run-identity: server-side run_id + board_scope stamping (supervisor guarantee) | 6 |
 | `test_run_log_seams.py` | run_log write seams — best-effort spawn + result persistence (unified-control-plane P0, | 2 |
