@@ -1,7 +1,7 @@
 # Name the feedback file, and show its text, in a feedback spawn's prompt
 
 Type: task
-Status: resolved
+Status: open
 Blocked by: —
 Test first: yes
 
@@ -159,3 +159,11 @@ prints clean
 - No open ticket depends on this. The first open question in map.md is the one left: a headless run still never writes `retry_count_by_key`, so the ladder (with its `AGENT_DONE` history block) and `escalation_routing` never climb; the new block covers what the prompt shows, not the escalation.
 - The last item of map.md § Open questions (a builder feedback prompt does not name its feedback file) is resolved by this ticket; I left the map's text as it is.
 - A reviewer's or tester's round-1 feedback prompt now holds the file's text, so a test that pins "the reviewer's prompt has no X" for a spawn with a feedback file should expect the block.
+
+## Review findings (round 1, floor guard)
+
+floor guard: the diff weakens the bar instead of meeting it
+skip: tests/fsm_flows/test_feedback_prompt_names_file.py: _write(tmp_path, "FLOOR_FAILURES.md", "skip: tests/test_app.py: @pytest.mark.skip")
+skip: tests/fsm_flows/test_feedback_prompt_names_file.py: assert "skip: tests/test_app.py: @pytest.mark.skip" in _block_of(prompt)
+skip: tests/fsm_flows/test_feedback_prompt_names_file.py: assert prompt.count("skip: tests/test_app.py: @pytest.mark.skip") == 1
+if a finding is intended, the ticket needs a line like: Floor: allow <category>
