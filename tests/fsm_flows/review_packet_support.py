@@ -10,6 +10,7 @@ import re
 import subprocess
 from importlib.resources import files
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import yaml
@@ -100,6 +101,23 @@ def _claim(text: str = FROZEN) -> str:
     )
     assert claim_task(conn, task_id, "build")
     return task_id
+
+
+def _as(repo: Path, flow: dict, role: str, state: str, work) -> None:
+    """Run ``work()`` as a spawn of ``role`` in ``state``, recording its SPAWN_WINDOW.
+
+    That is how a headless run attributes a plan file (the reviewer's REVIEW.md, a planner's
+    routed edit) to the role that wrote it, which the floor gate needs to excuse it.
+    """
+    from pathly_orchestrator.supervisor import spawn_window
+
+    ns = SimpleNamespace(
+        project_root=str(repo),
+        topic="demo",
+        storage_path=str(_storage(repo)),
+        current_state=state,
+    )
+    spawn_window.observe(ns, flow, role, "run-%s-%s" % (role, state), work)
 
 
 def _build(repo: Path, flow: dict, edit: bool = True) -> str:

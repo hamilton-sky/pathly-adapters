@@ -111,8 +111,8 @@ path entirely (see its own section below).
                                          |
                                          v
                       run_gates(STATE -> next)   <- THE JOIN, once
-                      (goal-loop's: require_tasks_done + command_gate build + test;
-                       each flow declares its own under `gates:`)
+                      (goal-loop's: require_tasks_done + command_gate build + test
+                       + floor_gate; each flow declares its own under `gates:`)
 ```
 
 `fsm_state.current` stays the **scalar** `"DRAINING"` for the whole drain. The parallelism is
@@ -891,13 +891,14 @@ module, never another `elif`**. Each check returns `None` to allow the transitio
 | `scope_gate` | `scope.py` | the builder stayed inside its declared footprint (git diff ∪ untracked vs. the paths in `scope_file` ∪ the claimed tasks' `files`; see "Scope gate" below) | `scope_file` (optional); flow-level `scope_gate.exempt_prefixes` |
 | `command_gate` | `command.py` | **the project's own verify command exits 0** | `command_key` (+ optional `command`, `timeout`) |
 | `reviewer_unchanged` | `reviewer.py` | a reviewer spawn changed no file and made no commit (the supervisor's `SPAWN_WINDOW` events; see "Reviewer gate" below) | — |
+| `floor_gate` | `floor.py` | **the run's diff since the `proof_base` weakens no test, check, config or plan** (`proof.floor.scan` over two working-tree snapshots; see "Floor gate" below) | — (app setting `floor.enabled`) |
 
 **The first four read state that agents produced; only `command_gate` executes something.** That
 distinction is the point of it: `verify_gate` is satisfied by an agent writing `RESULT: PASS`, so
 the FSM's pass/fail signal was, end to end, an agent's opinion of its own work. `command_gate`
 re-derives the answer from a process exit code and routes the real stdout/stderr back as feedback.
 `reviewer_unchanged` reads what the supervisor measured around the reviewer's spawn, not what the
-reviewer reported.
+reviewer reported. `floor_gate` reads the git working tree itself, not what the builder reported.
 
 **Command resolution** (highest precedence first): `gate["command"]` literal → app-setting
 `verify.<command_key>` → **skip**. Configure a project with
@@ -961,7 +962,8 @@ name git C-quotes in a patch header. Every `tree` function fails open (`None` or
 root is not the top folder of a git work tree (a project inside a larger repo included), or git
 fails or is missing; each git call has a 60 s timeout and drops inherited `GIT_DIR`-style and
 pathspec variables (`GIT_LITERAL_PATHSPECS`, …). Snapshot objects are unreachable, so `git gc`
-prunes them later. `supervisor/task_proof.py` calls the scan for a goal-loop task; no gate does yet.
+prunes them later. `supervisor/task_proof.py` calls the scan for a goal-loop task and `floor_gate`
+calls it for the whole run ("Floor gate").
 
 **Proof base and task proofs (`fsm/gates/_proof_record.py`).** The floor and task-check gates
 judge the whole run, not one stage: a builder fix round runs inside REVIEWING, TESTING, RETRO or
@@ -990,9 +992,10 @@ with `claimed_at` copied from the task row (`checks`: `passed` | `failed` | `non
 current `claimed_at`, `checks` is `passed` or `none` and `floor` is not `failed`: a retry or a
 human re-open claims the task again (a new `claimed_at`), so the earlier record stops counting,
 and a failed proof is run again. It reads the whole event log on each call and is false when
-the events cannot be read (the checks then run again). No packaged flow declares a `floor_gate`
-or `task_checks` gate yet, so a real run stamps no base yet. The only writer of `TASK_PROOF` is the
-goal-loop drain's task proof ("Task proof in the goal-loop drain").
+the events cannot be read (the checks then run again). `team`, `team-build` and `goal-loop`
+declare a `floor_gate`, so their runs stamp a base on first entry to BUILDING (`team`,
+`team-build`) or DRAINING (`goal-loop`); no flow declares a `task_checks` gate yet. The only
+writer of `TASK_PROOF` is the goal-loop drain's task proof ("Task proof in the goal-loop drain").
 
 **Spawn windows and stage writes (`supervisor/spawn_window.py`, `fsm/gates/_proof.py`).** The
 floor, scope and reviewer gates must tell who wrote a file: in `team`/`team-build` a planner or
@@ -1009,8 +1012,9 @@ feedback's `target_agent`, so a builder or planner routed a file inside REVIEWIN
 as the `reviewer` that `terminal_identity._spawn_role` would mint). A fan-out drain records none.
 The spawn's result comes back unchanged; an exception from it propagates and no window is written;
 outside a git repo, or when a snapshot or the event write fails, there is no window and a log line.
-`team` and `team-build` carry a `scope_gate`, so their runs record windows; `goal-loop` carries
-none of the three yet.
+`team` and `team-build` carry a `scope_gate`, and all three flows carry a `floor_gate`, so their
+runs record windows (in `goal-loop` only for the feedback spawns of a builder fix round, since a
+fan-out drain records none).
 
 What each role may change (`_proof.stage_writes(storage_path, role)`, a predicate over
 repo-relative POSIX paths). `<storage>` is the run's storage dir; the *board home*
@@ -1104,6 +1108,58 @@ the only gate of `REVIEWING->BUILDING` in `team` and `team-build` (`REVIEWER_CHA
 human); the REVIEWING exit requirement tells the reviewer to change nothing but `REVIEW.md` and
 feedback files and not to commit. Limit: with early advance the window's closing snapshot is taken
 at the reviewer's `AGENT_DONE`, so a write after its completion report can land outside the window.
+
+**Floor gate (`fsm/gates/floor.py`).** Did the run get green by weakening the bar? The gate takes
+a working-tree snapshot now and runs `proof.floor.scan` against the run-wide `proof_base.tree`
+(not the stage's `build_baseline`), so a builder fix round that ran inside REVIEWING, TESTING or
+RETRO, or after a goal-loop drain, while the FSM stayed in the state, is judged at the next
+transition, and a back-edge or a resumed run still sees the whole run. The scan's inputs:
+
+- **allow** is the union of the `floor_allow` lists a human set on the tasks claimed since
+  `proof_base.started_at` (`task_proof.tasks_claimed_since`, goal-scoped when the run has a
+  `goal_id`, else `(board, scope)`). A category allowed for one task is therefore also excused in a
+  fix round or in another task's file at these gates; the per-task proof in the drain uses each
+  task's own list.
+- **`task-edit`**: a claimed task whose `claimed_text` differs from its live `text` is a finding
+  (`task-edit: task <id>: its text was changed after the claim`) unless that task allows
+  `task-edit`. A human clears it by allowing the category or by `refreeze` (both in
+  `POST /comms/tasks/floor-allow`).
+- **`plan-edit`**: `protected` is `_proof.board_home(storage)`. A changed path under it passes when
+  `_proof.stage_writes(storage, "builder")` allows it, or when `_proof.explained` finds a
+  `SPAWN_WINDOW` since the base whose role may write it and left it at its current content
+  (so the reviewer's `REVIEW.md` and a planner's routed plan edit are not blamed on the builder).
+  The windows are read once, on the first path that needs them. If they cannot be read, a path
+  some role may write is excused and `FLOOR_CHECKED` carries a warning.
+- **`config_commands`** are the `verify.build`, `verify.test`, `verify.lint` and `verify.smoke`
+  settings, so a `Makefile` counts as config when the project builds with make.
+
+A finding writes `FLOOR_FAILURES.md` (it starts "Floor guard: the diff weakens the bar instead of
+meeting it", lists each finding, says a human can allow a category for a claimed task through
+`POST /comms/tasks/floor-allow` or turn the guard off with the `floor.enabled` setting, and ends
+with the fix: undo the weakening and fix the cause) and fails with `GATE_FAILED {gate, transition,
+findings, count}`; the flows route the file to `builder`. `FLOOR_CHECKED {warnings}` is appended
+whenever a scan ran, pass or fail (the Review packet's supervisor notes read it). It skips
+(`GATE_SKIPPED` with a reason, fail open) when `floor.enabled` is `false`, `0` or `off`
+(`floor_disabled`), the run has no `proof_base` (`no_proof_base`), the base has no tree
+(`no_snapshot`, not a git repo top), the snapshot now fails (`snapshot_failed`), the claimed tasks
+cannot be read (`tasks_unreadable`), an unexpected error stops the scan (`scan_failed`), or git
+could not diff and nothing else was found (`scan_incomplete`; the warning stays in `FLOOR_CHECKED`).
+
+Wired in `core/flows/team.flow.yaml` and `team-build.flow.yaml` at `BUILDING->REVIEWING`
+(after `command_gate`, before `scope_gate`, which stays last), `REVIEWING->TESTING` (before
+`reviewer_unchanged`, which stays last), `TESTING->RETRO` and the wildcard `->DONE` (it covers an
+`INCOMPLETE_TASKS` builder fix round inside RETRO, which no other floor gate sees), and in
+`goal-loop.flow.yaml` at `DRAINING->DONE` after the two `command_gate`s: a builder fix round after
+the drain (`BUILD_FAILURES`, `TEST_FAILURES` or `INCOMPLETE_TASKS` routed to `builder`) is a plain
+feedback spawn, not a `sched-<id>#<n>` task spawn, so only this gate sees it, and it also sees a
+weakening an earlier failed task attempt left in place. Each flow routes `FLOOR_FAILURES` to
+`builder`. `fsm_compose_responses._exit_requirement` tells the stage's agent the diff is scanned.
+
+Limits: the guard raises the cost of weakening the bar, it does not make it impossible (a builder
+with a shell can reach the DB and the git object store). An interactive `/pathly` run records no
+`SPAWN_WINDOW`, so a plan file another role wrote there (the reviewer's `REVIEW.md`) is not
+explained and reads as a `plan-edit`; set `floor.enabled` to `false` for such a run. A test or
+tester edit in TESTING that trips the floor goes to the builder, who did not make it.
 
 **Review packet (`fsm_compose_review.py`) — the reviewer's view.** A reviewer judges a diff
 against a task, not against the builder's account of its work. The reviewer has no Bash, so it
@@ -1507,7 +1563,7 @@ Fails open on what the proof cannot do: no git (the floor is `off`, the checks s
 unreadable task, or an unexpected error is logged and the outcome returned unchanged. Limits:
 each attempt is judged on its own diff, so a weakening an earlier failed attempt left in place
 is not seen again (the retry prompt carries the finding, and the floor gate at the goal-loop
-join is meant to re-check the whole run); lane-parallel tasks share one working tree, so an
+join re-checks the whole run); lane-parallel tasks share one working tree, so an
 undeclared path is blamed on every overlapping task (`WorktreeIsolation` is still a stub); and
 the checks run in the project root with the server's account, as a builder's commands do.
 
@@ -1926,6 +1982,7 @@ gates:
     - {type: require_tasks_done, on_fail: INCOMPLETE_TASKS.md}
     - {type: command_gate, command_key: build, on_fail: BUILD_FAILURES.md}
     - {type: command_gate, command_key: test,  on_fail: TEST_FAILURES.md}
+    - {type: floor_gate, on_fail: FLOOR_FAILURES.md}   # build-proof 06: the whole run's diff
 ```
 
 `goal_executor._run_loop` is now a delegation to `_run_team(flow="goal-loop")` — no

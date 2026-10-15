@@ -13,6 +13,7 @@ import re
 from review_packet_support import (
     FEATURE,
     _args,
+    _as,
     _build,
     _enter_building,
     _state,
@@ -99,7 +100,13 @@ def test_leaving_another_state_keeps_the_review_base(repo, flow):
     complete_task(get_db(), task_id)
     fsm_ops.complete_stage(_args(repo))
     kept = _state(repo)["review_base"]
-    _write(repo, FEATURE + "/REVIEW.md", "RESULT: PASS\nReviewed: fine.\n")
+    _as(
+        repo,
+        flow,
+        "reviewer",
+        "REVIEWING",
+        lambda: _write(repo, FEATURE + "/REVIEW.md", "RESULT: PASS\nReviewed: fine.\n"),
+    )
 
     fsm_ops.complete_stage(_args(repo))
 

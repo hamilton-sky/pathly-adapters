@@ -112,6 +112,14 @@ def _exit_requirement(flow_config: dict | None, state_name: str) -> str | None:
                 )
                 if rule not in lines:
                     lines.append(rule)
+            elif t == "floor_gate":
+                rule = (
+                    "The run's diff is scanned for weakened tests, silenced checks and "
+                    "plan edits: it is run, not self-reported. Fix the cause instead of "
+                    "skipping, deleting or loosening a test, a check or the plan."
+                )
+                if rule not in lines:
+                    lines.append(rule)
             elif t == "command_gate":
                 lines.append(
                     f"The project's `{chk.get('command_key')}` verification command must "

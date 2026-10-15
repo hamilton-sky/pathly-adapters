@@ -17,6 +17,7 @@ from review_packet_support import (
     FEATURE,
     SUMMARY,
     _args,
+    _as,
     _build,
     _claim,
     _enter_building,
@@ -110,7 +111,15 @@ def test_the_packet_names_only_the_tasks_claimed_since_the_build_began(repo, flo
 
 def test_the_diff_leaves_out_everything_under_pathly(repo, flow):
     _build(repo, flow)
-    _write(repo, FEATURE + "/IMPLEMENTATION_PLAN.md", "# Plan\nPLAN-EDIT-LINE\n")
+    _as(
+        repo,
+        flow,
+        "planner",
+        "BUILDING",
+        lambda: _write(
+            repo, FEATURE + "/IMPLEMENTATION_PLAN.md", "# Plan\nPLAN-EDIT-LINE\n"
+        ),
+    )
     _write(repo, "src/new_module.py", "NEW_MODULE_LINE = 1\n")
     fsm_ops.complete_stage(_args(repo))
 

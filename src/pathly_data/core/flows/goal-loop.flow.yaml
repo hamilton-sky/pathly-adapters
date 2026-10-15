@@ -64,6 +64,14 @@ adapter_map:
 #                          fail-open-when-unconfigured contract — but a failure is now
 #                          ROUTED (feedback_routing below re-drives a fix) instead of only
 #                          posting a board escalation and stopping.
+#   floor_gate          the whole run's diff since the run-wide proof_base, scanned for
+#                       weakened tests, silenced checks, edited config and plan edits. The
+#                       per-task proof inside the drain (supervisor/task_proof.py) judges one
+#                       attempt's own diff; this gate also sees a builder fix round after the
+#                       drain (BUILD_FAILURES / TEST_FAILURES / INCOMPLETE_TASKS routed to
+#                       builder, a plain feedback spawn the per-task proof never sees) and a
+#                       weakening an earlier failed attempt left in place. After the command
+#                       gates, so a skipped test cannot turn them green unseen.
 gates:
   DRAINING->DONE:
     - type: require_tasks_done
@@ -74,6 +82,8 @@ gates:
     - type: command_gate
       command_key: test
       on_fail: TEST_FAILURES.md
+    - type: floor_gate
+      on_fail: FLOOR_FAILURES.md
 
 feedback_priority:
   - HUMAN_QUESTIONS
@@ -89,6 +99,7 @@ feedback_priority:
 feedback_routing:
   BLOCKED_ON_HUMAN: human
   BUILD_FAILURES: builder
+  FLOOR_FAILURES: builder
   HUMAN_QUESTIONS: human
   INCOMPLETE_TASKS: builder
   TEST_FAILURES: builder
