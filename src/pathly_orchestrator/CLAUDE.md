@@ -882,7 +882,7 @@ import, so no call site moved:
 | `fsm_compose.py` (298) — keeps `build_prompt` / `build_prompt_for_agent` / `_load_agent_text` | `fsm_compose_tables` (lookup tables) · `fsm_compose_vars` (`_inject_prompt_vars` + its inputs) · `fsm_compose_paths` (`resolve_stage_out_path`, `resolve_board_scope`) · `fsm_compose_stage` (section drops, stage overrides, adapter choice) · `fsm_compose_hints` (`_agent_hint`) · `fsm_compose_review` (the reviewer's Review packet) |
 | `skills/compose.py` (197) — keeps the resolver | `compose_base` (constants + `_strip_leading_frontmatter`) · `compose_resources` (manifest/skill/fragment I/O) · `compose_caps` · `compose_segments` · `compose_validate` |
 | `supervisor/terminal.py` (390) — keeps the spawn | `terminal_argv` · `terminal_identity` · `terminal_reconcile` · `terminal_billing` · `terminal_phase` |
-| `fsm/engine_actions.py` (204) — keeps `run_transition_actions` | `fsm/gates/` — one module per gate type (`artifact` · `tasks` · `scope` · `command`) behind the `run_gates` dispatcher in `gates/__init__.py`; `_helpers` owns `append_event` / `_write_gate_feedback` / `gate_failed` / `project_root_of` |
+| `fsm/engine_actions.py` (204) — keeps `run_transition_actions` | `fsm/gates/` — one module per gate type (`artifact` · `tasks` · `scope` · `command` · `reviewer` · `floor` · `task_checks`) behind the `run_gates` dispatcher in `gates/__init__.py`; `_helpers` owns `append_event` / `_write_gate_feedback` / `gate_failed` / `project_root_of`; `_proof` (stage writes, spawn windows), `_proof_record` (`proof_base`, `TASK_PROOF`) and `_scope_tasks` are shared by the build-proof gates |
 
 Two constraints govern what may leave these files, and both are load-bearing:
 `fsm_compose._load_agent_text` and `supervisor.terminal._reconciliation_window` are **monkeypatched
@@ -920,8 +920,9 @@ reads the git working tree itself, not what the builder reported.
 **Command resolution** (highest precedence first): `gate["command"]` literal → app-setting
 `verify.<command_key>` → **skip**. Configure a project with
 `PUT /db/settings/verify.test {"value": "python -m pytest -q"}` (also `verify.build`, `verify.lint`,
-and `verify.timeout_seconds`; default timeout 600s). `verify.smoke` is read by no gate: only the
-run-start base smoke does (see "Run guard rails").
+and `verify.timeout_seconds`; default timeout 600s). `verify.smoke` is run by no gate: only the
+run-start base smoke runs it (see "Run guard rails"); `floor_gate` and the task proof only read it, to
+tell whether a `Makefile` counts as config.
 
 **Fail-open on absent config, fail-closed on everything else.** No configured command → `GATE_SKIPPED`
 (`no_command_configured`), so adding the gate to a shared flow never breaks a project that has not

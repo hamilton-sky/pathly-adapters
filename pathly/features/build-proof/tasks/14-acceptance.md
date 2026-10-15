@@ -1,7 +1,7 @@
 # Prove build-proof end to end
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 01, 02, 03, 04, 05, 06, 07, 08, 09, 10, 11, 12, 13, 15, 16
 Test first: no
 Floor: allow skip
@@ -123,3 +123,40 @@ prints found
   not edit it.
 
 ## Answer
+
+**Built**
+
+- `tests/fsm_flows/test_build_proof_acceptance.py` (11 tests, about 260 lines): the bar, driven through the real `supervisor.start_run` with the packaged `team-build` and `goal-loop` flows in a real `git init` project (one commit: `src/app.py`, `tests/test_app.py`, `.gitignore`), `fhc.next_action` and `fhc.complete_stage` patched to the in-process `fsm_ops` functions, `supervisor._run_stage_via_terminal` replaced by one scripted fake agent, `code_context.backend` set to `off`.
+- `tests/fsm_flows/build_proof_acceptance_support.py` (the project factory, the `projects` fixture, the `Harness` fake agent that records every spawn and appends `AGENT_DONE`, `drive`) and `tests/fsm_flows/build_proof_acceptance_runs.py` (one `run_*` function per scenario). Both are under 400 lines.
+- `CHANGELOG.md`: a `### Headless runs prove a build is done instead of trusting the agent (build-proof)` entry at the top of "Unreleased": what is measured, what helps agents, the guard rails, the settings, route, columns and events, and the known limits from spec.md Risks and map.md Open questions.
+- `src/pathly_orchestrator/CLAUDE.md`, the only living doc the audit found stale: the `fsm/gates/` row of the "Modules split under the 400-line ratchet" table listed four gate modules (now all seven, plus the three shared `_proof*`/`_scope_tasks` helpers), and "`verify.smoke` is read by no gate" now says no gate runs it and that `floor_gate` and the task proof only read it for the `Makefile` rule.
+- Regenerated `tests/INDEX.md` and `tests/fsm_flows/INDEX.md`; a line each in `map.md` (Decisions, and one Open question), `learnings.md` (three `(14)` lines).
+
+**Proof**
+
+- `python -m pytest tests/fsm_flows/test_build_proof_acceptance.py -q -p no:cacheprovider`: `11 passed in 14.45s`, exit 0.
+- `python -m pytest tests/ -q -p no:cacheprovider`: `2918 passed, 14 skipped in 464.70s`, exit 0 (run after the last edit to a test or doc).
+- `python scripts/gen_test_index.py --check`: `All test INDEX.md files up to date.`, exit 0.
+- The CHANGELOG check printed `found`, exit 0.
+- Beyond the Done when, run fresh at the end: the Lint chain (black, mypy, check_file_size `OK: 1008 source files checked; 19 known over 400 lines, none new, none grown.`, check_no_mirror_reads, gen_test_index, lint-imports `1 kept, 0 broken`, bandit, check_adapters, check_entry_points) exited 0; Smoke exited 0; `python -m build --wheel` built `pathly_adapters-2.24.1-py3-none-any.whl`.
+- Mutation pass (a temporary probe file, deleted before the commit): switching each of floor_gate, the goal-loop task proof, the `task-edit` check, `reviewer_unchanged`, the base smoke, the dependency block, the root-cause guide, the fresh reviewer session and `task_checks` off made the matching acceptance test fail, and replacing the Review packet by the old history block made test 8 (team-build) fail on the `## Review packet` heading count and the builder marker.
+
+**Decisions**
+
+- The bar is 8 items but 11 tests: items 1, 3 and 8 each name two flows (or two kinds of edit), so each flow is its own test; 2, 4, 5, 6 and 7 are one test each.
+- Each scenario gets its own `git init` project at `tmp_path/<name>`, never at `tmp_path`: `tests/conftest.py` makes `tmp_path` the fake home, so the DB would sit inside the tree the floor and scope gates snapshot. A check's log file is also written outside the project.
+- Item 7 reads the prompts of the runs of items 1 and 2 (`keep`/`kept`) instead of repeating them, and runs the scenarios itself if it is run alone; only the in-memory spawns are read from a kept run, since its DB is gone by then.
+- The ticket says the builder feedback spawn's instructions "name" `FLOOR_FAILURES.md`. They do not (see For later tickets), so `assert_sent_back` checks what is true: the spawn is a `feedback` spawn, it is made while `FLOOR_FAILURES.md` is the only file in `feedback/`, it is the builder prompt, and it carries the storage path. Item 7 asserts the root-cause heading on the three builder feedback spawns as the ticket says.
+- In the task-edit scenario the first `TASK_PROOF` is `checks: passed, floor: failed`, not `none`: the check runs from the frozen text, so it ran although the live text had lost its block, and the floor verdict failed the attempt. The test also asserts the check ran on both attempts (`edit.log` is `xx`).
+- Sessions in test 8 are asserted from the `SESSION` broadcasts and the sessions the fake received: builder none, reviewer none (the builder returned one), tester resumes the reviewer's, retro the tester's.
+- The audit of the living docs checked the gate list, wiring, event, setting, route, module and function names in the root, `src/pathly_orchestrator` and `src/pathly_data` docs (the only living docs tickets 01 to 13, 15 and 16 touched; `studio/CLAUDE.md` changed only for the HQ work) against the code and the gates sections of the three flow YAMLs. I found nothing else stale; the sentences the plan expected to go stale ("nothing writes them yet", "no gate calls any of it yet") were already gone.
+
+**Shortcuts taken**
+
+none
+
+**For later tickets**
+
+- A builder feedback prompt does not name the feedback file it was spawned for. `build_prompt_for_agent` adds the file's name and text only when `retry_count > 0` (the retry-ladder block), and a headless run never writes `retry_count_by_key`, so the builder spawned for `FLOOR_FAILURES.md`, `TASK_CHECK_FAILURES.md` or `TEST_FAILURES.md` gets the agent text, the storage path and the root-cause guide, whose step 1 says "Read every failure above" with nothing above it. The file is in `feedback/` when the agent starts, so a builder that lists the folder finds it, but the prompt does not say so. The fix is to pass the file's name and text into the prompt for a builder (it changes every builder feedback prompt, and `tests/fsm_flows/test_fix_routing.py` and `test_retry_ladder.py` pin the current text), so it is a new ticket, not part of this one. Noted in map.md Open questions and in the CHANGELOG limits.
+- Test 8's `FLOOR_CHECKED` count of 4 (BUILDING->REVIEWING, REVIEWING->TESTING, TESTING->RETRO, ->DONE) and the goal-loop count of 1 pin the gate wiring of the three flows; a ticket that adds or moves a `floor_gate` must change them on purpose.
+- No other ticket is made wrong by this one.

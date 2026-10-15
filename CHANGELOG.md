@@ -2,6 +2,82 @@
 
 ## Unreleased
 
+### Headless runs prove a build is done instead of trusting the agent (build-proof)
+
+A headless run used to advance on what its agents said: a builder wrote `RESULT: PASS`, completed
+its tasks and moved on, and a reviewer resumed the builder's own conversation and read the
+builder's summary of the work. Now the supervisor measures the project itself, at the points where
+a claim used to be taken on trust. It judges the whole run since a run-wide `proof_base`, so a
+builder fix round that runs inside REVIEWING, TESTING or after a goal-loop drain is judged too.
+Design: `pathly/features/build-proof/spec.md`. The measuring is on by default in a git project and
+needs no setting, except `command_gate` and the base smoke, which still wait for `verify.build` /
+`verify.test` (and `verify.smoke`) to be configured.
+
+What is now measured:
+
+- Floor guard: `floor_gate` (`proof/floor.py` over `proof/tree.py` working-tree snapshots) scans
+  the run's diff for a skipped, focused or deleted test, a silenced linter, an empty catch, a
+  lowered threshold, a trivial assertion, edited lint/test/CI config, an edited plan file and an
+  edited task text, and sends the builder back with `FLOOR_FAILURES.md`. It sits at
+  `BUILDING->REVIEWING`, `REVIEWING->TESTING`, `TESTING->RETRO` and `->DONE` in `team` and
+  `team-build`, and at the `goal-loop` join, so a builder that turns a red test command green with a
+  skip is caught.
+- Checks: a task's text can carry a ```` ```check ```` block (`$ <command>`, `exit`, `prints`). The
+  supervisor runs it after the builder reports the task done, and a failing check is a failure
+  whatever the builder reported. In `goal-loop` each task attempt is proven as it returns and a
+  failure goes through the existing per-task retry with the real output (up to 4000 characters
+  now, was 500); in `team` and `team-build` the `task_checks` gate runs each completed task's
+  block once (`TASK_CHECK_FAILURES.md`). The planner now writes a `Check:` field per phase.
+- Frozen task text: `claim_task` copies the text into the new `comms_messages.claimed_text`, and
+  every proof runs from that copy, so a builder that rewrites its own task (or drops its check) is
+  caught as a `task-edit` and the retry prompt shows the text it was claimed with.
+- Scope: `scope_gate` now declares the claimed tasks' `files` as well as the plan's paths, exempts
+  only what the builder stage may write, and no longer excuses the plan files, so a builder edit to
+  `USER_STORIES.md` or `IMPLEMENTATION_PLAN.md` fails. It is wired into `team` and `team-build`.
+- Reviewer no-change: the supervisor records the tree and `HEAD` around every stage spawn
+  (`SPAWN_WINDOW`), and `reviewer_unchanged` parks the run for a human
+  (`REVIEWER_CHANGED_FILES.md`) when a reviewer spawn changed a file other than `REVIEW.md` and its
+  feedback files, or committed.
+- Review packet: the reviewer's prompt carries the tasks' frozen text, the diff outside `pathly/`
+  (3 lines of context, clipped to 48 KiB) and the supervisor's notes (task proofs, floor
+  warnings), in place of the builder's `AGENT_DONE` summaries. The reviewer also opens a fresh CLI
+  session instead of resuming the builder's (`SESSION` events carry `independent: true`), and the
+  next same-adapter stage continues the reviewer's session.
+
+What helps the agents: a DAG task's prompt gets `## Results of the tasks this one depends on` (each
+direct dependency's latest result), and a retried task, and a builder given a feedback file, gets a
+`## Root-cause debugging` guide (read the failure, reproduce it, fix the cause and never the check).
+
+Run guard rails: before the first spawn of `team`, `team-build` or `goal-loop` the supervisor runs
+`verify.smoke` (else `verify.build`), and a red base parks the run (`error_kind: base_red`, a human
+escalation, nothing spawned; resuming it smokes again). A goal run's iteration cap is raised to
+`tasks x goal.task_max_attempts x 4` as its DAG grows, and never lowered.
+
+New settings and route: `floor.enabled` (`false`, `0` or `off` turns the floor guard off),
+`verify.smoke`, and `POST /comms/tasks/floor-allow` `{message_id, allow, refreeze}`, the only way
+to set a task's `floor_allow` list (the floor categories a human excuses for that task) or to
+re-freeze its text; it answers 403 to a live run token. The new `comms_messages` columns are
+`claimed_text` and `floor_allow`; the new events are `SPAWN_WINDOW`, `TASK_PROOF` and
+`FLOOR_CHECKED`. `tests/fsm_flows/test_build_proof_acceptance.py` drives the real `team-build` and
+`goal-loop` flows through `supervisor.start_run` with a scripted fake agent and shows each of
+these, and a clean run reaching `done`.
+
+Known limits: the proof raises the cost of cheating, it does not make it impossible (an agent with
+a shell can reach the DB and the git object store, and a caller that drops its run token counts as
+a human, as for `force_past_gate`). Early advance can leave a write after an agent's completion
+report outside its spawn window, though the next gate's whole-run diff still sees it. Lane-parallel
+goal-loop tasks share one working tree, so an undeclared write is blamed on every overlapping
+task and a check can see another lane's half-done work (`WorktreeIsolation` is still a stub).
+Check commands come from task text that agents write and run in the project root under the
+server's account; a task's checks run once per completion, so a later regression is left to
+`command_gate test`. The whole-run floor gates take the union of the claimed tasks' allow lists,
+and a test edit by the tester that trips the floor goes to the builder. Snapshots leave
+unreachable objects in `.git/objects` until `git gc`. A fresh reviewer session costs tokens.
+Headless runs never write `retry_count_by_key`, so the FSM retry ladder never climbs and a builder
+feedback prompt does not name the feedback file it is handed. Studio has no control for the allow
+list yet (use `curl`). An interactive `/pathly` run records no `SPAWN_WINDOW`, so `scope_gate`
+cannot judge a path that was dirty when BUILDING began and `reviewer_unchanged` skips there.
+
 ### Board — run identity and authorship provenance (role-read-policy)
 
 Runner, board and goal spawns that the supervisor drives now get a server-issued identity, and
