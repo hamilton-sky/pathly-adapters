@@ -43,6 +43,14 @@ _GATE = "floor_gate"
 # The failure text lists at most this many findings, then a count of the rest.
 _MAX_LISTED = 30
 
+# ``FLOOR_CHECKED`` notes: a plan file was excused as the spawn windows could not say who wrote it.
+_NOTE_UNREADABLE = (
+    "spawn windows unreadable: plan files a role may write were not judged"
+)
+_NOTE_NO_WINDOWS = (
+    "the run recorded no spawn windows: plan files a role may write were not judged"
+)
+
 
 def _claimed_tasks(
     since: str, goal_id: str | None, feature_scope: str | None, board: str
@@ -103,9 +111,10 @@ def _may_change(
     True for what the builder stage may write, else for a path a ``SPAWN_WINDOW`` since the base
     explains. The windows are read once, on the first path that needs them. When they cannot be
     read, or were read and there are none (an interactive run records none), a path some role may
-    write is excused (and ``notes`` says which), so a DB hiccup or a run without windows does not
-    blame the builder for the reviewer's ``REVIEW.md``; a path no role may write still counts.
-    With at least one window, only an explaining window excuses a path.
+    write is excused, so a DB hiccup or a run without windows does not blame the builder for the
+    reviewer's ``REVIEW.md``; ``notes`` then says which, once, and only when a path was excused. A
+    path no role may write still counts. With at least one window, only an explaining window
+    excuses a path.
     """
     builder = _proof.stage_writes(storage_path, "builder")
     any_role = _proof.any_role_writes(storage_path)
@@ -117,24 +126,23 @@ def _may_change(
                 loaded.append(_proof.windows_since(storage_path, started_at))
             except Exception:
                 logger.warning("floor_gate could not read the windows", exc_info=True)
-                notes.append(
-                    "spawn windows unreadable: plan files a role may write were not judged"
-                )
                 loaded.append(None)
-            else:
-                if not loaded[0]:
-                    notes.append(
-                        "the run recorded no spawn windows: plan files a role may write "
-                        "were not judged"
-                    )
         return loaded[0]
+
+    def excuse_without_windows(path: str) -> bool:
+        if not any_role(path):
+            return False
+        note = _NOTE_UNREADABLE if loaded[0] is None else _NOTE_NO_WINDOWS
+        if note not in notes:
+            notes.append(note)
+        return True
 
     def may_change(path: str) -> bool:
         if builder(path):
             return True
         found = windows()
         if not found:
-            return any_role(path)
+            return excuse_without_windows(path)
         return _proof.explained(root, path, now_tree, found, storage_path)
 
     return may_change

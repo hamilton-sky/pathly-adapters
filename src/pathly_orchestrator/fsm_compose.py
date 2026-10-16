@@ -23,7 +23,7 @@ from .fsm_compose_vars import (
 from .fsm_compose_paths import resolve_stage_out_path, resolve_board_scope
 from .fsm_compose_stage import _drop_sections, _apply_stage_selection, _resolve_adapter
 from .fsm_compose_hints import _codex_subagent_hint, _agent_hint
-from .fsm_compose_feedback import feedback_block, read_feedback
+from .fsm_compose_feedback import feedback_block, feedback_path, read_feedback
 
 __all__ = [
     "RUNNER_CONTRACT_BLOCK",
@@ -343,13 +343,14 @@ def build_prompt_for_agent(
     artifact = _FIX_MODE_ARTIFACT.get(agent_name)
     if feedback_file and artifact is not None:
         feature_path = storage_path.as_posix().rstrip("/")
+        feedback_at = feedback_path(storage_path, feedback_file)
         prompt += (
             f"\n## Fix mode — you are resolving a routed review/test failure\n"
             f"\n"
             f"A reviewer/tester traced a failure to YOUR artifact. You are NOT re-running your\n"
             f"whole stage — you are patching the specific decision that was wrong.\n"
             f"\n"
-            f"1. Read  {feature_path}/feedback/{feedback_file}   (the failure + why it is yours).\n"
+            f"1. Read  {feedback_at}   (the failure + why it is yours).\n"
             f"2. Correct YOUR artifact: {artifact}  (if absent, the nearest equivalent —\n"
             f"   IMPLEMENTATION_PLAN.md / USER_STORIES.md). Change only what the failure requires.\n"
             f"3. Hand off to the builder: if the corrected artifact implies code changes, write\n"
@@ -357,7 +358,7 @@ def build_prompt_for_agent(
             f'   naming the change ("implement per updated ARCHITECTURE_PROPOSAL.md §X").\n'
             f"   If the correction is decision-only (no code), skip this — the re-review gate\n"
             f"   will re-verify.\n"
-            f"4. Delete {feature_path}/feedback/{feedback_file} when your artifact is corrected.\n"
+            f"4. Delete {feedback_at} when your artifact is corrected.\n"
             f"5. Report what changed. Do NOT run pathly-fsm-call / complete-stage (supervisor owns the FSM).\n"
         )
     # A builder given a feedback file is on a second attempt at its stage, though a headless

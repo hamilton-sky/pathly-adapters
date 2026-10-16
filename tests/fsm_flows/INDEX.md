@@ -15,11 +15,11 @@ FSM engine, gates, transitions, flow definitions, feedback protocol & fix-routin
 | `test_design_questions_routing.py` | DESIGN_QUESTIONS.md routes to the architect in EVERY flow that routes it at all | 3 |
 | `test_feedback_escalation.py` | 3-tier feedback escalation (fsm.engine.route_feedback) | 11 |
 | `test_feedback_file_reachability.py` | A feedback file a flow can actually produce must be ROUTED by that flow | 4 |
-| `test_feedback_prompt_names_file.py` | A feedback spawn's prompt names the feedback file it is handed and shows its text (build-proof 18) | 16 |
+| `test_feedback_prompt_names_file.py` | A feedback spawn's prompt names the feedback file it is handed and shows its text (build-proof 18) | 20 |
 | `test_feedback_protocol.py` | Adapters side of the feedback protocol contract | 4 |
 | `test_fix_routing.py` | Smart fix-routing (pathly/features/.archive/smart-fix-routing/DESIGN.md) | 11 |
 | `test_floor_gate.py` | ``floor_gate`` sends a build that weakened the bar back to the builder (build-proof 06) | 18 |
-| `test_floor_gate_no_windows.py` | ``floor_gate`` in a run that recorded no spawn windows (build-proof 17) | 6 |
+| `test_floor_gate_no_windows.py` | ``floor_gate`` in a run that recorded no spawn windows (build-proof 17) | 8 |
 | `test_fsm.py` | Unit tests for pathly_orchestrator.fsm functions | 35 |
 | `test_fsm_http_client.py` | covers next action auto starts server and posts json; poll exits early on first healthy response; poll exhausted raises runtime error; … | 8 |
 | `test_fsm_ops.py` | Integration tests for fsm_ops.py (next_action, complete_stage) | 36 |
