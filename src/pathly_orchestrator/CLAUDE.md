@@ -879,7 +879,7 @@ import, so no call site moved:
 
 | Entry point | Now delegates to |
 |---|---|
-| `fsm_compose.py` (384) — keeps `build_prompt` / `build_prompt_for_agent` / `_load_agent_text` | `fsm_compose_tables` (lookup tables) · `fsm_compose_vars` (`_inject_prompt_vars` + its inputs) · `fsm_compose_paths` (`resolve_stage_out_path`, `resolve_board_scope`) · `fsm_compose_stage` (section drops, stage overrides, adapter choice) · `fsm_compose_hints` (`_agent_hint`) · `fsm_compose_review` (the reviewer's Review packet) · `fsm_compose_feedback` (`read_feedback`, `feedback_block`: what a feedback prompt shows of its file) |
+| `fsm_compose.py` (385) — keeps `build_prompt` / `build_prompt_for_agent` / `_load_agent_text` | `fsm_compose_tables` (lookup tables) · `fsm_compose_vars` (`_inject_prompt_vars` + its inputs) · `fsm_compose_paths` (`resolve_stage_out_path`, `resolve_board_scope`) · `fsm_compose_stage` (section drops, stage overrides, adapter choice) · `fsm_compose_hints` (`_agent_hint`) · `fsm_compose_review` (the reviewer's Review packet) · `fsm_compose_feedback` (`feedback_path`, `read_feedback`, `feedback_block`: what a feedback prompt shows of its file) |
 | `skills/compose.py` (197) — keeps the resolver | `compose_base` (constants + `_strip_leading_frontmatter`) · `compose_resources` (manifest/skill/fragment I/O) · `compose_caps` · `compose_segments` · `compose_validate` |
 | `supervisor/terminal.py` (390) — keeps the spawn | `terminal_argv` · `terminal_identity` · `terminal_reconcile` · `terminal_billing` · `terminal_phase` |
 | `fsm/engine_actions.py` (204) — keeps `run_transition_actions` | `fsm/gates/` — one module per gate type (`artifact` · `tasks` · `scope` · `command` · `reviewer` · `floor` · `task_checks`) behind the `run_gates` dispatcher in `gates/__init__.py`; `_helpers` owns `append_event` / `_write_gate_feedback` / `gate_failed` / `project_root_of`; `_proof` (stage writes, spawn windows), `_proof_record` (`proof_base`, `TASK_PROOF`) and `_scope_tasks` are shared by the build-proof gates |
@@ -1157,8 +1157,8 @@ transition, and a back-edge or a resumed run still sees the whole run. The scan'
   The windows are read once, on the first path that needs them. If they cannot be read, or the
   run recorded none since the base (an interactive `/pathly` run records none), a path some role
   may write is excused and `FLOOR_CHECKED` carries a warning saying which (`spawn windows
-  unreadable` or `the run recorded no spawn windows`); a path no role may write is still a
-  finding. With one window or more, only a window that explains the path excuses it, whichever
+  unreadable` or `the run recorded no spawn windows`), once, and only when a path was in fact
+  excused; a path no role may write is still a finding. With one window or more, only a window that explains the path excuses it, whichever
   roles the windows belong to.
 - **`config_commands`** are the `verify.build`, `verify.test`, `verify.lint` and `verify.smoke`
   settings, so a `Makefile` counts as config when the project builds with make.
@@ -1190,9 +1190,11 @@ with a shell can reach the DB and the git object store). An interactive `/pathly
 `SPAWN_WINDOW`, so there the gate cannot tell which role wrote a plan file: the reviewer's
 `REVIEW.md` or a planner's edit is excused (with the `FLOOR_CHECKED` warning above) and so is a
 plan edit by the builder, which goes unseen, as for `scope_gate`. Every other category is judged
-as in a supervised run. A goal-loop drain records no window either; its tasks' own plan edits are
-caught by the per-task proof (`protected=[board home]`). A test or tester edit in TESTING that
-trips the floor goes to the builder, who did not make it.
+as in a supervised run. A goal-loop drain records no window either. Its tasks' own plan edits are
+caught by the per-task proof (`protected=[board home]`), which judges each attempt on its own diff,
+so a plan file a role may write that a failed attempt edited and the retry left in place goes
+unseen at the join (a path no role may write is still a finding there). A test or tester edit in
+TESTING that trips the floor goes to the builder, who did not make it.
 
 **Task checks gate (`fsm/gates/task_checks.py`).** In `team` and `team-build` the builder claims a
 board task and completes it itself (`POST /comms/tasks/complete`), so the supervisor never sees
@@ -1448,16 +1450,19 @@ fresh at call time (capped, so a pathological feedback file can't blow up the pr
 normal stage-advance path already uses, so no second history mechanism exists. **Round 1
 (`retry_count == 0`, the default) has no ladder.** Every existing caller that never threads
 the new parameter, and every golden snapshot, is unaffected; but a headless run never climbs
-`retry_count`, so it would never have shown the file at all. So a round-1 prompt for a role
-outside `_FIX_MODE_ARTIFACT` (builder, reviewer, tester) that is given a `feedback_file` carries a
-`## Feedback to resolve` block (`fsm_compose_feedback.feedback_block`), in the ladder's place,
-right after the `## Current task` context: the file's path (`<storage>/feedback/<file>`, the
-one the Fix mode block uses), a sentence saying the gate or reviewer wrote it and that the cause,
-not the file, is to be fixed, and the file's text in a code fence one backtick longer than any run
-of backticks in it (these files quote failing command output). The text is `read_feedback`'s:
-stripped and clipped to 4000 characters, the same read the ladder uses; a file that is missing,
-not text or empty gets a block that still names it and says its text could not be read. From
-round 2 the ladder already carries the text, so the block is not added a second time. A call with
+`retry_count`, so it would never have shown the file at all. So a round-1 prompt for any role
+outside `_FIX_MODE_ARTIFACT` (typically builder, reviewer, tester) that is given a
+`feedback_file` carries a `## Feedback to resolve` block
+(`fsm_compose_feedback.feedback_block`), in the ladder's place, right after the
+`## Current task` context: the file's path (`<storage>/feedback/<file>`, from
+`fsm_compose_feedback.feedback_path`, which the Fix mode block uses too), a sentence saying the
+gate or reviewer wrote it and that the cause, not the file, is to be fixed, and the file's text
+in a code fence one backtick longer than any run of backticks in it (these files quote failing
+command output). The text is `read_feedback`'s: stripped and clipped to 4000 characters, the
+same read the ladder uses; a file longer than that gets a closing line saying the text is its
+first 4000 characters and naming the full file; a file that is missing, not text or empty gets a
+block that still names it and says its text could not be read. From round 2 the ladder already
+carries the text, so the block is not added a second time. A call with
 no `feedback_file`, and the four Fix mode roles (po, planner, architect, designer: Fix mode tells
 them to read the file), are byte-identical to before. All three callers (`fsm_ops_complete` twice,
 `fsm_ops.next_action` once) get it through `build_prompt_for_agent`.

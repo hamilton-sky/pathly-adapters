@@ -151,7 +151,7 @@ def test_a_file_that_is_not_text_is_reported_unreadable(tmp_path):
 
 
 def test_a_long_file_is_clipped_to_4000_characters(tmp_path):
-    marker = ""
+    marker = "\ue000"  # a character nothing else in the prompt holds
     _write(tmp_path, "FLOOR_FAILURES.md", marker * 6000)
 
     prompt = build_prompt_for_agent(
@@ -159,6 +159,39 @@ def test_a_long_file_is_clipped_to_4000_characters(tmp_path):
     )
 
     assert prompt.count(marker) == 4000
+
+
+def test_a_clipped_file_says_so_and_points_at_the_full_file(tmp_path):
+    _write(tmp_path, "FLOOR_FAILURES.md", "a" * 4000 + "b" * 10)
+
+    block = _block_of(
+        build_prompt_for_agent("builder", tmp_path, feedback_file="FLOOR_FAILURES.md")
+    )
+
+    assert "b" not in block.split("```")[1]  # the fenced text is the first 4000 only
+    tail = block.rsplit("```", 1)[1]
+    assert "first 4000 characters" in tail
+    assert "`%s`" % _path(tmp_path, "FLOOR_FAILURES.md") in tail
+
+
+def test_a_file_of_exactly_4000_characters_is_not_called_clipped(tmp_path):
+    _write(tmp_path, "FLOOR_FAILURES.md", "a" * 4000)
+
+    block = _block_of(
+        build_prompt_for_agent("builder", tmp_path, feedback_file="FLOOR_FAILURES.md")
+    )
+
+    assert "first 4000" not in block
+
+
+def test_a_short_file_is_not_called_clipped(tmp_path):
+    _write(tmp_path, "FLOOR_FAILURES.md", "short")
+
+    block = _block_of(
+        build_prompt_for_agent("builder", tmp_path, feedback_file="FLOOR_FAILURES.md")
+    )
+
+    assert "first 4000" not in block
 
 
 def test_a_file_holding_a_triple_backtick_is_fenced_with_four(tmp_path):
@@ -222,3 +255,22 @@ def test_feedback_block_is_the_same_text_the_prompt_carries(tmp_path):
     )
 
     assert feedback_block(tmp_path, "FLOOR_FAILURES.md") in prompt
+
+
+def test_feedback_path_is_the_path_the_block_and_fix_mode_both_name(tmp_path):
+    from pathly_orchestrator.fsm_compose_feedback import feedback_path
+
+    _write(tmp_path, "REVIEW_FAILURES.md", "the failure")
+    path = feedback_path(tmp_path, "REVIEW_FAILURES.md")
+
+    assert path == _path(tmp_path, "REVIEW_FAILURES.md")
+    assert feedback_path(tmp_path / "x" / "", "A.md").endswith("/x/feedback/A.md")
+    builder = build_prompt_for_agent(
+        "builder", tmp_path, feedback_file="REVIEW_FAILURES.md"
+    )
+    planner = build_prompt_for_agent(
+        "planner", tmp_path, feedback_file="REVIEW_FAILURES.md"
+    )
+    assert "`%s`" % path in builder
+    assert "1. Read  %s " % path in planner
+    assert "4. Delete %s " % path in planner

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .fsm_compose_tables import _SKILL_AGENT_ROLE
+from .fsm_compose_tables import agent_role_of
 
 
 def resolve_stage_out_path(
@@ -27,8 +27,7 @@ def resolve_stage_out_path(
         agent = (flow_config.get("agent_map") or {}).get(state_name)
         if not agent or "/" not in agent:
             return None
-        _role = _SKILL_AGENT_ROLE.get(agent)
-        agent_role = _role if _role is not None else agent.split("/")[-1]
+        agent_role = agent_role_of(agent)
         from pathly_orchestrator.compose import manifest_role_file
 
         entry = manifest_role_file(agent_role, agent)

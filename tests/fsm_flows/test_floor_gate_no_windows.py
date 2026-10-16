@@ -30,6 +30,7 @@ from review_packet_support import (
 from pathly_orchestrator import eventlog, fsm_ops
 from pathly_orchestrator.db import get_db
 from pathly_orchestrator.db.queries.comms_tasks import complete_task
+from pathly_orchestrator.fsm.gates import _proof
 
 TESTS = "tests/test_calc.py"
 STORIES = FEATURE + "/USER_STORIES.md"
@@ -38,6 +39,7 @@ NESTED = FEATURE + "/notes/NOTES.md"
 CLEAN = "def test_calc():\n    assert 1 + 1 == 2\n"
 FEEDBACK = "FLOOR_FAILURES.md"
 NO_WINDOWS = "no spawn windows"
+UNREADABLE = "spawn windows unreadable"
 
 
 @pytest.fixture
@@ -63,6 +65,11 @@ def _feedback_path(repo):
     return _storage(repo) / "feedback" / FEEDBACK
 
 
+def _notes(repo, text: str) -> list[str]:
+    """The warnings of the last ``FLOOR_CHECKED`` that carry ``text``."""
+    return [w for w in _events(repo, "FLOOR_CHECKED")[-1]["warnings"] if text in w]
+
+
 def _reviewing(repo, flow, build=None) -> str:
     """Build, then advance to REVIEWING with the task still open. Returns the task id."""
     _enter_building(repo, flow)
@@ -84,10 +91,7 @@ def _assert_passes_with_the_note(repo, task_id: str) -> None:
     assert moved.get("next_state") == "TESTING", moved
     assert not _feedback_path(repo).exists()
     assert not [e for e in _events(repo, "GATE_FAILED") if e["gate"] == "floor_gate"]
-    notes = [
-        w for w in _events(repo, "FLOOR_CHECKED")[-1]["warnings"] if NO_WINDOWS in w
-    ]
-    assert len(notes) == 1, _events(repo, "FLOOR_CHECKED")
+    assert len(_notes(repo, NO_WINDOWS)) == 1, _events(repo, "FLOOR_CHECKED")
     assert not _events(repo, "SPAWN_WINDOW")
 
 
@@ -145,6 +149,42 @@ def test_a_file_no_role_may_write_is_a_plan_edit_with_no_windows(proj, flow):
     _assert_blocked(proj, task_id, "plan-edit: %s" % NESTED)
 
     assert not _events(proj, "SPAWN_WINDOW")
+    # Nothing was excused, so the note about plan files a role may write is not added.
+    assert _notes(proj, NO_WINDOWS) == []
+
+
+def test_unreadable_windows_excuse_a_plan_file_with_their_own_note(
+    proj, flow, monkeypatch
+):
+    def broken(*_args, **_kwargs):
+        raise RuntimeError("db is gone")
+
+    task_id = _reviewing(proj, flow)
+    monkeypatch.setattr(_proof, "windows_since", broken)
+    _write(proj, REVIEW, "RESULT: PASS\nClean.\n")
+    complete_task(get_db(), task_id)
+
+    moved = _complete(proj)
+
+    assert moved.get("next_state") == "TESTING", moved
+    assert not _feedback_path(proj).exists()
+    assert len(_notes(proj, UNREADABLE)) == 1, _events(proj, "FLOOR_CHECKED")
+    assert _notes(proj, NO_WINDOWS) == []
+
+
+def test_unreadable_windows_still_block_a_file_no_role_may_write(
+    proj, flow, monkeypatch
+):
+    def broken(*_args, **_kwargs):
+        raise RuntimeError("db is gone")
+
+    task_id = _reviewing(proj, flow)
+    monkeypatch.setattr(_proof, "windows_since", broken)
+    _write(proj, NESTED, "# Notes\n")
+
+    _assert_blocked(proj, task_id, "plan-edit: %s" % NESTED)
+
+    assert _notes(proj, UNREADABLE) == []
 
 
 def test_a_plan_edit_outside_any_window_is_blocked_once_a_window_exists(proj, flow):
@@ -163,7 +203,4 @@ def test_a_plan_edit_outside_any_window_is_blocked_once_a_window_exists(proj, fl
 
     _assert_blocked(proj, task_id, "plan-edit: %s" % STORIES)
 
-    notes = [
-        w for w in _events(proj, "FLOOR_CHECKED")[-1]["warnings"] if NO_WINDOWS in w
-    ]
-    assert notes == []
+    assert _notes(proj, NO_WINDOWS) == []
