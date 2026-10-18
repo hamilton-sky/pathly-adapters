@@ -1,7 +1,7 @@
 # Open and close a chief session in the supervisor
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 04, 05
 Test first: yes
 
@@ -127,3 +127,122 @@ exit 0
   user's allow rules
 
 ## Answer
+
+**Built**
+
+- `src/pathly_orchestrator/runner/chief_argv.py` (new, pure): `chief_argv(engine, model,
+  settings_path, mcp_path, session_id)` and `claude_settings(hook_command)`. claude gets
+  `--restricted --tools Bash,Read,Glob,Grep --settings … --mcp-config … --strict-mcp-config
+  --session-id …` and `--model` only when given; codex gets `--sandbox read-only
+  --ask-for-approval on-request` and the optional model pair; any other engine is a `ValueError`.
+- `src/pathly_orchestrator/supervisor/chief_session.py` (new): `ChiefAlreadyOpen(run_id, tab_id)`,
+  `open_chief(...)`, `close_chief(run_id, reason)`, the watcher thread (`chief-watch-<run_id>`) and
+  `_chief_root()`.
+- `tests/runner_supervisor/test_chief_session.py` (new, 44 tests incl. parametrized; committed alone
+  first as `9131286` `test(chief-agent): 06 failing test`; at that commit it failed at collection with
+  `ModuleNotFoundError: No module named 'pathly_orchestrator.runner.chief_argv'`, the right reason).
+  `tests/INDEX.md` and `tests/runner_supervisor/INDEX.md` regenerated.
+- `src/pathly_orchestrator/CLAUDE.md`: one line each for `chief_argv.py` and `chief_session.py` in the
+  package tree (the root `CLAUDE.md` documentation-sync rule; tickets 04 and 05 did the same).
+- `learnings.md` (two lines) and `map.md` (one Decisions line).
+
+**Proof** (each run fresh, after the last edit to code or tests)
+
+- `python -m pytest tests/runner_supervisor/test_chief_session.py -q -p no:cacheprovider` -> `44
+  passed in 8.75s`, exit 0. It covers every item of the Done when: one `TERMINAL_SPAWN` with
+  `interactive` true, `submit` false, the front matter gone from `prompt`, topic `chief:<run_id>`,
+  label `Chief · Operator`; `resolve_run_token` maps the payload token to role `chief`, board
+  `project`, scope `resolve_board_scope("project", root, "")` and the session's run id; the token is
+  in neither `prompt`, nor `argv`, nor any file of the session folder; claude argv has `--settings`
+  (the folder's file), `--strict-mcp-config`, an `--mcp-config` file that parses to `{"mcpServers":
+  {}}`, `--tools` exactly `Bash,Read,Glob,Grep`, `--restricted`, `--session-id` with a UUID equal to
+  the session's `cli_session_id`, and no `--dangerously-skip-permissions`; codex argv has `--sandbox
+  read-only`, no `--session-id`, `cli_session_id` None and a folder holding only `hook_secret`; the
+  settings allow list is exactly `["Bash(pathly *)"]`, the deny list is the eleven entries (incl.
+  `Bash(curl *)`, `Bash(wget *)`, `WebFetch`), and the hook command, split with `shlex.split` from a
+  folder whose name has a space, is `[sys.executable, -m, pathly_hooks.chief_prompt, --run-id, <id>,
+  --secret-file, <folder>/hook_secret, --port, 8123]`; a second open raises `ChiefAlreadyOpen` with
+  the first run's ids and sends nothing; `copilot` is a `ValueError`; after `mark_started()` and
+  `mark_pty_result(...)` the token is revoked (`resolve_run_token` None, `lookup_run_token` has
+  `revoked_at`), the folder is gone, `get_run` is None and the session reads `tab closed`; with
+  `start_timeout=0.05` and no start the session closes with reason `never started`. The mode check
+  (0600 on `hook_secret`, `settings.json`, `mcp.json`) runs under `if os.name == "posix"` inside the
+  test. No test patches `time.sleep`.
+- Mutation checks (source edited, suite run, source restored): dropping `--strict-mcp-config`,
+  `submit: True`, the token appended to `prompt`, skipping the folder removal, skipping the watcher
+  release, skipping the already-open check and mode `0o644` each made a named test fail. I ran the
+  file 25 times in a row after fixing a test-side race (below): 25 of 25 passed.
+- `lint-imports` -> exit 0, `Orchestrator layer rule (db -> runner -> supervisor -> http_server) KEPT
+  (3 ignored imports)`, `Contracts: 1 kept, 0 broken.`
+- The rest of the Lint chain from `commands.md`, run piece by piece, all exit 0: `black --check src/
+  tests/` (580 files unchanged), `mypy src/ ...` (`Success: no issues found in 319 source files`),
+  `check_file_size.py` (`none new, none grown`; `chief_session.py` is under 400 lines),
+  `check_no_mirror_reads.py`, `gen_test_index.py --check`, `bandit -q -r src/ -ll -x
+  src/pathly_data/`, `check_adapters.py`, `check_entry_points.py`. Smoke command exit 0; both new
+  modules also import alone and in either order.
+- Test command from `commands.md` (`tests/comms_board tests/db tests/runner_supervisor
+  tests/http_api`) -> `1308 passed, 2 skipped in 264.79s`, exit 0 (the 2 skips are not mine).
+- The real-claude check the Reference asks for, on the installed claude **2.1.302** (not 2.1.292), with
+  `-p` on `--model haiku`: `--restricted --tools "Bash,Read,Glob,Grep" --settings <file with a
+  UserPromptSubmit hook> --mcp-config <{"mcpServers": {}}> --strict-mcp-config --session-id <uuid>`.
+  The hook fired, its stdin `session_id` was the `--session-id`, and the stream-json init event listed
+  `tools` = Bash, Glob, Grep, Read and `mcp_servers` = []. See `learnings.md`.
+
+**Decisions**
+
+- `--restricted` stays, `--setting-sources` is not used: the `--settings` hook fires under
+  `--restricted` on the installed claude. The check was run with `-p`; an interactive tab could not
+  be started in this environment, so the interactive path is the same hook machinery but not observed.
+- The folder and the session row are made before the token is minted, so a failure before the row
+  exists leaves no token to revoke; a failure after (mint, `create_run`, the broadcast) runs
+  `close_chief(run_id, "open failed")`, which revokes, removes the folder and drops the run. A
+  `threading.Lock` makes the already-open check and `create_session` one step inside this process.
+- `close_chief` also calls `mark_started()` and `mark_pty_result({"closed": reason})` on a run that is
+  still registered before dropping it. Without that, a session closed by a route (ticket 07) leaves a
+  watcher thread waiting for a result that can never come. Closing is not atomic: `closed_at` is set
+  first, the folder is removed and the run dropped after (in a `finally`, so a DB error still removes
+  the secret).
+- `close_chief` returns False for an id that is not `chief-` plus 12 hex chars, before it touches any
+  path, so a bad id cannot make `rmtree` reach outside `~/.pathly/chief`.
+- Validation beyond the ticket's list, at a trust boundary: `preset` must be a string, `model` a string
+  that does not start with `-` (it becomes an argv element), and the prompt must be non-empty after its
+  front matter is stripped (a front-matter-only prompt would paste nothing). The 64 KiB limit is on the
+  UTF-8 bytes of the prompt as given.
+- `hook_secret_hash` is the sha256 hex digest of the secret's UTF-8 bytes, the same function
+  `run_tokens` uses for tokens. `settings_dir` stores the session folder path.
+- A codex session folder holds `hook_secret` only (no `settings.json`, no `mcp.json`), and the hook
+  command, hence `Settings.from_env()`, is only built for claude.
+- `project_root` is stored and compared as given, with no normalisation, as the token's `project_root`
+  is too; the board scope is normalised by `resolve_board_scope`.
+- The `run_token` is in the payload as the ticket and spec say; ticket 01 already strips it from every
+  channel but `/events/spawn`.
+- A test-side race found and fixed: the first version of the `never started` test read `get_run` as soon
+  as `closed_at` appeared, but `drop_run` is the last step of the close. The test now waits for
+  `get_run(run_id) is None` first. An autouse fixture also closes any chief a test leaves open, so no
+  watcher outlives its test's patched home.
+
+**Shortcuts taken**
+
+none
+
+**For later tickets**
+
+- Ticket 07: map `ChiefAlreadyOpen` to 409 `{error, run_id, tab_id}` and `ValueError` to 400. Call
+  `close_chief(run_id, ...)` from `/chief/close` and also send the host a `TERMINAL_KILL` for the tab:
+  `close_chief` does not kill the process. `queries.chief.close_stale_sessions` revokes tokens but
+  does not remove folders, so the startup cleanup must also clear `_chief_root()` (the folders hold the
+  hook secrets). Normalise `project_root` the same way on open, close and session lookup, or a trailing
+  slash escapes the one-chief-per-project check. `open_chief` pastes `strip_front_matter(prompt)` only;
+  ticket 17's `chief-connect` fragment has to be appended by the caller or inside `open_chief` (the
+  64 KiB limit is checked before any append). `Settings.from_env()` runs on each claude open: it can
+  create the server secret file and exits on an invalid `PATHLY_FSM_HTTP_PORT`, which cannot happen in
+  a running server.
+- Ticket 09: the hook module is `pathly_hooks.chief_prompt` with `--run-id`, `--secret-file`, `--port`;
+  the secret file holds the raw secret, the session row holds its sha256 hex (compare with
+  `hmac.compare_digest`); `chief_sessions.cli_session_id` is what a hook post's `session_id` must equal.
+- Ticket 08: the session's tier is `chief_sessions.tier` (what `resolve_preset_tier` returned); the
+  token's `board` is `project` and its `scope` the normalised project root.
+- With only `pathly-pty-host`, the refusal posts a result without a `started`, so the watcher closes the
+  session after `start_timeout` (30 s) as `never started`, not at once. If that delay matters, the
+  watcher can also wake on a result; the ticket asked for the plain two-step wait.
+- Ticket 15 adds `chief_sessions.runs_started`; `open_chief` calls `create_session` without it.
