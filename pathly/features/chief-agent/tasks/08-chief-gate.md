@@ -1,7 +1,7 @@
 # Refuse every chief call its tier does not allow
 
 Type: task
-Status: resolved
+Status: open
 Blocked by: 04, 05, 07
 Test first: yes
 
@@ -604,5 +604,50 @@ Ways around the gate I tried that were refused or harmless:
 - A mismatch between the type the gate classes and the type the route stores.
 
 `cache=False` on the forced parse does not change what a later route handler sees. I ran a Flask app with and without the gate's `_bodies()` call across 12 content-type and body combinations (valid, invalid, empty, BOM, UTF-16, list, form, multipart, cp1252), reading `get_json` with and without `silent`/`force`, `request.json` and `get_data`, and the responses were identical. The one difference, for form content types, appears only when a route reads `request.form` before `get_data()`. No real route does, and `read_json_body` caches first.
+
+REVIEW: FAIL
+
+## Review findings (round 3, quality review)
+
+QUALITY
+
+Range reviewed: 570a6ee..ffe326b. ffe326b is the ticket's newest commit, so no later commits were left out. I read the ticket as it stood at 570a6ee plus the `## Review findings` sections of rounds 1 and 2 from the working copy, and the diff (ticket folder excluded). Both Done when commands pass: `tests/http_api/test_chief_gate.py` 483 passed, `tests/comms_board/test_comms_write_perm.py` 33 passed. black, mypy, lint-imports, check_file_size and gen_test_index --check are clean. The repo working tree is clean. My probes are in the scratchpad `rv3/` (test_p1.py, test_p2.py, test_p3.py, test_p4.py, test_p5.py, test_p6.py, list_routes.py, srcscan.py, conftest.py).
+
+Disclosure: a grep I ran over the tasks folder for "code/query" printed snippets of the ticket's `## Answer` (ticket lines about the `/code/query` marker rule, and "Tests I edited"). Before that I had already found the `/runs/<id>/retry` hole and decided on FAIL. The Answer text did not change any finding.
+
+How I checked the table: I enumerated every `(rule, method)` the chief can reach (84, all have an entry, none stale). For each one I read the view and the helpers it calls, and compared the fields it really reads, its fallbacks, and body versus query string. I also scanned every view's source: no listed GET view reads a body and no listed POST view reads `request.args`. Most entries are true. The ones below are not.
+
+1. major src/pathly_orchestrator/http_server/chief_fields.py line 161 (`/runs/<run_id>/<action>`): `POST /runs/<id>/retry` falls back to the server's directory when `project_root` is empty, and the table does not mirror that.
+   - `blueprints/control/_helpers.py::handle_retry` checks that the key `project_root` is present, not its value. It then calls `start_run(project_root=body["project_root"])`. `Path("")` and `project_root or None` resolve to the server's working directory.
+   - The entry is `Fields(roots=_ROOT, unbound=("run_id",))`, so the gate only checks a foreign root. `_foreign_root` skips falsy values, and `names_root` is off for this rule.
+   - Repro (test_p1.py): an operator chief on A, with a finished registry run, sends `POST /runs/run-own-1/retry` with `{"flow":"team","project_root":"","max_iterations":3,"max_cost_usd":1}`. The gate lets it through and `start_run` receives `""`. The same happens for null, 0, false, [] and {}. The control with project B's root gets the gate's 403.
+   - So an operator chief can restart a run in the server's directory, which may be another project, with agents spawned there.
+   - The test `test_every_route_that_starts_an_agent_in_a_directory_names_its_root` excludes this rule with the comment "names a run by id (ticket 14)". But `retry` starts an agent in a directory taken from its own body.
+   - Fix: make the naming rule verb-aware, so `retry` requires a truthy `project_root` in the body. pause, resume, advance and reroute must stay callable without it. Add tests for ""/null/0 on retry, and shrink the exclusion in that test.
+2. major src/pathly_orchestrator/http_server/chief_fields.py line 135 (`/comms/features/decompose`): `feature` is declared `unbound` as a board name, but the route joins it into a filesystem path, so a planner or operator chief can write into another project.
+   - `blueprints/comms/features.py::_dispatch_board_run` does `os.makedirs(os.path.join(project_root, "pathly", "features", feature))`. It then passes that string as `storage_path` to `start_board_run`. `_dispatch_consultation` does the same `makedirs`. Neither calls the `_safe_topic` guard that `_resolve_storage_path` uses.
+   - Repro (test_p3.py, test_p6.py): a chief on A (planner and operator tier) sends `feature="../../../proj-b/pathly/features/planted"` with `project_root=A` and rigor light, full or consultation. The gate lets it through. The directory is created inside project B. With the real `start_board_run` and the spawn faked, the run is accepted ("started") with `storage_path` pointing into B. The planner agent is told "Your working directory is: <that path>".
+   - The table's own contract says a path the route stores or creates "must lie inside the chief's project" (`paths`/`abs_paths`). This route's `feature` is such a path but is listed only as an id.
+   - The tripwire test cannot catch it, because `feature` is declared. I checked the other routes that take a topic or scope from the body: `/comms/run`, `/runs` and `/status` are protected by `_safe_topic` or a containment check. A `/comms/run` evaluator probe with a traversal scope got a 500 ValueError (test_p5.py), so that one is not a bypass.
+   - Fix, preferably in the route: validate `feature` with the `_safe_topic`/`_is_unsafe_topic` guard before `makedirs` in both dispatchers. In the gate, treat `feature` of this route as a path-segment field that may not contain a separator or `..`. Add a test that plants nothing outside the project.
+3. major src/pathly_orchestrator/CLAUDE.md, "Chief gate", bullet "Naming it": the section overclaims.
+   - It says a route that falls back to the server's working directory, `PATHLY_PROJECT_ROOT` or every project is refused when it names no root, and it lists the routes. Finding 1 shows `retry` falls back and is not refused. Finding 4 shows `/telemetry/trends` falls back to every project and is not refused.
+   - The "Reads are not all pure" bullet says a status chief can cause "three small writes". `GET /skills/prompts` without `kind` calls `migrate_db_presets_to_files`, which writes prompt files and deletes legacy DB rows. That is a fourth.
+   - Fix: correct the lists after fixing 1 and 2, or state the exceptions.
+4. minor src/pathly_orchestrator/http_server/chief_fields.py lines 260-264 (`/telemetry/trends`) and 203-205 (`/db/stats`): both fallbacks go unmirrored.
+   - With a blank `feature` and no `project_root`, `/telemetry/trends` aggregates every project's daily cost (test_p2.py: a status chief on A got B's $12.50 bucket). The note only says "a named feature is summed across every project".
+   - `/db/stats` with `project_root` filters cost and tokens, but its `features`, `events` and `invocations` counts are global. The table presents it as project-bound with no fleet-wide note.
+   - This is the same exposure class as the accepted `/db/rollup` global block. Add `names_root` for the blank-feature case and say so in the notes, or list both as fleet-wide.
+5. minor src/pathly_orchestrator/http_server/chief_fields.py: the `unbound=("feature",)` entries on `/db/features/<feature>/*` and `/api/features/<feature>/*` are misleading. Those queries also filter by the named `project_root`, so the feature is bound there. Only list what is genuinely unbound.
+6. minor ownership of id-addressed calls. The task brief says ticket 14 covers ids. Ticket 14 as written covers only `/runs/<id>/stop|<action>`, `/comms/acknowledge|answer|supersede` and `/runner/agent-answer`.
+   - Nothing owns `goal_id` on `/comms/goals/run|stop|decompose` and `/runs` kind=goal, or the task `message_id` on `/comms/tasks/run|stop`. An operator chief on A can start a goal or task from project B in A's directory.
+   - CLAUDE.md says "no ticket yet", which is accurate. Add these routes to ticket 14 or open a ticket. Ticket 14's first line ("binds only when project_root is named") is also stale now.
+7. minor legitimate flows: the new refusals do not break any flow the ticket lists.
+   - The planner and operator Done when calls still pass once `project_root` is in the body. The builder edited those tests to add it.
+   - Ticket 17's `pathly help` and the built-in style texts must now tell the chief to give `project_root` on run, decompose, `/code/query` and `/db/*` calls, and to use its own root or a `(marker)` as `scope`. The 403 text names the missing field.
+   - An `artifact` post with a relative path in its text and no `artifact_path` is refused by design. That is the stricter behaviour.
+8. minor tests/http_api/test_chief_gate.py is 2165 lines in one file, and `test_a_view_reads_no_project_ish_field_its_entry_does_not_name` reads only each view's own source, as its docstring admits. Splitting by concern would keep later tickets from growing it. The tripwire misses helper code such as `create_run`, `handle_retry` and `_dispatch_*`, which is exactly where findings 1 and 2 live.
+
+Checked and found true: the `ScopeRead` fallbacks (`scope or feature` including blank, 0 and null) for `/comms/post`, `/comms/search`, `GET /comms`, `/comms/tasks` and `/comms/goals`. The board default and unknown-board handling, which is stricter than the routes. `/comms/artifacts` and `/comms/run/status` taking `scope` only. The `/code/query` scope, marker and target anchoring. The project-decompose `project` override. `artifact_path` and the text-recovered path. `names_root` for `/runs`, `/comms/run`, `/comms/goals/run`, `/comms/tasks/run`, the three decompose routes, `/code/query`, the `/db/*` family, `/status` and `/comms/artifacts/section`. Absent-root behaviour of `/api/*`, `/skills/*`, `/db/agents`, `/runs`, `/comms/permissions`, `/hq/context`, `/comms/scope`, `/chief/session` and `/flows/stage-config`. The "reads no project" entries. The repeated-query-key and whitespace handling, which fails closed.
 
 REVIEW: FAIL
