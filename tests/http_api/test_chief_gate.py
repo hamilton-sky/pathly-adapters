@@ -18,6 +18,7 @@ strongest tier. A route added later is refused to the chief until someone lists 
 
 from __future__ import annotations
 
+import json
 import os
 import secrets
 from pathlib import Path
@@ -227,6 +228,7 @@ OVERRIDES = [
 @pytest.mark.parametrize("extra", OVERRIDES, ids=["prompt_override", "stage_overrides"])
 def test_planner_overrides_need_run(client, project, path, base, extra):
     chief = _chief("planner", project)
+    base = {**base, "project_root": str(project)}
 
     without = client.post(path, json=base, headers=chief.headers)
     assert _passed(without), without.get_data(as_text=True)
@@ -242,7 +244,12 @@ def test_empty_overrides_do_not_need_run(client, project):
 
     resp = client.post(
         "/comms/goals/decompose",
-        json={"mode": "planner", "prompt_override": "", "stage_overrides": {}},
+        json={
+            "mode": "planner",
+            "prompt_override": "",
+            "stage_overrides": {},
+            "project_root": str(project),
+        },
         headers=chief.headers,
     )
 
@@ -271,7 +278,12 @@ def test_operator_passes_the_decompose_routes_with_overrides(
 
     resp = client.post(
         path,
-        json={**base, "stage_overrides": {"PLANNING": "x"}, "prompt_override": "y"},
+        json={
+            **base,
+            "project_root": str(project),
+            "stage_overrides": {"PLANNING": "x"},
+            "prompt_override": "y",
+        },
         headers=chief.headers,
     )
 
@@ -281,7 +293,11 @@ def test_operator_passes_the_decompose_routes_with_overrides(
 def test_operator_passes_the_gate_on_a_run_start(client, project):
     chief = _chief("operator", project)
 
-    resp = client.post("/runs", json={"kind": "bogus"}, headers=chief.headers)
+    resp = client.post(
+        "/runs",
+        json={"kind": "bogus", "project_root": str(project)},
+        headers=chief.headers,
+    )
 
     assert resp.status_code == 400
     assert _passed(resp)
@@ -879,3 +895,567 @@ def test_every_unlisted_non_get_route_is_refused_to_an_operator(
 
     assert exits == []
     assert not_gated == []
+
+
+# --- the gate reads the body the way the route will ---------------------------------------
+#
+# The comms routes read the body with ``read_json_body`` (UTF-8, then cp1252, whatever the
+# content type); ``/runs``, ``/runner/agent-answer``, ``/code/query`` and ``/runs/<id>/<verb>``
+# read it with ``get_json``, which hands the raw bytes to ``json.loads`` (a BOM, UTF-16 and
+# UTF-32 are all understood). A body only the second reader understands used to look like ``{}``
+# to the gate, so the project binding never ran.
+
+ENCODINGS = [
+    "utf-8-sig",
+    "utf-16",
+    "utf-16-le",
+    "utf-16-be",
+    "utf-32",
+    "utf-32-le",
+    "utf-32-be",
+]
+WITH_PLAIN = [None, *ENCODINGS]
+
+
+def _send(client, path, payload, encoding, headers):
+    """POST ``payload`` as plain JSON, or as JSON text in ``encoding`` (BOM, UTF-16, UTF-32)."""
+    if encoding is None:
+        return client.post(path, json=payload, headers=headers)
+    return client.post(
+        path,
+        data=json.dumps(payload).encode(encoding),
+        content_type="application/json",
+        headers=headers,
+    )
+
+
+@pytest.fixture()
+def started(monkeypatch):
+    """Record the board runs the routes start, instead of starting any."""
+    calls: list[dict] = []
+
+    def fake(*args, **kwargs):
+        calls.append(kwargs)
+        return {"ok": True, "run_id": "r-1"}
+
+    monkeypatch.setattr(
+        "pathly_orchestrator.supervisor.board_run.start_board_run", fake
+    )
+    return calls
+
+
+@pytest.fixture(autouse=True)
+def _no_reindex(monkeypatch):
+    """``/code/query`` fires a background re-index of the project it names; keep it off."""
+    monkeypatch.setattr(
+        "pathly_orchestrator.runner.code_context.maybe_reindex", lambda root: None
+    )
+
+
+def _run_spec(root: Path) -> dict:
+    return {
+        "kind": "single",
+        "board": "feature",
+        "scope": "demo",
+        "project_root": str(root),
+    }
+
+
+@pytest.mark.parametrize("encoding", WITH_PLAIN)
+def test_runs_refuses_another_project_however_the_body_is_encoded(
+    client, project, other_project, started, encoding
+):
+    chief = _chief("operator", project)
+
+    resp = _send(client, "/runs", _run_spec(other_project), encoding, chief.headers)
+
+    assert _gated(resp), (resp.status_code, resp.get_data(as_text=True)[:200])
+    assert started == []
+
+
+@pytest.mark.parametrize("encoding", WITH_PLAIN)
+def test_runs_hands_the_route_the_whole_body_of_its_own_project(
+    client, project, started, encoding
+):
+    chief = _chief("operator", project)
+
+    resp = _send(client, "/runs", _run_spec(project), encoding, chief.headers)
+
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    assert [c["project_root"] for c in started] == [str(project)]
+
+
+@pytest.mark.parametrize("encoding", WITH_PLAIN)
+def test_agent_answer_refuses_another_project_however_the_body_is_encoded(
+    client, project, other_project, encoding
+):
+    chief = _chief("operator", project)
+    body = {"topic": "t", "answer": "a", "project_root": str(other_project)}
+
+    resp = _send(client, "/runner/agent-answer", body, encoding, chief.headers)
+
+    assert _gated(resp), (resp.status_code, resp.get_data(as_text=True)[:200])
+
+
+@pytest.mark.parametrize("encoding", WITH_PLAIN)
+def test_agent_answer_of_its_own_project_reaches_the_route(client, project, encoding):
+    chief = _chief("operator", project)
+    body = {"topic": "t", "answer": "a", "project_root": str(project)}
+
+    resp = _send(client, "/runner/agent-answer", body, encoding, chief.headers)
+
+    # The route read the topic and the answer from the body: no run has that topic.
+    assert resp.status_code == 404, resp.get_data(as_text=True)
+    assert _passed(resp)
+
+
+@pytest.mark.parametrize("encoding", WITH_PLAIN)
+def test_code_query_refuses_another_project_however_the_body_is_encoded(
+    client, project, other_project, encoding
+):
+    chief = _chief("status", project)
+    body = {
+        "op": "impact",
+        "target": "a.py",
+        "scope": "(interactive)",
+        "project_root": str(other_project),
+    }
+
+    resp = _send(client, "/code/query", body, encoding, chief.headers)
+
+    assert _gated(resp), (resp.status_code, resp.get_data(as_text=True)[:200])
+
+
+@pytest.mark.parametrize("encoding", WITH_PLAIN)
+def test_code_query_of_its_own_project_reaches_the_route(client, project, encoding):
+    chief = _chief("status", project)
+    body = {
+        "op": "impact",
+        "target": "a.py",
+        "scope": "(interactive)",
+        "project_root": str(project),
+    }
+
+    resp = _send(client, "/code/query", body, encoding, chief.headers)
+
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    assert _passed(resp)
+
+
+@pytest.mark.parametrize("verb", ["retry", "reroute"])
+@pytest.mark.parametrize("encoding", WITH_PLAIN)
+def test_run_control_refuses_another_project_however_the_body_is_encoded(
+    client, project, other_project, verb, encoding
+):
+    chief = _chief("operator", project)
+    body = {"project_root": str(other_project)}
+
+    resp = _send(client, f"/runs/x/{verb}", body, encoding, chief.headers)
+
+    assert _gated(resp), (resp.status_code, resp.get_data(as_text=True)[:200])
+
+
+@pytest.mark.parametrize("encoding", ENCODINGS)
+def test_an_encoded_body_is_classed_by_its_type_too(client, project, encoding):
+    chief = _chief("status", project)
+
+    resp = _send(client, "/comms/post", _msg("decision"), encoding, chief.headers)
+
+    assert _gated(resp)
+    assert resp.get_json()["action"] == "decide"
+
+
+def test_the_gate_does_not_change_what_a_route_reads(client, project, started):
+    """A body the route ignores (no JSON content type) stays ignored: the gate adds no cache."""
+    chief = _chief("operator", project)
+
+    resp = client.post(
+        "/runs",
+        data=json.dumps(_run_spec(project)),
+        content_type="text/plain",
+        headers=chief.headers,
+    )
+
+    assert resp.status_code == 400
+    assert "kind" in resp.get_json()["error"]
+    assert started == []
+
+
+# --- a body that is not UTF-8 (cp1252, as a Windows shell sends it) ------------------------
+
+
+def _cp1252(payload: dict) -> bytes:
+    return json.dumps(payload, ensure_ascii=False).encode("cp1252")
+
+
+def test_a_cp1252_body_is_classed_by_its_type(client, project):
+    chief = _chief("status", project)
+    body = _cp1252(_msg("decision", text="keep it \u2014 simple"))
+    assert b"\x97" in body
+
+    resp = client.post(
+        "/comms/post", data=body, content_type="application/json", headers=chief.headers
+    )
+
+    assert _gated(resp)
+    assert resp.get_json()["action"] == "decide"
+
+
+@pytest.mark.parametrize("path", ["/comms/search", "/runs", "/code/query"])
+def test_a_cp1252_body_naming_another_project_is_refused(
+    client, project, other_project, path
+):
+    chief = _chief("operator", project)
+    body = _cp1252(
+        {
+            "query": "caf\u00e9 \u2014",
+            "feature": "demo",
+            "project_root": str(other_project),
+        }
+    )
+
+    resp = client.post(
+        path, data=body, content_type="application/json", headers=chief.headers
+    )
+
+    assert _gated(resp)
+    assert "project" in resp.get_json()["error"]
+
+
+def test_an_operator_cp1252_post_is_stored_whole(client, project):
+    chief = _chief("operator", project)
+    body = _cp1252(_msg("note", text="kept \u2014 whole"))
+
+    resp = client.post(
+        "/comms/post", data=body, content_type="application/json", headers=chief.headers
+    )
+
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    assert (
+        _count(
+            "SELECT COUNT(*) FROM comms_messages WHERE text = ?", "kept \u2014 whole"
+        )
+        == 1
+    )
+
+
+# --- HEAD, redirects and paths no route matches -------------------------------------------
+
+
+def test_head_is_read_as_get(client, project):
+    chief = _chief("status", project)
+
+    assert client.head("/comms?feature=demo", headers=chief.headers).status_code == 200
+    for path in ("/events/spawn", "/events/runner?topic=x", "/db/settings"):
+        assert client.head(path, headers=chief.headers).status_code == 403, path
+
+
+def test_a_post_only_route_has_no_head(client, project):
+    chief = _chief("operator", project)
+
+    assert client.head("/db/query", headers=chief.headers).status_code == 405
+
+
+REDIRECTED = [
+    ("post", "/db//query", {"sql": "SELECT 1 AS n"}),
+    ("post", "/comms//post", _msg("note")),
+    ("get", "/events//spawn", None),
+    ("get", "/db//settings", None),
+]
+
+
+@pytest.mark.parametrize(
+    "verb,path,body", REDIRECTED, ids=[f"{v} {p}" for v, p, _ in REDIRECTED]
+)
+def test_a_redirect_runs_no_view_and_its_target_is_gated(
+    client, project, verb, path, body
+):
+    chief = _chief("operator", project)
+    kwargs = {"json": body} if body is not None else {}
+
+    first = getattr(client, verb)(path, headers=chief.headers, **kwargs)
+    assert first.status_code == 308, (first.status_code, first.get_data(as_text=True))
+
+    followed = getattr(client, verb)(
+        path, headers=chief.headers, follow_redirects=True, **kwargs
+    )
+    if path.startswith("/comms"):
+        assert followed.status_code == 200
+    else:
+        assert _gated(followed), (followed.status_code, followed.get_data(as_text=True))
+    assert _count("SELECT COUNT(*) FROM comms_messages WHERE type = 'note'") == (
+        1 if path.startswith("/comms") else 0
+    )
+
+
+NOT_RUN_PATHS = [
+    "/DB/query",
+    "/db/query/",
+    "/db/./query",
+    "//db/query",
+    "/comms/../db/query",
+    "/db/query;x=1",
+    "/db/query%00",
+    "/db/query%2F",
+]
+
+
+@pytest.mark.parametrize("path", NOT_RUN_PATHS)
+def test_a_lookalike_path_never_reaches_an_unlisted_view(client, project, path):
+    chief = _chief("operator", project)
+
+    resp = client.post(path, json={"sql": "SELECT 1 AS n"}, headers=chief.headers)
+
+    assert _gated(resp) or resp.status_code in (308, 404, 405), (
+        resp.status_code,
+        resp.get_data(as_text=True)[:200],
+    )
+
+
+@pytest.mark.parametrize("method", ["put", "delete", "patch"])
+@pytest.mark.parametrize("path", ["/db/query", "/events/spawn", "/comms/delete"])
+def test_a_method_no_route_has_is_a_405(client, project, method, path):
+    chief = _chief("operator", project)
+
+    resp = getattr(client, method)(path, headers=chief.headers)
+
+    assert resp.status_code == 405
+
+
+# --- the project board is named by `scope` too --------------------------------------------
+
+
+def _board_count(root: Path | str) -> int:
+    return _count(
+        "SELECT COUNT(*) FROM comms_messages WHERE board = 'project' AND scope = ?",
+        str(root),
+    )
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"scope": "OTHER"},
+        {"scope": "OTHER", "project_root": "OWN"},
+        {"scope": "OTHER/"},
+        {"feature": "OTHER"},
+        {"feature": "OTHER", "scope": "  "},
+        {"feature": "OTHER", "scope": ["x"]},
+        {"feature": "OTHER", "scope": None},
+        {"scope": "demo"},
+        {},
+    ],
+    ids=lambda f: ",".join(f) or "nothing",
+)
+def test_a_project_board_post_must_name_the_chiefs_project_in_scope(
+    client, project, other_project, fields
+):
+    chief = _chief("operator", project)
+    fields = {
+        k: (
+            str(other_project) + ("/" if v == "OTHER/" else "")
+            if isinstance(v, str) and v.startswith("OTHER")
+            else str(project) if v == "OWN" else v
+        )
+        for k, v in fields.items()
+    }
+
+    resp = client.post(
+        "/comms/post",
+        json=_msg("decision", board="project", **fields),
+        headers=chief.headers,
+    )
+
+    assert _gated(resp), (resp.status_code, resp.get_data(as_text=True)[:200])
+    assert _board_count(other_project) == 0
+    assert _count("SELECT COUNT(*) FROM comms_messages WHERE type = 'decision'") == 0
+
+
+@pytest.mark.parametrize("spelling", ["same", "trailing slash", "backslashes"])
+def test_a_project_board_post_to_its_own_scope_passes(client, project, spelling):
+    chief = _chief("operator", project)
+    root = str(project)
+    scope = {
+        "same": root,
+        "trailing slash": root + "/",
+        "backslashes": root.replace("/", "\\"),
+    }[spelling]
+
+    resp = client.post(
+        "/comms/post",
+        json=_msg("decision", board="project", scope=scope),
+        headers=chief.headers,
+    )
+
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+
+
+def test_a_feature_board_post_is_not_bound_by_its_scope(client, project):
+    chief = _chief("operator", project)
+
+    resp = client.post(
+        "/comms/post",
+        json=_msg("note", board="feature", scope="some-feature"),
+        headers=chief.headers,
+    )
+
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+
+
+@pytest.mark.parametrize("encoding", ENCODINGS)
+def test_a_project_board_post_is_bound_in_any_encoding(
+    client, project, other_project, encoding
+):
+    chief = _chief("operator", project)
+    body = _msg("decision", board="project", scope=str(other_project))
+
+    resp = _send(client, "/comms/post", body, encoding, chief.headers)
+
+    assert _gated(resp)
+    assert "project" in resp.get_json()["error"]
+    assert _board_count(other_project) == 0
+
+
+@pytest.mark.parametrize(
+    "path", ["/runs", "/comms/run", "/comms/run/stop"], ids=lambda p: p
+)
+def test_a_run_on_another_projects_board_is_refused(
+    client, project, other_project, started, path
+):
+    chief = _chief("operator", project)
+    body = {
+        "kind": "single",
+        "board": "project",
+        "scope": str(other_project),
+        "project_root": str(project),
+    }
+
+    resp = client.post(path, json=body, headers=chief.headers)
+
+    assert _gated(resp), (resp.status_code, resp.get_data(as_text=True)[:200])
+    assert started == []
+
+
+def test_a_run_on_its_own_projects_board_passes(client, project, started):
+    chief = _chief("operator", project)
+    body = {
+        "kind": "single",
+        "board": "project",
+        "scope": str(project),
+        "project_root": str(project),
+    }
+
+    resp = client.post("/runs", json=body, headers=chief.headers)
+
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    assert len(started) == 1
+
+
+def test_the_project_decompose_override_must_be_the_chiefs_project(
+    client, project, other_project
+):
+    chief = _chief("planner", project)
+    base = {"rigor": "bogus", "project_root": str(project)}
+
+    other = client.post(
+        "/comms/project/decompose",
+        json={**base, "project": str(other_project)},
+        headers=chief.headers,
+    )
+    assert _gated(other)
+
+    for project_field in ("project", "  ", str(project), str(project) + "/"):
+        ok = client.post(
+            "/comms/project/decompose",
+            json={**base, "project": project_field},
+            headers=chief.headers,
+        )
+        assert _passed(ok), (project_field, ok.get_data(as_text=True))
+
+
+# --- a run or decompose route needs the project named -------------------------------------
+#
+# Left out, the routes fall back to the server's working directory, which can be another
+# project. The chief names its own project on every route that starts an agent.
+
+NAMES_A_PROJECT = [
+    ("/runs", {"kind": "bogus"}),
+    ("/comms/goals/run", {"goal_id": "x"}),
+    ("/comms/run", {"scope": "demo"}),
+    ("/comms/tasks/run", {"message_id": "x"}),
+    ("/comms/goals/decompose", {"mode": "planner"}),
+    ("/comms/features/decompose", {"rigor": "light"}),
+    ("/comms/project/decompose", {"rigor": "bogus"}),
+]
+
+
+@pytest.mark.parametrize(
+    "path,body", NAMES_A_PROJECT, ids=[p for p, _ in NAMES_A_PROJECT]
+)
+@pytest.mark.parametrize("value", ["absent", None, "", 0, []])
+def test_a_chief_that_names_no_project_is_refused_on_a_run_route(
+    client, project, path, body, value
+):
+    chief = _chief("operator", project)
+    sent = dict(body) if value == "absent" else {**body, "project_root": value}
+
+    resp = client.post(path, json=sent, headers=chief.headers)
+
+    assert _gated(resp), (resp.status_code, resp.get_data(as_text=True)[:200])
+    assert "project_root" in resp.get_json()["error"]
+
+
+@pytest.mark.parametrize(
+    "path,body", NAMES_A_PROJECT, ids=[p for p, _ in NAMES_A_PROJECT]
+)
+def test_a_chief_that_names_its_project_passes_a_run_route(client, project, path, body):
+    chief = _chief("operator", project)
+
+    resp = client.post(
+        path, json={**body, "project_root": str(project)}, headers=chief.headers
+    )
+
+    assert _passed(resp), resp.get_data(as_text=True)
+
+
+@pytest.mark.parametrize(
+    "path,body", NAMES_A_PROJECT[4:], ids=[p for p, _ in NAMES_A_PROJECT[4:]]
+)
+def test_a_planner_that_names_no_project_is_refused_on_a_decompose_route(
+    client, project, path, body
+):
+    chief = _chief("planner", project)
+
+    resp = client.post(path, json=body, headers=chief.headers)
+
+    assert _gated(resp)
+    assert "project_root" in resp.get_json()["error"]
+
+
+def test_a_project_named_in_the_query_string_counts(client, project):
+    chief = _chief("operator", project)
+
+    resp = client.post(
+        "/runs?project_root=" + str(project),
+        json={"kind": "bogus"},
+        headers=chief.headers,
+    )
+
+    assert _passed(resp)
+
+
+def test_the_routes_that_must_name_a_project_are_the_listed_run_and_decompose_routes():
+    from pathly_orchestrator.http_server.chief_routes import (
+        NAMES_PROJECT_ROOT,
+        ROUTE_ACTIONS,
+    )
+
+    # `/runs/<run_id>/<action>` and the stops name a run or a board by id (ticket 14).
+    started_by_a_call = {
+        rule
+        for (rule, _), action in ROUTE_ACTIONS.items()
+        if action == "run" and rule != "/runs/<run_id>/<action>"
+    } | {rule for (rule, _), action in ROUTE_ACTIONS.items() if "decompose" in rule}
+
+    assert set(NAMES_PROJECT_ROOT) == started_by_a_call
+    assert started_by_a_call == {p for p, _ in NAMES_A_PROJECT}
