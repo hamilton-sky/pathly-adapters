@@ -4,7 +4,7 @@
 
 Comms board / message-board subsystem — messages, tasks, artifacts, goals, context retrieval & relevance, board mirror & hydration.
 
-52 test file(s).
+53 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -19,6 +19,7 @@ Comms board / message-board subsystem — messages, tasks, artifacts, goals, con
 | `test_board_mirror_hydrate.py` | Board disk-mirror P2 — hydration (import BOARD.json mirrors back into the DB) | 13 |
 | `test_board_mirror_live.py` | Board disk-mirror P1 — live debounced mirror | 11 |
 | `test_board_run.py` | Tests for start_board_run and POST /comms/run (BOARD-RUNTIME-SPEC §2/US4) | 15 |
+| `test_chief_tiers.py` | chief-agent 04: the chief tiers and the preset-to-tier resolution | 25 |
 | `test_comms_agent_context.py` | Tests for POST /comms/agent-context (BLOCK C1 — BOARD-INFO mode) | 6 |
 | `test_comms_agent_context_preview.py` | Tests for board-context-pull Solution C — POST /comms/agent-context/preview | 4 |
 | `test_comms_answer.py` | Tests for POST /comms/answer — the chosen option + answered status must persist | 3 |

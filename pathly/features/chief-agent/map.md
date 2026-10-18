@@ -199,6 +199,7 @@ no:cacheprovider` passes in full. Ticket 13 runs both.
   the request thread's connection, so a `WITH ... INSERT|UPDATE|DELETE` is a 400 "attempt to write a
   readonly database" and writes nothing; the keyword check stays as the first filter.
 - 03 — `POST /comms/edit` re-stamps the row to the editor: `update_message_text` (now in `db/queries/comms_edit.py`, re-exported from `comms_messages`) sets text and the three `author_*` columns in one `UPDATE`, from `_helpers.edit_stamp(request)` = `stamp(caller_identity(request))`; no token stores `author_source="none"`, and a call with no stamp does too.
+- 04 — `supervisor/chief_tiers.py` holds the tiers as code (`TIERS` read-only: status=read, planner=read/post/plan, operator=all seven); `resolve_preset_tier(preset, project_root)` lets a `chief/<preset>` prompt file decide by its leading front matter `tier:` (no file-level `tier:` = status), else the built-in names map to themselves (exact match), anything else is status; `strip_front_matter` reuses `compose_base._strip_leading_frontmatter`.
 
 ## Open questions
 
