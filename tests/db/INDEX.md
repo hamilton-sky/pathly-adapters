@@ -4,11 +4,12 @@
 
 Database layer — schema/queries, connection isolation, write guard.
 
-15 test file(s).
+16 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
 | `test_board_scope_column.py` | run-identity: fsm_events.board_scope column + append_event extraction | 4 |
+| `test_chief_tables.py` | chief-agent: the chief session tables, their queries and the revoked-token lookup | 14 |
 | `test_comms_run_id.py` | unified-control-plane: post_message stamps run_id so board posts correlate to their run | 3 |
 | `test_db.py` | Unit tests for pathly_orchestrator.db — all tables and helpers | 20 |
 | `test_db_isolation.py` | covers project root isolation; get db reopens connection when db path changes | 2 |

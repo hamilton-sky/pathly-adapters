@@ -5,6 +5,7 @@ from __future__ import annotations
 import sqlite3
 import uuid
 
+from .migrations_chief import add_chief_tables
 from .migrations_provenance import add_comms_provenance, add_run_tokens
 
 
@@ -183,3 +184,4 @@ def _add_additive_migrations(conn: sqlite3.Connection) -> None:
         pass
     add_run_tokens(conn)
     add_comms_provenance(conn)
+    add_chief_tables(conn)
