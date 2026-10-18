@@ -87,6 +87,20 @@ def chief_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return root
 
 
+@pytest.fixture(autouse=True)
+def _no_watcher_outlives_its_test(chief_root: Path):
+    """A chief a test leaves open has a watcher waiting; close it while this test's DB and
+    sessions folder are still patched in, so it cannot wake up in a later test."""
+    yield
+    prefix = "chief-watch-"
+    for thread in threading.enumerate():
+        if thread.name.startswith(prefix):
+            close_chief(thread.name[len(prefix) :], "test over")
+    assert _wait(
+        lambda: not [t for t in threading.enumerate() if t.name.startswith(prefix)]
+    )
+
+
 def _open(project: str, host: Host, **overrides) -> dict:
     args = dict(
         project_root=project,
@@ -168,6 +182,12 @@ def test_codex_argv_is_read_only_and_asks_before_every_command():
 def test_any_other_engine_is_a_value_error(engine):
     with pytest.raises(ValueError):
         chief_argv(engine, "", "s", "m", "x")
+
+
+@pytest.mark.parametrize("session_id", [None, ""])
+def test_a_claude_chief_needs_the_session_id_the_server_chose(session_id):
+    with pytest.raises(ValueError):
+        chief_argv("claude", "", "s", "m", session_id)
 
 
 @pytest.mark.parametrize("engine", ["claude", "codex"])
@@ -453,12 +473,13 @@ def test_a_chief_that_never_starts_is_closed_as_never_started(project, chief_roo
     host = Host()
     run_id = _open(project, host, start_timeout=0.05)["run_id"]
     token = host.payload["run_token"]
-    assert _wait(lambda: chief_queries.get_session(get_db(), run_id)["closed_at"])
+    # Dropping the run is the last step of the close, so wait for it before the rest.
+    assert _wait(lambda: get_run(run_id) is None)
     session = chief_queries.get_session(get_db(), run_id)
+    assert session["closed_at"] is not None
     assert session["close_reason"] == "never started"
     assert resolve_run_token(get_db(), token) is None
     assert not (chief_root / run_id).exists()
-    assert get_run(run_id) is None
 
 
 def test_a_started_chief_is_not_closed_by_the_start_timeout(project, chief_root):

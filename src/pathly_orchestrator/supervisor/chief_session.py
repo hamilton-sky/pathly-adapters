@@ -1,0 +1,242 @@
+"""Open and close a chief session (chief-agent).
+
+The chief is a long-lived interactive spawn, so it cannot go through
+``terminal._run_stage_via_terminal``: that call blocks its caller until the process exits and
+gives up after 30 minutes. ``open_chief`` builds the same pieces by hand (a run token, a run
+registered for the host's callbacks, one ``TERMINAL_SPAWN``) and returns at once; a watcher
+thread closes the session when the host reports the tab started and then exited, or never
+started. Studio's result post and ``pathly-pty-host``'s refusal of an interactive spawn both
+reach the watcher through the existing ``/runner/terminal/result`` handler, which finds the run
+with ``registry.get_run``.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import re
+import secrets
+import shlex
+import shutil
+import sys
+import threading
+import uuid
+from pathlib import Path
+from typing import Callable
+
+from pathly_orchestrator.config import Settings
+from pathly_orchestrator.db.connection import get_db
+from pathly_orchestrator.db.queries import chief as queries
+from pathly_orchestrator.db.queries.run_tokens import mint_run_token
+from pathly_orchestrator.runner.chief_argv import chief_argv, claude_settings
+
+from .chief_tiers import resolve_preset_tier, strip_front_matter
+from .registry import create_run, drop_run, get_run
+from .state import logger
+
+ENGINES = ("claude", "codex")
+MAX_PROMPT_BYTES = 64 * 1024
+
+_RUN_ID_RE = re.compile(r"chief-[0-9a-f]{12}")
+_open_lock = threading.Lock()
+
+
+class ChiefAlreadyOpen(Exception):
+    """The project already has an open chief; carries the open tab so the caller can show it."""
+
+    def __init__(self, run_id: str, tab_id: str) -> None:
+        super().__init__(f"a chief is already open for this project ({tab_id})")
+        self.run_id = run_id
+        self.tab_id = tab_id
+
+
+def _chief_root() -> Path:
+    """Where session folders live; a function so a test can point it elsewhere."""
+    return Path.home() / ".pathly" / "chief"
+
+
+def _validate(
+    project_root: object, engine: object, preset: object, prompt: object, model: object
+) -> None:
+    if engine not in ENGINES:
+        raise ValueError(f"the chief runs on claude or codex, not {engine!r}")
+    if not isinstance(project_root, str) or not os.path.isdir(project_root):
+        raise ValueError("project_root must be an existing directory")
+    if not isinstance(preset, str):
+        raise ValueError("preset must be a string")
+    if not isinstance(model, str) or model.startswith("-"):
+        raise ValueError("model must be a string that does not start with '-'")
+    if not isinstance(prompt, str) or not strip_front_matter(prompt).strip():
+        raise ValueError("prompt must be a non-empty string")
+    if len(prompt.encode("utf-8")) > MAX_PROMPT_BYTES:
+        raise ValueError(f"prompt must be at most {MAX_PROMPT_BYTES} bytes")
+
+
+def _write_private(path: Path, text: str) -> None:
+    """Create ``path`` readable by its owner only (the mode is set at creation, not after)."""
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        handle.write(text)
+
+
+def _hook_command(run_id: str, secret_file: Path) -> str:
+    port = Settings.from_env().port
+    return " ".join(
+        [
+            shlex.quote(sys.executable),
+            "-m",
+            "pathly_hooks.chief_prompt",
+            "--run-id",
+            shlex.quote(run_id),
+            "--secret-file",
+            shlex.quote(str(secret_file)),
+            "--port",
+            str(port),
+        ]
+    )
+
+
+def _write_session_folder(folder: Path, engine: str, run_id: str) -> str:
+    """Write the folder's files; returns the sha256 of the hook secret."""
+    folder.mkdir(parents=True, mode=0o700)
+    secret = secrets.token_urlsafe(32)
+    secret_file = folder / "hook_secret"
+    _write_private(secret_file, secret)
+    if engine == "claude":
+        settings = claude_settings(_hook_command(run_id, secret_file))
+        _write_private(folder / "settings.json", json.dumps(settings, indent=2))
+        _write_private(folder / "mcp.json", json.dumps({"mcpServers": {}}))
+    return hashlib.sha256(secret.encode("utf-8")).hexdigest()
+
+
+def _remove_folder(run_id: str) -> None:
+    folder = _chief_root() / run_id
+    try:
+        shutil.rmtree(folder)
+    except FileNotFoundError:
+        return
+    except OSError:
+        logger.warning("chief: could not remove %s", folder, exc_info=True)
+
+
+def open_chief(
+    *,
+    project_root: str,
+    engine: str,
+    preset: str,
+    prompt: str,
+    model: str = "",
+    broadcast_fn: Callable[[str, dict], None],
+    start_timeout: float = 30.0,
+) -> dict:
+    """Open a chief for ``project_root`` and send its interactive ``TERMINAL_SPAWN``.
+
+    Raises ``ValueError`` for a bad engine, directory, prompt (empty, or over 64 KiB) or model,
+    and ``ChiefAlreadyOpen`` when the project has an open chief. Returns
+    ``{run_id, tab_id, tier, engine}`` without waiting for the tab.
+    """
+    _validate(project_root, engine, preset, prompt, model)
+    conn = get_db()
+    tier = resolve_preset_tier(preset, project_root)
+    run_id = "chief-" + secrets.token_hex(6)
+    folder = _chief_root() / run_id
+    cli_session_id = str(uuid.uuid4()) if engine == "claude" else None
+
+    with _open_lock:
+        existing = queries.open_session_for_project(conn, project_root)
+        if existing is not None:
+            raise ChiefAlreadyOpen(existing["run_id"], existing["tab_id"])
+        try:
+            secret_hash = _write_session_folder(folder, engine, run_id)
+            queries.create_session(
+                conn,
+                run_id=run_id,
+                project_root=project_root,
+                preset=preset or None,
+                tier=tier,
+                engine=engine,
+                tab_id=run_id,
+                cli_session_id=cli_session_id,
+                hook_secret_hash=secret_hash,
+                settings_dir=str(folder),
+            )
+        except BaseException:
+            _remove_folder(run_id)
+            raise
+
+    try:
+        from pathly_orchestrator.fsm_compose import resolve_board_scope
+
+        scope = resolve_board_scope("project", project_root, "")
+        token = mint_run_token(
+            conn, run_id, "chief", None, project_root, "project", scope
+        )
+        argv = chief_argv(
+            engine,
+            model,
+            str(folder / "settings.json"),
+            str(folder / "mcp.json"),
+            cli_session_id,
+        )
+        run = create_run(run_id)
+        broadcast_fn(
+            "chief:" + run_id,
+            {
+                "type": "TERMINAL_SPAWN",
+                "topic": "chief:" + run_id,
+                "run_id": run_id,
+                "run_token": token,
+                "tab_id": run_id,
+                "label": "Chief · " + tier.title(),
+                "adapter": engine,
+                "argv": argv,
+                "cwd": project_root,
+                "prompt": strip_front_matter(prompt),
+                "interactive": True,
+                "submit": False,
+                "category": "single",
+            },
+        )
+    except BaseException:
+        close_chief(run_id, "open failed")
+        raise
+
+    threading.Thread(
+        target=_watch,
+        args=(run, run_id, start_timeout),
+        daemon=True,
+        name=f"chief-watch-{run_id}",
+    ).start()
+    return {"run_id": run_id, "tab_id": run_id, "tier": tier, "engine": engine}
+
+
+def _watch(run, run_id: str, start_timeout: float) -> None:
+    """Close the session when its tab never started, or has exited."""
+    try:
+        if not run.wait_started(start_timeout):
+            close_chief(run_id, "never started")
+            return
+        run.wait_pty_result(None)
+        close_chief(run_id, "tab closed")
+    except Exception:
+        logger.exception("chief watcher for %s failed", run_id)
+
+
+def close_chief(run_id: str, reason: str) -> bool:
+    """Close the session: revoke its token, remove its folder, drop its run.
+
+    Returns False when the session was unknown or already closed, so it is safe to call twice.
+    A watcher still waiting on the run is let go, so no thread outlives the session.
+    """
+    if not isinstance(run_id, str) or not _RUN_ID_RE.fullmatch(run_id):
+        return False
+    try:
+        return queries.close_session(get_db(), run_id, reason)
+    finally:
+        _remove_folder(run_id)
+        run = get_run(run_id)
+        if run is not None:
+            run.mark_started()
+            run.mark_pty_result({"closed": reason})
+        drop_run(run_id)
