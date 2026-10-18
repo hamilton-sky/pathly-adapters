@@ -1,7 +1,7 @@
 # Refuse every chief call its tier does not allow
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 04, 05, 07
 Test first: yes
 
@@ -170,6 +170,18 @@ prints passed
   `src/pathly_orchestrator/CLAUDE.md` is rewritten for the table, with the unbound items listed
   plainly, and the package tree gains `chief_fields.py`. `tests/http_api/test_chief_gate.py`
   (483 tests; the test-only commit is `f298248`); `tests/http_api/INDEX.md` regenerated.
+- Round 4 (see **Review fixes (round 3)**): `chief_fields.py` (342 lines) gains `Fields.under_root`,
+  `names_root_unless`, `names_root_verbs` and `ScopeRead.segment`; `chief_project.py` (201 lines)
+  applies them (`_unnamed_root` knows the verb and the "unless" rule, `project_refusal` takes the
+  route's `view_args` and refuses a `segment` scope that is not one folder name); `chief_gate.py`
+  (139 lines) passes `request.view_args` on. Two routes get a guard of their own:
+  `blueprints/comms/features.py` (`feature` must be a safe folder name, else 400
+  `invalid_feature`) and `blueprints/comms/runs.py` (an evaluator reply is not saved under an
+  unsafe scope). The "Chief gate" section of `src/pathly_orchestrator/CLAUDE.md` is corrected.
+  `tests/http_api/test_chief_gate.py` is split by concern into `test_chief_gate.py` (the Done-when
+  cases, 97 tests) and ten `test_chief_gate_*.py` files, with the shared fixtures in
+  `chief_gate_support.py` (651 tests in all; test-only commit `d3d52b1`, fix `53dc2fa`, split
+  `45357e6`); `tests/INDEX.md` and `tests/http_api/INDEX.md` regenerated.
 
 **Proof** (each run fresh, after the last edit to code or tests)
 
@@ -491,6 +503,142 @@ after the last full code run, and the Done-when commands were run again after th
   `check_entry_points.py`. Smoke and `python -m build --wheel` exit 0. No `# noqa`, `# nosec` or
   `type: ignore` added.
 
+**Review fixes (round 3)** (quality review; the round starts at `6d48b88`. Test-only commit first:
+`d3d52b1`, run red before any source change: 129 of the 648 tests failed and 519 passed. Then the
+fix, `53dc2fa`, and the test split, `45357e6`, as its own commit. The cause of findings 1, 2, 4 and
+5 is again one: the table said less, or more, than the view does with a field. Each fix is a table
+entry or a route guard, and each is held by a test that fails without it.)
+
+1. *major, `retry` falls back to the server's directory.* Reproduced as the finding says: with a
+   finished registry run, `POST /runs/run-own-1/retry` with `project_root` `""`, `null`, `0`, `false`,
+   `[]` or `{}` passed the gate and `start_run` received the empty root (an absent key was refused
+   by the route's own 400, not by the gate). Fixed by a naming rule that knows the verb:
+   `Fields.names_root_verbs=("retry",)` on `/runs/<run_id>/<action>`, applied in
+   `chief_project._unnamed_root` from `request.view_args["action"]`, so `retry` needs a truthy
+   `project_root` in the body (403 `a chief names its project_root on this route`) and `pause`,
+   `resume`, `advance`, `reroute`, `stop` and `abort` still need none
+   (`test_the_other_run_verbs_need_no_root`). Tests: seven empty spellings refused, the own root
+   starts the run there (`start_run` receives it), another project's root refused. The exclusion in
+   `test_every_route_that_starts_an_agent_in_a_directory_names_its_root` is shrunk: the by-id rule is
+   no longer left out, the test now requires `names_root_verbs == ("retry",)` there and that
+   `RUN_VERB_ACTIONS` classes that verb `run`. The tripwire now reads the helpers a view calls too
+   (see item 8). The run id of the route is still ticket 14's.
+2. *major, `feature` of `/comms/features/decompose` is a folder name.* Reproduced (a planner and an
+   operator chief with `feature="../../../proj-b/pathly/features/planted"` and every rigor made the
+   folder inside project B). Fixed in both places, as the finding recommends: the route refuses a
+   `feature` that `storage_paths._is_unsafe_topic` rejects (400 `invalid_feature`, before any
+   `makedirs`), and the gate treats the field as a folder name (`ScopeRead(..., segment=True)`: a
+   string without `/`, `\`, `:`, a NUL, and not `.` or `..`, else 403 `feature must be one folder name`).
+   The gate is stricter than the route on purpose: the route allows a nested `a/b` (the existing
+   `_is_unsafe_topic`), the gate refuses it, because a chief's feature is one folder. A route test
+   plants nothing outside the project (8 spellings x 3 rigors: 400 `invalid_feature`, no run
+   started, the other project's tree empty) and still makes the folder for a plain name; the gate
+   tests cover the three rigors and both tiers, 12 path spellings (4 of them the route allows, such
+   as `sub/dir`), non-string values, and plain names that must pass (`Q3 plan`, `.hidden`).
+   **Found by the same check, not named by the review:** `POST /comms/run` of an `evaluator` on a
+   `feature` or `global` board saves a reply that posted no `BOARD_EVAL` artifact to
+   `<project_root>/pathly/features/<scope>/artifacts/`. The review's probe got a 500 there. With
+   the spawn faked (the test's `evaluator_reply`) the request answers 200 and the run's `_on_done`
+   writes the evaluation inside project B for `scope="../../../proj-b/planted"` on a `global`
+   board (red run: `test_the_route_saves_no_evaluation_outside_the_project` failed). Fixed
+   the same way: the `scope` of `/comms/run` is a `segment` when the board is not `project` (a
+   project board's scope is the root and stays bound as a root), and `runs.py` saves no evaluation
+   under an unsafe scope (it falls to the existing warning post). Tests: the route saves the
+   evaluation inside the project for a plain scope and nothing outside it for three traversal
+   scopes; the gate refuses them; a project-board run still names the root as its scope. A
+   mutation of any of the four guards (route and table, each route) fails a named test.
+3. *major, the "Chief gate" section overclaims.* Corrected after the code was fixed, against the
+   code: "Naming it" now lists exactly what is refused when no root is named (including `retry` and
+   `/telemetry/trends` without a feature) and names the exceptions that do not need a root and why
+   (`GET /runs`, `/api/*`, `/skills/*`, `/flows/stage-config`, `/db/agents`, `/comms/permissions`,
+   `/comms/scope`, `/hq/context`, `/chief/session`: they filter by the root when given one, or read
+   no project); a new bullet says what a folder-name field is; "Not bound" gains the `/db/stats`
+   global counts and the rule for `under_root`; "Reads are not all pure" now lists **four** writes,
+   with `GET /skills/prompts` without `kind` (or `kind=preset`), which calls
+   `migrate_db_presets_to_files`, writes prompt files and deletes the legacy DB rows. I verified the
+   fourth by reading the view; I did not add a binding for it (the route reads no project at all),
+   and it is stated rather than hidden.
+4. *minor, `/telemetry/trends` and `/db/stats`.* `/telemetry/trends` with a blank or whitespace
+   `feature` and no `project_root` is refused: `Fields.names_root_unless=("feature",)` (the root is
+   required unless a usable feature is given). A named feature stays summed across every project, the
+   same exposure class as the accepted `/db/rollup` global block, and the entry's note says so.
+   `/db/stats` keeps its `project_root` filter for cost and tokens, and its note now says that its
+   `features`, `events` and `invocations` counts are global. Tests: the three tiers with a blank
+   feature (no root, another project's root, the own root), the fleet-wide note, the `/db/stats` note.
+5. *minor, `unbound=("feature",)` was misleading.* Fixed with `Fields.under_root`: a name the view
+   reads together with `project_root` and filters by it is bound by the root the gate already checks.
+   `unbound` now lists only what the route really leaves to the caller. Moved to `under_root`:
+   `feature` on `/db/rollup`, `/db/features/<feature>/{agents,events,otel,runs}`,
+   `/api/features/<feature>/{artifacts,events,invocations,metrics}`, `/api/traces`,
+   `/flows/stage-config` and `/comms/scope`, and `artifact` on the two artifact-section routes. I
+   checked each against its query before moving it. Left in `unbound`: `run_id` (`/runs/<run_id>/...`,
+   `/api/traces`), and the feature of `/telemetry/trends` (summed across every project). A test
+   holds the twelve `feature` entries: `feature` is not in their `unbound` and `project_root` is in
+   their `roots`.
+6. *minor, ownership of id-addressed calls.* Not changed in ticket 14, as the brief says. The calls
+   nothing owns are recorded under **For later tickets**, as an exact list.
+7. *minor, legitimate flows.* No change needed. The 403 text names the missing field (`a chief
+   names its project_root on this route`), so the chief can tell what to add; the same text is used
+   for the new `retry` and `/telemetry/trends` refusals. Ticket 17's prompt must say what the
+   finding lists (see **For later tickets**).
+8. *minor, one 2165-line test file and a tripwire that misses helpers.* The tripwire now reads the
+   view **and the helpers it calls** (`create_run`, `handle_retry`, `_dispatch_*`): functions called
+   by name, as a module-level name or an import inside the body, that live under `blueprints/`, to
+   three levels; `test_the_walk_reaches_the_helpers_the_views_call` fails if that walk stops
+   reaching them. It replaces the view-only tripwire and is a superset of it (`data["x"]` is read
+   too, not only `data.get("x")`). A second tripwire fails when a field the entry calls an id is
+   used as an argument of a path call (`join`, `Path`, `makedirs`, `open`, ...) in a view or helper
+   (`test_a_request_field_a_view_or_helper_joins_into_a_path_is_declared_as_one`); a mutation that
+   puts `feature` back as an id fails it. Both are **heuristics**: they match by variable name, so a
+   helper that renames the value, calls a method (`obj.f(x)`) or goes deeper than three levels is not
+   seen. The split is its own commit, `45357e6`: `test_chief_gate.py` (the Done-when cases, 97 tests),
+   `test_chief_gate_actions.py`, `_bodies.py`, `_requests.py`, `_project_scope.py`,
+   `_root_naming.py`, `_board_reads.py`, `_files.py`, `_tables.py`, `_folders.py`,
+   `_unbound_reads.py`, and `chief_gate_support.py` with the shared fixtures and helpers (the three
+   autouse fixtures and `app` are imported into every file, so each file runs alone). No assertion
+   changed or was weakened: every top-level definition has the same AST as before (176 names, 0
+   differences), the 651 collected node ids are the same set, each file passes on its own, and the
+   mutation run below was repeated against the split files.
+
+Tests I edited, not only added: `test_run_control_verbs_are_run_or_stop` (the `retry` call now sends
+`project_root`, because the gate now requires it), `test_a_route_that_names_its_root_reads_one`
+(covers the two new naming fields), the exclusion in `test_every_route_that_starts_an_agent_in_a_
+directory_names_its_root` (item 1), and the view-only tripwire (replaced by its superset, item 8).
+No assertion was loosened.
+
+Also worth knowing: `start_board_run` leaks the board lock when `_resolve_storage_path` raises (it
+raised for the traversal scope before the guard). It is pre-existing and not touched here; the guard
+means a chief can no longer reach it with a path-like feature or scope, but another caller still can.
+A path-like feature scope also made the board mirror write `<scope>/pathly/project/BOARD.json` under
+the working directory in the red runs; the guard stops that too.
+
+Proof after the fixes (each run fresh, after the last edit to code, tests and docs):
+
+- `python -m pytest tests/http_api/test_chief_gate.py -q -p no:cacheprovider` -> `97 passed in
+  27.71s`, exit 0 (the Done-when cases; the whole chief set, `tests/http_api/test_chief_gate*.py`, is
+  651 tests: `651 passed in 167.65s` before the doc-only edits that followed, and inside the Test
+  command below after them). `python -m pytest tests/comms_board/test_comms_write_perm.py -q -p
+  no:cacheprovider` -> `33 passed in 8.18s`, exit 0.
+- Test first: at `d3d52b1`, `129 failed, 519 passed` (the retry, feature-name, evaluator-scope,
+  trends, `/db/stats`, `under_root` and tripwire cases); all 648 pass at `53dc2fa` plus the three
+  tripwire tests that commit added (651).
+- Mutation checks, each run against the matching tests of the split files, each failing (13): the
+  `retry` rule off; `names_root_unless` off; the segment check off; `.` and `..` allowed as a
+  segment; `:` allowed in a segment; the `features.py` guard off; the evaluation-save guard off;
+  `/comms/run` scope not a segment; `/comms/features/decompose` feature not a segment; the
+  `/db/stats` note gone; `/db/rollup` `feature` unbound again; `retry` dropped from the table;
+  `/telemetry/trends` root rule dropped from the table. Before the split, one more: the helper walk
+  cut to the view alone fails `test_the_walk_reaches_the_helpers_the_views_call`.
+- Test command from `commands.md` -> `2024 passed, 2 skipped in 440.99s`, exit 0 (the 2 skips are
+  not mine). `tests/consistency tests/local_operator tests/hq_copilot` -> `155 passed in 20.89s`.
+- Lint chain from `commands.md`, piece by piece, all exit 0: `black --check src/ tests/` (599 files
+  unchanged), `mypy` (`no issues found in 325 source files`), `check_file_size.py` (`none new, none
+  grown`; `chief_fields.py` 342, `chief_project.py` 201, `chief_gate.py` 139, `chief_routes.py` 117
+  lines), `check_no_mirror_reads.py`, `gen_test_index.py --check`, `lint-imports` (`1 kept, 0
+  broken`), `bandit -q -r src/ -ll -x src/pathly_data/` (no SQL added), `check_adapters.py`,
+  `check_entry_points.py`. Smoke and `python -m build --wheel` exit 0. No `# noqa`, `# nosec` or
+  `type: ignore` added.
+
 **For later tickets**
 
 - Ticket 09: no change to the table is needed for `/chief/human-messages`. Its hook posts with no
@@ -502,23 +650,33 @@ after the last full code run, and the Done-when commands were run again after th
   predicate `chief_gate._human_escalation_check(conn)` builds), so the rule has one place to hook.
   `chief_gate.py` is 147 lines, so a new `chief_cite.py` fits as the ticket plans.
 - Ticket 12: `/comms/directives` is already mapped to `decide`, `chief` is already a project
-  writer, and `test_chief_gate.py::PLANNED` may drop its entry once the route exists. The living-doc
+  writer, and `PLANNED` (now in `tests/http_api/chief_gate_support.py`) may drop its entry once the
+  route exists. The living-doc
   "Chief gate" section says the route arrives with ticket 12; fix that sentence then. The route
   also needs an entry in `chief_fields.ROUTE_FIELDS` (the fields it reads as a project root, board
   scope or file; `Fields(roots=("project_root",), names_root=True, ...)` if it falls back to the
   server's directory): without one the gate answers 403 `the gate has no project entry for this
-  route` and `test_every_route_a_chief_can_reach_says_which_fields_it_reads_as_a_project` fails.
+  route` and `test_every_route_a_chief_can_reach_says_which_fields_it_reads_as_a_project` (in
+  `test_chief_gate_tables.py`) fails. A new test for the chief gate goes in the
+  `test_chief_gate_*.py` file of its concern; the shared fixtures are in `chief_gate_support.py`.
 - Ticket 14: add `chief_bind.target_in_project(...)` after the action check in
   `chief_gate._refusal()` (`request.view_args` and the body are already in hand there);
   `chief_project` covers the project a request names (`project_root`, a project board's `scope`,
   a code query's scope, the decompose override), not a run or message id. The `unbound` entries of
   `chief_fields.ROUTE_FIELDS` are the list of what is left: take the ids ticket 14 binds off it
   as they land, and update the "Not here yet" and "Not bound" bullets of the "Chief gate" section.
-  Not on ticket 14's list, and still unbound: `goal_id` (`/comms/goals/run|stop|decompose`, `/runs`
-  with a goal), a task's `message_id` (`/comms/tasks/run|stop`) and the id-addressed reads (`GET
-  /runs/<run_id>`, `/runner/status`, `/status?topic=`, `/db/runs/<id>/cost`,
-  `/comms/artifacts/<id>/section`, `/comms/goals/refs-coverage`); add them to ticket 14 or give
-  them a ticket. The feature-board "context pull" row (Shortcuts) is the other unbound write.
+  Ticket 14's first paragraph ("binds only when `project_root` is named") is stale: since round 2 a
+  chief must name its root on every run, decompose, `/code/query` and `/db/*` call, and since round
+  3 on `POST /runs/<run_id>/retry` (the only verb that starts an agent in a directory the body
+  names), so ticket 14 binds the **run id** and needs no root rule.
+  **Id-addressed calls that no ticket owns** (the exact list; ticket 14 as written covers none of
+  them, and an operator chief on project A can start a goal or a task of project B in A's
+  directory): `goal_id` on `/comms/goals/run`, `/comms/goals/stop` and `/comms/goals/decompose`, and
+  on `/runs` with `kind` `goal`; the task `message_id` on `/comms/tasks/run` and
+  `/comms/tasks/stop`. Add them to ticket 14 or give them a ticket. Also unowned and unbound, but
+  reads: `GET /runs/<run_id>`, `/runner/status`, `/status?topic=`, `/db/runs/<id>/cost`,
+  `/comms/artifacts/<id>/section` and `/comms/goals/refs-coverage`. The feature-board "context pull"
+  row (Shortcuts) is the other unbound write.
 - Ticket 15: `POST /runs` is the `("/runs", "POST")` entry; ticket 15's ceiling can key on it. The
   `GET /chief/session` route is already a `read` for the chief, so its new fields reach it.
 - Ticket 17: the chief's prompt must tell it to post with `"from": "chief"` and to name its
@@ -526,9 +684,12 @@ after the last full code run, and the Done-when commands were run again after th
   `normalise_project_root`). It must also say: send `project_root` in the JSON body (a query string
   does not count on a POST) of every run, goal, decompose and `/code/query` call, and in the query
   string of the `/db/*`, `/status` and `/comms/artifacts/section` reads (a call without it is
-  403); give the project root as `scope` on a project-board post, search, read or run (a missing
-  scope is read as `feature`, which is a feature board, and a feature name given for a project
-  board is 403); use a parenthesized scope such as `(interactive)` on `/code/query` (a feature name
+  403), in the body of `POST /runs/<run_id>/retry`, and in the query string of
+  `/telemetry/trends` unless it names a feature; name the `feature` of
+  `/comms/features/decompose` and the `scope` of a `/comms/run` on a feature or global board as one
+  plain folder name (no `/`, `\`, `:` or `..`); give the project root as `scope` on a
+  project-board post, search, read or run (a missing scope is read as `feature`, which is a
+  feature board, and a feature name given for a project board is 403); use a parenthesized scope such as `(interactive)` on `/code/query` (a feature name
   is 403) and a `target` inside the project; give `artifact_path` as an absolute path inside the
   project. `pathly api` may fill `project_root` in from the session itself.
 - Ticket 13: `test_status_chief_reads_and_is_refused_a_note` already checks "a Status-style token
