@@ -4,7 +4,7 @@
 
 HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, prompt-event contract.
 
-14 test file(s).
+15 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -22,3 +22,4 @@ HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, 
 | `test_runs_control.py` | POST /runs/<run_id>/stop, /runs/<run_id>/<action> — the run_id-addressed control surface | 26 |
 | `test_runs_read.py` | Control-plane run read API — GET /runs, GET /runs/<run_id> (unified-control-plane P0, | 6 |
 | `test_spawn_policy_routes.py` | spawn-policy P1 — /comms/model-policy + /comms/logging-config routes | 4 |
+| `test_sse_run_token_strip.py` | `sse._broadcast_runner` sends a spawn's raw run token only on /events/spawn | 6 |

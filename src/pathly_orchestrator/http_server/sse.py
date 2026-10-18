@@ -224,8 +224,17 @@ def _broadcast_runner(topic: str, payload: dict) -> None:
     /events/spawn channel, so the PTY opens/closes even when the run's topic is not
     the board the user is currently viewing. Any event whose payload carries a run_id
     is ALSO mirrored to the run-scoped /events/runs channel (unified-control-plane T3).
+
+    A TERMINAL_SPAWN payload carries the spawn's raw ``run_token``. Only the spawn hosts
+    read it, both from /events/spawn, so the /events/runner and /events/runs copies are
+    sent without the key. *payload* itself is not mutated; callers reuse it.
     """
-    raw = json.dumps(payload)
+    public = (
+        {k: v for k, v in payload.items() if k != "run_token"}
+        if "run_token" in payload
+        else payload
+    )
+    raw = json.dumps(public)
     with _runner_lock:
         clients = _runner_clients.get(topic, [])
         dead = [q for q in clients if q.full()]
@@ -240,7 +249,7 @@ def _broadcast_runner(topic: str, payload: dict) -> None:
         _broadcast_spawn(payload)
     run_id = payload.get("run_id")
     if run_id:
-        _broadcast_run_event(run_id, payload)
+        _broadcast_run_event(run_id, public)
 
 
 def _broadcast_comms(scope: str, payload: dict) -> None:

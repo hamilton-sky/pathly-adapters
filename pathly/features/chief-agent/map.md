@@ -192,6 +192,9 @@ no:cacheprovider` passes in full. Ticket 13 runs both.
   by default, as of SQLite version 3.38.0"; `json_each`'s `value` column is the element's SQL
   value. Measured: `x IN (SELECT value FROM json_each(?))` with a JSON list works on Python 3.11,
   3.12 and 3.13 with SQLite 3.45.1 (ticket 11).
+- 01 — `sse._broadcast_runner` sends `run_token` only on `/events/spawn`: the `/events/runner` and
+  `/events/runs` copies are built without the key and the caller's dict is untouched;
+  `/events/spawn` itself stays credential-free until the UI token (RRP-2b).
 
 ## Open questions
 
