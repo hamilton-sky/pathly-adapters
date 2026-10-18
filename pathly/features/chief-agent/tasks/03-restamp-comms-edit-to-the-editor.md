@@ -1,7 +1,7 @@
 # Stamp an edited board row with the editor, not the original author
 
 Type: task
-Status: resolved
+Status: open
 Blocked by: —
 Test first: yes
 
@@ -88,3 +88,9 @@ exit 0
 - Ticket 12 (refuse edits of binding directives) and 08 (the gate lists `/comms/edit` as an unlisted write for a chief token) are unaffected; ticket 12 adds its refusal to the `/comms/edit` route in `messages_crud.py`, which is at 395 lines, so it needs room first (move more into `_helpers`, or the route into its own file).
 - A builder that edits a task's text now leaves the task stamped `builder`. `fsm/gates/_scope_tasks.py` skips tasks with `author_role == "builder"` when it builds the declared scope, so a planner's task that a builder edits stops widening the builder's scope. That matches the gate's intent; no change needed.
 - The ticket named `studio/src/renderer/src/services/messages.ts` for Studio's goal rename; the `/comms/edit` caller is now `studio/src/renderer/src/store/commsApi/messages.ts`. Not touched. Studio sends no run token, so a goal rename now stamps `none` until the UI token exists.
+
+## Review findings (round 1, floor guard)
+
+floor guard: the diff weakens the bar instead of meeting it
+suppress: src/pathly_orchestrator/db/queries/comms_messages.py: from .comms_edit import update_message_text  # noqa: E402, F401
+if a finding is intended, the ticket needs a line like: Floor: allow <category>
