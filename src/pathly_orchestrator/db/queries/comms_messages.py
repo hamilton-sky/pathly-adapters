@@ -356,22 +356,8 @@ def soft_delete_message(
     return "deleted"
 
 
-def update_message_text(conn: sqlite3.Connection, message_id: str, text: str) -> str:
-    """Edit a message's text in place. Returns ``"updated"`` or ``"not_found"``."""
-    row = conn.execute(
-        "SELECT id FROM comms_messages WHERE id=? AND deleted_at IS NULL",
-        (message_id,),
-    ).fetchone()
-    if row is None:
-        return "not_found"
-    with _get_write_lock(conn):
-        conn.execute(
-            "UPDATE comms_messages SET text=? WHERE id=?",
-            (text, message_id),
-        )
-        conn.commit()
-    return "updated"
-
-
 # insert_message_row lives in comms_hydrate.py (400-line cap); re-exported here.
 from .comms_hydrate import insert_message_row  # noqa: E402, F401
+
+# update_message_text lives in comms_edit.py (400-line cap); re-exported here.
+from .comms_edit import update_message_text

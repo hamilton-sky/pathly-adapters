@@ -259,3 +259,15 @@ def refuse_agent_on_human_gate(conn, request, message_id: str):
     if str(row["to_agent"] or "").strip().lower() != "human":
         return None
     return jsonify({"error": "only a human closes a human-addressed escalation"}), 403
+
+
+def edit_stamp(request) -> dict:
+    """Author columns for an edit: the editor's own stamp, never the original author's.
+
+    ``POST /comms/edit`` passes this to ``update_message_text`` so the row carries whoever
+    last changed its words. No token gives ``author_source="none"``.
+    """
+    from pathly_orchestrator.http_server.run_identity import caller_identity
+    from pathly_orchestrator.runner.provenance import stamp
+
+    return stamp(caller_identity(request))

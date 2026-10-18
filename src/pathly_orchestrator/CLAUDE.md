@@ -368,7 +368,7 @@ GET  /comms/scope           ← read the active board scope
 POST /comms/scope           ← set the active board scope
 GET  /comms/permissions     ← role-based write permissions
 POST /comms/delete          ← soft-delete a message
-POST /comms/edit            ← edit a message's text (e.g. goal rename)
+POST /comms/edit            ← edit a message's text (e.g. goal rename); re-stamps the row to the EDITOR (`stamp(caller_identity(request))`: their token's role and run, or `author_source="none"` with no token), not the original author, so words cannot sit under another run's `token` stamp. Anyone may still edit; Studio's goal rename sends no token yet, so it stamps `none`
 POST /comms/tasks/claim     ← claim a ready task (pending → in_progress)
 POST /comms/tasks/fail      ← mark a task failed (cascade-blocks dependents)
 GET  /comms/artifacts/<id>/section ← hydrate a named section of a .md artifact (+ path form); context-retrieval HYDRATE tier
@@ -677,6 +677,7 @@ pathly_orchestrator/
                            #   bucketing (scope_tier is the board tier, not the run type).
       comms.py             # re-export shim — splits into comms_messages, comms_artifacts, comms_tasks, comms_embeddings, comms_counts, comms_goals_read (import from domain modules for new code)
       comms_messages.py    # board message CRUD; goal_id/executor columns back the Goals->Task-DAG model
+      comms_edit.py        # update_message_text: edits a row's text AND sets its three author columns from the editor's stamp (none when no stamp is passed); re-exported from comms_messages / comms
       comms_artifacts.py   # artifact metadata CRUD (attach, list, section index, update_summary)
       comms_tasks.py       # task DAG operations (get_ready, complete, claim, fail, reclaim, goal_refs_coverage)
       task_results.py      # build-proof: latest_task_summaries(conn, task_ids) — the newest AGENT_DONE `summary` of each task's `sched-<id>#<n>` runs (a dependent task's prompt shows it)
