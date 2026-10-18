@@ -25,6 +25,7 @@ from .blueprints.flows.stage_configs import bp as stage_configs_bp
 from .blueprints.catalog.items import bp as catalog_bp
 from .blueprints.catalog.registry import bp as registry_bp
 from .blueprints.skills.editor import bp as skills_bp
+from .blueprints.chief import all_blueprints as chief_blueprints
 from .blueprints.comms import all_blueprints as comms_blueprints
 from .blueprints.control import all_blueprints as control_blueprints
 from .blueprints.hq import all_blueprints as hq_blueprints
@@ -62,6 +63,8 @@ for _control_bp in control_blueprints:
     app.register_blueprint(_control_bp)
 for _hq_bp in hq_blueprints:
     app.register_blueprint(_hq_bp)
+for _chief_bp in chief_blueprints:
+    app.register_blueprint(_chief_bp)
 
 # Register request/response hooks
 app.before_request(_log_request)
@@ -130,6 +133,17 @@ def main() -> None:
         logger.info("retrieval status: %s", retrieval_status())
     except Exception:
         logger.debug("startup DB/vec warm failed", exc_info=True)
+
+    # A chief open when the last process died has no watcher left: close its session and
+    # revoke its token before any request is served. A cleanup failure must not stop boot.
+    try:
+        from pathly_orchestrator.supervisor.chief_session import chief_startup_cleanup
+
+        stale = chief_startup_cleanup()
+        if stale:
+            logger.info("closed %d chief session(s) left open: %s", len(stale), stale)
+    except Exception:
+        logger.warning("chief startup cleanup failed", exc_info=True)
 
     # Run Flask in non-debug mode, with warnings suppressed
     app.run(host=host, port=port, debug=False, use_reloader=False, threaded=True)

@@ -56,6 +56,13 @@ def _chief_root() -> Path:
     return Path.home() / ".pathly" / "chief"
 
 
+def normalise_project_root(project_root: str) -> str:
+    """The key a project's chief is registered and looked up under: forward slashes, no
+    trailing slash (the form the board code uses), so ``/p`` and ``/p/`` are one project.
+    """
+    return project_root.replace("\\", "/").rstrip("/") or project_root
+
+
 def _validate(
     project_root: object, engine: object, preset: object, prompt: object, model: object
 ) -> None:
@@ -133,10 +140,12 @@ def open_chief(
     """Open a chief for ``project_root`` and send its interactive ``TERMINAL_SPAWN``.
 
     Raises ``ValueError`` for a bad engine, directory, prompt (empty, or over 64 KiB) or model,
-    and ``ChiefAlreadyOpen`` when the project has an open chief. Returns
+    and ``ChiefAlreadyOpen`` when the project has an open chief. ``project_root`` is
+    normalised (``normalise_project_root``) before anything is stored or compared. Returns
     ``{run_id, tab_id, tier, engine}`` without waiting for the tab.
     """
     _validate(project_root, engine, preset, prompt, model)
+    project_root = normalise_project_root(project_root)
     conn = get_db()
     tier = resolve_preset_tier(preset, project_root)
     run_id = "chief-" + secrets.token_hex(6)
@@ -240,3 +249,17 @@ def close_chief(run_id: str, reason: str) -> bool:
             run.mark_started()
             run.mark_pty_result({"closed": reason})
         drop_run(run_id)
+
+
+def chief_startup_cleanup() -> list[str]:
+    """Close every session the last server process left open and remove its folder.
+
+    A chief open across a restart has no watcher left to close it, so its token and its hook
+    secret must not outlive the process. Called once by ``app.main()`` before the server
+    serves. Returns the closed run ids.
+    """
+    closed = queries.close_stale_sessions(get_db())
+    for run_id in closed:
+        if _RUN_ID_RE.fullmatch(run_id):
+            _remove_folder(run_id)
+    return closed

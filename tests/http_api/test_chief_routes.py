@@ -15,12 +15,17 @@ a test leaves open has a watcher thread, which is closed while the test's DB is 
 
 from __future__ import annotations
 
+import json
+import os
 import re
+import subprocess
+import sys
 import threading
 import time
 from pathlib import Path
 
 import pytest
+from _paths import SRC
 
 from pathly_orchestrator.db import get_db
 from pathly_orchestrator.db.queries import chief as chief_queries
@@ -481,3 +486,95 @@ def test_startup_cleanup_leaves_a_session_that_is_already_closed_alone(
     assert chief_session.chief_startup_cleanup() == []
     row = chief_queries.get_session(get_db(), opened["run_id"])
     assert row["close_reason"] == "closed from Studio"
+
+
+def test_startup_cleanup_never_removes_a_folder_outside_the_sessions_root():
+    chief_session._chief_root().mkdir(parents=True)
+    outside = chief_session._chief_root().parent / "keep"
+    outside.mkdir()
+    chief_queries.create_session(
+        get_db(),
+        run_id="../keep",
+        project_root="/odd",
+        preset=None,
+        tier="status",
+        engine="claude",
+        tab_id=None,
+        cli_session_id=None,
+        hook_secret_hash=None,
+        settings_dir=None,
+    )
+
+    assert chief_session.chief_startup_cleanup() == ["../keep"]
+    assert chief_queries.open_session_for_project(get_db(), "/odd") is None
+    assert outside.is_dir()
+
+
+# ── app.main() calls the cleanup before the server serves ────────────────────────
+
+# main() resets the root logger, the middleware globals and starts threads, so it runs in its
+# own process with its own home: a stale session is seeded, main() runs with Flask's run()
+# replaced by a recorder, and the script reports what is left.
+MAIN_SCRIPT = """
+import importlib, json, sys
+app_module = importlib.import_module("pathly_orchestrator.http_server.app")
+import pathly_orchestrator.runner.embeddings as embeddings
+from pathly_orchestrator.db import get_db
+from pathly_orchestrator.db.queries import chief as queries
+from pathly_orchestrator.db.queries.run_tokens import mint_run_token, resolve_run_token
+from pathly_orchestrator.supervisor import chief_session
+
+embeddings.warm = lambda: None
+served = []
+app_module.app.run = lambda *a, **k: served.append(True)
+
+conn = get_db()
+queries.create_session(
+    conn, run_id="chief-0123456789ab", project_root="/p", preset="status", tier="status",
+    engine="claude", tab_id="chief-0123456789ab", cli_session_id=None,
+    hook_secret_hash=None, settings_dir=None,
+)
+token = mint_run_token(conn, "chief-0123456789ab", "chief", None, "/p", "project", "/p")
+if sys.argv[1] == "fail":
+    def explode():
+        raise RuntimeError("cleanup exploded")
+    chief_session.chief_startup_cleanup = explode
+app_module.main()
+print(json.dumps({
+    "served": bool(served),
+    "open": queries.open_session_for_project(conn, "/p") is not None,
+    "token_live": resolve_run_token(conn, token) is not None,
+}))
+"""
+
+
+def _run_main(tmp_path: Path, mode: str) -> tuple[dict, str]:
+    home = tmp_path / "main-home"
+    home.mkdir()
+    env = {
+        **os.environ,
+        "HOME": str(home),
+        "USERPROFILE": str(home),
+        "PYTHONPATH": str(SRC),
+    }
+    done = subprocess.run(
+        [sys.executable, "-c", MAIN_SCRIPT, mode],
+        env=env,
+        cwd=str(tmp_path),
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert done.returncode == 0, done.stderr
+    return json.loads(done.stdout.strip().splitlines()[-1]), done.stderr
+
+
+def test_main_closes_a_session_the_last_process_left_open_before_serving(tmp_path):
+    report, _ = _run_main(tmp_path, "ok")
+    assert report == {"served": True, "open": False, "token_live": False}
+
+
+def test_main_still_serves_when_the_chief_cleanup_fails(tmp_path):
+    report, stderr = _run_main(tmp_path, "fail")
+    assert report == {"served": True, "open": True, "token_live": True}
+    assert "chief startup cleanup failed" in stderr
