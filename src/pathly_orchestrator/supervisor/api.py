@@ -18,7 +18,7 @@ def start_run(
     model: str = "claude-sonnet-4-6",
     timeout: int = 600,
     max_iterations: int = 10,
-    max_cost_usd: float = 1.0,
+    max_cost_usd: Optional[float] = 1.0,
     autonomy: Optional[dict] = None,
     broadcast_fn: Optional[Callable] = None,
     interactive: bool = True,
@@ -30,6 +30,8 @@ def start_run(
 ) -> RunnerState:
     """Start a new supervised run for *topic*.  Raises ValueError if already active.
 
+    max_cost_usd: no new stage starts once the run has spent this much. ``None`` is no cap
+        (a goal run whose ``goal.max_cost_usd`` setting is unset, see goal_executor._run_team).
     goal_id: when set, this run is a goal decompose/executor — the terminal planner
         stage is told to seed THIS goal's DAG (see orchestrator._decompose_directive).
     on_done: called as ``on_done(run_id, result)`` exactly once when the run reaches a

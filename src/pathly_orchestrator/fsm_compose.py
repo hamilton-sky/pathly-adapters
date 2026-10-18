@@ -334,8 +334,8 @@ def build_prompt_for_agent(
     if retry_count > 0 and feedback_file:
         prompt += _retry_ladder_block(storage_path, feedback_file, retry_count)
     elif feedback_file and agent_name not in _FIX_MODE_ARTIFACT:
-        # Round 1 (a headless run never climbs retry_count): name the file and show its text
-        # before the root-cause guide below, whose first step says "Read every failure above".
+        # Round 1 (retry_count 0, the ladder below has not started): name the file and show its
+        # text before the root-cause guide below, whose first step says "Read every failure above".
         prompt += feedback_block(storage_path, feedback_file)
     # Fix mode (smart-fix-routing DESIGN.md ss3.1): only appended when the routed target is
     # a root-cause role (po/planner/architect/designer) AND a feedback file was supplied —
@@ -361,8 +361,8 @@ def build_prompt_for_agent(
             f"4. Delete {feedback_at} when your artifact is corrected.\n"
             f"5. Report what changed. Do NOT run pathly-fsm-call / complete-stage (supervisor owns the FSM).\n"
         )
-    # A builder given a feedback file is on a second attempt at its stage, though a headless
-    # run never climbs retry_count (build-proof): it gets the root-cause guide.
+    # A builder given a feedback file is on a second attempt at its stage whatever retry_count
+    # says (round 1 of a file is still a retry of the stage): it gets the root-cause guide.
     if agent_name == "builder" and feedback_file:
         from pathly_orchestrator.skills.compose_resources import root_cause_guide
 

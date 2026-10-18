@@ -4,7 +4,7 @@
 
 Goal/DAG decomposition & scheduling — feature/flow/project decompose, goals read-model, PRD import.
 
-18 test file(s).
+19 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -15,6 +15,7 @@ Goal/DAG decomposition & scheduling — feature/flow/project decompose, goals re
 | `test_drain_shared.py` | ONE drain — `supervisor/drain.py` (fan-out convergence) | 10 |
 | `test_feature_decompose.py` | Feature-decompose ladder (planner-hierarchy T5): route dispatch, goal-count gate, flow, skill | 9 |
 | `test_flow_decompose.py` | Tests for flow decompose/assemble round-trip and DB idempotency | 19 |
+| `test_goal_run_cost_cap.py` | A goal's FSM run (`executor: team` / `loop`) takes its cost cap from `goal.max_cost_usd` | 3 |
 | `test_goal_verify.py` | Tests for supervisor/goal_verify.py — ground truth for the loop executor's DAG | 14 |
 | `test_goals_readmodel.py` | Goals read-model (GET /comms/goals): goals enriched with a task-DAG rollup | 5 |
 | `test_lane_partition.py` | `lane` + `files` have a write path, and the partition is checkable (fan-out C.5) | 13 |

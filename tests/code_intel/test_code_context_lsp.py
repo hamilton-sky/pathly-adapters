@@ -203,8 +203,17 @@ def test_build_block_backend_override_wins(monkeypatch):
 
 # --- proxy: engine routing + per-backend cache separation -----------------
 @pytest.fixture()
-def client():
+def client(monkeypatch):
+    """The /code/query proxy with the configured backend pinned to the legacy graph.
+
+    These tests drive the legacy engines. Left at ``auto``, a machine with the ``codeintel``
+    package on PATH resolves to it, and the proxy then hands ``engine=graph|lsp`` to codeintel
+    instead of the legacy backend under test. A test that needs another backend sets its own.
+    """
+    import pathly_orchestrator.runner.code_context as cc
     from pathly_orchestrator.http_server.blueprints.code.query import bp
+
+    monkeypatch.setattr(cc, "_resolve_backend", lambda: "cli")
 
     app = Flask(__name__)
     app.register_blueprint(bp)

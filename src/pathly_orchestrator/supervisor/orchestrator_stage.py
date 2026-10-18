@@ -7,7 +7,7 @@ from typing import Callable, Optional
 
 from . import run_budget
 from .human_escalation import post_human_escalation
-from .registry import _lock, _set_status
+from .registry import _lock, _set_status, _write_mirror
 from .state import MAX_FEEDBACK_ROUNDS, RunnerState, logger
 
 
@@ -208,7 +208,7 @@ def _resolve_stage_supervised(
             from pathly_orchestrator.supervisor import fan_out, spawn_window
 
             try:
-                spawn_window.observe(
+                fb_result = spawn_window.observe(
                     state,
                     fan_out.load_flow_config(flow, project_root),
                     target,
@@ -227,6 +227,20 @@ def _resolve_stage_supervised(
             except RuntimeError as exc:
                 _fail("spawn_failed", str(exc))
                 return None
+
+            # A fix round is spend like a stage spawn: count it, so the loop's cost cap sees it.
+            with _lock:
+                state.cost_usd_so_far += (fb_result or {}).get("cost_usd", 0.0) or 0.0
+                _write_mirror(state)
+            _broadcast(
+                {
+                    "type": "COST_UPDATE",
+                    "topic": topic,
+                    "cost_usd": state.cost_usd_so_far,
+                    "iterations": state.iterations,
+                    "max_cost_usd": state.max_cost_usd,
+                }
+            )
 
             resolved = [file_]
             continue

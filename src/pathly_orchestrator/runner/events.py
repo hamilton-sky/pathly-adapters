@@ -43,13 +43,7 @@ def _patch_last_agent_done(
     patched_agent: str | None = None
     patched_conv: int | None = None
     try:
-        from pathly_orchestrator.db import get_db as _get_db
-        from pathly_orchestrator.db import read_last_agent_done as _db_read_last
-
-        conn = _get_db()
-        feature = storage_path.name
-        project_root = str(storage_path.parent.parent.parent)
-        last = _db_read_last(conn, project_root, feature)
+        last = read_last_agent_done(storage_path)
         if last:
             patched_agent = last.get("agent")
             patched_conv = last.get("conversation")
@@ -87,16 +81,16 @@ def _patch_last_agent_done(
 def read_last_agent_done(storage_path: Path) -> dict[str, Any] | None:
     """Return the last AGENT_DONE event for the feature, or None if absent.
 
-    Reads exclusively from the central SQLite DB.
+    Reads exclusively from the central SQLite DB, under the key append_event wrote it with
+    (``eventlog.storage_key``), so a nested goal run (``features/<f>/goals/<slug>``) is found.
     """
     try:
         from pathly_orchestrator.db import get_db as _get_db
         from pathly_orchestrator.db import read_last_agent_done as _db_read_last
+        from pathly_orchestrator.eventlog import storage_key
 
-        conn = _get_db()
-        feature = storage_path.name
-        project_root = str(storage_path.parent.parent.parent)
-        return _db_read_last(conn, project_root, feature)
+        project_root, feature = storage_key(storage_path)
+        return _db_read_last(_get_db(), project_root, feature)
     except Exception:
         return None
 

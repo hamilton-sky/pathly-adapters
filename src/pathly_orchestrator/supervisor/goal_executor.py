@@ -385,7 +385,7 @@ def _run_team(
     event_broadcast_fn=None,
 ) -> dict:
     """Run an FSM flow (default team-build) on the goal's scope via start_run."""
-    from pathly_orchestrator.supervisor import board_lock
+    from pathly_orchestrator.supervisor import board_lock, cost_cap
     from pathly_orchestrator.supervisor.registry import get_state
 
     if board_lock.holder(board, scope) is not None:
@@ -464,6 +464,8 @@ def _run_team(
             # path (which start_run defaults to). interactive=True would spawn a bare REPL
             # and hang waiting on prompt injection. Mirror _decompose_consultation.
             interactive=False,
+            # The goal's cap: goal.max_cost_usd, the number the drain reads too. Unset = none.
+            max_cost_usd=cost_cap.resolve_goal_max_cost_usd(),
             # Carry the goal context and fire the lifecycle on_done on terminal status so
             # the goal-run indicator clears even when the FSM flow ends in error.
             goal_id=goal_id,

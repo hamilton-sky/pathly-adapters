@@ -142,7 +142,7 @@ def _run_stage_via_terminal(
                     _db.get_db()
                     .execute(
                         "SELECT MAX(seq) FROM fsm_events WHERE project_root=? AND feature=?",
-                        (state.project_root, ea_feature),
+                        _eventlog.storage_key(ea_feature_dir),
                     )
                     .fetchone()
                 )

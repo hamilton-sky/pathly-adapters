@@ -52,7 +52,8 @@ class RunnerState:
     iterations: int = 0
     max_iterations: int = 10
     cost_usd_so_far: float = 0.0
-    max_cost_usd: float = 1.0
+    # None = no cap: a goal run with no goal.max_cost_usd setting (see over_cost_cap).
+    max_cost_usd: Optional[float] = 1.0
     # UI-configurable mode: True = visible PTY killed on AGENT_DONE; False = headless/reconciliation
     interactive: bool = True
     autonomy: dict = field(default_factory=dict)
@@ -149,6 +150,12 @@ class RunnerState:
     # A killed runner tab leaves this False, so on_done becomes the sole announcer that
     # clears the board's "Decomposing…/Running…" timer pill.
     stop_announced: bool = field(default=False, repr=False, compare=False)
+
+    def over_cost_cap(self) -> bool:
+        """True once the spend reached the cap. A run with no cap (None) is never over it."""
+        return (
+            self.max_cost_usd is not None and self.cost_usd_so_far >= self.max_cost_usd
+        )
 
     def public_dict(self) -> dict:
         """Return serialisable state for RUNNER_STATE.json and status API."""

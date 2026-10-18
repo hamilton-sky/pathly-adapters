@@ -8,17 +8,18 @@ failing, the suspect is the diagnosis/scope above it) and to the human past roun
 team/team-build/test.
 
 These drive the REAL route_feedback against the REAL packaged YAMLs, with the retry count
-supplied the way the FSM supplies it — `STATE.json`'s `retry_count_by_key`.
+supplied the way the FSM supplies it — `retry_count_by_key` in `fsm_state` (the DB), which
+`complete_stage` writes each time it routes a round.
 """
 
 from __future__ import annotations
 
-import json
 from importlib.resources import files
 
 import pytest
 import yaml
 
+from pathly_orchestrator import eventlog
 from pathly_orchestrator.fsm import route_feedback
 
 LADDER = [(0, "builder"), (1, "builder"), (2, "scout"), (3, "human"), (5, "human")]
@@ -37,14 +38,8 @@ def _route(tmp_path, flow: str, filename: str, retry_count: int | None) -> dict 
     (storage / "feedback").mkdir(parents=True, exist_ok=True)
     (storage / "feedback" / filename).write_text("still failing\n", encoding="utf-8")
     if retry_count is not None:
-        (storage / "STATE.json").write_text(
-            json.dumps(
-                {
-                    "current": "VERIFYING",
-                    "retry_count_by_key": {f"conv-1:{filename}": retry_count},
-                }
-            ),
-            encoding="utf-8",
+        eventlog.write_state(
+            str(storage), {"retry_count_by_key": {filename: retry_count}}
         )
     return route_feedback(_flow(flow), storage)
 
@@ -73,7 +68,7 @@ def test_every_flow_with_a_failure_loop_has_a_human_backstop(tmp_path, flow):
 
 
 def test_without_any_count_source_the_ladder_starts_at_round_one(tmp_path):
-    """No STATE.json and no injected counts -> attempt 1, the base agent. A caller that
+    """No fsm_state count and no injected counts -> attempt 1, the base agent. A caller that
     persists nothing gets round 1 forever, which is the failure mode the ladder exists to
     prevent — the count has to come from somewhere."""
     result = _route(tmp_path, "debug", "VERIFY_FAILURES.md", retry_count=None)

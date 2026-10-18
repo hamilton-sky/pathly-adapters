@@ -22,18 +22,29 @@ from .registry import TerminalRun, drop_run, _TERMINAL_RESULT_TIMEOUT
 from .terminal_identity import _run_board_scope
 
 
+def _reports_run(event: dict, run_id: str) -> bool:
+    """Whether an AGENT_DONE is *run_id*'s: stamped with it, or stamped with none (an empty
+    value or the literal ``<run_id>`` placeholder), which predates the stamp."""
+    stamped = str(event.get("run_id") or "")
+    return not stamped or stamped.startswith("<") or stamped == run_id
+
+
 def _agent_done_watcher(
     run: TerminalRun,
     feature_dir: Path,
     feature: str,
     last_seq: int,
 ) -> None:
-    """Poll SQLite fsm_events for AGENT_DONE; call run.mark_agent_done() on first match.
+    """Poll SQLite fsm_events for THIS run's AGENT_DONE; call run.mark_agent_done() on it.
 
     Runs as a daemon thread when feature_flags.early_advance is True.
     Stops when run.request_stop_watcher() is called or after _TERMINAL_RESULT_TIMEOUT seconds.
     The caller passes the TerminalRun object directly so the watcher keeps a live
     reference even if drop_run() removes it from the registry.
+
+    An AGENT_DONE stamped with another run's ``run_id`` is skipped: the tasks of a drain share
+    the goal's storage dir, so one task's report must not end another task's spawn. A report
+    with no ``run_id`` (an agent whose prompt kept no ``<run_id>``) is still taken.
     """
     from pathly_orchestrator import db as _db
 
@@ -43,7 +54,8 @@ def _agent_done_watcher(
         logger.warning("_agent_done_watcher: cannot open DB for %s: %s", feature, exc)
         return
 
-    project_root = str(feature_dir.parent.parent.parent)
+    # The key append_event wrote under: a nested goal run's root is above pathly/, not 3 up.
+    project_root, _ = _eventlog.storage_key(feature_dir)
     _POLL = 0.15
     elapsed = 0.0
     seq = last_seq
@@ -58,7 +70,7 @@ def _agent_done_watcher(
         for row in rows:
             if row.get("seq", 0) > seq:
                 seq = row["seq"]
-            if row.get("type") == "AGENT_DONE":
+            if row.get("type") == "AGENT_DONE" and _reports_run(row, run.run_id):
                 run.mark_agent_done()
                 return
         run.wait_watcher_stop_signal(_POLL)
