@@ -103,10 +103,11 @@ posts; a post without one is stored as unverified (`none`). This is the identity
   lets the spawn go out). It is stored hashed in the new `run_tokens` table with the run's id,
   role and board scope, sent as `run_token` in the `TERMINAL_SPAWN` payload, exported to the
   agent as `PATHLY_RUN_TOKEN` by both spawn hosts (Studio and `pathly-pty-host`), and revoked
-  when the spawn ends. The payload carries the raw token, and `_broadcast_runner` delivers it
-  to the topic's `/events/runner` clients, to every `/events/spawn` client and to the
-  `/events/runs` clients of that run, so a client subscribed to any of them when the spawn
-  starts can read the token and use it until the spawn ends.
+  when the spawn ends. The `TERMINAL_SPAWN` payload carries the raw token and
+  `_broadcast_runner` sends it to every `/events/spawn` client only: the copies for the topic's
+  `/events/runner` clients and the run's `/events/runs` clients have the `run_token` key removed.
+  A client subscribed to `/events/spawn` when the spawn starts can still read the token and use
+  it until the spawn ends (that stream needs no credentials; closing it needs the UI token).
 - `X-Pathly-Run-Token`: every `curl` to `8765/comms` in the core skills, fragments and the
   evaluator agent sends it (a consistency test fails on one that does not).
   `http_server/run_identity.py::caller_identity` resolves it to a run, or to `anonymous` when

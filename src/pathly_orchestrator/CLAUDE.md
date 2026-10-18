@@ -130,7 +130,8 @@ to change.
         +- _issue_spawn_token()       <- run_tokens {sha256(token) -> run_id, role, board, scope}
         |
         +--> SSE  TERMINAL_SPAWN {tab_id, run_id, run_token, argv[], cwd, adapter}
-        |         on /events/spawn (topic-independent)
+        |         on /events/spawn (topic-independent); /events/runner and
+        |         /events/runs get the same event without run_token
         |                    |
         |      +-------------+--------------+   exactly ONE host may listen
         |      v                            v
@@ -569,7 +570,7 @@ first) is a later plan.
 | Event type | Payload fields | Purpose |
 |---|---|---|
 | `RUN_STARTED` | `topic`, `run_id` | pipeline run began |
-| `TERMINAL_SPAWN` | `tab_id`, `run_id`, `run_token`, `label`, `cwd`, `argv[]`, `adapter` | Studio should open a new terminal tab and spawn the PTY. `run_token` is the spawn's identity token, sent raw: `_broadcast_runner` delivers the whole payload to the topic's `/events/runner` clients, to every `/events/spawn` client and to the `/events/runs` clients of that `run_id`, so a client subscribed to any of them when the spawn starts can read the token and use it until the spawn settles (`None` when the best-effort mint failed) |
+| `TERMINAL_SPAWN` | `tab_id`, `run_id`, `run_token`, `label`, `cwd`, `argv[]`, `adapter` | Studio should open a new terminal tab and spawn the PTY. `run_token` is the spawn's identity token, sent raw on `/events/spawn` only: `_broadcast_runner` strips the key from the copies it sends to the topic's `/events/runner` clients and the `/events/runs` clients of that `run_id` (the caller's dict is not mutated), so only a client subscribed to `/events/spawn` when the spawn starts can read the token, and use it until the spawn settles (`None` when the best-effort mint failed). `/events/spawn` needs no credentials, so that hole stays open until the UI token (RRP-2b) |
 | `SESSION` | `topic`, `adapter`, `kind` (`opened`/`continued`), `degraded` (the adapter cannot resume), `independent` | adapter session continuity signal. `independent` is true for a stage whose role is in `orchestrator_session.INDEPENDENT_ROLES` (the reviewer): `kind` is then always `opened`, whatever the open session is |
 | `RUNNER_WARNING` | `message` | non-fatal warning to surface as a toast |
 | `RUNNER_STATUS` | `status`, `topic` | status change + periodic state sync (`running`/`paused`/`done`/`aborted`/`error`) — `supervisor/registry.py` `_set_status` |
