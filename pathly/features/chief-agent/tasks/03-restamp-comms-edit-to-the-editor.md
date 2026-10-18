@@ -1,7 +1,7 @@
 # Stamp an edited board row with the editor, not the original author
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: —
 Test first: yes
 
@@ -58,3 +58,33 @@ exit 0
 - `tests/comms_board/test_rrp_acceptance.py` (posting with a minted token)
 
 ## Answer
+
+**Built**
+
+- `src/pathly_orchestrator/db/queries/comms_edit.py` (new): `update_message_text(conn, message_id, text, author_role=None, author_run_id=None, author_source=None)`. It validates `author_source` against `AUTHOR_SOURCES` (raises `ValueError` before any write, as `post_message` does), then sets `text` and the three author columns in one `UPDATE`. A `None` source is stored as `none`, as in `post_message`.
+- `src/pathly_orchestrator/db/queries/comms_messages.py`: the old `update_message_text` is removed and re-exported from `comms_edit` at the bottom (next to `insert_message_row`); 377 -> 363 lines. `db/queries/comms.py` is unchanged: it already imports the name from `comms_messages`, so `comms.update_message_text` and `comms_messages.update_message_text` both still resolve.
+- `src/pathly_orchestrator/http_server/blueprints/comms/_helpers.py`: new `edit_stamp(request)` = `stamp(caller_identity(request))` (lazy imports inside the function, as `refuse_agent_on_human_gate` does); 261 -> 273 lines.
+- `src/pathly_orchestrator/http_server/blueprints/comms/messages_crud.py`: `comms_edit` passes `**edit_stamp(request)` to `_update_text` (same line count: 395, one import name added to the existing `_helpers` import).
+- `tests/comms_board/test_comms_edit_restamp.py` (new, committed first as `6109641`) plus the regenerated `tests/INDEX.md` and `tests/comms_board/INDEX.md`.
+- `src/pathly_orchestrator/CLAUDE.md`: the `POST /comms/edit` line says the row is re-stamped to the editor; one line for `comms_edit.py` in the package map.
+
+**Proof** (each run fresh after the last code edit)
+
+- Test-first: at `6109641` the new file ran `5 failed, 2 passed` for the right reasons (`assert 'token' == 'none'`, `TypeError: unexpected keyword argument 'author_role'`); the 2 passes are the two 404 cases, which already held.
+- `python -m pytest tests/comms_board/test_comms_edit_restamp.py -q -p no:cacheprovider` -> `7 passed`, exit 0. It covers: reviewer-token row edited with no token -> `author_source="none"`, `author_role` and `author_run_id` NULL, text changed; same row edited with a builder token -> `builder` / `token` / `run-builder`, text changed; a body naming `from`, `run_id` and `author_role` as the reviewer changes nothing (still `none`); a revoked token edits as `none`; an unknown id is 404 with and without a token; an unknown `author_source` raises `ValueError` and leaves the row as it was.
+- `python scripts/check_file_size.py` -> `OK: 1010 source files checked; 19 known over 400 lines, none new, none grown.`, exit 0.
+- commands.md Test (`tests/comms_board tests/db tests/runner_supervisor tests/http_api`, `-x`): `1208 passed, 2 skipped in 241.91s`, exit 0. Lint chain: exit 0 (black, mypy, file size, mirror reads, `gen_test_index --check`, lint-imports, bandit, adapters, entry points). Smoke exit 0. `python -m build --wheel` exit 0. Also `tests/fsm_flows/test_review_packet.py` + `tests/consistency`: 70 passed (they import `update_message_text`).
+
+**Decisions**
+
+- `comms_messages.py` came to 401 lines after `black`, so I took the ticket's fallback and moved the function to `comms_edit.py` rather than trimming the docstring to fit.
+- A caller that passes no stamp (the existing test callers of `update_message_text`) gets `none`, not "leave the old stamp": the function always re-stamps, so it cannot reopen the hole at function level. The only `src/` caller is the `/comms/edit` route, which always passes a stamp.
+- The edit route does not refuse non-authors and does not change `from_agent`; both are outside the ticket.
+
+**Shortcuts taken**: none.
+
+**For later tickets**
+
+- Ticket 12 (refuse edits of binding directives) and 08 (the gate lists `/comms/edit` as an unlisted write for a chief token) are unaffected; ticket 12 adds its refusal to the `/comms/edit` route in `messages_crud.py`, which is at 395 lines, so it needs room first (move more into `_helpers`, or the route into its own file).
+- A builder that edits a task's text now leaves the task stamped `builder`. `fsm/gates/_scope_tasks.py` skips tasks with `author_role == "builder"` when it builds the declared scope, so a planner's task that a builder edits stops widening the builder's scope. That matches the gate's intent; no change needed.
+- The ticket named `studio/src/renderer/src/services/messages.ts` for Studio's goal rename; the `/comms/edit` caller is now `studio/src/renderer/src/store/commsApi/messages.ts`. Not touched. Studio sends no run token, so a goal rename now stamps `none` until the UI token exists.

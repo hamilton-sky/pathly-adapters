@@ -8,7 +8,7 @@ from flask import jsonify, request
 
 from ...sse import _broadcast_comms
 from ._messages_bp import bp
-from ._helpers import read_json_body, refuse_agent_on_human_gate
+from ._helpers import edit_stamp, read_json_body, refuse_agent_on_human_gate
 from ._supersede_on_post import refuse_agent_supersede
 
 
@@ -259,7 +259,7 @@ def comms_edit():
             return jsonify({"error": "Field 'text' must be a non-empty string"}), 400
 
         conn = _get_db()
-        result = _update_text(conn, message_id, text.strip())
+        result = _update_text(conn, message_id, text.strip(), **edit_stamp(request))
         if result == "not_found":
             return jsonify({"ok": False, "error": "Message not found"}), 404
         return jsonify({"ok": True}), 200
