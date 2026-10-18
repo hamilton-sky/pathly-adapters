@@ -612,7 +612,9 @@ def test_run_control_verbs_are_run_or_stop(client, project, verb, action):
 
     assert action in actions_for("operator")
     operator = _chief("operator", project)
-    resp = client.post(f"/runs/x/{verb}", json={}, headers=operator.headers)
+    # `retry` starts a run in the directory its own body names, so it names the project.
+    body = {"project_root": str(project)} if verb == "retry" else {}
+    resp = client.post(f"/runs/x/{verb}", json=body, headers=operator.headers)
     assert _passed(resp), resp.get_data(as_text=True)
 
 
@@ -2163,3 +2165,390 @@ def test_a_route_with_no_entry_is_refused_not_passed(client, project, monkeypatc
 
     assert _gated(resp), (resp.status_code, resp.get_data(as_text=True)[:200])
     assert resp.get_json()["action"] == "read"
+
+
+# --- round 4: a name or a root a route takes as given -------------------------------------
+#
+# The earlier rounds bound the fields the views read as a project. The review of round 3 found
+# three places where a route does more with a field than the table said: `retry` starts a run in
+# the directory its own body names (and takes an empty one), `/comms/features/decompose` joins the
+# `feature` into a path, and `/telemetry/trends` with no feature sums every project.
+
+RETRY_FIELDS = {"flow": "team", "max_iterations": 3, "max_cost_usd": 1}
+
+
+@pytest.fixture()
+def finished_run(monkeypatch):
+    """A finished run of the registry, and a record of the runs a retry starts."""
+    from types import SimpleNamespace
+
+    from pathly_orchestrator.supervisor import registry
+
+    started_runs: list[dict] = []
+
+    def fake_start_run(**kwargs):
+        started_runs.append(kwargs)
+        return SimpleNamespace(run_id="run-new-1")
+
+    monkeypatch.setitem(
+        registry._registry,
+        "retry-topic",
+        SimpleNamespace(run_id="run-own-1", status="done"),
+    )
+    monkeypatch.setattr("pathly_orchestrator.supervisor.api.start_run", fake_start_run)
+    return started_runs
+
+
+@pytest.mark.parametrize("value", ["absent", "", None, 0, False, [], {}], ids=repr)
+def test_a_retry_that_names_no_project_is_refused(client, project, finished_run, value):
+    chief = _chief("operator", project)
+    body = dict(RETRY_FIELDS)
+    if value != "absent":
+        body["project_root"] = value
+
+    resp = client.post("/runs/run-own-1/retry", json=body, headers=chief.headers)
+
+    assert _gated(resp), (resp.status_code, resp.get_data(as_text=True)[:200])
+    assert "project_root" in resp.get_json()["error"]
+    assert finished_run == []
+
+
+def test_a_retry_that_names_its_own_project_starts_the_run_there(
+    client, project, finished_run
+):
+    chief = _chief("operator", project)
+
+    resp = client.post(
+        "/runs/run-own-1/retry",
+        json={**RETRY_FIELDS, "project_root": str(project)},
+        headers=chief.headers,
+    )
+
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    assert [c["project_root"] for c in finished_run] == [str(project)]
+
+
+def test_a_retry_in_another_project_is_refused(
+    client, project, other_project, finished_run
+):
+    chief = _chief("operator", project)
+
+    resp = client.post(
+        "/runs/run-own-1/retry",
+        json={**RETRY_FIELDS, "project_root": str(other_project)},
+        headers=chief.headers,
+    )
+
+    assert _gated(resp)
+    assert finished_run == []
+
+
+@pytest.mark.parametrize("verb", ["pause", "resume", "advance", "reroute"])
+def test_the_other_run_verbs_need_no_root(client, project, verb):
+    """They act on a run's own state, not on a directory the body names."""
+    chief = _chief("operator", project)
+
+    resp = client.post(f"/runs/x/{verb}", json={}, headers=chief.headers)
+
+    assert _passed(resp), resp.get_data(as_text=True)
+
+
+# `/comms/features/decompose` makes `<project_root>/pathly/features/<feature>` and hands the
+# string to the run as its storage path, so the feature is a folder name.
+
+RIGORS = ["light", "full", "consultation"]
+ROUTE_REFUSES = [
+    "../../../proj-b/pathly/features/planted",
+    "../../../proj-b/planted",
+    "../planted",
+    "a/../../planted",
+    "..",
+    "OTHER/planted",
+    "a\\b",
+    "c:x",
+]
+ONLY_THE_GATE_REFUSES = ["sub/dir", "./x", " ../x ", " .. "]
+
+
+@pytest.fixture()
+def consultations(monkeypatch):
+    """Record the feature-consultation runs the route starts, instead of starting any."""
+    from types import SimpleNamespace
+
+    calls: list[dict] = []
+
+    def fake_start_run(**kwargs):
+        calls.append(kwargs)
+        return SimpleNamespace(run_id="consult-1")
+
+    monkeypatch.setattr("pathly_orchestrator.supervisor.api.start_run", fake_start_run)
+    monkeypatch.setattr(
+        "pathly_orchestrator.supervisor.goal_executor._reset_fsm_state_for_flow",
+        lambda *a, **k: None,
+    )
+    return calls
+
+
+def _feature_body(feature, rigor, project) -> dict:
+    return {"feature": feature, "rigor": rigor, "project_root": str(project)}
+
+
+@pytest.mark.parametrize("tier", ["planner", "operator"])
+@pytest.mark.parametrize("rigor", RIGORS)
+@pytest.mark.parametrize("feature", [*ROUTE_REFUSES, *ONLY_THE_GATE_REFUSES])
+def test_a_feature_name_that_is_a_path_is_refused_to_a_chief(
+    client, project, other_project, started, consultations, tier, rigor, feature
+):
+    chief = _chief(tier, project)
+    feature = feature.replace("OTHER", str(other_project))
+
+    resp = client.post(
+        "/comms/features/decompose",
+        json=_feature_body(feature, rigor, project),
+        headers=chief.headers,
+    )
+
+    assert _gated(resp), (resp.status_code, resp.get_data(as_text=True)[:200])
+    assert "feature" in resp.get_json()["error"]
+    assert started == [] and consultations == []
+    assert list(other_project.rglob("*")) == []
+
+
+@pytest.mark.parametrize("value", [["x"], 7, {"a": 1}])
+def test_a_feature_that_is_not_a_string_is_refused_to_a_chief(client, project, value):
+    chief = _chief("operator", project)
+
+    resp = client.post(
+        "/comms/features/decompose",
+        json=_feature_body(value, "light", project),
+        headers=chief.headers,
+    )
+
+    assert _gated(resp)
+
+
+@pytest.mark.parametrize("tier", ["planner", "operator"])
+@pytest.mark.parametrize("rigor", RIGORS)
+@pytest.mark.parametrize("feature", ["export-csv", "feat_1", "Q3 plan", ".hidden"])
+def test_a_plain_feature_name_passes_the_gate(
+    client, project, started, consultations, tier, rigor, feature
+):
+    chief = _chief(tier, project)
+
+    resp = client.post(
+        "/comms/features/decompose",
+        json=_feature_body(feature, rigor, project),
+        headers=chief.headers,
+    )
+
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    assert _passed(resp)
+
+
+@pytest.mark.parametrize("rigor", RIGORS)
+@pytest.mark.parametrize("feature", ROUTE_REFUSES)
+def test_the_route_plants_nothing_for_a_feature_that_is_a_path(
+    client, project, other_project, started, consultations, rigor, feature
+):
+    """The route itself, with no token: a feature name must not leave the project."""
+    feature = feature.replace("OTHER", str(other_project))
+
+    resp = client.post(
+        "/comms/features/decompose", json=_feature_body(feature, rigor, project)
+    )
+
+    assert resp.status_code == 400, resp.get_data(as_text=True)
+    assert resp.get_json()["reason"] == "invalid_feature"
+    assert started == [] and consultations == []
+    assert list(other_project.rglob("*")) == []
+    assert not (project / "pathly" / "planted").exists()
+
+
+@pytest.mark.parametrize("rigor", RIGORS)
+def test_the_route_still_makes_the_folder_of_a_plain_feature(
+    client, project, started, consultations, rigor
+):
+    resp = client.post(
+        "/comms/features/decompose", json=_feature_body("export-csv", rigor, project)
+    )
+
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    assert (project / "pathly" / "features" / "export-csv").is_dir()
+
+
+# `/comms/run` of an evaluator on a feature or global board saves a reply that posted no
+# BOARD_EVAL artifact to `<project_root>/pathly/features/<scope>/artifacts/`, so its scope is a
+# folder name there too (a project board's scope is the root itself, and is bound as such).
+
+
+def _wait_for_the_board_run(board: str, scope: str) -> None:
+    import time
+
+    from pathly_orchestrator.supervisor import board_lock
+
+    deadline = time.monotonic() + 10
+    while board_lock.holder(board, scope) is not None and time.monotonic() < deadline:
+        time.sleep(0.02)
+    assert board_lock.holder(board, scope) is None, "the board run never finished"
+
+
+@pytest.fixture()
+def evaluator_reply(monkeypatch):
+    """Spawn no agent; the evaluator's run ends at once with a reply and no artifact."""
+    monkeypatch.setattr(
+        "pathly_orchestrator.supervisor.board_run._default_spawn",
+        lambda **kwargs: {"result": "a real analysis of the board"},
+    )
+    monkeypatch.setattr(
+        "pathly_orchestrator.http_server.sse._broadcast_runner", lambda *a, **k: None
+    )
+
+
+def _evaluate(client, project, scope, headers=None):
+    return client.post(
+        "/comms/run",
+        json={
+            "board": "global",
+            "scope": scope,
+            "mode": "evaluator",
+            "project_root": str(project),
+        },
+        headers=headers or {},
+    )
+
+
+def test_the_route_saves_an_evaluation_inside_the_project(
+    client, project, evaluator_reply
+):
+    resp = _evaluate(client, project, "demo-board")
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    _wait_for_the_board_run("global", "demo-board")
+
+    saved = project / "pathly" / "features" / "demo-board" / "artifacts"
+    assert (saved / "BOARD_EVAL.md").is_file()
+
+
+def test_the_route_saves_no_evaluation_outside_the_project(
+    client, project, other_project, evaluator_reply
+):
+    scope = "../../../proj-b/planted"
+
+    resp = _evaluate(client, project, scope)
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    _wait_for_the_board_run("global", scope)
+
+    assert list(other_project.rglob("*")) == []
+
+
+@pytest.mark.parametrize("scope", ["../../../proj-b/planted", "sub/../../x", "a\\b"])
+def test_a_chief_names_a_folder_name_as_the_scope_of_a_global_board_run(
+    client, project, other_project, evaluator_reply, scope
+):
+    chief = _chief("operator", project)
+
+    resp = _evaluate(client, project, scope, chief.headers)
+
+    assert _gated(resp), (resp.status_code, resp.get_data(as_text=True)[:200])
+    assert "scope" in resp.get_json()["error"]
+    assert list(other_project.rglob("*")) == []
+
+
+def test_a_project_board_run_names_the_root_as_its_scope_still(
+    client, project, started
+):
+    chief = _chief("operator", project)
+    body = {
+        "board": "project",
+        "scope": str(project),
+        "mode": "single-agent",
+        "project_root": str(project),
+    }
+
+    resp = client.post("/comms/run", json=body, headers=chief.headers)
+
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    assert len(started) == 1
+
+
+# `/telemetry/trends` with a feature sums that feature across every project; without one it sums
+# every project's cost unless `project_root` narrows it.
+
+
+@pytest.mark.parametrize("tier", TIERS)
+@pytest.mark.parametrize("feature", ["", "   "])
+def test_trends_without_a_feature_must_name_the_project(
+    client, project, other_project, tier, feature
+):
+    chief = _chief(tier, project)
+
+    unnamed = client.get(
+        "/telemetry/trends", query_string={"feature": feature}, headers=chief.headers
+    )
+    other = client.get(
+        "/telemetry/trends",
+        query_string={"feature": feature, "project_root": str(other_project)},
+        headers=chief.headers,
+    )
+    own = client.get(
+        "/telemetry/trends",
+        query_string={"feature": feature, "project_root": str(project)},
+        headers=chief.headers,
+    )
+
+    assert _gated(unnamed), (unnamed.status_code, unnamed.get_data(as_text=True)[:200])
+    assert "project_root" in unnamed.get_json()["error"]
+    assert _gated(other)
+    assert _passed(own), (own.status_code, own.get_data(as_text=True)[:200])
+
+
+def test_trends_of_a_named_feature_stay_fleet_wide_and_say_so(client, project):
+    from pathly_orchestrator.http_server.chief_fields import ROUTE_FIELDS
+
+    chief = _chief("status", project)
+
+    resp = client.get(
+        "/telemetry/trends", query_string={"feature": "demo"}, headers=chief.headers
+    )
+
+    assert _passed(resp), (resp.status_code, resp.get_data(as_text=True)[:200])
+    entry = ROUTE_FIELDS[("/telemetry/trends", "GET")]
+    assert "feature" in entry.unbound
+    assert "every project" in entry.note
+
+
+def test_db_stats_says_its_counts_are_global():
+    from pathly_orchestrator.http_server.chief_fields import ROUTE_FIELDS
+
+    note = ROUTE_FIELDS[("/db/stats", "GET")].note
+
+    for word in ("features", "events", "invocations", "global"):
+        assert word in note, note
+
+
+# The `unbound` entries list what the gate really leaves to the caller. A feature that a query
+# filters by `project_root` as well is bound by the root the gate checks.
+
+FEATURE_UNDER_THE_ROOT = [
+    "/db/features/<feature>/agents",
+    "/db/features/<feature>/events",
+    "/db/features/<feature>/otel",
+    "/db/features/<feature>/runs",
+    "/api/features/<feature>/artifacts",
+    "/api/features/<feature>/events",
+    "/api/features/<feature>/invocations",
+    "/api/features/<feature>/metrics",
+    "/api/traces",
+    "/flows/stage-config",
+    "/comms/scope",
+    "/db/rollup",
+]
+
+
+@pytest.mark.parametrize("rule", FEATURE_UNDER_THE_ROOT)
+def test_a_feature_filtered_by_the_root_as_well_is_not_listed_unbound(rule):
+    from pathly_orchestrator.http_server.chief_fields import ROUTE_FIELDS
+
+    entry = ROUTE_FIELDS[(rule, "GET")]
+
+    assert "feature" not in entry.unbound
+    assert "project_root" in entry.roots
