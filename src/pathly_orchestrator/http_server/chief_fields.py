@@ -4,9 +4,9 @@
 every route a chief token can get past the route table, the fields the view reads as a project
 root, a board scope or a file, with the fallback it uses when the field is absent. The gate
 applies the table with one function (``chief_project.project_refusal``), so a route that reads a
-new field is one table entry, not another branch. ``tests/http_api/test_chief_gate.py`` walks
-``app.url_map`` and fails when a route the chief can reach has no entry, so a route added later
-cannot be added unbound.
+new field is one table entry, not another branch. ``tests/http_api/test_chief_gate_tables.py``
+walks ``app.url_map`` and fails when a route the chief can reach has no entry, so a route added
+later cannot be added unbound.
 
 A GET route reads its query string; every other listed route reads the JSON body (no listed view
 reads ``request.args`` on a POST, and the test above checks that). ``project_root`` is also

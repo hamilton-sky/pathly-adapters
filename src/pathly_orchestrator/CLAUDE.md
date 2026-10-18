@@ -629,9 +629,12 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
   `/comms/tasks/status` and the FSM routes that take `force_past_gate`): the chief never forces
   past a human gate and never marks a task done itself. An unknown `/runs/<run_id>/<verb>` is
   unlisted too. `tests/http_api/test_chief_gate.py` walks `app.url_map` and fails when an unlisted
-  route is not refused to an operator, when the table lists a rule no route has, or when a route
-  the chief can reach has no `ROUTE_FIELDS` entry (below), so a route added later is refused to
-  the chief until someone lists it and says which project it reads. Two tripwires read the
+  route is not refused to an operator or when the table lists a rule no route has;
+  `test_chief_gate_tables.py` fails when a route the chief can reach has no `ROUTE_FIELDS` entry
+  (below), so a route added later is refused to the chief until someone lists it and says which
+  project it reads. (The chief gate tests are `tests/http_api/test_chief_gate*.py`, one file per
+  concern, with the shared fixtures in `chief_gate_support.py`; a new test goes in the file of
+  its concern.) Two tripwires, in `test_chief_gate_tables.py`, read the
   source of every such view **and the helpers it calls** under `blueprints/` (`create_run`,
   `handle_retry`, `_dispatch_*`): one for a request field they read (`.get("x")` or `["x"]`) that
   the entry does not name, one for a field they use as an argument of a path call that the entry

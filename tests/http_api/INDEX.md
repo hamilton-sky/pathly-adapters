@@ -4,14 +4,24 @@
 
 HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, prompt-event contract.
 
-18 test file(s).
+28 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
 | `test_api.py` | Tests for the HTTP routes Blueprint (api/__init__.py). Uses Flask test client | 15 |
 | `test_caller_identity.py` | caller_identity(request): the caller is the holder of a live run token, never a body field | 9 |
 | `test_chat_agent.py` | covers pathly studio chat is plan aware; generic chat remains unchanged | 2 |
-| `test_chief_gate.py` | chief-agent 08: the chief gate refuses every call a chief token's tier does not allow | 118 |
+| `test_chief_gate.py` | chief-agent 08: the chief gate refuses every call a chief token's tier does not allow | 32 |
+| `test_chief_gate_actions.py` | chief-agent 08: which action a call is, and so which tier may make it | 6 |
+| `test_chief_gate_board_reads.py` | chief-agent 08: reads of a board are bound by the board and scope they name | 8 |
+| `test_chief_gate_bodies.py` | chief-agent 08: the gate reads the body the way the route will | 12 |
+| `test_chief_gate_files.py` | chief-agent 08: a file a chief names must be inside its project | 8 |
+| `test_chief_gate_folders.py` | chief-agent 08: a name a route makes a folder of is one folder name | 9 |
+| `test_chief_gate_project_scope.py` | chief-agent 08: a board named by ``scope`` is bound to the chief's project | 9 |
+| `test_chief_gate_requests.py` | chief-agent 08: HEAD, redirects, lookalike paths and methods no route has | 5 |
+| `test_chief_gate_root_naming.py` | chief-agent 08: a route that falls back to another project must be told which | 12 |
+| `test_chief_gate_tables.py` | chief-agent 08: the field table is complete and says what each route reads | 13 |
+| `test_chief_gate_unbound_reads.py` | chief-agent 08: the reads that are fleet-wide say so, and no more | 4 |
 | `test_chief_routes.py` | chief-agent 07: POST /chief/open, POST /chief/close and GET /chief/session | 32 |
 | `test_config.py` | Tests for Settings.from_env() — specifically bind-host validation | 8 |
 | `test_db_agents_route.py` | GET /db/agents — registry-backed agent list for the spawn-policy Settings model-policy UI | 3 |
