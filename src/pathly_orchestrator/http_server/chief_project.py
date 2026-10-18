@@ -1,55 +1,168 @@
-"""Which project a chief's request names, for the chief gate (chief-agent).
+"""Which project a chief's request names, and whether it is the session's (chief-agent).
 
-A project is named by ``project_root`` (body or query string), by the ``scope`` of a call on the
-project board (a code query's too, since it logs onto that board), and by the project-decompose
-``project`` override. ``board_values`` reads those
-the way the routes do, so a value the route would use is a value the gate checks. A value is
-the chief's own when it is a string that ``normalise_project_root`` maps to the session's root
-(forward slashes, no trailing slash); anything else, a non-string included, is not.
+``project_refusal`` applies ``chief_fields.ROUTE_FIELDS`` to one request: the fields its route
+reads as a project root, a board scope or a file, read from the JSON body of a POST and from the
+query string of a GET, the way the view reads them. A value is the chief's own when it is a
+string that ``normalise_project_root`` maps to the session's root (forward slashes, no trailing
+slash); anything else, a non-string included, is not. A file is the chief's own when it lies
+under that root after its ``..`` segments are collapsed (text only: symlinks are not followed,
+and a Windows drive letter is compared as written).
+
+A route with no entry is refused, so a route added without one is not passed by default.
 """
 
 from __future__ import annotations
 
+import posixpath
+import re
 from typing import Mapping
 
-# ``/comms/project/decompose`` takes this literal as "no override".
-_NO_OVERRIDE = ("", "project")
+from .chief_fields import ROUTE_FIELDS, Fields, ScopeRead, TextPath
+
+ROOT_KEY = "project_root"
+_BOARDS = ("feature", "project", "global")
+_DRIVE = re.compile(r"^[A-Za-z]:")
+
+NOT_OWN = "that is not this chief's project"
+NOT_NAMED = "a chief names its project_root on this route"
+NOT_INSIDE = "a chief names only files inside its project"
+NO_ENTRY = "the gate has no project entry for this route"
 
 
-def root_values(body: Mapping, args) -> list:
-    """Every ``project_root`` the call names; an absent, null or empty one is not named."""
-    return [v for v in (body.get("project_root"), *args.getlist("project_root")) if v]
+def _normalise(value: str) -> str:
+    from pathly_orchestrator.supervisor.chief_session import normalise_project_root
 
-
-def board_values(rule: str, body: Mapping) -> list:
-    """Every other value the route will use as a project: a project board's scope, an override."""
-    named: list = []
-    if body.get("board") == "project":
-        scope = body.get("scope")
-        if isinstance(scope, str) and scope.strip():
-            named.append(scope)
-        elif rule == "/comms/post" and body.get("feature"):
-            # ``/comms/post`` falls back to ``feature`` for a missing or blank scope.
-            named.append(body["feature"])
-    if rule == "/code/query":
-        # The route logs a discovery on the project board at this scope, except for a blank scope
-        # or a parenthesized marker such as "(interactive)", which it leaves unlogged.
-        scope = body.get("scope") or body.get("feature")
-        unlogged = isinstance(scope, str) and (
-            not scope.strip() or scope.strip().startswith("(")
-        )
-        if scope and not unlogged:
-            named.append(scope)
-    override = body.get("project") if rule == "/comms/project/decompose" else None
-    if override:
-        override = override.strip() if isinstance(override, str) else override
-        if override not in _NO_OVERRIDE:
-            named.append(override)
-    return named
+    return normalise_project_root(value)
 
 
 def is_own(value: object, own: str) -> bool:
     """True when ``value`` names the project whose normalised root is ``own``."""
-    from pathly_orchestrator.supervisor.chief_session import normalise_project_root
+    return isinstance(value, str) and _normalise(value) == own
 
-    return isinstance(value, str) and normalise_project_root(value) == own
+
+def _path_like(value: str) -> bool:
+    return "/" in value or "\\" in value or bool(_DRIVE.match(value))
+
+
+def _usable(value: object) -> bool:
+    """A value a route takes as a scope: truthy, and not a blank string."""
+    return bool(value) and not (isinstance(value, str) and not value.strip())
+
+
+def _board(source: Mapping, read: ScopeRead) -> str | None:
+    """The board a scope read applies to; None when it has no board (a bare scope id)."""
+    if read.board_key is None:
+        return read.board
+    raw = source.get(read.board_key)
+    name = raw.strip() if isinstance(raw, str) else ""
+    return name if name in _BOARDS else (read.board or "feature")
+
+
+def _bound_scope(source: Mapping, read: ScopeRead) -> object:
+    """The scope the route will use if it is one the chief's project must own, else None."""
+    value = None
+    for key in read.keys:
+        if _usable(source.get(key)):
+            value = source.get(key)
+            break
+    if value is None:
+        return None
+    if isinstance(value, str):
+        text = value.strip()
+        if text in read.skip_exact or text.startswith(read.skip_prefix):
+            return None
+    board = _board(source, read)
+    if board is None:
+        # A bare scope id is a project root when it looks like a path; else a feature name.
+        return None if isinstance(value, str) and not _path_like(value) else value
+    return value if board == "project" else None
+
+
+def _under(path: str, own: str, anchored: bool) -> bool:
+    """True when ``path`` lies under ``own``. A relative path is read against ``own`` when it is
+    ``anchored`` (a code query's target), else it is not a path of the project at all.
+    """
+    text = path.strip().replace("\\", "/")
+    if not own:
+        return False
+    if not (text.startswith("/") or _DRIVE.match(text)):
+        if not anchored:
+            return False
+        text = f"{own.rstrip('/')}/{text}"
+    text = posixpath.normpath(text)
+    base = own.rstrip("/")
+    return text in (own, base) or text.startswith(base + "/")
+
+
+def _recovered_path(source: Mapping, read: TextPath) -> str | None:
+    """The path a post of ``when_type`` takes from its prose when ``path_key`` is blank."""
+    given = source.get(read.path_key)
+    if (isinstance(given, str) and given.strip()) or source.get(
+        "type"
+    ) != read.when_type:
+        return None
+    text = source.get(read.text_key)
+    if not isinstance(text, str):
+        return None
+    from .blueprints.comms._helpers import extract_artifact_path
+
+    return extract_artifact_path(text)
+
+
+def _foreign_root(fields: Fields, body: Mapping, args, own: str) -> bool:
+    """A project root anywhere in the request that is not the chief's, whether the route reads
+    it or not.
+    """
+    return any(
+        value and not is_own(value, own)
+        for key in {ROOT_KEY, *fields.roots}
+        for value in (body.get(key), *args.getlist(key))
+    )
+
+
+def _unnamed_root(fields: Fields, source: Mapping) -> bool:
+    """The route falls back to another project unless the root is named where it reads it."""
+    must_name = fields.names_root or any(source.get(k) for k in fields.names_root_when)
+    return must_name and not any(source.get(k) for k in fields.roots)
+
+
+def _foreign_file(fields: Fields, source: Mapping, own: str) -> bool:
+    """A file the route reads or stores that lies outside the chief's project."""
+    for keys, anchored in ((fields.paths, True), (fields.abs_paths, False)):
+        for key in keys:
+            value = source.get(key)
+            if isinstance(value, str) and value.strip():
+                if not _under(value, own, anchored):
+                    return True
+    for text_read in fields.text_paths:
+        value = _recovered_path(source, text_read)
+        if value is not None and not _under(value, own, False):
+            return True
+    return False
+
+
+def project_refusal(
+    rule: str, method: str, session: Mapping, body: Mapping, args
+) -> str | None:
+    """The reason a call is not for this chief's project, or None.
+
+    ``method`` is the request method with HEAD already read as GET; ``body`` is one reading of the
+    JSON body (``{}`` for a GET) and ``args`` the query string.
+    """
+    fields = ROUTE_FIELDS.get((rule, method))
+    if fields is None:
+        return NO_ENTRY
+    own = _normalise(session.get("project_root") or "")
+    source = args if method == "GET" else body
+
+    if _foreign_root(fields, body, args, own):
+        return NOT_OWN
+    if _unnamed_root(fields, source):
+        return NOT_NAMED
+    for read in fields.scopes:
+        scope = _bound_scope(source, read)
+        if scope is not None and not is_own(scope, own):
+            return NOT_OWN
+    if _foreign_file(fields, source, own):
+        return NOT_INSIDE
+    return None

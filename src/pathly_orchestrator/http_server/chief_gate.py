@@ -6,17 +6,18 @@ A chief whose token is revoked or whose session is closed gets 401, never the an
 treatment ``caller_identity`` would give it, because anonymous loopback callers can do everything.
 
 For a live chief, the call is classed by ``chief_routes.action_for`` and refused with 403 unless
-the session's tier holds that action, names only its own project (``chief_project``) and, on
-``/comms/post``, posts as the chief. Each check runs over every reading of the body a route may
-get (``_bodies``). Registered in ``app.py`` right after ``_log_request``, so the secret check
-and the rate limit run first. Flask matches the URL rule before any hook runs, so a path no route
-matches (``url_rule`` is None) passes here and Flask answers 404 or 405.
+the session's tier holds that action, names only its own project in the fields its route reads
+(``chief_fields``, applied by ``chief_project``) and, on ``/comms/post``, posts as the chief. Each
+check runs over every reading of the body a route may get (``_bodies``). Registered in
+``app.py`` right after ``_log_request``, so the secret check and the rate limit run first. Flask
+matches the URL rule before any hook runs, so a path no route matches (``url_rule`` is None)
+passes here and Flask answers 404 or 405.
 """
 
 from __future__ import annotations
 
-from .chief_project import board_values, is_own, root_values
-from .chief_routes import NAMES_PROJECT_ROOT, POSTS_AS_CHIEF, action_for
+from .chief_project import project_refusal
+from .chief_routes import POSTS_AS_CHIEF, action_for
 from .run_identity import RUN_TOKEN_HEADER
 
 
@@ -46,19 +47,6 @@ def _human_escalation_check(conn):
 def _asks_for_overrides(body: dict) -> bool:
     """A non-empty ``prompt_override`` or ``stage_overrides``: verbatim text for spawned agents."""
     return bool(body.get("prompt_override")) or bool(body.get("stage_overrides"))
-
-
-def _project_refusal(rule: str, method: str, session: dict, body: dict, args):
-    """The reason a call is not for this chief's project, or None."""
-    from pathly_orchestrator.supervisor.chief_session import normalise_project_root
-
-    own = normalise_project_root(session.get("project_root") or "")
-    roots = root_values(body, args)
-    if not all(is_own(v, own) for v in [*roots, *board_values(rule, body)]):
-        return "that is not this chief's project"
-    if method != "GET" and rule in NAMES_PROJECT_ROOT and not roots:
-        return "a chief names its project_root on this route"
-    return None
 
 
 def _bodies() -> list[dict]:
@@ -107,7 +95,7 @@ def _refusal(rule, method: str, session: dict, conn, body: dict):
             allowed,
             "prompt_override and stage_overrides need the run action",
         )
-    other = _project_refusal(rule.rule, method, session, body, request.args)
+    other = project_refusal(rule.rule, method, session, body, request.args)
     if other is not None:
         return _refuse(tier, action, allowed, other)
     if rule.rule in POSTS_AS_CHIEF and body.get("from") != "chief":

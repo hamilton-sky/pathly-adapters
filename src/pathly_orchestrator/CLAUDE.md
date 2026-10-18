@@ -629,26 +629,68 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
   `/comms/tasks/status` and the FSM routes that take `force_past_gate`): the chief never forces
   past a human gate and never marks a task done itself. An unknown `/runs/<run_id>/<verb>` is
   unlisted too. `tests/http_api/test_chief_gate.py` walks `app.url_map` and fails when an unlisted
-  route is not refused to an operator, or when the table lists a rule no route has, so a route
-  added later is refused to the chief until someone lists it.
+  route is not refused to an operator, when the table lists a rule no route has, or when a route
+  the chief can reach has no `ROUTE_FIELDS` entry (below), so a route added later is refused to
+  the chief until someone lists it and says which project it reads.
 - **Overrides.** A body with a non-empty `prompt_override` or `stage_overrides`, on any route,
   also needs `run` (the 403 names `run`): the Planner may call the decompose routes but cannot
   hand verbatim prompt text to the agents they start.
-- **One project.** Every value the call uses to name a project must be the session's, compared
-  after `supervisor/chief_session.normalise_project_root` (forward slashes, no trailing slash),
-  else 403; a value that is not a string is refused too. The values are `project_root` (body or
-  query string), the `scope` of a call with `board: "project"` (on `/comms/post` a missing or
-  blank `scope` is read as `feature`, as the route does, so a project-board post must give its
-  own root as `scope`), the `scope` or `feature` of a `/code/query` that is not blank or a
-  parenthesized marker such as `(interactive)` (the route logs a `discovery` row at that scope
-  on the project board), and the `project` override of `/comms/project/decompose`
-  (`http_server/chief_project.py`). The routes that start an agent in a working directory
-  (`chief_routes.NAMES_PROJECT_ROOT`: `POST /runs`, `/comms/goals/run`, `/comms/run`,
-  `/comms/tasks/run` and the three decompose routes) also refuse a call that names no
-  `project_root` at all (absent, null, empty), because the server would use its own working
-  directory, which can be another project. The gate cannot fill it in from the session, since
-  the route reads the request's own body. On `/comms/post`, a `from` other than `chief` (or
-  none) is 403.
+- **One project.** `http_server/chief_fields.py::ROUTE_FIELDS` is the inventory: one entry per
+  `(rule, method)` a chief can get past the action table, saying which request fields the view
+  reads as a project root, a board scope or a file, and which ids it reads that the gate does not
+  bind. `chief_project.project_refusal` applies the entry with one function, reading the query
+  string for a GET and the JSON body for every other route, as the views do; a route with no entry
+  is 403 (`the gate has no project entry for this route`), so the gate fails closed. Every value is
+  compared after `supervisor/chief_session.normalise_project_root` (forward slashes, no trailing
+  slash) with the session's, else 403; a value that is not a string is refused too.
+  - **`project_root`** is checked wherever it appears, in the body or the query string of any
+    route.
+  - **Naming it.** A route that falls back to the server's working directory,
+    `PATHLY_PROJECT_ROOT` or every project when `project_root` is absent (`names_root`) is also
+    refused when the call names none (absent, null, empty) in the place the route reads it. A
+    root in the query string of a POST does not count: those views read the body. The routes are
+    `POST /runs`, `/comms/goals/run`, `/comms/run`, `/comms/tasks/run`, the three decompose
+    routes and `/code/query`, and the GETs `/db/features`, `/db/stats`, `/db/stats/trends`,
+    `/db/recent`, `/db/rollup`, `/db/features/<feature>/{agents,events,otel,runs}`, `/status` and
+    `/comms/artifacts/section`; `POST /comms/post` needs it only when it carries `context_refs`.
+    The gate cannot fill it in from the session, since the route reads the request's own fields.
+  - **A project board's scope.** When the board a call reads or writes is `project`, the scope must
+    be the session's root. The scope is the first usable value (truthy, not a blank string) of the
+    keys the route reads, as the view's `scope or feature` does (`/comms/post`, `/comms/search`
+    and the board reads `GET /comms`, `/comms/tasks`, `/comms/goals` take `scope`, else
+    `feature`; `/comms/artifacts`, `/comms/run/status`, `/runs`, `/comms/run` and
+    `/comms/run/stop` take `scope` only). A missing or unknown `board` is `feature`, which is not
+    bound. So a project-board post, search or read gives its own root as `scope`. A scope with no
+    `board` (`GET /comms/trash`, `/hq/context`'s `board`, the `scope` or `feature` of
+    `/comms/artifacts/section` and `/comms/artifacts/<id>/section`) is a project root when it looks
+    like a path (a `/`, a `\` or a drive prefix) and is then bound; otherwise it is a feature name.
+    `/code/query` logs a `discovery` row on the project board at its `scope` or `feature`, so that
+    is bound unless it is blank or a parenthesized marker such as `(interactive)`; the `project`
+    override of `/comms/project/decompose` is a project-board scope (the literal `project` means
+    none).
+  - **A file.** `/code/query`'s `target` (read against `project_root`, so a relative one is the
+    project's), `/comms/post`'s `artifact_path` (it must be absolute; the row keeps it and `GET
+    /comms/artifacts/<id>/section` later reads it whole, so it is checked at the post) and the path
+    an `artifact` post takes from its `text` when `artifact_path` is blank (always relative, so
+    refused) must lie under the session's root once their `..` segments are collapsed. This is a
+    text check: symlinks are not followed and a Windows drive letter is compared as written.
+  - On `/comms/post`, a `from` other than `chief` (or none) is 403.
+  - **Not bound.** The table lists these as `unbound` rather than leaving them out. (1) Calls that
+    name their target by id or by name: `goal_id` (`/comms/goals/run|stop|decompose`, `/runs` with
+    a goal, `/comms/tasks`, `/comms/artifacts`), a task's `message_id` (`/comms/tasks/run|stop`),
+    `run_id`, `topic`, `artifact_id`, a feature name (feature boards are keyed by name only, so
+    `board: "feature"` is not bound to a project) and the posting fields `goal_id` and `run_id`.
+    A chief that knows such an id can reach another project's row. Ticket 14 binds the run ids of
+    `/runs/<run_id>/stop|<action>`, the message ids of `/comms/acknowledge|answer|supersede` and
+    the `topic` of `/runner/agent-answer`; `goal_id`, task ids and the id-addressed reads (`GET
+    /runs/<run_id>`, `/runner/status`, `/status?topic=`, `/db/runs/<id>/cost`,
+    `/comms/artifacts/<id>/section`, `/comms/goals/refs-coverage`) have no ticket yet. (2) Routes
+    that are fleet-wide and have no project filter to bind: `GET /db/rollup`'s `global` block
+    (it sums every project whatever `project_root` says), `GET /telemetry/trends` with a named
+    feature (summed across projects), and `GET /metrics` and `/metrics/json` (server counters). A
+    status chief can read those, and so can every other token. (3) The packaged and global reads
+    (`/flows`, `/registry/*`, `/skills/catalog`, the `/comms/default-*` settings, `/health`) name
+    no project.
 - **The gate reads the body as the route will.** The comms routes read it with
   `comms/_helpers.read_json_body` (UTF-8, then cp1252, whatever the content type); `/runs`,
   `/runs/<id>/<verb>`, `/runner/agent-answer` and `/code/query` read it with `get_json`, which
@@ -661,17 +703,25 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
 - **A project writer.** `chief` is in `_PROJECT_WRITERS` and the default project write list
   (`db/queries/app_settings._DEFAULT_WRITE_PERMISSIONS["project"]`), not the global one; a saved
   project list that omits it keeps the existing `/comms/post` 403 naming the allowed roles.
+- **Reads are bound too, where the route can be.** A status chief's reads go through the same
+  table: a project-board read of another project's scope, a `/db/*` read or `GET /runs` filtered
+  to another project, a code query of another project and a `project_root` that is not the
+  session's are 403 (the lists above). The reads that cannot be bound are the ones under "Not
+  bound": id-addressed reads, the fleet-wide aggregates, and a feature name.
 - **Reads are not all pure.** The gate treats every GET (and `POST /comms/search`,
   `/code/query`) as `read`, so a status chief can cause three small writes: `GET
   /comms/artifacts/section?scope=<feature>&trail=x` posts a `status` row ("context pull") on that
   feature's board when the hydrate succeeds (feature boards are keyed by feature name only, so the
-  gate cannot bind it to a project); `GET /menu/<name>` broadcasts a menu push over SSE;
-  `POST /code/query` can start a debounced re-index of the project it names (bound above) and logs
-  a `discovery` row (bound above). They stay `read` because a status chief must be able to read
-  artifact sections and query code; none of them can change a decision, a task or a run.
-- **Not here yet.** Calls that name a run or message by id are not bound to the chief's project
-  (ticket 14); the cite rule for `answer` (10), the cost and run ceiling (15) and the directive
-  route (12) are later tickets.
+  gate cannot bind the feature name to a project, but it does bind the `project_root` the section
+  is read from); `GET /menu/<name>` broadcasts a menu push over SSE; `POST /code/query` can start a
+  debounced re-index of the project it names (bound above) and logs a `discovery` row (bound
+  above). They stay `read` because a status chief must be able to read artifact sections and query
+  code; none of them can change a decision, a task or a run.
+- **Not here yet.** Calls that name a run, a message or a goal by id are not bound to the chief's
+  project (ticket 14 binds some of the writes; the rest are listed under "Not bound"); the cite
+  rule for `answer` (10), the cost and run ceiling (15) and the directive route (12) are later
+  tickets. Ticket 12's `/comms/directives` needs a `ROUTE_FIELDS` entry as well as a
+  `ROUTE_ACTIONS` one, or the gate refuses it with `NO_ENTRY`.
 
 ### SSE events (GET /events/runner)
 
@@ -927,8 +977,9 @@ pathly_orchestrator/
     app.py                 # Flask app factory, blueprint registration, main() (which calls supervisor.chief_session.chief_startup_cleanup() before serving; a failure is logged and boot goes on)
     middleware.py          # _log_request, _log_response, rate limiting, metrics
     chief_gate.py          # chief_gate(): the before_request hook (registered after _log_request) that refuses a chief token's call its tier, project or poster does not allow, and answers 401 for a closed chief session — see "Chief gate"
-    chief_routes.py        # the chief gate's route table as data: ROUTE_ACTIONS ((rule, method) -> action), the GET refusals, `NAMES_PROJECT_ROOT`, the post-type and run-verb refinements and action_for()
-    chief_project.py       # which project a chief request names (project_root, a project board's scope, a code query's scope, the project-decompose override) and whether it is the session's — see "Chief gate"
+    chief_routes.py        # the chief gate's route table as data: ROUTE_ACTIONS ((rule, method) -> action), the GET refusals, the post-type and run-verb refinements and action_for()
+    chief_fields.py        # the chief gate's second route table: ROUTE_FIELDS ((rule, method) -> Fields), per route the request fields it reads as a project root, a board scope or a file, which must name the root, and the ids it leaves unbound (with a note for the fleet-wide reads); a test fails when a reachable route has no entry
+    chief_project.py       # project_refusal(): applies a ROUTE_FIELDS entry to one request (query string for a GET, body otherwise) and says whether the project it names is the session's — see "Chief gate"
     run_identity.py        # caller_identity(request) -> CallerIdentity: kind run|anonymous from the X-Pathly-Run-Token header (body role/run_id/from never read); unknown/revoked token logged at info with the remote addr; `ui` kind reserved (RRP-2b). Nothing applies a policy from it yet
     sse.py                 # SSE globals (_clients, _runner_clients, _menu_clients) + broadcast helpers
     pricing.py             # MODEL_PRICING, compute_cost_usd()

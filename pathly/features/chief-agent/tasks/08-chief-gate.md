@@ -1,7 +1,7 @@
 # Refuse every chief call its tier does not allow
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 04, 05, 07
 Test first: yes
 
@@ -158,6 +158,18 @@ prints passed
   request names and whether it is the session's), `chief_routes.NAMES_PROJECT_ROOT`, `chief_gate.py`
   split into `_bodies` / `_refusal` / `_project_refusal`, and the "Chief gate" section rewritten
   for the body and project rules and the residual writes of a read.
+- Round 3 (see **Review fixes (round 2)**): `http_server/chief_fields.py` (new, 298 lines):
+  `ROUTE_FIELDS`, one `Fields` entry per route a chief can reach (the 19 listed POST routes that
+  exist, `/comms/directives` aside, and every GET the gate lets through: 84 entries), saying which
+  request fields the view reads as a project root, a board scope or a file, and which ids it
+  reads that the gate does not bind. `chief_project.py` rewritten
+  (168 lines) to one generic function, `project_refusal(rule, method, session, body, args)`, that
+  applies an entry (the old `root_values`, `board_values` and the hard-coded route branches are
+  gone). `chief_routes.NAMES_PROJECT_ROOT` is gone (it is `Fields.names_root` now); `chief_gate.py`
+  calls `project_refusal` and lost `_project_refusal` (137 lines). The "Chief gate" section of
+  `src/pathly_orchestrator/CLAUDE.md` is rewritten for the table, with the unbound items listed
+  plainly, and the package tree gains `chief_fields.py`. `tests/http_api/test_chief_gate.py`
+  (483 tests; the test-only commit is `f298248`); `tests/http_api/INDEX.md` regenerated.
 
 **Proof** (each run fresh, after the last edit to code or tests)
 
@@ -290,6 +302,21 @@ prints passed
   its own root as `scope`: a feature name is refused, because the route logs a project-board row at
   whatever scope it is given. It stops being right if the chief needs its code queries logged under
   a feature name; the fix is then to bind the logged row, not to drop the check.
+- Round 3: the project binding is textual (`normalise_project_root`, then `posixpath.normpath` for a
+  file). A symlink inside the project that points into another project is not followed, so a
+  `/code/query` `target` or an `artifact_path` through one passes; a Windows drive letter is
+  compared as written (`c:/p` is not `C:/p`). It stops working on a project that links other
+  projects into its tree; the upgrade is `os.path.realpath` at the gate, at the price of a
+  filesystem call per request and a different answer on a path that does not exist yet.
+- Round 3: the calls that name their target by an id or a name are not bound (the `unbound` entries
+  of `ROUTE_FIELDS`; the list is in the "Chief gate" section). The new ones this round makes
+  visible are the id-addressed reads (`GET /runs/<run_id>`, `/runner/status`, `/status?topic=`,
+  `/db/runs/<id>/cost`, `/comms/artifacts/<id>/section`, `/comms/goals/refs-coverage`) and the
+  `goal_id` and task `message_id` of the run and stop routes; ticket 14 covers neither. Two reads
+  have no project filter at all and cannot be bound: `GET /db/rollup`'s `global` block and `GET
+  /telemetry/trends` with a feature, plus `GET /metrics` and `/metrics/json`. The owner's
+  decision (reads are bound where the route allows it) is met for every other route; these are
+  stated in the living doc, not hidden.
 
 **Review fixes** (round 1, quality review; the round starts at `c2de8da`. Test-only commits first:
 `b5014df` and `286bb1e`, each run red before any source change.)
@@ -365,6 +392,105 @@ Proof after the fixes (each run fresh, after the last edit to code, tests and do
   `bandit -q -r src/ -ll -x src/pathly_data/`, `check_adapters.py`, `check_entry_points.py`. Smoke
   and `python -m build --wheel` exit 0. No `# noqa`, `# nosec` or `type: ignore` added.
 
+**Review fixes (round 2)** (quality review; the round starts at `5631406`. Test-only commit first:
+`f298248`, run red before any source change: with `chief_fields.py` absent, 143 of the 483 tests
+failed and 340 passed. The structure is fixed, not only the cases the review named.)
+
+The cause of findings 1 to 3 is one: which request fields name a project was code, in branches per
+route (`board_values`, `root_values`), so a route's fallback (`scope or feature` on `/comms/search`)
+or its source (body, not query string) was missed by hand. Now it is data next to `ROUTE_ACTIONS`.
+I read the view of every route the gate lets a chief reach (19 POST routes and 65 GET rules, 84
+table entries) and recorded the fields it uses, the source it reads them from and
+the fallback it applies; a test then holds the table to `app.url_map`.
+
+1. *major, a query-string `project_root` satisfied "names its project".* Reproduced as the finding
+   says (the test the finding names asserted it). Fixed: the rule is `Fields.names_root` of the
+   route's entry and is judged against the source the view reads, the body of a POST and the query
+   string of a GET (verified in the source: no listed POST view reads `request.args`, no GET view
+   reads a body; a tripwire test scans the views and fails if that changes). A root only in the
+   query string of `POST /runs`, `/comms/goals/run`, `/comms/run`, `/comms/tasks/run` or the three
+   decompose routes is 403 `a chief names its project_root on this route`; a foreign root in either
+   place is still `that is not this chief's project`. `test_a_project_named_in_the_query_string_counts`
+   is flipped to `test_a_project_named_only_in_the_query_string_does_not_count` (403). New: the seven
+   routes with the root only in the query string, only in the body, and in both; for a planner too.
+2. *major, `/comms/search` and the `board=project` reads.* Reproduced (B's seeded decision text came
+   back to all three tiers). Fixed both ways the review gave, and the owner's decision is that reads
+   are bound like writes: `/comms/search` reads `scope`, else `feature` (the first usable value:
+   truthy and not a blank string, so `0`, `null`, `""` and `"  "` fall through, as the view's
+   `scope or feature` does), on the board `board` names (an unknown or missing one is `feature`,
+   as the view takes it); `GET /comms`, `/comms/tasks`, `/comms/goals` take the same from the query
+   string, and `/comms/artifacts`, `/comms/run/status` their `scope`; `/comms/trash` has no board,
+   so its `scope` is bound when it looks like a path. The scope must be the session's root when the
+   board is `project`. Tests: the search with `feature` as the other project and `scope` absent, `0`,
+   `null`, `""`, `false` or `[]`, and with the scope given, for the three tiers; `GET /comms`,
+   `/comms/tasks` and `/comms/goals` of another project's board by `scope`, by `feature`, with a
+   padded `board` and with both, for the three tiers; the same reads on the chief's own board pass
+   and return its rows; a feature board stays unbound.
+3. *minor, hard-coded routes.* `chief_fields.ROUTE_FIELDS` is the table and `project_refusal` the one
+   function that applies it; `board_values`, `root_values` and the route branches are removed (a
+   mutation that switches off any one rule fails a named test). three tests walk `app.url_map` the way the action walk does and fail for a reachable `(rule,
+   method)` with no entry (`test_every_route_a_chief_can_reach_says_which_fields_it_reads_as_a_
+   project`), for an entry whose rule no route has (`test_the_field_table_lists_no_route_that_does_
+   not_exist`) and for an entry that names no field and gives no `note` (`test_an_entry_names_a_
+   field_or_gives_a_reason`); a route with no entry is refused by the gate (`NO_ENTRY`), so the
+   gate fails closed even if a test is not run.
+4. *minor, an absolute `/code/query` `target`.* Fixed: `target` is anchored on the session's root (a
+   relative one is the project's own) and must lie under it once its `..` segments are collapsed, in
+   POSIX and Windows drive spelling (`C:\other`, `c:/other`), else 403 `a chief names only files
+   inside its project`; `/code/query` also now has to name `project_root` (without it the backend
+   resolves a relative target against the server's directory). 11 outside targets for the 3 tiers
+   are refused, 8 inside ones pass, and the root is required. Same rule for the file `POST
+   /comms/post` stores as `artifact_path` (it must be absolute; `GET /comms/artifacts/<id>/section`
+   later reads whatever path the row keeps, whole) and the path an `artifact` post takes from its
+   `text` when `artifact_path` is blank (always relative, so refused): 9 refused variants, an
+   inside one and a note that merely mentions a path pass.
+5. *minor, missing tests.* Added with 1 and 2: the query-string-only root on all seven run routes,
+   the `board=project` reads, the search fallbacks, the target and artifact path cases, the
+   completeness walk, a source-scan tripwire for the body/query rule, and a fail-closed test that
+   empties the table and sees 403 on every reachable route.
+
+Found by reading the routes, not named by the review, and bound the same way: `POST /comms/post`
+with `context_refs` must name `project_root` (the refs resolve under the server's directory
+otherwise); the `/db/features`, `/db/stats`, `/db/stats/trends`, `/db/recent`, `/db/rollup`,
+`/db/features/<feature>/{agents,events,otel,runs}`, `/status` and `GET /comms/artifacts/section`
+reads fall back to `PATHLY_PROJECT_ROOT` or to every project when `project_root` is absent, so they
+must name it (a status chief that sends no root used to read the server's own project's runs and
+costs); the board-less scope ids (`/comms/trash`, `/hq/context`, the two artifact-section routes)
+are bound when they look like a path; `GET /runs`, `/api/*`, `/skills/*` and `/flows/stage-config`
+filter by the `project_root` they are given, which is bound.
+
+Stated plainly instead of bound, because the route cannot be (living doc, "Chief gate", bullet "Not
+bound", and Shortcuts above): calls addressed by an id or a name (`goal_id`, a task's `message_id`,
+`run_id`, `topic`, `artifact_id`, a feature name) and the fleet-wide reads (`/db/rollup`'s `global`
+block, `/telemetry/trends` with a feature, `/metrics`). The wording that implied a binding that
+did not exist ("Every value the call uses to name a project must be the session's") is replaced.
+Tests I edited, not only added: the `/code/query` case of `test_a_status_chief_may_call_the_read_
+routes` and the `_code_query` helper send `project_root` now (the route requires it); the query-
+string test was flipped (item 1); `test_the_routes_that_must_name_a_project_are_the_listed_run_and_
+decompose_routes` was replaced by the table-based tests (item 3); no assertion was loosened.
+
+Proof after the fixes (each run fresh, after the last edit to code and tests; docs were edited
+after the last full code run, and the Done-when commands were run again after that):
+
+- `python -m pytest tests/http_api/test_chief_gate.py -q -p no:cacheprovider` -> `483 passed in
+  132.14s`, exit 0. `python -m pytest tests/comms_board/test_comms_write_perm.py -q -p
+  no:cacheprovider` -> `33 passed in 7.33s`, exit 0.
+- Mutation checks, each against the matching tests, each failing (17): naming rule off; the query
+  string counting as naming; the `/comms/search` `feature` fallback off; the board name not
+  stripped; `_under` always true; the text-recovered path off; a missing entry passing; the GET
+  scope reads off; bare scope ids unbound; absolute paths off; relative targets not anchored; a
+  Windows drive not absolute; the universal `project_root` check off; the `(marker)` skip off; the
+  decompose override off; the `context_refs` naming off; the `/db/stats` naming off.
+- Test command from `commands.md` -> `1856 passed, 2 skipped in 414.75s`, exit 0 (the 2 skips are
+  not mine). `tests/consistency tests/local_operator tests/hq_copilot` -> `155 passed in 20.91s`.
+- Lint chain from `commands.md`, piece by piece, all exit 0: `black --check src/ tests/` (588 files
+  unchanged), `mypy` (`no issues found in 325 source files`), `check_file_size.py` (`none new, none
+  grown`; `chief_fields.py` 298, `chief_project.py` 168, `chief_gate.py` 137, `chief_routes.py` 117
+  lines), `check_no_mirror_reads.py`, `gen_test_index.py --check`, `lint-imports` (`1 kept, 0
+  broken`), `bandit -q -r src/ -ll -x src/pathly_data/` (no SQL added), `check_adapters.py`,
+  `check_entry_points.py`. Smoke and `python -m build --wheel` exit 0. No `# noqa`, `# nosec` or
+  `type: ignore` added.
+
 **For later tickets**
 
 - Ticket 09: no change to the table is needed for `/chief/human-messages`. Its hook posts with no
@@ -377,22 +503,34 @@ Proof after the fixes (each run fresh, after the last edit to code, tests and do
   `chief_gate.py` is 147 lines, so a new `chief_cite.py` fits as the ticket plans.
 - Ticket 12: `/comms/directives` is already mapped to `decide`, `chief` is already a project
   writer, and `test_chief_gate.py::PLANNED` may drop its entry once the route exists. The living-doc
-  "Chief gate" section says the route arrives with ticket 12; fix that sentence then.
+  "Chief gate" section says the route arrives with ticket 12; fix that sentence then. The route
+  also needs an entry in `chief_fields.ROUTE_FIELDS` (the fields it reads as a project root, board
+  scope or file; `Fields(roots=("project_root",), names_root=True, ...)` if it falls back to the
+  server's directory): without one the gate answers 403 `the gate has no project entry for this
+  route` and `test_every_route_a_chief_can_reach_says_which_fields_it_reads_as_a_project` fails.
 - Ticket 14: add `chief_bind.target_in_project(...)` after the action check in
   `chief_gate._refusal()` (`request.view_args` and the body are already in hand there);
   `chief_project` covers the project a request names (`project_root`, a project board's `scope`,
-  a code query's scope, the decompose override), not a run or message id. Update the "Not here yet"
-  bullet of the "Chief gate" section when it lands. The feature-board "context pull" row (Shortcuts)
-  is the other unbound write.
+  a code query's scope, the decompose override), not a run or message id. The `unbound` entries of
+  `chief_fields.ROUTE_FIELDS` are the list of what is left: take the ids ticket 14 binds off it
+  as they land, and update the "Not here yet" and "Not bound" bullets of the "Chief gate" section.
+  Not on ticket 14's list, and still unbound: `goal_id` (`/comms/goals/run|stop|decompose`, `/runs`
+  with a goal), a task's `message_id` (`/comms/tasks/run|stop`) and the id-addressed reads (`GET
+  /runs/<run_id>`, `/runner/status`, `/status?topic=`, `/db/runs/<id>/cost`,
+  `/comms/artifacts/<id>/section`, `/comms/goals/refs-coverage`); add them to ticket 14 or give
+  them a ticket. The feature-board "context pull" row (Shortcuts) is the other unbound write.
 - Ticket 15: `POST /runs` is the `("/runs", "POST")` entry; ticket 15's ceiling can key on it. The
   `GET /chief/session` route is already a `read` for the chief, so its new fields reach it.
 - Ticket 17: the chief's prompt must tell it to post with `"from": "chief"` and to name its
   project by the exact spelling it was opened with (`project_root` is compared textually, after
-  `normalise_project_root`). It must also say: send `project_root` on every run, goal and decompose
-  call (a call without it is 403); give the project root as `scope` on a project-board post and a
-  run on the project board (a missing scope is read as `feature`, which is 403); use a
-  parenthesized scope such as `(interactive)` on `/code/query` (a feature name is 403). `pathly api`
-  may fill `project_root` in from the session itself.
+  `normalise_project_root`). It must also say: send `project_root` in the JSON body (a query string
+  does not count on a POST) of every run, goal, decompose and `/code/query` call, and in the query
+  string of the `/db/*`, `/status` and `/comms/artifacts/section` reads (a call without it is
+  403); give the project root as `scope` on a project-board post, search, read or run (a missing
+  scope is read as `feature`, which is a feature board, and a feature name given for a project
+  board is 403); use a parenthesized scope such as `(interactive)` on `/code/query` (a feature name
+  is 403) and a `target` inside the project; give `artifact_path` as an absolute path inside the
+  project. `pathly api` may fill `project_root` in from the session itself.
 - Ticket 13: `test_status_chief_reads_and_is_refused_a_note` already checks "a Status-style token
   is refused on a write" at the HTTP level; the operator "starts a run" scenario is not covered
   here beyond the operator passing the gate on `POST /runs`.
