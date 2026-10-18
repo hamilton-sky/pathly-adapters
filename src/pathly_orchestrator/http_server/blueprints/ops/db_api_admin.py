@@ -11,7 +11,12 @@ from ._db_api_bp import _ALLOWED_KEYWORDS, _FORBIDDEN_KEYWORDS, _get_db, bp, log
 
 @bp.route("/db/query", methods=["POST"])
 def db_query():
-    """Sandboxed SELECT-only SQL query."""
+    """Sandboxed SELECT-only SQL query, run under ``PRAGMA query_only``.
+
+    The first-word check is only a first filter: ``WITH x AS (...) INSERT ...`` passes it.
+    ``query_only`` makes SQLite refuse any write (400 with its message). ``execute`` takes one
+    statement, so the SQL cannot switch the pragma off; never use ``executescript`` here.
+    """
     try:
         data = request.get_json() or {}
         sql = str(data.get("sql", "")).strip()
@@ -21,7 +26,11 @@ def db_query():
         if first_word in _FORBIDDEN_KEYWORDS or first_word not in _ALLOWED_KEYWORDS:
             return jsonify({"error": "Only SELECT queries are allowed"}), 400
         conn = _get_db()
-        rows = conn.execute(sql).fetchmany(500)
+        try:
+            conn.execute("PRAGMA query_only = ON")
+            rows = conn.execute(sql).fetchmany(500)
+        finally:
+            conn.execute("PRAGMA query_only = OFF")
         return jsonify({"rows": [dict(r) for r in rows]})
     except sqlite3.Error as e:
         return jsonify({"error": str(e)}), 400

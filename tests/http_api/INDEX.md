@@ -4,7 +4,7 @@
 
 HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, prompt-event contract.
 
-15 test file(s).
+16 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -14,6 +14,7 @@ HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, 
 | `test_config.py` | Tests for Settings.from_env() — specifically bind-host validation | 8 |
 | `test_db_agents_route.py` | GET /db/agents — registry-backed agent list for the spawn-policy Settings model-policy UI | 3 |
 | `test_db_features_fields.py` | Tests for the state-one-authority /db/features extension (split-db-api-explorer) | 7 |
+| `test_db_query_read_only.py` | POST /db/query runs its statement read-only | 5 |
 | `test_event_prompt_timestamps.py` | covers prompt json event examples include timestamps | 1 |
 | `test_floor_allow_route.py` | build-proof 03: POST /comms/tasks/floor-allow sets a task's floor allow list, humans only | 9 |
 | `test_http_server.py` | Integration tests for the HTTP server endpoints | 26 |

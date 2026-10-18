@@ -127,11 +127,12 @@ posts; a post without one is stored as unverified (`none`). This is the identity
 
 No change to which rows any agent can read: no production code calls the policy
 (`retrieve_board_context`, `POST /comms/search` and `GET /comms` select the same rows as
-before), so a reviewer still reads the builder's posts. Known limits: Studio's own posts carry
+before), so a reviewer still reads the builder's posts. `POST /db/query` runs its statement under
+`PRAGMA query_only`, so a `WITH ... INSERT|UPDATE|DELETE` is refused with a 400 instead of writing
+a row with a forged stamp. Known limits: Studio's own posts carry
 no token yet and are stored `none`; the agent `curl`s to `/code/query` and `/record_phase` send
 none; roles are minted from a flow's `agent_map`, which differs from its `role_map` in some
-states; `POST /db/query` still accepts a `WITH ... INSERT`, which can write a row with a
-forged stamp; and a board restored from a `BOARD.json` snapshot (`POST /comms/hydrate`) keeps
+states; and a board restored from a `BOARD.json` snapshot (`POST /comms/hydrate`) keeps
 the stamps written in the file. Not included: wiring the policy into the read paths,
 `(board, scope)` pair binding, the UI token.
 
