@@ -1,7 +1,7 @@
 # Refuse every chief call its tier does not allow
 
 Type: task
-Status: resolved
+Status: open
 Blocked by: 04, 05, 07
 Test first: yes
 
@@ -420,5 +420,51 @@ Routes, paths and headers tried that did not get around the gate (each refused b
 Not rated, because the ticket scopes it out (RRP-2b, RRP-4/5): a chief that simply omits `X-Pathly-Run-Token` is anonymous and unrestricted.
 
 Range reviewed: 570a6ee..03801f5, the ticket's own last commit and HEAD. I did not read the Answer. I re-ran both Done when commands (132 passed, 33 passed); black, mypy, lint-imports, check_file_size and gen_test_index --check are clean. I left no files in the repo; my probe tests are in the scratchpad.
+
+REVIEW: FAIL
+
+## Review findings (round 2, quality review)
+
+QUALITY
+
+Range reviewed: 570a6ee..7c9340c. That is the ticket's own last commit and also HEAD, so no later commits were left out. I read the ticket as it stood at 570a6ee, its `## Review findings (round 1)` section, and the diff. I did not read `## Answer`.
+
+Both Done when commands pass: 313 passed for `tests/http_api/test_chief_gate.py` and 33 passed for `tests/comms_board/test_comms_write_perm.py`. black, mypy, lint-imports, check_file_size and `gen_test_index --check` are clean. The repo working tree is clean. My probes are under the scratchpad `rv2/`: `test_h1.py`, `test_h2.py`, `test_h2b.py`, `test_h3.py`, `diff_cache.py`, `conftest.py`.
+
+1. major src/pathly_orchestrator/http_server/chief_gate.py (`_project_refusal`) and chief_project.py: a `project_root` in the query string satisfies the "must name its project_root" rule, but the run and decompose routes read the body only. This is round-1 finding 2b, still open under a different spelling.
+   - Repro (`test_h1.py`): an operator chief on project A, with `start_goal_run` and `start_board_run` patched to record what they receive.
+     - `POST /comms/goals/run?project_root=<A>` with body `{"goal_id":"g1"}` passes the gate, and `start_goal_run` receives `project_root=""`.
+     - `POST /comms/run?project_root=<A>` with `{"scope":"s","board":"feature"}` passes, and `start_board_run` receives `""`.
+     - `POST /runs?project_root=<A>` with `{"kind":"single","scope":"s"}` passes with `""`, and the same URL with `{"kind":"goal","goal_id":"g"}` passes with `""`.
+     - With no `project_root` anywhere, the gate correctly refuses (control).
+   - Cause: `root_values(body, args)` merges the query string into `roots`, then `not roots` is the "names a project" test. None of the seven `NAMES_PROJECT_ROOT` routes reads `request.args`.
+   - The test `test_a_project_named_in_the_query_string_counts` asserts the hole as intended behaviour.
+   - Fix: for `NAMES_PROJECT_ROOT`, require a truthy `project_root` in the parsed body. Keep checking query-string values for the binding only, so they do not count as naming. Flip that test to expect the 403.
+2. major src/pathly_orchestrator/http_server/chief_project.py (`board_values`): the gate does not check every value a route uses as a project board, so a chief can read another project's board. This is the same class as round-1 finding 2, on the read side.
+   - `/comms/search` reads `scope = data.get("scope") or feature`. `board_values` applies the `feature` fallback only when `rule == "/comms/post"`.
+   - Repro (`test_h2.py`, `test_h2b.py`): with another project B's board seeded with a decision, `POST /comms/search` with `{"query":"zebra","board":"project","feature":"<B root>","mode":"keyword"}` returns B's decision text to status, planner and operator chiefs. `scope` is absent, or `0`, `null` or `""`, in these variants. With `scope=<B>` the gate refuses, so only the fallback is missed.
+   - GET routes are checked with an empty body and only `project_root` from the query string. `GET /comms?feature=x&board=project&scope=<B>` returns B's rows to every tier (reproduced, same seeded decision text). `GET /comms/tasks?board=project&scope=<B>` passes the gate (200) with the same query.
+   - `src/pathly_orchestrator/CLAUDE.md` says "Every value the call uses to name a project must be the session's". That is not true for these routes.
+   - Fix: fix `/comms/search` at least (use `scope or feature` when `board == "project"`). For GET, check `board=project` plus `scope` from the query string. Or decide that reads are fleet-wide, since `GET /runs` and `/db/*` already are, and then say so in the ticket and CLAUDE.md. Do not keep a partial binding that implies otherwise.
+3. minor chief_project.py and chief_routes.py: `board_values` hard-codes `/comms/post`, `/code/query` and `/comms/project/decompose` in a branchy function, while the action table is data.
+   - This is why `/comms/search` was missed (finding 2).
+   - Make the per-route fields the route reads as project or scope, with their fallbacks, a table next to `ROUTE_ACTIONS`. Then a test can compare it with the routes the way the url_map walk does for actions.
+4. minor src/pathly_orchestrator/http_server/blueprints/code/query.py via the gate: an absolute `target` into another project passes with `project_root` omitted or set to the chief's own project. The graph is keyed by file path, so the advisory block is read from project B. This is not covered by `project_root` binding. Bind it, or add it to the "Not here yet" paragraph for ticket 14.
+5. minor tests/http_api/test_chief_gate.py: no case for a `project_root` only in the query string on a run route, or for `board=project` read routes. Add both with the fixes for findings 1 and 2.
+
+Ways around the gate I tried that were refused or harmless:
+- Repeated query keys (A then B, and B then A).
+- A percent-encoded key (`project%5Froot`).
+- A body `project_root` of A with a query `project_root` of B.
+- `project_root` given as a number, bool, list or dict, or with leading whitespace, a trailing newline or upper-case letters.
+- A list body, a string body, and a nested `project_root`.
+- Trailing slashes and backslash spellings of the session root, which pass only as the same project.
+- BOM, UTF-16, UTF-32 and cp1252 bodies, and a missing or wrong `Content-Type`.
+- HEAD, 308 redirects and `//` paths.
+- Unlisted methods.
+- `/runs/<id>/<verb>` case and encoding variants.
+- A mismatch between the type the gate classes and the type the route stores.
+
+`cache=False` on the forced parse does not change what a later route handler sees. I ran a Flask app with and without the gate's `_bodies()` call across 12 content-type and body combinations (valid, invalid, empty, BOM, UTF-16, list, form, multipart, cp1252), reading `get_json` with and without `silent`/`force`, `request.json` and `get_data`, and the responses were identical. The one difference, for form content types, appears only when a route reads `request.form` before `get_data()`. No real route does, and `read_json_body` caches first.
 
 REVIEW: FAIL
