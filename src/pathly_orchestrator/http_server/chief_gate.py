@@ -95,7 +95,9 @@ def _refusal(rule, method: str, session: dict, conn, body: dict):
             allowed,
             "prompt_override and stage_overrides need the run action",
         )
-    other = project_refusal(rule.rule, method, session, body, request.args)
+    other = project_refusal(
+        rule.rule, method, session, body, request.args, request.view_args or {}
+    )
     if other is not None:
         return _refuse(tier, action, allowed, other)
     if rule.rule in POSTS_AS_CHIEF and body.get("from") != "chief":

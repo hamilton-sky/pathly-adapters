@@ -17,15 +17,24 @@ What an entry can say:
 * ``roots``: the route reads ``project_root``. Whatever it holds must be the chief's own project.
 * ``names_root``: the route falls back to something else when ``project_root`` is absent (the
   server's working directory or ``PATHLY_PROJECT_ROOT``, or every project), so the chief must
-  name its own. ``names_root_when`` does the same only when one of those keys is present.
+  name its own. ``names_root_when`` does the same only when one of those keys is present,
+  ``names_root_unless`` only when none of those keys is given a usable value (``/telemetry/trends``
+  sums every project unless it is given a feature), and ``names_root_verbs`` only for the
+  ``<action>`` verbs listed (``/runs/<run_id>/retry`` starts a run in the directory its body names;
+  the other verbs act on the run's own state).
 * ``scopes``: a board scope the route reads (see ``ScopeRead``). On the project board the scope
-  is the project root, so it must be the chief's own.
+  is the project root, so it must be the chief's own; ``segment`` marks a scope the route also
+  joins into a path, which must then be one folder name.
 * ``paths`` / ``abs_paths`` / ``text_paths``: a file the route reads or stores. It must lie inside
   the chief's project.
+* ``under_root``: a feature or other name the route reads together with ``project_root`` (its
+  query filters by both), so the root the gate checks bounds it.
 * ``unbound``: a feature, goal, task, message, run, topic or other id the route reads and the gate
   does not bind to the project: feature boards are keyed by name only, and the id-addressed calls
-  are ticket 14's (writes) or have no ticket yet (reads). Listed so the table is the inventory.
-* ``note``: why the route reads no project (it must say, if it names no field).
+  are ticket 14's (writes) or have no ticket yet (reads). Only what is really unbound is listed
+  here, so the table is the inventory.
+* ``note``: why the route reads no project (it must say, if it names no field), or what it sums
+  across projects whatever ``project_root`` says.
 """
 
 from __future__ import annotations
@@ -45,6 +54,10 @@ class ScopeRead:
     a value that looks like a path is a project root and is bound. The scope is bound when the
     board is ``project``; ``skip_exact`` and ``skip_prefix`` name values the route does not use
     as a scope (a ``(interactive)`` marker, the ``project`` literal of the decompose override).
+
+    ``segment`` is for a scope the route also joins into ``<project_root>/pathly/features/<scope>``:
+    on a board other than ``project`` it must be one folder name (no ``/``, ``\\``, ``:``, ``.``
+    or ``..``), or the folder it makes or writes into can lie in another project.
     """
 
     keys: tuple[str, ...]
@@ -52,6 +65,7 @@ class ScopeRead:
     board: str | None = None
     skip_exact: tuple[str, ...] = ()
     skip_prefix: tuple[str, ...] = ()
+    segment: bool = False
 
 
 @dataclass(frozen=True)
@@ -72,15 +86,18 @@ class Fields:
     paths: tuple[str, ...] = ()
     abs_paths: tuple[str, ...] = ()
     text_paths: tuple[TextPath, ...] = ()
+    under_root: tuple[str, ...] = ()
     unbound: tuple[str, ...] = ()
     names_root: bool = False
     names_root_when: tuple[str, ...] = ()
+    names_root_unless: tuple[str, ...] = ()
+    names_root_verbs: tuple[str, ...] = ()
     note: str = ""
 
     def declared(self) -> frozenset[str]:
         """Every request field this entry names."""
         found = {*self.roots, *self.paths, *self.abs_paths, *self.unbound}
-        found.update(self.names_root_when)
+        found.update(self.under_root, self.names_root_when, self.names_root_unless)
         for read in self.scopes:
             found.update(read.keys)
             if read.board_key:
@@ -94,6 +111,8 @@ _ROOT = ("project_root",)
 # `scope`, else `feature`, on the board `board` names (the feature board by default).
 _BOARD_SCOPE = ScopeRead(("scope", "feature"), board_key="board")
 _BOARD_SCOPE_ONLY = ScopeRead(("scope",), board_key="board")
+# `/comms/run` saves an evaluator's reply under `<project_root>/pathly/features/<scope>/`.
+_RUN_BOARD_SCOPE = ScopeRead(("scope",), board_key="board", segment=True)
 
 
 def _reads_none(why: str) -> Fields:
@@ -133,7 +152,12 @@ ROUTE_FIELDS: Mapping[tuple[str, str], Fields] = MappingProxyType(
             roots=_ROOT, names_root=True, unbound=("goal_id",)
         ),
         ("/comms/features/decompose", "POST"): Fields(
-            roots=_ROOT, names_root=True, unbound=("feature",)
+            roots=_ROOT,
+            names_root=True,
+            # The feature is the board's name (feature boards are keyed by name only, so it is not
+            # bound to a project) and the folder `<project_root>/pathly/features/<feature>`, which
+            # the route makes and hands to the run as its storage path: one folder name.
+            scopes=(ScopeRead(("feature",), board="feature", segment=True),),
         ),
         ("/comms/project/decompose", "POST"): Fields(
             roots=_ROOT,
@@ -153,12 +177,18 @@ ROUTE_FIELDS: Mapping[tuple[str, str], Fields] = MappingProxyType(
             roots=_ROOT, names_root=True, unbound=("goal_id",)
         ),
         ("/comms/run", "POST"): Fields(
-            roots=_ROOT, names_root=True, scopes=(_BOARD_SCOPE_ONLY,)
+            roots=_ROOT, names_root=True, scopes=(_RUN_BOARD_SCOPE,)
         ),
         ("/comms/tasks/run", "POST"): Fields(
             roots=_ROOT, names_root=True, unbound=("message_id",)
         ),
-        ("/runs/<run_id>/<action>", "POST"): Fields(roots=_ROOT, unbound=("run_id",)),
+        ("/runs/<run_id>/<action>", "POST"): Fields(
+            roots=_ROOT,
+            # `retry` starts a run in `body["project_root"]`, empty or not; the other verbs act on
+            # the registry's run and read no directory from the body.
+            names_root_verbs=("retry",),
+            unbound=("run_id",),
+        ),
         ("/runs/<run_id>/stop", "POST"): Fields(unbound=("run_id",)),
         ("/comms/goals/stop", "POST"): Fields(unbound=("goal_id",)),
         ("/comms/run/stop", "POST"): Fields(scopes=(_BOARD_SCOPE_ONLY,)),
@@ -182,12 +212,15 @@ ROUTE_FIELDS: Mapping[tuple[str, str], Fields] = MappingProxyType(
             # pull" row on the feature board `scope` when `trail` is given.
             names_root=True,
             scopes=(ScopeRead(("scope", "feature")),),
-            unbound=("artifact",),
+            # The artifact is looked up under `project_root`, behind the traversal guard of
+            # `hydrate.safe_artifact_path`.
+            under_root=("artifact",),
         ),
         ("/comms/artifacts/<artifact_id>/section", "GET"): Fields(
             roots=_ROOT,
             scopes=(ScopeRead(("scope", "feature")),),
-            unbound=("artifact_id", "artifact"),
+            under_root=("artifact",),
+            unbound=("artifact_id",),
         ),
         ("/hq/context", "GET"): Fields(
             roots=_ROOT,
@@ -195,32 +228,38 @@ ROUTE_FIELDS: Mapping[tuple[str, str], Fields] = MappingProxyType(
             scopes=(ScopeRead(("board",)),),
         ),
         ("/comms/goals/refs-coverage", "GET"): Fields(unbound=("goal_id",)),
-        ("/comms/scope", "GET"): Fields(roots=_ROOT, unbound=("feature", "role")),
+        ("/comms/scope", "GET"): Fields(roots=_ROOT, under_root=("feature",)),
         ("/comms/permissions", "GET"): Fields(roots=_ROOT),
         # The /db read API: a project filter that falls back to PATHLY_PROJECT_ROOT, else to
         # every project. The chief names its own. `/db/rollup`'s `global` block sums every
         # project whatever the filter says (fleet-wide), and `/db/runs/<id>/cost` is by run id.
         ("/db/features", "GET"): Fields(roots=_ROOT, names_root=True),
-        ("/db/stats", "GET"): Fields(roots=_ROOT, names_root=True),
+        ("/db/stats", "GET"): Fields(
+            roots=_ROOT,
+            names_root=True,
+            note=_FLEET
+            + "its `features`, `events` and `invocations` counts are global (every project); "
+            "only the token and cost totals follow project_root",
+        ),
         ("/db/stats/trends", "GET"): Fields(roots=_ROOT, names_root=True),
         ("/db/recent", "GET"): Fields(roots=_ROOT, names_root=True),
         ("/db/rollup", "GET"): Fields(
             roots=_ROOT,
             names_root=True,
-            unbound=("feature",),
+            under_root=("feature",),
             note=_FLEET + "its `global` block sums every project",
         ),
         ("/db/features/<feature>/agents", "GET"): Fields(
-            roots=_ROOT, names_root=True, unbound=("feature",)
+            roots=_ROOT, names_root=True, under_root=("feature",)
         ),
         ("/db/features/<feature>/events", "GET"): Fields(
-            roots=_ROOT, names_root=True, unbound=("feature",)
+            roots=_ROOT, names_root=True, under_root=("feature",)
         ),
         ("/db/features/<feature>/otel", "GET"): Fields(
-            roots=_ROOT, names_root=True, unbound=("feature",)
+            roots=_ROOT, names_root=True, under_root=("feature",)
         ),
         ("/db/features/<feature>/runs", "GET"): Fields(
-            roots=_ROOT, names_root=True, unbound=("feature",)
+            roots=_ROOT, names_root=True, under_root=("feature",)
         ),
         ("/db/runs/<run_id>/cost", "GET"): Fields(unbound=("run_id",)),
         ("/db/agents", "GET"): Fields(roots=_ROOT),
@@ -241,24 +280,29 @@ ROUTE_FIELDS: Mapping[tuple[str, str], Fields] = MappingProxyType(
         ("/api/flows", "GET"): Fields(roots=_ROOT),
         ("/api/skills", "GET"): Fields(roots=_ROOT),
         ("/api/features/<feature>/artifacts", "GET"): Fields(
-            roots=_ROOT, unbound=("feature",)
+            roots=_ROOT, under_root=("feature",)
         ),
         ("/api/features/<feature>/events", "GET"): Fields(
-            roots=_ROOT, unbound=("feature",)
+            roots=_ROOT, under_root=("feature",)
         ),
         ("/api/features/<feature>/invocations", "GET"): Fields(
-            roots=_ROOT, unbound=("feature",)
+            roots=_ROOT, under_root=("feature",)
         ),
         ("/api/features/<feature>/metrics", "GET"): Fields(
-            roots=_ROOT, unbound=("feature",)
+            roots=_ROOT, under_root=("feature",)
         ),
-        ("/api/traces", "GET"): Fields(roots=_ROOT, unbound=("feature", "run_id")),
-        ("/flows/stage-config", "GET"): Fields(roots=_ROOT, unbound=("feature",)),
+        # `get_spans` filters by project_root and feature and ignores the run id it is given.
+        ("/api/traces", "GET"): Fields(
+            roots=_ROOT, under_root=("feature",), unbound=("run_id",)
+        ),
+        ("/flows/stage-config", "GET"): Fields(roots=_ROOT, under_root=("feature",)),
         ("/skills/abilities", "GET"): Fields(roots=_ROOT),
         ("/skills/composition", "GET"): Fields(roots=_ROOT),
         ("/skills/prompts", "GET"): Fields(roots=_ROOT),
         ("/telemetry/trends", "GET"): Fields(
             roots=_ROOT,
+            # A blank feature sums every project's cost unless project_root narrows it.
+            names_root_unless=("feature",),
             unbound=("feature",),
             note=_FLEET + "a named feature is summed across every project",
         ),

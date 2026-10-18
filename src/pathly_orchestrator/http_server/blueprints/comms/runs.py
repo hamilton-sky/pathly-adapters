@@ -139,7 +139,12 @@ def comms_run():
                             "ok",
                         )
                         saved = False
-                        if project_root and not trivial:
+                        # A feature or global board's scope becomes a folder under the project,
+                        # so a scope that points out of it saves nothing (it gets the warning).
+                        from pathly_orchestrator.storage_paths import _is_unsafe_topic
+
+                        unsafe = board != "project" and _is_unsafe_topic(scope)
+                        if project_root and not trivial and not unsafe:
                             try:
                                 import os as _os
 

@@ -34,6 +34,23 @@ def comms_features_decompose():
         if not feature:
             return jsonify({"error": "Field 'feature' must be a non-empty string"}), 400
 
+        # The feature is a folder name under <project_root>/pathly/features/ (both dispatchers
+        # make it and the board run is told it is its working directory), so it must not point
+        # out of the project: no traversal, no absolute path, no drive or backslash.
+        from pathly_orchestrator.storage_paths import _is_unsafe_topic
+
+        unsafe = _is_unsafe_topic(feature)
+        if unsafe:
+            return (
+                jsonify(
+                    {
+                        "error": f"Field 'feature' is not a safe folder name ({unsafe})",
+                        "reason": "invalid_feature",
+                    }
+                ),
+                400,
+            )
+
         rigor = (data.get("rigor") or "light").strip().lower()
         if rigor not in _VALID_RIGORS:
             return (

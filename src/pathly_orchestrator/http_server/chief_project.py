@@ -6,7 +6,8 @@ query string of a GET, the way the view reads them. A value is the chief's own w
 string that ``normalise_project_root`` maps to the session's root (forward slashes, no trailing
 slash); anything else, a non-string included, is not. A file is the chief's own when it lies
 under that root after its ``..`` segments are collapsed (text only: symlinks are not followed,
-and a Windows drive letter is compared as written).
+and a Windows drive letter is compared as written). A name the route joins into a path (a scope
+marked ``segment``) is one folder name: no separator, no drive colon, not ``.`` or ``..``.
 
 A route with no entry is refused, so a route added without one is not passed by default.
 """
@@ -22,10 +23,12 @@ from .chief_fields import ROUTE_FIELDS, Fields, ScopeRead, TextPath
 ROOT_KEY = "project_root"
 _BOARDS = ("feature", "project", "global")
 _DRIVE = re.compile(r"^[A-Za-z]:")
+_SEGMENT_BREAKERS = "/\\:\0"
 
 NOT_OWN = "that is not this chief's project"
 NOT_NAMED = "a chief names its project_root on this route"
 NOT_INSIDE = "a chief names only files inside its project"
+NOT_A_SEGMENT = "must be one folder name: no '/', '\\', ':' or '..'"
 NO_ENTRY = "the gate has no project entry for this route"
 
 
@@ -58,15 +61,28 @@ def _board(source: Mapping, read: ScopeRead) -> str | None:
     return name if name in _BOARDS else (read.board or "feature")
 
 
-def _bound_scope(source: Mapping, read: ScopeRead) -> object:
-    """The scope the route will use if it is one the chief's project must own, else None."""
-    value = None
+def _first_usable(source: Mapping, read: ScopeRead) -> tuple[str, object] | None:
+    """The key and value a route takes as the scope: the first of ``keys`` with a usable value."""
     for key in read.keys:
         if _usable(source.get(key)):
-            value = source.get(key)
-            break
-    if value is None:
+            return key, source.get(key)
+    return None
+
+
+def _not_a_segment(value: object) -> bool:
+    """True when ``value`` cannot be one folder name (a non-string cannot, for the route)."""
+    if not isinstance(value, str):
+        return True
+    text = value.strip()
+    return text in (".", "..") or any(c in text for c in _SEGMENT_BREAKERS)
+
+
+def _bound_scope(source: Mapping, read: ScopeRead) -> object:
+    """The scope the route will use if it is one the chief's project must own, else None."""
+    found = _first_usable(source, read)
+    if found is None:
         return None
+    value = found[1]
     if isinstance(value, str):
         text = value.strip()
         if text in read.skip_exact or text.startswith(read.skip_prefix):
@@ -120,9 +136,17 @@ def _foreign_root(fields: Fields, body: Mapping, args, own: str) -> bool:
     )
 
 
-def _unnamed_root(fields: Fields, source: Mapping) -> bool:
+def _unnamed_root(fields: Fields, source: Mapping, view_args: Mapping) -> bool:
     """The route falls back to another project unless the root is named where it reads it."""
-    must_name = fields.names_root or any(source.get(k) for k in fields.names_root_when)
+    must_name = (
+        fields.names_root
+        or any(source.get(k) for k in fields.names_root_when)
+        or view_args.get("action") in fields.names_root_verbs
+        or (
+            bool(fields.names_root_unless)
+            and not any(_usable(source.get(k)) for k in fields.names_root_unless)
+        )
+    )
     return must_name and not any(source.get(k) for k in fields.roots)
 
 
@@ -142,12 +166,18 @@ def _foreign_file(fields: Fields, source: Mapping, own: str) -> bool:
 
 
 def project_refusal(
-    rule: str, method: str, session: Mapping, body: Mapping, args
+    rule: str,
+    method: str,
+    session: Mapping,
+    body: Mapping,
+    args,
+    view_args: Mapping | None = None,
 ) -> str | None:
     """The reason a call is not for this chief's project, or None.
 
     ``method`` is the request method with HEAD already read as GET; ``body`` is one reading of the
-    JSON body (``{}`` for a GET) and ``args`` the query string.
+    JSON body (``{}`` for a GET), ``args`` the query string and ``view_args`` the values the URL
+    rule captured (the ``<action>`` of ``/runs/<run_id>/<action>``).
     """
     fields = ROUTE_FIELDS.get((rule, method))
     if fields is None:
@@ -157,12 +187,15 @@ def project_refusal(
 
     if _foreign_root(fields, body, args, own):
         return NOT_OWN
-    if _unnamed_root(fields, source):
+    if _unnamed_root(fields, source, view_args or {}):
         return NOT_NAMED
     for read in fields.scopes:
         scope = _bound_scope(source, read)
         if scope is not None and not is_own(scope, own):
             return NOT_OWN
+        found = _first_usable(source, read) if read.segment else None
+        if found and _board(source, read) != "project" and _not_a_segment(found[1]):
+            return f"{found[0]} {NOT_A_SEGMENT}"
     if _foreign_file(fields, source, own):
         return NOT_INSIDE
     return None
