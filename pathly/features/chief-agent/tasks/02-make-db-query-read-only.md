@@ -1,7 +1,7 @@
 # Run POST /db/query read-only
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: —
 Test first: yes
 
@@ -53,3 +53,68 @@ prints passed
 - `src/pathly_orchestrator/db/connection.py::get_db` (thread-local connection; read-only here)
 
 ## Answer
+
+Work started at `ea037dff13236b117f4295bce8a0a4d58d5af45a`. Test-only commit: `26242de`
+(`test(chief-agent): 02 failing test`).
+
+**Built**
+
+- `tests/http_api/test_db_query_read_only.py` (new, 7 tests), committed alone first, plus the two
+  regenerated `tests/INDEX.md` and `tests/http_api/INDEX.md`.
+- `src/pathly_orchestrator/http_server/blueprints/ops/db_api_admin.py::db_query`: after the keyword
+  check, `PRAGMA query_only = ON` on `_get_db()`'s connection, the `execute(sql).fetchmany(500)`
+  inside a `try`, and `PRAGMA query_only = OFF` in its `finally`. The docstring now says so. The
+  existing `except sqlite3.Error` still turns the refusal into a 400 with SQLite's message.
+- `CHANGELOG.md` (Unreleased, role-read-policy paragraph): the known limit "`POST /db/query` still
+  accepts a `WITH ... INSERT`" is no longer true, so it is replaced by a sentence saying the route
+  runs under `query_only` (ticket 01 edited the same file for its change).
+
+**Proof** (all run fresh after the last edit)
+
+- `python -m pytest tests/http_api/test_db_query_read_only.py -q -p no:cacheprovider` printed
+  `7 passed in 2.11s`, exit 0. At commit `26242de` (test only) the same command gave `5 failed, 2
+  passed`: the failures were `assert 200 == 400` (the `WITH` writes went through), and the two that
+  passed were the plain `SELECT` and the pragma-state check, as expected.
+- What the tests cover: `WITH x AS (SELECT 1) INSERT INTO run_tokens ...`, the same with `UPDATE
+  comms_messages SET author_role = 'chief' ...` and with `DELETE` each return 400 with "readonly" in
+  the message and leave `run_tokens`/`comms_messages` counts and every `(id, author_role,
+  author_source)` unchanged; `SELECT 1; PRAGMA query_only = OFF` returns 400 and the `WITH ... INSERT`
+  sent after it is still 400; a plain `SELECT` returns `[{"text": "seed row"}]`; `PRAGMA query_only`
+  reads 0 after a select, a refused write, a refused two-statement call and a `no such table` error;
+  `post_message` on the same thread succeeds after a refused write.
+- Mutation check: replacing the `finally` body with `pass` made `test_pragma_is_off_again_after_every_outcome`
+  and `test_normal_write_on_the_same_thread_works_after_a_refused_one` fail (`attempt to write a
+  readonly database` from `post_message`). Reverted; the file is as committed above.
+- Same statements run directly on `sqlite3` under `query_only`, with `python3.11`, `3.12` and `3.13`
+  (`-I`): both `WITH` writes and the `WITH ... DELETE` raise `OperationalError`, the two-statement
+  call raises `ProgrammingError`, and the table keeps its row, on 3.11.17, 3.12.3 and 3.13.16 with
+  SQLite 3.45.1. The pytest file itself ran only on 3.12.3 (the venv's interpreter).
+- Test command from `commands.md` (`tests/comms_board tests/db tests/runner_supervisor tests/http_api`):
+  `1201 passed, 2 skipped in 298.21s`, exit 0. The 2 skips are not in the new file.
+- Lint chain from `commands.md`: exit 0 (black, mypy `no issues found in 313 source files`,
+  `check_file_size` `none new, none grown`, mirror reads OK, `gen_test_index --check` up to date,
+  `lint-imports` `1 kept, 0 broken`, bandit, `check_adapters`, `check_entry_points`).
+  Smoke: exit 0. Build (`python -m build --wheel`): exit 0.
+
+**Decisions**
+
+- `PRAGMA query_only = ON` is set inside the `try`, so the `finally` resets it whatever happens
+  (including an error in the `ON` statement).
+- No change to `_ALLOWED_KEYWORDS` / `_FORBIDDEN_KEYWORDS`: they stay the first filter, as the
+  ticket says.
+- `src/pathly_orchestrator/CLAUDE.md` does not mention `/db/query` at all (grep of the repo outside
+  `pathly/features/` found only the code, Studio's caller `studio/src/main/ipc/db.ts`, the
+  CHANGELOG line and an old research note), so it needed no change. The old research note
+  `pathly/.research/PRODUCTION_READINESS_FINDINGS.md` is a record and was left alone.
+
+**Shortcuts taken**: none. Known limit, not a shortcut: the statement can still read every table
+(ticket 08 refuses `/db/query` for chief tokens). Another: a runaway `SELECT` still has no cost
+limit (the research note's LOW finding), unchanged.
+
+**For later tickets**
+
+- The Flask test client serves a request on the calling thread, so route and test share the
+  thread-local `get_db()` connection. That makes "the pragma leaked to the next request" directly
+  testable (ticket 13's acceptance can assert `PRAGMA query_only` is 0 after a refused call).
+- Ticket 13's acceptance and its docs pass can cite `/db/query` as already read-only; the spec's
+  "Migration and compatibility" line for `/db/query` is now true.

@@ -195,6 +195,9 @@ no:cacheprovider` passes in full. Ticket 13 runs both.
 - 01 — `sse._broadcast_runner` sends `run_token` only on `/events/spawn`: the `/events/runner` and
   `/events/runs` copies are built without the key and the caller's dict is untouched;
   `/events/spawn` itself stays credential-free until the UI token (RRP-2b).
+- 02 — `/db/query` runs its statement under `PRAGMA query_only = ON` (reset to OFF in a `finally`) on
+  the request thread's connection, so a `WITH ... INSERT|UPDATE|DELETE` is a 400 "attempt to write a
+  readonly database" and writes nothing; the keyword check stays as the first filter.
 
 ## Open questions
 

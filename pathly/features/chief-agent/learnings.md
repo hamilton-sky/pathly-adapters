@@ -6,3 +6,5 @@ ticket number. Never edit or delete another line. Keep it short; a human prunes 
 
 - (01) Lint chain from `commands.md` takes about a minute; piping it through `tail` hides its exit code, so read `${PIPESTATUS[0]}` or run it unpiped. The Test command takes about 5 minutes here: run it in the background and wait on its log.
 - (01) `gen_test_index.py` rewrites `tests/INDEX.md` and `tests/<domain>/INDEX.md` when a test file is added, so a "test-only" commit leaves those two files for the final commit, and `gen_test_index.py --check` in Lint fails until they are committed.
+- (02) Flask's test client serves a request on the test's own thread, so a route and the test share one thread-local `get_db()` connection: a per-connection pragma or open transaction a route leaves behind is visible to the test (and to the next test step) directly.
+- (02) `python3.11`, `python3.12` and `python3.13` all exist in `/usr/bin` here, but only the venv's 3.12 has the project deps; to check a stdlib behaviour on all three, run a tiny script with `python3.NN -I script.py` (no pytest).
