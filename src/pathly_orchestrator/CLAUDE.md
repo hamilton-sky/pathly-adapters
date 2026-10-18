@@ -464,6 +464,38 @@ human checkpoints to `DONE`.
   task proof reads both ("Task proof in the goal-loop drain"); `floor_gate`, `scope_gate` and the
   Review packet read the claimed ones, `task_checks` the completed ones.
 
+### Chief endpoints (chief-agent)
+
+The chief is a long-lived interactive agent a human opens for a project from Studio's launcher.
+`blueprints/chief/session.py` is a thin layer over `supervisor/chief_session.py`:
+
+```
+POST /chief/open            ← {project_root, engine, preset, prompt, model?} → 201 {run_id, tab_id, tier, engine}
+POST /chief/close           ← {project_root} → 200 {closed: true|false}
+GET  /chief/session?project_root=  ← {open: false} | {open: true, run_id, tab_id, tier, engine, opened_at}
+```
+
+- **Open:** 403 when the caller sends a live run token (an agent cannot open a chief); 400 when a
+  field is missing or not a string, or `open_chief` raises `ValueError` (its message is passed
+  on); 409 `{error, run_id, tab_id}` on `ChiefAlreadyOpen`. `open_chief` gets the runner
+  broadcaster (`sse._broadcast_runner`), so the `TERMINAL_SPAWN` reaches whichever spawn host
+  is listening.
+- **Close:** 403 for a live run token. It closes the project's open session with reason
+  `closed from Studio` (`close_chief`: revokes the token, removes the folder, drops the run) and
+  then sends `TERMINAL_KILL {tab_id, run_id}` on topic `chief:<run_id>` so the host closes the
+  tab, because `close_chief` kills no process. `closed` is false, and nothing is killed, when the
+  project has no open chief (or the watcher closed it first).
+- **One project, one key:** `chief_session.normalise_project_root` (forward slashes, no trailing
+  slash) is applied by `open_chief` and by all three routes, so `/p` and `/p/` are one project and
+  cannot get two open chiefs.
+- **Restart:** `app.main()` calls `chief_startup_cleanup()` before the server serves, inside a
+  `try` that logs a warning and goes on: it closes every session still open (reason `server
+  restart`, token revoked) and removes their `~/.pathly/chief/<run_id>/` folders, because a chief
+  open across a restart has no watcher left to close it.
+- Same limit as the other human-only routes: a caller with no token (or an unknown or revoked
+  one) is treated as a human until the UI token (RRP-2b) exists. Refusing the chief's own token
+  here is the chief gate (a later ticket).
+
 ### Request bodies — one lenient reader for every comms route (`_helpers.read_json_body`)
 
 Agents reach `/comms/*` through curl. On Windows a shell not in UTF-8 mode hands curl a
@@ -814,9 +846,9 @@ pathly_orchestrator/
     board_run.py           # start_board_run: board-lock + skill compose + async spawn helper
     board_lock.py          # Per-board/scope advisory lock (acquire/release/holder)
     chief_tiers.py         # what a chief may do (chief-agent): ACTIONS, TIERS (status=read; planner=read,post,plan; operator=all seven), actions_for/normalise_tier, and resolve_preset_tier — a user prompt file chief/<preset> names its tier in leading front matter `tier:`, else the built-in names map to themselves, anything else (unknown tier, missing front matter, malformed name) is status. Code, never read from prompt text; strip_front_matter reuses skills/compose_base
-    chief_session.py       # open_chief / close_chief (chief-agent): the chief is a long-lived interactive spawn, so it has its own open path instead of _run_stage_via_terminal (which blocks its caller and gives up after 30 minutes). open_chief validates (engine claude|codex, existing project_root, prompt non-empty and at most 64 KiB, model not starting with `-`), raises ChiefAlreadyOpen(run_id, tab_id) for a project with an open chief, resolves the tier from the preset, writes ~/.pathly/chief/<run_id>/ (hook_secret, and for claude settings.json + an empty mcp.json; mode 0600), registers the chief_sessions row (secret sha256, the claude --session-id), mints a `chief` token on the project board, create_run(run_id), and sends one interactive TERMINAL_SPAWN (topic `chief:<run_id>`, submit false, prompt without front matter); a daemon watcher closes the session as `never started` or `tab closed`. close_chief revokes the token, removes the folder and drops the run (False the second time)
+    chief_session.py       # open_chief / close_chief (chief-agent): the chief is a long-lived interactive spawn, so it has its own open path instead of _run_stage_via_terminal (which blocks its caller and gives up after 30 minutes). open_chief validates (engine claude|codex, existing project_root, prompt non-empty and at most 64 KiB, model not starting with `-`), raises ChiefAlreadyOpen(run_id, tab_id) for a project with an open chief, resolves the tier from the preset, writes ~/.pathly/chief/<run_id>/ (hook_secret, and for claude settings.json + an empty mcp.json; mode 0600), registers the chief_sessions row (secret sha256, the claude --session-id), mints a `chief` token on the project board, create_run(run_id), and sends one interactive TERMINAL_SPAWN (topic `chief:<run_id>`, submit false, prompt without front matter); a daemon watcher closes the session as `never started` or `tab closed`. close_chief revokes the token, removes the folder and drops the run (False the second time). normalise_project_root (forward slashes, no trailing slash) keys a project's chief for open_chief and the routes; chief_startup_cleanup() closes every session still open at server start (reason `server restart`) and removes their folders
   http_server/             # Flask HTTP server: FSM endpoints + SSE + runner routes
-    app.py                 # Flask app factory, blueprint registration, main()
+    app.py                 # Flask app factory, blueprint registration, main() (which calls supervisor.chief_session.chief_startup_cleanup() before serving; a failure is logged and boot goes on)
     middleware.py          # _log_request, _log_response, rate limiting, metrics
     run_identity.py        # caller_identity(request) -> CallerIdentity: kind run|anonymous from the X-Pathly-Run-Token header (body role/run_id/from never read); unknown/revoked token logged at info with the remote addr; `ui` kind reserved (RRP-2b). Nothing applies a policy from it yet
     sse.py                 # SSE globals (_clients, _runner_clients, _menu_clients) + broadcast helpers
@@ -863,6 +895,9 @@ pathly_orchestrator/
                            # pathly_sse_clients_active gauge bookkeeping; fed by
                            # sse._broadcast_run_event, teed from _broadcast_runner/_broadcast_comms
                            # whenever a payload carries a run_id)
+      chief/               # session.py (chief-agent): POST /chief/open, POST /chief/close, GET
+                           # /chief/session — see "Chief endpoints"; __init__.py exposes all_blueprints
+                           # (registered in app.py like control/)
 ```
 
 **Layer rules — CI-enforced (`import-linter`, `[tool.importlinter]` in `pyproject.toml`).**
