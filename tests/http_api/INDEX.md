@@ -11,7 +11,7 @@ HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, 
 | `test_api.py` | Tests for the HTTP routes Blueprint (api/__init__.py). Uses Flask test client | 15 |
 | `test_caller_identity.py` | caller_identity(request): the caller is the holder of a live run token, never a body field | 9 |
 | `test_chat_agent.py` | covers pathly studio chat is plan aware; generic chat remains unchanged | 2 |
-| `test_chief_gate.py` | chief-agent 08: the chief gate refuses every call a chief token's tier does not allow | 38 |
+| `test_chief_gate.py` | chief-agent 08: the chief gate refuses every call a chief token's tier does not allow | 69 |
 | `test_chief_routes.py` | chief-agent 07: POST /chief/open, POST /chief/close and GET /chief/session | 32 |
 | `test_config.py` | Tests for Settings.from_env() — specifically bind-host validation | 8 |
 | `test_db_agents_route.py` | GET /db/agents — registry-backed agent list for the spawn-policy Settings model-policy UI | 3 |

@@ -40,6 +40,21 @@ ROUTE_ACTIONS: Mapping[tuple[str, str], str] = MappingProxyType(
     }
 )
 
+# Routes that start an agent in a working directory. A body that names no ``project_root`` leaves
+# the server to use its own working directory, which can be another project, so a chief must name
+# its project on each of these. Calls addressed by run or message id are ticket 14's.
+NAMES_PROJECT_ROOT = frozenset(
+    {
+        "/runs",
+        "/comms/goals/run",
+        "/comms/run",
+        "/comms/tasks/run",
+        "/comms/goals/decompose",
+        "/comms/features/decompose",
+        "/comms/project/decompose",
+    }
+)
+
 READ_REFUSED_PREFIXES = ("/events/",)
 READ_REFUSED_RULES = frozenset({"/db/settings"})
 

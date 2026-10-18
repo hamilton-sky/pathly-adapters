@@ -6,14 +6,17 @@ A chief whose token is revoked or whose session is closed gets 401, never the an
 treatment ``caller_identity`` would give it, because anonymous loopback callers can do everything.
 
 For a live chief, the call is classed by ``chief_routes.action_for`` and refused with 403 unless
-the session's tier holds that action. Registered in ``app.py`` right after ``_log_request``, so
-the secret check and the rate limit run first. Flask matches the URL rule before any hook runs,
-so a path no route matches (``url_rule`` is None) passes here and Flask answers 404 or 405.
+the session's tier holds that action, names only its own project (``chief_project``) and, on
+``/comms/post``, posts as the chief. Each check runs over every reading of the body a route may
+get (``_bodies``). Registered in ``app.py`` right after ``_log_request``, so the secret check
+and the rate limit run first. Flask matches the URL rule before any hook runs, so a path no route
+matches (``url_rule`` is None) passes here and Flask answers 404 or 405.
 """
 
 from __future__ import annotations
 
-from .chief_routes import POSTS_AS_CHIEF, action_for
+from .chief_project import board_values, is_own, root_values
+from .chief_routes import NAMES_PROJECT_ROOT, POSTS_AS_CHIEF, action_for
 from .run_identity import RUN_TOKEN_HEADER
 
 
@@ -45,20 +48,71 @@ def _asks_for_overrides(body: dict) -> bool:
     return bool(body.get("prompt_override")) or bool(body.get("stage_overrides"))
 
 
-def _names_another_project(session: dict, body: dict, args) -> bool:
-    """True when the body or query string names a ``project_root`` that is not the session's."""
-    from pathly_orchestrator.fsm_compose import resolve_board_scope
+def _project_refusal(rule: str, method: str, session: dict, body: dict, args):
+    """The reason a call is not for this chief's project, or None."""
+    from pathly_orchestrator.supervisor.chief_session import normalise_project_root
 
-    own = resolve_board_scope("project", session.get("project_root") or "", "")
-    for named in (body.get("project_root"), args.get("project_root")):
-        if not named:
-            continue
-        if (
-            not isinstance(named, str)
-            or resolve_board_scope("project", named, "") != own
-        ):
-            return True
-    return False
+    own = normalise_project_root(session.get("project_root") or "")
+    roots = root_values(body, args)
+    if not all(is_own(v, own) for v in [*roots, *board_values(rule, body)]):
+        return "that is not this chief's project"
+    if method != "GET" and rule in NAMES_PROJECT_ROOT and not roots:
+        return "a chief names its project_root on this route"
+    return None
+
+
+def _bodies() -> list[dict]:
+    """Every JSON object a route may read from this request's body; ``[{}]`` when none.
+
+    The comms routes read the body with ``read_json_body`` (UTF-8, then cp1252, whatever the
+    content type). ``/runs``, ``/runner/*``, ``/code/query`` and the run-control verbs read it
+    with ``get_json``, which hands the raw bytes to ``json.loads``: a BOM, UTF-16 and UTF-32 are
+    all understood there and none of them is by the first reader. A body only one reader
+    understands must still be checked, so every check runs over each result. The second parse
+    forces the content type and does not cache, so what a route reads is unchanged.
+    """
+    from flask import request
+
+    from .blueprints.comms._helpers import read_json_body
+
+    found: list[dict] = []
+    for parsed in (
+        read_json_body({}),
+        request.get_json(silent=True, force=True, cache=False),
+    ):
+        if isinstance(parsed, dict) and parsed and parsed not in found:
+            found.append(parsed)
+    return found or [{}]
+
+
+def _refusal(rule, method: str, session: dict, conn, body: dict):
+    """The 403 for one reading of the body, or None when the gate lets it through."""
+    from flask import request
+
+    from pathly_orchestrator.supervisor.chief_tiers import actions_for
+
+    tier = str(session.get("tier") or "")
+    allowed = sorted(actions_for(tier))
+    action = action_for(
+        rule.rule, method, request.view_args or {}, body, _human_escalation_check(conn)
+    )
+    if action is None:
+        return _refuse(tier, None, allowed, "the chief may not call this route")
+    if action not in allowed:
+        return _refuse(tier, action, allowed, f"a {tier} chief may not {action}")
+    if _asks_for_overrides(body) and "run" not in allowed:
+        return _refuse(
+            tier,
+            "run",
+            allowed,
+            "prompt_override and stage_overrides need the run action",
+        )
+    other = _project_refusal(rule.rule, method, session, body, request.args)
+    if other is not None:
+        return _refuse(tier, action, allowed, other)
+    if rule.rule in POSTS_AS_CHIEF and body.get("from") != "chief":
+        return _refuse(tier, action, allowed, "a chief posts as 'chief'")
+    return None
 
 
 def chief_gate():
@@ -72,7 +126,6 @@ def chief_gate():
     from pathly_orchestrator.db.connection import get_db
     from pathly_orchestrator.db.queries import chief as sessions
     from pathly_orchestrator.db.queries.run_tokens import lookup_run_token
-    from pathly_orchestrator.supervisor.chief_tiers import actions_for
 
     conn = get_db()
     row = lookup_run_token(conn, token)
@@ -88,31 +141,9 @@ def chief_gate():
     if rule is None:
         return None
 
-    tier = str(session.get("tier") or "")
-    allowed = sorted(actions_for(tier))
     method = "GET" if request.method == "HEAD" else request.method
-    body: dict = {}
-    if method != "GET":
-        from .blueprints.comms._helpers import read_json_body
-
-        body = read_json_body({}) or {}
-
-    action = action_for(
-        rule.rule, method, request.view_args or {}, body, _human_escalation_check(conn)
-    )
-    if action is None:
-        return _refuse(tier, None, allowed, "the chief may not call this route")
-    if action not in allowed:
-        return _refuse(tier, action, allowed, f"a {tier} chief may not {action}")
-    if _asks_for_overrides(body) and "run" not in allowed:
-        return _refuse(
-            tier,
-            "run",
-            allowed,
-            "prompt_override and stage_overrides need the run action",
-        )
-    if _names_another_project(session, body, request.args):
-        return _refuse(tier, action, allowed, "that is not this chief's project")
-    if rule.rule in POSTS_AS_CHIEF and body.get("from") != "chief":
-        return _refuse(tier, action, allowed, "a chief posts as 'chief'")
+    for body in [{}] if method == "GET" else _bodies():
+        refused = _refusal(rule, method, session, conn, body)
+        if refused is not None:
+            return refused
     return None

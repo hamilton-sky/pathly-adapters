@@ -634,19 +634,44 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
 - **Overrides.** A body with a non-empty `prompt_override` or `stage_overrides`, on any route,
   also needs `run` (the 403 names `run`): the Planner may call the decompose routes but cannot
   hand verbatim prompt text to the agents they start.
-- **One project.** A `project_root` in the body or query string must resolve
-  (`fsm_compose.resolve_board_scope("project", value, "")`) to the session's project, else 403
-  (so a value that is not a string is refused too); an absent, null or empty one is left to the
-  route. On `/comms/post`, a `from` other than `chief` (or none) is 403.
-- **The body stays readable.** The gate reads it with `comms/_helpers.read_json_body` (it calls
-  `request.get_data()`, which Werkzeug caches, so the route still gets the body).
+- **One project.** Every value the call uses to name a project must be the session's, compared
+  after `supervisor/chief_session.normalise_project_root` (forward slashes, no trailing slash),
+  else 403; a value that is not a string is refused too. The values are `project_root` (body or
+  query string), the `scope` of a call with `board: "project"` (on `/comms/post` a missing or
+  blank `scope` is read as `feature`, as the route does, so a project-board post must give its
+  own root as `scope`), the `scope` or `feature` of a `/code/query` that is not blank or a
+  parenthesized marker such as `(interactive)` (the route logs a `discovery` row at that scope
+  on the project board), and the `project` override of `/comms/project/decompose`
+  (`http_server/chief_project.py`). The routes that start an agent in a working directory
+  (`chief_routes.NAMES_PROJECT_ROOT`: `POST /runs`, `/comms/goals/run`, `/comms/run`,
+  `/comms/tasks/run` and the three decompose routes) also refuse a call that names no
+  `project_root` at all (absent, null, empty), because the server would use its own working
+  directory, which can be another project. The gate cannot fill it in from the session, since
+  the route reads the request's own body. On `/comms/post`, a `from` other than `chief` (or
+  none) is 403.
+- **The gate reads the body as the route will.** The comms routes read it with
+  `comms/_helpers.read_json_body` (UTF-8, then cp1252, whatever the content type); `/runs`,
+  `/runs/<id>/<verb>`, `/runner/agent-answer` and `/code/query` read it with `get_json`, which
+  hands the raw bytes to `json.loads`, so a UTF-8 BOM, UTF-16 and UTF-32 body is understood there
+  but not by `read_json_body`, which would show the gate `{}`. `chief_gate._bodies` therefore parses with both
+  (`read_json_body` first, which fills Werkzeug's `get_data` cache, then
+  `get_json(silent=True, force=True, cache=False)`, which adds no JSON cache, so a body a route
+  ignores stays ignored) and every body check (action, overrides, project, `from`) runs over each
+  non-empty result.
 - **A project writer.** `chief` is in `_PROJECT_WRITERS` and the default project write list
   (`db/queries/app_settings._DEFAULT_WRITE_PERMISSIONS["project"]`), not the global one; a saved
   project list that omits it keeps the existing `/comms/post` 403 naming the allowed roles.
+- **Reads are not all pure.** The gate treats every GET (and `POST /comms/search`,
+  `/code/query`) as `read`, so a status chief can cause three small writes: `GET
+  /comms/artifacts/section?scope=<feature>&trail=x` posts a `status` row ("context pull") on that
+  feature's board when the hydrate succeeds (feature boards are keyed by feature name only, so the
+  gate cannot bind it to a project); `GET /menu/<name>` broadcasts a menu push over SSE;
+  `POST /code/query` can start a debounced re-index of the project it names (bound above) and logs
+  a `discovery` row (bound above). They stay `read` because a status chief must be able to read
+  artifact sections and query code; none of them can change a decision, a task or a run.
 - **Not here yet.** Calls that name a run or message by id are not bound to the chief's project
   (ticket 14); the cite rule for `answer` (10), the cost and run ceiling (15) and the directive
-  route (12) are later tickets. A `/comms/post` that names another project's board in `scope`
-  rather than `project_root` is not bound either.
+  route (12) are later tickets.
 
 ### SSE events (GET /events/runner)
 
@@ -902,7 +927,8 @@ pathly_orchestrator/
     app.py                 # Flask app factory, blueprint registration, main() (which calls supervisor.chief_session.chief_startup_cleanup() before serving; a failure is logged and boot goes on)
     middleware.py          # _log_request, _log_response, rate limiting, metrics
     chief_gate.py          # chief_gate(): the before_request hook (registered after _log_request) that refuses a chief token's call its tier, project or poster does not allow, and answers 401 for a closed chief session — see "Chief gate"
-    chief_routes.py        # the chief gate's route table as data: ROUTE_ACTIONS ((rule, method) -> action), the GET refusals, the post-type and run-verb refinements and action_for()
+    chief_routes.py        # the chief gate's route table as data: ROUTE_ACTIONS ((rule, method) -> action), the GET refusals, `NAMES_PROJECT_ROOT`, the post-type and run-verb refinements and action_for()
+    chief_project.py       # which project a chief request names (project_root, a project board's scope, a code query's scope, the project-decompose override) and whether it is the session's — see "Chief gate"
     run_identity.py        # caller_identity(request) -> CallerIdentity: kind run|anonymous from the X-Pathly-Run-Token header (body role/run_id/from never read); unknown/revoked token logged at info with the remote addr; `ui` kind reserved (RRP-2b). Nothing applies a policy from it yet
     sse.py                 # SSE globals (_clients, _runner_clients, _menu_clients) + broadcast helpers
     pricing.py             # MODEL_PRICING, compute_cost_usd()

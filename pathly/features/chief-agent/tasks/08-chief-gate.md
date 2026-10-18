@@ -1,7 +1,7 @@
 # Refuse every chief call its tier does not allow
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 04, 05, 07
 Test first: yes
 
@@ -138,21 +138,26 @@ prints passed
   `POSTS_AS_CHIEF`, and `action_for(rule, method, view_args, body, is_human_escalation)`, which
   applies the three refinements (a post by its `type`, `/runs/<run_id>/<action>` by its verb, an
   acknowledgement by the row it names) through a small `_REFINERS` dict.
-- `src/pathly_orchestrator/http_server/chief_gate.py` (new, 118 lines): `chief_gate()`.
+- `src/pathly_orchestrator/http_server/chief_gate.py` (new, 118 lines; 147 after round 2):
+  `chief_gate()`.
 - `src/pathly_orchestrator/http_server/app.py`: `app.before_request(chief_gate)` right after
   `_log_request`.
 - `blueprints/comms/_helpers.py::_PROJECT_WRITERS` and
   `db/queries/app_settings.py::_DEFAULT_WRITE_PERMISSIONS["project"]` gain `chief` (not the
   global tier), kept in step.
 - `tests/http_api/test_chief_gate.py` (new, 132 tests with parameters; committed alone first as
-  `c19ab46` `test(chief-agent): 08 failing test`); `tests/INDEX.md` and `tests/http_api/INDEX.md`
-  regenerated.
+  `c19ab46` `test(chief-agent): 08 failing test`; 313 tests after round 2);
+  `tests/INDEX.md` and `tests/http_api/INDEX.md` regenerated.
 - `tests/comms_board/test_comms_write_perm.py`: one word, `"chief"` added to the `expected` set of
   `test_comms_write_perm_project_writers_constant` (see Decisions).
 - `src/pathly_orchestrator/CLAUDE.md`: a "Chief gate (chief-agent)" section next to "Who wrote a
   board row, and who may read it" (tiers, the action table, deny by default, overrides, project
   and poster rules, what is not here yet), the two files in the package tree, and the "Chief
   endpoints" sentence that said the gate was "a later ticket".
+- Round 2 (see **Review fixes**): `http_server/chief_project.py` (new, 45 lines: which project a
+  request names and whether it is the session's), `chief_routes.NAMES_PROJECT_ROOT`, `chief_gate.py`
+  split into `_bodies` / `_refusal` / `_project_refusal`, and the "Chief gate" section rewritten
+  for the body and project rules and the residual writes of a read.
 
 **Proof** (each run fresh, after the last edit to code or tests)
 
@@ -245,7 +250,8 @@ prints passed
   `resolve_board_scope("project", value, "")` on both sides, as the ticket says, so it is textual
   after the board code's own normalisation (forward slashes, no trailing slash); `..` segments,
   symlinks and case differences are refused (fail closed), and the chief has to use the spelling it
-  was opened with.
+  was opened with. (Round 2: the comparison is now `normalise_project_root`, and a run or
+  decompose route refuses an unnamed root; see **Review fixes**.)
 - `from` on `/comms/post` must be exactly `chief`; a missing `from` is 403 too (the route would
   400 it, but the gate does not rely on that).
 - A post's `type` is stripped and lower-cased before it is classed, so `Decision` or ` constraint `
@@ -270,35 +276,123 @@ prints passed
 
 **Shortcuts taken**
 
-- A chief's `POST /comms/post` that names another project's board in `scope` (with
-  `board: "project"`) rather than in `project_root` is not bound: the ticket binds only a
-  `project_root` the call names, and `POST /runs` (`board`/`scope` fields) is the same. This is the
-  hole ticket 14 is closest to; it covers calls that name a run or message by id, not a project
-  board named by `scope`. It stops working when a chief posts to a project board by scope with no
-  `project_root`; the fix is one more key in `_names_another_project`, or ticket 14 owning it.
-- The gate reads and parses the body of every non-GET chief request (`get_data` is cached, so the
-  route pays nothing twice). Cheap for the chief's traffic; it would matter only for a very large
-  body.
+- The gate reads and parses the body of every non-GET chief request, twice since round 2 (once
+  with `read_json_body`, once with `get_json`; `get_data` is cached, so the route pays nothing
+  twice). Cheap for the chief's traffic; it would matter only for a very large body.
+- A status chief can still cause two small writes through `read` routes: `GET
+  /comms/artifacts/section?scope=<feature>&trail=x` posts a "context pull" `status` row on that
+  feature's board, and `GET /menu/<name>` broadcasts a menu push. Feature boards are keyed by
+  feature name only, so the gate cannot tell whose feature it is. Stated in the "Chief gate"
+  section of `src/pathly_orchestrator/CLAUDE.md`. It stops working if a deployment reads that row as
+  a signal that an agent worked on the feature; the upgrade is to bind the feature name to the
+  chief's project (ticket 14's id-binding is the closest home) or to list the two routes as `post`.
+- A chief's `/code/query` must give a parenthesized marker such as `(interactive)`, no scope, or
+  its own root as `scope`: a feature name is refused, because the route logs a project-board row at
+  whatever scope it is given. It stops being right if the chief needs its code queries logged under
+  a feature name; the fix is then to bind the logged row, not to drop the check.
+
+**Review fixes** (round 1, quality review; the round starts at `c2de8da`. Test-only commits first:
+`b5014df` and `286bb1e`, each run red before any source change.)
+
+1. *blocker, an encoded body hides the project binding.* Reproduced as the finding says (red run at
+   `b5014df`: 94 failed, 210 passed; each failure was the gate letting an encoded body through, an
+   unbound project on `/runs`, `/runner/agent-answer`, `/code/query`, `/runs/x/retry` and
+   `/runs/x/reroute`, or a `decision` class read as `post`). Fixed in `chief_gate._bodies()`: the
+   gate parses the body with `read_json_body` (what the comms routes read) and with
+   `request.get_json(silent=True, force=True, cache=False)` (what `/runs`, `/runner/*`,
+   `/code/query` and the run-control verbs read), and `_refusal` runs every check (action,
+   overrides, project, `from`) over each non-empty result. `cache=False` matters: with the default
+   cache the forced parse would store the dict, and a route that ignores a non-JSON content type
+   would then read it (`test_the_gate_does_not_change_what_a_route_reads` fails with `cache=True`).
+   Tests, each of the 7 encodings (`utf-8-sig`, `utf-16`, `-le`, `-be`, `utf-32`, `-le`, `-be`) plus
+   plain JSON as the control: `/runs` refuses another project's root and hands `start_board_run` the
+   whole body of its own, `/runner/agent-answer` and `/code/query` and `/runs/x/retry|reroute` refuse
+   it, `/comms/post` is classed by its type. I did not add a branch for the two readers returning
+   different non-empty objects (both are checked, which is the stricter reading): no input does that,
+   because a body valid as UTF-8 gives both the same object and the other encodings parse in one
+   reader only.
+2. *major, the project is bound only by `project_root`.* Fixed. `chief_project.py` reads every value
+   the routes use as a project: `project_root` (body, and each value of a repeated query key), the
+   `scope` of a call with `board: "project"` (`/comms/post` falls back to `feature` for a missing or
+   blank scope, as the route does), the `project` override of `/comms/project/decompose`, and the
+   `scope`/`feature` of `/code/query` unless blank or a marker such as `(interactive)` (found while
+   fixing this: the route logs a `discovery` row on the project board at that scope, so a status
+   chief could write to another project's board; `286bb1e`). All must be the session's after
+   `normalise_project_root`. `chief_routes.NAMES_PROJECT_ROOT` (`/runs`, `/comms/goals/run`,
+   `/comms/run`, `/comms/tasks/run`, the three decompose routes) also refuses a call that names no
+   `project_root` (absent, null, empty, `0`, `[]`): I refused rather than taking it from the session,
+   because the route reads the request's own body, which a `before_request` hook should not rewrite.
+   Tests: nine project-board posts that name another project or none, three spellings of the own
+   scope that pass, a feature-board post that stays unbound, the same post in every encoding,
+   `/runs`, `/comms/run` and `/comms/run/stop` on another project's board, the decompose override, 35
+   missing-root cases over the seven routes, the same for a planner, the query-string form, and a
+   property test that `NAMES_PROJECT_ROOT` equals the listed `run` and decompose rules (id-addressed
+   `/runs/<run_id>/<action>` excepted, that is ticket 14). Four existing tests that call run and decompose
+   routes now send `project_root` (`test_planner_overrides_need_run`,
+   `test_empty_overrides_do_not_need_run`, `test_operator_passes_the_decompose_routes_with_overrides`,
+   `test_operator_passes_the_gate_on_a_run_start`); their assertions did not change, because without
+   it the gate now (rightly) refuses them.
+3. *minor, `read` routes with side effects.* Took the recommended path: `/comms/artifacts/section`
+   and `/code/query` stay `read` (a status chief must read artifact sections and query code), and
+   the "Chief gate" section of `src/pathly_orchestrator/CLAUDE.md` now says plainly (bullet "Reads
+   are not all pure") what a read can still write: the "context pull" status row, the menu push, the
+   re-index and the code-query `discovery` row. The last two are bound to the chief's project (item
+   2); the first two are listed under Shortcuts.
+4. *minor, missing cases.* Added: non-UTF-8 text bodies (cp1252, an em-dash is byte 0x97) classed by
+   type, refused when they name another project on `/comms/search`, `/runs` and `/code/query`, and
+   stored whole for an operator post; HEAD read as GET (`/comms` 200, `/events/spawn`,
+   `/events/runner`, `/db/settings` 403) and no HEAD on a POST-only route (405); the 308 redirect of
+   `/db//query`, `/comms//post`, `/events//spawn`, `/db//settings` (no view runs, and the followed
+   request is gated, or posts normally for the allowed route); eight look-alike paths of `/db/query`
+   (`/DB/query`, trailing slash, dot segment, double slash, `..`, `;x=1`, `%00`, `%2F`) never
+   reach a view; PUT, DELETE and PATCH on three unlisted routes are 405. These pass before and after
+   the fix, as regression cases, except where item 1 applies.
+
+Proof after the fixes (each run fresh, after the last edit to code, tests and docs):
+
+- `python -m pytest tests/http_api/test_chief_gate.py -q -p no:cacheprovider` -> `313 passed in
+  84.34s`, exit 0. `python -m pytest tests/comms_board/test_comms_write_perm.py -q -p
+  no:cacheprovider` -> `33 passed in 7.40s`, exit 0.
+- Mutation checks, each against the matching tests, each failing: `cache=True`, no `get_json`
+  reading, the missing-root rule off, the project-board scope off, the `/code/query` scope off, the
+  decompose override off, the `/comms/post` `feature` fallback off.
+- Test command from `commands.md` -> `1686 passed, 2 skipped in 350.69s`, exit 0 (the 2 skips are
+  not mine). `tests/consistency tests/local_operator tests/hq_copilot` -> `155 passed`.
+- Lint chain from `commands.md`, piece by piece, all exit 0: `black --check src/ tests/` (587 files
+  unchanged), `mypy` (`no issues found in 324 source files`), `check_file_size.py` (`none new, none
+  grown`; `chief_gate.py` 147, `chief_project.py` 45, `chief_routes.py` 132 lines),
+  `check_no_mirror_reads.py`, `gen_test_index.py --check`, `lint-imports` (`1 kept, 0 broken`),
+  `bandit -q -r src/ -ll -x src/pathly_data/`, `check_adapters.py`, `check_entry_points.py`. Smoke
+  and `python -m build --wheel` exit 0. No `# noqa`, `# nosec` or `type: ignore` added.
 
 **For later tickets**
 
 - Ticket 09: no change to the table is needed for `/chief/human-messages`. Its hook posts with no
   run token, so the gate does not see it.
-- Ticket 10: call the cite rule from `chief_gate()` after the action check. The `answer` action is
+- Ticket 10: call the cite rule from `chief_gate._refusal()` after the action check (it runs once
+  per reading of the body, so a cite rule that reads the body reads the one it is given). The `answer` action is
   already assigned to `/runner/agent-answer`, `/comms/answer` and to `/comms/acknowledge` on a
   human escalation (classed in `chief_routes._acknowledge_action` through the `is_human_escalation`
   predicate `chief_gate._human_escalation_check(conn)` builds), so the rule has one place to hook.
-  `chief_gate.py` is 118 lines, so a new `chief_cite.py` fits as the ticket plans.
+  `chief_gate.py` is 147 lines, so a new `chief_cite.py` fits as the ticket plans.
 - Ticket 12: `/comms/directives` is already mapped to `decide`, `chief` is already a project
   writer, and `test_chief_gate.py::PLANNED` may drop its entry once the route exists. The living-doc
   "Chief gate" section says the route arrives with ticket 12; fix that sentence then.
-- Ticket 14: add `chief_bind.target_in_project(...)` after the action check in `chief_gate()`
-  (`request.view_args` and the body are already in hand there); `_names_another_project` covers
-  `project_root` only. Update the "Not here yet" bullet of the "Chief gate" section when it lands.
+- Ticket 14: add `chief_bind.target_in_project(...)` after the action check in
+  `chief_gate._refusal()` (`request.view_args` and the body are already in hand there);
+  `chief_project` covers the project a request names (`project_root`, a project board's `scope`,
+  a code query's scope, the decompose override), not a run or message id. Update the "Not here yet"
+  bullet of the "Chief gate" section when it lands. The feature-board "context pull" row (Shortcuts)
+  is the other unbound write.
 - Ticket 15: `POST /runs` is the `("/runs", "POST")` entry; ticket 15's ceiling can key on it. The
   `GET /chief/session` route is already a `read` for the chief, so its new fields reach it.
 - Ticket 17: the chief's prompt must tell it to post with `"from": "chief"` and to name its
-  project by the exact spelling it was opened with (`project_root` is compared textually).
+  project by the exact spelling it was opened with (`project_root` is compared textually, after
+  `normalise_project_root`). It must also say: send `project_root` on every run, goal and decompose
+  call (a call without it is 403); give the project root as `scope` on a project-board post and a
+  run on the project board (a missing scope is read as `feature`, which is 403); use a
+  parenthesized scope such as `(interactive)` on `/code/query` (a feature name is 403). `pathly api`
+  may fill `project_root` in from the session itself.
 - Ticket 13: `test_status_chief_reads_and_is_refused_a_note` already checks "a Status-style token
   is refused on a write" at the HTTP level; the operator "starts a run" scenario is not covered
   here beyond the operator passing the gate on `POST /runs`.
