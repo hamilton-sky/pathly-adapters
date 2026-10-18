@@ -27,6 +27,7 @@ from pathly_orchestrator import eventlog, fsm_ops
 from pathly_orchestrator.db import get_db
 from pathly_orchestrator.db.queries.comms import post_message
 from pathly_orchestrator.db.queries.comms_tasks import claim_task, complete_task
+from tests._python import python_command
 
 __all__ = ["flow", "repo"]
 
@@ -42,18 +43,18 @@ def text_with(title: str, command: str) -> str:
 
 def red(title: str = "Red task.", marker: str = "red-marker") -> str:
     return text_with(
-        title, "python -c \"import sys; print('%s'); sys.exit(1)\"" % marker
+        title, python_command("import sys; print('%s'); sys.exit(1)" % marker)
     )
 
 
 def green(title: str = "Green task.") -> str:
-    return text_with(title, "python -c \"print('green-marker')\"")
+    return text_with(title, python_command("print('green-marker')"))
 
 
 def counting(title: str, log: Path, code: int = 0) -> str:
     """A check that appends one character to ``log`` (outside the repo) and exits ``code``."""
-    command = "python -c \"import sys; open('%s', 'a').write('x'); sys.exit(%d)\""
-    return text_with(title, command % (log.as_posix(), code))
+    code_text = "import sys; open('%s', 'a').write('x'); sys.exit(%d)"
+    return text_with(title, python_command(code_text % (log.as_posix(), code)))
 
 
 def load(name: str) -> dict:

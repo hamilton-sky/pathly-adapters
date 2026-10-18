@@ -31,6 +31,7 @@ from pathly_orchestrator.db.queries.comms_tasks import (
 )
 from pathly_orchestrator.fsm_ops import next_action
 from pathly_orchestrator.fsm_ops_complete import complete_stage
+from tests._python import python_command
 
 APP = "def add(a, b):\n    return a + b\n"
 APP_V2 = APP + "\n\ndef answer():\n    return 42\n"
@@ -63,7 +64,7 @@ def check_block(command: str) -> str:
 
 def appending(log: Path) -> str:
     """A check that exits 0 and appends one character to ``log`` (outside the repo)."""
-    return "python -c \"open('%s', 'a').write('x')\"" % log.as_posix()
+    return python_command("open('%s', 'a').write('x')" % log.as_posix())
 
 
 class Projects:

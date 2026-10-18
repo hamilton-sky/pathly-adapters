@@ -91,6 +91,14 @@ def _project_root_of(feature_dir: Path) -> str:
     return _norm_root(feature_dir.parent.parent.parent)
 
 
+def storage_key(storage_path: "str | Path") -> tuple[str, str]:
+    """``(project_root, feature)`` the event log keys *storage_path* by: what append_event
+    writes under. Readers elsewhere use it, so a nested run dir is read where it was written.
+    """
+    feature_dir = _resolve_path(str(storage_path)).resolve()
+    return _project_root_of(feature_dir), feature_dir.name
+
+
 def _now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -242,10 +250,9 @@ write_state.__wrapped__ = _write_state_db  # type: ignore[attr-defined]
 
 
 def read_events(storage_path: str) -> list[dict]:
-    feature_dir = _resolve_path(storage_path).resolve()
-    project_root = _project_root_of(feature_dir)
+    project_root, feature = storage_key(storage_path)
     conn = _db.get_db()
-    events = _db.read_events(conn, project_root, feature_dir.name)
+    events = _db.read_events(conn, project_root, feature)
     for event in events:
         schema_version = event.get("schema_version")
         if schema_version is None:
@@ -265,10 +272,8 @@ def read_events(storage_path: str) -> list[dict]:
 
 
 def read_state(storage_path: str) -> dict | None:
-    feature_dir = _resolve_path(storage_path).resolve()
-    project_root = _project_root_of(feature_dir)
-    conn = _db.get_db()
-    return _db.read_state(conn, project_root, feature_dir.name)
+    project_root, feature = storage_key(storage_path)
+    return _db.read_state(_db.get_db(), project_root, feature)
 
 
 def summary(storage_path: str) -> dict:

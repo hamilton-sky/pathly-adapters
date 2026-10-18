@@ -16,6 +16,46 @@ from pathly_orchestrator.fsm import (
 )
 
 
+def _feedback_response(
+    feedback: dict, state_info: dict, storage_path, flow_config: dict
+) -> dict:
+    """The blocked response that routes *feedback*, with its agent's prompt.
+
+    Also counts the round in fsm_state (``feedback_rounds.record_round``), which is what
+    lets the escalation ladder climb in a headless run. ``feedback["retry_count"]`` is the
+    count from before this round, so the ladder's role and prompt agree.
+    """
+    from pathly_orchestrator.fsm.feedback_rounds import record_round
+
+    record_round(storage_path, feedback, flow_config)
+    result = _fops._blocked_response(
+        feedback,
+        state_info,
+        storage_path,
+        preferred_adapter=_fops._resolve_adapter(
+            flow_config, state_info["current_state"]
+        ),
+    )
+    if feedback["target_agent"] != "human":
+        try:
+            instructions = _fops.build_prompt_for_agent(
+                feedback["target_agent"],
+                storage_path,
+                feedback_file=feedback["file"],
+                retry_count=feedback.get("retry_count", 0),
+            )
+            result["instructions"] = instructions
+            result["agent_hint"] = _fops._agent_hint(
+                feedback["target_agent"], instructions
+            )
+            result["codex_subagent"] = _fops._codex_subagent_hint(
+                feedback["target_agent"], instructions
+            )
+        except Exception:
+            result["instructions"] = None
+    return result
+
+
 def complete_stage(args: dict) -> dict:
     flow_name = args["flow"]
     topic = args["topic"]
@@ -80,32 +120,7 @@ def complete_stage(args: dict) -> dict:
 
     feedback = route_feedback(flow_config, storage_path)
     if feedback is not None:
-        result = _fops._blocked_response(
-            feedback,
-            state_info,
-            storage_path,
-            preferred_adapter=_fops._resolve_adapter(
-                flow_config, state_info["current_state"]
-            ),
-        )
-        if feedback["target_agent"] != "human":
-            try:
-                instructions = _fops.build_prompt_for_agent(
-                    feedback["target_agent"],
-                    storage_path,
-                    feedback_file=feedback["file"],
-                    retry_count=feedback.get("retry_count", 0),
-                )
-                result["instructions"] = instructions
-                result["agent_hint"] = _fops._agent_hint(
-                    feedback["target_agent"], instructions
-                )
-                result["codex_subagent"] = _fops._codex_subagent_hint(
-                    feedback["target_agent"], instructions
-                )
-            except Exception:
-                result["instructions"] = None
-        return result
+        return _feedback_response(feedback, state_info, storage_path, flow_config)
 
     if state_info["current_state"] == "DONE":
         return {"done": True}
@@ -177,32 +192,7 @@ def complete_stage(args: dict) -> dict:
                 "target_agent": "human",
                 "file": gate_failure.get("feedback_file", "HUMAN_QUESTIONS.md"),
             }
-        result = _fops._blocked_response(
-            feedback,
-            state_info,
-            storage_path,
-            preferred_adapter=_fops._resolve_adapter(
-                flow_config, state_info["current_state"]
-            ),
-        )
-        if feedback["target_agent"] != "human":
-            try:
-                instructions = _fops.build_prompt_for_agent(
-                    feedback["target_agent"],
-                    storage_path,
-                    feedback_file=feedback["file"],
-                    retry_count=feedback.get("retry_count", 0),
-                )
-                result["instructions"] = instructions
-                result["agent_hint"] = _fops._agent_hint(
-                    feedback["target_agent"], instructions
-                )
-                result["codex_subagent"] = _fops._codex_subagent_hint(
-                    feedback["target_agent"], instructions
-                )
-            except Exception:
-                result["instructions"] = None
-        return result
+        return _feedback_response(feedback, state_info, storage_path, flow_config)
 
     # Human escalation gate. Checked AFTER next_state is known and BEFORE the transition is
     # committed, so an open gate blocks the specific transition it stands in front of rather
@@ -270,6 +260,8 @@ def complete_stage(args: dict) -> dict:
 
     prior_state = _elog_ws.read_state(str(storage_path)) or dict(state_before or {})
     prior_state.pop("conv_start_sha", None)
+    # The stage the feedback blocked is passed: a later failure starts its ladder at round 1.
+    prior_state.pop("retry_count_by_key", None)
     baseline = prior_state.pop("build_baseline", None)
     if next_state == "DONE":
         # The run-wide proof base lasts until DONE: back-edges and resumed runs keep it.

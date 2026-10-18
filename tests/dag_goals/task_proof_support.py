@@ -11,6 +11,7 @@ from pathlib import Path
 
 from pathly_orchestrator.supervisor.drain import drain_frontier
 from pathly_orchestrator.supervisor.isolation import SerialIsolation
+from tests._python import python_command
 
 SCOPE = "proof-feat"
 PLAN = "pathly/features/proof-feat/IMPLEMENTATION_PLAN.md"
@@ -18,12 +19,9 @@ SAMPLE_TEST = "def test_sample():\n    assert 1 + 1 == 2\n"
 SKIPPED_TEST = (
     "import pytest\n\n\n@pytest.mark.skip\ndef test_sample():\n    assert 1 + 1 == 2\n"
 )
-RED_TEXT = """Add the greeting.
-
-```check
-$ python -c "import sys; print('red-marker'); sys.exit(3)"
-```
-"""
+RED_TEXT = "Add the greeting.\n\n```check\n$ %s\n```\n" % python_command(
+    "import sys; print('red-marker'); sys.exit(3)"
+)
 
 
 def git(repo: Path, *args: str) -> None:

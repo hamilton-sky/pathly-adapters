@@ -34,7 +34,11 @@ from task_proof_support import (
     write,
 )
 
-GREEN_TEXT = "Greet.\n\n```check\n$ python -c \"print('green')\"\nprints green\n```\n"
+from tests._python import python_command
+
+GREEN_TEXT = "Greet.\n\n```check\n$ %s\nprints green\n```\n" % python_command(
+    "print('green')"
+)
 
 
 @pytest.fixture(autouse=True)
@@ -127,7 +131,7 @@ def test_the_whole_report_survives_into_the_retry_prompt_and_the_final_failure(
     state = State(repo)
     set_app_setting("goal.task_max_attempts", "2")
     noisy = "import sys; print('x' * 3000 + 'EN' + 'D-MARKER'); sys.exit(2)"
-    tid = add_task(f'Greet.\n\n```check\n$ python -c "{noisy}"\n```\n')
+    tid = add_task(f"Greet.\n\n```check\n$ {python_command(noisy)}\n```\n")
     seen: dict = {}
 
     def second_attempt(repo: Path) -> None:

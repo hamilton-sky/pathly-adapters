@@ -4,12 +4,13 @@
 
 Runner control loop, supervisor, spawn channel, lane/worktree isolation, file-claim registry, services facade.
 
-21 test file(s).
+22 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
 | `test_base_smoke.py` | supervisor/base_smoke.py — a red base parks a run before it spawns anything (build-proof 12) | 19 |
 | `test_fan_out.py` | supervisor/fan_out.py — the DAG scheduler as an FSM stage executor (fan-out Phase C) | 19 |
+| `test_feedback_spawn_cost.py` | A feedback spawn's cost counts toward the run, as a stage spawn's does | 2 |
 | `test_file_claims.py` | Unit tests for the cross-feature file-claim overlap registry | 6 |
 | `test_fsm_port_config.py` | PATHLY_FSM_HTTP_PORT reaches every caller, so Pathly can run beside another server on 8765 | 7 |
 | `test_isolation.py` | Tests for supervisor/isolation.py — LaneIsolation workspace seam | 11 |

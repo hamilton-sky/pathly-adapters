@@ -22,6 +22,8 @@ from task_proof_support import (
     write,
 )
 
+from tests._python import python_command
+
 
 @pytest.fixture(autouse=True)
 def _code_intel_off(_isolate_db):
@@ -145,7 +147,7 @@ def test_the_error_names_each_failing_part_and_stays_within_4000_characters(tmp_
     repo = make_repo(tmp_path)
     state = State(repo)
     noisy = "import sys; print('x' * 12000); sys.exit(4)"
-    tid = add_task(f'Greet.\n\n```check\n$ python -c "{noisy}"\n```\n')
+    tid = add_task(f"Greet.\n\n```check\n$ {python_command(noisy)}\n```\n")
     assert claim_task(get_db(), tid, run_id=_run_id(tid))
 
     def spawn(state, instructions, adapter, model, run_id, broadcast_fn):

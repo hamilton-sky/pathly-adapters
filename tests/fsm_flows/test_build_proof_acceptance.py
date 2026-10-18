@@ -121,8 +121,13 @@ def test_2_failing_check_is_retried_with_its_output_then_fails(projects):
     assert row["task_status"] == "failed"
     assert "got: exit 3" in row["fail_reason"]
     escalations = board_posts(h.topic, "escalation")
-    assert [e["goal_id"] for e in escalations] == [h.goal_id]
-    assert "Task failed after 2 attempt(s)" in escalations[0]["text"]
+    task_failed = [e for e in escalations if e["from_agent"] != "system"]
+    assert [e["goal_id"] for e in task_failed] == [h.goal_id]
+    assert "Task failed after 2 attempt(s)" in task_failed[0]["text"]
+    # The join's INCOMPLETE_TASKS then climbs the ladder (builder, builder, planner) and its
+    # fourth round parks the run for a human, with the server's checkpoint escalation.
+    assert (run.state.status, run.state.error_kind) == ("parked", "human_checkpoint")
+    assert [e["from_agent"] for e in escalations if e not in task_failed] == ["system"]
 
 
 def test_3_task_text_edit_is_caught_and_the_retry_shows_the_frozen_text(projects):

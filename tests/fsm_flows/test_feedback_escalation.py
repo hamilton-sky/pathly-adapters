@@ -7,8 +7,6 @@ A failure file's target climbs as the same loop keeps failing:
 
 from __future__ import annotations
 
-import json
-
 from pathly_orchestrator.fsm.engine import _resolve_feedback_target, route_feedback
 
 ESC = {"REVIEW_FAILURES": "planner", "TEST_FAILURES": "po"}
@@ -126,17 +124,20 @@ def test_route_feedback_escalates_with_injected_counts(tmp_path):
     ), "human escalation includes the file content"
 
 
-def test_route_feedback_reads_retry_from_state_json(tmp_path):
-    fb = tmp_path / "feedback"
-    fb.mkdir()
+def test_route_feedback_reads_retry_from_fsm_state(tmp_path):
+    from pathly_orchestrator import eventlog
+
+    storage = tmp_path / "pathly" / "features" / "esc-feat"
+    fb = storage / "feedback"
+    fb.mkdir(parents=True)
     (fb / "TEST_FAILURES.md").write_text("tester: criteria fail", encoding="utf-8")
-    (tmp_path / "STATE.json").write_text(
-        json.dumps({"retry_count_by_key": {"conv-2:TEST_FAILURES.md": 2}}),
-        encoding="utf-8",
+    # An older run's key form (conv-N:FILE.md) still counts.
+    eventlog.write_state(
+        str(storage), {"retry_count_by_key": {"conv-2:TEST_FAILURES.md": 2}}
     )
     flow = {"feedback_routing": {"TEST_FAILURES": "builder"}, "escalation_routing": ESC}
-    # No retry_counts passed → route_feedback reads STATE.json → round 3 → po.
-    assert route_feedback(flow, tmp_path)["target_agent"] == "po"
+    # No retry_counts passed → route_feedback reads fsm_state (the DB) → round 3 → po.
+    assert route_feedback(flow, storage)["target_agent"] == "po"
 
 
 # ── flow declares the escalation ─────────────────────────────────────────────

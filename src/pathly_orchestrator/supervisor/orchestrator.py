@@ -115,7 +115,7 @@ def _loop(state: RunnerState, broadcast_fn: Optional[Callable]) -> None:
             # ── Boundary: check caps ──────────────────────────────────────────
             with _lock:
                 over_iter = state.iterations >= state.max_iterations
-                over_cost = state.cost_usd_so_far >= state.max_cost_usd
+                over_cost = state.over_cost_cap()
             if over_iter or over_cost:
                 with _lock:
                     state.error_kind = "cap_exceeded"

@@ -233,7 +233,7 @@ Features advance through: `PLANNING -> DESIGNING -> BUILDING -> REVIEWING -> TES
 Each transition is driven by events written to the central SQLite DB (`~/.pathly/pathly.db`).
 
 **State & flow storage — the DB is authoritative:**
-- **FSM state** lives in the `fsm_state` table (source of truth). `STATE.json` directly in the feature dir (`pathly/features/<feature>/`; legacy `pathly/plans/<feature>/`, still resolved) is a **DB→disk EXPORT** written after every transition (`eventlog.write_state` writes the DB first, then the file atomically). `next_action`/`complete_stage` read the DB and only fall back to `STATE.json` when the DB has no row. The only remaining direct readers are allow-listed DB-first fallbacks (scope gate `build_baseline`, FSM recovery, feedback-routing retry counts) and the human CLI (`pathly-back`/`-log`/discovery globs) — Studio reads `/db/features` instead (state-one-authority; enforced by `scripts/check_no_mirror_reads.py`).
+- **FSM state** lives in the `fsm_state` table (source of truth). `STATE.json` directly in the feature dir (`pathly/features/<feature>/`; legacy `pathly/plans/<feature>/`, still resolved) is a **DB→disk EXPORT** written after every transition (`eventlog.write_state` writes the DB first, then the file atomically). `next_action`/`complete_stage` read the DB and only fall back to `STATE.json` when the DB has no row. The only remaining direct readers are allow-listed DB-first fallbacks (scope gate `build_baseline`, FSM recovery) and the human CLI (`pathly-back`/`-log`/discovery globs) — Studio reads `/db/features` instead (state-one-authority; enforced by `scripts/check_no_mirror_reads.py`).
 
 **Disk-file classification (state-one-authority):** *the SQLite DB is the single runtime authority; every per-feature disk file is a SEED (read once into the DB) or an EXPORT (written DB→disk) — never round-tripped for a runtime decision.*
 
@@ -1383,6 +1383,33 @@ absent/invalid/non-positive means **no cap**, the same fail-open contract as
 `verify_clean_drain` already uses, so every `on_done` consumer (which branches on
 `res.get("error")`) reports it as a non-clean stop rather than silent success.
 
+**The goal's FSM run reads the same setting.** `goal_executor._run_team` (both `executor: team`,
+flow `team-build`, and `executor: loop`, flow `goal-loop`) passes
+`max_cost_usd=resolve_goal_max_cost_usd()` to `start_run`. It used to pass nothing, so every goal
+run got `start_run`'s default of $1 and parked as `cap_exceeded` after its first dollar, while the
+drain inside the same run read `goal.max_cost_usd`. The choice, and why not a higher default:
+
+- **One number, one meaning.** The setting already capped a goal's drain and meant "no cap" when
+  unset. The run now follows it at both levels, so `team` and `loop` agree and the documented
+  contract holds.
+- **A run-level default could not bound a `loop` goal.** Its whole DAG drains inside one
+  DRAINING stage, and the loop checks the cap only between stages, so a $10 default there would
+  stop nothing while the drain stayed uncapped.
+- **Unset is not unbounded.** A goal run is still held by its iteration budget (`run_budget`)
+  and `MAX_FEEDBACK_ROUNDS`. Set `goal.max_cost_usd` for a hard money limit on unattended runs.
+
+`None` reaches the run as "no cap": `start_run(max_cost_usd=None)`, `RunnerState.max_cost_usd`
+is `Optional[float]`, and the loop asks `state.over_cost_cap()` (false when the cap is `None`).
+`COST_UPDATE` and the runner-state mirror then carry `max_cost_usd: null`. Every other caller
+(`/runner/start`, `POST /runs`, the consultation decomposers) passes a number, or `start_run`'s
+$1 default, as before.
+
+**Feedback spawns count.** The fix-round spawn in `orchestrator_stage._resolve_stage_supervised`
+adds its `cost_usd` to `state.cost_usd_so_far` (and broadcasts `COST_UPDATE`), as a stage spawn
+does in `_loop`. Its result used to be thrown away, so a run's fix rounds cost money the cap never
+saw. The cap is still checked only at the top of `_loop`, so a fix round already running is not
+stopped; the next stage is.
+
 ## Headless spawn host (`pty_host/`)
 
 The supervisor never spawns a CLI itself. `supervisor/terminal.py` emits `TERMINAL_SPAWN` on the
@@ -1449,8 +1476,8 @@ fresh at call time (capped, so a pathological feedback file can't blow up the pr
 `build_pipeline_history_block` — the SAME recent-`AGENT_DONE`-summaries helper `build_prompt`'s
 normal stage-advance path already uses, so no second history mechanism exists. **Round 1
 (`retry_count == 0`, the default) has no ladder.** Every existing caller that never threads
-the new parameter, and every golden snapshot, is unaffected; but a headless run never climbs
-`retry_count`, so it would never have shown the file at all. So a round-1 prompt for any role
+the new parameter, and every golden snapshot, is unaffected; but the ladder never shows the file
+on a file's first round. So a round-1 prompt for any role
 outside `_FIX_MODE_ARTIFACT` (typically builder, reviewer, tester) that is given a
 `feedback_file` carries a `## Feedback to resolve` block
 (`fsm_compose_feedback.feedback_block`), in the ladder's place, right after the
@@ -1471,9 +1498,8 @@ them to read the file), are byte-identical to before. All three callers (`fsm_op
 `fragments/root-cause-debug.md` (`## Root-cause debugging`: read every failure, reproduce it with
 the exact command, isolate the cause, fix it without weakening a check, prove it; stop after two
 failed fixes of the same error) when `agent_name == "builder"` and a `feedback_file` is given, whatever
-`retry_count` says. A headless run never writes `retry_count_by_key` to STATE, so the ladder above
-never climbs there; and a builder handed a feedback file is, by definition, on a second attempt at
-its stage. The guide comes after the feedback: the round-1 `## Feedback to resolve` block, or the ladder's
+`retry_count` says: a builder handed a feedback file is, by definition, on a second attempt at its
+stage, even on that file's first round. The guide comes after the feedback: the round-1 `## Feedback to resolve` block, or the ladder's
 current feedback from round 2, so its first step ("Read every failure above") has something above
 it. It is read at call time by `skills/compose_resources.root_cause_guide()` (empty
 and logged when the file is unreadable), is not in `composition.yaml` (so no golden snapshot
@@ -1481,6 +1507,42 @@ moves), and does not contain the words "Retry attempt" that `tests/fsm_flows/tes
 uses to tell attempts apart. A builder prompt with no feedback file, and every other role, gets no
 guide (a reviewer or tester given a feedback file gets only the feedback block). The DAG-task twin
 is in "Phase 1: per-task retry" below.
+
+**Where the round count lives (`fsm/feedback_rounds.py`).** Nothing used to write
+`retry_count_by_key`, so `route_feedback` read 0 on every round: in a headless run the round-3
+hand-off and the round-4 human step never fired, and the supervisor gave up after
+`MAX_FEEDBACK_ROUNDS` (3, `supervisor/state.py`) fix spawns with `error_kind="feedback_exhausted"`.
+The count now lives in `fsm_state`, the DB: `route_feedback` reads it through
+`feedback_rounds.read_retry_counts` (no `STATE.json` read, and `engine_transitions.py` left the
+mirror-read allow list).
+
+- **Counted** by `fsm_ops_complete._feedback_response`, the one builder of both blocked responses
+  in `complete_stage`, which calls `feedback_rounds.record_round` each time it routes a file: one
+  more for an agent target. A round routed to `human` clears that file's count, so once the human
+  has had it a new failure starts again at round 1 (the owner) instead of parking again at once.
+  `next_action`'s `route_feedback` call counts nothing; it only reports what is open.
+- **Cleared** when `complete_stage` commits a transition (`retry_count_by_key` is popped with
+  `build_baseline`): the stage the file blocked was passed, so a later failure is a new problem.
+- **In sync:** the `retry_count` `route_feedback` returns is the count from before this round, so
+  the role and the prompt's ladder block agree. Older `conv-N:FILE.md` keys read as `FILE.md`.
+
+With the supervisor this lines up with `MAX_FEEDBACK_ROUNDS`: a file with an
+`escalation_routing` entry gets owner, owner, specialist (the three fix spawns), and its fourth
+block routes to `human`, which `orchestrator_stage` parks (`human_checkpoint`, resumable; checked
+before the round limit), so a laddered file never ends a run as `feedback_exhausted`. A file with
+no entry (`FLOOR_FAILURES`, `TASK_CHECK_FAILURES`, ...) still gets three fix rounds and then
+`feedback_exhausted`. Interactive `/pathly` runs call the same `complete_stage` and climb too.
+
+Why persist the count rather than delete the ladder: five failure-looping flows carry
+`escalation_routing`, and it is the only thing that hands a persistently failing loop upstream
+(planner, po, scout) instead of back to the same role; deleting it would have thrown that away to
+fix a missing write. The human step it already had is a park, which is what the delete option
+would have had to add for round exhaustion anyway.
+
+Limit: the count is per stage visit. A gate re-writes its file inside one state (`command_gate`,
+`scope_gate`, `require_tasks_done`, ...), so those files climb. `REVIEW_FAILURES` is written once
+per REVIEWING visit by the reviewer, and the builder's fix round is followed by a transition, so
+each REVIEWING visit starts it at round 1 again.
 
 ## FSM/DAG convergence — Phase 0 hygiene fixes
 
@@ -1768,7 +1830,7 @@ rebuilds it:
 - **It broke the state-one-authority rule**, and that rule pays for itself. With no DB row the
   run was invisible to `pathly-status`, had no `STATE_TRANSITION` audit trail, could not
   park/resume, and silently disabled `escalation_routing` (whose tiers climb off
-  `STATE.json`'s `retry_count_by_key`). Two of those needed their own patches — a whole second
+  the state row's `retry_count_by_key`). Two of those needed their own patches — a whole second
   CLI discovery source and an in-memory retry dict — before anyone noticed they shared one
   cause.
 - **It made the problem it was meant to solve worse.** The convergence goal was two engines
@@ -2250,6 +2312,24 @@ When a PTY stage exits, the supervisor merges two sources:
 The `summary` field is written by the agent via the `log-agent-done` skill to the central DB during its run.
 It is never subject to the PTY's 500-chunk rolling output buffer.
 If `summary` is absent (e.g. legacy agent), stdout `result` is used as a fallback.
+
+**Every reader keys the log the way `append_event` writes it.** `append_event` keys an event by
+`(eventlog._project_root_of(dir), dir.name)`: the directory above `pathly/`, at any depth.
+`eventlog.storage_key(storage_path)` returns that pair, and the readers outside `eventlog` use it:
+`runner.read_last_agent_done` (the `AGENT_DONE` summary and outcome the PTY result is enriched
+with) and `runner._patch_last_agent_done` (the `BILLING_UPDATE`'s agent and conversation),
+`terminal_reconcile._agent_done_watcher` and the early-advance `last_seq` baseline in
+`terminal.py`, and `route_feedback`'s `feedback_items` sync. They used to take
+`storage.parent.parent.parent`, which for a goal run (`pathly/features/<f>/goals/<slug>`) is
+`<root>/pathly/features`, so they read nothing: a goal run's failed `outcome` was lost, every goal
+run got a synthetic `AGENT_DONE` on top of its own, and early advance never fired.
+
+**The early-advance watcher takes only its own spawn's report.** `_agent_done_watcher` skips an
+`AGENT_DONE` stamped with another run's `run_id` (`terminal_reconcile._reports_run`): the tasks of
+a `goal-loop` drain share the goal's storage dir, so one task's report used to end another task's
+spawn. A report with no `run_id`, or the literal `<run_id>` placeholder, is still taken, so an
+agent whose prompt kept no `<run_id>` advances early as before. After the watcher fires,
+`terminal.py` still reads the newest `AGENT_DONE` of the slug for the result, not the matched one.
 
 The runner→FSM result dict `_run_stage_via_terminal` returns also relays the agent's self-reported `outcome` (`success`/`failed`) + `error` from `AGENT_DONE`, so the loop executor's `_outcome_is_failure` (`supervisor/scheduler.py`) fails a task that exited cleanly but reported failure (silent-failure guard #2); a `_pty_return()` helper merges the CLI `exit_code` into the same returned dict for that check.
 

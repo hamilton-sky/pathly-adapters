@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import re
 from pathlib import Path
 
@@ -266,20 +265,10 @@ def _resolve_feedback_target(
 
 
 def _read_retry_counts(storage_path: Path) -> dict[str, int]:
-    """{FILENAME.md: max retry count} from STATE.json retry_count_by_key. Best-effort."""
-    out: dict[str, int] = {}
-    try:
-        # pathly:allow-mirror-read: best-effort retry_count_by_key read from the state snapshot
-        raw = json.loads((storage_path / "STATE.json").read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return out
-    for key, count in (raw.get("retry_count_by_key") or {}).items():
-        fname = key.split(":", 1)[1] if ":" in key else key
-        try:
-            out[fname] = max(out.get(fname, 0), int(count or 0))
-        except (TypeError, ValueError):
-            continue
-    return out
+    """{FILENAME.md: rounds already routed} from fsm_state (the DB; see fsm/feedback_rounds)."""
+    from pathly_orchestrator.fsm.feedback_rounds import read_retry_counts
+
+    return read_retry_counts(storage_path)
 
 
 def route_feedback(
@@ -304,9 +293,11 @@ def route_feedback(
             write_feedback_item,
         )
 
+        from pathly_orchestrator.eventlog import storage_key
+
         _conn = get_db()
-        _feature = storage_path.name
-        _project_root = str(storage_path.parent.parent.parent)
+        # The event log's key: a nested goal run's root is above pathly/, not 3 levels up.
+        _project_root, _feature = storage_key(storage_path)
         for _fname in md_files:
             _content: str | None = None
             try:

@@ -30,11 +30,11 @@ from build_proof_acceptance_support import (
 
 from pathly_orchestrator.db import get_db
 from pathly_orchestrator.supervisor import RunnerState
+from tests._python import python_command
 
-RED_CHECK = "python -c \"import sys; print('red-marker'); sys.exit(3)\""
-FIXED_TEST = (
-    "python -c \"import pathlib,sys; sys.exit(0 if pathlib.Path('src/fixed.txt').exists() "
-    'else 1)"'
+RED_CHECK = python_command("import sys; print('red-marker'); sys.exit(3)")
+FIXED_TEST = python_command(
+    "import pathlib,sys; sys.exit(0 if pathlib.Path('src/fixed.txt').exists() else 1)"
 )
 EDITED_TASK = "Make the build green (an easier version)."
 Script = Callable[[Harness, Spawn], Optional[str]]
@@ -185,7 +185,7 @@ def run_red_base(projects: Projects) -> Run:
         lambda h, s: None,
         "Add answer() to src/app.py.",
         ["src/app.py"],
-        {"verify.build": 'python -c "raise SystemExit(1)"'},
+        {"verify.build": python_command("raise SystemExit(1)")},
     )
 
 
@@ -223,7 +223,10 @@ def run_happy_team(projects: Projects, log: Path) -> Run:
         script,
         text,
         ["src/app.py"],
-        {"verify.build": 'python -c "pass"', "verify.test": 'python -c "pass"'},
+        {
+            "verify.build": python_command("pass"),
+            "verify.test": python_command("pass"),
+        },
     )
 
 
