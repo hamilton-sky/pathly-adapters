@@ -360,4 +360,4 @@ def soft_delete_message(
 from .comms_hydrate import insert_message_row  # noqa: E402, F401
 
 # update_message_text lives in comms_edit.py (400-line cap); re-exported here.
-from .comms_edit import update_message_text  # noqa: E402, F401
+from .comms_edit import update_message_text
