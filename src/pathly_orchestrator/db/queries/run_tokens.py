@@ -62,6 +62,24 @@ def resolve_run_token(conn: sqlite3.Connection, token: str | None) -> dict | Non
     return dict(zip(keys, tuple(row)))
 
 
+def lookup_run_token(conn: sqlite3.Connection, token: str | None) -> dict | None:
+    """The row for a token's hash, revoked or not, or None (unknown, empty or missing).
+
+    ``resolve_run_token`` keeps returning live rows only; this is for a caller that must
+    tell a revoked token (``revoked_at`` set) from one the server never issued.
+    """
+    if not token:
+        return None
+    row = conn.execute(
+        "SELECT * FROM run_tokens WHERE token_hash = ?",
+        (_hash(token),),
+    ).fetchone()
+    if row is None:
+        return None
+    keys = [d[0] for d in conn.execute("SELECT * FROM run_tokens LIMIT 0").description]
+    return dict(zip(keys, tuple(row)))
+
+
 def revoke_run_tokens(conn: sqlite3.Connection, run_id: str) -> int:
     """Revoke every live token of ``run_id``; returns how many were revoked."""
     with _get_write_lock(conn):

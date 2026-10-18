@@ -621,7 +621,7 @@ pathly_orchestrator/
                            # busy_timeout=5000 handle cross-process contention; the RLock handles
                            # cross-thread contention within the server process.
     migrations.py          # _run_migrations(), CREATE TABLE SQL
-    migrations_provenance.py # run provenance (role-read-policy), called last from
+    migrations_provenance.py # run provenance (role-read-policy), called from
                            # migrations_incremental._add_additive_migrations:
                            #   add_run_tokens() creates run_tokens (per-spawn identity, only the
                            #   sha256 of the token stored);
@@ -636,6 +636,11 @@ pathly_orchestrator/
                            #   is relabelled `legacy` at the next start; hydrate_board
                            #   (board_mirror_hydrate.py) runs it after importing a snapshot, so
                            #   a pre-upgrade BOARD.json row is `legacy` at once.
+    migrations_chief.py    # add_chief_tables() (chief-agent), called last from
+                           # migrations_incremental._add_additive_migrations: chief_sessions
+                           # (one row per chief tab, indexed on project_root), chief_human_messages
+                           # (indexed on run_id) and chief_citations (message_id UNIQUE, so a human
+                           # message is citable once). CREATE ... IF NOT EXISTS, idempotent
     provenance_values.py   # the author_source vocabulary and the `system` stamp, defined ONCE
                            # (AUTHOR_SOURCES = token|system|legacy|none, SYSTEM_ROLE, SYSTEM_AUTHOR,
                            # SYSTEM_PAIR); imported by runner/provenance.py, post_message (rejects
@@ -688,7 +693,12 @@ pathly_orchestrator/
       comms_summary.py     # per-artifact AI-summary selection/style/note setters+getters (unified-ai-routing)
       skill_composition.py # per-project skill-composition overrides (composition editor)
       prompt_library.py    # prompt_library table CRUD — now the LEGACY kind='ability' store only; global/project merge, name-upsert, idempotent seed. kind='preset' (system-prompts) moved to FILES → skills/prompt_files.py (mirrors abilities), with a one-time lazy DB→files migration
-      run_tokens.py        # mint_run_token / resolve_run_token / revoke_run_tokens — the per-spawn identity (role-read-policy): the raw token is returned once and only its sha256 is stored, next to run_id/role/feature/project_root/board/scope; resolve returns None for an empty, unknown or revoked token; revoked when the spawn settles
+      chief.py             # chief-agent sessions: create_session / get_session / open_session_for_project,
+                           # close_session (once; revokes the run's tokens before marking it closed) and
+                           # close_stale_sessions (reason `server restart`), add_human_message (first message
+                           # of a session is `style_prompt`, later ones `human` or `relayed`) / get_human_message,
+                           # record_citation (False when the message was already cited). Static SQL, writes under _get_write_lock
+      run_tokens.py        # mint_run_token / resolve_run_token / revoke_run_tokens — the per-spawn identity (role-read-policy): the raw token is returned once and only its sha256 is stored, next to run_id/role/feature/project_root/board/scope; resolve returns None for an empty, unknown or revoked token; lookup_run_token returns the row whether or not it is revoked (None only for an empty or unknown one), so the chief gate can tell a revoked token from an unknown one; revoked when the spawn settles
   runner/                  # CLI runner, agent invocation, argv, output parsing
     argv.py                # resolve_argv, resolve_interactive_argv, _storage_path
     output.py              # parse_result, _extract_json_payload; extract_tokens + the per-adapter
