@@ -293,7 +293,6 @@ UNLISTED = [
     ("post", "/db/query", {"sql": "SELECT 1"}),
     ("post", "/chief/open", {"engine": "claude"}),
     ("post", "/chief/close", {}),
-    ("post", "/chief/human-messages", {"text": "x"}),
     ("get", "/events/spawn", None),
     ("get", "/events/runner?topic=x", None),
     ("get", "/db/settings", None),

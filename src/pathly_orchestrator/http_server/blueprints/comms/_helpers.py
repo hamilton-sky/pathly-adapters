@@ -73,6 +73,7 @@ _PROJECT_WRITERS: frozenset[str] = frozenset(
         "evaluator",
         "director",
         "human",
+        "chief",
     }
 )
 _GLOBAL_WRITERS: frozenset[str] = frozenset({"director", "evaluator", "human"})

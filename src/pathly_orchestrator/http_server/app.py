@@ -15,6 +15,7 @@ except ImportError:
 
 from pathly_orchestrator.api import api_bp
 from .middleware import _log_request, _log_response, _setup_logging
+from .chief_gate import chief_gate
 from .feedback import _feedback_watcher
 from .blueprints.core.health import bp as health_bp
 from .blueprints.core.fsm import bp as fsm_bp
@@ -68,6 +69,7 @@ for _chief_bp in chief_blueprints:
 
 # Register request/response hooks
 app.before_request(_log_request)
+app.before_request(chief_gate)
 app.after_request(_log_response)
 
 

@@ -493,8 +493,8 @@ GET  /chief/session?project_root=  ← {open: false} | {open: true, run_id, tab_
   restart`, token revoked) and removes their `~/.pathly/chief/<run_id>/` folders, because a chief
   open across a restart has no watcher left to close it.
 - Same limit as the other human-only routes: a caller with no token (or an unknown or revoked
-  one) is treated as a human until the UI token (RRP-2b) exists. Refusing the chief's own token
-  here is the chief gate (a later ticket).
+  one) is treated as a human until the UI token (RRP-2b) exists. The chief's own token is refused
+  here by the chief gate ("Chief gate" below).
 
 ### Request bodies — one lenient reader for every comms route (`_helpers.read_json_body`)
 
@@ -596,6 +596,57 @@ same rows as before this feature (each row now also carries the three `author_*`
 code reads the `read_policy.mode` setting. A role's reads still differ only by the existing
 per-role `board_scope` tier switches. Wiring the predicate into the three read paths (in `warn`
 first) is a later plan.
+
+### Chief gate (chief-agent)
+
+`http_server/chief_gate.py::chief_gate` is a `before_request` hook registered in `app.py` right
+after `_log_request`, so the secret check and the rate limit run first. It acts only on a request
+whose `X-Pathly-Run-Token` belongs to a token row with role `chief` (`lookup_run_token`, live or
+revoked); a builder token, an unknown token and no token pass untouched. A `chief` token whose
+row is revoked, or whose session (`chief_sessions`) is missing or closed, gets **401**
+`{"error": "chief session closed"}`, never `caller_identity`'s anonymous fallback, because
+anonymous loopback callers can do everything. A path no route matches (`request.url_rule` is
+None; Flask matches the rule before any hook runs) passes, and Flask answers 404 or 405.
+
+For a live chief the call is classed into one of seven actions by `http_server/chief_routes.py`
+(`ROUTE_ACTIONS` maps `(rule, method)` to an action; `action_for` applies the three refinements),
+and refused with **403** `{error, action, tier, allowed}` unless the session's tier holds it. The
+tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post, plan;
+`operator` = those plus decide, run, stop, answer. A tier the row does not name is `status`.
+
+| Action | Calls |
+|---|---|
+| `read` | every GET except `/events/*` and `/db/settings` (spawn tokens, stored secrets); `POST /comms/search`, `/code/query` |
+| `post` | `POST /comms/post` of any type not below |
+| `plan` | `/comms/post` type `goal` or `task`; `/comms/goals/decompose`, `/comms/features/decompose`, `/comms/project/decompose` |
+| `decide` | `/comms/post` type `decision` or `constraint` (a `supersedes` list included); `/comms/acknowledge` on any row that is not a human-addressed escalation; `/comms/supersede`, `/comms/directives` (the route arrives with ticket 12) |
+| `run` | `POST /runs`, `/comms/goals/run`, `/comms/run`, `/comms/tasks/run`; `/runs/<run_id>/<action>` for `pause\|resume\|advance\|reroute\|retry` |
+| `stop` | `/runs/<run_id>/stop`; `/runs/<run_id>/<action>` for `abort`; `/comms/goals/stop`, `/comms/run/stop`, `/comms/tasks/stop` |
+| `answer` | `/runner/agent-answer`, `/comms/answer`; `/comms/acknowledge` on an escalation with `to_agent = "human"` (the gate looks the row up by `message_id`) |
+
+- **Deny by default.** Every non-GET route the table does not list is 403 to every tier (for
+  example `/db/query`, `/skills/prompts`, `/chief/open|close`, `/comms/edit|delete|hydrate`,
+  `/comms/tasks/status` and the FSM routes that take `force_past_gate`): the chief never forces
+  past a human gate and never marks a task done itself. An unknown `/runs/<run_id>/<verb>` is
+  unlisted too. `tests/http_api/test_chief_gate.py` walks `app.url_map` and fails when an unlisted
+  route is not refused to an operator, or when the table lists a rule no route has, so a route
+  added later is refused to the chief until someone lists it.
+- **Overrides.** A body with a non-empty `prompt_override` or `stage_overrides`, on any route,
+  also needs `run` (the 403 names `run`): the Planner may call the decompose routes but cannot
+  hand verbatim prompt text to the agents they start.
+- **One project.** A `project_root` in the body or query string must resolve
+  (`fsm_compose.resolve_board_scope("project", value, "")`) to the session's project, else 403
+  (so a value that is not a string is refused too); an absent, null or empty one is left to the
+  route. On `/comms/post`, a `from` other than `chief` (or none) is 403.
+- **The body stays readable.** The gate reads it with `comms/_helpers.read_json_body` (it calls
+  `request.get_data()`, which Werkzeug caches, so the route still gets the body).
+- **A project writer.** `chief` is in `_PROJECT_WRITERS` and the default project write list
+  (`db/queries/app_settings._DEFAULT_WRITE_PERMISSIONS["project"]`), not the global one; a saved
+  project list that omits it keeps the existing `/comms/post` 403 naming the allowed roles.
+- **Not here yet.** Calls that name a run or message by id are not bound to the chief's project
+  (ticket 14); the cite rule for `answer` (10), the cost and run ceiling (15) and the directive
+  route (12) are later tickets. A `/comms/post` that names another project's board in `scope`
+  rather than `project_root` is not bound either.
 
 ### SSE events (GET /events/runner)
 
@@ -850,6 +901,8 @@ pathly_orchestrator/
   http_server/             # Flask HTTP server: FSM endpoints + SSE + runner routes
     app.py                 # Flask app factory, blueprint registration, main() (which calls supervisor.chief_session.chief_startup_cleanup() before serving; a failure is logged and boot goes on)
     middleware.py          # _log_request, _log_response, rate limiting, metrics
+    chief_gate.py          # chief_gate(): the before_request hook (registered after _log_request) that refuses a chief token's call its tier, project or poster does not allow, and answers 401 for a closed chief session — see "Chief gate"
+    chief_routes.py        # the chief gate's route table as data: ROUTE_ACTIONS ((rule, method) -> action), the GET refusals, the post-type and run-verb refinements and action_for()
     run_identity.py        # caller_identity(request) -> CallerIdentity: kind run|anonymous from the X-Pathly-Run-Token header (body role/run_id/from never read); unknown/revoked token logged at info with the remote addr; `ui` kind reserved (RRP-2b). Nothing applies a policy from it yet
     sse.py                 # SSE globals (_clients, _runner_clients, _menu_clients) + broadcast helpers
     pricing.py             # MODEL_PRICING, compute_cost_usd()

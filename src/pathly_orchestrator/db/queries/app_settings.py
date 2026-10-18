@@ -111,6 +111,7 @@ _DEFAULT_WRITE_PERMISSIONS: dict[str, list[str]] = {
             "evaluator",
             "director",
             "human",
+            "chief",
         ]
     ),
     "global": sorted(["director", "evaluator", "human"]),
