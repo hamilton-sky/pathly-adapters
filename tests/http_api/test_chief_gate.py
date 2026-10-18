@@ -952,6 +952,14 @@ def _no_reindex(monkeypatch):
     )
 
 
+@pytest.fixture(autouse=True)
+def _no_code_backend(monkeypatch):
+    """Resolve the code-intelligence backend to ``none``: no Serena session starts in a test."""
+    monkeypatch.setattr(
+        "pathly_orchestrator.runner.code_context._resolve_backend", lambda: "none"
+    )
+
+
 def _run_spec(root: Path) -> dict:
     return {
         "kind": "single",
@@ -1371,6 +1379,60 @@ def test_the_project_decompose_override_must_be_the_chiefs_project(
             headers=chief.headers,
         )
         assert _passed(ok), (project_field, ok.get_data(as_text=True))
+
+
+def _code_query(client, chief, **fields):
+    body = {"op": "impact", "target": "a.py", "role": "architect", **fields}
+    return client.post("/code/query", json=body, headers=chief.headers)
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [{"scope": "OTHER"}, {"feature": "OTHER"}, {"scope": "some-feature"}],
+    ids=["scope", "feature", "a feature name"],
+)
+def test_a_code_query_logs_to_the_project_board_so_its_scope_must_be_this_projects(
+    client, project, other_project, fields
+):
+    chief = _chief("status", project)
+    fields = {k: str(other_project) if v == "OTHER" else v for k, v in fields.items()}
+
+    resp = _code_query(client, chief, **fields)
+
+    assert _gated(resp), (resp.status_code, resp.get_data(as_text=True)[:200])
+    assert _board_count(other_project) == 0
+    assert (
+        _count("SELECT COUNT(*) FROM comms_messages WHERE from_agent = 'code-intel'")
+        == 0
+    )
+
+
+@pytest.mark.parametrize(
+    "fields,logged",
+    [
+        ({}, 0),
+        ({"scope": "(interactive)"}, 0),
+        ({"scope": "   "}, 0),
+        ({"scope": "OWN"}, 1),
+        ({"scope": "OWN/"}, 1),
+        ({"feature": "OWN"}, 1),
+    ],
+    ids=["no scope", "a marker", "blank", "own root", "own root, slash", "own feature"],
+)
+def test_a_code_query_of_this_project_or_with_a_marker_scope_passes(
+    client, project, fields, logged
+):
+    chief = _chief("status", project)
+    fields = {k: v.replace("OWN", str(project)) for k, v in fields.items()}
+
+    resp = _code_query(client, chief, **fields)
+
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    assert _passed(resp)
+    assert (
+        _count("SELECT COUNT(*) FROM comms_messages WHERE from_agent = 'code-intel'")
+        == logged
+    )
 
 
 # --- a run or decompose route needs the project named -------------------------------------
