@@ -802,6 +802,7 @@ pathly_orchestrator/
     run_budget.py          # refresh — raise a goal run's max_iterations from its DAG (see "Run guard rails")
     board_run.py           # start_board_run: board-lock + skill compose + async spawn helper
     board_lock.py          # Per-board/scope advisory lock (acquire/release/holder)
+    chief_tiers.py         # what a chief may do (chief-agent): ACTIONS, TIERS (status=read; planner=read,post,plan; operator=all seven), actions_for/normalise_tier, and resolve_preset_tier — a user prompt file chief/<preset> names its tier in leading front matter `tier:`, else the built-in names map to themselves, anything else (unknown tier, missing front matter, malformed name) is status. Code, never read from prompt text; strip_front_matter reuses skills/compose_base
   http_server/             # Flask HTTP server: FSM endpoints + SSE + runner routes
     app.py                 # Flask app factory, blueprint registration, main()
     middleware.py          # _log_request, _log_response, rate limiting, metrics
