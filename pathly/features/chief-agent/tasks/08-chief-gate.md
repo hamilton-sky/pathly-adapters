@@ -1,7 +1,7 @@
 # Refuse every chief call its tier does not allow
 
 Type: task
-Status: resolved
+Status: open
 Blocked by: 04, 05, 07
 Test first: yes
 
@@ -302,3 +302,29 @@ prints passed
 - Ticket 13: `test_status_chief_reads_and_is_refused_a_note` already checks "a Status-style token
   is refused on a write" at the HTTP level; the operator "starts a run" scenario is not covered
   here beyond the operator passing the gate on `POST /runs`.
+
+## Review findings (round 1, quality review)
+
+QUALITY
+1. blocker src/pathly_orchestrator/http_server/chief_gate.py: a UTF-8 BOM or UTF-16/32 JSON body hides the whole body from the gate, so the project binding is skipped.
+   - Cause: the gate reads the body with `read_json_body`, which decodes only utf-8 or cp1252 as text. Routes that call `request.get_json(...)` hand the raw bytes to `json.loads`, which accepts a BOM, UTF-16 and UTF-32. For such a body the gate sees `{}` and the route sees the real fields.
+   - Reproduced with an operator chief on project A and `Content-Type: application/json`: `POST /runs` with `project_root` set to project B returned the gate's 403 as plain JSON. With a BOM or UTF-16 body it returned 200, and `start_board_run` was called with project B's root. `POST /runner/agent-answer` showed the same: gated as plain JSON, then reached the route (404 "No run found") with a BOM or UTF-16 body.
+   - Status tier too: `POST /code/query` is `read`, so a status chief is also affected. A plain body with another `project_root` got the gate's 403. With a BOM or UTF-16 body it returned 200, so the status chief can query, and trigger a reindex of, another project's code graph.
+   - Other routes at risk: `/runs/<id>/retry` and `/runs/<id>/reroute` read their bodies with `get_json` as well.
+   - Not affected: the routes that use `read_json_body` (`/comms/*`, decompose) fail identically in gate and route. This also means the `prompt_override` and `stage_overrides` check is not bypassed for the planner today, only because those routes share the gate's parser.
+   - Fix: make the gate parse exactly as the route will. For example, parse with both `read_json_body` and `request.get_json(silent=True, force=True)` and run every body check on both results. Or refuse a non-GET whose non-empty body the two parsers read differently. Add tests with BOM, UTF-16 and UTF-32 bodies on `/runs`, `/runner/agent-answer` and `/code/query`.
+2. major src/pathly_orchestrator/http_server/chief_gate.py: the project binding applies only when the caller names `project_root`, and no ticket owns the rest.
+   - Reproduced: an operator chief on project A posted `type: decision`, `board: "project"`, `scope: "<project B root>"` to `/comms/post` and got 200. The row landed on project B's board with `author_role=chief`, so it feeds B's governance block.
+   - Documented but unowned: the author's "Not here yet" paragraph admits this. Ticket 14 covers only ids (`run_id`, `message_id`, `question_id`, `old_id`), so no ticket closes it.
+   - Also unbound: run and decompose routes with `project_root` omitted fall back to the server's working directory, which can be a different project.
+   - Fix: on `/comms/post` with `board: "project"`, require `scope` to equal the session's project scope. For the chief on run and decompose routes, refuse a missing `project_root`, or take it from the session rather than the body.
+3. minor src/pathly_orchestrator/http_server/chief_routes.py: some `read`-classed routes have side effects. `GET /comms/artifacts/section?scope=<any feature>&trail=x` posts a board `status` row ("context pull · <artifact>") when the hydrate succeeds, so a status chief can write. `GET /menu/<name>` broadcasts a menu push over SSE. `POST /code/query` can log to the board and reindex. The spec lists `/code/query` as `read`. Consider listing the other two as exceptions, or at least stating the residual write in the CLAUDE.md "Chief gate" section.
+4. minor tests/http_api/test_chief_gate.py: the tests have no case for non-UTF-8 text bodies (finding 1), HEAD, or the 308 redirect and 404 paths. Add them with the fix for finding 1.
+
+Routes, paths and headers tried that did not get around the gate (each refused by the gate, 404, 405 or a 308 redirect, none executed): unlisted POST routes `//db/query`, `/db//query` (308), `/db/query/`, `/DB/query`, `/db/qu%65ry`, `/db/./query`, `/comms/../db/query`, `%00`, `%2F` and `;x=1` variants; `/events/*` with the same variants, including `HEAD` (`HEAD /events/spawn` is refused with 403, `GET /events//spawn` redirects); PUT, DELETE, PATCH and TRACE on `/db/query` and `/events/spawn` (OPTIONS is answered by `_log_request` before the gate runs and has no side effect); the `X-Pathly-Run-Token` header (the gate reads and strips it exactly as `caller_identity` does); the post `type` normalisation (the gate's is wider than the route's, so it classes a post at least as high); `supersedes` (accepted only on exact `decision` or `constraint` posts).
+
+Not rated, because the ticket scopes it out (RRP-2b, RRP-4/5): a chief that simply omits `X-Pathly-Run-Token` is anonymous and unrestricted.
+
+Range reviewed: 570a6ee..03801f5, the ticket's own last commit and HEAD. I did not read the Answer. I re-ran both Done when commands (132 passed, 33 passed); black, mypy, lint-imports, check_file_size and gen_test_index --check are clean. I left no files in the repo; my probe tests are in the scratchpad.
+
+REVIEW: FAIL
