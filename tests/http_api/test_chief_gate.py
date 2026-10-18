@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import secrets
 from pathlib import Path
 from typing import NamedTuple
@@ -562,11 +563,12 @@ def test_a_status_chief_is_refused_each_listed_route_by_its_action(
     "path,body",
     [
         ("/comms/search", {"query": "", "feature": "demo"}),
-        ("/code/query", {}),
+        ("/code/query", {"project_root": "OWN"}),
     ],
 )
 def test_a_status_chief_may_call_the_read_routes(client, project, path, body):
     chief = _chief("status", project)
+    body = {k: str(project) if v == "OWN" else v for k, v in body.items()}
 
     resp = client.post(path, json=body, headers=chief.headers)
 
@@ -1381,8 +1383,14 @@ def test_the_project_decompose_override_must_be_the_chiefs_project(
         assert _passed(ok), (project_field, ok.get_data(as_text=True))
 
 
-def _code_query(client, chief, **fields):
-    body = {"op": "impact", "target": "a.py", "role": "architect", **fields}
+def _code_query(client, chief, project, **fields):
+    body = {
+        "op": "impact",
+        "target": "a.py",
+        "role": "architect",
+        "project_root": str(project),
+        **fields,
+    }
     return client.post("/code/query", json=body, headers=chief.headers)
 
 
@@ -1397,7 +1405,7 @@ def test_a_code_query_logs_to_the_project_board_so_its_scope_must_be_this_projec
     chief = _chief("status", project)
     fields = {k: str(other_project) if v == "OTHER" else v for k, v in fields.items()}
 
-    resp = _code_query(client, chief, **fields)
+    resp = _code_query(client, chief, project, **fields)
 
     assert _gated(resp), (resp.status_code, resp.get_data(as_text=True)[:200])
     assert _board_count(other_project) == 0
@@ -1425,7 +1433,7 @@ def test_a_code_query_of_this_project_or_with_a_marker_scope_passes(
     chief = _chief("status", project)
     fields = {k: v.replace("OWN", str(project)) for k, v in fields.items()}
 
-    resp = _code_query(client, chief, **fields)
+    resp = _code_query(client, chief, project, **fields)
 
     assert resp.status_code == 200, resp.get_data(as_text=True)
     assert _passed(resp)
@@ -1494,7 +1502,7 @@ def test_a_planner_that_names_no_project_is_refused_on_a_decompose_route(
     assert "project_root" in resp.get_json()["error"]
 
 
-def test_a_project_named_in_the_query_string_counts(client, project):
+def test_a_project_named_only_in_the_query_string_does_not_count(client, project):
     chief = _chief("operator", project)
 
     resp = client.post(
@@ -1503,21 +1511,655 @@ def test_a_project_named_in_the_query_string_counts(client, project):
         headers=chief.headers,
     )
 
+    assert _gated(resp), (resp.status_code, resp.get_data(as_text=True)[:200])
+    assert "project_root" in resp.get_json()["error"]
+
+
+# --- round 3: what every route reads as a project, board, scope or file -------------------
+#
+# Two rounds each left one hole of the same class: a request field a route reads as a project,
+# a board or a scope that the gate did not look at (a query-string `project_root` on a route that
+# reads the body, `/comms/search`'s `feature` fallback, `GET /comms?board=project&scope=...`, an
+# absolute `/code/query` target). `chief_fields.ROUTE_FIELDS` now says, per route the chief can
+# reach, which fields it reads that way, and `chief_project` applies that one table to the body
+# and the query string.
+
+
+@pytest.mark.parametrize(
+    "path,body", NAMES_A_PROJECT, ids=[p for p, _ in NAMES_A_PROJECT]
+)
+def test_a_project_named_only_in_the_query_string_does_not_name_it(
+    client, project, path, body
+):
+    chief = _chief("operator", project)
+
+    resp = client.post(
+        path,
+        query_string={"project_root": str(project)},
+        json=body,
+        headers=chief.headers,
+    )
+
+    assert _gated(resp), (resp.status_code, resp.get_data(as_text=True)[:200])
+    assert "project_root" in resp.get_json()["error"]
+
+
+def test_the_route_reads_the_body_so_the_body_must_carry_the_root(
+    client, project, started
+):
+    chief = _chief("operator", project)
+    spec = {"kind": "single", "board": "feature", "scope": "demo"}
+
+    query_only = client.post(
+        "/runs",
+        query_string={"project_root": str(project)},
+        json=spec,
+        headers=chief.headers,
+    )
+    in_body = client.post(
+        "/runs", json={**spec, "project_root": str(project)}, headers=chief.headers
+    )
+
+    assert _gated(query_only)
+    assert in_body.status_code == 200, in_body.get_data(as_text=True)
+    assert [c["project_root"] for c in started] == [str(project)]
+
+
+def _seed_board(root: Path | str, text: str) -> None:
+    from pathly_orchestrator.db.connection import get_db
+    from pathly_orchestrator.db.queries.comms_messages import post_message
+
+    post_message(
+        get_db(),
+        board="project",
+        scope=str(root),
+        from_agent="chief",
+        type="decision",
+        text=text,
+    )
+
+
+# `/comms/search` reads `data.get("scope") or feature`.
+@pytest.mark.parametrize("tier", TIERS)
+@pytest.mark.parametrize("scope", ["absent", 0, None, "", False, []], ids=repr)
+def test_a_search_of_the_project_board_falls_back_to_feature_and_that_is_bound(
+    client, project, other_project, tier, scope
+):
+    _seed_board(other_project, "zebra decision of the other project")
+    chief = _chief(tier, project)
+    body = {
+        "query": "zebra",
+        "board": "project",
+        "feature": str(other_project),
+        "mode": "keyword",
+    }
+    if scope != "absent":
+        body["scope"] = scope
+
+    resp = client.post("/comms/search", json=body, headers=chief.headers)
+
+    assert _gated(resp), (resp.status_code, resp.get_data(as_text=True)[:200])
+    assert "zebra" not in resp.get_data(as_text=True)
+
+
+@pytest.mark.parametrize("tier", TIERS)
+def test_a_search_of_its_own_project_board_passes_by_scope_or_by_feature(
+    client, project, other_project, tier
+):
+    _seed_board(project, "zebra decision of this project")
+    _seed_board(other_project, "zebra decision of the other project")
+    chief = _chief(tier, project)
+
+    for fields in ({"scope": str(project)}, {"feature": str(project)}):
+        resp = client.post(
+            "/comms/search",
+            json={
+                "query": "zebra",
+                "board": "project",
+                "mode": "keyword",
+                **{"feature": "demo", **fields},
+            },
+            headers=chief.headers,
+        )
+        assert resp.status_code == 200, resp.get_data(as_text=True)
+        assert "other project" not in resp.get_data(as_text=True)
+
+
+def test_a_search_of_a_feature_board_is_not_bound(client, project):
+    chief = _chief("status", project)
+
+    resp = client.post(
+        "/comms/search",
+        json={"query": "zebra", "feature": "demo", "mode": "keyword"},
+        headers=chief.headers,
+    )
+
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+
+
+BOARD_LISTS = ["/comms", "/comms/tasks", "/comms/goals"]
+
+
+# The GET board reads read `board`, then `scope or feature`, with `.strip()` on the board.
+@pytest.mark.parametrize("tier", TIERS)
+@pytest.mark.parametrize("path", BOARD_LISTS)
+@pytest.mark.parametrize(
+    "how", ["scope", "feature", "padded board", "scope and feature"]
+)
+def test_a_board_read_of_another_projects_board_is_refused(
+    client, project, other_project, tier, path, how
+):
+    _seed_board(other_project, "zebra decision of the other project")
+    chief = _chief(tier, project)
+    other = str(other_project)
+    query = {
+        "scope": {"feature": "x", "board": "project", "scope": other},
+        "feature": {"feature": other, "board": "project"},
+        "padded board": {"feature": "x", "board": " project ", "scope": other},
+        "scope and feature": {"feature": other, "board": "project", "scope": other},
+    }[how]
+
+    resp = client.get(path, query_string=query, headers=chief.headers)
+
+    assert _gated(resp), (resp.status_code, resp.get_data(as_text=True)[:200])
+    assert "zebra" not in resp.get_data(as_text=True)
+
+
+@pytest.mark.parametrize("path", BOARD_LISTS)
+def test_a_board_read_of_its_own_board_or_of_a_feature_board_passes(
+    client, project, other_project, path
+):
+    _seed_board(project, "zebra decision of this project")
+    _seed_board(other_project, "zebra decision of the other project")
+    chief = _chief("status", project)
+    own = str(project)
+
+    for query in (
+        {"feature": "x", "board": "project", "scope": own},
+        {"feature": own, "board": "project"},
+        {"feature": "x", "board": "project", "scope": own + "/"},
+        {"feature": "demo"},
+        {"feature": "demo", "board": "feature", "scope": "some-feature"},
+        {"feature": "demo", "board": "global"},
+    ):
+        resp = client.get(path, query_string=query, headers=chief.headers)
+        assert resp.status_code == 200, (query, resp.get_data(as_text=True)[:200])
+        assert "other project" not in resp.get_data(as_text=True)
+
+
+def test_a_board_read_of_its_own_board_returns_the_board(client, project):
+    _seed_board(project, "zebra decision of this project")
+    chief = _chief("status", project)
+
+    resp = client.get(
+        "/comms",
+        query_string={"feature": "x", "board": "project", "scope": str(project)},
+        headers=chief.headers,
+    )
+
+    assert "zebra decision of this project" in resp.get_data(as_text=True)
+
+
+# Reads that take a board and a scope, or only a scope, or a board id.
+OTHER_BOARD_READS = [
+    ("/comms/artifacts", {"board": "project", "scope": "OTHER"}),
+    ("/comms/run/status", {"board": "project", "scope": "OTHER"}),
+    ("/comms/trash", {"scope": "OTHER"}),
+    ("/comms/artifacts/section", {"scope": "OTHER", "project_root": "OWN"}),
+    ("/comms/artifacts/section", {"feature": "OTHER", "project_root": "OWN"}),
+    ("/comms/artifacts/x/section", {"scope": "OTHER"}),
+    ("/hq/context", {"board": "OTHER"}),
+]
+
+
+@pytest.mark.parametrize(
+    "path,query",
+    OTHER_BOARD_READS,
+    ids=[f"{p} {sorted(q)}" for p, q in OTHER_BOARD_READS],
+)
+def test_the_other_reads_of_a_board_are_bound_too(
+    client, project, other_project, path, query
+):
+    chief = _chief("status", project)
+    query = {
+        k: str(other_project) if v == "OTHER" else str(project) if v == "OWN" else v
+        for k, v in query.items()
+    }
+
+    resp = client.get(path, query_string=query, headers=chief.headers)
+
+    assert _gated(resp), (resp.status_code, resp.get_data(as_text=True)[:200])
+
+
+@pytest.mark.parametrize(
+    "path,query",
+    [
+        ("/comms/artifacts", {"board": "project", "scope": "OWN"}),
+        ("/comms/artifacts", {"board": "feature", "scope": "some-feature"}),
+        ("/comms/run/status", {"board": "project", "scope": "OWN"}),
+        ("/comms/trash", {"scope": "OWN"}),
+        ("/comms/trash", {"scope": "some-feature"}),
+        ("/comms/artifacts/section", {"scope": "some-feature", "project_root": "OWN"}),
+        ("/hq/context", {"board": "OWN"}),
+        ("/hq/context", {"board": "some-feature"}),
+    ],
+)
+def test_the_other_reads_of_its_own_board_pass(client, project, path, query):
+    chief = _chief("status", project)
+    query = {k: str(project) if v == "OWN" else v for k, v in query.items()}
+
+    resp = client.get(path, query_string=query, headers=chief.headers)
+
+    assert _passed(resp), (resp.status_code, resp.get_data(as_text=True)[:200])
+
+
+# Reads whose project filter is optional and falls back to the server's own project, or to every
+# project: the chief names its project on each.
+NAMES_A_PROJECT_READS = [
+    "/db/features",
+    "/db/stats",
+    "/db/stats/trends",
+    "/db/recent",
+    "/db/rollup",
+    "/db/features/<feature>/agents",
+    "/db/features/<feature>/events",
+    "/db/features/<feature>/otel",
+    "/db/features/<feature>/runs",
+    "/status",
+    "/comms/artifacts/section",
+]
+
+
+@pytest.mark.parametrize("rule", NAMES_A_PROJECT_READS)
+def test_a_read_that_falls_back_to_another_project_must_name_the_chiefs(
+    client, project, other_project, rule
+):
+    path = rule.replace("<feature>", "x")
+    chief = _chief("status", project)
+
+    unnamed = client.get(path, headers=chief.headers)
+    other = client.get(
+        path, query_string={"project_root": str(other_project)}, headers=chief.headers
+    )
+    own = client.get(
+        path, query_string={"project_root": str(project)}, headers=chief.headers
+    )
+
+    assert _gated(unnamed), (unnamed.status_code, unnamed.get_data(as_text=True)[:200])
+    assert "project_root" in unnamed.get_json()["error"]
+    assert _gated(other)
+    assert _passed(own), (own.status_code, own.get_data(as_text=True)[:200])
+
+
+def test_a_read_that_filters_by_project_is_bound_by_its_query_string(
+    client, project, other_project
+):
+    chief = _chief("status", project)
+
+    for path in ("/runs", "/api/features", "/skills/prompts", "/comms/permissions"):
+        other = client.get(
+            path,
+            query_string={"project_root": str(other_project)},
+            headers=chief.headers,
+        )
+        own = client.get(
+            path, query_string={"project_root": str(project)}, headers=chief.headers
+        )
+        assert _gated(other), path
+        assert _passed(own), (path, own.get_data(as_text=True)[:200])
+
+
+# --- /code/query: the target is a file ----------------------------------------------------
+
+
+def _target(client, chief, project, target, **fields):
+    return _code_query(
+        client, chief, project, target=target, scope="(interactive)", **fields
+    )
+
+
+@pytest.mark.parametrize(
+    "target",
+    [
+        "OTHER/src/x.py",
+        "OTHER\\src\\x.py",
+        "OTHER/../proj-b/x.py",
+        "OWN/../proj-b/x.py",
+        "../proj-b/x.py",
+        "src/../../proj-b/x.py",
+        "C:\\Users\\someone\\other\\x.py",
+        "C:/Users/someone/other/x.py",
+        "c:x.py",
+        "/etc/passwd",
+        "//server/share/x.py",
+    ],
+)
+@pytest.mark.parametrize("tier", TIERS)
+def test_a_code_query_target_outside_the_project_is_refused(
+    client, project, other_project, target, tier
+):
+    chief = _chief(tier, project)
+    target = target.replace("OTHER", str(other_project)).replace("OWN", str(project))
+
+    resp = _target(client, chief, project, target)
+
+    assert _gated(resp), (resp.status_code, resp.get_data(as_text=True)[:200])
+    assert "project" in resp.get_json()["error"]
+
+
+def test_a_code_query_target_outside_the_project_is_refused_with_another_root(
+    client, project, other_project
+):
+    chief = _chief("status", project)
+    body = {
+        "op": "impact",
+        "target": str(other_project / "x.py"),
+        "scope": "(interactive)",
+        "project_root": str(other_project),
+    }
+
+    assert _gated(client.post("/code/query", json=body, headers=chief.headers))
+
+
+@pytest.mark.parametrize(
+    "target",
+    [
+        "a.py",
+        "src/a.py",
+        "src/../a.py",
+        "OWN/src/a.py",
+        "OWN\\src\\a.py",
+        "OWN/",
+        "OWN",
+        "parse_result",
+    ],
+)
+def test_a_code_query_target_inside_the_project_passes(client, project, target):
+    chief = _chief("status", project)
+
+    resp = _target(client, chief, project, target.replace("OWN", str(project)))
+
+    assert resp.status_code == 200, resp.get_data(as_text=True)
     assert _passed(resp)
 
 
-def test_the_routes_that_must_name_a_project_are_the_listed_run_and_decompose_routes():
-    from pathly_orchestrator.http_server.chief_routes import (
-        NAMES_PROJECT_ROOT,
-        ROUTE_ACTIONS,
+def test_a_code_query_names_its_project_even_for_an_absolute_target(client, project):
+    chief = _chief("status", project)
+    body = {"op": "impact", "target": str(project / "a.py"), "scope": "(interactive)"}
+
+    resp = client.post("/code/query", json=body, headers=chief.headers)
+
+    assert _gated(resp)
+    assert "project_root" in resp.get_json()["error"]
+
+
+# --- a post names a file by `artifact_path` -----------------------------------------------
+#
+# An artifact row keeps the path it was given, and `GET /comms/artifacts/<id>/section` reads that
+# file whole, so a chief that can name any path can read any file the server can.
+
+
+@pytest.mark.parametrize("tier", ["planner", "operator"])
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"artifact_path": "OTHER/secret.md"},
+        {"artifact_path": "OTHER/secret.md", "type": "note"},
+        {"artifact_path": "/etc/passwd"},
+        {"artifact_path": "C:\\Users\\someone\\secret.md"},
+        {"artifact_path": "pathly/features/x/PLAN.md"},
+        {"artifact_path": "OWN/../proj-b/secret.md"},
+        {"text": "report is at OTHER/secret.md"},
+        {"text": "report is at pathly/features/x/PLAN.md"},
+        {"artifact_path": "  ", "text": "report is at pathly/features/x/PLAN.md"},
+    ],
+    ids=lambda f: ",".join(f"{k}={v}"[:44] for k, v in f.items()),
+)
+def test_a_post_may_name_only_a_file_inside_its_project(
+    client, project, other_project, tier, fields
+):
+    chief = _chief(tier, project)
+    fields = {
+        k: v.replace("OTHER", str(other_project)).replace("OWN", str(project))
+        for k, v in fields.items()
+    }
+
+    resp = client.post(
+        "/comms/post",
+        json=_msg("artifact", **{"type": "artifact", **fields}),
+        headers=chief.headers,
     )
 
+    assert _gated(resp), (resp.status_code, resp.get_data(as_text=True)[:200])
+    assert _count("SELECT COUNT(*) FROM comms_artifacts") == 0
+
+
+def test_a_post_of_a_file_inside_its_project_passes(client, project):
+    chief = _chief("operator", project)
+
+    resp = client.post(
+        "/comms/post",
+        json=_msg(
+            "artifact",
+            text="the plan",
+            artifact_path=str(project / "pathly" / "PLAN.md"),
+        ),
+        headers=chief.headers,
+    )
+
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    assert _count("SELECT COUNT(*) FROM comms_artifacts") == 1
+
+
+def test_a_note_that_mentions_a_path_is_not_an_artifact(client, project):
+    chief = _chief("operator", project)
+
+    resp = client.post(
+        "/comms/post",
+        json=_msg("note", text="see pathly/features/x/PLAN.md"),
+        headers=chief.headers,
+    )
+
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+
+
+def test_context_refs_resolve_against_the_server_directory_unless_the_root_is_named(
+    client, project
+):
+    chief = _chief("operator", project)
+    refs = [{"artifact": "pathly/features/x/PLAN.md", "anchor": "goal"}]
+
+    unnamed = client.post(
+        "/comms/post", json=_msg("note", context_refs=refs), headers=chief.headers
+    )
+    named = client.post(
+        "/comms/post",
+        json=_msg("note", context_refs=refs, project_root=str(project)),
+        headers=chief.headers,
+    )
+
+    assert _gated(unnamed)
+    assert "project_root" in unnamed.get_json()["error"]
+    assert named.status_code == 200, named.get_data(as_text=True)
+
+
+# --- the table is complete, and says something about every route --------------------------
+
+
+def _chief_reachable(app) -> set[tuple[str, str]]:
+    """Every (rule, method) a chief token can get past the route table: the listed non-GET
+    routes, and every GET that is not refused.
+    """
+    from pathly_orchestrator.http_server.chief_routes import ROUTE_ACTIONS, action_for
+
+    found = set()
+    for rule in app.url_map.iter_rules():
+        for method in rule.methods - {"HEAD", "OPTIONS"}:
+            if method == "GET":
+                if action_for(rule.rule, "GET", {}, {}, lambda _: False) is not None:
+                    found.add((rule.rule, "GET"))
+            elif (rule.rule, method) in ROUTE_ACTIONS:
+                found.add((rule.rule, method))
+    return found
+
+
+def test_the_walk_finds_the_routes_a_chief_can_reach(app):
+    reachable = _chief_reachable(app)
+
+    assert {
+        ("/comms", "GET"),
+        ("/runs/<run_id>", "GET"),
+        ("/db/stats", "GET"),
+        ("/comms/post", "POST"),
+        ("/code/query", "POST"),
+        ("/runs/<run_id>/<action>", "POST"),
+    } <= reachable
+    assert ("/db/settings", "GET") not in reachable
+    assert ("/events/spawn", "GET") not in reachable
+    assert ("/db/query", "POST") not in reachable
+    assert len(reachable) > 60
+
+
+def test_every_route_a_chief_can_reach_says_which_fields_it_reads_as_a_project(app):
+    from pathly_orchestrator.http_server.chief_fields import ROUTE_FIELDS
+
+    missing = _chief_reachable(app) - set(ROUTE_FIELDS)
+
+    assert not missing, (
+        "a route the chief can reach has no entry in chief_fields.ROUTE_FIELDS "
+        f"(list the project fields it reads, or say that it reads none): {sorted(missing)}"
+    )
+
+
+def test_the_field_table_lists_no_route_that_does_not_exist(app):
+    from pathly_orchestrator.http_server.chief_fields import ROUTE_FIELDS
+
+    stale = set(ROUTE_FIELDS) - _chief_reachable(app) - PLANNED
+
+    assert (
+        not stale
+    ), f"the field table lists routes the chief cannot reach: {sorted(stale)}"
+
+
+def test_an_entry_names_a_field_or_gives_a_reason(app):
+    from pathly_orchestrator.http_server.chief_fields import ROUTE_FIELDS
+
+    silent = [
+        key
+        for key, fields in ROUTE_FIELDS.items()
+        if not fields.declared() and not fields.note.strip()
+    ]
+
+    assert silent == [], f"an entry that reads no project field must say why: {silent}"
+
+
+def test_a_route_that_names_its_root_reads_one(app):
+    from pathly_orchestrator.http_server.chief_fields import ROUTE_FIELDS
+
+    for key, fields in ROUTE_FIELDS.items():
+        if fields.names_root or fields.names_root_when:
+            assert "project_root" in fields.roots, key
+
+
+def test_every_route_that_starts_an_agent_in_a_directory_names_its_root():
+    from pathly_orchestrator.http_server.chief_fields import ROUTE_FIELDS
+    from pathly_orchestrator.http_server.chief_routes import ROUTE_ACTIONS
+
     # `/runs/<run_id>/<action>` and the stops name a run or a board by id (ticket 14).
-    started_by_a_call = {
+    starts_one = {
         rule
         for (rule, _), action in ROUTE_ACTIONS.items()
         if action == "run" and rule != "/runs/<run_id>/<action>"
-    } | {rule for (rule, _), action in ROUTE_ACTIONS.items() if "decompose" in rule}
+    } | {rule for (rule, _) in ROUTE_ACTIONS if "decompose" in rule}
+    names_root = {
+        rule
+        for (rule, method), f in ROUTE_FIELDS.items()
+        if method != "GET" and f.names_root
+    }
 
-    assert set(NAMES_PROJECT_ROOT) == started_by_a_call
-    assert started_by_a_call == {p for p, _ in NAMES_A_PROJECT}
+    assert names_root == starts_one | {"/code/query"}
+    assert starts_one == {p for p, _ in NAMES_A_PROJECT}
+
+
+def test_the_reads_that_name_their_root_are_the_ones_that_fall_back_to_another_project():
+    from pathly_orchestrator.http_server.chief_fields import ROUTE_FIELDS
+
+    names_root = {
+        rule
+        for (rule, method), f in ROUTE_FIELDS.items()
+        if method == "GET" and f.names_root
+    }
+
+    assert names_root == set(NAMES_A_PROJECT_READS)
+
+
+_FIELD_READ = re.compile(
+    r"""(?:\bdata|\bbody|args|payload)\.get(?:list)?\(\s*["']([A-Za-z_]+)["']"""
+)
+_PROJECT_ISH = re.compile(r"root|scope|board|project|feature|path|target|topic|_id$")
+
+
+def test_a_view_reads_no_project_ish_field_its_entry_does_not_name(app):
+    """A tripwire, not a proof: it reads the view function's own source, not its helpers."""
+    import inspect
+
+    from pathly_orchestrator.http_server.chief_fields import ROUTE_FIELDS
+
+    undeclared = {}
+    for (rule_text, method), fields in ROUTE_FIELDS.items():
+        for rule in app.url_map.iter_rules():
+            if rule.rule != rule_text or method not in rule.methods:
+                continue
+            try:
+                source = inspect.getsource(
+                    inspect.unwrap(app.view_functions[rule.endpoint])
+                )
+            except (OSError, TypeError):
+                continue
+            read = {k for k in _FIELD_READ.findall(source) if _PROJECT_ISH.search(k)}
+            if read - fields.declared():
+                undeclared[(rule_text, method)] = sorted(read - fields.declared())
+
+    assert undeclared == {}, f"views read fields the table does not name: {undeclared}"
+
+
+def test_a_listed_non_get_route_reads_the_body_and_a_get_route_reads_the_query(app):
+    """The table applies to the body of a POST and the query string of a GET: no listed POST view
+    reads ``request.args`` and no GET view reads a JSON body.
+    """
+    import inspect
+
+    from pathly_orchestrator.http_server.chief_fields import ROUTE_FIELDS
+
+    crossed = []
+    for rule_text, method in ROUTE_FIELDS:
+        for rule in app.url_map.iter_rules():
+            if rule.rule != rule_text or method not in rule.methods:
+                continue
+            try:
+                source = inspect.getsource(
+                    inspect.unwrap(app.view_functions[rule.endpoint])
+                )
+            except (OSError, TypeError):
+                continue
+            if method != "GET" and "request.args" in source:
+                crossed.append((rule_text, method, "reads the query string"))
+            if method == "GET" and re.search(
+                r"get_json|read_json_body|request\.json|get_data", source
+            ):
+                crossed.append((rule_text, method, "reads a body"))
+
+    assert crossed == []
+
+
+def test_a_route_with_no_entry_is_refused_not_passed(client, project, monkeypatch):
+    chief = _chief("status", project)
+    assert client.get("/comms?feature=demo", headers=chief.headers).status_code == 200
+    monkeypatch.setattr(
+        "pathly_orchestrator.http_server.chief_project.ROUTE_FIELDS", {}
+    )
+
+    resp = client.get("/comms?feature=demo", headers=chief.headers)
+
+    assert _gated(resp), (resp.status_code, resp.get_data(as_text=True)[:200])
+    assert resp.get_json()["action"] == "read"
