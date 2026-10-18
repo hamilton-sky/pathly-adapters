@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Licensed under Apache-2.0
+
+The repository now carries a `LICENSE` (Apache-2.0), declared in `pyproject.toml` (which also gets a description that
+says what Pathly is, and `setuptools>=77` for the license metadata) and linked from the README. The readiness and
+architecture docs name the current version.
+
 ### Headless runs prove a build is done instead of trusting the agent (build-proof)
 
 A headless run used to advance on what its agents said: a builder wrote `RESULT: PASS`, completed
