@@ -1,7 +1,7 @@
 # Refuse every chief call its tier does not allow
 
 Type: task
-Status: resolved
+Status: open
 Blocked by: 04, 05, 07
 Test first: yes
 
@@ -1358,5 +1358,29 @@ Notes above the verdict.
 - (c) I found no regression for legitimate callers, apart from item 6. Roots checked: POSIX, `C:/`, spaces and unicode. Names checked: feature names with dots, spaces and unicode, plus `(interactive)`, `(project)` and `global`.
 - (d) I checked the sampled `ROUTE_FIELDS` entries against the route code: `/comms/artifacts/<id>/section`, `/flows/*`, `/skills/*`, `/menu/<name>`, `/hq/context`, `/db/*`, `/telemetry/trends`, `/runner/status`, `/comms/trash`, `/static`. The only entry that does not match its route is the id section (item 4).
 - Files left behind: `git status` is clean. All probes and logs are under the scratchpad `rv5/` and `venv`. The first finding's probe created `planted/` directories only inside throwaway test project directories under `/tmp/pathly-tests`.
+
+REVIEW: FAIL
+
+## Review findings (round 6, quality review)
+
+QUALITY (chief-agent 08, round 6: acf32ae and 45d1854 on top of 7521392, range 570a6eef44c62cc658b338f90572d9ab871edb6f..45d1854)
+
+Scope notes. I did not read the ticket's `## Answer`. I read the base-commit ticket, the earlier review findings and the diff. No repo file was changed, staged or committed (`git status` is clean). My probes are only under the scratchpad `rv6/`. I re-ran both Done when commands and they pass (97 and 33 tests). 1529 gate, mirror and storage tests pass, and the lints are clean. A background full-suite run (`pytest tests/ -q -x --deselect tests/http_api`) had not finished when I stopped. It was at about 34% with no failure, so I count it as incomplete.
+
+1. major src/pathly_orchestrator/http_server/chief_project.py (`is_own` and `_under`, with `supervisor/chief_session.py::normalise_project_root`): The gate treats backslash as a path separator on POSIX. `is_own` compares after `\` becomes `/` and a trailing `/` is stripped, so a backslash spelling of the chief's own `project_root` passes. Examples are `/work/proj\`, `\work\proj`, and `/work/proj/sub\..\..\other`. On POSIX the routes use the raw string and read it as a relative path under the server's cwd, or as a sibling directory. I reproduced this as planner on `/comms/features/decompose`. As operator I reproduced it on `/comms/goals/run`, `/comms/run`, the decompose routes and `/code/query`. The audit hook recorded 27 file touches in the server cwd. This is a chief reaching files outside its own project through a declared key. Fix: on non-Windows, refuse any `project_root` or path value that contains a backslash. Alternatively compare the raw string after `rstrip("/")` only. Then change `test_the_chiefs_own_project_passes_however_it_is_spelled` in tests/http_api/test_chief_gate.py, whose "backslashes" case currently asserts `_passed`. Add these spellings to the audit.
+2. major src/pathly_orchestrator/CLAUDE.md ("Chief gate", "What was measured") and tests/http_api/test_chief_gate_audit.py: The doc says every key gets the full hostile list at every tier. The test does not do that. `_attack` sends only `FEWER = ("dotdot","other project","other file","nul","very long")` to plain keys and to the status and planner tiers. The audit never sends the own-root spellings that the gate accepts, which is why finding 1 got through. The sentence that nothing falls in the server cwd is false on POSIX. Fix: add the accepted-spelling variants (backslash, trailing slash, `.` segments, doubled slashes) to the hostile list for the root and path kinds. Either run the full list at every tier or reword the doc to say what is actually sent.
+3. minor tests/http_api/test_chief_gate_audit.py: Plain keys get no relative climbing value (`../..`). The two removed tripwire tests also did not check that each key has the right kind. A key declared plain that is really a path sink would not be caught. Fix: add a relative climbing value for plain keys, and a check that a key's declared kind matches what the sink does with it.
+4. minor src/pathly_orchestrator/http_server/chief_routes.py, chief_fields.py and CLAUDE.md "Not here yet": Ticket 15 plans `max_cost_usd` on `POST /runs`. That key is not in the complete allowlist, so a chief would get a 403 when it uses it. Fix: list it in the audit's `WAITS_FOR_A_TICKET` entries and in the "Not here yet" paragraph, so ticket 15 knows to extend the entry.
+5. minor chief_gate and the feature-board routes: Feature boards are keyed by feature name only. A chief can name another feature on its own project but not another project. This is already documented, so I only list it. Nothing to change beyond ticket 14's id-addressed work.
+6. minor tests/http_api/chief_audit_world.py: Several audit baselines stop early. `/comms/supersede` returns a route 403, `/runner/agent-answer` returns 404, and the stop routes, `/code/query` (backend none) and `reroute`/`retry` (loop patched) also end before the sink. The hostile values may not reach the sink on those routes. Fix: give each a baseline that reaches the sink (a real superseded message, an open question, and so on), or list them as not covered.
+7. minor src/pathly_orchestrator/runner/code_context_cli.py (`_file_section`): The tail of `target` goes unescaped into a Cypher string, so a quote in `target` could change the query. I did not test it. It stays inside the chief's own project graph, so this is not a tier breach. Fix: escape or parameterise `target`.
+8. minor, docs and ticket 17: A relative `artifact_path` post is refused. A symbol target like `a:b` is read as a drive path. The planned `pathly api` texts for ticket 17 must teach the `project_root` field and the per-route key lists, or chiefs will hit 403s on legitimate calls. Fix: note this in ticket 17 and the doc.
+
+Checked and found sound (no finding):
+- Allowlists are wide enough for the Done when, the spec's chief flows and ticket 17's planned calls, apart from finding 4. The 13 `MUST_BE_ACCEPTED` routes pass.
+- The sink guards hold with the gate's name checks switched off: `board_mirror`, `_load_flow`, `_skill_file`, `_run_team`, `ensure_goal_slug`, `hydrate_section(contain_in=)` and `_is_unsafe_topic`.
+- The GET routes and URL path variables were attacked and hold.
+- The sink edits cause no legitimate-caller regressions.
+- Every sentence of the "Chief gate" section matches the code except the "What was measured" claim in finding 2.
 
 REVIEW: FAIL
