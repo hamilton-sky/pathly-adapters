@@ -1,7 +1,7 @@
 # Refuse every chief call its tier does not allow
 
 Type: task
-Status: resolved
+Status: open
 Blocked by: 04, 05, 07
 Test first: yes
 
@@ -810,5 +810,35 @@ How I checked the table: I enumerated every `(rule, method)` the chief can reach
 8. minor tests/http_api/test_chief_gate.py is 2165 lines in one file, and `test_a_view_reads_no_project_ish_field_its_entry_does_not_name` reads only each view's own source, as its docstring admits. Splitting by concern would keep later tickets from growing it. The tripwire misses helper code such as `create_run`, `handle_retry` and `_dispatch_*`, which is exactly where findings 1 and 2 live.
 
 Checked and found true: the `ScopeRead` fallbacks (`scope or feature` including blank, 0 and null) for `/comms/post`, `/comms/search`, `GET /comms`, `/comms/tasks` and `/comms/goals`. The board default and unknown-board handling, which is stricter than the routes. `/comms/artifacts` and `/comms/run/status` taking `scope` only. The `/code/query` scope, marker and target anchoring. The project-decompose `project` override. `artifact_path` and the text-recovered path. `names_root` for `/runs`, `/comms/run`, `/comms/goals/run`, `/comms/tasks/run`, the three decompose routes, `/code/query`, the `/db/*` family, `/status` and `/comms/artifacts/section`. Absent-root behaviour of `/api/*`, `/skills/*`, `/db/agents`, `/runs`, `/comms/permissions`, `/hq/context`, `/comms/scope`, `/chief/session` and `/flows/stage-config`. The "reads no project" entries. The repeated-query-key and whitespace handling, which fails closed.
+
+REVIEW: FAIL
+
+## Review findings (round 4, quality review)
+
+QUALITY
+
+Scope of this review: ticket 08 of chief-agent, round 4. The range is 570a6eef44c62cc658b338f90572d9ab871edb6f..c88f85b. c88f85b is also HEAD and the newest commit touching the ticket, so no later commits were excluded. It covers d3d52b1, 53dc2fa, 45357e6 (test-file split) and c88f85b. I read the ticket as of the base commit plus its Review findings sections, and the diff with the ticket folder excluded. I did not read `## Answer`.
+
+Checks I ran:
+- Done-when commands: `test_chief_gate.py` gave 97 passed; the glob gave 651 passed; `test_comms_write_perm.py` gave 33 passed.
+- black, mypy, lint-imports, check_file_size and gen_test_index --check were clean.
+- `git status` is clean. I changed nothing in the repo.
+- Files left behind are outside the repo, in the scratchpad `rv4/`: routes.py, missing.py, split_check.py, old_gate.py, and probe/{conftest.py,test_p1.py..test_p5.py}.
+
+Your items (a) to (d):
+- (a) I compared `ROUTE_FIELDS` with the views and the helpers they call, route by route. Most entries are true: fallbacks (`scope or feature`), board defaults and strips, blank/0/null, query vs body, and the `_project_root_param` env fallback. The exceptions are findings 1 and 2 below.
+- (b) I checked the "Chief gate" section sentence by sentence. Finding 1 is a doc claim the code does not back. Findings 3 and 4 are minor understatements.
+- (c) The new guards do not reject legitimate names. `_is_unsafe_topic` in `blueprints/comms/features.py` and the 4-line guard in `blueprints/comms/runs.py` let nested names, dots, unicode and spaces through. They reject only reserved bare names, `:`, `\`, absolute paths and `..` segments.
+- (d) The test split is lossless. An AST comparison of old and new shows the same test names and bodies. Fixtures are shared through `chief_gate_support.py`, and basenames are unique.
+
+1. major src/pathly_orchestrator/CLAUDE.md ("Reads are not all pure"): The section says a status chief "can cause four small writes" and that the context-pull `status` row happens on `GET /comms/artifacts/section?scope=<feature>&trail=x`. The code does more. `GET /comms/artifacts/section` goes through `runner/hydrate.py` and `db/queries/comms_artifacts.py::find_or_create_artifact_by_path`. For a status chief it inserts a sentinel `comms_messages` row (board feature, `scope` as given, from `system`, type `artifact`, text "[legacy artifact] <title>"), a `comms_artifacts` row and a section index. This happens without `trail`, at any feature `scope` the caller names. I confirmed it with probe test_p1.py: the message count went from 0 to 1 for a status-tier chief. The closing claim "none of them can change a decision, a task or a run" stays true, but "four" and the trail-only wording do not. Fix: list it as a fifth write and say it needs no `trail`. Alternatively, make the hydrate path write no sentinel rows when the caller is a read-tier chief.
+2. major src/pathly_orchestrator/http_server/chief_fields.py (`("/comms/post","POST")` with `_BOARD_SCOPE`, and `("/runs","POST")` with `_BOARD_SCOPE_ONLY`): A planner or operator chief can post to `board:"feature"` with a path-like or traversal `scope`, for example `/abs/proj-b`, `../../proj-b` or `C:/x`. The table does not bind a feature-board scope and sets no `segment` on this route. The post then reaches `_broadcast_comms` -> `board_mirror.mark_board_dirty_by_scope` -> `board_from_scope` -> `write_board_mirror`. `board_from_scope` treats any scope containing `/` as the project board, so `<scope>/pathly/project/BOARD.json` and its directories are created inside another project, or relative to the server cwd. Probe test_p3.py reproduced this: files and directories appeared in project B from a chief on project A. The cause is that the gate applies project binding by the declared `board`, while the mirror applies it by the shape of the scope. The "A folder name" bullet in CLAUDE.md, and the tripwire test that backs it, say that only `features/decompose` and the `/comms/run` evaluator make a folder from a name. This path is a third. Under your rubric this is arguable, because the table documents `board:"feature"` as unbound, so I rate it major. It is a write to another project's tree through a scope field. Fix, either of these:
+   - In `chief_project._bound_scope`, treat a path-like scope (`_path_like`) as a project root on every board and bind it. Or give the `/comms/post` scope `segment=True` on non-project boards, as `/comms/run` already has.
+   - Make `board_mirror` refuse or ignore a scope that is not a normalised absolute project root for the project board and not a single segment for the other boards. This also covers the human and agent callers, which the gate does not reach.
+   Then correct the CLAUDE.md folder-name bullet and add a test for the post route.
+   Related, less certain: `POST /runs` with `kind=single`, `board=global` and a traversal `scope` passes the gate, because `/runs` has no `segment` on its `ScopeRead`. With early advance on (the default), `_run_stage_via_terminal` raises ValueError at `terminal.py:133` (`_resolve_storage_path`), and nothing was written (probes test_p4.py and test_p5.py). I did not trace the early-advance-off slow path; `terminal_phase.py`'s fallback joins the topic under the project root. The same `segment` fix would close it.
+3. minor src/pathly_orchestrator/CLAUDE.md ("Not bound", item 2): The text says `GET /db/rollup`'s `global` block "sums every project". It also lists every project's root path and cost (`by_project`). That helps a chief learn other projects' roots. Say so, or drop the per-project rows from `global` when the caller is a chief.
+4. minor src/pathly_orchestrator/CLAUDE.md ("Not bound", item 1): The id-addressed reads list names `/comms/artifacts/<id>/section` but not `GET /comms/artifacts?message_id=`. That route is also unbound by an id, and its `ROUTE_FIELDS` entry is correct. Add it to the list.
+5. minor pathly/features/chief-agent/tasks/14-bind-id-addressed-chief-calls-to-its-project.md: Its opening sentence says ticket 08 binds the chief only when the body or query string names `project_root`. That is stale, since 08 now also binds board scopes, files and folder names. A builder reading ticket 14 will misjudge what is already bound. Reword that sentence. The same ticket should also say that `chief_bind` and `ROUTE_FIELDS` must stay consistent.
 
 REVIEW: FAIL
