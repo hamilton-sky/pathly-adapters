@@ -137,7 +137,7 @@ def test_the_route_reads_the_body_so_the_body_must_carry_the_root(
 def test_a_read_that_falls_back_to_another_project_must_name_the_chiefs(
     client, project, other_project, rule
 ):
-    path = rule.replace("<feature>", "x")
+    path = rule.replace("<feature>", "x").replace("<artifact_id>", "x")
     chief = _chief("status", project)
 
     unnamed = client.get(path, headers=chief.headers)

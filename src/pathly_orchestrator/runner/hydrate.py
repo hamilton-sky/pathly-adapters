@@ -25,8 +25,10 @@ from .hydrate_helpers import (  # noqa: F401
     _is_md,
     _read_file_text,
     _resolve_plan_root,
+    inside_root,
     safe_artifact_path,
     safe_plan_path,
+    whole_file_result,
 )
 
 logger = logging.getLogger(__name__)
@@ -128,6 +130,7 @@ def hydrate_section(
     artifact: str = "",
     anchor: str | None = None,
     project_root: str | None = None,
+    contain_in: str | None = None,
 ) -> dict:
     """Hydrate a section of a .md artifact.  Returns {body: {...}, status: int}.
 
@@ -136,7 +139,9 @@ def hydrate_section(
     §4.2 response body.  Never raises — unexpected errors become {status:500}.
 
     Path-traversal guard: artifact basename must not contain a path separator;
-    the resolved absolute path must be under pathly/plans/<scope>/.
+    the resolved absolute path must be under pathly/plans/<scope>/. A row read by id keeps the
+    path it was stored with, so when ``contain_in`` names a project root that path must lie
+    under it.
     """
     try:
         from pathly_orchestrator.db.queries.comms import (
@@ -161,6 +166,14 @@ def hydrate_section(
             row = dict(row)
             path = row["path"]
             resolved_scope = scope or row.get("msg_scope", "")
+            if contain_in and not inside_root(path, contain_in):
+                return {
+                    "body": {
+                        "error": "path_out_of_scope",
+                        "detail": "outside the project",
+                    },
+                    "status": 400,
+                }
         else:
             if not scope or not artifact:
                 return {
@@ -210,21 +223,7 @@ def hydrate_section(
                     "body": {"error": "artifact_not_found", "path": path},
                     "status": 404,
                 }
-            return {
-                "body": {
-                    "ok": True,
-                    "artifact_id": artifact_id,
-                    "artifact": os.path.basename(path),
-                    "anchor": None,
-                    "heading": None,
-                    "line_start": 1,
-                    "line_end": len(text.splitlines()),
-                    "text": text,
-                    "summary": row.get("summary"),
-                    "stale_rebuilt": False,
-                },
-                "status": 200,
-            }
+            return whole_file_result(artifact_id, path, text, row)
 
         # ── Whole-file request (anchor=None) ──────────────────────────────
         if anchor is None:
@@ -234,21 +233,7 @@ def hydrate_section(
                     "body": {"error": "artifact_not_found", "path": path},
                     "status": 404,
                 }
-            return {
-                "body": {
-                    "ok": True,
-                    "artifact_id": artifact_id,
-                    "artifact": os.path.basename(path),
-                    "anchor": None,
-                    "heading": None,
-                    "line_start": 1,
-                    "line_end": len(text.splitlines()),
-                    "text": text,
-                    "summary": row.get("summary"),
-                    "stale_rebuilt": False,
-                },
-                "status": 200,
-            }
+            return whole_file_result(artifact_id, path, text, row)
 
         # ── Ensure index is fresh (§3.4) ──────────────────────────────────
         ensure_result = ensure_indexed(conn, resolved_scope, path, project_root)

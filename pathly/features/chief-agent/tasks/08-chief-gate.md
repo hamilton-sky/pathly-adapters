@@ -1,7 +1,7 @@
 # Refuse every chief call its tier does not allow
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 04, 05, 07
 Test first: yes
 
@@ -197,6 +197,34 @@ prints passed
   `tests/http_api/test_chief_gate_mirror.py` (the gate: the post route, `/runs`, every scope read of
   `ROUTE_FIELDS`, the slug); small edits to `tests/http_api/test_chief_gate_tables.py`; the three
   `INDEX.md` files regenerated. Test-only commit `0ab8cdb`, then the fix.
+- Round 6 (see **Review fixes (round 5)**): the owner chose "strict keys". Every `ROUTE_FIELDS`
+  entry is now the **complete list of the keys a chief may send** to its route (body keys; query
+  keys for a GET), and every listed key that can reach a path, a file or a folder has a declared
+  kind with a rule at the gate and, where the key reaches a sink, at the sink. The table moved:
+  `chief_fields.py` (28 lines) is only the merge of `chief_field_calls.py` (182, the 19 POST
+  entries), `chief_field_reads.py` (181, the 65 GET entries) and `chief_field_types.py` (183:
+  `Fields`, `ScopeRead`, `TextPath`, the kinds, `url_variables`); 84 entries, 221 listed keys, 9
+  keys a view reads that no chief flow needs (`not_for_chief`). New `chief_keys.py` (55 lines):
+  `key_refusal`, which `chief_gate.py` (144 lines) calls last (an unlisted key is 403 naming it; a
+  `flow` that is not one name and a `skill` that is not `name` or `category/name` too).
+  `chief_project.py` (205 lines) only changed its imports. `scope_names.py` (77 lines) gains
+  `is_flow_name`, `is_skill_name` and `resolves_inside`. The sinks: `fsm_ops._load_flow` (353) and
+  `skills/compose_resources._skill_file` (152) refuse a string that is not one name or that
+  resolves outside the packaged folder; `supervisor/goal_executor.py`: `_flow_kind` raises
+  `ValueError`, and `_run_team` checks the flow before it makes a folder (the file stays at 492
+  lines, its baseline); `runner/hydrate.py` (388): `hydrate_section(contain_in=...)` answers 400
+  `path_out_of_scope` for a stored path outside the root the call names (`inside_root` and
+  `whole_file_result` live in `hydrate_helpers.py`, 143), and `blueprints/comms/artifacts.py` passes
+  the root. `scripts/file_size_baseline.txt` loses the `runner/hydrate.py:403` line (the file is
+  under 400 now and the ratchet fails until it goes). The "Chief gate" section of
+  `src/pathly_orchestrator/CLAUDE.md` is rewritten sentence by sentence. New tests (test-only commit
+  `acf32ae` first, then the rest with the fix): `test_chief_gate_flow_skill.py` (25),
+  `test_chief_gate_artifact_section.py` (8), `test_chief_gate_strict_keys.py` (30),
+  `test_chief_gate_keys.py` (88, with `chief_walk_support.py`), `test_chief_gate_audit.py` (6, with
+  `chief_audit_support.py` and `chief_audit_world.py`), `tests/comms_board/test_board_mirror_
+  relative_root.py` (12), `tests/storage_paths/test_scope_names_flow_skill.py` (58); edits to
+  `test_chief_gate.py`, `test_chief_gate_tables.py`, `test_chief_gate_root_naming.py` and
+  `chief_gate_support.py` (listed under Review fixes); the four `INDEX.md` files regenerated.
 
 **Proof** (each run fresh, after the last edit to code or tests)
 
@@ -312,6 +340,31 @@ prints passed
 - An autouse fixture in the test replaces every `/events/*` view with a stub. The test client
   waits for a streaming view's first chunk, so without a gate a call to `GET /events/spawn` hung
   the run (found when the first failing run did not return) instead of failing.
+- Round 6: `hydrate.py` went from 403 to 388 lines because the whole-file response that was
+  written out twice is now `hydrate_helpers.whole_file_result` and the containment check is
+  `hydrate_helpers.inside_root` (the file would have grown past its baseline otherwise). The file
+  is under 400 now, so `check_file_size.py` made me remove its baseline line; I removed that one
+  line by hand, because `--update` also rewrote two unrelated baseline lines (I put them back).
+- Round 6: `goal_executor._flow_kind` raises `ValueError` for a flow that is neither a goal flow
+  nor one name, and `_run_team` calls it and `_load_flow` before it makes any folder. It answers
+  the same `{"ok": false, "reason": "unknown_flow"}` as before for a flow that does not exist; the
+  only change a caller sees is that the folder is no longer made first. I moved lines instead of
+  adding them, so `goal_executor.py` stays at 492, its baseline.
+- Round 6: `flow` is not a key a chief may send to `POST /comms/goals/run` (`not_for_chief`): the
+  goal's executor picks its flow, and a chief that wants another one starts it with `POST /runs`.
+  The review asked for a folder-name field on that route; removing the key closes the same hole
+  with less surface, and the sinks hold it for every other caller.
+- Round 6: `cite` is listed on `/runner/agent-answer`, `/comms/answer` and `/comms/acknowledge`
+  before any view reads it, so ticket 10 can read it without the gate refusing a chief that sends
+  it. `test_a_listed_key_is_read_or_is_a_url_variable_or_waits_for_a_ticket` names the keys that
+  wait for a ticket (`cite`) so a listed key that nothing reads is still caught.
+- Round 6: the audit's zones are the chief's project, another project, the server's working
+  directory and `Path.home()` of the test (which `tests/conftest.py` points at `tmp_path`). The
+  user's real home is **not** a zone: the repository may lie inside it, and the test never sends a
+  real home path.
+- Round 6: a key the planner sends to a decompose route that does not read it is now a 403 for
+  every tier (`prompt_override` to `features/decompose` or `project/decompose`: the planner is told
+  `run` first, as before; an operator is told the key is not listed). Before, the route ignored it.
 
 **Shortcuts taken**
 
@@ -358,6 +411,47 @@ prints passed
   rewrites `<own root>/pathly/project/BOARD.json` from the project board's rows (the posted row is
   not in it). It is the mirror's existing reading of such a scope and writes inside the chief's own
   project; it stops being fine if the mirror's reading of a path scope changes.
+- Round 6: the name-pattern tripwires of `test_chief_gate_tables.py` are gone, on purpose (the
+  owner's choice, finding 3): `test_a_view_and_the_helpers_it_calls_read_no_project_ish_field_its_
+  entry_does_not_name` (a regex for project-like names) and `test_a_request_field_a_view_or_helper_
+  joins_into_a_path_is_declared_as_one` (a list of path calls). `test_chief_gate_keys.py` replaces the
+  first with a stricter one (every key a view or helper reads, found by what a name is bound to,
+  must be listed or in `not_for_chief`). **Nothing replaces the second one statically**: it saw a key
+  whose view joined it into a path with `join`, `Path`, `makedirs`, `mkdir` or `open`; now a key
+  of a plain kind (text, number, name, enum, id, flag) that a view starts to join into a path is
+  found only by the audit (`test_chief_gate_audit.py`: twelve hostile values to every file-kind key
+  of an operator chief, five of them to every other key and to every key of a status or planner
+  chief). It stops working for a route the audit's baseline cannot get past its first check
+  (below).
+- Round 6: what the audit cannot see. `os.stat`, `os.path.exists` and `os.path.isfile` are not
+  audit events, so a probe for a file in another project is invisible (a read of its content is
+  seen); nor is the C layer of a library (sqlite is seen at `connect` only) or what a child process
+  opens (only its working directory is seen); other writers' rows (a human's post may store any
+  path, and the by-id section read of it is what `contain_in` is for) are outside the sandbox; and a
+  route is only as deep as the requests it is sent: `chief_audit_world.py` gives one or more valid
+  requests for the routes that need one, 13 of them asserted to be accepted
+  (`test_the_requests_the_audit_starts_from_are_valid_ones`), and a route with no baseline is sent
+  only the project root, so a hostile value in a key it needs is stopped by its first check. The
+  audit's request set is 3,830 (operator) or 2,535 (planner, status) requests per tier, not a proof.
+- Round 6: three things the audit's hostile values showed that I did not change, because they are
+  not the gate's: a non-numeric value for a number key in a query string makes a few `GET` views
+  raise `ValueError` from `int()`, a 500 (production behaviour; the audit fixture turns
+  `PROPAGATE_EXCEPTIONS` off so the test sees the 500 the server gives instead of raising it);
+  a folder name over the file system's limit (the 5,000-character value) raises `OSError` in the
+  route that makes the folder, also a 500; and the by-id section read tells a chief whether an id
+  exists (400 `path_out_of_scope` for a row in another project, 404 for no row), though not what
+  is in it.
+- Round 6: feature boards are keyed by feature name only, so a chief's post to a feature board
+  makes the board mirror rewrite `BOARD.json` in whichever project `run_history` last mapped that
+  name to (`resolve_project_root`; the startup backfill matches by an existing
+  `pathly/features/<name>/` folder). The audit does not see it because every `demo` run of its
+  sandbox lives in the chief's project. The gate cannot bind a feature name to a project; the
+  living doc says so (finding 5). The upgrade is to key feature boards by project, which changes
+  the board model, not the gate.
+- Round 6: `PROPAGATE_EXCEPTIONS=False` in the audit fixture and a `settle()` plus a 0.3 s sleep
+  after seeding (a post indexes its artifact on a background thread) are the two timing-dependent
+  parts of `test_chief_gate_audit.py`; the sleep is what keeps a late seeding write from being
+  counted against a chief. The file takes about 40 s.
 
 **Review fixes** (round 1, quality review; the round starts at `c2de8da`. Test-only commits first:
 `b5014df` and `286bb1e`, each run red before any source change.)
@@ -827,6 +921,177 @@ Proof after the fixes (each run fresh, after the last edit to code, tests and do
   `check_adapters.py`, `check_entry_points.py`. Smoke and `python -m build --wheel` exit 0. No
   `# noqa`, `# nosec` or `type: ignore` added (grepped over the diff).
 
+**Review fixes (round 5)** (quality review; the round starts at `12df38b`, work from `acf32ae`.
+Test-only commit first: `acf32ae`, run red before any source change: `56 failed, 7 passed` over its
+three files, re-run today in a worktree of that commit against the source as it was at `7521392`.
+The project owner chose "strict keys" for it. The cause of findings 1, 2 and 4 is one: a request
+key reached a join (a folder, a packaged file, a stored path) and the table did not list the key,
+because the table listed only what looked like a project. So the table now lists everything, and
+refuses the rest: an entry is the complete list of the keys a chief may send, a key that can reach a
+path has a kind with a rule at the gate and at the sink, and two tests, one static and one that
+watches the file system, check the lists against the code.)
+
+1. *blocker, `flow` on `POST /comms/goals/run` made folders in another project.* Reproduced as the
+   finding says (red: `test_the_goal_run_route_makes_no_folder_for_a_flow_that_is_not_a_flow`, 8
+   cases posted with no token, and `test_a_chief_cannot_name_a_flow_on_a_goal_run`, 8 more): with `executor:
+   "team"`, `_run_team` made `pathly/features/<scope>/<flow>/<slug>` of the flow (`_flow_kind`
+   returned any unknown name) and `os.makedirs`'d it, and only then did `_load_flow` answer
+   `unknown_flow`. Held three times:
+   - **the gate:** `flow` is not a key of that route (`not_for_chief`), so any chief that sends it
+     is 403 naming `flow`;
+   - **the folder:** `goal_executor._flow_kind` raises `ValueError` for a flow that is neither a
+     goal flow nor one name (`scope_names.is_flow_name`), and `_run_team` now runs `_flow_kind` and
+     `_load_flow` first and answers `unknown_flow` before `board_run_topic` and `os.makedirs`; the
+     route answers 400 `unknown_flow` as before, with no folder in either project (the test posts
+     with no token, so the gate is not what stops it). A packaged flow still gets its folder
+     (`test_the_goal_run_route_still_makes_the_folder_of_a_packaged_flow`);
+   - **the reader:** `fsm_ops._load_flow` (below).
+2. *major, `skill` on `POST /comms/run` and `flow` on `POST /runs` read files outside the packaged
+   folders.* Reproduced (red: `test_a_chief_cannot_start_a_flow_named_by_a_path`, `test_a_chief_cannot_
+   name_a_skill_that_is_a_path`, and `test_the_run_route_hands_an_agent_no_file_outside_the_skills`,
+   which puts a marker line in `<other project>/planted.md`, names it as the skill with no token,
+   and checks that what the faked spawn host was handed holds no marker). Fixed at the
+   readers and at the gate, with one pair of predicates: `scope_names.is_flow_name` (one folder
+   name) and `is_skill_name` (`name` or `category/name`, each part one name) and
+   `resolves_inside(root, path)` (symlinks followed). `fsm_ops._load_flow` reads a packaged flow
+   only when the name passes and the file resolves inside `core/flows` (else `FileNotFoundError`,
+   which `start_run` already answers); a flow stored in the database is found by its name and never
+   opened as a file. `compose_resources._skill_file` does the same for `core/skills`, and
+   `_skill_exists` answers False for such a string. At the gate, `Fields` kinds `FLOW` (the `flow` of
+   `POST /runs` and `/runs/<run_id>/<action>`) and `SKILL` (the `skill` of `POST /comms/run`) are
+   checked by `chief_keys.key_refusal`; the 403 names the key. A packaged flow and a packaged
+   skill still load (`test_a_packaged_flow_still_loads`, `test_a_packaged_skill_is_still_composed_
+   into_the_prompt`, `test_a_chief_may_name_a_packaged_skill`). The 58 tests of `tests/storage_paths/
+   test_scope_names_flow_skill.py` pin the predicates (names a packaged flow or skill can have,
+   `..`, absolute, UNC, drive, NUL, empty, non-strings, a link out of the folder).
+3. *major, the claim and the tripwire.* The "Chief gate" section no longer says the gate holds "each
+   of three ways". It lists, in "What reaches a path, and what holds it", what is held at the gate
+   and the sink, at the gate only, by the route's own design, and **not held** (feature boards
+   keyed by name, the event-mirror backfill, `goal_decomposer`); and "What was measured" says what
+   the audit did and what it cannot see. The review asked for a tripwire that lists every key a view
+   reads, not only project-like names:
+   - **the table is the list.** `chief_keys.key_refusal` (called last by `chief_gate._refusal`)
+     refuses a body key (a query key for a GET) the entry does not list, with a 403 naming it, on
+     every route; the entries were rewritten from the views and every helper they call: 84 entries,
+     221 listed keys, each with a kind (text, number, flag, enum, name, id, root, scope, segment,
+     path, ref, flow, skill) and 9 keys a view reads that no chief flow needs, in `not_for_chief`;
+   - **a static test** reads the views and the helpers under `blueprints/` for the keys they read
+     (`tests/http_api/test_chief_gate_keys.py`, 88 tests, with the AST walker in
+     `chief_walk_support.py`: found by what a name is bound to, not by what the key is called; three
+     levels of helper). It fails when a view reads a key the entry neither lists nor puts in
+     `not_for_chief`, when `not_for_chief` or the list names a key nothing reads (a ticket's `cite`
+     is the one exception, named in the test), and for each file kind it sends hostile values to the
+     gate; `test_chief_gate_strict_keys.py` (30) sends an unlisted key to every route;
+   - **a property test that watches the file system** (`test_chief_gate_audit.py`, 6 tests): it
+     sends hostile values to every key of every route of the table, and to every variable of its
+     URL, as a status, a planner and an operator chief, and records every file system call the
+     process makes with `sys.addaudithook`; none may fall in the other project, the server's
+     working directory or the home directory. The same file shows the audit sees each kind of call
+     and a write a request makes (a post with no token that names another project's root as a
+     board's scope makes the mirror write that project's `BOARD.json`; a chief's is refused).
+   - I **removed** the two name-pattern tests the review called weak (see Shortcuts for what the
+     second one saw that nothing static replaces). The "Chief gate" tripwire paragraph now says what
+     the new tests read and what they do not.
+4. *major, `GET /comms/artifacts/<id>/section` had no containment on the id branch.* Reproduced
+   (red: `test_a_chief_does_not_read_a_file_of_another_project_through_an_artifact_id`, three tiers,
+   and `test_the_section_route_reads_no_file_outside_the_root_it_is_given`: a row another writer
+   posted with a path in another project was read, 200, with and without `project_root`). The
+   document had said `safe_artifact_path` holds it, which is true of the by-path branch only. Fixed
+   at both ends. The sink: `hydrate_section(..., contain_in=<root>)` answers 400
+   `path_out_of_scope` (`outside the project`) when the row's stored path is not under that root
+   (`hydrate_helpers.inside_root`: real paths on both sides, symlinks followed), before it reads,
+   indexes or posts anything, and `comms_artifact_section` passes the root the request names. The
+   gate: the route is in the set that must name its root (`NAMES_A_PROJECT_READS` of the tests,
+   `names_root` of the entry), so a chief that sends no `project_root` is 403 and one that sends
+   its own gets the check. A caller that names no root (Studio, a human) reads the stored path as
+   before; that is stated in the section. The chief's own project's file still reads
+   (`test_a_chief_still_reads_a_file_of_its_own_project_through_an_artifact_id`).
+5. *minor, three imprecise sentences.* Each checked against the code and reworded: (a)
+   `board_mirror_path` is None for an unfit scope on a **feature** board only; on the project board
+   it joins whatever root it is given and `write_board_mirror`'s `_scope_fits` is what stops it.
+   (b) the `/db/*` reads: `GET /db/features` and `/db/stats` glob and read `STATE.json` and
+   `RUNNER_STATE.json` under the bound root, so what they open lies inside the chief's own project.
+   (c) feature boards are keyed by name only, so the mirror writes a feature board's `BOARD.json`
+   into whichever project `run_history` last mapped the name to (the startup backfill matches by an
+   existing `pathly/features/<name>/` folder), which may not be the chief's. Listed as **not held**
+   and under Shortcuts.
+6. *minor, a relative project root is no longer mirrored.* A project board whose scope is `proj/x`
+   was written under the server's working directory before the round-4 fix (`scope_names.
+   is_project_root`); since then its rows are stored and served as before and the export is gone. Deliberate, now pinned: `tests/comms_board/test_board_mirror_
+   relative_root.py` (12 tests: five relative spellings are no project board to the mirror, post
+   and flush write nothing and the rows stay, the startup backfill exports nothing for them, the
+   same root named absolutely is mirrored), and one bold sentence in the "A folder name" bullet of
+   the living doc.
+
+Tests I edited, not only added: `test_chief_gate.py::test_operator_passes_the_decompose_routes_with_
+overrides` now sends `prompt_override` only to `/comms/goals/decompose` (the one decompose route
+that reads it) and asserts the other two refuse it for an operator, naming the key; before, the
+routes ignored the key and the gate let it through. `chief_gate_support.NAMES_A_PROJECT_READS`
+gains `/comms/artifacts/<artifact_id>/section`, and `test_chief_gate_root_naming.py` fills the
+`<artifact_id>` converter in its path (finding 4). `test_chief_gate_tables.py` lost the two
+name-pattern tests (finding 3) and its walker helpers (`chief_walk_support.py` has them now). No
+assertion was loosened and no test is skipped.
+
+Proof after the fixes (each run fresh, after the last edit to code, tests and docs):
+
+- `python -m pytest tests/http_api/test_chief_gate.py -q -p no:cacheprovider` -> `97 passed in
+  36.91s`, exit 0. `python -m pytest tests/comms_board/test_comms_write_perm.py -q -p
+  no:cacheprovider` -> `33 passed in 8.68s`, exit 0. The whole chief set, the mirror tests and the
+  new predicate tests, `tests/http_api/test_chief_gate*.py tests/comms_board/test_board_mirror*.py
+  tests/storage_paths/test_scope_names_flow_skill.py` -> `1464 passed in 372.97s`.
+- Test first: at `acf32ae` (its three test files, `test_chief_gate_flow_skill.py`,
+  `test_chief_gate_artifact_section.py` and `test_chief_gate_strict_keys.py`, 63 tests) against the
+  source as it was at `7521392`, re-run today in a worktree: `56 failed, 7 passed`. The 7 that pass
+  are the "still works" cases (a packaged flow loads, a packaged skill composes, a chief names a
+  packaged skill, a chief reads its own project's file by id, a caller with no root still reads by
+  id, the keys a chief flow sends pass the gate, and the goal run still makes the folder of a
+  packaged flow). With the
+  fix all 63 pass.
+- The measurement, `test_chief_gate_audit.py` (6 tests, about 35 s): it sent the hostile values to
+  every key of every route of the table (and every variable of its URL) and counted the answers
+  with a temporary print that I removed: **3,830 requests as an operator chief** (1,938 refused by
+  the gate, 1,424 answered 200, 190 answered 400, 235 answered 404, 23 answered 500, 15 answered
+  308, 5 answered 403 by the route), **2,535 as a planner** (1,531 refused by the gate, 735 answered
+  200, 20 answered 500) and **2,535 as a status chief** (2,107 refused by the gate, 248 answered 200,
+  16 answered 500). The audit saw 10,250, 5,102 and 2,997 file system calls inside the chief's own
+  project, and **none outside it** in any tier. The 500s are the hostile numeric values and the
+  over-long folder name (Shortcuts); none touched a file outside the project.
+- Mutation checks (each failing the named tests; the scripts restored every file, and the sha256 of
+  every changed and new file under `src/`, `tests/` and `scripts/` is the same before and after):
+  `_load_flow` reads any string (1 failed); `_skill_file` reads any string (2); `_run_team` makes
+  the folder before it checks the flow and `_flow_kind` trusts any name (8); the gate lets a flow or
+  a skill that is a path through (2); the gate lets any key through (29 of 30 in
+  `test_chief_gate_strict_keys.py`); the by-id section reads any stored path (5); the section route
+  does not pass the root it was given (5); a relative root is a project root to the mirror (5);
+  `is_flow_name` accepts anything (21); `is_skill_name` accepts anything (18); `resolves_inside`
+  is always true (2); a key left off its entry (`mode` of `/comms/search`) (1, in the static keys
+  test); a `not_for_chief` key forgotten (`system_prompt`) (1). The audit itself, `-k operator`:
+  project rules off -> **229 touches outside the project**; project rules and the unsafe-topic check
+  off -> 245; key list and the `flow` and `skill` name checks off -> 16 (`open` of
+  `<other project>.md` through `skill`); stored-path containment off -> 35 (`open` of another
+  project's `PLAN.md` through the by-id section); **only the key list off -> passes**, which is the
+  point of holding each path twice: the sinks hold alone.
+- Test command from `commands.md` -> `2736 passed, 2 skipped in 690.45s (0:11:30)`, exit 0 (the 2
+  skips are not mine). `tests/consistency tests/local_operator tests/hq_copilot tests/storage_paths
+  tests/dag_goals tests/fsm_flows tests/install_skills` (the last three read the code I changed:
+  `_load_flow`, `compose_resources`, `_run_team`) -> `1642 passed, 11 skipped in 298.61s`, exit 0
+  (the skips are not in my files: `-rs` over the two small test files I edited after this run,
+  `test_scope_names_flow_skill.py` and `test_board_mirror_relative_root.py`, shows none, and they
+  were re-run after the last edit: `70 passed`).
+- Lint chain from `commands.md`, piece by piece, all exit 0: `black --check src/ tests/` (616 files
+  unchanged), `mypy` (`Success: no issues found in 330 source files`), `check_file_size.py` (`1026
+  source files checked; 18 known over 400 lines, none new, none grown`: `hydrate.py` 388 and its
+  baseline line is gone, `goal_executor.py` 492 = its baseline, `chief_field_calls.py` 182,
+  `chief_field_reads.py` 181, `chief_field_types.py` 183, `chief_fields.py` 28, `chief_keys.py` 55,
+  `chief_gate.py` 144, `chief_project.py` 205, `scope_names.py` 77, `chief_audit_world.py` 379
+  lines), `check_no_mirror_reads.py`, `gen_test_index.py --check`, `lint-imports` (`1 kept, 0
+  broken`), `bandit -q -r src/ -ll -x src/pathly_data/` (no SQL added), `check_adapters.py`,
+  `check_entry_points.py`. Smoke and `python -m build --wheel` exit 0. No `# noqa`, `# nosec`,
+  `type: ignore` or skipped test added (grepped over the diff and the untracked files; I had
+  written one `pytest.skip` as a guard for a platform without symlinks, which the floor scan counts
+  as a skipped test, and removed it: the other symlink tests in the repo call `symlink_to` bare).
+
+
 **For later tickets**
 
 - Ticket 09: no change to the table is needed for `/chief/human-messages`. Its hook posts with no
@@ -836,7 +1101,10 @@ Proof after the fixes (each run fresh, after the last edit to code, tests and do
   already assigned to `/runner/agent-answer`, `/comms/answer` and to `/comms/acknowledge` on a
   human escalation (classed in `chief_routes._acknowledge_action` through the `is_human_escalation`
   predicate `chief_gate._human_escalation_check(conn)` builds), so the rule has one place to hook.
-  `chief_gate.py` is 147 lines, so a new `chief_cite.py` fits as the ticket plans.
+  `chief_gate.py` is 144 lines, so a new `chief_cite.py` fits as the ticket plans. Round 6: the
+  `cite` key is already listed (kind `id`) on the entries of the three answer routes, so a chief
+  may send it; `WAITS_FOR_A_TICKET` in `test_chief_gate_keys.py` names those three so a listed key
+  that no view reads is still caught. When 10 starts to read it, delete those three tuples.
 - Ticket 12: `/comms/directives` is already mapped to `decide`, `chief` is already a project
   writer, and `PLANNED` (now in `tests/http_api/chief_gate_support.py`) may drop its entry once the
   route exists. The living-doc
@@ -845,7 +1113,17 @@ Proof after the fixes (each run fresh, after the last edit to code, tests and do
   scope or file; `Fields(roots=("project_root",), names_root=True, ...)` if it falls back to the
   server's directory): without one the gate answers 403 `the gate has no project entry for this
   route` and `test_every_route_a_chief_can_reach_says_which_fields_it_reads_as_a_project` (in
-  `test_chief_gate_tables.py`) fails. A new test for the chief gate goes in the
+  `test_chief_gate_tables.py`) fails. **Round 6: the entry is also the complete list of the body
+  keys a chief may send.** Put it in `chief_field_calls.py` (182 lines; `CALL_FIELDS`) with a
+  `keys={name: kind}` for every key the route reads (kinds in `chief_field_types.py`: text,
+  number, flag, enum, name, id, and the `scopes`, `paths`, `segments`, `flows` and `skills`
+  attributes for a key that can reach a file or a folder), and the keys it reads that no chief flow needs in
+  `not_for_chief`. A key the entry does not list is a 403 to the chief, and a key the route reads
+  that the entry neither lists nor puts in `not_for_chief` fails `test_chief_gate_keys.py`. Also
+  give the route a baseline request in `chief_audit_world.py` (`_POST`), or
+  `test_chief_gate_audit.py` sends it only the project root and stops at the route's first check;
+  that file is 379 lines, so a baseline that takes it past 400 means moving the GET ones to a new
+  file. A new test for the chief gate goes in the
   `test_chief_gate_*.py` file of its concern; the shared fixtures are in `chief_gate_support.py`.
 - Ticket 14: add `chief_bind.target_in_project(...)` after the action check in
   `chief_gate._refusal()` (`request.view_args` and the body are already in hand there);
@@ -866,6 +1144,9 @@ Proof after the fixes (each run fresh, after the last edit to code, tests and do
   `/comms/artifacts/<id>/section`, `GET /comms/artifacts?message_id=` and
   `/comms/goals/refs-coverage`. The feature-board "context pull" row (Shortcuts) and the sentinel
   rows of the artifact-section read ("Reads are not all pure") are the other unbound writes.
+  Round 6: the ids are listed as keys of kind `id`, so a chief may send them whatever 14 does;
+  binding one is a check in `chief_bind`, plus taking it off `unbound`, not a change of kind. A
+  new key 14 reads goes on the entry's list first (`test_chief_gate_keys.py` fails otherwise).
   Round 5: `chief_bind` and `ROUTE_FIELDS` must stay consistent. When ticket 14 binds an id, take
   it off that entry's `unbound` in the same change (and off the "Not bound" list in the living
   doc), and if the id also reaches a path (a `goal_id` whose row's `scope` `goal_decomposer` joins
@@ -892,7 +1173,19 @@ Proof after the fixes (each run fresh, after the last edit to code, tests and do
   project-board post, search, read or run (a missing scope is read as `feature`, which is a
   feature board, and a feature name given for a project board is 403); use a parenthesized scope such as `(interactive)` on `/code/query` (a feature name
   is 403) and a `target` inside the project; give `artifact_path` as an absolute path inside the
-  project. `pathly api` may fill `project_root` in from the session itself.
+  project. `pathly api` may fill `project_root` in from the session itself. **Round 6: send only
+  listed keys.** A body key (a query key on a GET) that the route's `ROUTE_FIELDS` entry does not
+  list is a 403 naming it, so the prompt must name the keys per route: they are the `keys`,
+  `scopes`, `paths` and so on of the entries in `chief_field_calls.py` and `chief_field_reads.py`
+  (`Fields.allowed(rule)` gives the list; 221 keys over 84 routes), not whatever the route's
+  view happens to read. In particular: `prompt_override` goes only to `/comms/goals/decompose`
+  (the other two decompose routes refuse it) and needs the operator tier; `flow` goes to
+  `POST /runs` (and the run verbs) and is one flow name, never a path, and is not a key of
+  `/comms/goals/run`; `skill` of `/comms/run` is `name` or `category/name`; `ability_ids`,
+  `system_prompt` and `interactive` of `/comms/run` are not for a chief; `GET
+  /comms/artifacts/<id>/section` needs the chief's own `project_root`. A project board must be
+  named by its absolute root: a relative root such as `proj/x` is stored and served but no longer
+  exported to disk.
 - Ticket 13: `test_status_chief_reads_and_is_refused_a_note` already checks "a Status-style token
   is refused on a write" at the HTTP level; the operator "starts a run" scenario is not covered
   here beyond the operator passing the gate on `POST /runs`.

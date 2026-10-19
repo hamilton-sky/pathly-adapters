@@ -1,7 +1,7 @@
 """chief-agent 08: the field table is complete and says what each route reads.
 
-Walks ``app.url_map`` and the source of the views (and the helpers they call) so a route
-or a request field added later cannot be added unbound.
+Walks ``app.url_map`` so a route added later cannot be added unbound. The keys of each route are
+read against the source of its view and helpers in ``test_chief_gate_keys.py``.
 """
 
 from __future__ import annotations
@@ -21,6 +21,7 @@ from chief_gate_support import (
     client,
     project,
 )
+from chief_walk_support import view_and_helpers
 
 # --- the table is complete, and says something about every route --------------------------
 
@@ -144,103 +145,6 @@ def test_the_reads_that_name_their_root_are_the_ones_that_fall_back_to_another_p
     assert names_root == set(NAMES_A_PROJECT_READS)
 
 
-_FIELD_READ = re.compile(
-    r"""(?:\bdata|\bbody|args|payload)(?:\.get(?:list)?\(\s*|\[\s*)["']([A-Za-z_]+)["']"""
-)
-_PROJECT_ISH = re.compile(
-    r"root|scope|board|project|feature|path|target|topic|_id$|slug"
-)
-_PATH_CALLS = {"join", "joinpath", "Path", "makedirs", "mkdir", "open"}
-_HELPER_PACKAGE = "pathly_orchestrator.http_server.blueprints"
-
-
-def _called_functions(function):
-    """The functions under ``blueprints/`` that ``function`` calls by name: a module-level name,
-    or one it imports inside its body (the layer rule keeps the imports lazy).
-    """
-    import ast
-    import importlib
-    import importlib.util
-    import inspect
-    import textwrap
-
-    try:
-        tree = ast.parse(textwrap.dedent(inspect.getsource(function)))
-    except (OSError, TypeError):
-        return
-    package = function.__module__.rpartition(".")[0]
-    imported = {}
-    for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom):
-            module = importlib.util.resolve_name(
-                "." * node.level + (node.module or ""), package
-            )
-            for alias in node.names:
-                imported[alias.asname or alias.name] = (module, alias.name)
-    called = {
-        n.func.id
-        for n in ast.walk(tree)
-        if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
-    }
-    for name in called:
-        if name in imported:
-            module, attr = imported[name]
-            target = (
-                getattr(importlib.import_module(module), attr, None)
-                if module.startswith(_HELPER_PACKAGE)
-                else None
-            )
-        else:
-            target = function.__globals__.get(name)
-        if inspect.isfunction(target) and target.__module__.startswith(_HELPER_PACKAGE):
-            yield target
-
-
-def _view_and_helpers(app, rule_text: str, method: str):
-    """``(function, source)`` for each view of the route and every helper it calls (3 levels)."""
-    import inspect
-    import textwrap
-
-    seen: set = set()
-
-    def walk(function, depth):
-        if function in seen or depth < 0:
-            return
-        seen.add(function)
-        try:
-            yield function, textwrap.dedent(inspect.getsource(function))
-        except (OSError, TypeError):
-            return
-        for helper in _called_functions(function):
-            yield from walk(helper, depth - 1)
-
-    for rule in app.url_map.iter_rules():
-        if rule.rule == rule_text and method in rule.methods:
-            yield from walk(inspect.unwrap(app.view_functions[rule.endpoint]), 3)
-
-
-def test_a_view_and_the_helpers_it_calls_read_no_project_ish_field_its_entry_does_not_name(
-    app,
-):
-    """A tripwire, not a proof: it reads the source of the view and of the functions under
-    ``blueprints/`` it calls (``create_run``, ``handle_retry``, ``_dispatch_*``), for the request
-    fields they read by ``.get("name")`` or ``["name"]``. A helper that reads its inputs under
-    another variable name, or a callee outside ``blueprints/``, is not seen.
-    """
-    from pathly_orchestrator.http_server.chief_fields import ROUTE_FIELDS
-
-    undeclared = {}
-    for (rule_text, method), fields in ROUTE_FIELDS.items():
-        for function, source in _view_and_helpers(app, rule_text, method):
-            read = {k for k in _FIELD_READ.findall(source) if _PROJECT_ISH.search(k)}
-            if read - fields.declared():
-                undeclared.setdefault((rule_text, method), {})[function.__name__] = (
-                    sorted(read - fields.declared())
-                )
-
-    assert undeclared == {}, f"views read fields the table does not name: {undeclared}"
-
-
 def test_the_walk_reaches_the_helpers_the_views_call(app):
     names = {
         f.__name__
@@ -249,72 +153,11 @@ def test_the_walk_reaches_the_helpers_the_views_call(app):
             ("/runs/<run_id>/<action>", "POST"),
             ("/comms/features/decompose", "POST"),
         )
-        for f, _ in _view_and_helpers(app, rule, method)
+        for f, _ in view_and_helpers(app, rule, method)
     }
 
     assert {"create_run", "_create_flow_run", "handle_retry"} <= names
     assert {"_dispatch_board_run", "_dispatch_consultation"} <= names
-
-
-def _joined_into_a_path(source: str) -> set[str]:
-    """The names used as an argument of a path-building call (``os.path.join``, ``Path``,
-    ``makedirs``, ``open``, ...) or of a ``/``: where a request value becomes part of a path.
-    """
-    import ast
-
-    found: set[str] = set()
-    for node in ast.walk(ast.parse(source)):
-        parts: list = []
-        if isinstance(node, ast.Call):
-            func = node.func
-            name = (
-                func.attr
-                if isinstance(func, ast.Attribute)
-                else getattr(func, "id", "")
-            )
-            if name in _PATH_CALLS:
-                parts = list(node.args)
-        elif isinstance(node, ast.BinOp) and isinstance(node.op, ast.Div):
-            parts = [node.left, node.right]
-        found.update(
-            sub.id
-            for part in parts
-            for sub in ast.walk(part)
-            if isinstance(sub, ast.Name)
-        )
-    return found
-
-
-def test_a_request_field_a_view_or_helper_joins_into_a_path_is_declared_as_one(app):
-    """A tripwire for round 3 finding 2: ``feature`` was listed as an id (a board name) while the
-    route joined it into ``<project_root>/pathly/features/<feature>``. A field of the entry that a
-    view or helper uses as an argument of a path call must be a file (``paths``, ``abs_paths``)
-    or a folder name (a ``segment`` scope, or a ``segments`` field). The match is by variable
-    name, so it sees a helper that keeps the request's name for the value, as these do.
-    """
-    from pathly_orchestrator.http_server.chief_fields import ROUTE_FIELDS
-
-    undeclared = {}
-    for (rule_text, method), fields in ROUTE_FIELDS.items():
-        path_safe = {
-            *fields.paths,
-            *fields.abs_paths,
-            *fields.segments,
-            "project_root",
-        }
-        for read in fields.scopes:
-            if read.segment:
-                path_safe.update(read.keys)
-        for function, source in _view_and_helpers(app, rule_text, method):
-            joined = _joined_into_a_path(source) & fields.declared() - path_safe
-            if joined:
-                undeclared.setdefault((rule_text, method), {})[function.__name__] = (
-                    sorted(joined)
-                )
-
-    assert (
-        undeclared == {}
-    ), f"a path is built from fields the table calls ids: {undeclared}"
 
 
 def test_the_segment_scopes_are_the_two_routes_that_make_a_folder_of_them():

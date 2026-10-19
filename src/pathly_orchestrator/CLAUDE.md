@@ -634,23 +634,28 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
   (below), so a route added later is refused to the chief until someone lists it and says which
   project it reads. (The chief gate tests are `tests/http_api/test_chief_gate*.py`, one file per
   concern, with the shared fixtures in `chief_gate_support.py`; a new test goes in the file of
-  its concern.) Two tripwires, in `test_chief_gate_tables.py`, read the
-  source of every such view **and the helpers it calls** under `blueprints/` (`create_run`,
-  `handle_retry`, `_dispatch_*`): one for a request field they read (`.get("x")` or `["x"]`) that
-  the entry does not name, one for a field they use as an argument of a path call that the entry
-  does not declare as a file or a folder name (`paths`, `abs_paths`, a `segment` scope or a
-  `segments` field). They are heuristics (a helper that renames the value is not seen), not proofs;
-  a scope that only reaches the board mirror, with no path call in the view, is not seen by them,
-  and is held by the scope rule below and by the mirror's own check instead.
+  its concern.) Three tests read the tables against the code, and each says what it does not read.
+  `test_chief_gate_tables.py` walks `app.url_map` for the routes. `test_chief_gate_keys.py` reads
+  the source of every view **and of the helpers it calls** under `blueprints/` (`create_run`,
+  `handle_retry`, `_dispatch_*`, three levels deep) for the keys they read from the request, found
+  by what a name is bound to, not by what the key is called: a name assigned `read_json_body()`,
+  `request.get_json()` or `request.args`, or a helper parameter called `body` or `data`, read by
+  `.get("k")`, `.getlist("k")`, `["k"]` or `"k" in …`. It does not read a function outside
+  `blueprints/` that is handed the whole body, a key built at run time, or `request.form`,
+  `request.values` and `request.json`. `test_chief_gate_audit.py` covers what a reading of the
+  source misses (see "What was measured").
 - **Overrides.** A body with a non-empty `prompt_override` or `stage_overrides`, on any route,
   also needs `run` (the 403 names `run`): the Planner may call the decompose routes but cannot
   hand verbatim prompt text to the agents they start.
 - **One project.** `http_server/chief_fields.py::ROUTE_FIELDS` is the inventory: one entry per
-  `(rule, method)` a chief can get past the action table, saying which request fields the view
-  reads as a project root, a board scope or a file, and which ids it reads that the gate does not
-  bind. `chief_project.project_refusal` applies the entry with one function, reading the query
-  string for a GET and the JSON body for every other route, as the views do; a route with no entry
-  is 403 (`the gate has no project entry for this route`), so the gate fails closed. Every value is
+  `(rule, method)` a chief can get past the action table (merged from `chief_field_calls.py`, the
+  POST routes, and `chief_field_reads.py`, the GETs; each entry is a `Fields` of
+  `chief_field_types.py`), saying which request keys the view reads, of which kind: a project
+  root, a board scope or a file (checked here), a flow or a skill (checked by `chief_keys`), and
+  which ids it reads that the gate does not bind. `chief_project.project_refusal` applies the
+  entry with one function, reading the query string for a GET and the JSON body for every other
+  route, as the views do; a route with no entry is 403 (`the gate has no project entry for this
+  route`), so the gate fails closed. Every value is
   compared after `supervisor/chief_session.normalise_project_root` (forward slashes, no trailing
   slash) with the session's, else 403; a value that is not a string is refused too.
   - **`project_root`** is checked wherever it appears, in the body or the query string of any
@@ -665,8 +670,9 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
     and `handle_retry` takes an empty one; `pause`, `resume`, `advance` and `reroute` act on the
     run's own state and need no root); `POST /comms/post` only when it carries `context_refs`;
     and the GETs `/db/features`, `/db/stats`, `/db/stats/trends`, `/db/recent`, `/db/rollup`,
-    `/db/features/<feature>/{agents,events,otel,runs}`, `/status`, `/comms/artifacts/section`, and
-    `/telemetry/trends` when it is given no feature (a blank feature sums every project unless
+    `/db/features/<feature>/{agents,events,otel,runs}`, `/status`, `/comms/artifacts/section`,
+    `/comms/artifacts/<artifact_id>/section` (the root bounds the path the row was stored with, see
+    "A stored path"), and `/telemetry/trends` when it is given no feature (a blank feature sums every project unless
     the root narrows it; a named feature is fleet-wide, see "Not bound"). The gate cannot fill the
     root in from the session, since the route reads the request's own fields.
     **The exceptions** are the reads whose absent root gives the global or packaged data or no
@@ -694,75 +700,161 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
     override of `/comms/project/decompose` is a project-board scope (the literal `project` means
     none).
   - **A file.** `/code/query`'s `target` (read against `project_root`, so a relative one is the
-    project's), `/comms/post`'s `artifact_path` (it must be absolute; the row keeps it and `GET
-    /comms/artifacts/<id>/section` later reads it whole, so it is checked at the post) and the path
-    an `artifact` post takes from its `text` when `artifact_path` is blank (always relative, so
-    refused) must lie under the session's root once their `..` segments are collapsed. This is a
-    text check: symlinks are not followed and a Windows drive letter is compared as written.
-  - **A folder name.** A request string becomes part of a path in three ways, and the gate holds
-    each. (1) `POST /comms/features/decompose` makes `<project_root>/pathly/features/<feature>`
-    and hands it to the run as its storage path, and `POST /comms/run` of an evaluator on a
-    feature or global board saves a reply that posted no BOARD_EVAL artifact under
-    `<project_root>/pathly/features/<scope>/artifacts/`. So the `feature` of the first and the
-    `scope` of the second (on a board other than `project`) must be one folder name: a string with
-    no `/`, `\`, `:` or NUL, and not `.` or `..` (`ScopeRead.segment`, which also refuses the
-    chief's own root there); the 403 names the field. The routes refuse the same class themselves,
-    from `storage_paths._is_unsafe_topic` (empty, absolute, backslash or colon, a `..` segment, a
-    reserved name): `features/decompose` answers 400 `invalid_feature`, and `/comms/run` skips the
-    save for such a scope (the board gets the usual warning). They still accept a nested `a/b`
-    that stays inside the project; the gate does not. (2) A `goal` post's `slug` is stored on the
-    row and the goal run and decompose later make `pathly/features/<scope>/goals/<slug>` of it
-    (`supervisor/slug.py::ensure_goal_slug`, `goal_decomposer`), so `/comms/post` declares it in
-    `Fields.segments` and the gate refuses a `slug` that is not one folder name; `ensure_goal_slug`
-    ignores a stored slug that is not one (`scope_names.is_segment`) and generates a new one, for
-    a row some other writer posted. (3) A scope that only reaches the board mirror, any route that
-    posts to a board (see "A project board's scope"): the gate holds it with the path rule above,
-    and the mirror holds it itself, in `board_mirror.py`, for a caller the gate does not see. The
-    mirror answers a normalised absolute project root on the project board and one folder name
-    on a feature board, and ignores any other scope (`board_from_scope` returns None, so
-    `mark_board_dirty_by_scope` queues nothing, `write_board_mirror` returns False and
-    `board_mirror_path` is None). Both predicates are in `scope_names.py` (`is_project_root`,
-    `is_segment`); a legitimate root (POSIX or `C:/...`, spaces and unicode) and a feature name
-    (dots, spaces, unicode) are accepted as before.
-  - **Other places a request string becomes a path.** Read in round 4 (reading code, not a
-    proof). Held: the board mirror (above), `features/decompose` and the evaluator save (gate and
-    `_is_unsafe_topic`), the goal `slug` (gate and `ensure_goal_slug`),
-    `fsm_ops._resolve_storage_path` (`_safe_topic` or the project root itself) for `start_run` and
-    `start_board_run`, `context_refs` and `GET /comms/artifacts/<id>/section`
-    (`hydrate_helpers.safe_artifact_path`, a realpath containment check), the artifact path of a
-    post and the target of `/code/query` (gate text containment; symlinks are not followed), the
-    `topic` of `/status`, the `/db/*` reads (they filter rows by the bound `project_root`, they
-    open no file), `GET /skills/prompts` (a category filter; `_SEG_RE` on writes) and the
-    flows, menu, catalog and `/api/*` reads (the database or an allow-list). **Not held at the
-    sink:** `event_mirror.backfill_event_mirrors` joins the `feature` of a stored event
-    (`eventlog.append_event` keeps its basename; `terminal_phase` passes a `_safe_topic` topic),
-    so it relies on the gate's hold on `/runs` and `/comms/run`; and `goal_decomposer` joins the
-    `scope` of the goal row it decomposes, which the gate checks for a goal a chief posted and
-    nobody checks for a goal another writer posted (the same id-addressed gap as `goal_id`
-    under "Not bound").
+    project's), `/comms/post`'s `artifact_path` (it must be absolute; the row keeps it, so it is
+    checked at the post) and the path an `artifact` post takes from its `text` when
+    `artifact_path` is blank (always relative, so refused) must lie under the session's root once
+    their `..` segments are collapsed. This is a text check: symlinks are not followed and a
+    Windows drive letter is compared as written.
+  - **A stored path.** A row keeps the path it was posted with (`comms_artifacts.path`), and
+    `GET /comms/artifacts/<artifact_id>/section` opens it, whoever posted it. So that read names
+    the root it reads under (a chief must send its own `project_root`) and `hydrate_section` is
+    given it as `contain_in`: a stored path that does not lie under that root (real paths on both
+    sides, symlinks followed: `hydrate_helpers.inside_root`) answers 400 `path_out_of_scope`
+    (`outside the project`) before anything is read, indexed or posted to the board. A caller that
+    names no root (Studio, a human) reads the stored path as before. The by-path form (`artifact=`)
+    and `context_refs` resolve under the root the call names through
+    `hydrate_helpers.safe_artifact_path`. The 400 for a row elsewhere against the 404 for no row
+    tells a chief whether an id exists, not what is in it.
+  - **A folder name.** A request string becomes part of a folder name in three places, and the
+    gate holds each of them with the rule below. (1) `POST /comms/features/decompose` makes
+    `<project_root>/pathly/features/<feature>` and hands it to the run as its storage path, and
+    `POST /comms/run` of an evaluator on a feature or global board saves a reply that posted no
+    BOARD_EVAL artifact under `<project_root>/pathly/features/<scope>/artifacts/`. So the `feature`
+    of the first and the `scope` of the second (on a board other than `project`) must be one folder
+    name: a string with no `/`, `\`, `:` or NUL, and not `.` or `..` (`ScopeRead.segment`, which
+    also refuses the chief's own root there); the 403 names the field. The routes refuse the same
+    class themselves, from `storage_paths._is_unsafe_topic` (empty, absolute, backslash or colon, a
+    `..` segment, a reserved name): `features/decompose` answers 400 `invalid_feature`, and
+    `/comms/run` skips the save for such a scope (the board gets the usual warning). They still
+    accept a nested `a/b` that stays inside the project; the gate does not. (2) A `goal` post's
+    `slug` is stored on the row and the goal run and decompose later make
+    `pathly/features/<scope>/goals/<slug>` of it (`supervisor/slug.py::ensure_goal_slug`,
+    `goal_decomposer`), so `/comms/post` declares it in `Fields.segments` and the gate refuses a
+    `slug` that is not one folder name; `ensure_goal_slug` ignores a stored slug that is not one
+    (`scope_names.is_segment`) and generates a new one, for a row some other writer posted. (3) A
+    scope that only reaches the board mirror, on any route that posts to a board (see "A project
+    board's scope"): the gate holds it with the path rule above, and the mirror holds it itself,
+    in `board_mirror.py`, for a caller the gate does not see. The mirror answers a normalised
+    absolute project root on the project board and one folder name on a feature board, and ignores
+    any other scope: `board_from_scope` returns None (so `mark_board_dirty_by_scope` queues nothing)
+    and `write_board_mirror` returns False (`_scope_fits`, on either board). `board_mirror_path`
+    itself is None for an unfit scope on a feature board only: on a project board it joins whatever
+    root it is given, and it is `write_board_mirror` that stops it. Both predicates are in
+    `scope_names.py` (`is_project_root`, `is_segment`); a legitimate root (POSIX or `C:/...`, spaces
+    and unicode) and a feature name (dots, spaces, unicode) are accepted as before. **A project
+    board whose scope is a relative root (`proj/x`) is no longer exported to disk**: it was
+    written under the server's working directory before; its rows are stored and served as
+    before, and a caller that wants the export names the absolute root
+    (`tests/comms_board/test_board_mirror_relative_root.py` pins it).
+  - **A flow or a skill.** `fsm_ops._load_flow` reads `core/flows/<flow>.flow.yaml` and
+    `skills/compose_resources` reads `core/skills/<skill>.md` by joining the request's string onto
+    a packaged folder (an absolute string replaces the folder), and the `team` executor of
+    `POST /comms/goals/run` made `pathly/features/<scope>/<flow>/<slug>` of its `flow` before it
+    checked that the flow existed. `flow` is a key of `POST /runs` and
+    `POST /runs/<run_id>/<action>`, `skill` of `POST /comms/run`: the gate refuses a `flow` that is
+    not one name and a `skill` that is neither `name` nor `category/name`
+    (`scope_names.is_flow_name` / `is_skill_name`, `chief_keys.key_refusal`; the 403 names the key).
+    The readers refuse the same spellings for every caller: `_load_flow`'s fallback to the packaged
+    file and `compose_resources._skill_file` raise `FileNotFoundError` for a string that is not one
+    name or that resolves (symlinks followed) outside its folder (`scope_names.resolves_inside`),
+    `_skill_exists` answers False, and `goal_executor._flow_kind` raises `ValueError` for a flow
+    that is neither a goal flow nor one name, which `_run_team` answers as `unknown_flow` before it
+    makes any folder (it used to make the folder first). A flow stored in the database is found by
+    its name and never opened as a file. `POST /comms/goals/run` takes no `flow` from a chief (see
+    "The key list").
+  - **The key list.** An entry is also the complete list of the keys a chief may send to its route
+    (`Fields.allowed`: the keys it names, plus `project_root`, minus the variables of the URL).
+    `chief_keys.key_refusal` runs last, and refuses a body key (a query key for a GET; a repeated
+    key is one key) the entry does not list, with a 403 that names it (`'x' is not a key a chief
+    may send to this route`). Only top-level keys are looked at and a value is opaque to it; a body
+    that is not a JSON object is read as no keys, as the routes read it. A key a view reads that no
+    chief flow needs is not listed but put in `not_for_chief`, so a test can tell "left out on
+    purpose" from "forgotten": `ability_ids` (composition packs picked in Studio), the
+    `system_prompt` and `interactive` of `/comms/run`, the `summary_backend` and `embed_summary`
+    of `/comms/post`, and the `flow` of `/comms/goals/run` (the goal's executor picks its flow; a
+    chief that wants another one starts it with `POST /runs`). Every listed key has a kind
+    (`Fields.kinds()`): text, number, flag, enum, name or id (opaque to the gate, never joined into
+    a path by design), or one of the kinds that can reach a file or a folder, each with a rule the
+    gate applies and, where the key reaches a sink, the sink applies as well: `root` (the
+    session's), `scope` and `segment` (above), `path` (inside the project), `ref` (a file ref
+    the sink resolves under the root the call names, which the gate makes it name: `context_refs`,
+    `artifact`), `flow` and `skill`. The `cite` of the three answer routes is listed before any
+    view reads it (ticket 10 reads it). A key a view starts to read is refused to a chief until
+    someone lists it (`test_chief_gate_keys.py` fails first), so the keys a chief's prompt may name
+    (ticket 17) are the entries' lists.
+  - **What reaches a path, and what holds it.** Read in round 4 and again in round 6; round 6
+    added the key list and the measurement below, which are what lets this list be short. Held at
+    the gate **and** at the sink: the board mirror's scope, `features/decompose` and the evaluator
+    save (`_is_unsafe_topic`), the goal `slug` (`ensure_goal_slug`), `flow` and `skill` (above), the
+    stored path of an artifact row (above), `context_refs` and `artifact`
+    (`safe_artifact_path`, a realpath containment check). Held at the gate only: the artifact path
+    of a post and the target of `/code/query` (text containment; symlinks are not followed).
+    Held by the route's own design: `fsm_ops._resolve_storage_path` (`_safe_topic` or the project
+    root itself) for `start_run` and `start_board_run`, the `topic` of `/status`, `GET
+    /skills/prompts` (a category filter; `_SEG_RE` on writes), `GET /skills/summary-format/<style>`
+    (an allow-list of three), and the flows, menu, catalog and `/api/*` reads (the database or an
+    allow-list). The `/db/*` reads filter rows by the bound `project_root`; `GET /db/features` and
+    `GET /db/stats` also glob and read `STATE.json` and `RUNNER_STATE.json` under that root (the
+    fallback for a feature that never ran), so what they open lies inside the root the gate bound.
+    **Not held:** feature boards are keyed by name only, and the board mirror writes a feature
+    board's `BOARD.json` into whichever project `run_history` last mapped that name to
+    (`resolve_project_root`; the startup backfill matches by an existing
+    `pathly/features/<name>/` folder instead), so a chief's post to feature `demo` rewrites `demo`'s `BOARD.json`
+    in the project that last ran a feature of that name, which may not be the chief's. The gate
+    cannot bind a feature name to a project. Nor at the sink: `event_mirror.backfill_event_mirrors`
+    joins the `feature` of a stored event (`eventlog.append_event` keeps its basename;
+    `terminal_phase` passes a `_safe_topic` topic), so it relies on the gate's hold on `/runs` and
+    `/comms/run`; and `goal_decomposer` joins the `scope` of the goal row it decomposes, which the
+    gate checks for a goal a chief posted and nobody checks for a goal another writer posted (the
+    same id-addressed gap as `goal_id` under "Not bound").
+  - **What was measured.** `tests/http_api/test_chief_gate_audit.py` runs the server with the
+    spawn host faked, a database of its own and three directories under a fake home (the chief's
+    project, another project, the server's working directory), and sends every key of every route
+    of the table, and every variable of its URL, hostile values (`..`, a climbing path, an absolute
+    path into the other project, into the server's directory and into the home directory, a UNC path
+    in both slash directions, a drive letter, a NUL, a trailing slash, a 5,000-character name), as
+    a status, a planner and an operator chief, in requests that are valid but for that value
+    (`chief_audit_world.py`: one or more per route, seeded as a human would). `sys.addaudithook`
+    records every file system call the process makes (`open`, `os.mkdir`, `rename`, `remove`,
+    `rmdir`, `symlink`, `link`, `truncate`, `chmod`, `listdir`, `scandir`, `shutil` copies and
+    moves, `glob`, `sqlite3.connect`, a child process's working directory) and none may fall in the
+    other project, the server's working directory or the home directory (`Path.home()` in the test;
+    the user's real home is not a zone, the repository may lie inside it), outside the chief's own
+    project and `~/.pathly`. The same file shows the audit sees each kind of call, and sees a write
+    a request makes: a post with no token that names another project's root as a board's scope
+    makes the mirror write that project's `BOARD.json`; the same post by a chief is refused. It was
+    also checked by breaking the guards: with the project rules off, with the key list and the
+    flow and skill name checks off, and with the stored-path containment off, it fails each
+    time; with only the key list off it passes, because the sinks hold. What it cannot see:
+    `os.stat` and `os.path.exists` are not audit events (a probe for a file is invisible), nor is
+    the C layer of a library (sqlite is seen at `connect`) or what a child process opens; a route
+    is only as deep as the requests it is sent (13 routes are asserted to accept their baseline);
+    and other writers (a human's post may store any path) and the feature-board mapping above are
+    outside it, since every `demo` run of the sandbox lives in the chief's project.
   - On `/comms/post`, a `from` other than `chief` (or none) is 403.
   - **Not bound.** The table lists these as `unbound` rather than leaving them out. (1) Calls that
     name their target by id or by name: `goal_id` (`/comms/goals/run|stop|decompose`, `/runs` with
     a goal, `/comms/tasks`, `/comms/artifacts`), a task's `message_id` (`/comms/tasks/run|stop`),
-    `run_id`, `topic`, `artifact_id`, a feature name (feature boards are keyed by name only, so
-    `board: "feature"` is not bound to a project) and the posting fields `goal_id` and `run_id`.
-    A chief that knows such an id can reach another project's row. Ticket 14 binds the run ids of
+    `run_id`, `topic`, `artifact_id` (the path the row keeps is bound, see "A stored path"; the row
+    is found by id), a feature name (feature boards are keyed by name only, so `board: "feature"`
+    is not bound to a project) and the posting fields `goal_id` and `run_id`. A chief that knows
+    such an id can reach another project's row. Ticket 14 binds the run ids of
     `/runs/<run_id>/stop|<action>`, the message ids of `/comms/acknowledge|answer|supersede` and
     the `topic` of `/runner/agent-answer`; `goal_id`, task ids and the id-addressed reads (`GET
     /runs/<run_id>`, `/runner/status`, `/status?topic=`, `/db/runs/<id>/cost`,
-    `/comms/artifacts/<id>/section`, `/comms/artifacts?message_id=`, `/comms/goals/refs-coverage`)
-    have no ticket yet. (2) Routes that are fleet-wide and have no project filter to bind: `GET
-    /db/rollup`'s `global` block (it sums every project whatever `project_root` says, and its
-    `by_project` lists every project's root path with its cost and tokens, so a status chief can
-    read where the other projects are and what they spend), `GET /db/stats`'s `features`, `events`
-    and `invocations` counts (global; only its token and cost totals follow `project_root`),
-    `GET /telemetry/trends` with a named feature (summed across projects), and `GET /metrics`
-    and `/metrics/json` (server counters). A status chief can read those, and so can every other
-    token. (3) The packaged and global reads (`/flows`, `/registry/*`, `/skills/catalog`, the
-    `/comms/default-*` settings, `/health`) name no project. A feature name that a query filters by
-    `project_root` as well (`/db/features/<feature>/*`, `/api/features/<feature>/*`,
-    `/api/traces`, `/flows/stage-config`, `/comms/scope`, the `feature` of `/db/rollup`) is bound
-    by that root, so the table lists it as `under_root`, not as unbound.
+    `/comms/artifacts?message_id=`, `/comms/goals/refs-coverage`) have no ticket yet. (2) Routes
+    that are fleet-wide and have no project filter to bind: `GET /db/rollup`'s `global` block (it
+    sums every project whatever `project_root` says, and its `by_project` lists every project's
+    root path with its cost and tokens, so a status chief can read where the other projects are
+    and what they spend), `GET /db/stats`'s `features`, `events` and `invocations` counts (global;
+    only its token and cost totals follow `project_root`), `GET /telemetry/trends` with a named
+    feature (summed across projects), and `GET /metrics` and `/metrics/json` (server counters). A
+    status chief can read those, and so can every other token. (3) The packaged and global reads
+    (`/flows`, `/registry/*`, `/skills/catalog`, the `/comms/default-*` settings, `/health`) name
+    no project. A feature name that a query filters by `project_root` as well
+    (`/db/features/<feature>/*`, `/api/features/<feature>/*`, `/api/traces`, `/flows/stage-config`,
+    `/comms/scope`, the `feature` of `/db/rollup`) is bound by that root, so the table lists it as
+    `under_root`, not as unbound.
 - **The gate reads the body as the route will.** The comms routes read it with
   `comms/_helpers.read_json_body` (UTF-8, then cp1252, whatever the content type); `/runs`,
   `/runs/<id>/<verb>`, `/runner/agent-answer` and `/code/query` read it with `get_json`, which
@@ -801,8 +893,8 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
 - **Not here yet.** Calls that name a run, a message or a goal by id are not bound to the chief's
   project (ticket 14 binds some of the writes; the rest are listed under "Not bound"); the cite
   rule for `answer` (10), the cost and run ceiling (15) and the directive route (12) are later
-  tickets. Ticket 12's `/comms/directives` needs a `ROUTE_FIELDS` entry as well as a
-  `ROUTE_ACTIONS` one, or the gate refuses it with `NO_ENTRY`.
+  tickets. Ticket 12's `/comms/directives` needs a `ROUTE_FIELDS` entry (with the list of the keys a chief
+  may send) as well as a `ROUTE_ACTIONS` one, or the gate refuses it with `NO_ENTRY`.
 
 ### SSE events (GET /events/runner)
 
@@ -1059,8 +1151,12 @@ pathly_orchestrator/
     middleware.py          # _log_request, _log_response, rate limiting, metrics
     chief_gate.py          # chief_gate(): the before_request hook (registered after _log_request) that refuses a chief token's call its tier, project or poster does not allow, and answers 401 for a closed chief session — see "Chief gate"
     chief_routes.py        # the chief gate's route table as data: ROUTE_ACTIONS ((rule, method) -> action), the GET refusals, the post-type and run-verb refinements and action_for()
-    chief_fields.py        # the chief gate's second route table: ROUTE_FIELDS ((rule, method) -> Fields), per route the request fields it reads as a project root, a board scope (a folder name where the route joins it into a path) or a file, when the root must be named (always, for some verbs, or unless a feature is given), the names the root bounds (`under_root`) and the ids it leaves unbound (with a note for the fleet-wide reads); a test fails when a reachable route has no entry
+    chief_fields.py        # the chief gate's second route table: ROUTE_FIELDS ((rule, method) -> Fields), merged from CALL_FIELDS and READ_FIELDS; per route the complete list of the keys a chief may send (and the ones deliberately left out), each with a kind, and which of them the route reads as a project root, a board scope (a folder name where the route joins it into a path), a file, a flow or a skill, when the root must be named (always, for some verbs, or unless a feature is given), the names the root bounds (`under_root`) and the ids it leaves unbound (with a note for the fleet-wide reads); a test fails when a reachable route has no entry
+    chief_field_types.py   # what an entry can say: the kinds of a key (text, number, flag, enum, name, id; root, scope, segment, path, ref, flow, skill), `Fields` (kinds(), declared(), allowed(rule)), `ScopeRead`, `TextPath` and `url_variables(rule)`
+    chief_field_calls.py   # CALL_FIELDS: the entries of the POST routes the action table lists, each written from the view and the helpers it calls
+    chief_field_reads.py   # READ_FIELDS: the entries of the GET routes a chief can reach (the query keys they read, or the reason they read no project)
     chief_project.py       # project_refusal(): applies a ROUTE_FIELDS entry to one request (query string for a GET, body otherwise, the URL's `<action>` for the retry verb) and says whether the project it names is the session's — see "Chief gate"
+    chief_keys.py          # key_refusal(): refuses a key the entry does not list, and a `flow` or `skill` that is not one name (scope_names.is_flow_name / is_skill_name) — see "Chief gate"
     run_identity.py        # caller_identity(request) -> CallerIdentity: kind run|anonymous from the X-Pathly-Run-Token header (body role/run_id/from never read); unknown/revoked token logged at info with the remote addr; `ui` kind reserved (RRP-2b). Nothing applies a policy from it yet
     sse.py                 # SSE globals (_clients, _runner_clients, _menu_clients) + broadcast helpers
     pricing.py             # MODEL_PRICING, compute_cost_usd()

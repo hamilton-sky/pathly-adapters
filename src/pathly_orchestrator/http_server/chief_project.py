@@ -24,7 +24,8 @@ from typing import Mapping
 
 from pathly_orchestrator.scope_names import is_segment
 
-from .chief_fields import ROUTE_FIELDS, Fields, ScopeRead, TextPath
+from .chief_field_types import Fields, ScopeRead, TextPath
+from .chief_fields import ROUTE_FIELDS
 
 ROOT_KEY = "project_root"
 _BOARDS = ("feature", "project", "global")

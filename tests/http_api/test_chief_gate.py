@@ -180,19 +180,21 @@ def test_operator_passes_the_decompose_routes_with_overrides(
     client, project, path, base
 ):
     chief = _chief("operator", project)
+    body = {**base, "project_root": str(project), "stage_overrides": {"PLANNING": "x"}}
+    if path == "/comms/goals/decompose":
+        body["prompt_override"] = "y"  # the only decompose route that reads it
 
-    resp = client.post(
-        path,
-        json={
-            **base,
-            "project_root": str(project),
-            "stage_overrides": {"PLANNING": "x"},
-            "prompt_override": "y",
-        },
-        headers=chief.headers,
-    )
+    resp = client.post(path, json=body, headers=chief.headers)
 
     assert _passed(resp), resp.get_data(as_text=True)
+
+    # A key the route does not read is refused, whatever the tier holds.
+    if path != "/comms/goals/decompose":
+        resp = client.post(
+            path, json={**body, "prompt_override": "y"}, headers=chief.headers
+        )
+        assert _gated(resp)
+        assert "prompt_override" in resp.get_json()["error"]
 
 
 def test_operator_passes_the_gate_on_a_run_start(client, project):

@@ -7,8 +7,9 @@ treatment ``caller_identity`` would give it, because anonymous loopback callers 
 
 For a live chief, the call is classed by ``chief_routes.action_for`` and refused with 403 unless
 the session's tier holds that action, names only its own project in the fields its route reads
-(``chief_fields``, applied by ``chief_project``) and, on ``/comms/post``, posts as the chief. Each
-check runs over every reading of the body a route may get (``_bodies``). Registered in
+(``chief_fields``, applied by ``chief_project``), on ``/comms/post`` posts as the chief, and sends
+only the keys its route lists (``chief_keys``). Each check runs over every reading of the body a
+route may get (``_bodies``). Registered in
 ``app.py`` right after ``_log_request``, so the secret check and the rate limit run first. Flask
 matches the URL rule before any hook runs, so a path no route matches (``url_rule`` is None)
 passes here and Flask answers 404 or 405.
@@ -16,6 +17,7 @@ passes here and Flask answers 404 or 405.
 
 from __future__ import annotations
 
+from .chief_keys import key_refusal
 from .chief_project import project_refusal
 from .chief_routes import POSTS_AS_CHIEF, action_for
 from .run_identity import RUN_TOKEN_HEADER
@@ -102,6 +104,9 @@ def _refusal(rule, method: str, session: dict, conn, body: dict):
         return _refuse(tier, action, allowed, other)
     if rule.rule in POSTS_AS_CHIEF and body.get("from") != "chief":
         return _refuse(tier, action, allowed, "a chief posts as 'chief'")
+    unlisted = key_refusal(rule.rule, method, request.args if method == "GET" else body)
+    if unlisted is not None:
+        return _refuse(tier, action, allowed, unlisted)
     return None
 
 

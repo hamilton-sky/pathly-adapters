@@ -7,12 +7,18 @@ places later make a path of it: the board mirror (``board_mirror``) writes
 decompose make ``pathly/features/<f>/goals/<slug>``. The chief gate (``http_server/chief_project``)
 refuses what these predicates refuse, so a gate and a sink cannot disagree about a spelling.
 
+``flow`` and ``skill`` are request strings too: ``fsm_ops._load_flow`` reads the packaged
+``core/flows/<flow>.flow.yaml`` and ``skills/compose_resources`` reads ``core/skills/<skill>.md``,
+and a goal run makes ``pathly/features/<scope>/<flow>/<slug>`` of its flow. ``is_flow_name`` and
+``is_skill_name`` say what may join onto those folders; the gate and the readers both ask them.
+
 Pure functions, no imports from the rest of the package.
 """
 
 from __future__ import annotations
 
 import re
+from pathlib import Path
 
 _DRIVE_ROOT = re.compile(r"^[A-Za-z]:/")
 _BREAKERS = "/\\:\0"
@@ -41,3 +47,31 @@ def is_project_root(value: object) -> bool:
     if not (value.startswith("/") or _DRIVE_ROOT.match(value)):
         return False
     return not any(part in (".", "..") for part in value.split("/"))
+
+
+def is_flow_name(value: object) -> bool:
+    """True for a flow's name: one folder name (``is_segment``), the way a flow is stored
+    (``core/flows/<name>.flow.yaml``, a database row's name, the folder a run is made in).
+    """
+    return is_segment(value)
+
+
+def is_skill_name(value: object) -> bool:
+    """True for a skill's name, ``name`` or ``category/name``: forward-slash separated parts that
+    are each one folder name. No absolute path, no ``..``, no backslash, drive colon or NUL.
+    """
+    if not isinstance(value, str) or not value.strip():
+        return False
+    return all(is_segment(part) for part in value.split("/"))
+
+
+def resolves_inside(root: object, candidate: object) -> bool:
+    """True when ``candidate`` resolves (symlinks followed) to a path under ``root``.
+
+    For two real paths only; a packaged resource that is not a file on disk (a zipped wheel) has
+    no symlinks to follow and is answered True, since its name was checked by the predicates
+    above.
+    """
+    if not (isinstance(root, Path) and isinstance(candidate, Path)):
+        return True
+    return candidate.resolve().is_relative_to(root.resolve())

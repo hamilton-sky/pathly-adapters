@@ -229,4 +229,5 @@ NAMES_A_PROJECT_READS = [
     "/db/features/<feature>/runs",
     "/status",
     "/comms/artifacts/section",
+    "/comms/artifacts/<artifact_id>/section",
 ]
