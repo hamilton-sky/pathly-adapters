@@ -1,7 +1,7 @@
 # Refuse every chief call its tier does not allow
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 04, 05, 07
 Test first: yes
 
@@ -182,6 +182,21 @@ prints passed
   cases, 97 tests) and ten `test_chief_gate_*.py` files, with the shared fixtures in
   `chief_gate_support.py` (651 tests in all; test-only commit `d3d52b1`, fix `53dc2fa`, split
   `45357e6`); `tests/INDEX.md` and `tests/http_api/INDEX.md` regenerated.
+- Round 5 (see **Review fixes (round 4)**): `src/pathly_orchestrator/scope_names.py` (new, 43
+  lines): `is_segment` (one plain folder name) and `is_project_root` (a normalised absolute root,
+  POSIX or `C:/...`), the two predicates the gate and the sinks share. `board_mirror.py` (306
+  lines) answers only those two shapes: `board_from_scope` returns None for anything else,
+  `mark_board_dirty_by_scope` queues nothing for it, `write_board_mirror` and `board_mirror_path`
+  refuse it. `supervisor/slug.py` (111 lines): `ensure_goal_slug` replaces a stored slug that is not
+  one folder name. `chief_fields.py` (363 lines): `Fields.segments` (the `slug` of `/comms/post`),
+  the `ScopeRead` docstring, the `/db/rollup` note. `chief_project.py` (204 lines): a scope that
+  is a path is bound to the session's project on every board, any other scope off the project
+  board is one folder name, and a `segments` field is one folder name. The "Chief gate" section of
+  `src/pathly_orchestrator/CLAUDE.md` is corrected (findings 1, 3, 4 and the scope and folder-name
+  bullets). New tests: `tests/comms_board/test_board_mirror_scope.py` (the sink) and
+  `tests/http_api/test_chief_gate_mirror.py` (the gate: the post route, `/runs`, every scope read of
+  `ROUTE_FIELDS`, the slug); small edits to `tests/http_api/test_chief_gate_tables.py`; the three
+  `INDEX.md` files regenerated. Test-only commit `0ab8cdb`, then the fix.
 
 **Proof** (each run fresh, after the last edit to code or tests)
 
@@ -329,6 +344,20 @@ prints passed
   /telemetry/trends` with a feature, plus `GET /metrics` and `/metrics/json`. The owner's
   decision (reads are bound where the route allows it) is met for every other route; these are
   stated in the living doc, not hidden.
+- Round 5: two joins of a stored string into a path are not guarded at the sink, only by the gate
+  in front of them. `event_mirror.backfill_event_mirrors` joins the `feature` of a stored event
+  (the basename `eventlog.append_event` keeps, or the topic `terminal_phase` passes behind
+  `_safe_topic`), and `goal_decomposer` joins the `scope` of the goal row it decomposes. The first
+  relies on the gate's hold on the `scope` of `/runs` and `/comms/run`; the second is checked for
+  a goal a chief posted and for none that another writer posted (the same gap as `goal_id`, which
+  no ticket owns). It stops working if a non-chief route stores a path-like value in either field;
+  the upgrade is the `is_segment` check at each join, as `ensure_goal_slug` and the mirror now do.
+- Round 5: the sink check and the gate check are two copies of the same rule (`scope_names`
+  holds the predicates, the gate decides per board). A scope the gate passes as the chief's own
+  root on a feature board (`board:"feature"`, `scope:<own root>`) is accepted, and the mirror then
+  rewrites `<own root>/pathly/project/BOARD.json` from the project board's rows (the posted row is
+  not in it). It is the mirror's existing reading of such a scope and writes inside the chief's own
+  project; it stops being fine if the mirror's reading of a path scope changes.
 
 **Review fixes** (round 1, quality review; the round starts at `c2de8da`. Test-only commits first:
 `b5014df` and `286bb1e`, each run red before any source change.)
@@ -639,6 +668,165 @@ Proof after the fixes (each run fresh, after the last edit to code, tests and do
   `check_entry_points.py`. Smoke and `python -m build --wheel` exit 0. No `# noqa`, `# nosec` or
   `type: ignore` added.
 
+**Review fixes (round 4)** (quality review; the round starts at `c88f85b`, work from `56ba48c`.
+Test-only commit first: `0ab8cdb`, run red before any source change: `364 failed, 178 passed` over
+its three files (the first run, before I amended the commit to exclude the global mirror from the
+"nothing written" assertions, counted 371 failed; the count moves a few tests between runs with
+the flusher thread's timing, and I did not chase that). The cause of finding 2 is one: the gate
+bound a scope by the board the request **declared**, while the board mirror reads the **shape** of
+the scope. I closed the class, not the one route: a request string that becomes a filesystem path
+is now held where the gate sees it and again where the path is made.)
+
+1. *major, "Reads are not all pure".* Verified in the code (`artifacts.py::comms_artifact_section`
+   -> `hydrate_section` -> `ensure_indexed` -> `find_or_create_artifact_by_path`): for an existing
+   file under a `pathly/features|plans|goals|project/` folder it inserts a sentinel
+   `comms_messages` row (board `feature`, the given scope, from `system`, type `artifact`), a
+   `comms_artifacts` row and a section index, with no `trail`. The "Chief gate" section now says
+   **five** small writes and lists this one, saying it needs no `trail` and works at any feature
+   scope the caller names (the scope is now held by the rule in item 2). I did not change the
+   hydrate path, as the brief says.
+2. *major, a path-like scope on a feature or global board plants files in another project.*
+   Reproduced (red run: `test_a_chief_plants_no_file_in_another_project_through_the_scope_of_a_
+   post`, 8 cases: the gate passed the post, where the review's probe saw the mirror write
+   `<other project>/pathly/project/BOARD.json`). Closed in the three places the brief names:
+   - **(a) the gate.** `chief_project._scope_refusal`: a scope that looks like a path (`/`, `\` or a
+     drive prefix) must be the chief's own root on **every** board (403 `that is not this chief's
+     project`), and a scope on a board other than `project` that is not a path must be one folder
+     name (`scope_names.is_segment`: no `/`, `\`, `:`, NUL, not `.` or `..`). This is in the one
+     function every `ScopeRead` goes through, so it applies to `/comms/post`, `/runs`, `/comms/run`,
+     `/comms/run/stop`, `/comms/search`, `/comms/features/decompose`, `GET /comms`,
+     `/comms/tasks`, `/comms/goals`, `/comms/artifacts`, `/comms/run/status`, `/comms/trash`,
+     `/hq/context` and the two artifact-section reads: a test walks the 15 `ScopeRead`s of
+     `ROUTE_FIELDS` that are not the project board's and sends nine path spellings (a foreign
+     root, `OWN/../proj-b`, `../proj-b`, `sub/dir`, `C:/other/proj`, `C:\other\proj`, `a\b`,
+     `..`, `.`) on `feature`, `global` and no board: all refused, and five plain names (a dot, a
+     space, unicode) pass. The own root passes on a non-project board (it is bound, as the
+     brief allows); a `segment` scope (`/comms/features/decompose`, the `/comms/run` evaluator)
+     still refuses even the own root. A new `Fields.segments` names a stored field the server
+     later joins into a folder: `/comms/post` declares `slug` (below).
+   - **(b) the sink.** `board_mirror.py` now answers only a normalised absolute project root on the
+     project board (`scope_names.is_project_root`: starts `/` or `X:/`, no `\`, no NUL, no
+     trailing `/`, no `.` or `..` part) and one plain folder name on a feature board:
+     `board_from_scope` returns None for any other scope, `mark_board_dirty_by_scope` queues
+     nothing, `write_board_mirror` returns False before touching a path (also when the pair is
+     queued directly with `mark_board_dirty`), and `board_mirror_path` is None for a non-segment
+     feature scope. It covers the callers the gate does not see (a human, an agent with another
+     token): `test_the_route_itself_plants_nothing_for_a_scope_that_is_a_path` posts with no token
+     and the other project's tree stays empty. Legitimate scopes are unchanged: roots in POSIX and
+     `C:/...` spelling with spaces and unicode, `//server/share/...`, and feature names with dots,
+     spaces and unicode (`Q3 plan`, `café-ü`, `v1.2.3`, `.hidden`, `(interactive)`); the existing
+     `test_board_mirror*.py` files (3, unchanged) pass, and `test_a_legitimate_project_root_still_
+     gets_its_mirror` writes the mirror for a plain, a spaced and a unicode root.
+   - **`POST /runs`, `kind=single`, board `global` or `feature`, traversal scope** (the "less
+     certain" case). The gate passed it before (red: 81 cases of `test_a_run_cannot_name_a_path_
+     as_the_scope_of_a_feature_or_global_board` failed, the faked run was started). It is refused
+     now for `single`, `evaluator` and `flow` on `feature`, `global` and no board, and the run
+     file-planting test passes with nothing created in either project. I did not trace the
+     early-advance-off slow path through `terminal_phase.py`; the gate refuses the scope before it
+     and `_resolve_storage_path` (`_safe_topic` or the root itself) stands behind it.
+   - **Found by the same check, not named by the review:** a goal's `slug` is stored from
+     `POST /comms/post` as given and the goal run and decompose later make
+     `pathly/features/<scope>/goals/<slug>` (and `os.makedirs` it) from it, so a chief could post
+     `slug: "../../../../proj-b/planted"` (red run: `test_a_goal_run_plants_nothing_for_a_stored_
+     slug_that_is_a_path`, 7 cases: `resolve_goal_home` handed the stored path back as the goal's
+     folder name and joined it under the project). Held
+     twice: the gate (`Fields.segments=("slug",)` on `/comms/post`: 403 `slug must be one folder
+     name`) and the sink (`supervisor/slug.py::ensure_goal_slug` ignores a stored slug that is not
+     a plain folder name and generates and stores a new one, so a goal posted with no token is
+     safe too).
+   - **(c) every other place a chief-reachable route turns a request string into a path**, read in
+     the code (a list, not a proof; also in the "Chief gate" section). **Guarded:** the board mirror
+     (gate and sink); `features/decompose` and the evaluator save (gate `segment`, and the routes'
+     `_is_unsafe_topic`); the goal `slug` (gate and sink); `fsm_ops._resolve_storage_path` for
+     `start_run` and `start_board_run` (`_safe_topic`, or the project root itself); the
+     `context_refs` of a post and `GET /comms/artifacts/<id>/section`
+     (`hydrate_helpers.safe_artifact_path`, a realpath containment check); a post's
+     `artifact_path`, the path recovered from an artifact post's text and `/code/query`'s `target`
+     (gate text containment; symlinks are not followed, said above); the `topic` of `/status` (read
+     against the database and the feature folder it names, behind `_safe_topic`); the `/db/*`
+     reads (rows filtered by the bound `project_root`, no file opened from the request);
+     `GET /skills/prompts` (a category filter; `_SEG_RE` on writes, which the gate does not
+     reach); the flows, menu, summary-format, catalog and `/api/*` reads (the database or an
+     allow-list); `/ops/export/skills` (configuration, not the request); static files (Flask's
+     own); the phase-summary fallback of `terminal_phase` (`.exists()` and a database event only).
+     **Not guarded at the sink:** `event_mirror.backfill_event_mirrors`, which joins the `feature`
+     of a stored event (kept as a basename by `eventlog.append_event`, or a `_safe_topic` topic from
+     `terminal_phase`; the gate holds the scope of `/runs` and `/comms/run` that feeds it); and
+     `goal_decomposer`, which joins the `scope` of the goal row it decomposes (the gate checks it
+     for a goal a chief posts, nothing checks it for a goal another writer posts: the same gap as
+     the unowned `goal_id`). Both are listed under **Shortcuts taken** and in the living doc.
+   - Tests: `tests/comms_board/test_board_mirror_scope.py` (new: the sink, 19 refused and 14
+     accepted spellings through `board_from_scope`, the dirty queue, `flush_dirty`,
+     `write_board_mirror` and `board_mirror_path`, the relative-traversal case end to end, and the
+     legitimate root) and `tests/http_api/test_chief_gate_mirror.py` (new: the post route for two
+     tiers x three boards x nine spellings, the fall-back-to-`feature` case, files planted in the
+     other project and in the chief's own tree, the tokenless route, `/runs` for three kinds x
+     three boards, the table walk, the own-root/foreign-root binding of every scope read, the
+     slug). The "nothing written" assertions exclude `~/.pathly` (the fake home holds the global
+     mirror in every test). The own-root/foreign-root test was added after the test-only commit,
+     because the mutation run (below) showed that dropping the path rule left the other tests green
+     (a path was still refused, as a bad folder name); it asserts the refusal text and that the
+     chief's own root passes.
+3. *minor, `/db/rollup`'s `by_project`.* "Not bound" item 2 now says the `global` block also lists
+   every project's root path with its cost and tokens (`by_project`), so a status chief can read
+   where the other projects are and what they spend. The entry's `note` in `chief_fields.py` says
+   it too. I did not drop the rows for a chief: that is a change to a read route the brief puts
+   outside this ticket.
+4. *minor, the id-addressed reads and the folder-name bullet.* `GET /comms/artifacts?message_id=`
+   is added to the id-addressed reads that no ticket owns (its entry has `unbound=("message_id",
+   "goal_id")`, which was right). The "A project board's scope" bullet no longer says an unknown
+   board is "not bound": a path is bound on every board and any other scope off the project board is
+   one folder name. The "A folder name" bullet now lists the three ways a request string becomes a
+   path (a decompose or evaluator folder, a stored `slug`, a scope that reaches the mirror), the
+   sink guards, and the list from (c); its tripwire sentence says the two tripwires miss a scope
+   that only reaches the mirror, and which rule holds it instead. `test_a_request_field_a_view_or_
+   helper_joins_into_a_path_is_declared_as_one` now counts a `segments` field as declared safe, and
+   the `segment`-scopes test says why only two routes are listed.
+5. *minor, ticket 14's first sentence.* I did not edit ticket 14 (not mine to edit). It is stale,
+   and `chief_bind` must stay consistent with `ROUTE_FIELDS`; both are under **For later tickets**.
+
+Tests I edited, not only added: `_PROJECT_ISH` in `test_a_view_and_the_helpers_it_calls_read_no_
+project_ish_field_its_entry_does_not_name` gains `slug` (the tripwire must see a field the table
+now declares), `path_safe` in `test_a_request_field_a_view_or_helper_joins_into_a_path_is_declared_
+as_one` gains `*fields.segments`, and a docstring on `test_the_segment_scopes_are_the_two_routes_
+that_make_a_folder_of_them`. A new test, `test_a_post_that_stores_a_slug_declares_it_a_folder_name`,
+holds the `slug` entry. No assertion was loosened.
+
+Proof after the fixes (each run fresh, after the last edit to code, tests and docs):
+
+- `python -m pytest tests/http_api/test_chief_gate.py -q -p no:cacheprovider` -> `97 passed in
+  28.09s`, exit 0. `python -m pytest tests/comms_board/test_comms_write_perm.py -q -p
+  no:cacheprovider` -> `33 passed in 7.65s`, exit 0. The whole chief set and the mirror tests,
+  `tests/http_api/test_chief_gate*.py tests/comms_board/test_board_mirror*.py` -> `1238 passed in
+  274.22s`.
+- Test first: at `0ab8cdb` (the source as it was at `56ba48c`), the three test files of that commit
+  gave `364 failed, 178 passed`, re-run today. Of the failures, `test_a_scope_that_is_a_path_is_
+  refused_on_every_board_but_the_project_board` 89, `test_a_run_cannot_name_a_path_as_the_scope_...`
+  81, `test_a_post_cannot_name_a_path_as_the_scope_...` 54, the sink tests (`write_board_mirror`,
+  `board_from_scope`, the dirty queue, `flush_dirty`, `board_mirror_path`, the end-to-end case) 93,
+  the slug tests 21, the post that falls back to a path `feature` 8, the file-planting tests (post,
+  run, and the tokenless route) 16, and two tripwire tests: 364. All pass with the fix.
+- Mutation checks (nine, each failing the named tests; the script restored every file and
+  `git status` is clean of them): the mirror reads any `/` as a project root; a feature scope
+  need not be a segment in `board_from_scope`; `write_board_mirror` skips `_scope_fits`;
+  `board_mirror_path` accepts a non-segment; `ensure_goal_slug` trusts a stored path slug; the gate
+  does not bind a path scope off the project board (this one **survived** the first run: a path was
+  still refused as a bad folder name, so I added `test_a_scope_that_is_a_path_is_bound_to_the_
+  chiefs_project_on_every_board`, which asserts the refusal text and that the own root passes, and
+  it now fails the mutation); a non-path scope off the project board need not be a segment; the
+  `segments` field is not checked; `/comms/post` no longer declares `slug`.
+- Test command from `commands.md` -> `2568 passed, 2 skipped in 533.94s (0:08:53)`, exit 0 (the 2
+  skips are not mine). `tests/consistency tests/local_operator tests/hq_copilot tests/storage_paths
+  tests/dag_goals` (the last two because `slug.py` and the mirror were touched) -> `451 passed in
+  75.49s`.
+- Lint chain from `commands.md`, piece by piece, all exit 0: `black --check src/ tests/` (602 files
+  unchanged), `mypy` (`no issues found in 326 source files`), `check_file_size.py` (`none new, none
+  grown`; `scope_names.py` 43, `board_mirror.py` 306, `slug.py` 111, `chief_fields.py` 363,
+  `chief_project.py` 204 lines), `check_no_mirror_reads.py`, `gen_test_index.py --check`,
+  `lint-imports` (`1 kept, 0 broken`), `bandit -q -r src/ -ll -x src/pathly_data/` (no SQL added),
+  `check_adapters.py`, `check_entry_points.py`. Smoke and `python -m build --wheel` exit 0. No
+  `# noqa`, `# nosec` or `type: ignore` added (grepped over the diff).
+
 **For later tickets**
 
 - Ticket 09: no change to the table is needed for `/chief/human-messages`. Its hook posts with no
@@ -675,8 +863,18 @@ Proof after the fixes (each run fresh, after the last edit to code, tests and do
   on `/runs` with `kind` `goal`; the task `message_id` on `/comms/tasks/run` and
   `/comms/tasks/stop`. Add them to ticket 14 or give them a ticket. Also unowned and unbound, but
   reads: `GET /runs/<run_id>`, `/runner/status`, `/status?topic=`, `/db/runs/<id>/cost`,
-  `/comms/artifacts/<id>/section` and `/comms/goals/refs-coverage`. The feature-board "context pull"
-  row (Shortcuts) is the other unbound write.
+  `/comms/artifacts/<id>/section`, `GET /comms/artifacts?message_id=` and
+  `/comms/goals/refs-coverage`. The feature-board "context pull" row (Shortcuts) and the sentinel
+  rows of the artifact-section read ("Reads are not all pure") are the other unbound writes.
+  Round 5: `chief_bind` and `ROUTE_FIELDS` must stay consistent. When ticket 14 binds an id, take
+  it off that entry's `unbound` in the same change (and off the "Not bound" list in the living
+  doc), and if the id also reaches a path (a `goal_id` whose row's `scope` `goal_decomposer` joins
+  into a folder, see Shortcuts) check it with `scope_names.is_segment`, since nothing else guards
+  that join. Ticket 14's **opening sentence** is stale as well as its first paragraph: it says
+  ticket 08 binds the chief only when the body or query string names `project_root`, but 08 also
+  binds board scopes (a path on every board, and a folder name off the project board), files and
+  the `slug` of a goal post, all through `ROUTE_FIELDS`. A builder of 14 should read the "Chief
+  gate" section, not that sentence. I did not edit ticket 14.
 - Ticket 15: `POST /runs` is the `("/runs", "POST")` entry; ticket 15's ceiling can key on it. The
   `GET /chief/session` route is already a `read` for the chief, so its new fields reach it.
 - Ticket 17: the chief's prompt must tell it to post with `"from": "chief"` and to name its
@@ -687,7 +885,10 @@ Proof after the fixes (each run fresh, after the last edit to code, tests and do
   403), in the body of `POST /runs/<run_id>/retry`, and in the query string of
   `/telemetry/trends` unless it names a feature; name the `feature` of
   `/comms/features/decompose` and the `scope` of a `/comms/run` on a feature or global board as one
-  plain folder name (no `/`, `\`, `:` or `..`); give the project root as `scope` on a
+  plain folder name (no `/`, `\`, `:` or `..`); the same holds since round 5 for the `scope` or
+  `feature` of every other call on a board that is not `project` (a path there must be exactly the
+  chief's own root, and anything else is one folder name), and for the `slug` of a goal post
+  (one folder name, or leave it out); give the project root as `scope` on a
   project-board post, search, read or run (a missing scope is read as `feature`, which is a
   feature board, and a feature name given for a project board is 403); use a parenthesized scope such as `(interactive)` on `/code/query` (a feature name
   is 403) and a `target` inside the project; give `artifact_path` as an absolute path inside the

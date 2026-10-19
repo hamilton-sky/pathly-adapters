@@ -23,8 +23,14 @@ What an entry can say:
   ``<action>`` verbs listed (``/runs/<run_id>/retry`` starts a run in the directory its body names;
   the other verbs act on the run's own state).
 * ``scopes``: a board scope the route reads (see ``ScopeRead``). On the project board the scope
-  is the project root, so it must be the chief's own; ``segment`` marks a scope the route also
-  joins into a path, which must then be one folder name.
+  is the project root, so it must be the chief's own. On any other board a scope that is a path
+  is a project root to the board mirror (it writes ``<scope>/pathly/project/BOARD.json``), so it
+  must be the chief's own too, and any other scope is one folder name; ``segment`` marks a scope
+  the route also joins into a folder it makes, which must then be one folder name even when it
+  is the chief's own root.
+* ``segments``: a field the route stores and the server later joins into a folder name (the
+  ``slug`` of a goal post, which the goal run and decompose make ``goals/<slug>`` of). One
+  folder name: no ``/``, ``\\``, ``:`` or ``..``.
 * ``paths`` / ``abs_paths`` / ``text_paths``: a file the route reads or stores. It must lie inside
   the chief's project.
 * ``under_root``: a feature or other name the route reads together with ``project_root`` (its
@@ -55,9 +61,13 @@ class ScopeRead:
     board is ``project``; ``skip_exact`` and ``skip_prefix`` name values the route does not use
     as a scope (a ``(interactive)`` marker, the ``project`` literal of the decompose override).
 
+    On a board other than ``project`` a scope that is a path (``/``, ``\\`` or a drive prefix)
+    must still be the chief's own root, because the board mirror reads such a scope as a project
+    root whatever board the row was posted to, and any other scope must be one folder name.
     ``segment`` is for a scope the route also joins into ``<project_root>/pathly/features/<scope>``:
     on a board other than ``project`` it must be one folder name (no ``/``, ``\\``, ``:``, ``.``
-    or ``..``), or the folder it makes or writes into can lie in another project.
+    or ``..``) even when it is the chief's own root, or the folder it makes or writes into can lie
+    in another project.
     """
 
     keys: tuple[str, ...]
@@ -86,6 +96,7 @@ class Fields:
     paths: tuple[str, ...] = ()
     abs_paths: tuple[str, ...] = ()
     text_paths: tuple[TextPath, ...] = ()
+    segments: tuple[str, ...] = ()
     under_root: tuple[str, ...] = ()
     unbound: tuple[str, ...] = ()
     names_root: bool = False
@@ -96,7 +107,13 @@ class Fields:
 
     def declared(self) -> frozenset[str]:
         """Every request field this entry names."""
-        found = {*self.roots, *self.paths, *self.abs_paths, *self.unbound}
+        found = {
+            *self.roots,
+            *self.paths,
+            *self.abs_paths,
+            *self.segments,
+            *self.unbound,
+        }
         found.update(self.under_root, self.names_root_when, self.names_root_unless)
         for read in self.scopes:
             found.update(read.keys)
@@ -146,6 +163,8 @@ ROUTE_FIELDS: Mapping[tuple[str, str], Fields] = MappingProxyType(
             # A path the row keeps, and `GET /comms/artifacts/<id>/section` later reads whole.
             abs_paths=("artifact_path",),
             text_paths=(TextPath("artifact_path", "text", "artifact"),),
+            # A goal's `slug` is stored as sent and becomes the folder `goals/<slug>`.
+            segments=("slug",),
             unbound=("goal_id", "run_id"),
         ),
         ("/comms/goals/decompose", "POST"): Fields(
@@ -247,7 +266,9 @@ ROUTE_FIELDS: Mapping[tuple[str, str], Fields] = MappingProxyType(
             roots=_ROOT,
             names_root=True,
             under_root=("feature",),
-            note=_FLEET + "its `global` block sums every project",
+            note=_FLEET
+            + "its `global` block sums every project and lists each one's root path and "
+            "cost (`by_project`)",
         ),
         ("/db/features/<feature>/agents", "GET"): Fields(
             roots=_ROOT, names_root=True, under_root=("feature",)

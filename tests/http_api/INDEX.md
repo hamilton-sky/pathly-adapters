@@ -4,7 +4,7 @@
 
 HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, prompt-event contract.
 
-28 test file(s).
+29 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -17,10 +17,11 @@ HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, 
 | `test_chief_gate_bodies.py` | chief-agent 08: the gate reads the body the way the route will | 12 |
 | `test_chief_gate_files.py` | chief-agent 08: a file a chief names must be inside its project | 8 |
 | `test_chief_gate_folders.py` | chief-agent 08: a name a route makes a folder of is one folder name | 9 |
+| `test_chief_gate_mirror.py` | chief-agent 08 (round 5): a request string that becomes part of a filesystem path | 14 |
 | `test_chief_gate_project_scope.py` | chief-agent 08: a board named by ``scope`` is bound to the chief's project | 9 |
 | `test_chief_gate_requests.py` | chief-agent 08: HEAD, redirects, lookalike paths and methods no route has | 5 |
 | `test_chief_gate_root_naming.py` | chief-agent 08: a route that falls back to another project must be told which | 12 |
-| `test_chief_gate_tables.py` | chief-agent 08: the field table is complete and says what each route reads | 13 |
+| `test_chief_gate_tables.py` | chief-agent 08: the field table is complete and says what each route reads | 14 |
 | `test_chief_gate_unbound_reads.py` | chief-agent 08: the reads that are fleet-wide say so, and no more | 4 |
 | `test_chief_routes.py` | chief-agent 07: POST /chief/open, POST /chief/close and GET /chief/session | 32 |
 | `test_config.py` | Tests for Settings.from_env() — specifically bind-host validation | 8 |

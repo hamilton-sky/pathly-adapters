@@ -638,8 +638,10 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
   source of every such view **and the helpers it calls** under `blueprints/` (`create_run`,
   `handle_retry`, `_dispatch_*`): one for a request field they read (`.get("x")` or `["x"]`) that
   the entry does not name, one for a field they use as an argument of a path call that the entry
-  does not declare as a file or a folder name. They are heuristics (a helper that renames the value
-  is not seen), not proofs.
+  does not declare as a file or a folder name (`paths`, `abs_paths`, a `segment` scope or a
+  `segments` field). They are heuristics (a helper that renames the value is not seen), not proofs;
+  a scope that only reaches the board mirror, with no path call in the view, is not seen by them,
+  and is held by the scope rule below and by the mirror's own check instead.
 - **Overrides.** A body with a non-empty `prompt_override` or `stage_overrides`, on any route,
   also needs `run` (the 403 names `run`): the Planner may call the decompose routes but cannot
   hand verbatim prompt text to the agents they start.
@@ -676,11 +678,17 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
     keys the route reads, as the view's `scope or feature` does (`/comms/post`, `/comms/search`
     and the board reads `GET /comms`, `/comms/tasks`, `/comms/goals` take `scope`, else
     `feature`; `/comms/artifacts`, `/comms/run/status`, `/runs`, `/comms/run` and
-    `/comms/run/stop` take `scope` only). A missing or unknown `board` is `feature`, which is not
-    bound. So a project-board post, search or read gives its own root as `scope`. A scope with no
-    `board` (`GET /comms/trash`, `/hq/context`'s `board`, the `scope` or `feature` of
-    `/comms/artifacts/section` and `/comms/artifacts/<id>/section`) is a project root when it looks
-    like a path (a `/`, a `\` or a drive prefix) and is then bound; otherwise it is a feature name.
+    `/comms/run/stop` take `scope` only). A missing or unknown `board` is `feature`. So a
+    project-board post, search or read gives its own root as `scope`. **A scope that looks like a
+    path (a `/`, a `\` or a drive prefix) is bound on every board**, not only on `project`: the
+    board mirror (`board_mirror.py`, a DB-to-disk export that runs on every broadcast, with or
+    without a chief token) reads such a scope as a project root and writes
+    `<scope>/pathly/project/BOARD.json`, so a feature or global board post of `scope:
+    "/abs/proj-b"` or `"../../proj-b"` would plant a file in another project (or relative to the
+    server's working directory). On a board other than `project`, any other scope is one folder
+    name (below). A scope with no `board` (`GET /comms/trash`, `/hq/context`'s `board`, the
+    `scope` or `feature` of `/comms/artifacts/section` and `/comms/artifacts/<id>/section`) is a
+    project root when it looks like a path and is then bound; otherwise it is one folder name.
     `/code/query` logs a `discovery` row on the project board at its `scope` or `feature`, so that
     is bound unless it is blank or a parenthesized marker such as `(interactive)`; the `project`
     override of `/comms/project/decompose` is a project-board scope (the literal `project` means
@@ -691,17 +699,47 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
     an `artifact` post takes from its `text` when `artifact_path` is blank (always relative, so
     refused) must lie under the session's root once their `..` segments are collapsed. This is a
     text check: symlinks are not followed and a Windows drive letter is compared as written.
-  - **A folder name.** `POST /comms/features/decompose` makes `<project_root>/pathly/features/
-    <feature>` and hands it to the run as its storage path, and `POST /comms/run` of an
-    evaluator on a feature or global board saves a reply that posted no BOARD_EVAL artifact under
+  - **A folder name.** A request string becomes part of a path in three ways, and the gate holds
+    each. (1) `POST /comms/features/decompose` makes `<project_root>/pathly/features/<feature>`
+    and hands it to the run as its storage path, and `POST /comms/run` of an evaluator on a
+    feature or global board saves a reply that posted no BOARD_EVAL artifact under
     `<project_root>/pathly/features/<scope>/artifacts/`. So the `feature` of the first and the
     `scope` of the second (on a board other than `project`) must be one folder name: a string with
-    no `/`, `\`, `:` or NUL, and not `.` or `..` (`ScopeRead.segment`); the 403 names the field.
-    The routes refuse the same class themselves, from `storage_paths._is_unsafe_topic` (empty,
-    absolute, backslash or colon, a `..` segment, a reserved name): `features/decompose` answers
-    400 `invalid_feature`, and `/comms/run` skips the save for such a scope (the board gets the
-    usual warning). They still accept a nested `a/b` that stays inside the project; the gate does
-    not.
+    no `/`, `\`, `:` or NUL, and not `.` or `..` (`ScopeRead.segment`, which also refuses the
+    chief's own root there); the 403 names the field. The routes refuse the same class themselves,
+    from `storage_paths._is_unsafe_topic` (empty, absolute, backslash or colon, a `..` segment, a
+    reserved name): `features/decompose` answers 400 `invalid_feature`, and `/comms/run` skips the
+    save for such a scope (the board gets the usual warning). They still accept a nested `a/b`
+    that stays inside the project; the gate does not. (2) A `goal` post's `slug` is stored on the
+    row and the goal run and decompose later make `pathly/features/<scope>/goals/<slug>` of it
+    (`supervisor/slug.py::ensure_goal_slug`, `goal_decomposer`), so `/comms/post` declares it in
+    `Fields.segments` and the gate refuses a `slug` that is not one folder name; `ensure_goal_slug`
+    ignores a stored slug that is not one (`scope_names.is_segment`) and generates a new one, for
+    a row some other writer posted. (3) A scope that only reaches the board mirror, any route that
+    posts to a board (see "A project board's scope"): the gate holds it with the path rule above,
+    and the mirror holds it itself, in `board_mirror.py`, for a caller the gate does not see. The
+    mirror answers a normalised absolute project root on the project board and one folder name
+    on a feature board, and ignores any other scope (`board_from_scope` returns None, so
+    `mark_board_dirty_by_scope` queues nothing, `write_board_mirror` returns False and
+    `board_mirror_path` is None). Both predicates are in `scope_names.py` (`is_project_root`,
+    `is_segment`); a legitimate root (POSIX or `C:/...`, spaces and unicode) and a feature name
+    (dots, spaces, unicode) are accepted as before.
+  - **Other places a request string becomes a path.** Read in round 4 (reading code, not a
+    proof). Held: the board mirror (above), `features/decompose` and the evaluator save (gate and
+    `_is_unsafe_topic`), the goal `slug` (gate and `ensure_goal_slug`),
+    `fsm_ops._resolve_storage_path` (`_safe_topic` or the project root itself) for `start_run` and
+    `start_board_run`, `context_refs` and `GET /comms/artifacts/<id>/section`
+    (`hydrate_helpers.safe_artifact_path`, a realpath containment check), the artifact path of a
+    post and the target of `/code/query` (gate text containment; symlinks are not followed), the
+    `topic` of `/status`, the `/db/*` reads (they filter rows by the bound `project_root`, they
+    open no file), `GET /skills/prompts` (a category filter; `_SEG_RE` on writes) and the
+    flows, menu, catalog and `/api/*` reads (the database or an allow-list). **Not held at the
+    sink:** `event_mirror.backfill_event_mirrors` joins the `feature` of a stored event
+    (`eventlog.append_event` keeps its basename; `terminal_phase` passes a `_safe_topic` topic),
+    so it relies on the gate's hold on `/runs` and `/comms/run`; and `goal_decomposer` joins the
+    `scope` of the goal row it decomposes, which the gate checks for a goal a chief posted and
+    nobody checks for a goal another writer posted (the same id-addressed gap as `goal_id`
+    under "Not bound").
   - On `/comms/post`, a `from` other than `chief` (or none) is 403.
   - **Not bound.** The table lists these as `unbound` rather than leaving them out. (1) Calls that
     name their target by id or by name: `goal_id` (`/comms/goals/run|stop|decompose`, `/runs` with
@@ -712,9 +750,11 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
     `/runs/<run_id>/stop|<action>`, the message ids of `/comms/acknowledge|answer|supersede` and
     the `topic` of `/runner/agent-answer`; `goal_id`, task ids and the id-addressed reads (`GET
     /runs/<run_id>`, `/runner/status`, `/status?topic=`, `/db/runs/<id>/cost`,
-    `/comms/artifacts/<id>/section`, `/comms/goals/refs-coverage`) have no ticket yet. (2) Routes
-    that are fleet-wide and have no project filter to bind: `GET /db/rollup`'s `global` block
-    (it sums every project whatever `project_root` says), `GET /db/stats`'s `features`, `events`
+    `/comms/artifacts/<id>/section`, `/comms/artifacts?message_id=`, `/comms/goals/refs-coverage`)
+    have no ticket yet. (2) Routes that are fleet-wide and have no project filter to bind: `GET
+    /db/rollup`'s `global` block (it sums every project whatever `project_root` says, and its
+    `by_project` lists every project's root path with its cost and tokens, so a status chief can
+    read where the other projects are and what they spend), `GET /db/stats`'s `features`, `events`
     and `invocations` counts (global; only its token and cost totals follow `project_root`),
     `GET /telemetry/trends` with a named feature (summed across projects), and `GET /metrics`
     and `/metrics/json` (server counters). A status chief can read those, and so can every other
@@ -741,11 +781,17 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
   session's are 403 (the lists above). The reads that cannot be bound are the ones under "Not
   bound": id-addressed reads, the fleet-wide aggregates, and a feature name.
 - **Reads are not all pure.** The gate treats every GET (and `POST /comms/search`,
-  `/code/query`) as `read`, so a status chief can cause four small writes: `GET
+  `/code/query`) as `read`, so a status chief can cause five small writes: `GET
   /comms/artifacts/section?scope=<feature>&trail=x` posts a `status` row ("context pull") on that
   feature's board when the hydrate succeeds (feature boards are keyed by feature name only, so the
   gate cannot bind the feature name to a project, but it does bind the `project_root` the section
-  is read from); `GET /menu/<name>` broadcasts a menu push over SSE; `POST /code/query` can start a
+  is read from); the same route, with no `trail` at all, inserts a sentinel `comms_messages` row
+  (board `feature`, the scope the caller gives, from `system`, type `artifact`), a
+  `comms_artifacts` row and a section index for a file it hydrates that exists under a
+  `pathly/features|plans|goals|project/` folder of the project it names (bound), at any feature
+  scope the caller names, once per file and scope, so this write needs no `trail` (`ensure_indexed`
+  and `find_or_create_artifact_by_path`; the scope is held by the path rule above, and the hydrate
+  path is unchanged); `GET /menu/<name>` broadcasts a menu push over SSE; `POST /code/query` can start a
   debounced re-index of the project it names (bound above) and logs a `discovery` row (bound
   above); and `GET /skills/prompts` without a `kind` (or with `kind=preset`) runs the one-time,
   idempotent migration of legacy preset rows in the database into prompt files, which writes the

@@ -289,14 +289,19 @@ def test_a_request_field_a_view_or_helper_joins_into_a_path_is_declared_as_one(a
     """A tripwire for round 3 finding 2: ``feature`` was listed as an id (a board name) while the
     route joined it into ``<project_root>/pathly/features/<feature>``. A field of the entry that a
     view or helper uses as an argument of a path call must be a file (``paths``, ``abs_paths``)
-    or a folder name (a ``segment`` scope). The match is by variable name, so it sees a helper
-    that keeps the request's name for the value, as these do.
+    or a folder name (a ``segment`` scope, or a ``segments`` field). The match is by variable
+    name, so it sees a helper that keeps the request's name for the value, as these do.
     """
     from pathly_orchestrator.http_server.chief_fields import ROUTE_FIELDS
 
     undeclared = {}
     for (rule_text, method), fields in ROUTE_FIELDS.items():
-        path_safe = {*fields.paths, *fields.abs_paths, "project_root"}
+        path_safe = {
+            *fields.paths,
+            *fields.abs_paths,
+            *fields.segments,
+            "project_root",
+        }
         for read in fields.scopes:
             if read.segment:
                 path_safe.update(read.keys)
@@ -313,6 +318,11 @@ def test_a_request_field_a_view_or_helper_joins_into_a_path_is_declared_as_one(a
 
 
 def test_the_segment_scopes_are_the_two_routes_that_make_a_folder_of_them():
+    """A ``segment`` scope is for a route that joins the scope into a folder it makes. A scope
+    that only reaches the board mirror is held by the rule every scope gets (a path is the
+    chief's own root, anything else off the project board is one folder name) and by the
+    mirror's own check, so it is not listed here.
+    """
     from pathly_orchestrator.http_server.chief_fields import ROUTE_FIELDS
 
     segments = {

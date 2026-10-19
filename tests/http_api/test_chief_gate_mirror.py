@@ -291,6 +291,33 @@ def test_a_scope_that_is_a_path_is_refused_on_every_board_but_the_project_board(
 
 
 @pytest.mark.parametrize("rule,method,read", _scope_reads())
+def test_a_scope_that_is_a_path_is_bound_to_the_chiefs_project_on_every_board(
+    project, other_project, rule, method, read
+):
+    """The mirror reads the path as a project root, so the gate binds it like one: the chief's
+    own root passes and another project's is refused as another project's. A scope the route
+    makes a folder of (``segment``) is refused whichever root it is, as a bad folder name.
+    """
+    from pathly_orchestrator.http_server.chief_project import NOT_A_SEGMENT, NOT_OWN
+
+    for board in _boards_of(read):
+        base = {"project_root": str(project)}
+        if board:
+            base[read.board_key] = board
+        key = read.keys[0]
+
+        other = _refusal(rule, method, project, **base, **{key: str(other_project)})
+        own = _refusal(rule, method, project, **base, **{key: str(project)})
+
+        if read.segment:
+            assert other == f"{key} {NOT_A_SEGMENT}", (rule, board, other)
+            assert own == f"{key} {NOT_A_SEGMENT}", (rule, board, own)
+        else:
+            assert other == NOT_OWN, (rule, method, board, other)
+            assert own is None, (rule, method, board, own)
+
+
+@pytest.mark.parametrize("rule,method,read", _scope_reads())
 @pytest.mark.parametrize("scope", PLAIN_SCOPES)
 def test_a_plain_name_is_not_refused_as_a_scope_on_any_route(
     project, rule, method, read, scope

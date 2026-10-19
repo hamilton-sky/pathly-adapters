@@ -6,8 +6,12 @@ query string of a GET, the way the view reads them. A value is the chief's own w
 string that ``normalise_project_root`` maps to the session's root (forward slashes, no trailing
 slash); anything else, a non-string included, is not. A file is the chief's own when it lies
 under that root after its ``..`` segments are collapsed (text only: symlinks are not followed,
-and a Windows drive letter is compared as written). A name the route joins into a path (a scope
-marked ``segment``) is one folder name: no separator, no drive colon, not ``.`` or ``..``.
+and a Windows drive letter is compared as written). A scope that is a path (a ``/``, a ``\\`` or a
+drive prefix) is a project root whatever board it is posted to, because the board mirror reads it
+as one, so it must be the chief's own on every board; any other scope off the project board, a
+scope marked ``segment`` (the route makes a folder of it, so even the chief's own root is refused)
+and a ``segments`` field (a goal's ``slug``) are one folder name: no separator, no drive colon,
+not ``.`` or ``..`` (``scope_names.is_segment``, the predicate the board mirror applies).
 
 A route with no entry is refused, so a route added without one is not passed by default.
 """
@@ -18,12 +22,13 @@ import posixpath
 import re
 from typing import Mapping
 
+from pathly_orchestrator.scope_names import is_segment
+
 from .chief_fields import ROUTE_FIELDS, Fields, ScopeRead, TextPath
 
 ROOT_KEY = "project_root"
 _BOARDS = ("feature", "project", "global")
 _DRIVE = re.compile(r"^[A-Za-z]:")
-_SEGMENT_BREAKERS = "/\\:\0"
 
 NOT_OWN = "that is not this chief's project"
 NOT_NAMED = "a chief names its project_root on this route"
@@ -69,29 +74,27 @@ def _first_usable(source: Mapping, read: ScopeRead) -> tuple[str, object] | None
     return None
 
 
-def _not_a_segment(value: object) -> bool:
-    """True when ``value`` cannot be one folder name (a non-string cannot, for the route)."""
+def _skipped(value: object, read: ScopeRead) -> bool:
+    """True for a value the route does not use as a scope (a ``(marker)``, a literal)."""
     if not isinstance(value, str):
-        return True
+        return False
     text = value.strip()
-    return text in (".", "..") or any(c in text for c in _SEGMENT_BREAKERS)
+    return text in read.skip_exact or text.startswith(read.skip_prefix)
 
 
-def _bound_scope(source: Mapping, read: ScopeRead) -> object:
-    """The scope the route will use if it is one the chief's project must own, else None."""
+def _scope_refusal(source: Mapping, read: ScopeRead, own: str) -> str | None:
+    """The reason the scope a route takes from ``source`` is not for this chief's project."""
     found = _first_usable(source, read)
-    if found is None:
+    if found is None or _skipped(found[1], read):
         return None
-    value = found[1]
-    if isinstance(value, str):
-        text = value.strip()
-        if text in read.skip_exact or text.startswith(read.skip_prefix):
-            return None
+    key, value = found
     board = _board(source, read)
-    if board is None:
-        # A bare scope id is a project root when it looks like a path; else a feature name.
-        return None if isinstance(value, str) and not _path_like(value) else value
-    return value if board == "project" else None
+    if read.segment and board != "project" and not is_segment(value):
+        return f"{key} {NOT_A_SEGMENT}"
+    if board == "project" or not isinstance(value, str) or _path_like(value):
+        # The project board's scope is its root; a path on any board is a root to the mirror.
+        return None if is_own(value, own) else NOT_OWN
+    return None if is_segment(value) else f"{key} {NOT_A_SEGMENT}"
 
 
 def _under(path: str, own: str, anchored: bool) -> bool:
@@ -190,12 +193,12 @@ def project_refusal(
     if _unnamed_root(fields, source, view_args or {}):
         return NOT_NAMED
     for read in fields.scopes:
-        scope = _bound_scope(source, read)
-        if scope is not None and not is_own(scope, own):
-            return NOT_OWN
-        found = _first_usable(source, read) if read.segment else None
-        if found and _board(source, read) != "project" and _not_a_segment(found[1]):
-            return f"{found[0]} {NOT_A_SEGMENT}"
+        refusal = _scope_refusal(source, read, own)
+        if refusal is not None:
+            return refusal
+    for key in fields.segments:
+        if _usable(source.get(key)) and not is_segment(source.get(key)):
+            return f"{key} {NOT_A_SEGMENT}"
     if _foreign_file(fields, source, own):
         return NOT_INSIDE
     return None
