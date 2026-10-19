@@ -33,6 +33,10 @@ class Variant:
     # the registry forgets, a task that is claimed). A value of ``data`` that is a function is
     # called at the same moment, for a name that must be new each time.
     prepare: Callable[[], None] | None = None
+    # The key of ``data`` whose value (the hostile one, when that key is under test) is the
+    # scope of the feature board a run is holding when the request arrives: a stop route does
+    # its work only for a board someone holds.
+    holds: str = ""
 
 
 def settle(timeout: float = 5.0) -> None:
@@ -66,6 +70,11 @@ class World:
         self.empty_goal = self.post("goal", text="Nothing planned yet")
         self.task = self.post("task", text="Write it", goal_id=self.goal)
         self.note = self.post("status", text="a note")
+        (project / "src").mkdir()
+        (project / "src" / "x.py").write_text("def a_function():\n    return 1\n")
+        self.project_decision = self.post(
+            "decision", board="project", scope=str(project), text="use the project way"
+        )
         self.decision_a = self.post("decision", text="use A")
         self.decision_b = self.post("decision", text="use B")
         self.question = self.post(
@@ -113,6 +122,12 @@ class World:
     def fresh_task(self) -> str:
         return self.post("task", text="Write it again", goal_id=self.goal)
 
+    def fresh_project_decision(self) -> str:
+        """A decision on the chief's own project board, which nothing has superseded."""
+        return self.post(
+            "decision", board="project", scope=str(self.project), text="an old way"
+        )
+
     def fresh_name(self, stem: str) -> str:
         return f"{stem}-{next(self.counter)}"
 
@@ -132,6 +147,37 @@ class World:
             status=status,
         )
 
+    def hold_board(self, scope: str = DEMO, run_id: str = "run-audit") -> None:
+        """Make ``run_id`` the holder of the feature board ``scope`` and of no other."""
+        from pathly_orchestrator.supervisor import board_lock
+
+        board_lock._held.clear()
+        board_lock.acquire("feature", scope, run_id)
+
+    def register_asking_run(self) -> None:
+        """A run of the registry that has asked its human a question and waits for the answer."""
+        from pathly_orchestrator.supervisor import registry
+        from pathly_orchestrator.supervisor.state import RunnerState
+
+        registry._registry["audit-asking"] = RunnerState(
+            topic="audit-asking",
+            flow="team",
+            project_root=str(self.project),
+            model="m",
+            timeout=60,
+            run_id="run-asking",
+            status="running",
+        )
+        registry._registry["audit-asking"]._awaiting_agent_answer = True
+
+    def forget_code_answers(self) -> None:
+        """The query cache would answer a repeated query without calling the backend."""
+        from pathly_orchestrator.http_server.blueprints.code import query
+        from pathly_orchestrator.runner import code_context_cli
+
+        query._QUERY_CACHE.clear()
+        code_context_cli._CLI_CACHE.clear()
+
     def root(self) -> dict:
         return {"project_root": str(self.project)}
 
@@ -139,11 +185,15 @@ class World:
 
     def variants(self, rule: str, method: str) -> list[Variant]:
         root = self.root()
-        maker = _POST.get(rule) if method == "POST" else _GET.get(rule)
+        from chief_audit_calls import POST_VARIANTS
+        from chief_audit_reads import GET_VARIANTS
+
+        maker = POST_VARIANTS.get(rule) if method == "POST" else GET_VARIANTS.get(rule)
         if maker is None:
             return [Variant("default", dict(root))]
         return [
-            Variant(v.label, {**root, **v.data}, v.url, v.prepare) for v in maker(self)
+            Variant(v.label, {**root, **v.data}, v.url, v.prepare, v.holds)
+            for v in maker(self)
         ]
 
     def request(self, rule: str, method: str, variant: Variant, key, value, headers):
@@ -163,6 +213,8 @@ class World:
         for name, val in url.items():
             text = quote(str(val), safe="")
             path = path.replace(f"<path:{name}>", text).replace(f"<{name}>", text)
+        if variant.holds:
+            self.hold_board(str(data.get(variant.holds)))
         if method == "GET":
             return self.client.get(
                 path, query_string=_query(data), headers=headers or {}
@@ -195,185 +247,4 @@ _SHAPES = {
     "options": lambda v: [{"id": v, "label": v}],
     "stage_overrides": lambda v: {v: v},
     "no_refs": lambda v: v,
-}
-
-
-def _post_variants(world: World) -> list[Variant]:
-    base = {"from": "chief", "feature": DEMO, "text": "hello"}
-    return [
-        Variant("status", {**base, "type": "status"}),
-        Variant(
-            "goal",
-            {**base, "type": "goal", "slug": lambda: world.fresh_name("ship")},
-        ),
-        Variant(
-            "task",
-            {
-                **base,
-                "type": "task",
-                "goal_id": world.goal,
-                "files": ["src/x.py"],
-                "lane": "a",
-                "executor": "single",
-                "no_refs": "none yet",
-            },
-        ),
-        Variant(
-            "artifact",
-            {
-                **base,
-                "type": "artifact",
-                "artifact_path": str(world.plan),
-                "artifact_type": "PLAN",
-                "summary": "the plan",
-            },
-        ),
-        Variant(
-            "decision",
-            {**base, "type": "decision", "supersedes": [world.decision_a]},
-        ),
-        Variant(
-            "question",
-            {**base, "type": "question", "options": [{"id": "a", "label": "A"}]},
-        ),
-    ]
-
-
-def _goal_run(world: World) -> list[Variant]:
-    return [
-        Variant(executor, {"goal_id": world.goal, "executor": executor})
-        for executor in ("team", "loop", "single")
-    ]
-
-
-def _runs(world: World) -> list[Variant]:
-    return [
-        Variant("flow", {"kind": "flow", "flow": "team", "scope": DEMO}),
-        Variant("single", {"kind": "single", "scope": DEMO, "board": "feature"}),
-        Variant("goal", {"kind": "goal", "goal_id": world.goal, "scope": DEMO}),
-    ]
-
-
-def _run_verbs(world: World) -> list[Variant]:
-    retry = {
-        "flow": "team",
-        "max_iterations": 3,
-        "max_cost_usd": 1,
-        "model": "m",
-        "adapter": "claude",
-        "stage": "BUILDING",
-    }
-    return [
-        Variant(
-            verb,
-            retry,
-            {"run_id": "run-audit", "action": verb},
-            lambda status=(
-                "done" if verb == "retry" else "running"
-            ): world.register_run(status),
-        )
-        for verb in ("pause", "resume", "advance", "reroute", "retry", "abort")
-    ]
-
-
-def _comms_run(world: World) -> list[Variant]:
-    return [
-        Variant(
-            "evaluator",
-            {"board": "global", "scope": "audit-board", "mode": "evaluator"},
-        ),
-        Variant(
-            "skill",
-            {
-                "board": "feature",
-                "scope": DEMO,
-                "mode": "single-agent",
-                "skill": "planning/evaluate",
-            },
-        ),
-    ]
-
-
-_POST = {
-    "/comms/search": lambda w: [
-        Variant("search", {"query": "export", "feature": DEMO})
-    ],
-    "/code/query": lambda w: [
-        Variant("query", {"op": "symbol", "target": "src/x.py", "scope": "(audit)"})
-    ],
-    "/comms/post": _post_variants,
-    "/comms/goals/decompose": lambda w: [
-        Variant("planner", {"goal_id": w.empty_goal, "mode": "planner"}),
-        Variant("consultation", {"goal_id": w.empty_goal, "mode": "consultation"}),
-    ],
-    "/comms/features/decompose": lambda w: [
-        Variant("light", {"feature": "audit-feature", "rigor": "light"})
-    ],
-    "/comms/project/decompose": lambda w: [Variant("light", {"rigor": "light"})],
-    "/comms/acknowledge": lambda w: [
-        Variant("ack", {"message_id": w.note, "agent": "chief"})
-    ],
-    "/comms/supersede": lambda w: [
-        Variant("supersede", {"old_id": w.decision_a, "new_id": w.decision_b})
-    ],
-    "/runs": _runs,
-    "/comms/goals/run": _goal_run,
-    "/comms/run": _comms_run,
-    "/comms/tasks/run": lambda w: [Variant("task", {"message_id": w.fresh_task})],
-    "/runs/<run_id>/<action>": _run_verbs,
-    "/runs/<run_id>/stop": lambda w: [
-        Variant("stop", {}, {"run_id": "run-audit"}, lambda: w.register_run("running"))
-    ],
-    "/comms/goals/stop": lambda w: [Variant("stop", {"goal_id": w.goal})],
-    "/comms/run/stop": lambda w: [Variant("stop", {"scope": DEMO})],
-    "/comms/tasks/stop": lambda w: [Variant("stop", {"message_id": w.task})],
-    "/runner/agent-answer": lambda w: [
-        Variant("answer", {"topic": DEMO, "answer": "yes"})
-    ],
-    "/comms/answer": lambda w: [
-        Variant(
-            "answer",
-            {"question_id": w.question, "option_id": "a", "answer": "A"},
-        )
-    ],
-}
-
-_GET = {
-    "/comms/artifacts/<artifact_id>/section": lambda w: [
-        Variant(
-            "by id",
-            {"scope": DEMO, "anchor": "scope", "trail": "t"},
-            {"artifact_id": w.artifact_id()},
-        ),
-        Variant(
-            "another project's",
-            {"scope": DEMO},
-            {"artifact_id": w.foreign_id},
-        ),
-    ],
-    "/comms/artifacts/section": lambda w: [
-        Variant(
-            "by path",
-            {
-                "artifact": f"pathly/features/{DEMO}/PLAN.md",
-                "scope": DEMO,
-                "anchor": "scope",
-                "trail": "t",
-            },
-        )
-    ],
-    "/status": lambda w: [Variant("status", {"topic": DEMO})],
-    "/runner/status": lambda w: [Variant("status", {"topic": DEMO})],
-    "/comms": lambda w: [Variant("board", {"feature": DEMO})],
-    "/comms/tasks": lambda w: [Variant("tasks", {"feature": DEMO, "goal_id": w.goal})],
-    "/comms/goals": lambda w: [Variant("goals", {"feature": DEMO})],
-    "/comms/artifacts": lambda w: [
-        Variant("artifacts", {"scope": DEMO, "message_id": w.artifact})
-    ],
-    "/comms/goals/refs-coverage": lambda w: [Variant("coverage", {"goal_id": w.goal})],
-    "/comms/run/status": lambda w: [Variant("status", {"scope": DEMO})],
-    "/hq/context": lambda w: [Variant("packet", {"board": DEMO})],
-    "/flows/stage-config": lambda w: [
-        Variant("stage", {"feature": DEMO, "stage": "BUILDING"})
-    ],
 }

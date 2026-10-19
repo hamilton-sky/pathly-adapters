@@ -1,29 +1,39 @@
-"""chief-agent 08 (round 6): a chief that sends hostile values touches nothing outside its project.
+"""chief-agent 08 (rounds 6 and 7): a chief that sends hostile values touches nothing outside its
+project.
 
 The earlier rounds read the code for the places a request string becomes a path and listed them.
 This test does not rely on that list. It runs the server for real (the spawn host is faked, the
-database is the test's), puts every key a chief may send to every route through hostile values
-(``..``, a climbing path, an absolute path into another project, into the server's directory and
-into the home directory, a UNC path, a drive letter, a NUL, a trailing slash, a very long name), as
-a status, a planner and an operator chief, and records every file system call the process makes
-(``chief_audit_support``). It asserts that none fell in another project's tree, the server's
+database is the test's), puts every key a chief may send to every route through hostile values,
+as a status, a planner and an operator chief, and records every file system call the process
+makes (``chief_audit_support``). It asserts that none fell in another project's tree, the server's
 working directory or the home directory.
 
-The static test (``test_chief_gate_keys.py``) holds the other half: the list of keys is complete.
-What this one cannot see is in ``chief_audit_support``'s docstring (a probe with ``os.stat`` is
-not an audit event), and it only sends the requests ``chief_audit_world`` builds: a route reached
-by none of them is only as deep as its first check.
+What is sent to which key, at every tier (``hostile_values``, ``PLAIN_VALUES``):
+
+* a key of a kind that can reach a file or a folder (``chief_field_types.FILE_KINDS``: root,
+  scope, segment, path, ref, flow, skill) gets the **whole** list: climbing and absolute paths,
+  other project, server directory, home, UNC and drive spellings, a NUL, a very long name, and the
+  spellings of the chief's own root and of its own file (trailing and doubled slashes, dot
+  segments, backslashes, mixed separators, padded) that the gate may accept as the chief's own;
+* every other key (text, number, flag, enum, name, id) gets ``PLAIN_VALUES``: a climbing path in
+  both relative and absolute form, another project, another project's file, a NUL, a very long
+  name.
+
+The static tests (``test_chief_gate_keys.py``, ``test_chief_gate_kinds.py``) hold the other half:
+the list of keys is complete and a key's kind fits what its view does with it. What this one
+cannot see is in ``chief_audit_support``'s docstring (a probe with ``os.stat`` is not an audit
+event), and it only sends the requests ``chief_audit_calls`` and ``chief_audit_reads`` build: a
+route reached by none of them is only as deep as its first check. ``REACHES`` names the baselines
+that are asserted to get to the work their route exists for.
 """
 
 from __future__ import annotations
 
 import os
-import sys
-import time
-from types import SimpleNamespace
 
 import pytest
-from chief_audit_support import Audit, zones
+from chief_audit_sandbox import drain_the_mirrors, world
+from chief_audit_support import Audit, Touch
 from chief_audit_world import DEMO, World, settle
 from chief_gate_support import (
     _chief,
@@ -42,8 +52,10 @@ TIERS = ("operator", "planner", "status")
 
 def hostile_values(world: World) -> dict[str, str]:
     other, server, home = world.other, world.server, world.project.parent
+    own, plan = str(world.project), str(world.plan)
     return {
         "dotdot": "..",
+        "relative climbing": "../..",
         "climbing": "../../../../proj-b/planted",
         "other project": str(other),
         "other file": f"{other}/pathly/features/{DEMO}/PLAN.md",
@@ -55,74 +67,39 @@ def hostile_values(world: World) -> dict[str, str]:
         "nul": "x\0y",
         "trailing slash": "x/",
         "very long": "a" * 5000,
+        # The chief's own root and file, spelled so that a gate which reads them as the same
+        # directory might let them through: the routes open the raw string, so each must name the
+        # same directory there, or be refused.
+        "own root, trailing slash": own + "/",
+        "own root, doubled trailing slash": own + "//",
+        "own root, dot segment": own + "/.",
+        "own root, dot in the middle": own.replace(
+            world.project.name, "./" + world.project.name
+        ),
+        "own root, doubled slashes": own.replace("/", "//"),
+        "own root, backslash at the end": own + "\\",
+        "own root, backslashes": own.replace("/", "\\"),
+        "own root, mixed separators": f"{home}\\{world.project.name}",
+        "own root, climbing with backslashes": f"{own}/sub\\..\\..\\{other.name}",
+        "own root, padded": f" {own}",
+        "own file, backslashes": plan.replace("/", "\\"),
+        "own file, dot segments and doubled slashes": f"{own}/./pathly//features/{DEMO}/PLAN.md",
+        "own file, padded": f" {plan}",
     }
 
 
 # A key that is only text, a number or a name is never joined into a path by design, and a status
-# or a planner chief reaches the same code after the gate: a few values show it.
-FEWER = ("dotdot", "other project", "other file", "nul", "very long")
-
-
-@pytest.fixture()
-def world(app, client, project, other_project, tmp_path, monkeypatch):
-    """Three directories, a seeded board, a spawn host that spawns nothing, and the audit."""
-    server = tmp_path / "server"
-    server.mkdir()
-    (other_project / "pathly" / "features" / DEMO).mkdir(parents=True)
-    (other_project / "pathly" / "features" / DEMO / "PLAN.md").write_text("# other\n")
-    # A relative entry of sys.path would make a lazy import search the server's directory.
-    monkeypatch.setattr(sys, "path", [os.path.abspath(p or ".") for p in sys.path])
-    monkeypatch.chdir(server)
-    # A view that raises on a hostile value answers 500 as it does in production; the test
-    # client would raise it into the test instead.
-    monkeypatch.setitem(app.config, "PROPAGATE_EXCEPTIONS", False)
-
-    from pathly_orchestrator.supervisor import board_lock, file_claims, registry
-
-    board_lock._held.clear()
-    registry._registry.clear()
-    monkeypatch.setattr(file_claims, "_claims", {})
-    monkeypatch.setattr(
-        "pathly_orchestrator.supervisor.board_run._default_spawn",
-        lambda **kwargs: {"result": "a real analysis of the board"},
-    )
-    monkeypatch.setattr(
-        "pathly_orchestrator.http_server.sse._broadcast_runner", lambda *a, **k: None
-    )
-
-    def loop(state, broadcast_fn=None):
-        state.status = "done"
-
-    monkeypatch.setattr("pathly_orchestrator.supervisor.orchestrator._loop", loop)
-
-    audit = zones(project, other_project, server, tmp_path)
-    audit.label = "seeding"
-    with audit:
-        built = World(client, project, other_project, server)
-        # The seeding is a human's, who may write anywhere (a post indexes its artifact on a
-        # background thread): only the chief's requests are judged.
-        settle()
-        time.sleep(0.3)
-        audit.violations.clear()
-        audit.seen.clear()
-        yield SimpleNamespace(world=built, audit=audit)
-        settle()
-    board_lock._held.clear()
-    registry._registry.clear()
-
-
-def _drain_the_mirrors() -> None:
-    """Let the debounced board and event mirrors write what they were asked to: flush, wait out
-    one tick (a write the flusher thread took first finishes meanwhile), flush again.
-    """
-    from pathly_orchestrator import board_mirror, event_mirror
-    from pathly_orchestrator.db.connection import get_db
-
-    board_mirror.flush_dirty(get_db())
-    event_mirror.flush_dirty(get_db())
-    time.sleep(max(board_mirror.DEBOUNCE_SECONDS, event_mirror.DEBOUNCE_SECONDS) + 0.3)
-    board_mirror.flush_dirty(get_db())
-    event_mirror.flush_dirty(get_db())
+# or a planner chief reaches the same code after the gate: these values show it (the relative
+# and the absolute climbing path are the two ways a join leaves its folder).
+PLAIN_VALUES = (
+    "dotdot",
+    "relative climbing",
+    "climbing",
+    "other project",
+    "other file",
+    "nul",
+    "very long",
+)
 
 
 def _routes(app):
@@ -157,12 +134,12 @@ def _attack(env, app, tier: str) -> dict:
     world, audit = env.world, env.audit
     chief = _chief(tier, world.project)
     named = hostile_values(world)
-    every, few = list(named.values()), [named[n] for n in FEWER]
+    every, few = list(named.values()), [named[n] for n in PLAIN_VALUES]
     answers: dict[str, int] = {}
     for rule, method, keys in _routes(app):
         for variant in world.variants(rule, method):
             for key, kind in keys:
-                for value in few if tier != "operator" or kind == "plain" else every:
+                for value in few if kind == "plain" else every:
                     audit.label = (
                         f"{tier} {method} {rule} [{variant.label}] {key}={value[:40]!r}"
                     )
@@ -173,13 +150,17 @@ def _attack(env, app, tier: str) -> dict:
                     answers[answer] = answers.get(answer, 0) + 1
                     settle()
     audit.label = f"{tier} (the mirrors)"
-    _drain_the_mirrors()
+    drain_the_mirrors()
     return answers
 
 
 def _report(audit: Audit) -> str:
+    """The touches, one line for each distinct call (the first request that made it)."""
+    first: dict[tuple[str, str], Touch] = {}
+    for touch in audit.violations:
+        first.setdefault((touch.event, touch.path), touch)
     return f"{len(audit.violations)} touches outside the project:\n" + "\n".join(
-        f"{t.label}\n    {t.event} {t.path}" for t in audit.violations[:20]
+        f"{t.label}\n    {t.event} {t.path}" for t in list(first.values())[:40]
     )
 
 
@@ -250,7 +231,7 @@ def test_the_audit_sees_a_write_a_request_makes_in_another_project(world, client
     }
 
     human = client.post("/comms/post", json=body)
-    _drain_the_mirrors()
+    drain_the_mirrors()
     assert human.status_code == 200, human.get_data(as_text=True)
     assert any("BOARD.json" in t.path for t in audit.violations), _report(audit)
 
@@ -259,39 +240,77 @@ def test_the_audit_sees_a_write_a_request_makes_in_another_project(world, client
     resp = client.post(
         "/comms/post", json={**body, "from": "chief"}, headers=chief.headers
     )
-    _drain_the_mirrors()
+    drain_the_mirrors()
     assert _gated(resp)
     assert audit.violations == [], _report(audit)
 
 
-# The routes whose valid request must get to the view's work (a 2xx).
-MUST_BE_ACCEPTED = {
-    ("/comms/post", "POST"),
-    ("/comms/goals/run", "POST"),
-    ("/comms/goals/decompose", "POST"),
-    ("/comms/features/decompose", "POST"),
-    ("/comms/project/decompose", "POST"),
-    ("/comms/run", "POST"),
-    ("/comms/tasks/run", "POST"),
-    ("/comms/answer", "POST"),
-    ("/comms/acknowledge", "POST"),
-    ("/runs", "POST"),
-    ("/runs/<run_id>/<action>", "POST"),
-    ("/comms/artifacts/<artifact_id>/section", "GET"),
-    ("/comms/artifacts/section", "GET"),
+def _answered(**wanted):
+    """A check: the route answered 2xx and its JSON body has each of ``wanted``."""
+
+    def check(resp) -> bool:
+        body = resp.get_json(silent=True) or {}
+        return resp.status_code < 300 and all(
+            body.get(k) == v for k, v in wanted.items()
+        )
+
+    return check
+
+
+def _queried(resp) -> bool:
+    """``/code/query`` got through the canned ``cli`` backend and back with a block."""
+    body = resp.get_json(silent=True) or {}
+    return (
+        resp.status_code == 200
+        and body.get("backend") == "cli"
+        and "a_function" in (body.get("result") or "")
+    )
+
+
+# The routes whose valid request must get to the work the route exists for, and how to tell:
+# a 2xx for most, and for the ones that used to stop at "nothing to do" (a stop with no run
+# held, a supersede the route refuses for another board's decision, an answer with no question
+# open, a query that stops at "backend none") the answer that says the work was done.
+# Not here, because the audit's request stops before the sink: ``reroute`` (it sets an attribute
+# of a registered run) and ``retry`` (it starts the run, whose loop the audit replaces with one
+# that finishes at once), and the codeintel, lsp and both backends of ``/code/query`` (they need
+# an external tool).
+REACHES = {
+    ("/comms/post", "POST"): _answered(),
+    ("/comms/goals/run", "POST"): _answered(),
+    ("/comms/goals/decompose", "POST"): _answered(),
+    ("/comms/features/decompose", "POST"): _answered(),
+    ("/comms/project/decompose", "POST"): _answered(),
+    ("/comms/run", "POST"): _answered(),
+    ("/comms/tasks/run", "POST"): _answered(),
+    ("/comms/answer", "POST"): _answered(),
+    ("/comms/acknowledge", "POST"): _answered(),
+    ("/runs", "POST"): _answered(),
+    ("/runs/<run_id>/<action>", "POST"): _answered(),
+    ("/comms/artifacts/<artifact_id>/section", "GET"): _answered(),
+    ("/comms/artifacts/section", "GET"): _answered(),
+    ("/comms/supersede", "POST"): _answered(ok=True),
+    ("/runner/agent-answer", "POST"): _answered(status="accepted"),
+    ("/runs/<run_id>/stop", "POST"): _answered(stopped=True),
+    ("/comms/goals/stop", "POST"): _answered(stopped=True),
+    ("/comms/run/stop", "POST"): _answered(stopped=True),
+    ("/comms/tasks/stop", "POST"): _answered(stopped=True),
+    ("/code/query", "POST"): _queried,
 }
 
 
 def test_the_requests_the_audit_starts_from_are_valid_ones(world, client):
-    """Each baseline is accepted by its route, so the hostile value is the only thing wrong
-    with the request the audit sends. (The one that asks for another project's artifact is
-    refused by the route: that refusal is what it is there to show.)
+    """Each baseline in ``REACHES`` is accepted by its route and gets to its work, so the
+    hostile value is the only thing wrong with the request the audit sends. (The one that asks
+    for another project's artifact is refused by the route: that refusal is what it is there to
+    show.)
     """
     w = world.world
     chief = _chief("operator", w.project)
     refused = {}
     for rule, method, _keys in _routes(client.application):
-        if (rule, method) not in MUST_BE_ACCEPTED:
+        reached = REACHES.get((rule, method))
+        if reached is None:
             continue
         for variant in w.variants(rule, method):
             resp = w.request(
@@ -301,7 +320,10 @@ def test_the_requests_the_audit_starts_from_are_valid_ones(world, client):
             if variant.label == "another project's":
                 assert resp.status_code == 400, resp.get_data(as_text=True)
                 assert resp.get_json()["error"] == "path_out_of_scope"
-            elif resp.status_code >= 300:
-                refused[(rule, method, variant.label)] = resp.status_code
+            elif not reached(resp):
+                refused[(rule, method, variant.label)] = (
+                    resp.status_code,
+                    resp.get_data(as_text=True)[:120],
+                )
 
     assert refused == {}

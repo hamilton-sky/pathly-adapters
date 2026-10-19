@@ -23,13 +23,29 @@ from chief_gate_support import app
 from chief_walk_support import view_keys_read
 from werkzeug.datastructures import MultiDict
 
-# Listed for a ticket that reads it later: ticket 10 reads `cite` on the three answer routes.
+# Keys a later ticket reads. Ticket 10 reads `cite` on the three answer routes, and the entries
+# list it ahead of that, so a chief may send it. Ticket 15 reads `max_cost_usd` on `POST /runs`
+# (its ceiling), which no view reads yet: the entry does not list it, so a chief that sends it is
+# told the key is not listed. Ticket 15 lists it with the code that reads it, and deletes the line.
 WAITS_FOR_A_TICKET = {
     ("/comms/acknowledge", "cite"),
     ("/comms/answer", "cite"),
     ("/runner/agent-answer", "cite"),
+    ("/runs", "max_cost_usd"),
 }
 OWN = "/tmp/chief-keys/proj-a"
+
+
+@pytest.fixture(autouse=True)
+def _posix_host(monkeypatch):
+    """The roots below are POSIX paths: read separators the way a POSIX host does, wherever the
+    suite runs (a backslash is then a file-name character, not a separator).
+    """
+    monkeypatch.setattr(
+        "pathly_orchestrator.scope_names.host_is_windows",
+        lambda: False,
+        raising=False,
+    )
 
 
 def _entries():
@@ -108,6 +124,35 @@ def test_a_listed_key_is_read_or_is_a_url_variable_or_waits_for_a_ticket(app):
     assert unread == {}, f"a chief may send keys no route reads: {unread}"
 
 
+def test_a_key_that_waits_for_a_ticket_is_listed_or_refused_naming_it():
+    from pathly_orchestrator.http_server.chief_fields import ROUTE_FIELDS
+    from pathly_orchestrator.http_server.chief_keys import key_refusal
+
+    for rule, key in sorted(WAITS_FOR_A_TICKET):
+        fields = ROUTE_FIELDS[(rule, "POST")]
+        refusal = key_refusal(rule, "POST", {key: 1})
+
+        if key in fields.allowed(rule):
+            assert refusal is None, (rule, key)
+        else:
+            assert refusal is not None and repr(key) in refusal, (rule, key)
+
+
+def test_a_key_that_waits_for_a_ticket_is_taken_off_the_list_when_a_view_reads_it(app):
+    """The list says what no view reads yet. The ticket that reads a key deletes its line (and,
+    for an unlisted key, lists it); this fails until it does.
+    """
+    read_already = [
+        (rule, key)
+        for rule, key in sorted(WAITS_FOR_A_TICKET)
+        if any(key in keys for keys in view_keys_read(app, rule, "POST").values())
+    ]
+
+    assert (
+        read_already == []
+    ), f"delete these lines of WAITS_FOR_A_TICKET: {read_already}"
+
+
 def test_the_walk_sees_the_keys_it_is_meant_to_see(app):
     """Pins the reader: a flow, a skill and the keys of a helper are seen like a scope is."""
     run = view_keys_read(app, "/comms/goals/run", "POST")
@@ -176,6 +221,14 @@ HOSTILE_NAMES = [
     "x:y",
     "x" * 5000 + "/..",
 ]
+# The chief's own root spelled so that a reading of backslash as a separator takes it for the
+# chief's own. The routes open the raw string, where it is a file-name character.
+BACKSLASHED_ROOTS = [
+    OWN + "\\",
+    OWN.replace("/", "\\"),
+    "/tmp/chief-keys\\proj-a",
+    OWN + "/sub\\..\\..\\proj-b",
+]
 HOSTILE_PATHS = [
     "../../etc/passwd",
     "/tmp/chief-keys/proj-b/x",
@@ -186,6 +239,9 @@ HOSTILE_PATHS = [
     "C:\\Windows\\x",
     "/etc/passwd",
     "x\0y/../../proj-b",
+    OWN + "\\x.py",
+    OWN.replace("/", "\\") + "\\x.py",
+    OWN + "/src\\..\\..\\proj-b\\x.py",
 ]
 SESSION = {"project_root": OWN}
 
@@ -236,7 +292,7 @@ def test_a_scope_that_is_not_the_chiefs_root_or_one_folder_name_is_refused(
     from pathly_orchestrator.http_server.chief_fields import ROUTE_FIELDS
 
     fields = ROUTE_FIELDS[(rule, method)]
-    for value in [*HOSTILE_NAMES, "/tmp/chief-keys/proj-b"]:
+    for value in [*HOSTILE_NAMES, *BACKSLASHED_ROOTS, "/tmp/chief-keys/proj-b"]:
         for source in _sources(fields, name, value):
             assert _refused(rule, method, fields, source), (value, source)
 
@@ -296,6 +352,7 @@ def test_a_root_that_is_not_the_chiefs_is_refused(rule, method, name, kind):
         ["a"],
         {"a": 1},
         7,
+        *BACKSLASHED_ROOTS,
     ]:
         assert _refused(
             rule, method, fields, {name: value}, {"action": "retry"}, names_root=False

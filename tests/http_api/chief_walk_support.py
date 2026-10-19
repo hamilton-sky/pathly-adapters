@@ -5,6 +5,8 @@ Shared by the tests that check ``chief_fields.ROUTE_FIELDS`` against the code: t
 not). ``request_keys_read`` finds the keys a function reads from the request by what the name is
 bound to (``read_json_body()``, ``request.get_json()``, ``request.args``, a ``body`` or ``data``
 parameter), not by what the key is called, so a ``flow`` or a ``skill`` is seen like a ``scope``.
+``keys_joined_into_paths`` follows a key one step further, inside the function that reads it: into
+the names assigned from it and into the arguments of a call that makes or opens a path.
 """
 
 from __future__ import annotations
@@ -165,3 +167,146 @@ def view_keys_read(app, rule_text: str, method: str) -> dict[str, set[str]]:
         if keys:
             out[function.__name__] = keys
     return out
+
+
+# --- where a key goes inside the function that reads it ----------------------------------------
+
+# A call that makes, opens or measures a path. A bare last segment is enough for the distinctive
+# names; the ones a string method shares (``replace``, ``join``) must be spelled in full.
+_PATH_CALL_TAILS = {
+    "open",
+    "Path",
+    "PurePath",
+    "PurePosixPath",
+    "PureWindowsPath",
+    "makedirs",
+    "mkdir",
+    "listdir",
+    "scandir",
+    "rmtree",
+    "copytree",
+    "copyfile",
+    "unlink",
+    "iglob",
+    "_resolve_storage_path",
+    "safe_artifact_path",
+}
+_PATH_CALL_NAMES = {
+    "os.path.join",
+    "posixpath.join",
+    "os.path.abspath",
+    "os.path.realpath",
+    "os.path.exists",
+    "os.path.isfile",
+    "os.path.isdir",
+    "os.walk",
+    "os.remove",
+    "os.rename",
+    "os.replace",
+    "os.rmdir",
+    "glob.glob",
+    "shutil.copy",
+    "shutil.move",
+}
+
+
+def _dotted(node: ast.AST) -> str:
+    parts: list[str] = []
+    while isinstance(node, ast.Attribute):
+        parts.append(node.attr)
+        node = node.value
+    if isinstance(node, ast.Name):
+        parts.append(node.id)
+    return ".".join(reversed(parts))
+
+
+def _is_path_call(call: ast.Call) -> bool:
+    name = _dotted(call.func)
+    return name in _PATH_CALL_NAMES or name.rpartition(".")[2] in _PATH_CALL_TAILS
+
+
+def keys_joined_into_paths(source: str, parameters: bool) -> set[tuple[str, str]]:
+    """``(key, call)`` for each request key the function in ``source`` reads and then passes,
+    directly or through the names it is assigned to, to a call that makes or opens a path (or
+    divides a ``Path`` by it).
+
+    Inside one function only: a key handed to another function is followed only when that
+    function is itself one of the helpers the walk reaches and takes it as ``body`` or ``data``.
+    Calls outside ``_PATH_CALL_NAMES`` and ``_PATH_CALL_TAILS`` are not paths to it.
+    """
+    tree = ast.parse(source)
+    containers: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign) and _reads_the_request(node.value):
+            containers.update(t.id for t in node.targets if isinstance(t, ast.Name))
+        elif isinstance(node, ast.arguments) and parameters:
+            containers.update(a.arg for a in node.args if a.arg in BODY_PARAMETERS)
+
+    def is_container(node: ast.AST) -> bool:
+        return _is_request_args(node) or (
+            isinstance(node, ast.Name) and node.id in containers
+        )
+
+    def key_read(node: ast.AST) -> str | None:
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr in _GETTERS
+            and is_container(node.func.value)
+            and node.args
+        ):
+            return _string(node.args[0])
+        if isinstance(node, ast.Subscript) and is_container(node.value):
+            return _string(node.slice)
+        return None
+
+    tainted: dict[str, set[str]] = {}
+
+    def keys_in(expression: ast.AST) -> set[str]:
+        found: set[str] = set()
+        for node in ast.walk(expression):
+            key = key_read(node)
+            if key is not None:
+                found.add(key)
+            if isinstance(node, ast.Name):
+                found |= tainted.get(node.id, set())
+        return found
+
+    changed = True
+    while changed:  # a name assigned from a name assigned from a key
+        changed = False
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign):
+                targets, value = node.targets, node.value
+            elif isinstance(node, (ast.AnnAssign, ast.AugAssign)) and node.value:
+                targets, value = [node.target], node.value
+            else:
+                continue
+            keys = keys_in(value)
+            for target in targets:
+                for name in ast.walk(target):
+                    if isinstance(name, ast.Name) and not keys <= tainted.get(
+                        name.id, set()
+                    ):
+                        tainted.setdefault(name.id, set()).update(keys)
+                        changed = True
+
+    joined: set[tuple[str, str]] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and _is_path_call(node):
+            for argument in [*node.args, *(k.value for k in node.keywords)]:
+                joined |= {(k, _dotted(node.func)) for k in keys_in(argument)}
+        elif isinstance(node, ast.BinOp) and isinstance(node.op, ast.Div):
+            joined |= {(k, "/") for k in keys_in(node)}
+    return joined
+
+
+def view_keys_joined_into_paths(app, rule_text: str, method: str):
+    """``{(function name, key, call)}`` for the view of the route and the helpers it calls."""
+    found = set()
+    for index, (function, source) in enumerate(
+        view_and_helpers(app, rule_text, method)
+    ):
+        for key, call in keys_joined_into_paths(source, parameters=index > 0):
+            found.add((function.__name__, key, call))
+    return found

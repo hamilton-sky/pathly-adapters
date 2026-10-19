@@ -6,7 +6,7 @@ name this project in ``scope``; a feature board is not bound by it.
 
 from __future__ import annotations
 
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import pytest
 
@@ -79,9 +79,20 @@ def test_a_project_board_post_must_name_the_chiefs_project_in_scope(
 
 
 @pytest.mark.parametrize("spelling", ["same", "trailing slash", "backslashes"])
-def test_a_project_board_post_to_its_own_scope_passes(client, project, spelling):
-    chief = _chief("operator", project)
-    root = str(project)
+@pytest.mark.parametrize("windows", [False, True], ids=["posix host", "windows host"])
+def test_a_project_board_post_to_its_own_scope_passes(
+    client, project, spelling, windows, monkeypatch
+):
+    """The scope is the project's root, and a backslash spells it only on a Windows host (on
+    any other it is a different board, which the gate refuses as not the chief's own).
+    """
+    monkeypatch.setattr(
+        "pathly_orchestrator.scope_names.host_is_windows",
+        lambda: windows,
+        raising=False,
+    )
+    root = project.as_posix()
+    chief = _chief("operator", PurePosixPath(root))
     scope = {
         "same": root,
         "trailing slash": root + "/",
@@ -94,7 +105,10 @@ def test_a_project_board_post_to_its_own_scope_passes(client, project, spelling)
         headers=chief.headers,
     )
 
-    assert resp.status_code == 200, resp.get_data(as_text=True)
+    if spelling == "backslashes" and not windows:
+        assert _gated(resp), resp.get_data(as_text=True)
+    else:
+        assert resp.status_code == 200, resp.get_data(as_text=True)
 
 
 def test_a_feature_board_post_is_not_bound_by_its_scope(client, project):

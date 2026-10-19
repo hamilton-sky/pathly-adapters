@@ -20,6 +20,7 @@ strongest tier. A route added later is refused to the chief until someone lists 
 from __future__ import annotations
 
 import os
+from pathlib import PurePosixPath
 
 import pytest
 
@@ -282,11 +283,21 @@ def test_another_projects_root_is_refused(client, project, other_project, which)
 
 @pytest.mark.parametrize("which", range(3))
 @pytest.mark.parametrize("spelling", ["same", "trailing slash", "backslashes"])
+@pytest.mark.parametrize("windows", [False, True], ids=["posix host", "windows host"])
 def test_the_chiefs_own_project_passes_however_it_is_spelled(
-    client, project, which, spelling
+    client, project, which, spelling, windows, monkeypatch
 ):
-    chief = _chief("operator", project)
-    root = str(project)
+    """A backslash is a separator only on a Windows host. On any other host the routes open the
+    raw string, where ``\\`` is an ordinary file-name character, so a root spelled with
+    backslashes is another folder than the chief's own and is refused (round 7).
+    """
+    monkeypatch.setattr(
+        "pathly_orchestrator.scope_names.host_is_windows",
+        lambda: windows,
+        raising=False,
+    )
+    root = project.as_posix()
+    chief = _chief("operator", PurePosixPath(root))
     root = {
         "same": root,
         "trailing slash": root + "/",
@@ -296,7 +307,10 @@ def test_the_chiefs_own_project_passes_however_it_is_spelled(
 
     resp = getattr(client, verb)(path, headers=chief.headers, **kwargs)
 
-    assert _passed(resp), resp.get_data(as_text=True)
+    if spelling == "backslashes" and not windows:
+        assert _gated(resp), resp.get_data(as_text=True)
+    else:
+        assert _passed(resp), resp.get_data(as_text=True)
 
 
 @pytest.mark.parametrize("value", [["x"], 7, {"a": 1}, "  "])
