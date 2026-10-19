@@ -1,7 +1,7 @@
 # Refuse every chief call its tier does not allow
 
 Type: task
-Status: resolved
+Status: open
 Blocked by: 04, 05, 07
 Test first: yes
 
@@ -1615,5 +1615,61 @@ Checked and found sound (no finding):
 - The GET routes and URL path variables were attacked and hold.
 - The sink edits cause no legitimate-caller regressions.
 - Every sentence of the "Chief gate" section matches the code except the "What was measured" claim in finding 2.
+
+REVIEW: FAIL
+
+## Review findings (round 7, quality review)
+
+QUALITY (chief-agent 08, round 7, quality pass)
+
+Scope notes
+- Base 570a6eef44c62cc658b338f90572d9ab871edb6f. END = 92fa929 = HEAD, so no later commits were left out. Round 7 is 509e381, fc2b66e and 92fa929.
+- I read the ticket as of the base commit plus the `## Review findings` sections of rounds 1 to 6, and the diff. I did not read `## Answer`. The "Chief gate" section of src/pathly_orchestrator/CLAUDE.md I did read, as permitted.
+- Done when, re-run by me:
+  - `tests/http_api/test_chief_gate.py` gave 106 passed.
+  - `tests/comms_board/test_comms_write_perm.py` gave 33 passed.
+- Wider runs, no failures:
+  - All `test_chief_gate*.py`, `tests/storage_paths` and `tests/code_intel`. The one skip is the old Windows-only one in `test_code_context_pathresolve.py`.
+  - The rest of `tests/http_api` (220 passed).
+  - `tests/` minus `http_api`. This ran at -q -q with no summary line; the log has no F or E mark.
+- black, mypy on the changed modules, lint-imports, check_file_size, `gen_test_index --check`, check_no_mirror_reads and check_version_sync are clean. `git status` is clean; I changed nothing in the repo.
+- My probes are only under the scratchpad directory `rv7r/`. They created folders only inside throwaway test projects under /tmp/pathly-tests.
+
+1. major src/pathly_orchestrator/runner/code_context_cli.py (`_CLI_CACHE`) and src/pathly_orchestrator/http_server/blueprints/code/query.py (`_QUERY_CACHE`): `/code/query` hands one project's code-graph block to a chief on another project, on a call the gate passes as bound. This is the `_CLI_CACHE` side effect you asked about, and it is wider than that.
+   - `_CLI_CACHE` is keyed `(path, content-hash)` with no project. Round 7 made `_file_hash` read a relative target under the project root, so relative paths now hash and cache across projects. Before, they hashed against the server cwd, mostly to "", and were never cached. Probe `test_cache.py`: after project B built the block for `src/a.py`, project A with identical bytes was served `sym_of_pb` and the graph was not queried again.
+   - `_QUERY_CACHE` in `query.py` is keyed `(op, target, content-hash, backend)`, also with no project. The hash is "" for a directory or a missing file, so the key is then only the string. Probe `test_codecache_dir.py`: a human asked `{"op":"symbol","target":"src","project_root":B}`. A status chief on A then sent `{"op":"symbol","target":"src","project_root":A}`. The gate passed it, and the answer was `cached: true` with `symbols_of_project_B (callers:7, callees:9)`, although A's `src` has different files. The same happened with identical-bytes files (`test_codecache_e2e.py`). Clearing either cache alone still left the other leaking.
+   - `query.py` is unchanged in this ticket, so `_QUERY_CACHE` is old. But the section says a code query of another project is refused, and this is a read of another project's graph data through an accepted call. For legitimate callers (worktrees and forks share relative paths and bytes), agents can now get another project's caller counts. The doc does not mention it.
+   - Fix: put the normalised project root in both keys. For `_CLI_CACHE`, use `(project, path, hash)` or the joined absolute path. For `_QUERY_CACHE`, add `project_root`, or do not cache when the hash is "". Add a test with two projects and the same relative target.
+2. major src/pathly_orchestrator/CLAUDE.md ("Chief gate", "What was measured") and tests/http_api/test_chief_gate_audit.py (`_routes`): the doc says "a key of a file kind ... or a URL variable gets the whole list". The code does not do that.
+   - `_routes` gives the shorter `PLAIN_VALUES` list to any URL variable that the entry lists as a name or id. I ran `_routes`: 11 of the 19 URL variables get the short list. They are `feature` (4 `/api/features/<feature>/*` rules, 4 `/db/features/<feature>/*` rules), `artifact_id`, and `run_id` (`/db/runs/<run_id>/cost`, `/runs/<run_id>`, `/runs/<run_id>/<action>`, `/runs/<run_id>/stop`).
+   - They never receive the server-directory, home-directory, UNC, drive, trailing-slash or own-root spellings, so the claim is false for them.
+   - I sent the whole list to those 11 at the status and operator tiers (`test_urlvars.py`, 520 requests each): no violation. So the fix is cheap and safe.
+   - Fix: in `_routes`, give the whole list to every key in `url_variables(rule)`. Or reword the doc.
+   - Smaller nit in the same paragraph: the short list has no absolute climbing path (its absolute values are the other project and a file in it). Say what it sends.
+3. minor src/pathly_orchestrator/db/queries/run_history.py (`_SLUG_MATCH`, via `latest_project_root_for_feature`) and src/pathly_orchestrator/CLAUDE.md ("Not held"): the documented feature-board mapping is wider than the doc says. `feature LIKE '%/' || ?` treats `%` as a wildcard, and `%` passes `is_segment`.
+   - Probe `test_wild.py`: with one legacy run_history row (a full-path `feature`) for project B, a planner chief on A posted `board:"feature", scope:"%"`. The mirror created `B/pathly/features/%/BOARD.json`. The chief did not need to know any feature name of B.
+   - Needs old-format rows. It is the same class the section already discloses ("whichever project run_history last mapped that name to"), but "that name" is not true for a wildcard.
+   - Fix: add an `ESCAPE` clause or escape `%`, `_` and `\` before the LIKE in `_SLUG_MATCH`, or refuse them in a feature-board scope. At least reword the doc.
+4. minor src/pathly_orchestrator/CLAUDE.md ("Held at the gate only") and src/pathly_orchestrator/http_server/chief_project.py (`lies_under`): the symlink limit is stated, but its effect is not.
+   - Probe `test_symlink.py`: with a symlink inside project A pointing at project B, a chief posted `artifact_path=<A>/link/pathly/features/demo/PLAN.md`. The gate passed it (text containment), and the server then opened B's PLAN.md.
+   - `GET /comms/artifacts` returned `indexed_structure_key: "hidden-heading|secret-plan"`, so B's heading names reach the chief. The by-id `/section` read correctly answered 400.
+   - The chief's own tools cannot create the link, so this needs a link that already exists. Fix: apply `hydrate_helpers.inside_root` (realpath) to a chief's `artifact_path` and `/code/query` `target` at the gate, as the by-id read already does. Or state this effect in the doc.
+5. minor src/pathly_orchestrator/runner/code_context_cli.py (`_cypher_literal`): the escape is right for standard Cypher, but the real `codebase-memory-mcp` is not in the repo or the environment, and `test_code_context_cypher.py` reads the literal with its own standard-escape model. If the tool's lexer does not take `\"` as an escape, a quote still ends the literal. The tail never holds a backslash, since `\` is turned into `/` first. Fix: also drop or refuse `"` in the tail, or note that the escape is unverified against the tool.
+6. minor pathly/features/chief-agent/tasks/17-pathly-api-command-and-built-in-styles.md (note for ticket 17): the gate compares `project_root` as an exact string, but nothing tells the chief the stored string. A chief that reads its root with `pwd` can differ from the stored root (a symlinked parent such as macOS `/var`, letter case on Windows). That chief is then refused on every call that names its project. Ticket 17 should pass the stored root to the chief (an environment variable or the prompt), not only say "spell it as the session's".
+
+Checked, no finding
+- (a) I tried to reach another project's tree, board or files, or the server's directory or home, by independent routes:
+  - Marker taint (`test_taint.py`): 1,336 requests, with a marker in every plain-kind key and URL variable of every route, and four value shapes. No file-system or subprocess event carried the marker, and the SQL traces show bound parameters only.
+  - Spelling fuzz (`fuzz_spell.py`): 92,582 candidates compared with the real file system. The gate takes a root as the chief's own only when it is the root plus trailing slashes, and `samefile` agrees. No path accepted by `lies_under` leaves the project except through the in-project symlink of finding 4.
+  - Covered in the probes above: trailing and doubled slashes, `.` and `..` segments, case, NFC and NFD forms, percent-encoded text, padding, NUL, long values, a root equal to a parent or a prefix sibling (`/work/proj` vs `/work/proj-b`), and a project directory that is a symlink. All were refused or equal to the chief's own folder.
+  - The Windows reading (`host_is_windows` patched true): backslash and UNC roots are accepted only for the chief's own root, and case and `\\?\` spellings are refused.
+- (c) Every sentence of "Chief gate" matches the code except finding 2 (and the wording gaps in findings 3 and 4). Specific checks:
+  - Nine routes in the separators test, 20 `REACHES` baselines, and the three `HELD_BY_THE_VIEW` keys all match.
+  - I re-ran the "breaking the guards" claims on the operator audit. With the Windows reading forced, with the project rules off, and with the code backend's hash left to the server cwd, the audit fails each time. With only the key list off it passes. All as the doc says.
+  - The "not covered" list is accurate (reroute, retry, and the codeintel, lsp and both backends).
+- (d) The key allowlists admit every flow the spec's walkthrough and ticket 17 name. They include `cite` on the answer routes and `project_root` on `GET /chief/session`. `max_cost_usd` on `POST /runs` and `/comms/directives` wait for tickets 15 and 12, and are documented.
+- No weakened checks. The edited existing tests were flipped on purpose (a backslash root is refused on a POSIX host), and no skip, xfail or noqa was added. The new tests assume POSIX paths, but CI is Linux-only.
+
+Rated against your rubric: findings 1 and 2 are major (data of another project handed to a gated chief, and a doc claim the code does not back). Findings 3 to 6 are minor.
 
 REVIEW: FAIL
