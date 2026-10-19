@@ -147,7 +147,9 @@ def test_the_reads_that_name_their_root_are_the_ones_that_fall_back_to_another_p
 _FIELD_READ = re.compile(
     r"""(?:\bdata|\bbody|args|payload)(?:\.get(?:list)?\(\s*|\[\s*)["']([A-Za-z_]+)["']"""
 )
-_PROJECT_ISH = re.compile(r"root|scope|board|project|feature|path|target|topic|_id$")
+_PROJECT_ISH = re.compile(
+    r"root|scope|board|project|feature|path|target|topic|_id$|slug"
+)
 _PATH_CALLS = {"join", "joinpath", "Path", "makedirs", "mkdir", "open"}
 _HELPER_PACKAGE = "pathly_orchestrator.http_server.blueprints"
 
@@ -323,6 +325,14 @@ def test_the_segment_scopes_are_the_two_routes_that_make_a_folder_of_them():
         ("/comms/features/decompose", "POST"),
         ("/comms/run", "POST"),
     }
+
+
+def test_a_post_that_stores_a_slug_declares_it_a_folder_name():
+    """``slug`` of a goal post is stored and later joined into ``goals/<slug>`` by the goal
+    run and decompose, so the entry names it as a folder name, not an id."""
+    from pathly_orchestrator.http_server.chief_fields import ROUTE_FIELDS
+
+    assert "slug" in ROUTE_FIELDS[("/comms/post", "POST")].segments
 
 
 def test_a_listed_non_get_route_reads_the_body_and_a_get_route_reads_the_query(app):
