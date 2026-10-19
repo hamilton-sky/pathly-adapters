@@ -12,16 +12,78 @@ refuses what these predicates refuse, so a gate and a sink cannot disagree about
 and a goal run makes ``pathly/features/<scope>/<flow>/<slug>`` of its flow. ``is_flow_name`` and
 ``is_skill_name`` say what may join onto those folders; the gate and the readers both ask them.
 
+``root_spelling`` and ``lies_under`` say when two strings name the same folder, the way the host
+that opens them does (the chief gate compares a request's root and files with the chief's own by
+them). On Windows ``\\`` and ``/`` both separate; on any other host a backslash is an ordinary
+file-name character, so a string that has one is not a spelling of any root, and the routes, which
+open the raw string, would open a different folder than the slash form of it.
+
 Pure functions, no imports from the rest of the package.
 """
 
 from __future__ import annotations
 
+import os
+import posixpath
 import re
 from pathlib import Path
 
 _DRIVE_ROOT = re.compile(r"^[A-Za-z]:/")
+_DRIVE_PREFIX = re.compile(r"^[A-Za-z]:")
 _BREAKERS = "/\\:\0"
+
+
+def host_is_windows() -> bool:
+    """True when this host reads ``\\`` as a path separator. The one switch the readings below
+    take (a test patches it to try the other host).
+    """
+    return os.name == "nt"
+
+
+def _on_this_host(text: str) -> str | None:
+    """``text`` as this host's file system reads it with ``\\`` and ``/`` made one separator, or
+    None when it is not a path there: empty, a NUL, or (not on Windows) a backslash, which names
+    a file whose name has a backslash in it, not a folder the slash form of it names.
+    """
+    if not text or "\0" in text:
+        return None
+    if host_is_windows():
+        return text.replace("\\", "/")
+    return None if "\\" in text else text
+
+
+def root_spelling(value: object) -> str | None:
+    """The one spelling of a project root, or None when ``value`` is not one: trailing slashes
+    dropped (``/p/``, ``/p//`` are ``/p``, and ``/`` stays ``/``), nothing else changed (no ``.``
+    or ``..`` collapse, no trimming, a drive letter's case kept). Two strings with one spelling
+    are one folder when the routes open them as they are; a string with another spelling is not
+    taken for the same root, though it may be.
+    """
+    if not isinstance(value, str):
+        return None
+    text = _on_this_host(value)
+    return None if text is None else text.rstrip("/") or "/"
+
+
+def lies_under(path: object, root: str | None, anchored: bool) -> bool:
+    """True when ``path`` lies under ``root`` (a ``root_spelling``) once its ``..`` segments are
+    collapsed. A relative path is read against ``root`` when ``anchored`` (a route that joins it
+    to the project, as ``/code/query`` does with its ``target``), else it is not a path of the
+    project at all. A text check: symlinks are not followed, and a drive letter is compared as
+    written. A string with a drive prefix (``C:``, and so ``a:b``) is an absolute path on every
+    host, so it is refused unless it is under ``root``, though a POSIX host would read it as a
+    relative name: the gate does not guess which of the two a route means.
+    """
+    text = _on_this_host(path) if isinstance(path, str) else None
+    if text is None or not root:
+        return False
+    if not (text.startswith("/") or _DRIVE_PREFIX.match(text)):
+        if not anchored:
+            return False
+        text = f"{root.rstrip('/')}/{text}"
+    text = posixpath.normpath(text)
+    base = root.rstrip("/")
+    return text in (root, base) or text.startswith(base + "/")
 
 
 def is_segment(value: object) -> bool:

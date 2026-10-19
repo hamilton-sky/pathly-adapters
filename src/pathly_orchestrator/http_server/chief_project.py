@@ -3,10 +3,12 @@
 ``project_refusal`` applies ``chief_fields.ROUTE_FIELDS`` to one request: the fields its route
 reads as a project root, a board scope or a file, read from the JSON body of a POST and from the
 query string of a GET, the way the view reads them. A value is the chief's own when it is a
-string that ``normalise_project_root`` maps to the session's root (forward slashes, no trailing
-slash); anything else, a non-string included, is not. A file is the chief's own when it lies
-under that root after its ``..`` segments are collapsed (text only: symlinks are not followed,
-and a Windows drive letter is compared as written). A scope that is a path (a ``/``, a ``\\`` or a
+string that ``scope_names.root_spelling`` spells as the session's root (trailing slashes
+dropped, and on a host where a backslash separates, Windows, backslashes read as slashes; on any
+other host a backslash is a file-name character, so a value that has one is never the chief's own);
+anything else, a non-string included, is not. A file is the chief's own when it lies under that
+root after its ``..`` segments are collapsed (``scope_names.lies_under``; text only: symlinks are
+not followed, and a Windows drive letter is compared as written). A scope that is a path (a ``/``, a ``\\`` or a
 drive prefix) is a project root whatever board it is posted to, because the board mirror reads it
 as one, so it must be the chief's own on every board; any other scope off the project board, a
 scope marked ``segment`` (the route makes a folder of it, so even the chief's own root is refused)
@@ -18,11 +20,10 @@ A route with no entry is refused, so a route added without one is not passed by 
 
 from __future__ import annotations
 
-import posixpath
 import re
 from typing import Mapping
 
-from pathly_orchestrator.scope_names import is_segment
+from pathly_orchestrator.scope_names import is_segment, lies_under, root_spelling
 
 from .chief_field_types import Fields, ScopeRead, TextPath
 from .chief_fields import ROUTE_FIELDS
@@ -38,15 +39,11 @@ NOT_A_SEGMENT = "must be one folder name: no '/', '\\', ':' or '..'"
 NO_ENTRY = "the gate has no project entry for this route"
 
 
-def _normalise(value: str) -> str:
-    from pathly_orchestrator.supervisor.chief_session import normalise_project_root
-
-    return normalise_project_root(value)
-
-
-def is_own(value: object, own: str) -> bool:
-    """True when ``value`` names the project whose normalised root is ``own``."""
-    return isinstance(value, str) and _normalise(value) == own
+def is_own(value: object, own: str | None) -> bool:
+    """True when ``value`` is spelled as the root ``own`` (a ``root_spelling``; None binds
+    nothing)."""
+    spelled = root_spelling(value)
+    return spelled is not None and spelled == own
 
 
 def _path_like(value: str) -> bool:
@@ -83,7 +80,7 @@ def _skipped(value: object, read: ScopeRead) -> bool:
     return text in read.skip_exact or text.startswith(read.skip_prefix)
 
 
-def _scope_refusal(source: Mapping, read: ScopeRead, own: str) -> str | None:
+def _scope_refusal(source: Mapping, read: ScopeRead, own: str | None) -> str | None:
     """The reason the scope a route takes from ``source`` is not for this chief's project."""
     found = _first_usable(source, read)
     if found is None or _skipped(found[1], read):
@@ -96,22 +93,6 @@ def _scope_refusal(source: Mapping, read: ScopeRead, own: str) -> str | None:
         # The project board's scope is its root; a path on any board is a root to the mirror.
         return None if is_own(value, own) else NOT_OWN
     return None if is_segment(value) else f"{key} {NOT_A_SEGMENT}"
-
-
-def _under(path: str, own: str, anchored: bool) -> bool:
-    """True when ``path`` lies under ``own``. A relative path is read against ``own`` when it is
-    ``anchored`` (a code query's target), else it is not a path of the project at all.
-    """
-    text = path.strip().replace("\\", "/")
-    if not own:
-        return False
-    if not (text.startswith("/") or _DRIVE.match(text)):
-        if not anchored:
-            return False
-        text = f"{own.rstrip('/')}/{text}"
-    text = posixpath.normpath(text)
-    base = own.rstrip("/")
-    return text in (own, base) or text.startswith(base + "/")
 
 
 def _recovered_path(source: Mapping, read: TextPath) -> str | None:
@@ -129,7 +110,7 @@ def _recovered_path(source: Mapping, read: TextPath) -> str | None:
     return extract_artifact_path(text)
 
 
-def _foreign_root(fields: Fields, body: Mapping, args, own: str) -> bool:
+def _foreign_root(fields: Fields, body: Mapping, args, own: str | None) -> bool:
     """A project root anywhere in the request that is not the chief's, whether the route reads
     it or not.
     """
@@ -154,17 +135,17 @@ def _unnamed_root(fields: Fields, source: Mapping, view_args: Mapping) -> bool:
     return must_name and not any(source.get(k) for k in fields.roots)
 
 
-def _foreign_file(fields: Fields, source: Mapping, own: str) -> bool:
+def _foreign_file(fields: Fields, source: Mapping, own: str | None) -> bool:
     """A file the route reads or stores that lies outside the chief's project."""
     for keys, anchored in ((fields.paths, True), (fields.abs_paths, False)):
         for key in keys:
             value = source.get(key)
             if isinstance(value, str) and value.strip():
-                if not _under(value, own, anchored):
+                if not lies_under(value, own, anchored):
                     return True
     for text_read in fields.text_paths:
         value = _recovered_path(source, text_read)
-        if value is not None and not _under(value, own, False):
+        if value is not None and not lies_under(value, own, False):
             return True
     return False
 
@@ -186,7 +167,7 @@ def project_refusal(
     fields = ROUTE_FIELDS.get((rule, method))
     if fields is None:
         return NO_ENTRY
-    own = _normalise(session.get("project_root") or "")
+    own = root_spelling(session.get("project_root"))
     source = args if method == "GET" else body
 
     if _foreign_root(fields, body, args, own):

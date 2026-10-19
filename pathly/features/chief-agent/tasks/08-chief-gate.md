@@ -1,7 +1,7 @@
 # Refuse every chief call its tier does not allow
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 04, 05, 07
 Test first: yes
 
@@ -226,6 +226,23 @@ prints passed
   `test_chief_gate.py`, `test_chief_gate_tables.py`, `test_chief_gate_root_naming.py` and
   `chief_gate_support.py` (listed under Review fixes); the four `INDEX.md` files regenerated.
 
+- Round 7 (see **Review fixes (round 6)**): `scope_names.py` (139 lines) gains `host_is_windows()`,
+  `root_spelling()` and `lies_under()`, the one host-aware reading of a root and a file; `http_server/
+  chief_project.py` (186) uses them in place of `normalise_project_root` and its own `_under`;
+  `runner/code_context_cli.py` (201) escapes the target in its Cypher literal (`_cypher_literal`)
+  and hashes a relative file under the project root (`_file_hash(path, project_root)`,
+  `_file_section(..., project_root)`). No other source file changed. The "Chief gate" section of
+  `src/pathly_orchestrator/CLAUDE.md` is corrected (host reading of a backslash, the drive prefix,
+  "What was measured", the fourth reading test, `max_cost_usd`, ticket 17's texts), and so is the
+  `code_context_cli.py` line of its package map. Tests (test-only commits `509e381` and `fc2b66e`
+  first): new `test_chief_gate_separators.py` (122), `test_chief_gate_kinds.py` (7),
+  `tests/storage_paths/test_scope_names_host.py` (62), `tests/code_intel/test_code_context_cypher.py`
+  (8), and the audit's support files `chief_audit_sandbox.py`, `chief_audit_calls.py` and
+  `chief_audit_reads.py` (`chief_audit_world.py` fell from 379 to 250 lines); edits to
+  `test_chief_gate_audit.py`, `test_chief_gate_keys.py`, `chief_walk_support.py`,
+  `test_chief_gate.py`, `test_chief_gate_project_scope.py` and `test_chief_gate_files.py` (listed
+  under Review fixes (round 6)); the four `INDEX.md` files regenerated.
+
 **Proof** (each run fresh, after the last edit to code or tests)
 
 - Test first: at `c19ab46`, `python -m pytest tests/http_api/test_chief_gate.py
@@ -366,6 +383,28 @@ prints passed
   every tier (`prompt_override` to `features/decompose` or `project/decompose`: the planner is told
   `run` first, as before; an operator is told the key is not listed). Before, the route ignored it.
 
+- Round 7: the host decides what a backslash is, in one function (`scope_names.host_is_windows`),
+  and the gate follows the host rather than a fixed rule. Why not "always refuse a backslash": a
+  Windows deployment is a supported host (Studio runs there, and `C:\Users\...` is the form its
+  roots arrive in), and refusing it there would lock out every Windows chief. Why not "always read
+  it as a separator": that is the bug. The cost is that the same request is refused on one host
+  and not on the other; that is the truth about what the route opens, not an inconsistency.
+- Round 7: "the same directory" is decided by a spelling that does little: trailing slashes only.
+  A `.` segment, doubled slashes inside the path and a leading space may well name the same
+  directory, and the gate refuses them, because a spelling it does not rewrite is one it cannot
+  get wrong. Cost: a chief that spells its root with `./` is told it is not its project. The
+  prompt (ticket 17) says to use the root as the session has it.
+- Round 7: a string with a drive prefix (`C:`, so also `a:b`) is read as an absolute path on every
+  host and refused unless it lies under the root, though a POSIX host would read `a:b` as a
+  relative name. I kept the old reading rather than guess which a route means; a symbol target
+  like `a:b` is refused. Ticket 17's texts say so.
+- Round 7: the Cypher fix escapes (`\` and `"`) rather than refusing a target with a quote:
+  a legitimate file name can have a quote, and `/code/query` is a read. The escape is the standard
+  Cypher one; see Shortcuts for what I could not check.
+- Round 7: the early-stopping baselines were made to reach their sinks, not just listed as not
+  covered, wherever a baseline could: a stop with a run held, a supersede of a decision of the
+  same board, an answer with a question open, `/code/query` through a canned `cli` backend. That is
+  what showed the extra sink in `CliProvider._file_hash`.
 **Shortcuts taken**
 
 - The gate reads and parses the body of every non-GET chief request, twice since round 2 (once
@@ -452,6 +491,28 @@ prints passed
   after seeding (a post indexes its artifact on a background thread) are the two timing-dependent
   parts of `test_chief_gate_audit.py`; the sleep is what keeps a late seeding write from being
   counted against a chief. The file takes about 40 s.
+
+- Round 7: the escape in `_cypher_literal` is the standard Cypher form (a backslash before a quote
+  or a backslash). `codebase-memory-mcp` is not installed here, so I could not run a query with a
+  quote in it through the real binary; the test reads the literal as a Cypher reader does. If its
+  dialect escapes differently, the quote would still end the string. Worth one real query with a
+  quoted name before relying on it. The target's tail has had its backslashes made slashes before
+  it reaches the literal, so only the quote changes a query.
+- Round 7: the kinds test (`test_chief_gate_kinds.py`) reads one function at a time and a fixed
+  list of path calls. It does not follow a key into another function (`start_run(flow=...)` ends in
+  `_load_flow`), and a path call it does not list is invisible to it. A plain key that a later
+  change joins through such a call is caught by the audit only if the audit's plain values reach
+  the join. Upgrade: follow keys across calls with the call graph, or give every key whose value a
+  function receives as an argument a declared kind. Three plain keys are joined today and held by
+  the view (`HELD_BY_THE_VIEW`).
+- Round 7: `reroute`, `retry` and the codeintel, lsp and both backends of `/code/query` are not
+  covered by the audit (the doc says so). `retry` is the one that matters: it starts a run in the
+  directory the body names, which the gate binds to the chief's own root, but the audit replaces
+  the run's loop, so what the started run does with a hostile value is not measured. Upgrade: a
+  spawn host that runs a real fake agent, or a second audit with the supervisor's loop left in.
+- Round 7: a POSIX project directory whose name has a backslash cannot be a chief's project
+  (`open_chief` stores `normalise_project_root`, which makes the backslash a slash on every host).
+  Not changed: the ticket is the gate, and `chief_session` belongs to ticket 07.
 
 **Review fixes** (round 1, quality review; the round starts at `c2de8da`. Test-only commits first:
 `b5014df` and `286bb1e`, each run red before any source change.)
@@ -1092,6 +1153,159 @@ Proof after the fixes (each run fresh, after the last edit to code, tests and do
   as a skipped test, and removed it: the other symlink tests in the repo call `symlink_to` bare).
 
 
+**Review fixes (round 6)** (quality review; the round starts at `dfead50`, work from `509e381`.
+Test-only commit first: `509e381`, run red before any source change: `246 failed, 257 passed` over its nine files (`test_chief_gate_separators.py` 101 of 122, `test_scope_names_host.py` 62 of 62, `test_chief_gate_keys.py` 68 of 90, `test_code_context_cypher.py` 7 of 8, `test_chief_gate.py` 3, `test_chief_gate_project_scope.py` 1, `test_chief_gate_files.py` 1 (that one in the second test-only commit `fc2b66e`) and the audit 3), re-run today in a worktree of `fc2b66e` against the source as it was at `dfead50`. The tests that pass there are the "still works" cases, and the ones for findings 3, 4 and 6, which change what the tests send and what the lists say, not the source. The project owner
+approved fixing all eight. The cause of findings 1 and 2 is one: the gate compared the chief's root
+with the request's after turning `\` into `/` on every host, and the audit never sent it the
+spellings the gate accepted, so the gate and the sinks could disagree about a directory and nothing
+checked. So the gate now reads a spelling the way the host that opens it does, one place says how,
+and the audit sends the accepted spellings everywhere a file can be reached.)
+
+1. *major, the gate read a backslash as a separator on POSIX.* Reproduced as the finding says
+   (red: `test_chief_gate_separators.py`, which sends the spellings through nine routes on this
+   POSIX host and finds `proj-a\/pathly/...` and `server/\tmp\...` made by the decompose, goal-run
+   and project-decompose routes, and `open proj-a\` and `open server/<padded path>` by
+   `/code/query`; and the audit, 89 touches as an operator). The cause is the principle, not the
+   spelling: `chief_project.is_own` and `_under` compared after `normalise_project_root` turned
+   `\` into `/`, but the views use the request's string as it is (`os.path.join`, `os.makedirs`, a
+   git working directory), and on a POSIX host `/work/proj\` is a sibling folder and `\work\proj` a
+   path under the server's working directory. Fixed through one host-aware place, `scope_names.py`:
+   - `host_is_windows()` (`os.name == "nt"`), the one switch; a test patches it;
+   - `root_spelling(value)`: the one spelling of a root, trailing slashes dropped and nothing else
+     changed; on Windows `\` reads as `/`; on any other host a value with a backslash (or a NUL, or
+     empty, or not a string) has no spelling, so it is never the chief's own;
+   - `lies_under(path, root, anchored)`: the file test, with the same host reading (a path with a
+     backslash on a POSIX host is refused), `..` collapsed, a relative path read against the root
+     only when `anchored` (`target`), and a drive-prefixed string absolute on every host.
+   `chief_project` uses them (`own = root_spelling(session root)`, `is_own`, `_foreign_file`), and
+   the `_normalise` and `_under` it had are gone. The property the gate relies on is tested, not
+   argued: `tests/storage_paths/test_scope_names_host.py` makes the folder and asks `os.path.samefile`
+   of every string the gate takes for its root (`test_two_spellings_with_one_key_name_one_folder`),
+   and tables for both hosts. A trailing slash (any number) still passes and names the same
+   directory; a `.` segment, doubled slashes inside the path and a leading space are refused (they
+   may be the same directory, but the gate does not rely on it).
+   **A test I changed, as the finding asked:** `test_the_chiefs_own_project_passes_however_it_is_
+   spelled` (and its twin `test_a_project_board_post_to_its_own_scope_passes`) now run for both
+   hosts: the "backslashes" spelling is refused (`_gated`) on a POSIX host, which is the point of
+   the fix, and still passes under the patched Windows host; the other spellings pass on both.
+   `test_chief_gate_keys.py` runs its roots under a patched POSIX host, so its backslash cases
+   mean the same on any machine the suite runs on.
+2. *major, the audit never sent the accepted spellings, and the doc said it did.* Reproduced (the
+   audit, 89 touches as an operator, was red for the spellings of finding 1 and for one more sink
+   below). The audit now sends the **whole** list at every tier to every key of a file kind (root,
+   scope, segment, path, ref, flow, skill) and to every URL variable: the old hostile values, a
+   relative climbing path, and the spellings of the chief's own root and file that a gate might take
+   for the chief's own (trailing and doubled trailing slash, a dot segment at the end and in the
+   middle, doubled slashes, a backslash at the end, backslashes for every slash, mixed separators, a
+   climb with backslashes, padded). "What was measured" in the "Chief gate" section is rewritten
+   to say that, and the sentence that nothing falls in the server's working directory is now true
+   for every spelling in the list: the operator, planner and status runs all pass
+   (7,097 requests at each tier; counts in the proof below). The new baselines would have taken `chief_audit_world.py` past
+   400 lines; the POST baselines moved to `chief_audit_calls.py` and the GET ones to
+   `chief_audit_reads.py`, the fixture to `chief_audit_sandbox.py`.
+   **A sink the new baseline found, not named in the findings:** with the cli code backend canned
+   (`codebase-memory-mcp` answers from a table, so `/code/query` no longer stops at "backend none"),
+   `CliProvider._file_hash` opened a relative target against the server's working directory
+   (`open <server>/src/x.py`) for any `/code/query` with a relative `target`. It now takes the
+   project root the call names (`_file_section(..., project_root)`, passed by `build_block`) and
+   reads a relative file under it. Pinned by `test_a_relative_target_is_hashed_under_the_project_not_
+   the_working_directory`; the audit fails without it (mutation below).
+3. *minor, plain keys had no `../..` and nothing checked that a key's kind fits its sink.* Added
+   `relative climbing` (`../..`) to `PLAIN_VALUES`. The kind check is a static test,
+   `tests/http_api/test_chief_gate_kinds.py` (with `keys_joined_into_paths` in `chief_walk_support.py`,
+   a taint walk inside one function): a request key that a view or a `blueprints/` helper passes,
+   directly or through the names it is assigned to, to a call that makes or opens a path must have a
+   file kind or be listed in `HELD_BY_THE_VIEW` with what holds it. It found three plain keys that
+   are joined into a path: `board` of `POST /comms/run`, `adapter` of `GET /ops/export/skills`,
+   `topic` of `GET /status`; each is held by the view (a fixed list or `_safe_topic` and a
+   containment check), and a second test fails when a held key stops being joined, so the list
+   cannot go stale. 5 small tests pin the detector on source it must understand. **Its gap, stated
+   in the test and the doc:** it does not follow a key into another function (`start_run(flow=...)`
+   ends in `_load_flow`), does not know a path call that is not in its list, and cannot say a file
+   kind is the *right* one; the audit is the only check of those.
+4. *minor, `max_cost_usd` on `POST /runs`.* Added `("/runs", "max_cost_usd")` to
+   `WAITS_FOR_A_TICKET` and to the "Not here yet" paragraph, with the reason: no view reads the key
+   on `POST /runs` today (`handle_retry` and the `/runner/*` routes do), so the entry does not
+   list it and a chief that sends it is told the key is not listed. Ticket 15 lists it with the
+   code that reads it and deletes the line (a test fails until it does). I did not edit ticket 15.
+5. *minor, feature boards keyed by name.* Nothing to change, as the review says.
+6. *minor, early-stopping baselines.* Each now reaches its sink, asserted by `REACHES` in
+   `test_chief_gate_audit.py` (`test_the_requests_the_audit_starts_from_are_valid_ones`): a stop with
+   a run held (`stopped: true` on `/runs/<id>/stop`, `/comms/goals/stop`, `/comms/run/stop`,
+   `/comms/tasks/stop`), a supersede of a decision of the same board (`ok: true`), an answer with a
+   question open (`status: accepted`), and `/code/query` through the canned `cli` backend. Twenty
+   baselines in all. **Listed as not covered**, because the audit's request stops before the sink:
+   `reroute` and `retry` of `/runs/<run_id>/<action>` (reroute sets an attribute of a registered run;
+   retry starts a run whose loop the audit replaces) and the codeintel, lsp and both backends of
+   `/code/query` (they need an external tool). Said in "What was measured".
+7. *minor, the Cypher literal.* Reproduced (red: `test_code_context_cypher.py`, all 5 quote cases:
+   `a" OR 1=1 /x` ends the literal and adds a condition). `runner/code_context_cli.py::
+   _cypher_literal` escapes a backslash and a quote, and `_file_section` puts the tail through it.
+   (The tail has had its backslashes made slashes since before, so only the quote changes a query.)
+   The test reads the literal as a Cypher reader does and checks that it closes at the real closing
+   quote and that the rest of the query is the same text as before; an ordinary target gives the
+   same query as before.
+8. *minor, docs and ticket 17.* "For later tickets" (below) and the "Not here yet" paragraph of the
+   "Chief gate" section now say what ticket 17's `pathly api` texts must teach: the `project_root`
+   field, spelled as the session's (no backslash on a POSIX host), the per-route key lists, that a
+   relative `artifact_path` post is refused, and that a symbol `target` like `a:b` is read as a
+   drive path and refused. The "A file" bullet says the last two as well.
+
+Tests I edited, not only added: the two backslash tests above; `test_chief_gate_audit.py` (the
+value lists, `REACHES`, a grouped report, the fixture moved out); `chief_audit_world.py` (baselines
+moved to two new files); `test_chief_gate_keys.py` (`_posix_host`, `WAITS_FOR_A_TICKET`, backslashed
+roots in the hostile lists, two new tests). No assertion was loosened and no test is skipped.
+
+Proof after the fixes (each run fresh, after the last edit to code, tests and docs):
+
+- Test first: `509e381` and `fc2b66e` (two test-only commits; the second is `test_chief_gate_files.py`,
+  where `test_a_code_query_target_inside_the_project_passes` listed a backslash path as the
+  project's own: the Test command found it after the first commit, so it is host-aware now, in a
+  test-only commit of its own before the fix). Against the source as it was at `dfead50`, in a
+  worktree: `246 failed, 257 passed in 292.86s` over the nine files listed above.
+- The two Done when commands: `python -m pytest tests/http_api/test_chief_gate.py -q -p
+  no:cacheprovider` -> `106 passed in 31.12s`, exit 0; `python -m pytest
+  tests/comms_board/test_comms_write_perm.py -q -p no:cacheprovider` -> `33 passed in 8.09s`,
+  exit 0.
+- The measurement, `test_chief_gate_audit.py` (6 tests, about 50 s), counted with a temporary
+  print that I removed (the file is as committed): **7,097 requests at each tier.** Operator: 3,936
+  refused by the gate, 2,235 answered 200, 431 answered 404, 333 answered 400, 90 answered 409,
+  42 answered 308, 29 answered 500, 1 answered 405; 16,237 file system calls seen inside the
+  chief's own project and **0 outside it**. Planner: 5,032 refused, 1,392 answered 200, 361 answered
+  404, 243 answered 400, 42 answered 308, 26 answered 500, 1 answered 405; 11,874 seen, 0 outside.
+  Status: 5,992 refused, 555 answered 200, 347 answered 404, 138 answered 400, 42 answered 308, 22
+  answered 500, 1 answered 405; 8,364 seen, 0 outside. (Round 6 sent 3,830, 2,535 and 2,535.) The
+  500s are the hostile numeric values and the over-long folder name (Shortcuts); none touched a
+  file outside the project.
+- Mutation checks (each failing the named tests; every file restored afterwards and compared with a
+  copy): the host switch read as "a backslash always separates" (the old behaviour) -> the audit
+  fails at all three tiers (**28 touches** as an operator, 24 as a planner, 6 as a status chief) and
+  117 tests of the separators, gate, scope, files, keys and `scope_names_host` files fail; the code
+  backend's file read left to the working directory -> the audit fails at all three tiers (**55
+  touches** each) and `test_a_relative_target_is_hashed_under_the_project_not_the_working_
+  directory` fails; the Cypher literal not escaped -> 5 of 8 in `test_code_context_cypher.py`; the
+  file check turning a backslash into a slash before `lies_under` -> 6 failures in the files,
+  separators and keys tests.
+- Test command from `commands.md` -> `2880 passed, 2 skipped in 830.75s (0:13:50)`, exit 0 (the 2
+  skips are skips that the existing tests of those four folders make when FTS5, sqlite-vec or a
+  platform is missing; I added none). The domains that read what I changed besides it, `tests/consistency tests/local_operator
+  tests/hq_copilot tests/storage_paths tests/dag_goals tests/fsm_flows tests/install_skills
+  tests/code_intel` -> `1759 passed, 12 skipped in 305.46s`, exit 0 (`-rs` shows the skips: a flow
+  that has no designer stage, a Windows-only test, two "files not found in this environment", and
+  `test_windows_backslash_path_normalized`, which was skipped before).
+- Lint chain from `commands.md`, piece by piece, all exit 0: `black --check src/ tests/` (623 files
+  unchanged), `mypy` (`Success: no issues found in 330 source files`), `check_file_size.py` (`1026
+  source files checked; 18 known over 400 lines, none new, none grown`: `scope_names.py` 139,
+  `chief_project.py` 186, `code_context_cli.py` 201, `chief_audit_world.py` 250 and its new
+  neighbours `chief_audit_calls.py` 167, `chief_audit_reads.py` 48, `chief_audit_sandbox.py` 115,
+  `chief_walk_support.py` 312), `check_no_mirror_reads.py`, `gen_test_index.py --check`,
+  `lint-imports` (`1 kept, 0 broken`), `bandit -q -r src/ -ll -x src/pathly_data/` (exit 0, no SQL
+  added), `check_adapters.py`, `check_entry_points.py`. Smoke, `python -m build --wheel` and
+  `check_version_sync.py` exit 0. No `# noqa`, `# nosec`, `type: ignore`, `pytest.skip`,
+  `skipif` or `xfail` added (grepped over `git diff dfead50` of every file but the docs).
+
+
+
 **For later tickets**
 
 - Ticket 09: no change to the table is needed for `/chief/human-messages`. Its hook posts with no
@@ -1186,6 +1400,25 @@ Proof after the fixes (each run fresh, after the last edit to code, tests and do
   /comms/artifacts/<id>/section` needs the chief's own `project_root`. A project board must be
   named by its absolute root: a relative root such as `proj/x` is stored and served but no longer
   exported to disk.
+- Ticket 12 (round 7): the baseline request for `/comms/directives` goes in `chief_audit_calls.py`
+  (`POST_VARIANTS`, 167 lines) now, not `chief_audit_world.py`; the GET baselines are in
+  `chief_audit_reads.py`. Add the route to `REACHES` in `test_chief_gate_audit.py` with the answer
+  that says the work was done, so a baseline that stops early is caught.
+- Ticket 15 (round 7): `max_cost_usd` on `POST /runs` is a key no view reads there today (only
+  `POST /runs/<run_id>/retry` and the `/runner/*` routes do), and the `("/runs", "POST")` entry does
+  not list it, so a chief that sends it is told the key is not listed. Ticket 15's text says it
+  reads the key from `POST /runs`: list it in the entry (`chief_field_calls.py`, kind `NUMBER`) with
+  the code that reads it, and delete `("/runs", "max_cost_usd")` from `WAITS_FOR_A_TICKET` in
+  `test_chief_gate_keys.py`, which fails until you do. I did not edit ticket 15.
+- Ticket 17 (round 7): this corrects the bullet above, which says `project_root` is compared
+  after `normalise_project_root`: it is compared by `scope_names.root_spelling` (trailing slashes
+  dropped, nothing else), and on a POSIX host a value with a backslash is refused whatever it
+  spells. The `pathly api` texts must teach: name `project_root` exactly as the session has it, on
+  the routes that need it; send only the keys the route's entry lists (`Fields.allowed(rule)`, the
+  403 names a key that is not listed); post an artifact with an **absolute** `artifact_path` inside
+  the project (a relative one is refused); and give `/code/query` a **file path** as `target`, since
+  a symbol like `a:b` is read as a drive path and refused. The living doc says the same under "Not
+  here yet".
 - Ticket 13: `test_status_chief_reads_and_is_refused_a_note` already checks "a Status-style token
   is refused on a write" at the HTTP level; the operator "starts a run" scenario is not covered
   here beyond the operator passing the gate on `POST /runs`.

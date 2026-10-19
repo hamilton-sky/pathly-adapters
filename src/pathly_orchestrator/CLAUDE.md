@@ -634,7 +634,7 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
   (below), so a route added later is refused to the chief until someone lists it and says which
   project it reads. (The chief gate tests are `tests/http_api/test_chief_gate*.py`, one file per
   concern, with the shared fixtures in `chief_gate_support.py`; a new test goes in the file of
-  its concern.) Three tests read the tables against the code, and each says what it does not read.
+  its concern.) Four tests read the tables against the code, and each says what it does not read.
   `test_chief_gate_tables.py` walks `app.url_map` for the routes. `test_chief_gate_keys.py` reads
   the source of every view **and of the helpers it calls** under `blueprints/` (`create_run`,
   `handle_retry`, `_dispatch_*`, three levels deep) for the keys they read from the request, found
@@ -642,8 +642,17 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
   `request.get_json()` or `request.args`, or a helper parameter called `body` or `data`, read by
   `.get("k")`, `.getlist("k")`, `["k"]` or `"k" in …`. It does not read a function outside
   `blueprints/` that is handed the whole body, a key built at run time, or `request.form`,
-  `request.values` and `request.json`. `test_chief_gate_audit.py` covers what a reading of the
-  source misses (see "What was measured").
+  `request.values` and `request.json`. `test_chief_gate_kinds.py` reads the same source for a key
+  the entry calls plain (text, number, flag, enum, name, id) that a view, or a helper under
+  `blueprints/`, passes (directly or through the names it is assigned to, inside one function) to
+  a call that makes or opens a path; the three it finds today (`board` of `POST /comms/run`,
+  `adapter` of `GET /ops/export/skills`, `topic` of `GET /status`) are listed with what holds each
+  in the view, and a fourth fails the test until it has a file kind or is listed. It does not see a
+  key handed to a function that joins it later (`start_run(flow=...)`, `start_board_run`), a call
+  that is not in its list of path calls, or whether a file kind is the *right* one (a folder name
+  declared as a scope, a root declared as a path): that is left to the audit.
+  `test_chief_gate_audit.py` covers what a reading of the source misses (see "What was
+  measured").
 - **Overrides.** A body with a non-empty `prompt_override` or `stage_overrides`, on any route,
   also needs `run` (the 403 names `run`): the Planner may call the decompose routes but cannot
   hand verbatim prompt text to the agents they start.
@@ -656,8 +665,21 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
   entry with one function, reading the query string for a GET and the JSON body for every other
   route, as the views do; a route with no entry is 403 (`the gate has no project entry for this
   route`), so the gate fails closed. Every value is
-  compared after `supervisor/chief_session.normalise_project_root` (forward slashes, no trailing
-  slash) with the session's, else 403; a value that is not a string is refused too.
+  compared with the session's by one spelling, `scope_names.root_spelling` (trailing slashes
+  dropped; nothing else changed: no `.` or `..` collapse, no trimming, a drive letter's case kept),
+  else 403; a value that is not a string is refused too. **The host decides what a backslash is**
+  (`scope_names.host_is_windows`, the one switch a test patches): on Windows `\` and `/` both
+  separate and a backslash reads as a slash; on any other host a backslash is an ordinary
+  file-name character, so a `project_root` or a path-kind value (`scope`, `path`) that has one is
+  refused, because the routes open the raw string and `/work/proj\` is a different folder than
+  `/work/proj`. The rule is that two strings the gate calls one root must be one directory to
+  the routes that open them as they are (`test_scope_names_host.py` creates the folders and asks
+  the file system); a spelling that might be the same directory but cannot be shown to be (`.`
+  segments, doubled slashes inside, a leading space) is refused. A session row whose root has a
+  backslash on such a host binds nothing (every call that names a project is refused). No row
+  `open_chief` writes is one: it stores `normalise_project_root` (backslashes made slashes on
+  every host), so a POSIX project directory whose name has a backslash cannot be a chief's
+  project (the stored root names another path); that limit is not changed here.
   - **`project_root`** is checked wherever it appears, in the body or the query string of any
     route.
   - **Naming it.** A route that falls back to the server's working directory,
@@ -703,8 +725,14 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
     project's), `/comms/post`'s `artifact_path` (it must be absolute; the row keeps it, so it is
     checked at the post) and the path an `artifact` post takes from its `text` when
     `artifact_path` is blank (always relative, so refused) must lie under the session's root once
-    their `..` segments are collapsed. This is a text check: symlinks are not followed and a
-    Windows drive letter is compared as written.
+    their `..` segments are collapsed (`scope_names.lies_under`, with the host's reading of a
+    backslash above: on a POSIX host a path with one is refused). This is a text check: symlinks
+    are not followed and a Windows drive letter is compared as written. A string with a drive
+    prefix (`C:`, and so a symbol target like `a:b`) is read as an absolute path on every host and
+    refused unless it lies under the root; a POSIX host would read it as a relative name, but the
+    gate does not guess which a route means. A relative `artifact_path` is refused for the same
+    reason as the relative path of an `artifact` post: the row keeps the path it is posted
+    with.
   - **A stored path.** A row keeps the path it was posted with (`comms_artifacts.path`), and
     `GET /comms/artifacts/<artifact_id>/section` opens it, whoever posted it. So that read names
     the root it reads under (a chief must send its own `project_root`) and `hydrate_section` is
@@ -774,7 +802,7 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
     of `/comms/post`, and the `flow` of `/comms/goals/run` (the goal's executor picks its flow; a
     chief that wants another one starts it with `POST /runs`). Every listed key has a kind
     (`Fields.kinds()`): text, number, flag, enum, name or id (opaque to the gate, never joined into
-    a path by design), or one of the kinds that can reach a file or a folder, each with a rule the
+    a path by design; `test_chief_gate_kinds.py` and the audit's plain values check it), or one of the kinds that can reach a file or a folder, each with a rule the
     gate applies and, where the key reaches a sink, the sink applies as well: `root` (the
     session's), `scope` and `segment` (above), `path` (inside the project), `ref` (a file ref
     the sink resolves under the root the call names, which the gate makes it name: `context_refs`,
@@ -808,29 +836,50 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
     gate checks for a goal a chief posted and nobody checks for a goal another writer posted (the
     same id-addressed gap as `goal_id` under "Not bound").
   - **What was measured.** `tests/http_api/test_chief_gate_audit.py` runs the server with the
-    spawn host faked, a database of its own and three directories under a fake home (the chief's
-    project, another project, the server's working directory), and sends every key of every route
-    of the table, and every variable of its URL, hostile values (`..`, a climbing path, an absolute
-    path into the other project, into the server's directory and into the home directory, a UNC path
-    in both slash directions, a drive letter, a NUL, a trailing slash, a 5,000-character name), as
-    a status, a planner and an operator chief, in requests that are valid but for that value
-    (`chief_audit_world.py`: one or more per route, seeded as a human would). `sys.addaudithook`
-    records every file system call the process makes (`open`, `os.mkdir`, `rename`, `remove`,
-    `rmdir`, `symlink`, `link`, `truncate`, `chmod`, `listdir`, `scandir`, `shutil` copies and
-    moves, `glob`, `sqlite3.connect`, a child process's working directory) and none may fall in the
-    other project, the server's working directory or the home directory (`Path.home()` in the test;
-    the user's real home is not a zone, the repository may lie inside it), outside the chief's own
-    project and `~/.pathly`. The same file shows the audit sees each kind of call, and sees a write
-    a request makes: a post with no token that names another project's root as a board's scope
-    makes the mirror write that project's `BOARD.json`; the same post by a chief is refused. It was
-    also checked by breaking the guards: with the project rules off, with the key list and the
-    flow and skill name checks off, and with the stored-path containment off, it fails each
-    time; with only the key list off it passes, because the sinks hold. What it cannot see:
-    `os.stat` and `os.path.exists` are not audit events (a probe for a file is invisible), nor is
-    the C layer of a library (sqlite is seen at `connect`) or what a child process opens; a route
-    is only as deep as the requests it is sent (13 routes are asserted to accept their baseline);
-    and other writers (a human's post may store any path) and the feature-board mapping above are
-    outside it, since every `demo` run of the sandbox lives in the chief's project.
+    spawn host faked, a database of its own, a canned `codebase-memory-mcp` (the `cli` code backend
+    answers from a table, so `/code/query` reaches the file hash and the graph query) and three
+    directories under a fake home (the chief's project, another project, the server's working
+    directory). It sends every key of every route of the table, and every variable of its URL,
+    hostile values, as a status, a planner and an operator chief, in requests that are valid but
+    for that value (`chief_audit_world.py`, `chief_audit_calls.py`, `chief_audit_reads.py`: one or
+    more per route, seeded as a human would). **Which values reach which key, at every tier:** a key
+    of a file kind (root, scope, segment, path, ref, flow, skill) or a URL variable gets the whole
+    list: `..`, a relative climbing path (`../..`), a climbing path into the other project, an
+    absolute path into the other project, into the server's directory and into the home directory,
+    a UNC path in both slash directions, a drive letter, a NUL, a trailing slash, a
+    5,000-character name, and the spellings of the chief's own root and file that a gate might take
+    for the chief's own (a trailing slash, two, a dot segment at the end or in the middle, doubled
+    slashes, a backslash at the end, backslashes for every slash, mixed separators, a climb with
+    backslashes, a leading space). Every other key (text, number, flag, enum, name, id) gets a
+    shorter list: a relative and an absolute climbing path, the other project and a file in it, a
+    NUL, a long name. `sys.addaudithook` records every file system call the process makes (`open`,
+    `os.mkdir`, `rename`, `remove`, `rmdir`, `symlink`, `link`, `truncate`, `chmod`, `listdir`,
+    `scandir`, `shutil` copies and moves, `glob`, `sqlite3.connect`, a child process's working
+    directory) and none may fall in the other project, the server's working directory or the home
+    directory (`Path.home()` in the test; the user's real home is not a zone, the repository may
+    lie inside it), outside the chief's own project and `~/.pathly`. So nothing a request sends
+    lands in the server's working directory, at any tier, for any key and any spelling in those
+    lists. `test_chief_gate_separators.py` sends the root spellings through nine routes and
+    looks for what lands in the server's directory or has a backslash in its name. The audit file
+    also shows it sees each kind of call, and sees a write a request makes: a post with no token
+    that names another project's root as a board's scope makes the mirror write that project's
+    `BOARD.json`; the same post by a chief is refused. It was also checked by breaking the guards:
+    with the project rules off, with the key list and the flow and skill name checks off, with the
+    stored-path containment off, with the host switch read as "a backslash always separates" and
+    with the code backend's file read left to the server's directory, it fails each time; with
+    only the key list off it passes, because the sinks hold. What it cannot see: `os.stat` and
+    `os.path.exists` are not audit events (a probe for a file is invisible), nor is the C layer of
+    a library (sqlite is seen at `connect`) or what a child process opens; a route is only as deep
+    as the requests it is sent, and whether a key has the right kind is not judged by it; and
+    other writers (a human's post may store any path) and the feature-board mapping above are
+    outside it, since every `demo` run of the sandbox lives in the chief's project. Twenty
+    baselines (`REACHES`) are asserted to get to the work their route exists for, the early-stopping
+    ones included (a stop with a run held, a supersede, an answer with a question open, a query
+    through the canned backend). **Not covered:** `POST /runs/<run_id>/reroute` and `retry`
+    (`reroute` sets an attribute of a registered run, `retry` starts a run whose loop the audit
+    replaces with one that finishes at once, so a hostile value never reaches what they would do
+    with it) and the `codeintel`, `lsp` and `both` backends of `/code/query` (they need an
+    external tool; the audit's backend is `cli`).
   - On `/comms/post`, a `from` other than `chief` (or none) is 403.
   - **Not bound.** The table lists these as `unbound` rather than leaving them out. (1) Calls that
     name their target by id or by name: `goal_id` (`/comms/goals/run|stop|decompose`, `/runs` with
@@ -893,8 +942,18 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
 - **Not here yet.** Calls that name a run, a message or a goal by id are not bound to the chief's
   project (ticket 14 binds some of the writes; the rest are listed under "Not bound"); the cite
   rule for `answer` (10), the cost and run ceiling (15) and the directive route (12) are later
-  tickets. Ticket 12's `/comms/directives` needs a `ROUTE_FIELDS` entry (with the list of the keys a chief
-  may send) as well as a `ROUTE_ACTIONS` one, or the gate refuses it with `NO_ENTRY`.
+  tickets. Ticket 15 reads `max_cost_usd` on `POST /runs` (no view reads it there today;
+  `POST /runs/<run_id>/retry` and the `/runner/*` routes do), so that key is not on the entry's
+  list: a chief that sends it is told the key is not listed, and ticket 15 lists it with the code
+  that reads it and deletes its line from `WAITS_FOR_A_TICKET` in `test_chief_gate_keys.py`.
+  Ticket 12's `/comms/directives` needs a `ROUTE_FIELDS` entry (with the list of the keys a chief
+  may send) as well as a `ROUTE_ACTIONS` one, or the gate refuses it with `NO_ENTRY`. Ticket 17's
+  `pathly api` texts (what the chief's prompt teaches) must say: name your `project_root`, spelled
+  as the session's (on a POSIX host no backslash), on the routes under "Naming it"; send only the
+  keys a route's entry lists (`Fields.allowed`, the 403 names a key that is not listed); post an
+  artifact with an absolute `artifact_path` inside the project (a relative one is refused); and
+  give `/code/query` a file path as `target` (a symbol like `a:b` is read as a drive path and
+  refused).
 
 ### SSE events (GET /events/runner)
 
@@ -1056,7 +1115,7 @@ pathly_orchestrator/
     sections.py            # parse_sections/slugify_heading/structure_key — markdown section index (anchors)
     hydrate.py             # hydrate_section/ensure_indexed — /section payload + staleness; index_artifact_async (eager, section-index only)
     code_context.py        # CodeContextProvider protocol + get_provider()/build_block() (backend=auto[default]|off|cli|lsp|both|codeintel) — codebase-intelligence context injection
-    code_context_cli.py    # CliProvider — shells out to codebase-memory-mcp graph for code_context.py
+    code_context_cli.py    # CliProvider — shells out to codebase-memory-mcp graph for code_context.py; the target's tail goes into the Cypher as an escaped string literal (a quote or backslash cannot end it), and a relative target is hashed under the project root the call names, not the server's working directory
     code_context_lsp.py    # LspProvider — bridges a long-lived Serena MCP session (LSP, always-fresh); async warm-up, never-raise
     code_context_codeintel.py # CodeintelProvider — backend=codeintel: answers /code/query's op as asked (real callers/impact rows, semantic search) via the installed `codeintel` package — a running `codeintel serve-http` first, else one-shot `codeintel query --json`; `auto` prefers it when installed; never-raise
     cli.py                 # run_flow, main, resolve_stage, handle_blocked, handle_decide

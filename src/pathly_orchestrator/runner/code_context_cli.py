@@ -34,8 +34,19 @@ _CLI_MAX_FILES = 2
 _CLI_CACHE: dict[tuple[str, str], str] = {}
 
 
-def _file_hash(path: str) -> str:
-    """SHA1 of the file's bytes, or ``""`` when it can't be read."""
+def _cypher_literal(text: str) -> str:
+    """``text`` as the inside of a double-quoted Cypher string: a backslash or a quote in it
+    stays part of the string, so a request's target cannot end the literal and add conditions.
+    """
+    return text.replace("\\", "\\\\").replace('"', '\\"')
+
+
+def _file_hash(path: str, project_root: str = "") -> str:
+    """SHA1 of the file's bytes, or ``""`` when it can't be read. A relative ``path`` is read
+    under ``project_root`` (the project the call names), not the server's working directory.
+    """
+    if project_root and not os.path.isabs(path):
+        path = os.path.join(project_root, path)
     try:
         with open(path, "rb") as fh:
             return hashlib.sha1(fh.read(), usedforsecurity=False).hexdigest()
@@ -92,7 +103,7 @@ class CliProvider:
             return ""  # repo not indexed yet -> no block (caller degrades to Grep)
         sections: list[str] = []
         for path in list(files)[:_CLI_MAX_FILES]:
-            section = self._file_section(exe, project, path)
+            section = self._file_section(exe, project, path, project_root)
             if section:
                 sections.append(section)
         if not sections:
@@ -131,10 +142,12 @@ class CliProvider:
                     best_name, best_len = str(proj.get("name") or ""), len(root)
         return best_name
 
-    def _file_section(self, exe: str, project: str, path: str) -> str:
+    def _file_section(
+        self, exe: str, project: str, path: str, project_root: str = ""
+    ) -> str:
         """Cached-or-fresh structure section for ``path`` (content-hash cache).
         One deadline-bounded graph query; only non-empty sections cached."""
-        file_hash = _file_hash(path)
+        file_hash = _file_hash(path, project_root)
         key = (path, file_hash)
         if file_hash and key in _CLI_CACHE:
             return _CLI_CACHE[key]
@@ -142,7 +155,7 @@ class CliProvider:
         # both resolve against the graph's stored (index-root-relative) file_path.
         tail = "/".join(path.replace("\\", "/").rstrip("/").split("/")[-2:])
         cypher = (
-            'MATCH (n) WHERE n.file_path CONTAINS "' + tail + '" '
+            'MATCH (n) WHERE n.file_path CONTAINS "' + _cypher_literal(tail) + '" '
             'AND n.label IN ["Function","Method","Class"] '
             "RETURN n.name, n.in_degree, n.out_degree "
             "ORDER BY n.in_degree DESC LIMIT 12"

@@ -104,8 +104,11 @@ def _planted(env) -> list[str]:
     directory, and any file or folder, anywhere under the home, whose name has a backslash.
     """
     w = env.world
+    mark = (len(env.audit.violations), len(env.audit.seen))
     found = [p.name for p in w.server.iterdir()]
     found += [str(p) for p in w.project.parent.rglob("*") if "\\" in p.name]
+    # The listing above is the test's own, not the server's: the audit must not count it.
+    del env.audit.violations[mark[0] :], env.audit.seen[mark[1] :]
     return found
 
 

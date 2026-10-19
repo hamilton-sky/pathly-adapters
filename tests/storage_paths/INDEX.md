@@ -4,7 +4,7 @@
 
 Feature/goal storage layout, slugs, canonical artifact paths, storage migrations.
 
-11 test file(s).
+12 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -15,6 +15,7 @@ Feature/goal storage layout, slugs, canonical artifact paths, storage migrations
 | `test_p3_bucket_retirement.py` | board-scoped-storage P3: shared buckets retired from discovery; nested kinds resolve | 4 |
 | `test_resolve_storage_path.py` | Tests for _resolve_storage_path with the 3-tier probe order (P1) | 6 |
 | `test_scope_names_flow_skill.py` | ``scope_names``: what may join onto the packaged flows and skills folders (chief-agent 08, | 7 |
+| `test_scope_names_host.py` | chief-agent 08 (round 7): ``scope_names`` says what "the same directory" means on this host | 7 |
 | `test_storage.py` | covers activity rotates at 5mb | 1 |
 | `test_storage_layout_invariant.py` | Layout invariant: EVERY subsystem locates a feature at its ONE canonical home | 11 |
 | `test_storage_paths.py` | covers normal slug passes through; goal id slug passes; absolute forward slash raises; … | 9 |
