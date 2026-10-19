@@ -84,7 +84,6 @@ def test_a_code_query_target_outside_the_project_is_refused_with_another_root(
         "src/a.py",
         "src/../a.py",
         "OWN/src/a.py",
-        "OWN\\src\\a.py",
         "OWN/",
         "OWN",
         "parse_result",
@@ -97,6 +96,30 @@ def test_a_code_query_target_inside_the_project_passes(client, project, target):
 
     assert resp.status_code == 200, resp.get_data(as_text=True)
     assert _passed(resp)
+
+
+@pytest.mark.parametrize("windows", [False, True], ids=["posix host", "windows host"])
+def test_a_code_query_target_with_backslashes_is_the_projects_on_windows_only(
+    client, project, windows, monkeypatch
+):
+    """A backslash separates only on a Windows host. On any other host the route opens the raw
+    string, where ``proj-a\\src\\a.py`` is one file name in the folder above the project, so
+    the gate refuses it (round 7); it used to read it as ``proj-a/src/a.py``.
+    """
+    monkeypatch.setattr(
+        "pathly_orchestrator.scope_names.host_is_windows",
+        lambda: windows,
+        raising=False,
+    )
+    chief = _chief("status", project)
+
+    resp = _target(client, chief, project, str(project) + "\\src\\a.py")
+
+    if windows:
+        assert resp.status_code == 200, resp.get_data(as_text=True)
+        assert _passed(resp)
+    else:
+        assert _gated(resp), resp.get_data(as_text=True)
 
 
 def test_a_code_query_names_its_project_even_for_an_absolute_target(client, project):
