@@ -31,6 +31,7 @@ from binding_support import (
     ROOT,
     STANDING,
     TOPIC,
+    at,
     directive,
     governance_part,
     post,
@@ -130,9 +131,13 @@ def test_feature_directive_follows_its_own_tier_toggle():
 
 def test_project_directive_survives_every_tier_being_off():
     directive(NO_DEPS)
-    block = render("builder", board_scope=NONE)
+    directive(ONLY_BUILDER, to_agent="builder")
+    directive("For the reviewer.", to_agent="reviewer")
+    counts: dict = {}
+    block = render("builder", board_scope=NONE, counts=counts)
     assert block.startswith("## Communication Board")
     assert NO_DEPS in standing_part(governance_part(block))
+    assert counts["governance"] == 2, "the preview's governance count, not 0"
 
 
 def test_every_tier_off_without_a_directive_is_still_empty():
@@ -147,18 +152,25 @@ def test_get_binding_decisions_rules():
     from pathly_orchestrator.db.connection import get_db
     from pathly_orchestrator.db.queries.comms_directives import get_binding_decisions
 
-    first = directive("first", to_agent="builder")
-    second = directive("second")
+    conn = get_db()
+    # Dated explicitly and posted out of date order: neither the clock nor the row order
+    # can make the ORDER BY pass.
+    late = directive("late", ts=at(2))
+    early = directive("early", to_agent="builder", ts=at(1))
+    blank = directive("blank superseded_by", ts=at(3))
+    conn.execute("UPDATE comms_messages SET superseded_by='' WHERE id=?", (blank,))
+    conn.commit()
     directive("other role", to_agent="reviewer")
     directive("no addressee", to_agent="")
+    directive("a binding question", kind="question")
+    directive("a binding nudge", kind="nudge")
     post("not binding")
     retire(directive("deleted"), "deleted_at")
     retire(directive("superseded"), "superseded_by")
-    conn = get_db()
     ids = [r["id"] for r in get_binding_decisions(conn, ["project"], [ROOT], "builder")]
-    assert ids == [first, second], "oldest first, this role and * only"
+    assert ids == [early, late, blank], "oldest first; decisions for this role and *"
     star_only = get_binding_decisions(conn, ["project"], [ROOT], "")
-    assert [r["id"] for r in star_only] == [second]
+    assert [r["id"] for r in star_only] == [late, blank]
     assert get_binding_decisions(conn, [], [ROOT], "builder") == []
     assert get_binding_decisions(conn, ["project"], [], "builder") == []
 

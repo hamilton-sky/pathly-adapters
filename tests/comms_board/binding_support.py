@@ -1,9 +1,12 @@
 """Shared constants and helpers of the binding-directive tests (chief-agent 11).
 
-``post`` writes a decision through ``post_message`` and sets ``binding`` directly: the route
-that sets it is a later ticket. ``render`` renders the board context for a role; ``governance_part``,
-``standing_part`` and ``ranked_part`` cut the governance section and its two lists out of it. Imported by
-bare name (``tests/conftest.py`` puts ``tests/`` on ``sys.path``).
+``post`` writes a message through ``post_message`` and sets ``binding`` (and, when given, ``ts``)
+directly: the route that sets ``binding`` is a later ticket, and an explicit ``ts`` keeps an
+ordering assertion off the wall clock. ``render`` renders the board context for a role;
+``governance_part``, ``standing_part`` and ``ranked_part`` cut the governance section and its two
+lists out of it. Imported by bare name: with no ``__init__.py`` pytest puts the test file's own
+directory (``tests/comms_board``, where this file sits) on ``sys.path``; ``tests/conftest.py``
+adds only ``tests/`` itself.
 """
 
 from __future__ import annotations
@@ -31,7 +34,22 @@ RETIRE = {
 }
 
 
-def post(text, *, to_agent="*", board="project", scope=ROOT, binding=0, acked=True):
+def at(second):
+    """An explicit, strictly ordered ``ts`` for ``post(..., ts=at(n))``."""
+    return f"2026-08-10T10:00:{second:02d}+00:00"
+
+
+def post(
+    text,
+    *,
+    to_agent="*",
+    board="project",
+    scope=ROOT,
+    binding=0,
+    acked=True,
+    kind="decision",
+    ts=None,
+):
     from pathly_orchestrator.db.connection import get_db
     from pathly_orchestrator.db.queries.comms import acknowledge_message, post_message
 
@@ -42,11 +60,14 @@ def post(text, *, to_agent="*", board="project", scope=ROOT, binding=0, acked=Tr
         scope=scope,
         from_agent="chief",
         to_agent=to_agent,
-        type="decision",
+        type=kind,
         text=text,
     )
     if binding:
         conn.execute("UPDATE comms_messages SET binding=? WHERE id=?", (binding, mid))
+        conn.commit()
+    if ts:
+        conn.execute("UPDATE comms_messages SET ts=? WHERE id=?", (ts, mid))
         conn.commit()
     if acked:
         acknowledge_message(conn, mid, "builder")
