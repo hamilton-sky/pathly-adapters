@@ -245,6 +245,29 @@ def test_the_audit_sees_a_call_in_each_zone_and_ignores_the_projects_own(world):
     assert any(t.path.endswith("own.txt") for t in audit.seen)
 
 
+def test_the_audit_ignores_the_open_cpython_makes_to_quote_a_source_line(world):
+    """Python 3.13 formats a logged traceback by compiling source fragments; a syntax error in one
+    makes CPython open the code's name, ``<unknown>``, in the working directory (the server's).
+    No such file exists, so nothing was read. A real file under that name is still a touch.
+    """
+    w, audit = world.world, world.audit
+    audit.violations.clear()
+
+    audit.record("open", ("<unknown>", "rb", 0))
+    with pytest.raises(SyntaxError):
+        compile("(", "<unknown>", "exec")
+    assert audit.violations == []
+
+    planted = w.server / "<unknown>"
+    planted.write_text("x")
+    try:
+        audit.violations.clear()
+        audit.record("open", ("<unknown>", "rb", 0))
+        assert [t.event for t in audit.violations] == ["open"]
+    finally:
+        planted.unlink()
+
+
 def test_the_audit_sees_a_write_a_request_makes_in_another_project(world, client):
     """A caller with no token may name another project's root as a board's scope, and the board
     mirror then writes that project's ``BOARD.json``. The chief gate refuses the same call to a

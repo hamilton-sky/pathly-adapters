@@ -84,7 +84,7 @@ class Audit:
             if raw is None and event not in _DEFAULT_TO_CWD:
                 continue
             path = _absolute(raw)
-            if path is None:
+            if path is None or _is_pseudo_file(event, raw, path):
                 continue
             touch = Touch(event, path, self.label)
             if self.under(path, self.allowed):
@@ -123,6 +123,24 @@ def _absolute(raw: object) -> str | None:
             return os.path.normpath(joined)
     except Exception:
         return None
+
+
+def _is_pseudo_file(event: str, raw: object, path: str) -> bool:
+    """True for an ``open`` of a name like ``<unknown>`` that names no file.
+
+    CPython names code it compiles from a string ``<string>`` or ``<unknown>``, and a syntax error
+    in that code makes it open the name to quote the offending line. Python 3.13's traceback
+    formatting compiles source fragments, so the server logging an exception does this in the
+    working directory (the server's). The open finds nothing and reads nothing; a file that really
+    exists under such a name is still reported.
+    """
+    return (
+        event == "open"
+        and isinstance(raw, str)
+        and raw.startswith("<")
+        and raw.endswith(">")
+        and not os.path.lexists(path)
+    )
 
 
 _active: Audit | None = None
