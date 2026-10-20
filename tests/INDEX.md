@@ -13,7 +13,7 @@ Tests are grouped into domain folders that mirror the app's architecture layers.
 | [`db/`](db/INDEX.md) | Database layer — schema/queries, connection isolation, write guard. | 17 |
 | [`fsm_flows/`](fsm_flows/INDEX.md) | FSM engine, gates, transitions, flow definitions, feedback protocol & fix-routing. | 46 |
 | [`hq_copilot/`](hq_copilot/INDEX.md) | HQ copilot — board context packet, HQ model turn & read-only guardrails, model eligibility, /hq/* endpoints. | 5 |
-| [`http_api/`](http_api/INDEX.md) | HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, prompt-event contract. | 39 |
+| [`http_api/`](http_api/INDEX.md) | HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, prompt-event contract. | 41 |
 | [`install_skills/`](install_skills/INDEX.md) | Adapter install/setup, stitch & compose, skill composition / round-trip / export, plugin manifests. | 28 |
 | [`local_operator/`](local_operator/INDEX.md) | HQ operator actions — action catalog & availability, operator turn, proposal check, confirmed execution through real routes, audit. | 4 |
 | [`runner_supervisor/`](runner_supervisor/INDEX.md) | Runner control loop, supervisor, spawn channel, lane/worktree isolation, file-claim registry, services facade. | 22 |

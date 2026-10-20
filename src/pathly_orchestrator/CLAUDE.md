@@ -296,7 +296,7 @@ POST /runner/resume                  ← resume paused pipeline
 POST /runner/resume-parked           ← resume a run parked on a headless human checkpoint (fresh run_id, same FSM state)
 POST /runner/advance                 ← skip past current block
 POST /runner/decision                ← supply a continue/block/escalate decision to a waiting run
-POST /runner/agent-answer            ← answer an agent's mid-run human question
+POST /runner/agent-answer            ← answer an agent's mid-run human question (a chief token sends `cite` only — "Chief gate")
 POST /runner/reroute                 ← reroute the run to a different stage/adapter
 POST /runner/retry                   ← retry blocked stage
 POST /runner/abort                   ← abort run completely
@@ -557,7 +557,8 @@ POST /chief/human-messages  ← {run_id, hook_secret, text, session_id, relayed?
   - **`/clear` in the chief tab** gives claude a new session id (measured: the hook's
     `session_id` changes), so every later prompt is a 403 `not this chief's claude session` and
     nothing more is recorded for that tab. The hook says nothing, so neither the human nor the
-    chief sees it, and ticket 10 sees "no human message" from then on. It fails safe.
+    chief sees it, and the cite rule ("Cited answers" in the chief gate section) finds no later
+    message to cite: the chief can relay no answer until the tab is reopened. It fails safe.
 
 ### Request bodies — one lenient reader for every comms route (`_helpers.read_json_body`)
 
@@ -685,7 +686,7 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
 | `decide` | `/comms/post` type `decision` or `constraint` (a `supersedes` list included); `/comms/acknowledge` on any row that is not a human-addressed escalation; `/comms/supersede`, `/comms/directives` (the route arrives with ticket 12) |
 | `run` | `POST /runs`, `/comms/goals/run`, `/comms/run`, `/comms/tasks/run`; `/runs/<run_id>/<action>` for `pause\|resume\|advance\|reroute\|retry` |
 | `stop` | `/runs/<run_id>/stop`; `/runs/<run_id>/<action>` for `abort`; `/comms/goals/stop`, `/comms/run/stop`, `/comms/tasks/stop` |
-| `answer` | `/runner/agent-answer`, `/comms/answer`; `/comms/acknowledge` on an escalation with `to_agent = "human"` (the gate looks the row up by `message_id`) |
+| `answer` | `/runner/agent-answer`, `/comms/answer`; `/comms/acknowledge` on an escalation with `to_agent = "human"` (the gate looks the row up by `message_id`). Held to the cite rule ("Cited answers" below) |
 
 - **Deny by default.** Every non-GET route the table does not list is 403 to every tier (for
   example `/db/query`, `/skills/prompts`, `/chief/open|close|human-messages`, `/comms/edit|delete|hydrate`,
@@ -719,6 +720,57 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
 - **Overrides.** A body with a non-empty `prompt_override` or `stage_overrides`, on any route,
   also needs `run` (the 403 names `run`): the Planner may call the decompose routes but cannot
   hand verbatim prompt text to the agents they start.
+- **Cited answers.** A chief answers an agent only by naming a message the person typed in its
+  own tab; Pathly relays that message's text, so the chief never words the answer
+  (`http_server/chief_cite.py`, called by `chief_gate` once every reading of the body has passed
+  the other checks). An `answer` action (`/runner/agent-answer`, `/comms/answer`, and
+  `/comms/acknowledge` on an escalation with `to_agent = "human"`) from a chief token must send
+  `cite: <number>` and nothing else:
+  - A body that carries `answer` or `option_id` is 403 `send cite only: Pathly relays the cited
+    message's text` (so the chief cannot word an answer or pick an option for the person; its own
+    explanation goes on the board as a separate `note`).
+  - `cite` must be an integer (not a bool, string or float) naming a `chief_human_messages` row of
+    kind `human` and of this session's `run_id`: the style prompt (the session's first message) and
+    a `relayed` message cannot be cited, nor can another session's. Otherwise 403 `cite a human
+    message from this chief session` (for a session whose engine is not `claude` the text adds
+    that a codex chief records none, so it can relay nothing).
+  - The message must have been recorded at or after the question was asked: for a run's topic,
+    `RunnerState._agent_question["asked_at"]` (set under the registry lock by
+    `supervisor/interactions.py::_await_agent_question` together with the question, the options
+    and `questions`, the whole list of an AskUserQuestion, and cleared on every exit); for
+    `/comms/answer` the `ts` of the `question_id` row; for a human escalation the `ts` of the
+    escalation. A topic whose run belongs to another project is 403 `that is not this chief's
+    project`. A topic with no run, a run that is not awaiting an answer, a question id with no
+    row, and a `topic` or `question_id` that is not a non-blank string are left to the route, which
+    answers 404, 409, 404 and 400. A `ts` that cannot be read is a refusal.
+  - A message can be cited once (`chief_citations.message_id` is unique): the gate calls
+    `record_citation(run_id, cite, route, target)` last and answers 403 `that message was already
+    cited` for a second use. The citation is spent when the gate lets the call through, even if
+    the route then answers 404 or 409; the person types again.
+  - On success the gate sets `flask.g.chief_cited_text` to the message's `text`; the two answer
+    routes read their answer through `chief_cite.answer_text(data)` (the cited text for a chief,
+    the body's `answer` for every other caller, so a caller without a chief token gets exactly
+    what it sent). The route's own `.strip()` of the answer still applies. For a human
+    escalation the gate sets `g.chief_cited_gate = <escalation id>` instead, and
+    `comms/_helpers.refuse_agent_on_human_gate` lets a live run token through only for that id;
+    every other run token is refused as before, `/comms/delete` stays refused to a chief and
+    `force_past_gate` stays a human-only affordance.
+  - The gate reads every reading of the body (`_bodies`): the readings must agree on `cite` and on
+    the target, and none may carry `answer` or `option_id`.
+
+  **What a citation proves, and what it does not.** It proves the words an agent receives are
+  words that reached the chief's tab as a prompt claude delivered with none of the known wrappers
+  ("Human messages" above is a deny-list, not a test for "typed"), relayed to the question the
+  chief picked, once. It does not prove the person meant them for that question: a chief can cite
+  an unrelated later remark, and the person reading the board is what catches it. Against an
+  `operator` chief, which can start a headless agent, a `human` row is "what reached the tab",
+  not proof that a person typed it, because that agent runs as the same OS user and can post to
+  `POST /chief/human-messages` itself if it reads the session's secret file and `--session-id`
+  (spec § Risks). `/clear` in the tab changes claude's session id, so afterwards the hook records
+  nothing and the chief has nothing citable until the tab is reopened; a codex chief has none at
+  all. The gate checks the question when the request arrives and the route relays a moment later;
+  if the run's question changes in that window (the agent asks a new one), the cited message goes
+  to the new question although it may predate it. The words are still the person's.
 - **One project.** `http_server/chief_fields.py::ROUTE_FIELDS` is the inventory: one entry per
   `(rule, method)` a chief can get past the action table (merged from `chief_field_calls.py`, the
   POST routes, and `chief_field_reads.py`, the GETs; each entry is a `Fields` of
@@ -886,8 +938,11 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
     gate applies and, where the key reaches a sink, the sink applies as well: `root` (the
     session's), `scope` and `segment` (above), `path` (inside the project), `ref` (a file ref
     the sink resolves under the root the call names, which the gate makes it name: `context_refs`,
-    `artifact`), `flow` and `skill`. The `cite` of the three answer routes is listed before any
-    view reads it (ticket 10 reads it). A key a view starts to read is refused to a chief until
+    `artifact`), `flow` and `skill`. The `cite` of the three answer routes is read by the gate's cite
+    rule (`chief_cite`, "Cited answers" above), not by a view, so `test_chief_gate_keys.py` still
+    counts it as a listed key no view reads (`WAITS_FOR_A_TICKET`); the `answer` those routes list
+    is read through `chief_cite.answer_text`, which the test's walk follows (`BODY_HELPER_MODULES`
+    of `chief_walk_support.py`). A key a view starts to read is refused to a chief until
     someone lists it (`test_chief_gate_keys.py` fails first), so the keys a chief's prompt may name
     (ticket 17) are the entries' lists.
   - **What reaches a path, and what holds it.** Read in round 4 and again in round 6; round 6
@@ -1234,7 +1289,7 @@ pathly_orchestrator/
     terminal_reconcile.py  # _agent_done_watcher, _reconciliation_window, _synthesize_agent_done_if_missing
     terminal_billing.py    # _emit_executor_telemetry, _reconcile_billing_now (were spawn-local closures)
     terminal_phase.py      # _write_supervisor_phase_summary
-    interactions.py        # _await_agent_question
+    interactions.py        # _await_agent_question (keeps the pending question on RunnerState._agent_question: question, options, every question of the ask, asked_at; cleared on every exit)
     orchestrator.py        # _loop, _resolve_stage_supervised (399 lines — under the
                            #   400 ratchet since fan-out Phase C, so it can never regress)
     fan_out.py             # run_stage — THE one call site for executing an FSM stage:
@@ -1317,6 +1372,7 @@ pathly_orchestrator/
     chief_field_reads.py   # READ_FIELDS: the entries of the GET routes a chief can reach (the query keys they read, or the reason they read no project)
     chief_project.py       # project_refusal(): applies a ROUTE_FIELDS entry to one request (query string for a GET, body otherwise, the URL's `<action>` for the retry verb) and says whether the project it names is the session's — see "Chief gate"
     chief_keys.py          # key_refusal(): refuses a key the entry does not list, and a `flow` or `skill` that is not one name (scope_names.is_flow_name / is_skill_name) — see "Chief gate"
+    chief_cite.py          # cite_refusal() / answer_text(): the cite rule for an `answer` action — the chief names a human message of its session by `cite`, the gate checks it (kind human, this session, typed after the question, once) and keeps its text on flask.g for the answer routes to relay — see "Chief gate"
     run_identity.py        # caller_identity(request) -> CallerIdentity: kind run|anonymous from the X-Pathly-Run-Token header (body role/run_id/from never read); unknown/revoked token logged at info with the remote addr; `ui` kind reserved (RRP-2b). Nothing applies a policy from it yet
     sse.py                 # SSE globals (_clients, _runner_clients, _menu_clients) + broadcast helpers
     pricing.py             # MODEL_PRICING, compute_cost_usd()

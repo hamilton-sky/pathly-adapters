@@ -1,7 +1,7 @@
 # Require a cited human message when the chief answers an agent
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 08, 09
 Test first: yes
 
@@ -135,3 +135,199 @@ exit 0
   the WAL checkpoint daemon shares it
 
 ## Answer
+
+**Built**
+
+- `src/pathly_orchestrator/supervisor/state.py`: `_agent_question: Optional[dict]` next to
+  `_awaiting_agent_answer`. `supervisor/interactions.py::_await_agent_question` sets it under
+  `_lock` with `_awaiting_agent_answer = True` to `{question, options, questions, asked_at}`
+  (`questions` is the whole list of the ask; `asked_at` is `time.time()`), and sets it back to
+  None on both exits (answered, aborted). The `AGENT_QUESTION` broadcast and the loop are as before.
+- `src/pathly_orchestrator/http_server/chief_cite.py` (new, 153 lines): `cite_refusal(rule, session,
+  conn, bodies)` and `answer_text(data)`. `chief_gate.py` (172 lines) calls it through
+  `_cite_refusal` after every reading of the body has passed every other check, once, so the
+  citation is spent only for a call the gate lets through.
+- `blueprints/runner/api_control.py` (`runner_agent_answer`) and `blueprints/comms/messages_crud.py`
+  (`comms_answer`, 396 lines) read the answer through `answer_text` (one line plus a lazy import
+  each). `blueprints/comms/_helpers.py::refuse_agent_on_human_gate` lets a run token through when
+  `g.chief_cited_gate` names the escalation it was asked about.
+- No change to `chief_routes.py` or `chief_field*.py`: `cite` was already a listed key (kind `id`) on
+  the three routes (ticket 08), and `answer` / `option_id` stay listed on `/comms/answer`
+  (`option_id` is not a key of `/runner/agent-answer`, see Decisions).
+- Tests: `tests/http_api/test_chief_cited_answers.py` (26 tests, the Done-when cases),
+  `test_chief_cited_edges.py` (35), `chief_cite_support.py` (`Session`, `Asker`, helpers). Edits to
+  existing test files, each because the new rule legitimately changes what a chief may send, none
+  to an assertion's strength: `chief_walk_support.py` (`BODY_HELPER_MODULES`: the key tests follow
+  `chief_cite.answer_text`, else `answer` looks read by no view and
+  `test_a_listed_key_is_read_or_is_a_url_variable_or_waits_for_a_ticket` fails),
+  `chief_audit_calls.py` / `chief_audit_world.py` (the audit's answer baselines cite a fresh message
+  per request instead of sending `answer`; `register_asking_run` sets `_agent_question`; a new
+  `ack a human escalation` variant), `test_chief_gate_bodies.py` (the two `/runner/agent-answer`
+  body tests cite instead of sending `answer`; the other-project one now also asserts the project
+  error, so it no longer passes because of "send cite only"), `test_chief_gate.py` (one test: an
+  operator's acknowledgement of a human escalation without a cite is now the gate's 403, not the
+  human gate's). `tests/INDEX.md` and `tests/http_api/INDEX.md` regenerated.
+- Living docs: `src/pathly_orchestrator/CLAUDE.md` ("Chief gate": the `answer` row, a "Cited answers"
+  bullet with what a citation proves and does not, the `cite` sentence of "One project", the
+  `/clear` line of "Human messages", the package map for `chief_cite.py` and `interactions.py`, the
+  `/runner/agent-answer` line); `map.md` (one Decisions line) and `learnings.md` (three lines).
+
+**Proof** (each run fresh, after the last edit to code or tests; the ticket, map and learnings were
+edited afterwards)
+
+- Test first: commit `cac9792` `test(chief-agent): 10 failing test` holds only test files. At that
+  commit `python -m pytest tests/http_api/test_chief_cited_answers.py -q -p no:cacheprovider` ->
+  `23 failed, 3 passed`, exit 1 (the 3 are the cases that must stay as they are: callers without a
+  chief token, a builder token on a human escalation). The failures were the right ones:
+  `AttributeError: 'RunnerState' object has no attribute '_agent_question'`, the route's own `400
+  Field 'answer' must be a non-empty string` where the gate should have answered 403 (a chief's
+  `cite` with no `answer` reached the route), and `ModuleNotFoundError ... chief_cite`.
+- `python -m pytest tests/http_api/test_chief_cited_answers.py -q -p no:cacheprovider` -> `26 passed
+  in 7.86s`, exit 0. It covers, with a registered `RunnerState` and `_await_agent_question` in a
+  thread: the state holds the question text, `asked_at` (between the test's own clock reads), the
+  options and both questions of a two-question ask, and the `AGENT_QUESTION` broadcast is unchanged;
+  `_agent_question` is None after an answer and after an abort; an operator's `/runner/agent-answer`
+  without `cite` is the gate's 403 `cite a human message from this chief session` and the thread is
+  still waiting; the style prompt, a `relayed` message, another session's human message and a
+  human message recorded before the question are each that 403 (waiting, no `chief_citations` row);
+  `cite` with an `answer` of the chief's own is 403 `send cite only: Pathly relays the cited
+  message's text`; a message recorded after the question gives 200 `{status: accepted, topic}`, the
+  thread returns the text exactly (`use CSV, it's what "ops" asked for\nand keep the header row`),
+  `_agent_question` is None and one `chief_citations` row has the route and topic; the same message
+  for a second question is 403 `that message was already cited` (second question still waiting),
+  and a message older than a later question is 403; the same rules for `/comms/answer` against a
+  `question` row (the stored `answer` message is the cited text; `option_id` and `answer` from the
+  chief are 403); an operator acknowledges a `to_agent: "human"` escalation with a cite recorded after
+  it (200, the flag lets it past `refuse_agent_on_human_gate`, one citation row for
+  `/comms/acknowledge`), gets 403 without a cite and with a cite recorded before it (not
+  acknowledged), and a builder token still gets the human gate's 403; no token and a builder
+  token get the `answer` they sent on both routes, no citation and no human message stored.
+- `python -m pytest tests/http_api/test_chief_cited_edges.py -q -p no:cacheprovider` -> `35 passed in
+  10.94s`: `cite` as a string, float, list, object, null, negative, unknown id or `True` (with a
+  `human` row numbered 1) is refused; a message stamped exactly `asked_at` (or exactly the question
+  row's `ts`) counts and one 1 ms earlier does not; a `ts` that cannot be read is refused; UTF-8 BOM,
+  UTF-16 and UTF-32 bodies are cited like plain ones and hide no `answer` on either route; a topic
+  of another project is 403 `that is not this chief's project`; a topic with no run is the route's
+  404, a run that is not awaiting the route's 409; a topic that is blank, null or a number is the
+  route's 400 and spends nothing; a codex session's refusal names codex; a chief can still cite an
+  unrelated later remark (the documented limit); `answer_text`, the flag of
+  `refuse_agent_on_human_gate` (one id only), disagreeing readings and "every answer route has a
+  target key" are pinned.
+- `python -m pytest tests/runner_supervisor -q -x -p no:cacheprovider` -> `317 passed in 67.81s`, exit 0.
+- `python scripts/check_file_size.py` -> `OK: 1028 source files checked; 18 known over 400 lines, none
+  new, none grown.`, exit 0.
+- Beyond the Done-when: `python -m pytest tests/ -q -p no:cacheprovider` (the whole suite, for the
+  basename rule) -> `5048 passed, 14 skipped in 1115.32s`, exit 0 (the skips are older tests, none in
+  my files). Python 3.13 venv: the two new files, `test_chief_gate.py`, `_bodies`, `_keys`,
+  `_strict_keys`, `_tables`, `_kinds` -> `383 passed`; `test_chief_gate_audit.py` and
+  `test_chief_gate_separators.py` -> `130 passed in 281.75s`. Python 3.12: all of `tests/http_api`
+  (including the audit and the URL-variable tests) `exit 0` before the last two tests were added to
+  the edges file, and inside the full run after. `datetime.fromisoformat` on `+00:00`, `Z`, no
+  offset and garbage gives the same on 3.11, 3.12 and 3.13 (`python3.NN -I`).
+- Lint chain from `commands.md`, link by link: `black --check src/ tests/` (637 unchanged), `mypy`
+  (`no issues found in 333 source files`), `check_file_size.py`, `check_no_mirror_reads.py`,
+  `gen_test_index.py --check`, `lint-imports` (`1 kept, 0 broken`), `bandit -q -r src/ -ll -x
+  src/pathly_data/`, `check_adapters.py`, `check_entry_points.py`, the Smoke import, and `python -m
+  build --wheel` (the wheel holds `chief_cite.py`): all exit 0. No `# noqa`, `# nosec`, `type:
+  ignore` or skip added.
+- Mutation check (`scratchpad/mutate10.py`, one-line breakages run against the two new files, each
+  restored): 22 of 22 caught after adding one test. Kind check off, session check off, `bool`/string
+  accepted as `cite`, `<=` for `<`, timing off, project check off, citation not spent,
+  `answer`/`option_id` allowed, `answer_text` ignoring the flag, a bad `ts` accepted, flag never
+  set, flag for any id, flag always, gate skipping the rule, gate not seeing an acknowledgement as
+  an answer, question not cleared on answer / on abort, only the first question kept, `asked_at`
+  0, either route ignoring the cited text. One survived the first run (readings of the body that
+  disagree), because no body makes the gate's two readings differ; `test_readings_of_the_body_that_
+  disagree_are_refused` calls the rule with two readings and catches it.
+
+**Decisions**
+
+- Refusals use the gate's usual body `{error, action, tier, allowed}` (action `answer`), a superset
+  of the ticket's `{"error": ...}`, so a test tells the gate from the route with `allowed` as for
+  every other refusal.
+- The order inside the gate: the key allowlist (`key_refusal`) runs inside `_refusal` as before, so
+  an unlisted key is still named first; the cite rule runs after all of it. `answer` is a listed
+  key of both routes, so it gets "send cite only"; `option_id` is listed only on `/comms/answer`, so
+  on `/runner/agent-answer` it gets the allowlist's "'option_id' is not a key a chief may send to
+  this route" (still a 403; the route reads no such key). Moving the cite-only check ahead of the
+  allowlist would have changed what `test_chief_gate_strict_keys.py` asserts.
+- `cite` must be a JSON integer (`type(cite) is int`): `True`, `1.0` and `"1"` are refused, so a
+  chief cannot hit message 1 with a boolean or a number-looking string.
+- Readings of the body must agree on `cite` and on the target (`topic`, `question_id`,
+  `message_id`), because a route reads one of them and the gate cannot know which; any `answer` or
+  `option_id` in any reading is refused.
+- A target the route would reject for its own shape (a blank or non-string `topic`, `question_id`)
+  is left to the route with no cite effect: the route checks the target before the answer, answers
+  400, and nothing is spent or relayed.
+- A topic with no run, a run that is not awaiting, and a `question_id` with no row take the
+  project check (when a run exists) but not the time check, as the ticket says, and the citation
+  is spent: the route then answers 404/409/404. I chose spending over "set the text and do not
+  record", because a run could start asking between the gate and the route and the unrecorded
+  message could then be relayed to a question it predates and cited again.
+- The human-escalation flag is `g.chief_cited_gate = <the message_id the body named>` and the
+  helper compares it with the id it is asked about; `g.chief_cited_text` is not set for an
+  acknowledgement (it carries no words).
+- `/runner/agent-answer` still strips the answer before it supplies it (for everyone), so outer
+  whitespace of a cited message does not reach the agent; `/comms/answer` only checks that the
+  stripped text is not blank and stores the cited text unstripped.
+- `chief_walk_support.BODY_HELPER_MODULES` names one module outside `blueprints/` for the key tests
+  to follow. The alternative, adding `answer` to `WAITS_FOR_A_TICKET`, would have said "no view
+  reads it" for a key the routes do read.
+- Audit: the answer baselines cite `w.fresh_cite` (a new message per request, because each cite is
+  spent), so the audit still reaches the answer sinks (`REACHES` covers them) and
+  `/comms/acknowledge` now has a human-escalation variant that reaches the new flag.
+
+**Shortcuts taken**
+
+- The citation is spent at the gate, before the route runs, as the ticket says. A route that then
+  answers 404, 409 or 500 has used the person's message; they type again. It stops being right if
+  chiefs often name topics that are not pending; the upgrade is to release the citation when the
+  response is not 2xx (an `after_request` that deletes the row), which needs a delete query and
+  loses the "unique forever" property in the failure window.
+- The gate checks the question when the request arrives and the route relays a moment later. If the
+  run's question changes in that window the cited message goes to the new question although it
+  may predate it. The words are still the person's. Closing it needs the check and the relay under
+  one lock (a `supply_agent_answer(topic, answer, not_before=...)`), which is a change to
+  `supervisor/api.py` this ticket does not call for.
+- `/comms/answer` is bound to a project only by ticket 14 (`question_id` is an unbound id): a chief
+  can cite for a question of another project's board here. The same holds for the escalation id of an
+  acknowledgement.
+- `/comms/answer` on a human-escalation id spends the citation and then meets the human gate's 403
+  (only `/comms/acknowledge` sets the flag).
+- Not measured: a pasted prompt arrives wrapped in `<pasted_content ...>` lines in some claude
+  sessions (ticket 09 left it open); such a message would be relayed with those lines.
+- What a `human` row proves, said once here as the ticket asks: it is a prompt claude delivered to the
+  chief's tab with none of the wrappers ticket 09 measured, not proof that a person typed it. Against
+  an `operator` chief, which can start a headless agent, that agent runs as the same OS user and
+  can read the session's secret file and `--session-id` and post a `human` row to
+  `POST /chief/human-messages` itself. The cite rule makes a chief unable to word an answer or pick
+  an option; it does not make the answer the person's against such an agent. `/clear` in the tab
+  changes claude's session id, so afterwards the hook records nothing and the chief has nothing
+  citable until the tab is reopened (the living doc says both).
+
+**For later tickets**
+
+- Ticket 13 (acceptance): an answer scenario must give the chief a `cite`, not an `answer`; the
+  helpers `Session`, `Asker` and `post_row` in `tests/http_api/chief_cite_support.py` do it.
+  `RunnerState._agent_question` holds `questions` for round two's `GET /chief/inbox`.
+- Ticket 14 (bind id-addressed calls to the chief's project): `/comms/answer`'s `question_id` and
+  `/comms/acknowledge`'s `message_id` are the ids to bind; the cite rule reads their rows (`ts`) and
+  does not check their board or scope.
+- Ticket 17 (`chief-connect`, `pathly api`): the chief's text should say that an answer is
+  `{"topic"|"question_id": ..., "cite": <number from the hook's line>}` and nothing else, that a
+  message answers one question and must be typed after it, that a refusal "cite a human message ..."
+  means to ask the person to type the answer in the tab, and that `/clear` ends recording.
+- Ticket 15 (`max_cost_usd`) deletes its `WAITS_FOR_A_TICKET` line as planned; the `cite` lines stay,
+  because the gate reads `cite` and no view does. The comment above `WAITS_FOR_A_TICKET` in
+  `test_chief_gate_keys.py` ("Ticket 10 reads `cite` ...") is now only half true (the gate reads it);
+  I did not touch that file.
+
+**Minors noticed, not fixed**
+
+- `test_chief_gate.py::test_an_operator_acknowledges_an_ordinary_row_and_meets_the_human_gate` keeps
+  its name, but its second half now asserts the gate's cite refusal rather than "meets the human
+  gate" (the human gate is covered in `test_chief_cited_answers.py`); renaming it would look like a
+  deleted test to the floor scan.
+- `chief_field_calls.py` still says of `_CITE` "(ticket 10 reads it)"; true of the gate, not of a view.
+- The hook still prints "cite it with cite=<id> when you relay an answer." for every `human` message,
+  including one typed before any question; harmless, the chief cites what the question needs.

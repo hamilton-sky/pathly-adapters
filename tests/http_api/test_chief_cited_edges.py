@@ -206,6 +206,49 @@ def test_an_option_is_not_a_key_the_agent_answer_route_takes(client, project, as
     assert citations() == []
 
 
+def test_readings_of_the_body_that_disagree_are_refused(app, project, ask):
+    """No input makes the gate's two readings of a body differ today, so this calls the rule
+    with two readings, as it would be called if one did: it cites nothing unless they agree on
+    the message and on what it answers.
+    """
+    from pathly_orchestrator.http_server.chief_cite import cite_refusal
+
+    chief = Session("operator", project)
+    row = db().execute("SELECT * FROM chief_sessions WHERE run_id = ?", (chief.run_id,))
+    session = dict(row.fetchone())
+    ask("t-1")
+    ask("t-2")
+    first, second = chief.type("use CSV"), chief.type("use JSON")
+    here = {"topic": "t-1", "cite": first}
+
+    with app.test_request_context("/runner/agent-answer", method="POST"):
+        for other in (
+            {"topic": "t-1", "cite": second},
+            {"topic": "t-2", "cite": first},
+            {"cite": first},
+        ):
+            refusal = cite_refusal("/runner/agent-answer", session, db(), [here, other])
+            assert refusal == NOT_CITED
+        assert citations() == []
+        assert (
+            cite_refusal("/runner/agent-answer", session, db(), [here, dict(here)])
+            is None
+        )
+    assert len(citations()) == 1
+
+
+def test_every_answer_route_names_what_its_answer_is_for():
+    from pathly_orchestrator.http_server.chief_cite import TARGET_KEYS
+    from pathly_orchestrator.http_server.chief_routes import ROUTE_ACTIONS
+
+    answers = {
+        rule for (rule, _), action in ROUTE_ACTIONS.items() if action == "answer"
+    }
+
+    # An acknowledgement is an answer only for a human escalation (chief_routes refines it).
+    assert answers | {"/comms/acknowledge"} == set(TARGET_KEYS)
+
+
 # --- which run, which project ----------------------------------------------------------------
 
 

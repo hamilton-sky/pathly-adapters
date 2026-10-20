@@ -9,10 +9,11 @@ For a live chief, the call is classed by ``chief_routes.action_for`` and refused
 the session's tier holds that action, names only its own project in the fields its route reads
 (``chief_fields``, applied by ``chief_project``), on ``/comms/post`` posts as the chief, and sends
 only the keys its route lists (``chief_keys``). Each check runs over every reading of the body a
-route may get (``_bodies``). Registered in
-``app.py`` right after ``_log_request``, so the secret check and the rate limit run first. Flask
-matches the URL rule before any hook runs, so a path no route matches (``url_rule`` is None)
-passes here and Flask answers 404 or 405.
+route may get (``_bodies``). An ``answer`` is then held to the cite rule (``chief_cite``): the
+chief names a human message of its session by ``cite`` and Pathly relays that message's own text.
+Registered in ``app.py`` right after ``_log_request``, so the secret check and the rate limit run
+first. Flask matches the URL rule before any hook runs, so a path no route matches
+(``url_rule`` is None) passes here and Flask answers 404 or 405.
 """
 
 from __future__ import annotations
@@ -110,6 +111,32 @@ def _refusal(rule, method: str, session: dict, conn, body: dict):
     return None
 
 
+def _cite_refusal(rule, method: str, session: dict, conn, bodies: list[dict]):
+    """The 403 for an answer that does not cite a human message of the session, else None.
+
+    The cite rule (``chief_cite``) applies when any reading of the body is an ``answer`` action;
+    it spends the citation, so it runs once, after every other check has passed every reading.
+    """
+    from flask import request
+
+    from pathly_orchestrator.supervisor.chief_tiers import actions_for
+
+    from .chief_cite import cite_refusal
+
+    view_args = request.view_args or {}
+    is_human_escalation = _human_escalation_check(conn)
+    if not any(
+        action_for(rule.rule, method, view_args, body, is_human_escalation) == "answer"
+        for body in bodies
+    ):
+        return None
+    error = cite_refusal(rule.rule, session, conn, bodies)
+    if error is None:
+        return None
+    tier = str(session.get("tier") or "")
+    return _refuse(tier, "answer", sorted(actions_for(tier)), error)
+
+
 def chief_gate():
     """Refuse a chief token's call its tier or project does not allow; None lets it through."""
     from flask import jsonify, request
@@ -137,8 +164,9 @@ def chief_gate():
         return None
 
     method = "GET" if request.method == "HEAD" else request.method
-    for body in [{}] if method == "GET" else _bodies():
+    bodies = [{}] if method == "GET" else _bodies()
+    for body in bodies:
         refused = _refusal(rule, method, session, conn, body)
         if refused is not None:
             return refused
-    return None
+    return _cite_refusal(rule, method, session, conn, bodies)

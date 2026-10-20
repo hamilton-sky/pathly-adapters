@@ -245,8 +245,10 @@ def refuse_agent_on_human_gate(conn, request, message_id: str):
     how one is closed, and both routes trust the body's ``agent`` / nothing at all, so an agent
     could otherwise clear the gate "as human". Returns None when the call may proceed; a caller
     with no run token is unaffected until the UI token (RRP-2b) can tell Studio from an agent.
+    The one run token let through is a chief's, for the one escalation whose acknowledgement the
+    chief gate has just checked cites a human message typed after it (``g.chief_cited_gate``).
     """
-    from flask import jsonify
+    from flask import g, jsonify
 
     from pathly_orchestrator.http_server.run_identity import caller_identity
 
@@ -258,6 +260,8 @@ def refuse_agent_on_human_gate(conn, request, message_id: str):
     if row is None or row["type"] != "escalation":
         return None
     if str(row["to_agent"] or "").strip().lower() != "human":
+        return None
+    if getattr(g, "chief_cited_gate", None) == message_id:
         return None
     return jsonify({"error": "only a human closes a human-addressed escalation"}), 403
 
