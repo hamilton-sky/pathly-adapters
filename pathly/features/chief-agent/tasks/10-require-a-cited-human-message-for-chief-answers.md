@@ -1,7 +1,7 @@
 # Require a cited human message when the chief answers an agent
 
 Type: task
-Status: resolved
+Status: open
 Blocked by: 08, 09
 Test first: yes
 
@@ -331,3 +331,80 @@ edited afterwards)
 - `chief_field_calls.py` still says of `_CITE` "(ticket 10 reads it)"; true of the gate, not of a view.
 - The hook still prints "cite it with cite=<id> when you relay an answer." for every `human` message,
   including one typed before any question; harmless, the chief cites what the question needs.
+
+## Review findings (round 1, quality review)
+
+QUALITY
+
+Range reviewed: a3a1da4..b1af9ee. The ticket's last commit is HEAD, so there are no later commits. I did not read `## Answer`. The `--stat` line for the ticket file was the only exposure.
+
+Done-when, re-run by me:
+- `test_chief_cited_answers.py`: 26 passed.
+- `tests/runner_supervisor -x`: 317 passed.
+- `check_file_size.py`: exit 0.
+
+Extra runs:
+- All of `tests/http_api` on 3.12: 1741 passed.
+- Audit, separators, cited answers and cited edges on 3.13.16: 191 passed. The audit still gives every URL variable the whole hostile list.
+- `comms_board`, `hq_copilot`, `local_operator` and `consistency`: 1097 passed.
+- black, mypy, lint-imports, bandit, `check_no_mirror_reads` and `gen_test_index --check` are clean.
+- The working tree is clean. My test runs left only gitignored `__pycache__` files. My probe and mutation scripts are in `/tmp/claude-0/-home-claude-pathly-adapters/5223161d-7afa-5239-b776-b281c8303b1d/scratchpad/rv10q/`.
+
+I found no way to relay an answer or close a human escalation without a valid citation. I tried:
+- Duplicate JSON keys, `answer`, BOM / UTF-16 / UTF-32 bodies, `?answer=` in the query string, a form body, and `text/plain` content type.
+- `cite` as NaN, Infinity, `1e400`, bool, float, string, null, negative, unknown and a 5000-digit integer.
+- `asked_at` / `ts` equality and one millisecond before.
+- A question re-asked after its citation was spent.
+- Six concurrent requests spending one citation: exactly one got 200.
+- Another project's topic, another session's row, the style prompt and a `relayed` row.
+
+`flask.g` is per request (Flask 3.1). Only `cite_refusal` sets the two flags, and only after `record_citation` succeeds. `_agent_question` is set and cleared with `_awaiting_agent_answer` under `_lock` on both exits. A new question overwrites the old one at its start, so I found no stale-`asked_at` leak.
+
+1. major tests/http_api/test_chief_cited_edges.py:75-89: `test_true_is_not_message_number_one` cannot fail for the rule it names.
+   - In a scratchpad copy I changed `type(cite) is not int` to `not isinstance(cite, int)` (chief_cite.py:70). All 61 cited tests still passed.
+   - The test turns the style prompt (id 1) into a `human` row, but that row predates the question. So `cite=True` is refused on the timestamp (`NOT_CITED`), never on the type.
+   - I confirmed a corrected test catches the mutation: with id 1 set to `kind='human'` and `ts = asked_at + 1`, `cite=True` gives 200 under the mutation and 403 on the real code.
+   - Fix: make the converted row citable on every other count. Update its `ts` to `asked_at + 1` after `ask(...)`, or create the Asker before the Session. Then only the type check can refuse it.
+   - Every other mutation I tried on the new rule was killed. That was 19 of 21 in the first batch, plus a project-check mutation in the second. The two survivors are this one and item 5.
+
+2. minor chief_cite.py:72 (`_cited_message`): a `cite` outside int64, such as `9223372036854775808` or `-9223372036854775809`, raises `OverflowError` inside the `before_request` hook.
+   - Result is a 500 with a traceback, not the 403 the doc promises ("Otherwise 403", CLAUDE.md:734).
+   - Nothing is relayed or spent. No test covers it.
+   - Fix: refuse `abs(cite) >= 2**63` in `_cited_message`, and add that case to `test_cite_is_a_message_number_and_nothing_else`.
+
+3. minor src/pathly_orchestrator/CLAUDE.md:753 and chief_cite.py:23: "The route's own `.strip()` of the answer still applies" is true only for `/runner/agent-answer`.
+   - `/comms/answer` only strips for its emptiness check and stores the text unstripped. Probe: cited `"  padded answer \n"` is stored verbatim by `/comms/answer` and relayed as `"padded answer 2"` (stripped) by `/runner/agent-answer`.
+   - Fix: say which route strips.
+
+4. minor src/pathly_orchestrator/CLAUDE.md, the "What a citation proves" paragraph (lines 760-770, quote at 766): the operator-chief caveat is honest but incomplete.
+   - It says an operator chief's spawned agent can forge a `human` row, yet calls that row "what reached the tab". A forged row never reached the tab; "what the hook endpoint recorded" is accurate.
+   - It does not say that a headless agent the operator chief starts needs no forgery at all. `/runner/agent-answer` and `/comms/answer` are unchanged for non-chief callers, so a builder-token or tokenless call answers with no cite. The lead sentence ("A chief answers an agent only by naming a message...") is true of the chief's own token only.
+   - Fix: add one clause saying the rule guards the chief token's calls, not a process the chief starts.
+
+5. minor tests/http_api (coverage gap): nothing tests that a chief with a valid cite is still refused by `refuse_agent_on_human_gate` when it calls `/comms/answer` on a human-addressed escalation.
+   - The mutation "set `g.chief_cited_gate` for every rule, not only acknowledge" passed all 61 tests.
+   - It would still need a valid cite, so this is not a bypass of the citation requirement. It does let the chief close a human gate through a route the design keeps closed.
+   - Fix: add one request-level test for that call.
+
+6. minor Spent citations are documented too narrowly (chief_cite.py module docstring; CLAUDE.md:747-749).
+   - The docs say 404 or 409. Also spent are `text/plain` content type (the gate reads it with `force=True`, the route's strict `get_json()` gives 415 then 500) and `/comms/answer` on a human escalation (route 403).
+   - A chief, buggy or hostile, can burn any unspent message of its session at no cost by naming a topic with no run or an idle run. The person is not told.
+   - Fix: state that, in one sentence.
+   - Related and undocumented: both timestamp sides use the wall clock, so a backwards clock step lets an older message pass.
+
+7. minor chief_cite.py (acknowledge path): the chief chooses the `agent` field.
+   - Probe: `POST /comms/acknowledge {"message_id": <human escalation>, "agent": "human", "cite": N}` as a chief gives 200 and `acknowledged_by == ["human"]`. The board then reads as if the person closed it, and the board is the stated mitigation.
+   - Fix: require `agent == "chief"` on the cited acknowledge, as `/comms/post` requires `from == "chief"`.
+
+8. minor Stale text left behind.
+   - tests/http_api/test_chief_gate_keys.py:26: "Ticket 10 reads `cite` ... ahead of that". The gate reads it, so the `WAITS_FOR_A_TICKET` name is wrong for `cite`.
+   - src/pathly_orchestrator/http_server/chief_field_calls.py:39: "(ticket 10 reads it)".
+   - src/pathly_orchestrator/CLAUDE.md:397: the board-closure table still says an agent run's live token always gets 403 on a human-addressed escalation.
+   - tests/http_api/test_chief_gate.py:455: the test name still says `meets_the_human_gate`.
+   - src/pathly_orchestrator/CLAUDE.md:560: "can relay no answer until the tab is reopened" is too strong. After `/clear` a message recorded before it, for a question asked before it, can still be cited.
+
+9. minor Tests that depend on the clock.
+   - `later()` (tests/http_api/chief_cite_support.py) uses a 20 ms real sleep to order the clock. It is deterministic on Linux and I saw no flake across 3.12 and 3.13.
+   - The Asker thread polls with `time.sleep` every 50 ms, bounded by a 5 s join.
+
+REVIEW: FAIL
