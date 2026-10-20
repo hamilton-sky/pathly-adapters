@@ -464,16 +464,19 @@ def test_an_operator_acknowledges_an_ordinary_row_and_meets_the_human_gate(
     )
     assert ok.status_code == 200
 
-    # The operator holds `answer`, so the gate lets it through; the existing human gate
-    # (ticket 10 gives the chief a way past it) still answers for any live run token.
+    # The operator holds `answer`, so the tier lets it through; ticket 10's cite rule then
+    # refuses an acknowledgement of a human escalation that cites no message, so the
+    # existing human gate is not what answers for the chief any more (see
+    # test_chief_cited_answers.py for the acknowledgement with a cite, and for the builder token
+    # that the human gate still refuses).
     human = client.post(
         "/comms/acknowledge",
         json={"message_id": _escalation("human"), "agent": "chief"},
         headers=chief.headers,
     )
-    assert _passed(human)
-    assert human.status_code == 403
-    assert "human" in human.get_json()["error"]
+    assert _gated(human)
+    assert human.get_json()["action"] == "answer"
+    assert human.get_json()["error"] == "cite a human message from this chief session"
 
 
 # --- a closed session is a 401, never anonymous --------------------------------------------

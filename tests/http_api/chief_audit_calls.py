@@ -127,7 +127,15 @@ POST_VARIANTS = {
     ],
     "/comms/project/decompose": lambda w: [Variant("light", {"rigor": "light"})],
     "/comms/acknowledge": lambda w: [
-        Variant("ack", {"message_id": w.note, "agent": "chief"})
+        Variant("ack", {"message_id": w.note, "agent": "chief"}),
+        Variant(
+            "ack a human escalation",
+            {
+                "message_id": w.human_escalation,
+                "agent": "chief",
+                "cite": w.fresh_cite,
+            },
+        ),
     ],
     "/comms/supersede": lambda w: [
         Variant(
@@ -151,17 +159,15 @@ POST_VARIANTS = {
     "/comms/tasks/stop": lambda w: [
         Variant("stop", {"message_id": w.task}, prepare=w.hold_board)
     ],
+    # A chief answers by citing a message the person typed, never with words of its own.
     "/runner/agent-answer": lambda w: [
         Variant(
             "answer",
-            {"topic": "audit-asking", "answer": "yes"},
+            {"topic": "audit-asking", "cite": w.fresh_cite},
             prepare=w.register_asking_run,
         )
     ],
     "/comms/answer": lambda w: [
-        Variant(
-            "answer",
-            {"question_id": w.question, "option_id": "a", "answer": "A"},
-        )
+        Variant("answer", {"question_id": w.question, "cite": w.fresh_cite})
     ],
 }
