@@ -7,23 +7,31 @@ string that ``scope_names.root_spelling`` spells as the session's root (trailing
 dropped, and on a host where a backslash separates, Windows, backslashes read as slashes; on any
 other host a backslash is a file-name character, so a value that has one is never the chief's own);
 anything else, a non-string included, is not. A file is the chief's own when it lies under that
-root after its ``..`` segments are collapsed (``scope_names.lies_under``; text only: symlinks are
-not followed, and a Windows drive letter is compared as written). A scope that is a path (a ``/``, a ``\\`` or a
-drive prefix) is a project root whatever board it is posted to, because the board mirror reads it
-as one, so it must be the chief's own on every board; any other scope off the project board, a
-scope marked ``segment`` (the route makes a folder of it, so even the chief's own root is refused)
-and a ``segments`` field (a goal's ``slug``) are one folder name: no separator, no drive colon,
-not ``.`` or ``..`` (``scope_names.is_segment``, the predicate the board mirror applies).
+root after its ``..`` segments are collapsed (``scope_names.lies_under``, text only: a Windows
+drive letter is compared as written) and the path the route will open, resolved the way ``open``
+does (symlinks followed, ``hydrate_helpers.inside_root``), still lies under the real root. A
+scope that is a path (a ``/``, a ``\\`` or a drive prefix) is a project root whatever board it is
+posted to, because the board mirror reads it as one, so it must be the chief's own on every
+board; any other scope off the project board, a scope marked ``segment`` (the route makes a
+folder of it, so even the chief's own root is refused) and a ``segments`` field (a goal's
+``slug``) are one folder name: no separator, no drive colon, not ``.`` or ``..``
+(``scope_names.is_segment``, the predicate the board mirror applies).
 
 A route with no entry is refused, so a route added without one is not passed by default.
 """
 
 from __future__ import annotations
 
+import os
 import re
 from typing import Mapping
 
-from pathly_orchestrator.scope_names import is_segment, lies_under, root_spelling
+from pathly_orchestrator.scope_names import (
+    host_path,
+    is_segment,
+    lies_under,
+    root_spelling,
+)
 
 from .chief_field_types import Fields, ScopeRead, TextPath
 from .chief_fields import ROUTE_FIELDS
@@ -135,13 +143,34 @@ def _unnamed_root(fields: Fields, source: Mapping, view_args: Mapping) -> bool:
     return must_name and not any(source.get(k) for k in fields.roots)
 
 
+def _opens_inside(value: str, own: str | None) -> bool:
+    """True when ``value``, opened the way the route opens it (a relative one under the root),
+    resolves to a place under the real root: a symlink inside the project that points out of it,
+    or a ``..`` after such a link, is not. A path that does not exist yet resolves as far as it
+    can. Fails closed.
+    """
+    from pathly_orchestrator.runner.hydrate_helpers import inside_root
+
+    text = host_path(value)
+    if not own or text is None:
+        return False
+    try:
+        return inside_root(
+            text if os.path.isabs(text) else os.path.join(own, text), own
+        )
+    except (OSError, ValueError):
+        return False
+
+
 def _foreign_file(fields: Fields, source: Mapping, own: str | None) -> bool:
     """A file the route reads or stores that lies outside the chief's project."""
     for keys, anchored in ((fields.paths, True), (fields.abs_paths, False)):
         for key in keys:
             value = source.get(key)
             if isinstance(value, str) and value.strip():
-                if not lies_under(value, own, anchored):
+                if not lies_under(value, own, anchored) or not _opens_inside(
+                    value, own
+                ):
                     return True
     for text_read in fields.text_paths:
         value = _recovered_path(source, text_read)

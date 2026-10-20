@@ -21,24 +21,33 @@ import shutil
 import subprocess
 from typing import Sequence
 
+from pathly_orchestrator.scope_names import cache_root
+
 # Bounds — keep the shell-out cheap and never let it hang the prompt: at most N
 # files queried, each query deadline-capped (the graph binary is fast, but the
 # deadline is the backstop against a wedged process).
 _CLI_TIMEOUT_S = 8
 _CLI_MAX_FILES = 2
 
-# Content-hash cache. Key = (path, sha1-of-bytes), value = the rendered per-file
-# structure section. An UNCHANGED file is reused without re-querying; an edit
-# changes the hash and forces a refresh. Only NON-empty sections are cached, so
-# a query made before the repo is indexed is not frozen as "no data".
-_CLI_CACHE: dict[tuple[str, str], str] = {}
+# Content-hash cache. Key = (project root, path, sha1-of-bytes), value = the rendered
+# per-file structure section. An UNCHANGED file is reused without re-querying; an edit
+# changes the hash and forces a refresh. The project is part of the key: a relative path
+# with the same bytes is the same key in every project, and each project's graph answers
+# for its own symbols. Only NON-empty sections are cached, and only for a file that has a
+# hash, so a query made before the repo is indexed is not frozen as "no data".
+_CLI_CACHE: dict[tuple[str, str, str], str] = {}
 
 
-def _cypher_literal(text: str) -> str:
-    """``text`` as the inside of a double-quoted Cypher string: a backslash or a quote in it
-    stays part of the string, so a request's target cannot end the literal and add conditions.
+def _cypher_literal(text: str) -> str | None:
+    """``text`` as the inside of a double-quoted Cypher string, or None when it holds a double
+    quote. A quote cannot be made part of the string without trusting that the tool's lexer
+    reads a backslash before it as an escape (the real ``codebase-memory-mcp`` was not available
+    to check), and a quote that ends the literal lets a request's target add conditions, so the
+    caller makes no query for such a text. A backslash is doubled.
     """
-    return text.replace("\\", "\\\\").replace('"', '\\"')
+    if '"' in text:
+        return None
+    return text.replace("\\", "\\\\")
 
 
 def _file_hash(path: str, project_root: str = "") -> str:
@@ -148,14 +157,17 @@ class CliProvider:
         """Cached-or-fresh structure section for ``path`` (content-hash cache).
         One deadline-bounded graph query; only non-empty sections cached."""
         file_hash = _file_hash(path, project_root)
-        key = (path, file_hash)
+        key = (cache_root(project_root), path, file_hash)
         if file_hash and key in _CLI_CACHE:
             return _CLI_CACHE[key]
         # Match on the last two path segments so repo-relative vs absolute paths
         # both resolve against the graph's stored (index-root-relative) file_path.
         tail = "/".join(path.replace("\\", "/").rstrip("/").split("/")[-2:])
+        literal = _cypher_literal(tail)
+        if literal is None:
+            return ""  # a name with a double quote is not put into a query
         cypher = (
-            'MATCH (n) WHERE n.file_path CONTAINS "' + _cypher_literal(tail) + '" '
+            'MATCH (n) WHERE n.file_path CONTAINS "' + literal + '" '
             'AND n.label IN ["Function","Method","Class"] '
             "RETURN n.name, n.in_degree, n.out_degree "
             "ORDER BY n.in_degree DESC LIMIT 12"

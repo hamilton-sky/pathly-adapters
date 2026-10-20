@@ -52,6 +52,13 @@ def _on_this_host(text: str) -> str | None:
     return None if "\\" in text else text
 
 
+def host_path(path: str) -> str | None:
+    """``path`` as this host's file system reads it (``\\`` is a separator on Windows only), or
+    None when it is not a path there: empty, a NUL, or, off Windows, a backslash.
+    """
+    return _on_this_host(path)
+
+
 def root_spelling(value: object) -> str | None:
     """The one spelling of a project root, or None when ``value`` is not one: trailing slashes
     dropped (``/p/``, ``/p//`` are ``/p``, and ``/`` stays ``/``), nothing else changed (no ``.``
@@ -63,6 +70,15 @@ def root_spelling(value: object) -> str | None:
         return None
     text = _on_this_host(value)
     return None if text is None else text.rstrip("/") or "/"
+
+
+def cache_root(project_root: str) -> str:
+    """The project part of a cache key: ``root_spelling`` of the root (so ``/p`` and ``/p/`` share
+    their entries), else the string as given (a spelling this host does not read as a root names
+    a folder of its own, so it keeps a key of its own). Two projects never share a key.
+    """
+    spelled = root_spelling(project_root)
+    return project_root if spelled is None else spelled
 
 
 def lies_under(path: object, root: str | None, anchored: bool) -> bool:

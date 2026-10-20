@@ -28,6 +28,8 @@ from typing import Any
 
 from flask import Blueprint, jsonify, request
 
+from pathly_orchestrator.scope_names import cache_root
+
 logger = logging.getLogger("pathly.http")
 
 bp = Blueprint("code", __name__)
@@ -125,20 +127,21 @@ def _gate(role: str, op: str) -> str | None:
 
 
 # --- Gateway content-hash cache + board logging ------------------------------
-# Cache key is (op, target, content-hash): a repeated query for an UNCHANGED
-# file is served without re-querying the backend; editing the file changes the
-# hash and forces a fresh query. Gateway-local for now — when Phase 3 lands a
-# content-hash cache inside runner.code_context, this should delegate to it.
-_QUERY_CACHE: dict[tuple[str, str, str, str], "str | None"] = {}
+# Cache key is (project root, op, target, content-hash, backend): a repeated query
+# for an UNCHANGED file of the SAME project is served without re-querying the backend;
+# editing the file changes the hash and forces a fresh query. The project is in the
+# key because a relative target with the same bytes is the same string in every
+# project, and each project's graph answers for its own symbols. A target with no
+# hash (a directory, a missing file, a symbol) is never cached. Gateway-local for now
+# — when Phase 3 lands a content-hash cache inside runner.code_context, this should
+# delegate to it.
+_QUERY_CACHE: dict[tuple[str, str, str, str, str], "str | None"] = {}
 
 
 def _content_hash(target: str, project_root: str) -> str:
-    """SHA1 of the target file's bytes, or '' when it can't be read.
-
-    A stable '' hash still caches per-target (just not content-sensitive), so a
-    missing or symbol-style target degrades gracefully instead of disabling the
-    cache.
-    """
+    """SHA1 of the target file's bytes, or '' when it can't be read (a directory, a
+    missing file, a symbol-style target). A '' hash is not content-sensitive, so the
+    answer for it is not cached."""
     try:
         path = (
             target
@@ -327,9 +330,10 @@ def code_query():
         # re-querying the backend; an edit changes the hash and forces a refresh.
         # The backend is part of the key — an lsp query must not be served a cached
         # graph result for the same file (they carry different structure).
-        chash = _content_hash(target, str(data.get("project_root") or ""))
-        key = (op.strip().lower(), target.strip(), chash, backend)
-        cached = key in _QUERY_CACHE
+        root = str(data.get("project_root") or "")
+        chash = _content_hash(target, root)
+        key = (cache_root(root), op.strip().lower(), target.strip(), chash, backend)
+        cached = bool(chash) and key in _QUERY_CACHE
         if cached:
             result = _QUERY_CACHE[key]
         else:
@@ -350,7 +354,7 @@ def code_query():
             # stays null until its content hash changes. Re-querying a null is cheap
             # and lets the block appear the moment the index lands. (Mirrors
             # CliProvider._file_section, which likewise caches only non-empty sections.)
-            if result is not None:
+            if result is not None and chash:
                 _QUERY_CACHE[key] = result
             # Log fresh queries to the board (shared context) with a hit/miss marker
             # so the board shows whether the backend returned data. Cache hits are not

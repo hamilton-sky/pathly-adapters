@@ -11,13 +11,16 @@ working directory or the home directory.
 What is sent to which key, at every tier (``hostile_values``, ``PLAIN_VALUES``):
 
 * a key of a kind that can reach a file or a folder (``chief_field_types.FILE_KINDS``: root,
-  scope, segment, path, ref, flow, skill) gets the **whole** list: climbing and absolute paths,
+  scope, segment, path, ref, flow, skill) **and every variable of a URL** (the ``feature``,
+  ``run_id`` and ``artifact_id`` of a rule, whatever kind its entry gives it, since the route
+  joins it into a query or a path) gets the **whole** list: relative and absolute climbing paths,
   other project, server directory, home, UNC and drive spellings, a NUL, a very long name, and the
   spellings of the chief's own root and of its own file (trailing and doubled slashes, dot
   segments, backslashes, mixed separators, padded) that the gate may accept as the chief's own;
-* every other key (text, number, flag, enum, name, id) gets ``PLAIN_VALUES``: a climbing path in
-  both relative and absolute form, another project, another project's file, a NUL, a very long
-  name.
+* every other key (text, number, flag, enum, name, id) gets ``PLAIN_VALUES``, seven values: ``..``,
+  ``../..``, a relative climbing path into the other project, the other project's root and a file
+  in it (both absolute), a NUL and a very long name. It has no absolute climbing path, no server
+  or home directory, no UNC or drive spelling and none of the own-root spellings.
 
 The static tests (``test_chief_gate_keys.py``, ``test_chief_gate_kinds.py``) hold the other half:
 the list of keys is complete and a key's kind fits what its view does with it. What this one
@@ -89,8 +92,9 @@ def hostile_values(world: World) -> dict[str, str]:
 
 
 # A key that is only text, a number or a name is never joined into a path by design, and a status
-# or a planner chief reaches the same code after the gate: these values show it (the relative
-# and the absolute climbing path are the two ways a join leaves its folder).
+# or a planner chief reaches the same code after the gate: these values show it (``..``, ``../..``
+# and a relative path that climbs into the other project are the ways a join leaves its folder
+# from inside it; the other project's root and file are the absolute ones).
 PLAIN_VALUES = (
     "dotdot",
     "relative climbing",
@@ -104,8 +108,10 @@ PLAIN_VALUES = (
 
 def _routes(app):
     """``(rule, method, [(key, kind)])`` for every route of the table the app has: the keys a
-    chief may send and the variables of its URL. ``kind`` is ``"plain"`` for a key that names no
-    file, the file kind of one that can, and None for a URL variable the entry does not name.
+    chief may send and the variables of its URL. ``kind`` is ``"variable"`` for a variable of
+    the URL (whatever the entry calls it), the file kind of a key that can reach a file, None for
+    a key the entry gives no kind, and ``"plain"`` for the rest, the only keys that get the
+    short list.
     """
     from pathly_orchestrator.http_server.chief_field_types import (
         FILE_KINDS,
@@ -122,10 +128,15 @@ def _routes(app):
         if (rule, method) not in live:
             continue
         kinds = fields.kinds()
+        variables = url_variables(rule)
         keys = []
-        for key in sorted(fields.allowed(rule) | url_variables(rule)):
+        for key in sorted(fields.allowed(rule) | variables):
             kind = kinds.get(key)
-            keys.append((key, kind if kind in FILE_KINDS or kind is None else "plain"))
+            if key in variables:
+                kind = "variable"
+            elif kind is not None and kind not in FILE_KINDS:
+                kind = "plain"
+            keys.append((key, kind))
         yield rule, method, keys
 
 
