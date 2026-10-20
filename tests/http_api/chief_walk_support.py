@@ -18,15 +18,23 @@ import inspect
 import textwrap
 
 HELPER_PACKAGE = "pathly_orchestrator.http_server.blueprints"
+# Outside ``blueprints/``, the one module a view hands the request's body to: the answer routes
+# read ``answer`` through ``chief_cite.answer_text(data)`` (chief-agent 10).
+BODY_HELPER_MODULES = ("pathly_orchestrator.http_server.chief_cite",)
 # A helper takes the request's body under one of these parameter names.
 BODY_PARAMETERS = {"body", "data"}
 _READERS = {"read_json_body", "get_json"}
 _GETTERS = {"get", "getlist"}
 
 
+def _is_helper_module(module: str) -> bool:
+    return module.startswith(HELPER_PACKAGE) or module in BODY_HELPER_MODULES
+
+
 def called_functions(function):
-    """The functions under ``blueprints/`` that ``function`` calls by name: a module-level name,
-    or one it imports inside its body (the layer rule keeps the imports lazy).
+    """The functions under ``blueprints/`` (and in ``BODY_HELPER_MODULES``) that ``function``
+    calls by name: a module-level name, or one it imports inside its body (the layer rule keeps
+    the imports lazy).
     """
     try:
         tree = ast.parse(textwrap.dedent(inspect.getsource(function)))
@@ -51,12 +59,12 @@ def called_functions(function):
             module, attr = imported[name]
             target = (
                 getattr(importlib.import_module(module), attr, None)
-                if module.startswith(HELPER_PACKAGE)
+                if _is_helper_module(module)
                 else None
             )
         else:
             target = function.__globals__.get(name)
-        if inspect.isfunction(target) and target.__module__.startswith(HELPER_PACKAGE):
+        if inspect.isfunction(target) and _is_helper_module(target.__module__):
             yield target
 
 

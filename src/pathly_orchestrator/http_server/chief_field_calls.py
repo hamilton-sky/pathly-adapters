@@ -36,7 +36,7 @@ _RUN = {**_ENGINE, "progress": ENUM}
 # Verbatim prompt text for the agents a call starts (these also need the `run` action).
 _PROMPT = {"prompt_override": TEXT}
 _STAGES = {"stage_overrides": TEXT}  # a {state: prompt text} map
-# The answer routes carry the id of the human message they cite (ticket 10 reads it).
+# The answer routes carry the id of the human message they cite (`chief_cite` reads it).
 _CITE = {"cite": ID}
 
 CALL_FIELDS: dict[tuple[str, str], Fields] = {

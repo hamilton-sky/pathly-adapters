@@ -169,6 +169,33 @@ class World:
             status="running",
         )
         registry._registry["audit-asking"]._awaiting_agent_answer = True
+        registry._registry["audit-asking"]._agent_question = {
+            "question": "A or B?",
+            "options": [],
+            "questions": [{"question": "A or B?", "options": []}],
+            "asked_at": time.time(),
+        }
+
+    def human_escalation(self) -> str:
+        """An escalation addressed to the human: a chief closes it only by citing a message."""
+        return self.post("escalation", to="human", text="need a decision")
+
+    def fresh_cite(self) -> int:
+        """The number of a message the newest chief session has just recorded as typed by the
+        person (the first message of a session is its style prompt, so one is stored before).
+        Each answer a chief sends spends the message it cites, so every request needs its own.
+        """
+        from pathly_orchestrator.db.connection import get_db
+        from pathly_orchestrator.db.queries.chief import add_human_message
+
+        conn = get_db()
+        session = conn.execute(
+            "SELECT run_id, project_root FROM chief_sessions ORDER BY rowid DESC LIMIT 1"
+        ).fetchone()
+        stored = add_human_message(conn, *session, "go ahead")
+        if stored["kind"] == "style_prompt":
+            stored = add_human_message(conn, *session, "go ahead")
+        return stored["id"]
 
     def forget_code_answers(self) -> None:
         """The query cache would answer a repeated query without calling the backend."""

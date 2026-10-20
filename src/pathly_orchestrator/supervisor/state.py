@@ -77,6 +77,7 @@ class RunnerState:
 
     # Agent question — set while waiting for user to answer a denied AskUserQuestion
     _awaiting_agent_answer: bool = field(default=False, repr=False, compare=False)
+    _agent_question: Optional[dict] = field(default=None, repr=False, compare=False)
     _agent_question_answer: Optional[str] = field(
         default=None, repr=False, compare=False
     )

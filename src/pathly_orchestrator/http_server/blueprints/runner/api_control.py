@@ -159,10 +159,11 @@ def runner_agent_answer():
     """Supply a user answer for a stage that asked a question."""
     try:
         from pathly_orchestrator import supervisor as _sup
+        from pathly_orchestrator.http_server.chief_cite import answer_text
 
         data = request.get_json() or {}
         topic = _topic_from_body(data)
-        answer = data.get("answer", "")
+        answer = answer_text(data)
         if not topic:
             return jsonify({"error": "Field 'topic' must be a non-empty string"}), 400
         if not isinstance(answer, str) or not answer.strip():

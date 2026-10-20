@@ -181,13 +181,14 @@ def comms_answer():
     try:
         from pathly_orchestrator.db.connection import get_db as _get_db
         from pathly_orchestrator.db.queries.comms import answer_question as _answer
+        from pathly_orchestrator.http_server.chief_cite import answer_text as _text_of
 
         data = read_json_body()
         if not data:
             return jsonify({"error": "Missing JSON body"}), 400
 
         question_id = data.get("question_id", "")
-        answer_text = data.get("answer", "")
+        answer_text = _text_of(data)
         if not isinstance(question_id, str) or not question_id.strip():
             return (
                 jsonify({"error": "Field 'question_id' must be a non-empty string"}),

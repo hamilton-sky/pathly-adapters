@@ -11,6 +11,7 @@ import json
 from pathlib import Path
 
 import pytest
+from chief_cite_support import Session
 
 from chief_gate_support import (
     ENCODINGS,
@@ -70,22 +71,24 @@ def test_runs_hands_the_route_the_whole_body_of_its_own_project(
 def test_agent_answer_refuses_another_project_however_the_body_is_encoded(
     client, project, other_project, encoding
 ):
-    chief = _chief("operator", project)
-    body = {"topic": "t", "answer": "a", "project_root": str(other_project)}
+    chief = Session("operator", project)
+    body = {"topic": "t", "cite": chief.type("a"), "project_root": str(other_project)}
 
     resp = _send(client, "/runner/agent-answer", body, encoding, chief.headers)
 
     assert _gated(resp), (resp.status_code, resp.get_data(as_text=True)[:200])
+    assert resp.get_json()["error"] == "that is not this chief's project"
 
 
 @pytest.mark.parametrize("encoding", WITH_PLAIN)
 def test_agent_answer_of_its_own_project_reaches_the_route(client, project, encoding):
-    chief = _chief("operator", project)
-    body = {"topic": "t", "answer": "a", "project_root": str(project)}
+    chief = Session("operator", project)
+    body = {"topic": "t", "cite": chief.type("a"), "project_root": str(project)}
 
     resp = _send(client, "/runner/agent-answer", body, encoding, chief.headers)
 
-    # The route read the topic and the answer from the body: no run has that topic.
+    # The route read the topic from the body: no run has that topic. (A chief cites a message
+    # it did not word: the cite rule of ticket 10 refuses a body that carries an `answer`.)
     assert resp.status_code == 404, resp.get_data(as_text=True)
     assert _passed(resp)
 

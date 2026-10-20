@@ -28,6 +28,12 @@ def _await_agent_question(
 
     with _lock:
         state._awaiting_agent_answer = True
+        state._agent_question = {
+            "question": question_text,
+            "options": options,
+            "questions": questions,
+            "asked_at": time.time(),
+        }
         state._agent_question_answer = None
         state._agent_question_event.clear()
 
@@ -50,6 +56,7 @@ def _await_agent_question(
         with _lock:
             if state._abort_flag:
                 state._awaiting_agent_answer = False
+                state._agent_question = None
                 return None
             answer = state._agent_question_answer
         if answer is not None:
@@ -58,6 +65,7 @@ def _await_agent_question(
 
     with _lock:
         state._awaiting_agent_answer = False
+        state._agent_question = None
         state._agent_question_answer = None
 
     return answer
