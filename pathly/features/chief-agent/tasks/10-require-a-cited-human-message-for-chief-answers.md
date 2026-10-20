@@ -1,7 +1,7 @@
 # Require a cited human message when the chief answers an agent
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 08, 09
 Test first: yes
 
@@ -331,6 +331,150 @@ edited afterwards)
 - `chief_field_calls.py` still says of `_CITE` "(ticket 10 reads it)"; true of the gate, not of a view.
 - The hook still prints "cite it with cite=<id> when you relay an answer." for every `human` message,
   including one typed before any question; harmless, the chief cites what the question needs.
+
+**Review fixes (round 1)** (quality review of `b1af9ee`; the round starts at `030c05b`. Test-only
+commit first: `1409409`, which holds only test files. Run on the unchanged `src/` it gave
+`python -m pytest tests/http_api/test_chief_cited_edges.py tests/http_api/test_chief_cited_escalations.py
+tests/http_api/test_chief_gate_keys.py tests/http_api/test_chief_gate.py
+tests/http_api/test_chief_cited_answers.py -q -p no:cacheprovider` -> `10 failed, 260 passed`. The 10
+are the right ones: the two new int64 cases of `test_cite_is_a_message_number_and_nothing_else`
+(`OverflowError: Python int too large to convert to SQLite INTEGER`) and the 8 cases of
+`test_a_chief_cannot_close_a_human_escalation_as_anyone_else` (agent `human`, `Human`, `Chief`,
+`chief ` got the route's 200; `""`, `7`, `null` and an absent agent got the route's 400, where the gate
+should answer 403). The rest pass on the old code and are proved by mutation, below.)
+
+1. *major, `test_true_is_not_message_number_one` could not fail for its rule.* Reproduced (the round-0
+   file passes 61 of 61 under `not isinstance(cite, int)`) and fixed. The converted row (message 1, the
+   style prompt) is now `kind = 'human'` with `ts = asked_at + 1`, set after the question is asked, so it
+   is citable on every count but the type of `cite`. The test also cites the same row by its number
+   afterwards and sees 200 and the style prompt's text: a positive control, so a refusal can only be
+   about the type. Mutation proof (below): under `not isinstance(cite, int)` the new test fails.
+2. *minor, a `cite` outside int64 was a 500.* Fixed in `chief_cite._cited_message`: `type(cite) is not int
+   or abs(cite) >= 2**63` is "no such message", the same 403 as any bad cite, before any query. The
+   cite-shape test has two new cases (`2**63`, `-(2**63) - 1`). (`-2**63` is a valid int64 and is
+   refused too: negative, so never a row id.)
+3. *minor, the `.strip()` sentence.* Fixed in `src/pathly_orchestrator/CLAUDE.md` ("Cited answers") and
+   in the `chief_cite` docstring, which had no `.strip()` sentence but its "the words ... are the
+   person's" line implied none: `/runner/agent-answer` strips the answer before it supplies it (so
+   outer whitespace of a cited message does not reach the agent), `/comms/answer` strips only to see
+   whether it is blank and stores the cited text unstripped.
+4. *minor, "what reached the tab".* Fixed in the "What a citation proves" paragraph and the docstring:
+   a `human` row is "what the hook endpoint recorded" (a forged one never reached the tab), and the
+   rule guards the chief token's own calls, not a process the chief starts: a headless agent the
+   operator chief starts can call `/runner/agent-answer` and `/comms/answer`, unchanged for every
+   caller without a chief token, with no `cite` at all.
+5. *minor, no test that `refuse_agent_on_human_gate` still holds against a cited `/comms/answer`.*
+   Added `test_the_answer_route_does_not_close_a_human_escalation_for_a_chief` (a chief with a good cite
+   on a `to_agent: "human"` escalation: the chief gate lets it through, the route answers the human
+   gate's 403, no answer row, not acknowledged). Mutation proof (below).
+6. *minor, spent citations documented too narrowly.* Reproduced each claim first with a throwaway
+   request test (deleted): a `text/plain` body spends the message (route 500, from the 415 inside), a
+   run that is not awaiting spends it (409), a topic with no run spends it (404), `/comms/answer` on a
+   human escalation spends it (403), and a blank topic spends nothing (400). One paragraph, "What a
+   spent citation costs", in `src/pathly_orchestrator/CLAUDE.md` and the same words in the
+   `chief_cite` docstring: those cases, that a chief can burn any unspent message of its session by
+   naming a topic with no run or an idle run and the person is not told, and that both sides of "at or
+   after" are the wall clock (`time.time()` for a message and for a run's question, the row's ISO `ts`
+   for a board row), so a clock stepped backwards lets an older message pass.
+7. *minor, the chief chose the `agent` of the acknowledgement.* Fixed in `chief_cite.cite_refusal`:
+   for `/comms/acknowledge` (the cited path, a human escalation) every reading of the body must have
+   `agent == "chief"`, else 403 `a chief acknowledges a human escalation as 'chief'` (`AS_CHIEF`),
+   checked before the message is looked up, so nothing is spent. A missing, null, blank or non-string
+   agent is that 403 too (the route would have said 400). `test_chief_cited_escalations.py` (new file, the
+   answers file has 386 lines): agent `chief` closes it and the row says `["chief"]`; `human`,
+   `Human`, `Chief`, `chief `, `""`, `7`, `null` and an absent key are each the gate's 403, nothing
+   acknowledged, no `chief_citations` row, and the same message then closes it with `agent: "chief"`.
+   An acknowledgement of an ordinary row (the `decide` action) is not held to it.
+8. *minor, stale text.* (a) `test_chief_gate_keys.py`: the name and members were wrong for `cite`.
+   `WAITS_FOR_A_TICKET` now holds only `("/runs", "max_cost_usd")` and a new `READ_BY_THE_GATE` holds
+   the three `cite` lines, with a comment that says why; the exemption in
+   `test_a_listed_key_is_read_or_is_a_url_variable_or_waits_for_a_ticket` and the listed-or-refused check
+   cover both sets, so nothing is weaker, and a new test pins `READ_BY_THE_GATE` to the rules of
+   `chief_cite.TARGET_KEYS`. I kept the old test's name (ticket 08's Answer names it). (b)
+   `chief_field_calls.py`: "(`chief_cite` reads it)". (c) `CLAUDE.md` board-closure table: the live
+   token still gets 403 on a human escalation except a chief's acknowledgement as `chief` that cites
+   a message typed after it. (d) The test in `test_chief_gate.py` is now
+   `test_an_operator_acknowledges_an_ordinary_row_and_a_human_escalation_needs_a_cite`. (e) The
+   `/clear` sentences (two places in `CLAUDE.md`): a message recorded before the `/clear`, for a
+   question asked before it, can still be cited; nothing typed afterwards can be until the tab is
+   reopened. (f) Beyond the list: the "Not here yet" paragraph still named "the cite rule for `answer`
+   (10)" as a later ticket's work; removed. The package-map line of `chief_cite.py` mentions the
+   `agent` rule.
+9. *minor, tests that depend on the clock.* Not changed. I tried a `later()` that waits for the wall
+   clock to read later than on entry instead of sleeping 20 ms, and dropped it: a board row's `ts` is an
+   ISO string cut to the microsecond, so a message stamped a microsecond after a row can compare equal
+   or earlier, and the "older message" tests would flake. A fix without a pause has to wait for more
+   than a microsecond anyway; the 20 ms pause stays. The `Asker` thread's 50 ms poll is bounded by its 5
+   s join, as before.
+
+**Round 1 proof** (each run fresh, after the last edit to code, tests or docs; the ticket, map and
+learnings were edited afterwards)
+
+- `python -m pytest tests/http_api/test_chief_cited_answers.py -q -p no:cacheprovider` -> `26 passed in
+  7.53s`, exit 0.
+- `python -m pytest tests/runner_supervisor -q -x -p no:cacheprovider` -> `317 passed in 64.98s`, exit 0.
+- `python scripts/check_file_size.py` -> `OK: 1028 source files checked; 18 known over 400 lines, none
+  new, none grown.`, exit 0 (`chief_cite.py` is 175 lines; `messages_crud.py` is untouched at 396).
+- The Test command of `commands.md` (`python -m pytest tests/comms_board tests/db tests/runner_supervisor
+  tests/http_api -q -x -p no:cacheprovider`) -> `3155 passed, 2 skipped in 830.05s (0:13:50)`, exit 0 (the
+  2 skips are older tests, none in my files).
+- Python 3.13 venv: the five files above (`test_chief_cited_answers`, `_edges`, `_escalations`,
+  `test_chief_gate_keys`, `test_chief_gate`) -> `270 passed in 50.52s`; `test_chief_gate_audit.py` and
+  `test_chief_gate_separators.py` -> `130 passed in 208.61s`. Python 3.12: the same five files ->
+  `270 passed in 50.47s`, and the audit and separators are inside the 3155 above.
+- Lint chain from `commands.md`, link by link: `black --check src/ tests/` (638 files unchanged), `mypy`
+  (`no issues found in 333 source files`), `check_file_size.py`, `check_no_mirror_reads.py`,
+  `gen_test_index.py --check` (INDEX files regenerated for the new file), `lint-imports` (`1 kept, 0
+  broken`), `bandit -q -r src/ -ll -x src/pathly_data/`, `check_adapters.py`, `check_entry_points.py`,
+  plus `check_version_sync.py` (2.24.1): all exit 0. Smoke exit 0. `python -m build --wheel` exit 0, and
+  the wheel holds `chief_cite.py` with `AS_CHIEF`. No `# noqa`, `# nosec`, `type: ignore` or skip added.
+- Floor guard, after the commits: `FLOW_DIR=pathly/features FLOW_TICKETS=tasks python3
+  scripts/floor-guard.py chief-agent 10 030c05b` and the same with `a3a1da4` as the base -> `floor guard:
+  clean`, exit 0 both.
+- Mutation check (`scratchpad/mutate10b.py`, one-line breakages of `chief_cite.py` in a COPY of the repo
+  at `scratchpad/mut10b`, imported from the copy, the repo itself untouched; each restored, `restored:
+  True`), run against the four test files: `not isinstance(cite, int)` -> fails
+  `test_true_is_not_message_number_one` and nothing else; no int64 bound -> both int64 cases fail;
+  bound `>` instead of `>=` -> the "above int64" case fails; `g.chief_cited_gate` set for every rule
+  -> `test_the_answer_route_does_not_close_a_human_escalation_for_a_chief` fails; no agent check ->
+  the 8 agent cases fail; agent compared with `strip().lower()` -> the `Chief` and `chief ` cases fail;
+  agent checked after the citation is spent -> the 8 agent cases fail (a citation row exists): 7 of 7
+  caught. `scratchpad/mutate10b_old.py` ran the round-0 `test_chief_cited_edges.py` and
+  `test_chief_cited_answers.py` (copied into the copy as `*_old.py`) under `not isinstance(cite, int)`
+  and under the gate flag for every rule: `61 passed` both times, which is why neither was caught
+  in round 0.
+
+**Round 1 decisions**
+
+- The `agent` rule is in `chief_cite`, not in the gate's `_refusal`: it applies only to the cited
+  acknowledgement (the `answer` action), and it runs before the message is looked up so a refusal spends
+  nothing. Equality with `"chief"` is exact, as `/comms/post`'s `from`.
+- `READ_BY_THE_GATE` is a second set rather than a renamed one, so ticket 15's line and the CLAUDE.md
+  text about it (`WAITS_FOR_A_TICKET` for `max_cost_usd`) stay true.
+- The new tests live in `test_chief_cited_escalations.py`: `test_chief_cited_answers.py` is 386 lines.
+
+**Round 1 shortcuts taken**
+
+- none new. The round-0 ones stand (citation spent before the route runs; check and relay not under
+  one lock; `/comms/answer` and `/comms/acknowledge` ids not bound to a project until ticket 14).
+
+**Round 1, for later tickets**
+
+- Ticket 17 (`pathly api` texts): an acknowledgement of a human escalation is `{"message_id": <id>,
+  "agent": "chief", "cite": <number>}`, and the 403 `a chief acknowledges a human escalation as 'chief'`
+  means send `agent: "chief"`. A chief should name only a topic it was told is waiting: a topic with no
+  run, an idle run or a `text/plain` body spends the person's message and nobody tells them.
+- Ticket 13 (acceptance): the human-escalation scenario sends `agent: "chief"` (the audit's variant
+  already does); a chief cannot close it as `human`, and `/comms/answer` on an escalation stays the
+  human gate's 403.
+
+**Round 1, minors noticed, not fixed**
+
+- An acknowledgement of an ordinary row (action `decide`) still stores whatever `agent` the chief
+  sends; only the human-escalation path is held to `"chief"`.
+- The `refuse_agent_on_human_gate` docstring does not mention the `agent` rule (it is the chief gate's).
+- The hook still prints "cite it with cite=<id> when you relay an answer." for every `human` message.
+- `later()` still pauses 20 ms (item 9).
 
 ## Review findings (round 1, quality review)
 

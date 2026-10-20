@@ -394,7 +394,7 @@ retires on its own; three write paths make a resolution durable instead of prose
 |---|---|---|
 | this decision replaces that one | `POST /comms/post` with `supersedes:[id,…]` (`blueprints/comms/_supersede_on_post.py`) | explicit ids ONLY — never inferred from text/embedding similarity, because silently retiring the wrong governance is worse than a duplicate. Capped, de-duplicated; only on a `decision`/`constraint` post (else 400), and only targets that are themselves a decision or constraint on the SAME board and scope (`not_a_decision` covers escalations, so a human gate cannot be superseded away; `other_board` stops a feature post retiring a project/global call). Self-reference and bad ids degrade to a per-id `skipped` reason and never fail the post |
 | these tasks are settled | `POST /comms/tasks/status` (`blueprints/comms/tasks_status.py`) | needs a live `X-Pathly-Run-Token` (403 otherwise), and each task must sit on the token's board and scope (else `refused`); the status line is stamped as the caller. `done`/`failed` only; unknown ids reported, not dropped |
-| a human gate is closed | `POST /comms/acknowledge` (human; an agent run's live token gets 403 on a human-addressed escalation, as do `/comms/delete` and `/comms/answer` — `_helpers.refuse_agent_on_human_gate`; and `POST /comms/supersede` holds an agent run to the same decision-only, own-board rules as `supersedes` — `_supersede_on_post.refuse_agent_supersede`) | an agent decision does NOT close an escalation — `runner/comms_formatters.render_governance_lines` says so in the injected block when a decision post-dates an open escalation, and `fsm_human_gate` now makes it structurally true (below) |
+| a human gate is closed | `POST /comms/acknowledge` (human; an agent run's live token gets 403 on a human-addressed escalation, as do `/comms/delete` and `/comms/answer` — `_helpers.refuse_agent_on_human_gate` — except a chief's acknowledgement as `agent: "chief"` that cites a human message typed after the escalation ("Cited answers" under the chief gate), which the gate lets through for that one id; and `POST /comms/supersede` holds an agent run to the same decision-only, own-board rules as `supersedes` — `_supersede_on_post.refuse_agent_supersede`) | an agent decision does NOT close an escalation — `runner/comms_formatters.render_governance_lines` says so in the injected block when a decision post-dates an open escalation, and `fsm_human_gate` now makes it structurally true (below) |
 
 The agent-facing half is in `core/skills/fragments/comms-post.md` (supersede a decision you
 replace, by the `[id: …]` the governance block now shows on each decision) and
@@ -557,8 +557,10 @@ POST /chief/human-messages  ← {run_id, hook_secret, text, session_id, relayed?
   - **`/clear` in the chief tab** gives claude a new session id (measured: the hook's
     `session_id` changes), so every later prompt is a 403 `not this chief's claude session` and
     nothing more is recorded for that tab. The hook says nothing, so neither the human nor the
-    chief sees it, and the cite rule ("Cited answers" in the chief gate section) finds no later
-    message to cite: the chief can relay no answer until the tab is reopened. It fails safe.
+    chief sees it, and the cite rule ("Cited answers" in the chief gate section) finds nothing
+    recorded after it to cite: a message recorded before the `/clear`, for a question asked before
+    it, can still be cited, but nothing the person types afterwards can answer a question until
+    the tab is reopened. It fails safe.
 
 ### Request bodies — one lenient reader for every comms route (`_helpers.read_json_body`)
 
@@ -733,7 +735,12 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
     kind `human` and of this session's `run_id`: the style prompt (the session's first message) and
     a `relayed` message cannot be cited, nor can another session's. Otherwise 403 `cite a human
     message from this chief session` (for a session whose engine is not `claude` the text adds
-    that a codex chief records none, so it can relay nothing).
+    that a codex chief records none, so it can relay nothing). A number outside 64 bits is no
+    message either (SQLite cannot hold it), and is this same 403.
+  - On `/comms/acknowledge` the body's `agent` must be `"chief"` (as `/comms/post` needs `from ==
+    "chief"`), else 403 `a chief acknowledges a human escalation as 'chief'` and nothing is
+    spent: the name is stored on the row, so a chief that sent `"human"` would make the board
+    read as if the person closed the gate.
   - The message must have been recorded at or after the question was asked: for a run's topic,
     `RunnerState._agent_question["asked_at"]` (set under the registry lock by
     `supervisor/interactions.py::_await_agent_question` together with the question, the options
@@ -745,12 +752,15 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
     answers 404, 409, 404 and 400. A `ts` that cannot be read is a refusal.
   - A message can be cited once (`chief_citations.message_id` is unique): the gate calls
     `record_citation(run_id, cite, route, target)` last and answers 403 `that message was already
-    cited` for a second use. The citation is spent when the gate lets the call through, even if
-    the route then answers 404 or 409; the person types again.
+    cited` for a second use. The citation is spent when the gate lets the call through, whatever
+    the route then answers (404, 409, 403, 415, 500: see "What a spent citation costs" below); the
+    person types again.
   - On success the gate sets `flask.g.chief_cited_text` to the message's `text`; the two answer
     routes read their answer through `chief_cite.answer_text(data)` (the cited text for a chief,
     the body's `answer` for every other caller, so a caller without a chief token gets exactly
-    what it sent). The route's own `.strip()` of the answer still applies. For a human
+    what it sent). `/runner/agent-answer` strips the answer before it supplies it, so the outer
+    whitespace of a cited message does not reach the agent; `/comms/answer` strips only to see
+    whether it is blank and stores the cited text unstripped. For a human
     escalation the gate sets `g.chief_cited_gate = <escalation id>` instead, and
     `comms/_helpers.refuse_agent_on_human_gate` lets a live run token through only for that id;
     every other run token is refused as before, `/comms/delete` stays refused to a chief and
@@ -763,14 +773,29 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
   ("Human messages" above is a deny-list, not a test for "typed"), relayed to the question the
   chief picked, once. It does not prove the person meant them for that question: a chief can cite
   an unrelated later remark, and the person reading the board is what catches it. Against an
-  `operator` chief, which can start a headless agent, a `human` row is "what reached the tab",
-  not proof that a person typed it, because that agent runs as the same OS user and can post to
-  `POST /chief/human-messages` itself if it reads the session's secret file and `--session-id`
-  (spec § Risks). `/clear` in the tab changes claude's session id, so afterwards the hook records
-  nothing and the chief has nothing citable until the tab is reopened; a codex chief has none at
-  all. The gate checks the question when the request arrives and the route relays a moment later;
+  `operator` chief, which can start a headless agent, a `human` row is "what the hook endpoint
+  recorded", not proof that a person typed it (it need not even have reached the tab), because
+  that agent runs as the same OS user and can post to `POST /chief/human-messages` itself if it
+  reads the session's secret file and `--session-id` (spec § Risks). The rule guards the chief
+  token's own calls, not a process the chief starts: a headless agent the operator chief starts
+  can call `/runner/agent-answer` and `/comms/answer`, which are unchanged for every caller
+  without a chief token, with no `cite` at all. `/clear` in the tab changes claude's session id,
+  so afterwards the hook records nothing: a message recorded before it can still be cited for a
+  question asked before it, but nothing typed afterwards can be, until the tab is reopened; a
+  codex chief has no message at all. The gate checks the question when the request arrives and the route relays a moment later;
   if the run's question changes in that window (the agent asks a new one), the cited message goes
   to the new question although it may predate it. The words are still the person's.
+
+  **What a spent citation costs.** The gate spends the message before the route runs, so every
+  answer the route then refuses has already used it, and the person is not told: a topic with no
+  run (404), a run that is not awaiting an answer (409), a `text/plain` body (the gate reads the
+  body with `force=True`, the route's strict `get_json()` answers 415, then 500) and
+  `/comms/answer` on a human escalation (the human gate's 403). So a chief, buggy or hostile, can
+  burn any unspent message of its session by naming a topic with no run or an idle one, and the
+  person types again. A `topic` or `question_id` the route rejects for its shape (blank or not a
+  string) spends nothing. Both sides of "at or after" are the wall clock (`time.time()` for a
+  message and for a run's question, the board row's ISO `ts` for a board row), so a clock stepped
+  backwards lets an older message pass.
 - **One project.** `http_server/chief_fields.py::ROUTE_FIELDS` is the inventory: one entry per
   `(rule, method)` a chief can get past the action table (merged from `chief_field_calls.py`, the
   POST routes, and `chief_field_reads.py`, the GETs; each entry is a `Fields` of
@@ -940,7 +965,7 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
     the sink resolves under the root the call names, which the gate makes it name: `context_refs`,
     `artifact`), `flow` and `skill`. The `cite` of the three answer routes is read by the gate's cite
     rule (`chief_cite`, "Cited answers" above), not by a view, so `test_chief_gate_keys.py` still
-    counts it as a listed key no view reads (`WAITS_FOR_A_TICKET`); the `answer` those routes list
+    counts it as a listed key no view reads (`READ_BY_THE_GATE`); the `answer` those routes list
     is read through `chief_cite.answer_text`, which the test's walk follows (`BODY_HELPER_MODULES`
     of `chief_walk_support.py`). A key a view starts to read is refused to a chief until
     someone lists it (`test_chief_gate_keys.py` fails first), so the keys a chief's prompt may name
@@ -1090,9 +1115,8 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
   stay `read` because a status chief must be able to read artifact sections, query code and list
   prompts; none of them can change a decision, a task or a run.
 - **Not here yet.** Calls that name a run, a message or a goal by id are not bound to the chief's
-  project (ticket 14 binds some of the writes; the rest are listed under "Not bound"); the cite
-  rule for `answer` (10), the cost and run ceiling (15) and the directive route (12) are later
-  tickets. Ticket 15 reads `max_cost_usd` on `POST /runs` (no view reads it there today;
+  project (ticket 14 binds some of the writes; the rest are listed under "Not bound"); the cost
+  and run ceiling (15) and the directive route (12) are later tickets. Ticket 15 reads `max_cost_usd` on `POST /runs` (no view reads it there today;
   `POST /runs/<run_id>/retry` and the `/runner/*` routes do), so that key is not on the entry's
   list: a chief that sends it is told the key is not listed, and ticket 15 lists it with the code
   that reads it and deletes its line from `WAITS_FOR_A_TICKET` in `test_chief_gate_keys.py`.
@@ -1372,7 +1396,7 @@ pathly_orchestrator/
     chief_field_reads.py   # READ_FIELDS: the entries of the GET routes a chief can reach (the query keys they read, or the reason they read no project)
     chief_project.py       # project_refusal(): applies a ROUTE_FIELDS entry to one request (query string for a GET, body otherwise, the URL's `<action>` for the retry verb) and says whether the project it names is the session's — see "Chief gate"
     chief_keys.py          # key_refusal(): refuses a key the entry does not list, and a `flow` or `skill` that is not one name (scope_names.is_flow_name / is_skill_name) — see "Chief gate"
-    chief_cite.py          # cite_refusal() / answer_text(): the cite rule for an `answer` action — the chief names a human message of its session by `cite`, the gate checks it (kind human, this session, typed after the question, once) and keeps its text on flask.g for the answer routes to relay — see "Chief gate"
+    chief_cite.py          # cite_refusal() / answer_text(): the cite rule for an `answer` action — the chief names a human message of its session by `cite`, the gate checks it (kind human, this session, typed after the question, once; an acknowledgement must say `agent: "chief"`) and keeps its text on flask.g for the answer routes to relay — see "Chief gate"
     run_identity.py        # caller_identity(request) -> CallerIdentity: kind run|anonymous from the X-Pathly-Run-Token header (body role/run_id/from never read); unknown/revoked token logged at info with the remote addr; `ui` kind reserved (RRP-2b). Nothing applies a policy from it yet
     sse.py                 # SSE globals (_clients, _runner_clients, _menu_clients) + broadcast helpers
     pricing.py             # MODEL_PRICING, compute_cost_usd()

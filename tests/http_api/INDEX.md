@@ -4,7 +4,7 @@
 
 HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, prompt-event contract.
 
-41 test file(s).
+42 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -13,6 +13,7 @@ HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, 
 | `test_chat_agent.py` | covers pathly studio chat is plan aware; generic chat remains unchanged | 2 |
 | `test_chief_cited_answers.py` | chief-agent 10: a chief answers an agent only by citing a human message of its session | 17 |
 | `test_chief_cited_edges.py` | chief-agent 10: the edges of the cite rule | 17 |
+| `test_chief_cited_escalations.py` | chief-agent 10 (review round 1): a human escalation, from the chief's side | 3 |
 | `test_chief_gate.py` | chief-agent 08: the chief gate refuses every call a chief token's tier does not allow | 32 |
 | `test_chief_gate_actions.py` | chief-agent 08: which action a call is, and so which tier may make it | 6 |
 | `test_chief_gate_artifact_section.py` | chief-agent 08 (round 6): the section of an artifact read by id stays inside the named project | 5 |
@@ -24,7 +25,7 @@ HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, 
 | `test_chief_gate_files.py` | chief-agent 08: a file a chief names must be inside its project | 9 |
 | `test_chief_gate_flow_skill.py` | chief-agent 08 (round 6): a flow or a skill a request names is one packaged or stored name | 10 |
 | `test_chief_gate_folders.py` | chief-agent 08: a name a route makes a folder of is one folder name | 9 |
-| `test_chief_gate_keys.py` | chief-agent 08 (round 6): the key list of every route, read against the code | 17 |
+| `test_chief_gate_keys.py` | chief-agent 08 (round 6): the key list of every route, read against the code | 18 |
 | `test_chief_gate_kinds.py` | chief-agent 08 (round 7): a key's declared kind fits what its view does with it | 7 |
 | `test_chief_gate_mirror.py` | chief-agent 08 (round 5): a request string that becomes part of a filesystem path | 14 |
 | `test_chief_gate_project_scope.py` | chief-agent 08: a board named by ``scope`` is bound to the chief's project | 9 |

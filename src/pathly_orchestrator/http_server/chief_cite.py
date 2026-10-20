@@ -18,12 +18,30 @@ text on ``flask.g`` for the route, which reads its answer through ``answer_text`
 agent receives are the person's, whatever the chief does with shell quoting. A caller without a
 chief token is never touched: ``answer_text`` gives it the ``answer`` it sent.
 
-What this proves is that the words are the person's, relayed to the question the chief picked. It
-does not prove the person meant them for that question (a chief can cite an unrelated later
-remark), and for a chief that can start a headless agent a ``human`` row is "what reached the
-tab", not proof of who typed it (the hook's own docstring says why). A citation is spent when the
-gate lets the call through, even if the route then answers 404 or 409 (no such run, nothing
-pending): the person types again. A codex chief records no message, so it can cite nothing.
+What this proves is that the words are the person's, relayed to the question the chief picked.
+Outer whitespace is the one thing a route may change: ``/runner/agent-answer`` strips the answer
+before it supplies it, ``/comms/answer`` stores the cited text unstripped (it strips only to see
+whether it is blank). It does not prove the person meant the words for that question (a chief can
+cite an unrelated later remark). A ``human`` row is what the hook endpoint recorded, not proof of
+who typed it (the hook's own docstring says why): a headless agent an ``operator`` chief starts
+runs as the same OS user and can post a row itself if it reads the session's secret file and
+``--session-id``. And the rule guards the chief token's own calls, not a process the chief
+starts: that agent can call the unchanged answer routes with no ``cite`` at all.
+
+The acknowledgement of a human escalation is a cited answer too, and it must say who closes the
+gate: the body's ``agent`` is stored on the row, so it has to be ``"chief"`` (as ``/comms/post``
+needs ``from == "chief"``), else the board would read as if the person closed it.
+
+A citation is spent when the gate lets the call through, whatever the route then does: a topic
+with no run (404), a run that is not awaiting an answer (409), a ``text/plain`` body (the gate
+reads it with ``force=True``, the route's strict ``get_json()`` answers 415, then 500) and
+``/comms/answer`` on a human escalation (the route's 403) all use the message up, and the person
+is not told. So a chief, buggy or hostile, can burn any unspent message of its session by naming
+a topic with no run or an idle one; the person types again. A target the route rejects for its
+shape (a blank or non-string ``topic`` or ``question_id``) spends nothing. Both sides of "at or
+after" are the wall clock (``time.time()`` for a message and for a run's question, the row's ISO
+``ts`` for a board row), so a clock stepped backwards lets an older message pass. A codex chief
+records no message, so it can cite nothing.
 """
 
 from __future__ import annotations
@@ -43,6 +61,7 @@ NOT_CITED_CODEX = (
 )
 CITE_ONLY = "send cite only: Pathly relays the cited message's text"
 ALREADY_CITED = "that message was already cited"
+AS_CHIEF = "a chief acknowledges a human escalation as 'chief'"
 ACKNOWLEDGE = "/comms/acknowledge"
 
 # The key of each answer route's body that says what the answer is for.
@@ -67,7 +86,8 @@ def _cited_message(conn, session: Mapping, cite: object) -> dict | None:
     """The row ``cite`` names when it is a ``human`` message of this session, else None."""
     from pathly_orchestrator.db.queries.chief import get_human_message
 
-    if type(cite) is not int:  # not a bool, a float or a string
+    # Not a bool, a float or a string; and SQLite holds 64 bits, a larger number is no message.
+    if type(cite) is not int or abs(cite) >= 2**63:
         return None
     message = get_human_message(conn, cite)
     if (
@@ -126,6 +146,8 @@ def cite_refusal(
     """
     if any("answer" in body or "option_id" in body for body in bodies):
         return CITE_ONLY
+    if rule == ACKNOWLEDGE and any(body.get("agent") != "chief" for body in bodies):
+        return AS_CHIEF
     key = TARGET_KEYS[rule]
     asks = [(body.get("cite"), body.get(key)) for body in bodies]
     if any(ask != asks[0] for ask in asks):
