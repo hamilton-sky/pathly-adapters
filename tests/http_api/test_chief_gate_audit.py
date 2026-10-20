@@ -129,6 +129,26 @@ def _routes(app):
         yield rule, method, keys
 
 
+def test_every_url_variable_gets_the_whole_list(app):
+    """The short list is for a key that is only text. A variable of the URL (a feature, a run or
+    an artifact id) is joined into a path or a query by the route, whatever the entry calls it,
+    so it gets the same values as a key of a file kind. Round 7 found the ``feature`` of eight
+    rules, the ``artifact_id`` of one and the ``run_id`` of four on the short list.
+    """
+    from pathly_orchestrator.http_server.chief_field_types import url_variables
+
+    variables, short = [], []
+    for rule, method, keys in _routes(app):
+        kinds = dict(keys)
+        for variable in sorted(url_variables(rule)):
+            variables.append((rule, method, variable))
+            if kinds[variable] == "plain":
+                short.append((rule, method, variable))
+
+    assert variables, "the table lists no route with a variable in its URL"
+    assert short == [], f"URL variables on the short list: {short}"
+
+
 def _attack(env, app, tier: str) -> dict:
     """Send the hostile values in every key of every route; return how the routes answered."""
     world, audit = env.world, env.audit
