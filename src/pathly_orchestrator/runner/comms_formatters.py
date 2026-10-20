@@ -192,12 +192,19 @@ def _collect_hydrate_channel(
 _TIER_RANK = {"global": 0, "project": 1, "feature": 2}
 
 
+def _one_line(value: object) -> str:
+    """*value* with every run of whitespace, line breaks included, as one space."""
+    return " ".join(str(value).split())
+
+
 def _render_standing_orders(standing: list[dict]) -> list[str]:
     """Binding decisions in a block of their own, outside the ranked list.
 
     The ranked list tells the agent that the decision listed first wins, so a standing order
-    inside it would lose to any later note. Here the only way out is the human, through the
-    chief, which is why there is no `supersedes` hint.
+    inside it would lose to any later note. Here the way out is the human, through the chief,
+    which is why there is no `supersedes` hint; the block states that rule, and the routes
+    only start to enforce it with chief-agent tickets 12 and 16. Each order is ONE line, so a
+    row's text cannot start a new line and forge an entry or a header of its own.
     """
     lines = [
         "**Standing orders (binding; a newer decision does not override them):**",
@@ -205,10 +212,11 @@ def _render_standing_orders(standing: list[dict]) -> list[str]:
         "or another agent post does not.",
     ]
     for msg in sorted(standing, key=lambda m: str(m.get("ts") or "")):
-        to_agent = msg.get("to_agent") or "*"
+        to_agent = _one_line(msg.get("to_agent") or "*")
         who = "all roles" if to_agent == "*" else to_agent
-        ident = f"  [id: {msg['id']}]" if msg.get("id") else ""
-        lines.append(f"  • BINDING for {who}: {msg.get('text', '')}{ident}")
+        ident = f"  [id: {_one_line(msg['id'])}]" if msg.get("id") else ""
+        text = _one_line(msg.get("text", ""))
+        lines.append(f"  • BINDING for {who}: {text}{ident}")
     return lines
 
 

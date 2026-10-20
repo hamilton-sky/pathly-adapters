@@ -3,9 +3,10 @@
 A pending decision reaches every prompt on the boards the run reads, until the first
 acknowledgement makes it ``active``. A binding decision (``binding = 1``, a standing order)
 is read whatever its status until it is superseded or deleted, but only by the role it is
-addressed to (or by everyone, for ``*``), and it is read from the project board even when the
-run's project tier is off: a context-budget toggle must not mute a standing order. Retrieval
-only; ``comms_formatters.render_governance_lines`` renders the result.
+addressed to (or by everyone, for ``*``), and it is read from the project board (when the run
+has a project root) even when the run's project tier is off: a context-budget toggle must not
+mute a standing order. Retrieval only; ``comms_formatters.render_governance_lines`` renders the
+result.
 """
 
 from __future__ import annotations
@@ -49,24 +50,25 @@ def governance_decisions(
 ) -> list[dict]:
     """Pending decisions on *boards*/*scopes*, plus the standing orders for *role*.
 
-    A pending row with ``binding = 1`` is left out of the pending half: the binding query
-    answers for it, by role, so a directive addressed to the builder is not handed to the
-    reviewer while it waits for its first acknowledgement.
+    A pending row with ``binding = 1`` is left out of the pending half when the binding query
+    succeeded: the query answers for it, by role, so a directive addressed to the builder is
+    not handed to the reviewer while it waits for its first acknowledgement. When the query
+    raises, no order is served (a warning is logged) and the pending half stays as it was, so
+    a pending binding row still reaches the prompt as an ordinary pending decision.
     """
     from pathly_orchestrator.db.queries.comms import get_pending_decisions
 
-    pending: list[dict] = []
+    rows: list[dict] = []
     try:
         rows = get_pending_decisions(conn, boards=boards, scopes=scopes)
-        pending = [d for d in rows if not d.get("binding")]
     except Exception:
         logger.debug("comms_governance: pending decisions unavailable", exc_info=True)
-    standing: list[dict] = []
     try:
         standing = _standing_orders(conn, boards, scopes, role, project_scope)
     except Exception:
         logger.warning("comms_governance: standing orders unavailable", exc_info=True)
-    return pending + standing
+        return rows
+    return [d for d in rows if not d.get("binding")] + standing
 
 
 def standing_orders_only(project_scope: str, role: str, stats: dict[str, int]) -> str:
