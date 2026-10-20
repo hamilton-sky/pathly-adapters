@@ -18,6 +18,7 @@ from pathly_orchestrator.fsm import (
 )
 from pathly_orchestrator.fsm.gates._proof_record import stamp_proof_base
 from pathly_orchestrator.proof import tree as _proof_tree
+from pathly_orchestrator.scope_names import is_flow_name, resolves_inside
 from pathly_orchestrator.storage_paths import _safe_topic
 from pathly_orchestrator.fsm_compose import (
     _SCHEMA_VERSION,
@@ -58,12 +59,13 @@ def _load_flow(flow_name: str, project_root: str | None = None) -> dict:
                         return yaml.safe_load(row["flow_yaml"])
         except Exception:
             pass
-    text = (
-        files("pathly_data")
-        .joinpath(f"core/flows/{flow_name}.flow.yaml")
-        .read_text(encoding="utf-8")
-    )
-    return yaml.safe_load(text)
+    # The name joins onto the packaged flows folder: an absolute or climbing string would read
+    # a file anywhere (another project's flow file can carry a `command` for a gate).
+    flows = files("pathly_data").joinpath("core/flows")
+    path = flows.joinpath(f"{flow_name}.flow.yaml")
+    if not is_flow_name(flow_name) or not resolves_inside(flows, path):
+        raise FileNotFoundError(f"no packaged flow {flow_name!r}")
+    return yaml.safe_load(path.read_text(encoding="utf-8"))
 
 
 def _resolve_storage_path(

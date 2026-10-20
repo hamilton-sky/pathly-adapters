@@ -115,3 +115,29 @@ def _read_file_text(path: str) -> str | None:
             return fh.read()
     except OSError:
         return None
+
+
+def inside_root(path: str, root: str) -> bool:
+    """True when the file ``path`` lies under ``root``, symlinks followed the way ``open`` does."""
+    base = os.path.normcase(os.path.realpath(root))
+    target = os.path.normcase(os.path.realpath(path))
+    return target == base or target.startswith(base + os.sep)
+
+
+def whole_file_result(artifact_id: str | None, path: str, text: str, row: dict) -> dict:
+    """The ``{body, status}`` of a request for a whole file (a non-.md file, or no anchor)."""
+    return {
+        "body": {
+            "ok": True,
+            "artifact_id": artifact_id,
+            "artifact": os.path.basename(path),
+            "anchor": None,
+            "heading": None,
+            "line_start": 1,
+            "line_end": len(text.splitlines()),
+            "text": text,
+            "summary": row.get("summary"),
+            "stale_rebuilt": False,
+        },
+        "status": 200,
+    }

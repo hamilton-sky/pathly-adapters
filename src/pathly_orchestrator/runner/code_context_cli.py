@@ -21,21 +21,41 @@ import shutil
 import subprocess
 from typing import Sequence
 
+from pathly_orchestrator.scope_names import cache_root
+
 # Bounds — keep the shell-out cheap and never let it hang the prompt: at most N
 # files queried, each query deadline-capped (the graph binary is fast, but the
 # deadline is the backstop against a wedged process).
 _CLI_TIMEOUT_S = 8
 _CLI_MAX_FILES = 2
 
-# Content-hash cache. Key = (path, sha1-of-bytes), value = the rendered per-file
-# structure section. An UNCHANGED file is reused without re-querying; an edit
-# changes the hash and forces a refresh. Only NON-empty sections are cached, so
-# a query made before the repo is indexed is not frozen as "no data".
-_CLI_CACHE: dict[tuple[str, str], str] = {}
+# Content-hash cache. Key = (project root, path, sha1-of-bytes), value = the rendered
+# per-file structure section. An UNCHANGED file is reused without re-querying; an edit
+# changes the hash and forces a refresh. The project is part of the key: a relative path
+# with the same bytes is the same key in every project, and each project's graph answers
+# for its own symbols. Only NON-empty sections are cached, and only for a file that has a
+# hash, so a query made before the repo is indexed is not frozen as "no data".
+_CLI_CACHE: dict[tuple[str, str, str], str] = {}
 
 
-def _file_hash(path: str) -> str:
-    """SHA1 of the file's bytes, or ``""`` when it can't be read."""
+def _cypher_literal(text: str) -> str | None:
+    """``text`` as the inside of a double-quoted Cypher string, or None when it holds a double
+    quote. A quote cannot be made part of the string without trusting that the tool's lexer
+    reads a backslash before it as an escape (the real ``codebase-memory-mcp`` was not available
+    to check), and a quote that ends the literal lets a request's target add conditions, so the
+    caller makes no query for such a text. A backslash is doubled.
+    """
+    if '"' in text:
+        return None
+    return text.replace("\\", "\\\\")
+
+
+def _file_hash(path: str, project_root: str = "") -> str:
+    """SHA1 of the file's bytes, or ``""`` when it can't be read. A relative ``path`` is read
+    under ``project_root`` (the project the call names), not the server's working directory.
+    """
+    if project_root and not os.path.isabs(path):
+        path = os.path.join(project_root, path)
     try:
         with open(path, "rb") as fh:
             return hashlib.sha1(fh.read(), usedforsecurity=False).hexdigest()
@@ -92,7 +112,7 @@ class CliProvider:
             return ""  # repo not indexed yet -> no block (caller degrades to Grep)
         sections: list[str] = []
         for path in list(files)[:_CLI_MAX_FILES]:
-            section = self._file_section(exe, project, path)
+            section = self._file_section(exe, project, path, project_root)
             if section:
                 sections.append(section)
         if not sections:
@@ -131,18 +151,23 @@ class CliProvider:
                     best_name, best_len = str(proj.get("name") or ""), len(root)
         return best_name
 
-    def _file_section(self, exe: str, project: str, path: str) -> str:
+    def _file_section(
+        self, exe: str, project: str, path: str, project_root: str = ""
+    ) -> str:
         """Cached-or-fresh structure section for ``path`` (content-hash cache).
         One deadline-bounded graph query; only non-empty sections cached."""
-        file_hash = _file_hash(path)
-        key = (path, file_hash)
+        file_hash = _file_hash(path, project_root)
+        key = (cache_root(project_root), path, file_hash)
         if file_hash and key in _CLI_CACHE:
             return _CLI_CACHE[key]
         # Match on the last two path segments so repo-relative vs absolute paths
         # both resolve against the graph's stored (index-root-relative) file_path.
         tail = "/".join(path.replace("\\", "/").rstrip("/").split("/")[-2:])
+        literal = _cypher_literal(tail)
+        if literal is None:
+            return ""  # a name with a double quote is not put into a query
         cypher = (
-            'MATCH (n) WHERE n.file_path CONTAINS "' + tail + '" '
+            'MATCH (n) WHERE n.file_path CONTAINS "' + literal + '" '
             'AND n.label IN ["Function","Method","Class"] '
             "RETURN n.name, n.in_degree, n.out_degree "
             "ORDER BY n.in_degree DESC LIMIT 12"

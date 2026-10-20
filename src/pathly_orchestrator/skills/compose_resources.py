@@ -12,6 +12,8 @@ from typing import Any
 
 import yaml
 
+from pathly_orchestrator.scope_names import is_skill_name, resolves_inside
+
 logger = logging.getLogger("pathly.compose_resources")
 
 
@@ -80,12 +82,27 @@ def load_effective_manifest(project_root: str | None = None) -> dict:
     return merged
 
 
+def _skill_file(skill: str):
+    """The packaged ``<skill>.md``. A skill name is ``name`` or ``category/name``; a string that
+    would join to a file outside the skills folder (an absolute path, a ``..``, a backslash)
+    is no skill at all, and a request can name any string (``POST /comms/run``).
+    """
+    root = _skills_root()
+    path = root.joinpath(f"{skill}.md")
+    if not is_skill_name(skill) or not resolves_inside(root, path):
+        raise FileNotFoundError(f"no packaged skill {skill!r}")
+    return path
+
+
 def _read_skill_body(skill: str) -> str:
-    return _skills_root().joinpath(f"{skill}.md").read_text(encoding="utf-8")
+    return _skill_file(skill).read_text(encoding="utf-8")
 
 
 def _skill_exists(skill: str) -> bool:
-    return _skills_root().joinpath(f"{skill}.md").is_file()
+    try:
+        return _skill_file(skill).is_file()
+    except FileNotFoundError:
+        return False
 
 
 def _read_fragment(fragments_dir: str, name: str) -> str:

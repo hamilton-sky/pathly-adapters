@@ -208,7 +208,8 @@ def comms_artifact_section(artifact_id: str | None = None):
         anchor = (request.args.get("anchor") or "").strip() or None
         scope = (request.args.get("scope") or request.args.get("feature") or "").strip()
         artifact = (request.args.get("artifact") or "").strip()
-        project_root = (request.args.get("project_root") or "").strip() or _os.getcwd()
+        named_root = (request.args.get("project_root") or "").strip()
+        project_root = named_root or _os.getcwd()
 
         conn = _get_db()
         result = _hydrate(
@@ -218,6 +219,9 @@ def comms_artifact_section(artifact_id: str | None = None):
             artifact=artifact,
             anchor=anchor,
             project_root=project_root,
+            # A row read by id keeps the path it was stored with: a root named on the request
+            # bounds it (a request that names none reads the stored path as before).
+            contain_in=named_root or None,
         )
 
         # Context-access trail (board-context-pull Solution B.2): when an agent

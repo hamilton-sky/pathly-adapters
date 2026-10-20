@@ -4,13 +4,35 @@
 
 HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, prompt-event contract.
 
-17 test file(s).
+39 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
 | `test_api.py` | Tests for the HTTP routes Blueprint (api/__init__.py). Uses Flask test client | 15 |
 | `test_caller_identity.py` | caller_identity(request): the caller is the holder of a live run token, never a body field | 9 |
 | `test_chat_agent.py` | covers pathly studio chat is plan aware; generic chat remains unchanged | 2 |
+| `test_chief_gate.py` | chief-agent 08: the chief gate refuses every call a chief token's tier does not allow | 32 |
+| `test_chief_gate_actions.py` | chief-agent 08: which action a call is, and so which tier may make it | 6 |
+| `test_chief_gate_artifact_section.py` | chief-agent 08 (round 6): the section of an artifact read by id stays inside the named project | 5 |
+| `test_chief_gate_audit.py` | chief-agent 08 (rounds 6 and 7): a chief that sends hostile values touches nothing outside its | 6 |
+| `test_chief_gate_board_reads.py` | chief-agent 08: reads of a board are bound by the board and scope they name | 8 |
+| `test_chief_gate_bodies.py` | chief-agent 08: the gate reads the body the way the route will | 12 |
+| `test_chief_gate_code_cache.py` | chief-agent 08 (round 8): a chief's code query is answered from its own project | 3 |
+| `test_chief_gate_feature_names.py` | chief-agent 08 (round 8): a feature name is one name, not a pattern | 2 |
+| `test_chief_gate_files.py` | chief-agent 08: a file a chief names must be inside its project | 9 |
+| `test_chief_gate_flow_skill.py` | chief-agent 08 (round 6): a flow or a skill a request names is one packaged or stored name | 10 |
+| `test_chief_gate_folders.py` | chief-agent 08: a name a route makes a folder of is one folder name | 9 |
+| `test_chief_gate_keys.py` | chief-agent 08 (round 6): the key list of every route, read against the code | 17 |
+| `test_chief_gate_kinds.py` | chief-agent 08 (round 7): a key's declared kind fits what its view does with it | 7 |
+| `test_chief_gate_mirror.py` | chief-agent 08 (round 5): a request string that becomes part of a filesystem path | 14 |
+| `test_chief_gate_project_scope.py` | chief-agent 08: a board named by ``scope`` is bound to the chief's project | 9 |
+| `test_chief_gate_requests.py` | chief-agent 08: HEAD, redirects, lookalike paths and methods no route has | 5 |
+| `test_chief_gate_root_naming.py` | chief-agent 08: a route that falls back to another project must be told which | 12 |
+| `test_chief_gate_separators.py` | chief-agent 08 (round 7): the gate reads "the same directory" the way the host does | 7 |
+| `test_chief_gate_strict_keys.py` | chief-agent 08 (round 6): a chief sends only the keys its route's entry lists | 4 |
+| `test_chief_gate_symlinks.py` | chief-agent 08 (round 8): a file a chief names is inside its project once symlinks are followed | 5 |
+| `test_chief_gate_tables.py` | chief-agent 08: the field table is complete and says what each route reads | 12 |
+| `test_chief_gate_unbound_reads.py` | chief-agent 08: the reads that are fleet-wide say so, and no more | 4 |
 | `test_chief_routes.py` | chief-agent 07: POST /chief/open, POST /chief/close and GET /chief/session | 32 |
 | `test_config.py` | Tests for Settings.from_env() — specifically bind-host validation | 8 |
 | `test_db_agents_route.py` | GET /db/agents — registry-backed agent list for the spawn-policy Settings model-policy UI | 3 |

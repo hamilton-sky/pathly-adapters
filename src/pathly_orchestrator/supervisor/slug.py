@@ -13,6 +13,7 @@ from pathly_orchestrator.db.queries.comms_messages import (
     read_message_slug,
     set_message_slug,
 )
+from pathly_orchestrator.scope_names import is_segment
 
 # Trivial words dropped from a slug so the readable part is the meaningful head of the
 # title (e.g. "The Frontend of the App" -> "frontend-app", not "the-frontend-of-the-app").
@@ -54,8 +55,11 @@ def ensure_goal_slug(conn, goal_id: str) -> str:
             # Goal row not found — return a deterministic fallback without writing
             return f"goal-{goal_id[:8]}"
 
+        # A slug is the folder name the goal's home is made from, and `POST /comms/post` stores
+        # whatever string it is given: one that is not a plain folder name (`../x`, `a/b`) is
+        # replaced by a generated one, so no caller makes a folder outside the project from it.
         existing = row.get("slug") or ""
-        if existing:
+        if existing and is_segment(existing):
             return existing
 
         base = _slugify(row.get("text") or "")

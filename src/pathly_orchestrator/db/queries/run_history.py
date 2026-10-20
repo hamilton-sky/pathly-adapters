@@ -69,7 +69,15 @@ def upsert_run(
 # fix hold a FULL topic path (features/<f>/goals/<slug>, or a project-root path) in
 # `feature`. They are never rewritten — instead the readers below also match rows
 # whose path BASENAME equals the queried slug. New rows always store the slug.
-_SLUG_MATCH = "(feature=? OR feature LIKE '%/' || ?)"
+# The slug is a LIKE pattern's tail, so it is escaped by ``_like_literal`` and the
+# pattern says what the escape character is: ``%`` and ``_`` in a name are not wildcards.
+_SLUG_MATCH = "(feature=? OR feature LIKE '%/' || ? ESCAPE '\\')"
+
+
+def _like_literal(name: str) -> str:
+    """``name`` as a LIKE pattern that matches only itself: ``%``, ``_`` and the escape
+    character (a backslash, the one ``_SLUG_MATCH`` declares) are each escaped."""
+    return name.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 def read_run_history(
@@ -79,7 +87,7 @@ def read_run_history(
     rows = conn.execute(
         "SELECT * FROM run_history "  # nosec B608 - _SLUG_MATCH is a module constant; values are bound
         f"WHERE project_root=? AND {_SLUG_MATCH} ORDER BY id DESC",
-        (_norm(project_root), feature, feature),
+        (_norm(project_root), feature, _like_literal(feature)),
     ).fetchall()
     return [dict(r) for r in rows]
 
@@ -94,7 +102,7 @@ def latest_running_run_id_for_feature(
     row = conn.execute(
         "SELECT run_id FROM run_history "  # nosec B608 - _SLUG_MATCH is a module constant; values bound
         f"WHERE {_SLUG_MATCH} AND status='running' ORDER BY id DESC LIMIT 1",
-        (feature, feature),
+        (feature, _like_literal(feature)),
     ).fetchone()
     return row["run_id"] if row else None
 
@@ -111,6 +119,6 @@ def latest_project_root_for_feature(
     row = conn.execute(
         "SELECT project_root FROM run_history "  # nosec B608 - _SLUG_MATCH is a module constant; values are bound
         f"WHERE {_SLUG_MATCH} ORDER BY id DESC LIMIT 1",
-        (feature, feature),
+        (feature, _like_literal(feature)),
     ).fetchone()
     return row["project_root"] if row else None

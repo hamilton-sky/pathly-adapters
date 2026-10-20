@@ -4,7 +4,7 @@
 
 Comms board / message-board subsystem — messages, tasks, artifacts, goals, context retrieval & relevance, board mirror & hydration.
 
-53 test file(s).
+55 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -18,6 +18,8 @@ Comms board / message-board subsystem — messages, tasks, artifacts, goals, con
 | `test_board_mirror.py` | Board disk-mirror P0 — path resolver, atomic exporter, idempotent backfill | 19 |
 | `test_board_mirror_hydrate.py` | Board disk-mirror P2 — hydration (import BOARD.json mirrors back into the DB) | 13 |
 | `test_board_mirror_live.py` | Board disk-mirror P1 — live debounced mirror | 11 |
+| `test_board_mirror_relative_root.py` | A project board whose scope is a RELATIVE root is no longer mirrored (chief-agent 08, round 6) | 4 |
+| `test_board_mirror_scope.py` | The board mirror writes only for a scope that is a project root or a plain name | 12 |
 | `test_board_run.py` | Tests for start_board_run and POST /comms/run (BOARD-RUNTIME-SPEC §2/US4) | 15 |
 | `test_chief_tiers.py` | chief-agent 04: the chief tiers and the preset-to-tier resolution | 25 |
 | `test_comms_agent_context.py` | Tests for POST /comms/agent-context (BLOCK C1 — BOARD-INFO mode) | 6 |

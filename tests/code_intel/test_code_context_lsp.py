@@ -267,9 +267,10 @@ def test_cache_separates_by_backend(client, monkeypatch):
     assert r1["result"] == "block-for-cli" and r2["result"] == "block-for-lsp"
 
 
-def test_null_result_not_cached(client, monkeypatch):
+def test_null_result_not_cached(client, monkeypatch, tmp_path):
     """A warming-up/not-yet-indexed null must NOT be pinned — it re-queries so the
-    block appears once the async index lands (regression for the auto-onboard race)."""
+    block appears once the async index lands (regression for the auto-onboard race).
+    The target is a real file: a target with no content hash is never cached."""
     import pathly_orchestrator.runner.code_context as cc
     from pathly_orchestrator.http_server.blueprints.code import query as q
 
@@ -284,12 +285,13 @@ def test_null_result_not_cached(client, monkeypatch):
         return outputs[min(i, len(outputs) - 1)]
 
     monkeypatch.setattr(cc, "build_block", fake_build_block)
+    (tmp_path / "x.py").write_text("def f():\n    pass\n")
     body = {
         "op": "symbol",
         "target": "x.py",
         "role": "architect",
         "engine": "graph",
-        "project_root": _ABS,
+        "project_root": str(tmp_path),
     }
     r1 = client.post("/code/query", json=body).get_json()
     r2 = client.post("/code/query", json=body).get_json()

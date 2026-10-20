@@ -25,6 +25,7 @@ from pathly_orchestrator.db.connection import get_db
 from pathly_orchestrator.db.queries.comms_artifacts import list_artifacts_for_messages
 from pathly_orchestrator.db.queries.comms_messages import get_all_messages
 from pathly_orchestrator.db.queries.run_history import latest_project_root_for_feature
+from pathly_orchestrator.scope_names import is_project_root, is_segment
 from pathly_orchestrator.storage_paths import _RESERVED_TOPICS
 
 logger = logging.getLogger("pathly.board_mirror")
@@ -65,21 +66,35 @@ def board_mirror_path(board: str, scope: str, project_root: str | None) -> Path 
     # Defensive: never mirror a feature board whose scope is a reserved structural name
     # (e.g. a stray 'project'/'global' literal from a mis-scoped write). It would create
     # pathly/features/<reserved>/, and that dir's UI section id collides with the real
-    # project/global board section → duplicate React key → flicker.
-    if scope in _RESERVED_TOPICS:
+    # project/global board section → duplicate React key → flicker. Nor one whose scope is
+    # not a single plain folder name: the scope is request-derived and is joined into the path.
+    if scope in _RESERVED_TOPICS or not is_segment(scope):
         return None
     return Path(root) / "pathly" / "features" / scope / "BOARD.json"
 
 
-def board_from_scope(scope: str) -> str:
+def board_from_scope(scope: str) -> str | None:
     """Derive the board kind from a DB scope string. Scope conventions: the global board
     is the literal 'global'; a project board's scope is a normalized absolute path (has a
-    '/'); a feature board's scope is a bare slug (no '/')."""
+    '/'); a feature board's scope is a bare slug (no '/'). None when the scope is neither
+    shape (a relative or traversing path, a name with a separator): the scope is
+    request-derived and becomes part of the mirror's path, so nothing is mirrored for it.
+    """
     if scope == "global":
         return "global"
     if "/" in scope:
-        return "project"
-    return "feature"
+        return "project" if is_project_root(scope) else None
+    return "feature" if is_segment(scope) else None
+
+
+def _scope_fits(board: str, scope: str) -> bool:
+    """True when ``scope`` may become part of a mirror path for ``board``: a project board's
+    scope is a normalised absolute root and a feature board's one plain folder name."""
+    if board == "project":
+        return is_project_root(scope)
+    if board == "feature":
+        return is_segment(scope)
+    return True
 
 
 def resolve_project_root(
@@ -124,6 +139,8 @@ def write_board_mirror(
     board must reflect as empty, not stale). Returns True on a successful write, False
     when the path is unresolvable or the write failed for any reason.
     """
+    if not _scope_fits(board, scope):
+        return False
     path = board_mirror_path(board, scope, project_root)
     if path is None:
         return False
@@ -276,7 +293,9 @@ def mark_board_dirty_by_scope(scope: str) -> None:
     """Hook entry point: derive the board from the scope and queue it. Best-effort — never
     raises into the caller (the SSE broadcast)."""
     try:
-        mark_board_dirty(board_from_scope(scope), scope)
+        board = board_from_scope(scope)
+        if board is not None:
+            mark_board_dirty(board, scope)
     except Exception:
         logger.debug("mark_board_dirty_by_scope failed scope=%s", scope, exc_info=True)
 

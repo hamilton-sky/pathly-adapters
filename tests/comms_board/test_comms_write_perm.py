@@ -377,6 +377,7 @@ def test_comms_write_perm_project_writers_constant():
         "evaluator",
         "director",
         "human",
+        "chief",
     }
     assert _PROJECT_WRITERS == frozenset(expected)
 

@@ -23,12 +23,14 @@ _GOAL_FLOWS = frozenset({"team", "team-build", "consultation", "test", _LOOP_FLO
 
 
 def _flow_kind(flow: str) -> str:
+    from pathly_orchestrator.scope_names import is_flow_name
+
     f = flow or ""
     if f in _FLOW_KIND:
         return _FLOW_KIND[f]
-    if f in _GOAL_FLOWS:
-        return "goals"
-    return f
+    if f not in _GOAL_FLOWS and not is_flow_name(f):
+        raise ValueError(f"flow {f!r} is not one name")
+    return "goals" if f in _GOAL_FLOWS else f
 
 
 def _safe_call(fn: Optional[Callable], *args) -> None:
@@ -423,7 +425,21 @@ def _run_team(
             slug = ensure_goal_slug(get_db(project_root or None), goal_id)
         except Exception:
             pass
-    topic = board_run_topic(board, scope, _flow_kind(flow), slug)
+    # The flow is one name, and it exists, before a folder is made for it.
+    try:
+        kind = _flow_kind(flow)
+        if start_fn is None:
+            from pathly_orchestrator.fsm_ops import _load_flow
+
+            _load_flow(flow, project_root or None)
+    except Exception:
+        return {
+            "ok": False,
+            "reason": "unknown_flow",
+            "error": f"flow {flow!r} not found (run any seeded flow: team-build, debug, quick-fix, …)",
+        }
+
+    topic = board_run_topic(board, scope, kind, slug)
     if project_root:
         try:
             import os
@@ -433,18 +449,6 @@ def _run_team(
             )
         except Exception:
             pass
-
-    if start_fn is None:
-        try:
-            from pathly_orchestrator.fsm_ops import _load_flow
-
-            _load_flow(flow, project_root or None)
-        except Exception:
-            return {
-                "ok": False,
-                "reason": "unknown_flow",
-                "error": f"flow {flow!r} not found (run any seeded flow: team-build, debug, quick-fix, …)",
-            }
 
     _start = start_fn
     if _start is None:
