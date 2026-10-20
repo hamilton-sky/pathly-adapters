@@ -9,7 +9,7 @@ description = "Pathly: a board-driven control plane for orchestrating headless m
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 requires-python = ">=3.11"
-dependencies = ["pyyaml>=6.0,<7", "flask>=2.3,<4", "sqlite-vec==0.1.6", "sentence-transformers>=2.7.0"]
+dependencies = ["pyyaml>=6.0,<7", "flask>=2.3,<4", "sqlite-vec==0.1.9", "sentence-transformers>=2.7.0"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "pytest-cov>=5", "build", "twine", "jsonschema>=4", "black==26.5.1", "mypy==2.1.0", "import-linter==2.14"]
