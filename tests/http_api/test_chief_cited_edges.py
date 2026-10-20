@@ -56,8 +56,20 @@ def _comms_answer(client, who, **body):
         lambda n: None,
         lambda n: -n,
         lambda n: n + 1000,
+        lambda n: 2**63,
+        lambda n: -(2**63) - 1,
     ],
-    ids=["string", "float", "list", "object", "null", "negative", "unknown"],
+    ids=[
+        "string",
+        "float",
+        "list",
+        "object",
+        "null",
+        "negative",
+        "unknown",
+        "above int64",
+        "below int64",
+    ],
 )
 def test_cite_is_a_message_number_and_nothing_else(client, project, ask, make):
     chief = Session("operator", project)
@@ -74,19 +86,28 @@ def test_cite_is_a_message_number_and_nothing_else(client, project, ask, make):
 
 def test_true_is_not_message_number_one(client, project, ask):
     chief = Session("operator", project)
-    db().execute(
-        "UPDATE chief_human_messages SET kind = 'human' WHERE id = ?",
-        (chief.style_id,),
-    )
-    db().commit()
     assert chief.style_id == 1
     asker = ask("t-1")
+    # Message 1 is the style prompt. Make it citable on every count but the type of `cite`: a
+    # `human` message of this session recorded after the question was asked.
+    db().execute(
+        "UPDATE chief_human_messages SET kind = 'human', ts = ? WHERE id = ?",
+        (asker.state._agent_question["asked_at"] + 1, chief.style_id),
+    )
+    db().commit()
 
     refused = _agent_answer(client, chief, topic="t-1", cite=True)
 
     assert _gated(refused)
     assert refused.get_json()["error"] == NOT_CITED
     assert asker.still_waiting()
+    assert citations() == []
+
+    # Named by its number the same row is a good citation, so only the type of `cite` refused it.
+    accepted = _agent_answer(client, chief, topic="t-1", cite=chief.style_id)
+
+    assert accepted.status_code == 200, accepted.get_data(as_text=True)
+    assert asker.answer() == "You are the chief of this project."
 
 
 # --- "at or after" ---------------------------------------------------------------------------

@@ -452,7 +452,7 @@ def test_acknowledging_any_other_row_is_a_decision(client, project):
         assert resp.get_json()["action"] == "decide"
 
 
-def test_an_operator_acknowledges_an_ordinary_row_and_meets_the_human_gate(
+def test_an_operator_acknowledges_an_ordinary_row_and_a_human_escalation_needs_a_cite(
     client, project
 ):
     chief = _chief("operator", project)

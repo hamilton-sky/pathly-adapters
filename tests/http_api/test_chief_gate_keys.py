@@ -23,15 +23,16 @@ from chief_gate_support import app
 from chief_walk_support import view_keys_read
 from werkzeug.datastructures import MultiDict
 
-# Keys a later ticket reads. Ticket 10 reads `cite` on the three answer routes, and the entries
-# list it ahead of that, so a chief may send it. Ticket 15 reads `max_cost_usd` on `POST /runs`
-# (its ceiling), which no view reads yet: the entry does not list it, so a chief that sends it is
-# told the key is not listed. Ticket 15 lists it with the code that reads it, and deletes the line.
-WAITS_FOR_A_TICKET = {
+# Keys a later ticket reads. Ticket 15 reads `max_cost_usd` on `POST /runs` (its ceiling), which no
+# view reads yet: the entry does not list it, so a chief that sends it is told the key is not
+# listed. Ticket 15 lists it with the code that reads it, and deletes the line.
+WAITS_FOR_A_TICKET = {("/runs", "max_cost_usd")}
+# Keys the chief gate reads and no view does: the cite rule (`chief_cite`, ticket 10) reads `cite`
+# on the three answer routes to find the message a chief relays.
+READ_BY_THE_GATE = {
     ("/comms/acknowledge", "cite"),
     ("/comms/answer", "cite"),
     ("/runner/agent-answer", "cite"),
-    ("/runs", "max_cost_usd"),
 }
 OWN = "/tmp/chief-keys/proj-a"
 
@@ -116,7 +117,7 @@ def test_a_listed_key_is_read_or_is_a_url_variable_or_waits_for_a_ticket(app):
             for name in fields.kinds()
             if name not in every
             and name not in url_variables(rule)
-            and (rule, name) not in WAITS_FOR_A_TICKET
+            and (rule, name) not in WAITS_FOR_A_TICKET | READ_BY_THE_GATE
         }
         if wasted:
             unread[(rule, method)] = sorted(wasted)
@@ -128,7 +129,7 @@ def test_a_key_that_waits_for_a_ticket_is_listed_or_refused_naming_it():
     from pathly_orchestrator.http_server.chief_fields import ROUTE_FIELDS
     from pathly_orchestrator.http_server.chief_keys import key_refusal
 
-    for rule, key in sorted(WAITS_FOR_A_TICKET):
+    for rule, key in sorted(WAITS_FOR_A_TICKET | READ_BY_THE_GATE):
         fields = ROUTE_FIELDS[(rule, "POST")]
         refusal = key_refusal(rule, "POST", {key: 1})
 
@@ -136,6 +137,12 @@ def test_a_key_that_waits_for_a_ticket_is_listed_or_refused_naming_it():
             assert refusal is None, (rule, key)
         else:
             assert refusal is not None and repr(key) in refusal, (rule, key)
+
+
+def test_the_keys_the_gate_reads_are_the_ones_the_cite_rule_reads():
+    from pathly_orchestrator.http_server.chief_cite import TARGET_KEYS
+
+    assert READ_BY_THE_GATE == {(rule, "cite") for rule in TARGET_KEYS}
 
 
 def test_a_key_that_waits_for_a_ticket_is_taken_off_the_list_when_a_view_reads_it(app):

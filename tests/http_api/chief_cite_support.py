@@ -22,6 +22,7 @@ TEXT = 'use CSV, it\'s what "ops" asked for\nand keep the header row'
 NOT_CITED = "cite a human message from this chief session"
 CITE_ONLY = "send cite only: Pathly relays the cited message's text"
 ALREADY = "that message was already cited"
+AS_CHIEF = "a chief acknowledges a human escalation as 'chief'"
 NOT_OWN = "that is not this chief's project"
 PAUSE = 0.02
 
