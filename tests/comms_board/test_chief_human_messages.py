@@ -13,6 +13,8 @@ the hook with its ``prompt`` wrapped in ``<cross-session-message ...>``; a typed
 
 from __future__ import annotations
 
+import hashlib
+
 import pytest
 from chief_human_support import (
     RUN_ID,
@@ -95,6 +97,46 @@ def test_missing_session_id_key_is_403(client, project, chief_root):
     assert resp.status_code == 403
     assert resp.get_json() == {"error": "not this chief's claude session"}
     assert rows_of(opened.run_id) == []
+
+
+@pytest.mark.parametrize(
+    "stored_hash", [None, "", hashlib.sha256(b"s3cret").hexdigest()]
+)
+@pytest.mark.parametrize("cli_session_id", [None, "", SESSION_ID])
+def test_a_session_without_a_secret_or_a_claude_session_records_nothing(
+    client, project, stored_hash, cli_session_id
+):
+    """A codex chief has no claude session id, and a row may hold no secret hash: neither may
+    be satisfied by a request that leaves the field out, empty or made up."""
+    run_id = "chief-bbbbbbbbbbbb"
+    chief_queries.create_session(
+        get_db(),
+        run_id=run_id,
+        project_root=project,
+        preset=None,
+        tier="status",
+        engine="codex",
+        tab_id=run_id,
+        cli_session_id=cli_session_id,
+        hook_secret_hash=stored_hash,
+        settings_dir=None,
+    )
+    complete = bool(stored_hash) and bool(cli_session_id)
+
+    for secret in ("s3cret", "", None, "x"):
+        for session_id in (SESSION_ID, "", None, "x"):
+            body = {
+                "run_id": run_id,
+                "hook_secret": secret,
+                "text": "hi",
+                "session_id": session_id,
+            }
+            resp = client.post(ROUTE, json=body)
+            if (secret, session_id) == ("s3cret", SESSION_ID) and complete:
+                assert resp.status_code == 201
+            else:
+                assert resp.status_code == 403, (secret, session_id)
+    assert rows_of(run_id) == ([("style_prompt", "hi")] if complete else [])
 
 
 def test_relayed_true_stores_kind_relayed(client, project, chief_root):

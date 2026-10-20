@@ -325,7 +325,7 @@ blueprints/
   code/       query (codebase-intelligence query)
   hq/         context (GET /hq/context — board packet, for inspection) · prompt (POST /hq/prompt — the HQ copilot's model turn: system prompt + board packet + message, or a redirect for an action request; with enabled_actions, the operator turn + the function definitions offered) · actions (GET /hq/actions catalog, PUT /hq/actions/available) · actions_run (POST /hq/actions/check|run|report — operator proposals → confirm cards → execution through the real routes + audit)
   control/    runs_read (unified run read API: GET /runs, /runs/<id>) · runs_control (POST /runs/<id>/stop — run_id-addressed stop · POST /runs/<id>/<action> for pause|resume|advance|reroute|retry|abort — run_id-addressed control, mirrors /runner/* — board-lock runs support only abort)
-  chief/      session (POST /chief/open — open the project's chief agent, 201 / 409 if one is open · POST /chief/close — close it and kill its tab · GET /chief/session?project_root= — is one open; open and close refuse a live run token)
+  chief/      session (POST /chief/open — open the project's chief agent, 201 / 409 if one is open · POST /chief/close — close it and kill its tab · GET /chief/session?project_root= — is one open; open and close refuse a live run token) · human (POST /chief/human-messages — the chief's UserPromptSubmit hook, `pathly_hooks.chief_prompt`, records what the human types; needs the session's hook secret and claude session id, and a chief token cannot call it)
 ```
 A new endpoint goes into the matching domain file. If no domain matches, create a new domain file — do not add it to an unrelated file.
 

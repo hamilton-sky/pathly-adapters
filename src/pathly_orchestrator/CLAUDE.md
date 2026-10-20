@@ -473,6 +473,7 @@ The chief is a long-lived interactive agent a human opens for a project from Stu
 POST /chief/open            ← {project_root, engine, preset, prompt, model?} → 201 {run_id, tab_id, tier, engine}
 POST /chief/close           ← {project_root} → 200 {closed: true|false}
 GET  /chief/session?project_root=  ← {open: false} | {open: true, run_id, tab_id, tier, engine, opened_at}
+POST /chief/human-messages  ← {run_id, hook_secret, text, session_id, relayed?} → 201 {id, kind}   (blueprints/chief/human.py)
 ```
 
 - **Open:** 403 when the caller sends a live run token (an agent cannot open a chief); 400 when a
@@ -495,6 +496,29 @@ GET  /chief/session?project_root=  ← {open: false} | {open: true, run_id, tab_
 - Same limit as the other human-only routes: a caller with no token (or an unknown or revoked
   one) is treated as a human until the UI token (RRP-2b) exists. The chief's own token is refused
   here by the chief gate ("Chief gate" below).
+- **Human messages:** `POST /chief/human-messages` is written to by the chief's
+  UserPromptSubmit hook only, `python -m pathly_hooks.chief_prompt --run-id <id> --secret-file
+  <path> --port <port>` (the command `open_chief` writes into the session's `settings.json`).
+  The hook posts `{run_id, hook_secret, text, session_id}` through
+  `fsm_http_client._request_json` (127.0.0.1, 5 s) and always exits 0; for a reply of kind
+  `human` it prints `Pathly recorded this as human message <id>; cite it with cite=<id> when you
+  relay an answer.` (Claude Code adds hook stdout to the chief's context), for `style_prompt`
+  (the session's first prompt) and `relayed` it prints nothing. The route answers 400 for a body
+  that is not an object or a `text` that is blank, not a string, invalid Unicode or over 64 KiB
+  (bytes); 404 for an unknown or closed session; 403 when sha256 of `hook_secret` is not the
+  session's `hook_secret_hash` (`hmac.compare_digest`; a session with no stored hash never
+  matches) or `session_id` is missing or not the session's `cli_session_id` (`{"error": "not
+  this chief's claude session"}`; a codex session has none, so it records nothing); else
+  `add_human_message(..., relayed=bool(relayed))` and 201 `{id, kind}`. It is not in
+  `chief_routes.ROUTE_ACTIONS`, so the chief gate refuses it to a chief token at every tier: the
+  chief holds a token, never the secret, and cannot write a "human" message. The session id
+  binds the recorded prompt to the chief's own claude process, not to the typist. A message
+  another claude session sends into the chief arrives with the chief's session id but with its
+  `prompt` wrapped in `<cross-session-message ...>` (measured on claude 2.1.304; no other
+  hook-input field differs), so the hook sends `relayed: true` when that tag is anywhere in the
+  prompt and the server stores kind `relayed`, which is never citable (a typed prompt that holds
+  the tag is wrongly uncitable too). A `--restricted` claude binds no inbox socket, so on that
+  version no other session can message the chief at all.
 
 ### Request bodies — one lenient reader for every comms route (`_helpers.read_json_body`)
 
@@ -625,7 +649,7 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
 | `answer` | `/runner/agent-answer`, `/comms/answer`; `/comms/acknowledge` on an escalation with `to_agent = "human"` (the gate looks the row up by `message_id`) |
 
 - **Deny by default.** Every non-GET route the table does not list is 403 to every tier (for
-  example `/db/query`, `/skills/prompts`, `/chief/open|close`, `/comms/edit|delete|hydrate`,
+  example `/db/query`, `/skills/prompts`, `/chief/open|close|human-messages`, `/comms/edit|delete|hydrate`,
   `/comms/tasks/status` and the FSM routes that take `force_past_gate`): the chief never forces
   past a human gate and never marks a task done itself. An unknown `/runs/<run_id>/<verb>` is
   unlisted too. `tests/http_api/test_chief_gate.py` walks `app.url_map` and fails when an unlisted
@@ -1300,7 +1324,8 @@ pathly_orchestrator/
                            # sse._broadcast_run_event, teed from _broadcast_runner/_broadcast_comms
                            # whenever a payload carries a run_id)
       chief/               # session.py (chief-agent): POST /chief/open, POST /chief/close, GET
-                           # /chief/session — see "Chief endpoints"; __init__.py exposes all_blueprints
+                           # /chief/session; human.py: POST /chief/human-messages (the chief hook's
+                           # post) — see "Chief endpoints"; __init__.py exposes all_blueprints
                            # (registered in app.py like control/)
 ```
 
