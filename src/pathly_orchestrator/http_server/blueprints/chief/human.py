@@ -1,17 +1,25 @@
-"""POST /chief/human-messages — record a prompt typed into a chief's claude tab (chief-agent).
+"""POST /chief/human-messages — record a prompt that reached a chief's claude tab (chief-agent).
 
-Written to by one caller only: the chief's UserPromptSubmit hook (``pathly_hooks.chief_prompt``),
-which holds the session's hook secret (a 0600 file in the session folder; the session row keeps
-only its sha256). The chief itself holds a run token, never the secret, and the chief gate
-refuses this route to a chief token (it is not in ``chief_routes.ROUTE_ACTIONS``), so the chief
-cannot write a "human" message. The caller must also name the chief's own claude session id
-(``chief_sessions.cli_session_id``, which ``open_chief`` passed to claude as ``--session-id``),
-so a hook that picked up the settings file in another claude session records nothing.
+Written to by one caller in practice: the chief's UserPromptSubmit hook
+(``pathly_hooks.chief_prompt``), which holds the session's hook secret (a 0600 file in the
+session folder; the session row keeps only its sha256) and the claude session id. The chief
+itself holds a run token, never the secret, and the chief gate refuses this route to a chief
+token (it is not in ``chief_routes.ROUTE_ACTIONS``). So "only the hook can write" means no
+chief token can. The secret file is readable by every other process of the same user and the
+claude ``--session-id`` is in the chief's argv, so a same-user process that reads both (a
+headless builder, say) can post a ``human`` row. The caller must also name the chief's own
+claude session id (``chief_sessions.cli_session_id``, which ``open_chief`` passed to claude as
+``--session-id``), so a hook that picked up the settings file in another claude session records
+nothing; ``/clear`` in the tab gives claude a new id, after which every prompt is a 403.
 
-The session id binds the process, not the typist: a message another claude session sends into
-the chief arrives in the chief's process with the chief's session id. The hook labels those it
-can recognise by their wrapper and sends ``relayed: true``; the server stores kind ``relayed``,
-which ticket 10 never accepts as a citation.
+The session id binds the process, not the typist, and the server cannot tell a typed prompt from
+another one. The hook sends ``relayed: true`` for the prompts it recognises by a wrapper
+(``<task-notification>`` for a finished background task, ``<cross-session-message>`` for another
+session's message); the server stores kind ``relayed``, which ticket 10 never accepts as a
+citation. That is a deny-list of wrappers measured on claude 2.1.304: a prompt without one is
+stored as ``human`` whether or not anyone typed it (a scheduled task from the project's
+``.claude/scheduled_tasks.json`` arrives bare). ``src/pathly_orchestrator/CLAUDE.md`` ("Human
+messages") lists the sources found and the two claude switches that close most of them.
 """
 
 from __future__ import annotations

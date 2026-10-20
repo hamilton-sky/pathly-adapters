@@ -1,7 +1,7 @@
 # Record what the human types in a claude chief tab
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 06, 07, 08
 Test first: yes
 
@@ -254,6 +254,170 @@ edited afterwards)
   `python -m pathly_hooks.chief_prompt` also imports them (about 0.1 s in all); harmless, left alone.
 - The 2 skipped tests in the Test command are older tests; the file `tests/comms_board/test_chief_human_messages.py`
   was edited after the test-only commit (one added test), which is why the final diff touches it.
+
+**Review fixes (round 1)** (quality review of `14edaf3`; the round starts at `cfdfc56`. Test-only
+commit first: `d605ff3`, run red before any source change. At that commit, in a throwaway
+`git worktree` with `PYTHONPATH` on it, 12 of the 92 tests of the two new files failed and 80
+passed: the 8 `test_a_background_task_notification_is_marked_relayed` cases (no `relayed` for the
+notification), `test_the_written_hook_command_records_over_http` (the notification was stored as
+`human` and cited), `test_a_closed_stdout_still_exits_0` and the two
+`test_the_module_exits_0_when_nobody_reads_its_stdout` cases (exit 1 or 120 with no reader on
+stdout). Each failed for the finding's reason.)
+
+1. *major, a background Bash task forges a `human` row.* Reproduced and fixed. The captured prompt
+   shape is now in `tests/comms_board/chief_human_support.py` (`TASK_NOTIFICATION`,
+   `FAILED_NOTIFICATION`, `TIMEOUT_NOTIFICATION`, `STALL_NOTIFICATION`), and
+   `chief_prompt.py` sends `relayed: true` when `<task-notification` or `<cross-session-message`
+   (`_NOT_TYPED`, one regex with a word boundary) is anywhere in the prompt. The docs now say what
+   the finding asked: the marker list is a deny-list of wrappers measured on claude 2.1.304, and
+   they name the sources (`chief_prompt.py` and `human.py` docstrings, the "Human messages" bullet
+   of `src/pathly_orchestrator/CLAUDE.md`, and new superseding lines in `map.md` and
+   `learnings.md`, which are append-only for the floor guard).
+
+   *What I ran to enumerate the sources.* (a) `strings -n 6 /opt/claude-code/bin/claude` (claude
+   2.1.304 is a bun bundle; 63 MB of text) and Python `str.find` over it, for the list of harness
+   tags (`task-notification`, `agent-message`, `teammate-message`, `cross-session-message`,
+   `remote-review`, `slack-ping`, `slack-tag-message`, `tick`, `fetched-web-content`,
+   `coordinator-relay`, `artifact-*`, `channel`, `system-reminder`, `mcp-resource-update`,
+   `mcp-polling-update`) and for every function that queues a prompt (the notification builder, the
+   stall check, the quiet-shell and goal check-ins, the cron scheduler, the usage-limit
+   auto-continue, the worker-restart notice). (b) Measurement with the chief's exact flags:
+   `chief_argv("claude", "haiku", <settings>, <empty mcp>, <uuid>)` and `claude_settings(<hook>)`
+   (the real `--restricted --tools Bash,Read,Glob,Grep --settings ... --strict-mcp-config
+   --session-id ...` and the real deny list), plus `--debug-file`, run as `claude -p --input-format
+   stream-json --output-format stream-json --verbose` kept open on stdin and as an interactive tab
+   in a pty (Down+Enter on the trust dialog), `--model haiku`, tiny prompts, scratch directories
+   only, a `pathly` stub on PATH that execs its arguments (so the chief's one allow rule
+   `Bash(pathly *)` runs any command without a prompt), and a hook script that appends its raw
+   stdin and the clock to a file. The `init` message lists exactly `Bash, Glob, Grep, Read` (no
+   MCP, Agent, Monitor, Cron or Skill).
+
+   *The hook input has the same keys and values for every prompt* (`session_id, transcript_path,
+   cwd, scratchpad_dir, prompt_id, permission_mode, hook_event_name, prompt`); only the wrapper
+   around `prompt` differs. Sources of a prompt the human did not type, and how each is handled:
+
+   | Source | Measured | Handled |
+   |---|---|---|
+   | Background Bash ends (`run_in_background`) | `-p`: a second hook row 5.7 s after the first, `<task-notification>` with the call's `description` in `<summary>` (the forged "Approved by the human: ..." came back verbatim). Tab: second row 6.7 s | flagged `relayed` |
+   | Foreground Bash that hits its `timeout` (moved to the background: "Command did not complete within its 4s timeout and was moved to the background") | `-p`: second row 13.4 s, same wrapper | flagged |
+   | Stall check: a background command whose last output looks like a question (45 s with no output) | `-p`: second row 52.2 s: the wrapper, then `Last output:` and the command's own output after the closing tag | flagged (the marker is looked for anywhere) |
+   | Quiet-shell and goal check-ins | read in the binary (built by the same function; the first is behind a server-side flag); not measured | flagged by the same marker; not measured |
+   | Another session's message | the 09 round-0 measurement (without `--restricted`); a `--restricted` claude binds no inbox | flagged |
+   | `.claude/scheduled_tasks.json` task (also one made by another session of the project, durable `CronCreate`) | tab: the task fired as a **bare prompt** 24.4 s after the typed one (next minute boundary), and 22.4 s when its `createdBySessionId` named another session of the project; the hook rows are indistinguishable from typing | **open limit.** Stored as `human`. The chief cannot write the file (no Write or Edit; Bash is `pathly *`), a same-user process can. Closed by `CLAUDE_CODE_DISABLE_CRON=1` |
+   | Usage-limit auto-continue, worker-restart notice | fixed texts in the binary, not chief-controlled; not measured (needs a usage limit) | **open limit**, would be stored as `human` |
+   | The human accepting a suggested prompt | a human act | accepted as `human` |
+
+   The other harness tags (`teammate-message`, `agent-message`, `channel`, `coordinator-relay`,
+   `slack-*`, `remote-review`, `tick`, `mcp-resource-update`) need a surface the chief does not
+   have; not measured, not flagged.
+
+   *Is there a switch?* Yes, two, as environment variables and, measured separately, as an entry
+   of the settings file's `"env"` block: **`CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1`** (the Bash
+   schema loses `run_in_background`, a command that hits its timeout is killed with exit 143
+   instead of moving to the background, and no `<task-notification>` arrives: one hook row only,
+   with it as an env var in `-p` and on the timeout path, and as a settings `env` in `-p` and in a
+   tab) and **`CLAUDE_CODE_DISABLE_CRON=1`** (the scheduler does not start: one hook row only after
+   110 s, as an env var and as a settings `env`, in a tab). `claude_settings` sets neither; I did
+   not touch ticket 06's code. **A permission rule is not a switch**: `Bash(run_in_background:true)`
+   in the settings `permissions.deny` and as `--disallowedTools` (both run) refuses an explicit
+   background call ("Permission to use Bash with run_in_background:true has been denied.", one hook
+   row), a foreground call still works, but a foreground command with a long `timeout` is still
+   moved to the background and still ends in a `<task-notification>` prompt (measured with the rule
+   present). Only the env var closes both. `--bare` is no option: its help text says it skips the
+   settings-file hooks (not run).
+2. *minor, `print` outside the `try`.* Fixed. `main` now prints through `_say`, inside its `try`:
+   `print(line, flush=True)`, and on `OSError` the null device is `dup2`ed onto stdout so the
+   flush at exit cannot fail either. Reproduced first: with no reader on stdout the hook exited 1
+   (`PYTHONUNBUFFERED=1`, a `BrokenPipeError` at the call) or 120 (buffered, "Exception ignored in
+   TextIOWrapper" at the flush at exit). Tests: `test_a_closed_stdout_still_exits_0` (in-process,
+   `main` returns 0) and `test_the_module_exits_0_when_nobody_reads_its_stdout[buffered|unbuffered]`
+   (a real `python -m` child with `PYTHONUNBUFFERED` removed and set, `child.stdout` closed
+   before its stdin is written, against a canned HTTP server; exit 0 and nothing on stderr).
+3. *minor, `/clear` changes the session id.* Measured: the hook's `session_id` changed from the
+   `--session-id` to a new id after `/clear` (tab, `p7`), so every later prompt is a 403 and
+   nothing more is recorded. Documented in `src/pathly_orchestrator/CLAUDE.md` ("Human messages",
+   its own bullet), in the `human.py` docstring, in `map.md` and in `learnings.md`. The hook's
+   output is unchanged, as asked.
+4. *minor, "only the hook can write".* Carried into `human.py`'s docstring and the living doc: it
+   means no chief token can (the route is not in `ROUTE_ACTIONS`); the secret file (0600) is
+   readable by every other process of the same user and the `--session-id` is in the chief's argv,
+   so a same-user process that reads both can post a `human` row.
+5. *the false doc claims, rewritten* (human.py lines 3-8, the "Human messages" bullet, the map.md
+   Open-questions line): `map.md` and `learnings.md` are append-only for the floor guard, so the
+   old words stay and a new Decisions line ("09, round 2 (supersedes ...)"), a new Open-questions
+   block that says which old words were wrong, and three new `learnings.md` lines supersede them.
+
+**Round 1 proof** (each run fresh after the last edit to code or tests; the three docs and the
+ticket were edited afterwards)
+
+- `python -m pytest tests/comms_board/test_chief_human_messages.py -q -p no:cacheprovider` ->
+  `45 passed`, exit 0. `python scripts/check_entry_points.py` -> `Entry points OK: 16 checked`, exit 0.
+- Both new test files together: `92 passed` on Python 3.12 and `92 passed` on the Python 3.13 venv
+  (the file `test_chief_prompt_hook.py` grew from 33 to 47 tests; 348 lines, under 400).
+- Mutation check against the two new files, each one-line breakage of `chief_prompt.py` failing
+  and the file restored (diff identical): `task-notification` out of the marker (fails
+  `test_a_background_task_notification_is_marked_relayed[completed]`), marker only at the start
+  (`...marker_anywhere...[leading blank]`), the word boundary changed to need `>`
+  (`...[completed]`), `print` back outside the `try` (`test_a_closed_stdout_still_exits_0`), no
+  null-device redirect and no `flush=True` (both `...nobody_reads_its_stdout[buffered]`): 6 of 6
+  caught.
+- Test command from `commands.md` -> `3081 passed, 2 skipped in 813.00s (0:13:33)`, exit 0 (the 2
+  skips are older tests, not in the new files). After it started only a docstring line of
+  `test_chief_human_messages.py` changed; that file was re-run (`45 passed`) and `black --check` on it is clean.
+- Lint command, link by link: `black --check src/ tests/` (633 files unchanged), `mypy` (`no
+  issues found in 332 source files`), `check_file_size.py` (`1027 source files checked; 18 known
+  over 400 lines, none new, none grown`), `check_no_mirror_reads.py`, `gen_test_index.py --check`
+  (the INDEX was regenerated: `tests/comms_board/INDEX.md`), `lint-imports` (`1 kept, 0 broken`),
+  `bandit -q -r src/ -ll -x src/pathly_data/` (only its usual comment warnings), `check_adapters.py`,
+  `check_entry_points.py`, plus `check_version_sync.py`: all exit 0. Smoke exit 0. `python -m build --wheel` exit 0 and the wheel holds `pathly_hooks/chief_prompt.py` (with
+  `task-notification`) and `blueprints/chief/human.py`.
+  No `# noqa`, `# nosec`, skip or `type: ignore` added.
+
+**Round 1 decisions**
+
+- Only wrappers I measured (or read in the binary as built by the same function) are flagged. The
+  other harness tags are a list in the binary, not a measurement; flagging them blind would claim
+  a coverage nobody checked. The deny-list is documented as exactly that.
+- The marker stays "anywhere in the prompt" (the round-0 decision): the stall check puts the
+  command's own output after the closing tag, and a message queued with other text could arrive
+  joined; the wrong direction (another party's words citable as the human's) is the one that matters.
+- Closed stdout: redirecting to the null device (rather than a bare `return 0`) is what lets the
+  interpreter's flush at exit succeed; `main` still has no `except ...: pass`.
+- I did not make the hook print on a 403 (the finding's optional fix): it is a second line of
+  output in the chief's context for a case the human cannot act on, and the ticket says not to
+  change the hook's output for it.
+
+**Round 1 shortcuts taken**
+
+- The stall check and the timeout path were measured in `-p`, not in an interactive tab; the
+  background-end path was measured in both. The cross-session wrapper was not re-measured under
+  the chief's exact (`--restricted`) flags, because such a claude binds no inbox (round 0).
+- Whether `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS` also stops the quiet-shell check-in was not
+  measured (the check-in sits behind a server-side flag I cannot set).
+
+**Round 1, for later tickets**
+
+- Ticket 06 / the conductor: `claude_settings` should set `"env": {"CLAUDE_CODE_DISABLE_BACKGROUND_TASKS":
+  "1", "CLAUDE_CODE_DISABLE_CRON": "1"}` (both measured to work through the `--settings` file). With
+  them off, the two open limits above that the hook cannot see (a scheduled-task file, and
+  background-task text) are closed at the source. A command that runs past its timeout is then
+  killed, not backgrounded; the chief's `pathly` commands are short. Not done here (ticket 06 is
+  not this ticket).
+- Ticket 10: a `human` message is "a prompt claude delivered with none of the known wrappers",
+  not "typed". Until the two env switches are set, a `scheduled_tasks.json` task written by a
+  same-user process stores as `human`; a `/clear` ends recording for the tab (later prompts store
+  nothing, so ticket 10 should treat "no human message" as "unknown", not "the human did not say").
+
+**Round 1, minors noticed, not fixed**
+
+- The unmeasured harness tags are not flagged; usage-limit auto-continue and worker-restart
+  notices are unmeasured and would store as `human`; the `<pasted_content>` marker of a pasted
+  prompt is still not measured (round 0); the quiet-shell check-in switched on is not measured.
+- The over-HTTP test's server thread never calls `server_close()` (reviewer's nit; harmless).
+- `docs/ARCHITECTURE.md` line 134 lists the hook scripts without `stop_telemetry.py` and the chief
+  hook; `pathly_hooks/__init__.py` imports its two older hooks eagerly with a `# noqa`. Both are
+  outside this ticket.
+- `build/lib/` (gitignored) still holds the pre-round-0 copy of `human.py`; a rebuild refreshes it.
 
 ## Review findings (round 1, quality review)
 

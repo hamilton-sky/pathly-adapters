@@ -22,7 +22,7 @@ Comms board / message-board subsystem — messages, tasks, artifacts, goals, con
 | `test_board_mirror_scope.py` | The board mirror writes only for a scope that is a project root or a plain name | 12 |
 | `test_board_run.py` | Tests for start_board_run and POST /comms/run (BOARD-RUNTIME-SPEC §2/US4) | 15 |
 | `test_chief_human_messages.py` | chief-agent 09: record what the human types in a claude chief tab | 16 |
-| `test_chief_prompt_hook.py` | chief-agent 09: the chief's UserPromptSubmit hook, its edge cases and as a real process | 9 |
+| `test_chief_prompt_hook.py` | chief-agent 09: the chief's UserPromptSubmit hook, its edge cases and as a real process | 12 |
 | `test_chief_tiers.py` | chief-agent 04: the chief tiers and the preset-to-tier resolution | 25 |
 | `test_comms_agent_context.py` | Tests for POST /comms/agent-context (BLOCK C1 — BOARD-INFO mode) | 6 |
 | `test_comms_agent_context_preview.py` | Tests for board-context-pull Solution C — POST /comms/agent-context/preview | 4 |

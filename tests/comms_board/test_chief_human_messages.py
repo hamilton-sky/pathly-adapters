@@ -8,7 +8,8 @@ always exits 0. ``chief_human_support.py`` opens the sessions; ``test_chief_prom
 holds the hook's edge cases and the real-process check.
 
 Measured on claude 2.1.304 (learnings.md): a message another session sends into a chief reaches
-the hook with its ``prompt`` wrapped in ``<cross-session-message ...>``; a typed prompt is not.
+the hook with its ``prompt`` wrapped in ``<cross-session-message ...>`` and a finished background
+task as ``<task-notification>``; a typed prompt has no wrapper (neither has a scheduled one).
 """
 
 from __future__ import annotations
@@ -199,7 +200,7 @@ def test_a_chief_token_on_the_route_is_403_at_every_tier(
     client, project, chief_root, preset
 ):
     """The hook holds the secret and the chief only its token: the gate refuses the route to
-    the token even with a correct body, so the chief cannot write a 'human' message."""
+    the token even with a correct body, so no chief token can write a message."""
     opened = open_session(project, chief_root, preset)
 
     resp = client.post(

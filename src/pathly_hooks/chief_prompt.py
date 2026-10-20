@@ -9,21 +9,38 @@ accepts it from the chief's own claude session. For a message stored as ``human`
 prints one line, which Claude Code adds to the chief's context, naming the id to cite. The
 session's first prompt (the pasted style) and a ``relayed`` one print nothing.
 
-A message another claude session sends into the chief reaches this hook with its ``prompt``
-wrapped in ``<cross-session-message ...>`` (measured on claude 2.1.304; no other field of the
-hook input differs). Such a prompt is sent with ``relayed: true``, so the server stores it as
-``relayed`` and it can never be cited. The marker is looked for anywhere in the prompt: a
-typed prompt that happens to hold it is wrongly uncitable, which the human can repair by
-retyping, while the other mistake would let another session's words pass as the human's.
+The hook is also run for prompts nobody typed, and nothing in the hook input says which: the
+same keys and values arrive for a typed prompt and for the two below (measured on claude 2.1.304,
+in ``claude -p`` stream-json and in an interactive tab). What differs is a wrapper around
+``prompt``, so a prompt holding one of these tags anywhere is sent with ``relayed: true``, the
+server stores it as ``relayed`` and it can never be cited:
+
+* ``<task-notification>``: claude's message when a background task ends. A chief can start one
+  (Bash with ``run_in_background``, or a foreground command that hits its timeout), and the
+  Bash call's ``description`` comes back inside ``<summary>``, so the chief chooses words in
+  it. The same tag wraps the stall check ("appears to be waiting for interactive input"),
+  which puts the command's own output after the closing tag.
+* ``<cross-session-message ...>``: a message another claude session sends. A ``--restricted``
+  claude binds no inbox, so none reaches the chief that way; the check is a second line.
+
+That is a deny-list of the wrappers measured, not a test for "typed": a prompt without a tag is
+stored as ``human`` whether or not anyone typed it. Measured on 2.1.304, a task in the
+project's ``.claude/scheduled_tasks.json`` fires in the chief's tab as a bare prompt. The
+chief cannot write that file, another process of the same user can; ``CLAUDE_CODE_DISABLE_CRON``
+and ``CLAUDE_CODE_DISABLE_BACKGROUND_TASKS`` close it and the notifications above (see
+``src/pathly_orchestrator/CLAUDE.md``, "Human messages"). A typed prompt that happens to hold a
+tag is wrongly uncitable, which the human repairs by retyping; the other mistake would let
+another party's words pass as the human's.
 
 The hook never blocks or alters the prompt: bad stdin, bad arguments, a missing secret file, a
-server that is down or a 403 all end in exit 0 and no output.
+server that is down, a 403 or a stdout nobody reads all end in exit 0.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -36,7 +53,7 @@ CITE_LINE = (
     "Pathly recorded this as human message {id}; "
     "cite it with cite={id} when you relay an answer."
 )
-_CROSS_SESSION = re.compile(r"<cross-session-message\b")
+_NOT_TYPED = re.compile(r"<(?:task-notification|cross-session-message)\b")
 
 
 class _Args(argparse.ArgumentParser):
@@ -94,7 +111,7 @@ def _record(argv: list[str]) -> str:
         "text": prompt,
         "session_id": session_id,
     }
-    if _CROSS_SESSION.search(prompt):
+    if _NOT_TYPED.search(prompt):
         payload["relayed"] = True
     reply = _request_json(
         "POST",
@@ -107,14 +124,23 @@ def _record(argv: list[str]) -> str:
     return CITE_LINE.format(id=reply["id"]) if _is_human(reply) else ""
 
 
+def _say(line: str) -> None:
+    """Print ``line``. With no reader on stdout (a closed pipe) point it at the null device,
+    so the flush at exit does not fail either."""
+    try:
+        print(line, flush=True)
+    except OSError:
+        os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+
+
 def main(argv: list[str] | None = None) -> int:
     """Run the hook; always returns 0."""
     try:
         line = _record(sys.argv[1:] if argv is None else argv)
+        if line:
+            _say(line)
     except Exception:
         return 0
-    if line:
-        print(line)
     return 0
 
 
