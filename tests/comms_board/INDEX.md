@@ -4,11 +4,12 @@
 
 Comms board / message-board subsystem — messages, tasks, artifacts, goals, context retrieval & relevance, board mirror & hydration.
 
-57 test file(s).
+58 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
 | `test_artifact_reconcile.py` | T12: ensure_attached idempotency + reconcile + goal-path resolution + complete_stage threading | 5 |
+| `test_binding_directives.py` | Binding decisions (standing orders) keep reaching the prompts of the roles they target | 26 |
 | `test_board_closure.py` | Board closure — the write paths that let a resolution actually land | 29 |
 | `test_board_context_catalog.py` | Tests for board-context-pull Solution A — the 📚 Catalog channel | 3 |
 | `test_board_context_scope.py` | Tests for board_context_for — scope-aware context honoring the Reads toggle | 3 |

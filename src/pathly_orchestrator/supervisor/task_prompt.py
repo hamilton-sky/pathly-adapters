@@ -142,6 +142,7 @@ def build_task_prompt(
             getattr(state, "project_root", "") or "",
             task_text,
             task_id=task_id,
+            role=_TASK_ROLE,
         )
         if ctx:
             instructions = f"{instructions}\n\n{ctx}"

@@ -251,6 +251,7 @@ def build_prompt(
             # board scope). Without it the char budget + k-ladder in context_settings.py
             # would stay unfalsifiable — see context_record.py for how to read it back.
             storage_path=str(storage_path),
+            role=agent_role,
         )
     except Exception:
         pass

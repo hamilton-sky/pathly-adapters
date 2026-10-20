@@ -150,6 +150,7 @@ def test_get_binding_decisions_rules():
     first = directive("first", to_agent="builder")
     second = directive("second")
     directive("other role", to_agent="reviewer")
+    directive("no addressee", to_agent="")
     post("not binding")
     retire(directive("deleted"), "deleted_at")
     retire(directive("superseded"), "superseded_by")

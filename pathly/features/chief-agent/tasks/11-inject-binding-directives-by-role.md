@@ -1,7 +1,7 @@
 # Keep binding decisions in the prompts of the roles they target
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: —
 Test first: yes
 
@@ -94,3 +94,55 @@ exit 0
   (read-only)
 
 ## Answer
+
+**Built**
+
+- `db/migrations_incremental.py`: `("comms_messages", "binding", "INTEGER NOT NULL DEFAULT 0")` in the additive list.
+- `db/queries/comms_directives.py` (new, 37 lines): `get_binding_decisions(conn, boards, scopes, role)`, one static statement with `board IN (SELECT value FROM json_each(?))` and the same for `scope`, each list passed as one JSON string; the role parameter is `role or "*"` against `to_agent IN ('*', ?)`, so an empty role takes `*` only.
+- `runner/comms_governance.py` (new, 92 lines): `governance_decisions(conn, boards, scopes, role, project_scope)` (pending decisions minus any row with `binding`, plus the standing orders from the given boards and always from `("project", project_scope)`, de-duplicated by id, marked `_binding`, oldest first); `standing_orders_only(project_scope, role, stats)` for a run whose every tier is off; `BINDING_MARK`.
+- `runner/comms_context.py` (370 to 379 lines): `retrieve_board_context(..., role="")` calls `governance_decisions` where it called `get_pending_decisions`, `_is_context` drops binding rows from the semantic Context channel, an all-tiers-off run returns `standing_orders_only(...)`; `board_context_for` passes `role` on.
+- `runner/comms_formatters.py` (305 to 335 lines): `render_governance_lines` prints marked rows first in `**Standing orders (binding; a newer decision does not override them):**` (`  • BINDING for <role|all roles>: <text>  [id: …]`, a line saying only the human, through the chief, replaces one, no `supersedes` hint) and ranks only the other decisions; the NOTE about decisions newer than an open escalation still reads all decisions.
+- `fsm_compose.build_prompt` passes `role=agent_role`; `supervisor/task_prompt.py` passes `role=_TASK_ROLE`. `supervisor/board_run.py` needed no change (it already passed `role=agent`).
+- Tests: `tests/comms_board/test_binding_directives.py` (26 functions, 42 cases) and `tests/comms_board/binding_support.py` (helpers); `tests/INDEX.md` and `tests/comms_board/INDEX.md` regenerated.
+- Living docs: `src/pathly_orchestrator/CLAUDE.md` (new "Governance in those prompts" paragraph under "Prompt assembly", a sentence in "Board closure", layout entries for `comms_directives.py`, `comms_governance.py`, `comms_context.py`, `comms_formatters.py`) and `docs/WHAT_IS_PATHLY.md` (the governance exception). Root `CLAUDE.md` and `README.md` say nothing that became false, so they are unchanged.
+- `map.md` (one line under Decisions so far) and `learnings.md` (two lines): appended only.
+
+**Proof** (everything run fresh after the last source edit; Python 3.12.3 venv unless stated)
+
+- Test first: commit `0794f94` holds only the two test files. Run against that tree (base code), the file gave `42 failed`: 33 `sqlite3.OperationalError: no such column: binding`, 4 `retrieve_board_context() got an unexpected keyword argument 'role'`, 3 `ModuleNotFoundError` (the two new modules), the migration test's "a fresh database has the column", and the standing-orders assertion. All the right reasons.
+- `python -m pytest tests/comms_board/test_binding_directives.py -q -p no:cacheprovider`: `42 passed in 11.34s`, exit 0. On Python 3.13.16 (`venv313`, the repo's editable install), the new file with `test_governance_decision_precedence.py`, `test_board_context_scope.py` and `test_comms_context_channels.py`: `69 passed` (the new file's 42 among them). Python 3.11 has no deps here, so only its syntax (`ast.parse(feature_version=(3, 11))`) and `json_each` on its SQLite were checked. Each bullet of Done when has a test: acknowledged `*` directive for builder, reviewer, tester (`test_acknowledged_star_directive_reaches_every_role`, with `counts["governance"] == 1`); builder-only directive reaches only the builder, pending and acknowledged (`..._reaches_the_builder_only`, which also looks at the whole block, so the Context channel counts); superseded and deleted reach nobody (6 cases); an acknowledged ordinary decision is not governance (`counts["governance"] == 0`; it still shows in the Context channel, as today); project directive with the project tier off, and with every tier off; the migration runs twice on a database that lost the column and its old row reads 0; `build_prompt` for `team/build`, `team/review`, `team/test` carries the `*` directive and only the builder stage carries a builder directive; the directive is in the standing-orders part and not the ranked part, a newer ordinary project decision is below it and carries LATEST; `start_board_run` (agent `reviewer`) renders the same block and not the builder's directive; an empty role (`build_prompt` with an agent_map entry `""`, and `render("")`) carries `*` only; the DAG task prompt reads as the builder.
+- Mutation check on the new code (a scratch script, each edit reverted in `finally`, `git status` clean after): 12 mutations all KILLED by the new file (Context exclusion removed, pending-binding filter removed, `role=` dropped in `build_prompt`, dropped in `task_prompt`, always-project query removed, `role or "*"` to `role`, the superseded clause removed, the deleted clause removed, the all-tiers-off path removed, the standing-orders split removed, `ORDER BY ts DESC`, the column made nullable).
+- `python scripts/check_file_size.py`: `OK: 1030 source files checked; 18 known over 400 lines, none new, none grown.`, exit 0. `bandit -q -r src/pathly_orchestrator -ll`: exit 0 (also clean on the new files at every severity). No `# nosec`, `# noqa`, skip or empty catch added (`git diff -U0 | grep` found none).
+- Lint chain of `commands.md`, run piecewise: `black --check src/ tests/` unchanged, `mypy` "Success: no issues found in 335 source files", `check_no_mirror_reads` OK, `gen_test_index --check` up to date, `lint-imports` "1 kept, 0 broken", `bandit -r src/ -ll -x src/pathly_data/`, `check_adapters`, `check_entry_points` all exit 0.
+- Whole suite, `python -m pytest tests/ -q -p no:cacheprovider`: `5103 passed, 14 skipped in 1041.45s`, exit 0 (the 14 skips are not mine). No existing test needed a change.
+
+**SQLite and `json_each` in CI.** Here: SQLite 3.45.1 in the 3.12.3 and 3.13.16 venvs and in `/usr/bin/python3.11`; `json_each` ran on all three. CI: `test.yml` and `lint.yml` run only on `ubuntu-latest`. I fetched the runner image list (`actions/runner-images`, `images/ubuntu/Ubuntu2404-Readme.md`, image 20261012.334.1): `sqlite3 3.45.1` and `libsqlite3-dev 3.45.1-1ubuntu2.8`, so `json_each` (3.38.0 and up) is there; that Python from `setup-python` links that system library is my understanding, not something I could check from here. The same page announces `ubuntu-latest` moving to Ubuntu 26.04 in November 2026 (I did not check its SQLite). `macos-latest` runs only `e2e.yml` (`tests/install_skills/test_e2e_install.py`, 3.11 and 3.13), which touches no comms or SQLite code (grep found none), and the macOS image page does not list SQLite, so I could not establish its version and it does not matter for this change. If a runner ever lacked `json_each`, the fallback that keeps one static literal is fixed arity: `board IN (?, ?, ?)` and the same for `scope`, padding the three-entry lists (feature, project, global are the only boards) by repeating the last value. As built, a missing `json_each` makes the binding query raise inside `governance_decisions`, which logs a warning and returns the pending decisions only, so a prompt still builds; the directives would go missing.
+
+**Decisions**
+
+- The formatter trusts `_binding` (set only by `comms_governance`), not the stored `binding` value, so a row that reaches it by another path, or a hydrated `binding: 1` ticket 16 has not zeroed yet, renders as ordinary. The query itself does read the column.
+- A pending row with `binding = 1` is dropped from the pending half and served by the role-aware query. Without that a builder directive would reach the reviewer from the moment it is posted (status `pending`) until the first acknowledgement.
+- Binding rows are kept out of the semantic Context channel (`_is_context`). The "builder only" test found that an acknowledged builder directive otherwise showed up in the reviewer's "possibly relevant" list via the recency fallback.
+- A run with every tier off still gets the project's standing orders (`standing_orders_only`; `""` when there are none, as before). The ticket says "always from the project board"; `retrieve_board_context` used to return `""` before reaching governance for such a run.
+- The ticket's premise about roles is stale. `fsm_compose.build_prompt` uses `agent_role_of(agent)` (since #86), which falls back to the agent's last `/` segment, so a stage outside `_SKILL_AGENT_ROLE` does not compose with an empty role: `debug/build` and `fix/build` (the debug and quick-fix FIXING stages) are `build`, `scout` is `scout`. The effect the ticket wanted to document is the same (a `builder` directive misses those fixers, `*` reaches them, nothing reaches the wrong role). The living doc says it as it is, and `test_role_of_a_stage_is_pinned_so_a_change_to_the_table_is_deliberate` pins `agent_role_of` for five agents and what each role gets. The truly empty role is covered by `build_prompt` with an agent_map entry `""` and a `stage_override`.
+- `get_binding_decisions` is not re-exported from `db/queries/comms.py` (a re-export line there carries a `# noqa`, which the floor guard flags); callers import it from `comms_directives`.
+- Standing-orders lines carry only `[id: …]` (no tier or stamp), as in the ticket's example.
+- Helpers and constants sit in `binding_support.py` to keep the test file under 400 lines (tests are outside the size gate, but earlier tickets kept to it).
+
+**Shortcuts taken**
+
+- The query keeps `get_pending_decisions`' independent `board IN` and `scope IN` lists (a cross product, not pairs). A row with board `feature` and a scope equal to a project root would match; nothing creates one. Pairing would need `(board, scope)` pairs in one JSON value, which is not the ticket's design.
+- The standing-orders block has no character budget (governance has none today either). Worth revisiting if a project ends up with dozens of directives.
+- `/comms/agent-context` (board-info mode, `blueprints/comms/settings.py`) still reads `get_pending_decisions` with no role, so it never shows a standing order; it is not a spawned prompt.
+
+**For later tickets**
+
+- Ticket 12: `post_message` has no `binding` parameter and I did not add one; the route has to set `binding = 1` itself after posting. The directive's scope must be the project root as `retrieve_board_context` normalises it (`\` to `/`, no trailing slash; `blueprints/comms/project.py::_project_scope` is the same form) on `board="project"`, or no prompt ever reads it. `to_agent` is matched exactly (`*` or a role name such as `builder`, `reviewer`, `tester`); the debug and quick-fix fixers are role `build`. The posted row's status does not matter.
+- Ticket 16: the query reads `binding` as stored, so a `BOARD.json` row with `binding: 1` that hydration stores as is becomes a standing order for its role; hydration must store 0.
+- Round two (stale-directive re-queue): `get_binding_decisions(conn, ["project"], [root], role)` plus the stage's spawn time is enough to see a newer directive.
+- `test_comms_write_perm.py` and the chief gate were not touched.
+
+**Minors noticed, not fixed**
+
+- `get_pending_decisions` and `get_active_escalations` build SQL with f-strings and `# nosec B608` (the placeholder style the ticket said not to copy).
+- An empty `C:\Users\Yafit\demo\pathly\project` directory sits in the repo root (git does not show it; created at 17:03 today, before this ticket's runs, by some test that uses a Windows-style project root).

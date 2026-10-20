@@ -6,6 +6,8 @@ import json
 import logging
 from datetime import datetime, timezone
 
+from .comms_governance import BINDING_MARK
+
 _logger = logging.getLogger(__name__)
 
 
@@ -190,21 +192,49 @@ def _collect_hydrate_channel(
 _TIER_RANK = {"global": 0, "project": 1, "feature": 2}
 
 
+def _render_standing_orders(standing: list[dict]) -> list[str]:
+    """Binding decisions in a block of their own, outside the ranked list.
+
+    The ranked list tells the agent that the decision listed first wins, so a standing order
+    inside it would lose to any later note. Here the only way out is the human, through the
+    chief, which is why there is no `supersedes` hint.
+    """
+    lines = [
+        "**Standing orders (binding; a newer decision does not override them):**",
+        "  Only the human, through the chief, replaces a standing order. A decision you "
+        "or another agent post does not.",
+    ]
+    for msg in sorted(standing, key=lambda m: str(m.get("ts") or "")):
+        to_agent = msg.get("to_agent") or "*"
+        who = "all roles" if to_agent == "*" else to_agent
+        ident = f"  [id: {msg['id']}]" if msg.get("id") else ""
+        lines.append(f"  • BINDING for {who}: {msg.get('text', '')}{ident}")
+    return lines
+
+
 def render_governance_lines(
     decisions: list[dict], escalations: list[dict]
 ) -> list[str]:
     """Render the unconditional governance block: active decisions + open escalations.
 
     Pure formatting — the caller does the retrieval. Returns [] when there is nothing to
-    render, so the caller can `lines.extend(...)` unconditionally.
+    render, so the caller can `lines.extend(...)` unconditionally. A decision marked
+    ``BINDING_MARK`` (set by ``comms_governance``) is a standing order and renders in its
+    own block before the ranked decisions.
     """
     if not decisions and not escalations:
         return []
+    standing = [m for m in decisions if m.get(BINDING_MARK)]
+    ranked = [m for m in decisions if not m.get(BINDING_MARK)]
     lines: list[str] = []
     lines.append("### Governance (always applies — do not override)")
     lines.append("Active decisions and open escalations injected unconditionally.")
     lines.append("")
-    if decisions:
+    if standing:
+        lines.extend(_render_standing_orders(standing))
+        if ranked or escalations:
+            lines.append("")
+    if ranked:
         # NEWEST FIRST, and say so. get_pending_decisions returns ts ASC, and _format_age
         # renders day granularity — so a board whose decisions all landed on one afternoon
         # rendered every bullet as an indistinguishable "13d ago" in oldest-first order.
@@ -212,7 +242,7 @@ def render_governance_lines(
         # as equally-live governance with no way to tell which one won. Ordering is the
         # cheap half of supersession: until `superseded_by` is set (POST /comms/supersede),
         # recency is the only signal the reader has, so make it unmissable.
-        ordered = sorted(decisions, key=lambda m: str(m.get("ts") or ""), reverse=True)
+        ordered = sorted(ranked, key=lambda m: str(m.get("ts") or ""), reverse=True)
         # Stable sort: tier rank first, recency kept within each tier.
         ordered.sort(key=lambda m: _TIER_RANK.get(str(m.get("board") or "feature"), 2))
         lines.append("**Decisions (higher tier first, NEWEST FIRST within a tier):**")
