@@ -473,6 +473,7 @@ The chief is a long-lived interactive agent a human opens for a project from Stu
 POST /chief/open            ← {project_root, engine, preset, prompt, model?} → 201 {run_id, tab_id, tier, engine}
 POST /chief/close           ← {project_root} → 200 {closed: true|false}
 GET  /chief/session?project_root=  ← {open: false} | {open: true, run_id, tab_id, tier, engine, opened_at}
+POST /chief/human-messages  ← {run_id, hook_secret, text, session_id, relayed?} → 201 {id, kind}   (blueprints/chief/human.py)
 ```
 
 - **Open:** 403 when the caller sends a live run token (an agent cannot open a chief); 400 when a
@@ -495,6 +496,68 @@ GET  /chief/session?project_root=  ← {open: false} | {open: true, run_id, tab_
 - Same limit as the other human-only routes: a caller with no token (or an unknown or revoked
   one) is treated as a human until the UI token (RRP-2b) exists. The chief's own token is refused
   here by the chief gate ("Chief gate" below).
+- **Human messages:** `POST /chief/human-messages` is written to by the chief's
+  UserPromptSubmit hook only, `python -m pathly_hooks.chief_prompt --run-id <id> --secret-file
+  <path> --port <port>` (the command `open_chief` writes into the session's `settings.json`).
+  The hook posts `{run_id, hook_secret, text, session_id}` through
+  `fsm_http_client._request_json` (127.0.0.1, 5 s) and always exits 0; for a reply of kind
+  `human` it prints `Pathly recorded this as human message <id>; cite it with cite=<id> when you
+  relay an answer.` (Claude Code adds hook stdout to the chief's context), for `style_prompt`
+  (the session's first prompt) and `relayed` it prints nothing. The route answers 400 for a body
+  that is not an object or a `text` that is blank, not a string, invalid Unicode or over 64 KiB
+  (bytes); 404 for an unknown or closed session; 403 when sha256 of `hook_secret` is not the
+  session's `hook_secret_hash` (`hmac.compare_digest`; a session with no stored hash never
+  matches) or `session_id` is missing or not the session's `cli_session_id` (`{"error": "not
+  this chief's claude session"}`; a codex session has none, so it records nothing); else
+  `add_human_message(..., relayed=bool(relayed))` and 201 `{id, kind}`. It is not in
+  `chief_routes.ROUTE_ACTIONS`, so the chief gate refuses it to a chief token at every tier: **no
+  chief token can write a message.** That is all "only the hook can write" means. The secret
+  file (0600) is readable by every other process of the same user and the claude `--session-id`
+  is in the chief's argv, so a same-user process that reads both (a headless builder, say) can
+  post a `human` row (spec § Risks).
+  - **What the hook can and cannot tell apart.** The session id binds a recorded prompt to the
+    chief's claude process, not to the typist, and claude runs the hook for prompts nobody typed
+    with the same keys and values as for a typed one (measured on claude 2.1.304 in `claude -p`
+    stream-json and in an interactive tab). Only a wrapper around `prompt` differs. The hook
+    sends `relayed: true` when `<task-notification` or `<cross-session-message` is anywhere in
+    the prompt, and the server stores kind `relayed`, never citable (a typed prompt that holds
+    the tag is wrongly uncitable too; the human retypes it). **That list is a deny-list of the
+    wrappers measured, not a test for "typed":** a prompt without one is stored as `human`
+    whether or not anyone typed it. The chief's claude has exactly four tools (the `init`
+    message lists `Bash`, `Glob`, `Grep`, `Read`; no MCP server, no Agent, Monitor, Cron or
+    Skill). What can still make claude deliver a prompt, and what the hook does with it:
+
+    | Source | What the hook sees | Handled |
+    |---|---|---|
+    | A background Bash ends (`run_in_background`) | `<task-notification>` with the Bash call's `description` in `<summary>`, so the chief picks words in it (a forged "Approved by the human: ...") | flagged. Measured: `-p` and tab |
+    | A foreground Bash hits its `timeout` (moved to the background, "you will be notified") | the same wrapper | flagged. Measured: `-p` |
+    | A background command's last output looks like a question (45 s without output) | the wrapper, then `Last output:` and the command's own output after the closing tag | flagged (anywhere in the prompt). Measured: `-p` |
+    | Quiet-shell and goal check-ins | built by the same function (read in the binary; the first sits behind a server-side flag) | flagged; not measured switched on |
+    | Another claude session's message | `<cross-session-message ...>` | flagged. Measured without `--restricted`; a `--restricted` claude binds no inbox socket, so none arrives |
+    | A task in the project's `.claude/scheduled_tasks.json` (including one another session of that project made with a durable `CronCreate`) | **a bare prompt, nothing to tell it from typing** | **open.** Stored as `human`. Measured in a tab with the chief's flags: fired at the first minute boundary (23-26 s after the typed prompt), also when `createdBySessionId` named another session of the project. The chief cannot write the file (no Write or Edit; Bash is `pathly *`), a same-user process can |
+    | Usage-limit auto-continue, worker-restart notice | fixed text in the binary ("Your claude.ai usage limit has reset. Continue the task ...", "This session's worker process was restarted ..."), not chief-controlled | **open**, not measured (needs a usage limit). Would be stored as `human` |
+    | The human accepting a suggested prompt (Tab, Enter) | model-written text submitted by a human act | accepted |
+
+    Other tags claude names as harness input (`teammate-message`, `agent-message`, `channel`,
+    `coordinator-relay`, `slack-ping`, `slack-tag-message`, `remote-review`, `tick`,
+    `mcp-resource-update`) need a surface the chief does not have; they are not measured and the
+    hook does not flag them.
+  - **Switches in claude 2.1.304** (env vars, also accepted in the settings file's `env` block,
+    measured in both places): `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1` removes
+    `run_in_background` from the Bash schema (the call is rejected), makes a command that hits its
+    timeout die (exit 143) instead of moving to the background, and no `<task-notification>`
+    arrives (measured in `-p` and a tab); `CLAUDE_CODE_DISABLE_CRON=1` keeps the scheduler from
+    starting, so the file task above never fires (measured in a tab, 110 s). `claude_settings`
+    sets neither today. Not tried: `crossSessionInbound: "refuse"` (documented). A permission
+    rule is NOT a switch: `Bash(run_in_background:true)` (in the settings `permissions.deny` or as
+    `--disallowedTools`, both measured) refuses an explicit `run_in_background` ("Permission to use
+    Bash with run_in_background:true has been denied."), but a foreground command with a long
+    `timeout` is still moved to the background and still ends in a `<task-notification>` prompt
+    (measured with the rule present). Only the env var closes both.
+  - **`/clear` in the chief tab** gives claude a new session id (measured: the hook's
+    `session_id` changes), so every later prompt is a 403 `not this chief's claude session` and
+    nothing more is recorded for that tab. The hook says nothing, so neither the human nor the
+    chief sees it, and ticket 10 sees "no human message" from then on. It fails safe.
 
 ### Request bodies — one lenient reader for every comms route (`_helpers.read_json_body`)
 
@@ -625,7 +688,7 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
 | `answer` | `/runner/agent-answer`, `/comms/answer`; `/comms/acknowledge` on an escalation with `to_agent = "human"` (the gate looks the row up by `message_id`) |
 
 - **Deny by default.** Every non-GET route the table does not list is 403 to every tier (for
-  example `/db/query`, `/skills/prompts`, `/chief/open|close`, `/comms/edit|delete|hydrate`,
+  example `/db/query`, `/skills/prompts`, `/chief/open|close|human-messages`, `/comms/edit|delete|hydrate`,
   `/comms/tasks/status` and the FSM routes that take `force_past_gate`): the chief never forces
   past a human gate and never marks a task done itself. An unknown `/runs/<run_id>/<verb>` is
   unlisted too. `tests/http_api/test_chief_gate.py` walks `app.url_map` and fails when an unlisted
@@ -1300,7 +1363,8 @@ pathly_orchestrator/
                            # sse._broadcast_run_event, teed from _broadcast_runner/_broadcast_comms
                            # whenever a payload carries a run_id)
       chief/               # session.py (chief-agent): POST /chief/open, POST /chief/close, GET
-                           # /chief/session — see "Chief endpoints"; __init__.py exposes all_blueprints
+                           # /chief/session; human.py: POST /chief/human-messages (the chief hook's
+                           # post) — see "Chief endpoints"; __init__.py exposes all_blueprints
                            # (registered in app.py like control/)
 ```
 

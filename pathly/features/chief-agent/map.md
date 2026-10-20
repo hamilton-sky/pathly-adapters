@@ -211,6 +211,8 @@ no:cacheprovider` passes in full. Ticket 13 runs both.
 - 08 (round 6) — a chief may send only the keys its route's `ROUTE_FIELDS` entry lists (84 entries, now merged from `chief_field_calls.py`, `chief_field_reads.py` and `chief_field_types.py` in `http_server/`), and a key that can reach a file or a folder has a kind with a rule at the gate and at the sink. `chief_keys.key_refusal`, called last by `chief_gate._refusal`, is 403 naming an unlisted body key (query key for a GET) and a `flow` that is not one name or a `skill` that is not `name` or `category/name`; a key a view reads that no chief flow needs is in `Fields.not_for_chief` (`ability_ids`, the `system_prompt` and `interactive` of `/comms/run`, the `flow` of `/comms/goals/run`), and `cite` is listed ahead of ticket 10. The sinks hold the same spellings for every caller, through `scope_names.is_flow_name`, `is_skill_name` and `resolves_inside`: `fsm_ops._load_flow` and `compose_resources._skill_file` refuse a string that is not one name or resolves outside the packaged folder, `goal_executor._flow_kind` raises `ValueError` and `_run_team` checks the flow before `os.makedirs`, and `hydrate_section(contain_in=…)` answers 400 `path_out_of_scope` for a stored path outside the root a by-id section read names. Two tests replace the name-pattern tripwires: `test_chief_gate_keys.py` (an AST walk of the views and the `blueprints/` helpers they call, by what a name is bound to) and `test_chief_gate_audit.py` (`sys.addaudithook` over hostile values in every key of every route, as all three tiers; `chief_audit_world.py` holds the baseline requests, so a new route needs one). A project board whose scope is a relative root is stored and served but no longer exported to disk (`test_board_mirror_relative_root.py`). A new chief route needs its entry with a key list, or the gate refuses it.
 - 08 (round 7) — the gate reads "the same directory" the way the host does, through one place, `scope_names.py`: `host_is_windows()` (the one switch a test patches), `root_spelling(value)` (trailing slashes dropped, nothing else changed; None when it is not a root here) and `lies_under(path, root, anchored)`; on Windows `\` and `/` both separate, on any other host a value with a backslash is no spelling of any root or path, so `chief_project` refuses it for `project_root`, a project-board scope and a path-kind key (`target`, `artifact_path`), because the routes open the raw string. The audit now sends the whole hostile list, the accepted own-root spellings among it, to every file-kind key at every tier (plain keys also get `../..`), its early-stopping baselines reach their sinks (`REACHES`, twenty of them; `reroute`, `retry` and the non-`cli` code backends are listed as not covered), `test_chief_gate_kinds.py` reads the views for a plain-kind key that is joined into a path, `CliProvider._file_section` escapes the target in its Cypher literal and hashes a relative file under the project root, and `max_cost_usd` on `POST /runs` is a line of `WAITS_FOR_A_TICKET` for ticket 15.
 - 08 (round 8) — nothing cached or looked up by name alone may cross a project: the two `/code/query` caches (`query._QUERY_CACHE`, `code_context_cli._CLI_CACHE`) are keyed by `scope_names.cache_root(project_root)` first and hold nothing for a target with no content hash (a directory, a missing file, a symbol); `run_history._SLUG_MATCH` escapes `%`, `_` and `\` in a feature name (`_like_literal`, `ESCAPE '\'`) so a name is not a pattern (SQLite's `LIKE` still ignores ASCII case); the gate resolves a chief's `target` and `artifact_path` with symlinks followed (`chief_project._opens_inside` over `hydrate_helpers.inside_root`, the text as written and read through `scope_names.host_path`, so `link/../x` is judged where the file system puts it); a `/code/query` target whose last two segments hold a `"` is not put into the Cypher at all (no section) because the real tool's lexer could not be checked for `\"`; the audit's URL variables get the whole hostile list like a file-kind key, and "What was measured" says exactly which kind gets which list. Ticket 17 must hand the chief the STORED root string, since the gate compares `project_root` as `open_chief` stored it and refuses other spellings of the same directory.
+- 09 — `blueprints/chief/human.py` adds `POST /chief/human-messages` (400 for a bad `text`: blank, not a string, invalid Unicode or over 64 KiB in bytes; 404 unknown or closed session; 403 when sha256 of `hook_secret` differs from `hook_secret_hash` (`hmac.compare_digest`; no stored hash never matches); 403 `not this chief's claude session` when `session_id` is missing or is not `cli_session_id`; else `add_human_message(..., relayed=bool(relayed))` and 201 `{id, kind}`). It is not in `ROUTE_ACTIONS`, so the gate already refuses it to a chief token (a test pins that at all three tiers) and needs no `ROUTE_FIELDS` entry. `src/pathly_hooks/chief_prompt.py` (`main(argv)` is always 0, silent on any failure) posts `{run_id, hook_secret, text, session_id}` through `_request_json` (127.0.0.1, 5 s) and prints the cite line only for a reply of kind `human`; it adds `relayed: true` when the prompt holds `<cross-session-message` anywhere (measured on claude 2.1.304, see Open questions: a restricted claude binds no inbox, so this is a second line of defence).
+- 09, round 2 (supersedes the 09 line above where they differ, and the cross-session bullet under Open questions) — the hook also sends `relayed: true` for a prompt holding `<task-notification` (claude's message when a background Bash task ends; the Bash call's `description` comes back inside `<summary>`, so the chief could put "Approved by the human: ..." there and have it stored as `human` and cited); the marker list is a deny-list of wrappers measured on claude 2.1.304 (`-p` stream-json and an interactive tab), not a test for "typed"; a closed stdout still exits 0; "only the hook can write" means no chief token can (the secret file and the claude `--session-id` are readable by the user's other processes); `/clear` in the tab changes claude's session id and ends recording for it. Open: a `.claude/scheduled_tasks.json` task fires in the tab as a bare prompt, stored as `human`; claude has `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS` and `CLAUDE_CODE_DISABLE_CRON` (measured, env var and settings `env`), which ticket 06's `claude_settings` does not set.
 
 ## Open questions
 
@@ -275,6 +277,46 @@ Not known yet (later tickets or round two settle them):
   measures whether the hook input tells it apart; if it does, it is stored as `relayed` and can
   never be cited; if not, it is recorded as human and this question stays open (can
   cross-session messaging be turned off for the chief?).
+  **Measured by ticket 09 (claude 2.1.304, 2026-10-20):** a message another claude session
+  sends into a claude that is not restricted reaches the hook with `prompt` wrapped in
+  `<cross-session-message from=... from-name=... from-mode=...>` ... `</cross-session-message>`
+  and no other field of the hook input differs (`claude -p` and an interactive tab alike), so the
+  hook sends `relayed: true` for it and it is stored as `relayed`, never citable. And a
+  `--restricted` claude, which is how the chief starts, binds no inbox socket at all
+  (`[uds-messaging] Skipped: restricted session`; other sessions cannot list or message it), so
+  on this version nothing can message the chief and the wrapper check is a second line. Still
+  open: a typed prompt that holds the wrapper text is stored as `relayed` too (uncitable, so the
+  human retypes it); the prompts of a scheduled task or a background subagent have other
+  wrappers, not measured (the chief has neither tool); the docs name `crossSessionInbound:
+  "refuse"` in a session's settings as the switch that turns inbound messages off, which ticket
+  06 does not set and nobody has tried on a chief.
+  **Round 2 of ticket 09 (claude 2.1.304, 2026-10-20) supersedes parts of the paragraph above.**
+  The marker list is a deny-list of the wrappers measured, not a test for "typed", and these
+  words were wrong: "the chief has neither tool" (it has Bash, which starts background tasks) and
+  "the session id check keeps any other process from recording" (a process of the same user that
+  reads the secret file and the claude `--session-id` in the chief's argv can post a `human`
+  row; "only the hook can write" means no chief token can). Measured with the chief's flags, in
+  `claude -p` stream-json and in an interactive tab; the tools list claude reports is `Bash`,
+  `Glob`, `Grep`, `Read`, and the hook input has the same keys and values for every prompt:
+  a background Bash task that ends (`run_in_background`, or a foreground command that hits its
+  `timeout` and is moved to the background) is delivered as a prompt wrapped in
+  `<task-notification>` whose `<summary>` holds the Bash call's `description`, which the chief
+  chooses; the stall check on a background command whose last output looks like a question
+  wraps the same way and puts the command's output after the closing tag. The hook now sends
+  `relayed: true` for both wrappers. Still open: a task in the project's
+  `.claude/scheduled_tasks.json` (also one another session of that project made with a durable
+  `CronCreate`) fires in the chief's tab as a bare prompt with nothing to tell it from typing,
+  and the usage-limit auto-continue and worker-restart notices are fixed texts, not measured.
+  The chief cannot write the file; a process of the same user can. claude has two switches,
+  `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS` (the Bash schema loses `run_in_background`, a timed-out
+  command dies instead of moving to the background, no `<task-notification>` arrives) and
+  `CLAUDE_CODE_DISABLE_CRON` (the scheduler does not start); each worked as an env var and as an
+  `env` entry in the `--settings` file. A permission rule is not a switch:
+  `Bash(run_in_background:true)` as `permissions.deny` or `--disallowedTools` refuses an explicit
+  `run_in_background` but a foreground command with a long `timeout` still moves to the
+  background and still ends in a `<task-notification>`. The conductor decides whether ticket
+  06's `claude_settings` sets the env vars. `/clear` in the tab changes claude's session id, so nothing more
+  is recorded for that tab.
 - The UI token (RRP-2b) is still missing: a chief that drops its token is unrestricted on
   loopback, `/events/spawn` still carries every spawn's token and needs no secret, and Studio
   cannot post or retire a binding directive until it lands.
