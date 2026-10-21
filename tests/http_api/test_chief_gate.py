@@ -456,6 +456,8 @@ def test_an_operator_acknowledges_an_ordinary_row_and_a_human_escalation_needs_a
     client, project
 ):
     chief = _chief("operator", project)
+    # the row is the project's: the feature has a folder there
+    (project / "pathly" / "features" / "demo").mkdir(parents=True)
 
     ok = client.post(
         "/comms/acknowledge",

@@ -15,6 +15,7 @@ import time
 
 import pytest
 from chief_cite_support import (
+    _demo_is_a_feature_of_the_chiefs_project,
     ALREADY,
     CITE_ONLY,
     NOT_CITED,

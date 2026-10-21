@@ -45,10 +45,19 @@ What an entry can say:
   the readers apply as well.
 * ``under_root``: a feature or other name the route reads together with ``project_root`` (its
   query filters by both), so the root the gate checks bounds it.
-* ``unbound``: a feature, goal, task, message, run, topic or other id the route reads and the gate
-  does not bind to the project: feature boards are keyed by name only, and the id-addressed calls
-  are ticket 14's (writes) or have no ticket yet (reads). Only what is really unbound is listed
-  here, so the table is the inventory.
+* ``run_ids`` / ``stamped_run_ids`` / ``row_ids``: an id of a write that ``chief_bind`` binds to the
+  chief's project (the key is a URL variable, or a key of the body). ``run_ids`` name a run the
+  route acts on (``/runs/<run_id>/stop``): refused unless the run history, the registry or the
+  board lock places it in the project. ``stamped_run_ids`` name a run the route only stores on
+  the row it makes (the ``run_id`` of ``/comms/post``): refused when a source places the run
+  elsewhere, passed when none knows it. ``row_ids`` name a ``comms_messages`` row (a goal and a
+  task are rows too): refused when its board and scope are not the project's, passed when no row
+  has the id. They are ID keys like ``unbound`` ones, so the key list still holds them.
+* ``unbound``: an id or name the route reads and the gate does not bind to the project. What is
+  left is the id a GET reads (no ticket binds the reads yet), a feature name (feature boards are
+  keyed by name only), the ``topic`` of ``/runner/agent-answer`` (the cite rule, ``chief_cite``,
+  checks that run's project) and the ``option_id`` of ``/comms/answer`` (the cite rule refuses it
+  to a chief). Only what is really unbound is listed here, so the table is the inventory.
 * ``keys``: every other key the route reads and a chief may send, with its kind. It also gives the
   kind of a key another attribute names, when that is more exact (``artifact`` is a path).
 * ``not_for_chief``: keys the route reads and a chief may not send.
@@ -140,6 +149,9 @@ class Fields:
     flows: tuple[str, ...] = ()
     skills: tuple[str, ...] = ()
     under_root: tuple[str, ...] = ()
+    run_ids: tuple[str, ...] = ()
+    stamped_run_ids: tuple[str, ...] = ()
+    row_ids: tuple[str, ...] = ()
     unbound: tuple[str, ...] = ()
     keys: dict[str, str] = field(default_factory=dict)
     not_for_chief: tuple[str, ...] = ()
@@ -156,6 +168,9 @@ class Fields:
             dict.fromkeys((*self.names_root_when, *self.names_root_unless), TEXT)
         )
         found.update(dict.fromkeys(self.under_root, NAME))
+        found.update(
+            dict.fromkeys((*self.run_ids, *self.stamped_run_ids, *self.row_ids), ID)
+        )
         found.update(dict.fromkeys(self.unbound, ID))
         found.update(dict.fromkeys(self.roots, ROOT))
         for read in self.scopes:

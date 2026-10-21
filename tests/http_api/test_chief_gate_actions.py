@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import pytest
 
+from chief_bind_support import record_run
 from chief_gate_support import (
     _chief,
     _gated,
@@ -134,6 +135,7 @@ def test_run_control_verbs_are_run_or_stop(client, project, verb, action):
 
     assert action in actions_for("operator")
     operator = _chief("operator", project)
+    record_run(project, "x")  # a chief reaches only a run it can place in its project
     # `retry` starts a run in the directory its own body names, so it names the project.
     body = {"project_root": str(project)} if verb == "retry" else {}
     resp = client.post(f"/runs/x/{verb}", json=body, headers=operator.headers)

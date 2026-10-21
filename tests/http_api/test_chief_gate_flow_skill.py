@@ -98,6 +98,8 @@ def test_a_chief_cannot_name_a_flow_on_a_goal_run(
 ):
     chief = _chief("operator", project)
     goal = _goal(client)
+    # the goal is the project's: the feature has a folder there
+    (project / "pathly" / "features" / "demo").mkdir(parents=True)
     flow = flow.replace("OTHER", str(other_project))
 
     resp = _run_goal(client, goal, project, flow, chief.headers)

@@ -4,13 +4,16 @@
 
 HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, prompt-event contract.
 
-42 test file(s).
+45 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
 | `test_api.py` | Tests for the HTTP routes Blueprint (api/__init__.py). Uses Flask test client | 15 |
 | `test_caller_identity.py` | caller_identity(request): the caller is the holder of a live run token, never a body field | 9 |
 | `test_chat_agent.py` | covers pathly studio chat is plan aware; generic chat remains unchanged | 2 |
+| `test_chief_bind.py` | chief-agent 14: a chief reaches a run, a goal, a task or a message by id only inside its project | 16 |
+| `test_chief_bind_contract.py` | chief-agent 14 (contract): what ``target_in_project`` answers, and the table it reads | 4 |
+| `test_chief_bind_edges.py` | chief-agent 14 (edges): where an id is placed from, and what a malformed one does | 14 |
 | `test_chief_cited_answers.py` | chief-agent 10: a chief answers an agent only by citing a human message of its session | 17 |
 | `test_chief_cited_edges.py` | chief-agent 10: the edges of the cite rule | 17 |
 | `test_chief_cited_escalations.py` | chief-agent 10 (review round 1): a human escalation, from the chief's side | 3 |

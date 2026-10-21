@@ -807,7 +807,8 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
     escalation. A topic whose run belongs to another project is 403 `that is not this chief's
     project`. A topic with no run, a run that is not awaiting an answer, a question id with no
     row, and a `topic` or `question_id` that is not a non-blank string are left to the route, which
-    answers 404, 409, 404 and 400. A `ts` that cannot be read is a refusal.
+    answers 404, 409, 404 and 400 (a `question_id` that is not a string is 403 first, see "Ids"
+    below). A `ts` that cannot be read is a refusal.
   - A message can be cited once (`chief_citations.message_id` is unique): the gate calls
     `record_citation(run_id, cite, route, target)` last and answers 403 `that message was already
     cited` for a second use. The citation is spent when the gate lets the call through, whatever
@@ -851,7 +852,9 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
   `/comms/answer` on a human escalation (the human gate's 403). So a chief, buggy or hostile, can
   burn any unspent message of its session by naming a topic with no run or an idle one, and the
   person types again. A `topic` or `question_id` the route rejects for its shape (blank or not a
-  string) spends nothing. Both sides of "at or after" are the wall clock (`time.time()` for a
+  string) spends nothing, and so does a `topic` the gate cannot look up (`chief_bind.is_id`: over
+  512 characters, a control character or a lone surrogate, left to the route); a `question_id` that
+  is not an id is 403 first ("Ids" below). Both sides of "at or after" are the wall clock (`time.time()` for a
   message and for a run's question, the board row's ISO `ts` for a board row), so a clock stepped
   backwards lets an older message pass.
 - **One project.** `http_server/chief_fields.py::ROUTE_FIELDS` is the inventory: one entry per
@@ -1056,8 +1059,9 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
     joins the `feature` of a stored event (`eventlog.append_event` keeps its basename;
     `terminal_phase` passes a `_safe_topic` topic), so it relies on the gate's hold on `/runs` and
     `/comms/run`; and `goal_decomposer` joins the `scope` of the goal row it decomposes, which the
-    gate checks for a goal a chief posted and nobody checks for a goal another writer posted (the
-    same id-addressed gap as `goal_id` under "Not bound").
+    gate checks for a goal a chief posted and, for a goal a chief decomposes or runs by id, through
+    `chief_bind` ("Ids": a feature scope must be one plain folder name of the project); nobody
+    checks it for a goal another writer posted and a caller without a chief token decomposes.
   - **What was measured.** `tests/http_api/test_chief_gate_audit.py` runs the server with the
     spawn host faked, a database of its own, a canned `codebase-memory-mcp` (the `cli` code backend
     answers from a table, so `/code/query` reaches the file hash and the graph query) and three
@@ -1109,17 +1113,38 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
     with it) and the `codeintel`, `lsp` and `both` backends of `/code/query` (they need an
     external tool; the audit's backend is `cli`).
   - On `/comms/post`, a `from` other than `chief` (or none) is 403.
-  - **Not bound.** The table lists these as `unbound` rather than leaving them out. (1) Calls that
-    name their target by id or by name: `goal_id` (`/comms/goals/run|stop|decompose`, `/runs` with
-    a goal, `/comms/tasks`, `/comms/artifacts`), a task's `message_id` (`/comms/tasks/run|stop`),
-    `run_id`, `topic`, `artifact_id` (the path the row keeps is bound, see "A stored path"; the row
-    is found by id), a feature name (feature boards are keyed by name only, so `board: "feature"`
-    is not bound to a project) and the posting fields `goal_id` and `run_id`. A chief that knows
-    such an id can reach another project's row. Ticket 14 binds the run ids of
-    `/runs/<run_id>/stop|<action>`, the message ids of `/comms/acknowledge|answer|supersede` and
-    the `topic` of `/runner/agent-answer`; `goal_id`, task ids and the id-addressed reads (`GET
-    /runs/<run_id>`, `/runner/status`, `/status?topic=`, `/db/runs/<id>/cost`,
-    `/comms/artifacts?message_id=`, `/comms/goals/refs-coverage`) have no ticket yet. (2) Routes
+  - **Ids.** A write that names its target by id is bound by
+    `http_server/chief_bind.py::target_in_project`, which the gate calls for a chief token after
+    `project_refusal`; the route's entry lists the ids (`Fields.run_ids`, `stamped_run_ids`,
+    `row_ids`: ID keys, so the key list holds them). A **run** (`/runs/<run_id>/stop` and
+    `/runs/<run_id>/<action>`) is placed by the project root `run_history` recorded for it, else
+    the root of a registry entry of any status, else the board its board lock is held on; a run no
+    source places is 403 `not in this chief's project`. A **message** is placed by the `board` and
+    `scope` of its row, a deleted one included: `/comms/acknowledge`, `/comms/supersede` (`old_id`
+    and `new_id`), `/comms/answer` (`question_id`), and, because a goal and a task are rows too,
+    the `goal_id` of `/comms/goals/run|stop|decompose`, `POST /runs` and `POST /comms/post`, and
+    the `message_id` of `/comms/tasks/run|stop`. A `project` row is the project's when its scope
+    is the session's root (`is_own`, the rule a posted scope gets); a `feature` row when its scope
+    is one plain folder name and a folder of that name exists under `<root>/pathly/features/` or
+    `<root>/pathly/features/.archive/` (a feature scope is a name, not a path, and feature boards
+    are keyed by name only, so a feature that exists in two projects is in both); a `global` row,
+    and a row on any other board, never. An id no row has passes and the route answers it (404;
+    `/comms/acknowledge` does nothing and answers 200). The `run_id` that a `/comms/post` row
+    carries is only a correlation stamp, so there a run placed in another project is refused and a
+    run no source knows passes (the chief's own session run is one). An id that is not a string,
+    is over 512 characters or holds a control character or a lone surrogate is 403 (SQLite cannot
+    be handed the surrogate); a blank one names nothing and the route answers 400. Builder tokens
+    and no token are not checked.
+  - **Not bound.** The table lists these as `unbound` rather than leaving them out. (1) What a
+    chief can still reach by id or by name: the id-addressed reads, `goal_id` (`GET /comms/tasks`,
+    `/comms/artifacts`, `/comms/goals/refs-coverage`), `message_id` (`GET /comms/artifacts`),
+    `run_id` (`GET /runs/<run_id>`, `/db/runs/<id>/cost`, `/api/traces`), `topic` (`GET
+    /runner/status`, `/status?topic=`) and `artifact_id` (the path the row keeps is bound, see "A
+    stored path"; the row is found by id), have no ticket yet; the `topic` of
+    `/runner/agent-answer` is held by the cite rule and the `option_id` of `/comms/answer` is
+    refused to a chief by it; a feature name is not bound to a project (feature boards are keyed
+    by name only, so `board: "feature"` is not bound). A chief that knows a read's id can read
+    another project's row. (2) Routes
     that are fleet-wide and have no project filter to bind: `GET /db/rollup`'s `global` block (it
     sums every project whatever `project_root` says, and its `by_project` lists every project's
     root path with its cost and tokens, so a status chief can read where the other projects are
@@ -1172,9 +1197,8 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
   files and deletes the rows, for the global library and the project it names (bound above). They
   stay `read` because a status chief must be able to read artifact sections, query code and list
   prompts; none of them can change a decision, a task or a run.
-- **Not here yet.** Calls that name a run, a message or a goal by id are not bound to the chief's
-  project (ticket 14 binds some of the writes; the rest are listed under "Not bound"); the cost
-  and run ceiling (15) is a later ticket. Ticket 15 reads `max_cost_usd` on `POST /runs` (no view reads it there today;
+- **Not here yet.** The id-addressed reads are not bound to the chief's project (listed under "Not
+  bound"); the cost and run ceiling (15) is a later ticket. Ticket 15 reads `max_cost_usd` on `POST /runs` (no view reads it there today;
   `POST /runs/<run_id>/retry` and the `/runner/*` routes do), so that key is not on the entry's
   list: a chief that sends it is told the key is not listed, and ticket 15 lists it with the code
   that reads it and deletes its line from `WAITS_FOR_A_TICKET` in `test_chief_gate_keys.py`.
@@ -1328,6 +1352,7 @@ pathly_orchestrator/
                            # close_stale_sessions (reason `server restart`), add_human_message (first message
                            # of a session is `style_prompt`, later ones `human` or `relayed`) / get_human_message,
                            # record_citation (False when the message was already cited). Static SQL, writes under _get_write_lock
+      placement.py         # run_project_root(conn, run_id) (the root run_history recorded) and message_board_scope(conn, message_id) ((board, scope) of the row, deleted or not): what chief_bind places an id by; one static statement each
       run_tokens.py        # mint_run_token / resolve_run_token / revoke_run_tokens — the per-spawn identity (role-read-policy): the raw token is returned once and only its sha256 is stored, next to run_id/role/feature/project_root/board/scope; resolve returns None for an empty, unknown or revoked token; lookup_run_token returns the row whether or not it is revoked (None only for an empty or unknown one), so the chief gate can tell a revoked token from an unknown one; revoked when the spawn settles
   runner/                  # CLI runner, agent invocation, argv, output parsing
     argv.py                # resolve_argv, resolve_interactive_argv, _storage_path
@@ -1458,6 +1483,7 @@ pathly_orchestrator/
     chief_field_calls.py   # CALL_FIELDS: the entries of the POST routes the action table lists, each written from the view and the helpers it calls
     chief_field_reads.py   # READ_FIELDS: the entries of the GET routes a chief can reach (the query keys they read, or the reason they read no project)
     chief_project.py       # project_refusal(): applies a ROUTE_FIELDS entry to one request (query string for a GET, body otherwise, the URL's `<action>` for the retry verb) and says whether the project it names is the session's — see "Chief gate"
+    chief_bind.py          # target_in_project(): places the run, goal, task or message a chief names by id (`run_ids`, `stamped_run_ids`, `row_ids` of its entry) in the session's project, and is_id() — see "Chief gate"
     chief_keys.py          # key_refusal(): refuses a key the entry does not list, and a `flow` or `skill` that is not one name (scope_names.is_flow_name / is_skill_name) — see "Chief gate"
     chief_cite.py          # cite_refusal() / answer_text(): the cite rule for an `answer` action — the chief names a human message of its session by `cite`, the gate checks it (kind human, this session, typed after the question, once; an acknowledgement must say `agent: "chief"`) and keeps its text on flask.g for the answer routes to relay — see "Chief gate"
     run_identity.py        # caller_identity(request) -> CallerIdentity: kind run|anonymous from the X-Pathly-Run-Token header (body role/run_id/from never read); unknown/revoked token logged at info with the remote addr; `ui` kind reserved (RRP-2b). Nothing applies a policy from it yet
