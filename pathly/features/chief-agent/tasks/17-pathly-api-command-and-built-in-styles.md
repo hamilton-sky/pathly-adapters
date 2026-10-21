@@ -1,7 +1,7 @@
 # Make round one usable: a `pathly api` command and built-in style texts
 
 Type: task
-Status: resolved
+Status: open
 Blocked by: 06, 07, 08
 Test first: yes
 
@@ -340,3 +340,59 @@ Also run:
   read-only route for it before `/runner/agent-answer` can be offered without the user naming the topic.
 - Round two (map.md § Round two) still owns the friendly commands (`overview`, `inbox`,
   `answer --cite`, ...), `GET /chief/overview` and `/chief/inbox`, and the Studio Chief button.
+
+## Review findings (round 1, quality review)
+
+QUALITY
+1. major tests/http_api/chief_cli_support.py:200-215 (and the import lists at test_chief_cli.py:21-29, test_chief_cli_edges.py:25, test_chief_prompt_text.py:21): the autouse guard `_no_watcher_outlives_its_test` is defined but never imported, so it never runs. Autouse fixtures only apply in modules that import them; tests/http_api/chief_gate_support.py:1-8 and the sibling modules test_chief_routes.py:78 and test_chief_session.py:100 each carry their own copy. The new tests that open a chief (7 of them in test_chief_cli.py) leave `chief-watch-*` threads alive.
+   - Evidence 1: running test_chief_cli.py::test_open_without_a_prompt_pastes_the_built_in_text_then_the_fragment and the root-line test, then counting threads, shows 4 `chief-watch-*` threads still alive.
+   - Evidence 2: with HOME set to an empty scratch dir, a no_pathly_autouse test that only sleeps 38s after those tests got `$HOME/.pathly/pathly.db` and `$HOME/.pathly/global/BOARD.json` created by the woken watchers (`close_chief` calls `get_db()`). The same sleep without the chief tests created nothing.
+   - Consequence: a bare `pytest tests/http_api/test_chief_cli.py` writes to the developer's real ~/.pathly. In a full run the watchers wake 30s later in the middle of other tests, the 'database is locked' flake source named in tests/conftest.py (_isolate_db comment).
+   - Change: import `_no_watcher_outlives_its_test` in the three modules (or make it autouse in a conftest), and add `httpd.server_close()` to the `server` fixture (chief_cli_support.py:83; the `stub` fixture already does it).
+2. minor src/pathly_orchestrator/chief_cli.py:54-61 and supervisor/chief_presets.py:77: `pathly help` lists bare `GET /runs`, and OPERATOR says "keep watching `GET /runs`". I ran it with an operator token against a project that has a run. Bare `GET /runs` is exit 0 with `[]`, because the route returns an empty list without `project_root` (runs_read.py:28-33), so a chief following the help concludes there are no runs. Bare `GET /comms`, `/comms/goals` and `/chief/session` are loud 400s. This is the spec pass's bare-route minor, but `/runs` is silently wrong. Change: print `GET /runs?project_root=<root>` in help and in OPERATOR, and add a test that every help route which needs a root says so.
+3. minor src/pathly_orchestrator/chief_cli.py:121 and 158: a body, path or stdin that is not valid UTF-8 escapes the usage checks. Example: `pathly api POST /x $'{"a":"\xff"}'` gives UnicodeEncodeError, and `printf '\xff{}' | pathly api POST /x -` gives UnicodeDecodeError. Both are a traceback with exit 1, which the help defines as "non-2xx or no server"; nothing was sent. Change: catch UnicodeError around the read and the encode and return `_usage(...)`, exit 2.
+4. minor src/pathly_orchestrator/chief_cli.py:126 and 158: no cap on the answer or on stdin. A 50 MB answer was printed whole, and `GET /runs/<id>` can be large. Change: optionally cap what is printed and say so on stderr.
+5. minor src/pathly_orchestrator/chief_cli.py:166-168: the connection-error text redacts the token but not the secret, while `_print_body` redacts both. No path puts the secret there today. Also `_load_secret()` is called twice (lines 114 and 171). Change: redact both, and read the secret once.
+6. minor src/pathly_orchestrator/supervisor/chief_presets.py:77: "keep watching `GET /runs` and the board, and tell the user when a run finishes" invites a poll loop of calls that need no approval, with no stop rule. Only refused starts carry a no-loop warning (fragment line 24). Change: say to check when the user writes or asks, never in a loop.
+7. minor src/pathly_orchestrator/supervisor/chief_presets.py:77: OPERATOR names `POST /comms/goals/decompose` with no cost caution, while PLANNER (line 67) says "an agent costs money, so ask the user first". Decompose is not counted by chief_budget, so the text is the only brake. Change: add the same sentence to OPERATOR.
+8. minor src/pathly_data/core/skills/fragments/chief-connect.md:9 and chief_presets.py:102: only a JSON body is told to be quoted. OPERATOR line 102 prints an unquoted query URL in backticks, and help says nothing about quoting a path with `?` or `&`. Unquoted, `&` backgrounds the command and `?` globs under zsh. Nothing says "one command per call, no pipes", which `Bash(pathly *)` needs. Windows PowerShell 5.1, where a codex chief would run, strips the inner double quotes from a single-quoted JSON argument. The `-` stdin form appears only in `pathly help`, not in the fragment (I did not run PowerShell). Change: one sentence quoting paths with a query, one command per call, and `-` as the fallback.
+9. minor tests (mutation gap): Prose rules the ticket requires are not pinned by any test (the prior reviewer also found this). The edit that removes one survives all three new test files. They are: the "Before you do anything else, read..." start-up rule (T04), "do not retry in a loop" (T01), "check the question and the id first" and the once-only citation sentence (T02, T10), "never edit files" (T11), the no-cite-number branch (T12), "do not look for another route around it" (T09), the OPERATOR "never on your own idea" and "in the user's words" (T05, T07), and PLANNER "ask the user first" (T06). Change: pin the start-up sentence and the retry/cite caveats the way `never run /clear` and the `'` escape already are.
+
+Checks run
+- Tests: the Done-when tests and the edited sibling tests pass, 241 passed on Python 3.12 and 241 on 3.13. The three new files also pass alone. The wider chief set (`-k "chief or binding or directive"` over tests/comms_board, http_api and runner_supervisor) gives 2575 passed. consistency, install_skills, snapshots, test_chief_gate_audit and test_config give 501 passed, 2 skipped.
+- Tooling: `scripts/check_entry_points.py`, `check_version_sync.py`, `check_adapters.py`, `check_no_mirror_reads.py`, `check_file_size.py` (messages_crud.py is exactly 400) and `gen_test_index.py --check` pass. black on the changed files, mypy on src/ (343 files), lint-imports (1 kept) and `bandit -r src/ -ll -x src/pathly_data/` (exit 0) are clean. The changed files parse under Python 3.11 syntax; I could not run the tests on 3.11 (no environment).
+- Packaging: the wheel built in the scratchpad contains pathly_data/core/skills/fragments/chief-connect.md and the entry point `pathly = pathly_orchestrator.chief_cli:main`.
+- Import cost: `import pathly_orchestrator.chief_cli` loads only config and fsm_http_client (no flask).
+- Hygiene: no skip/xfail/noqa in the new tests, and test basenames are unique. `server` and `stub` use free ports and the in-process runs patch Path.home (apart from the leak in finding 1).
+- Boundary behaviour:
+  - Host is the fixed 127.0.0.1 and only the port comes from the environment, so no path or env value can send the token elsewhere. http.client does not follow redirects or use proxies.
+  - A 302 gives exit 1.
+  - A short read gives exit 1 with an IncompleteRead message.
+  - A hung server gives exit 1 "timed out".
+  - Binary replies print with replacement characters.
+  - Control characters in the path and a `//host` path are exit 2.
+  - A token echoed by the server is redacted.
+  - Nothing secret is ever in argv.
+- Texts: the doc claims in the three CLAUDE.md files check out against the code. The texts' `pathly api` examples ran against the real gate and server with no gate refusal. `POST /runs` returns `run_id`, the decompose refusal for a goal with tasks and `ref_warning` exist, and `chief-connect` and `root-cause-debug` are the only fragments outside composition.yaml. No text lets a chief treat a `human` row as proof a person typed it, and none bypasses the cite rule.
+
+Mutations (single edit, in a scratch copy; the 5 ticket test files, or the 3 new ones for the prose batch)
+- Killed (30 code mutants):
+  - Status mapping: 3xx counted as success, only 200 counted as success.
+  - Headers: token header dropped, secret header dropped, secret never read, content-type dropped.
+  - Redaction: token printed on a connection error, body redaction removed.
+  - Token handling: missing-token path still calls the server, token not stripped.
+  - Addressing: port hard-coded, quote() removed, method case-sensitive, stdin dash not read.
+  - Usage exit code 2 changed to 1.
+  - Validation relaxed: `//` authority allowed, control characters allowed, non-object body allowed, GET with a body allowed.
+  - Server unreachable returns exit 0.
+  - Prompt composition: front matter not stripped, user file ignored, fragment skipped, root line dropped, `prompt` read as `body["prompt"]`, non-string prompt accepted, 64 KiB limit off by one, 64 KiB limit removed.
+  - Help route dropped; timeout shrunk (not a meaningful mutant, it breaks every real call).
+  - Text edits: the cite rule, the injection paragraph, the header line and an operator answer example carrying its own words removed; a write example added to STATUS.
+  - Prose: the `/clear` rule and the `'` escape.
+- Survived:
+  - M27, equivalent: the "prompt is required for preset" message is not pinned, but the outcome is still a ValueError.
+  - M34, cosmetic: the fragment's `.strip()` removed.
+  - M35: `_use_utf8()` removed; it is untested.
+  - The prose survivors in finding 9.
+
+REVIEW: FAIL
