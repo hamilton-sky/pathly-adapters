@@ -22,7 +22,7 @@ from urllib.parse import quote
 import pytest
 from _paths import REPO_ROOT, SRC
 from chief_cite_support import Session, ask, db
-from chief_cli_support import NO_TOKEN, host, pathly, server, stub
+from chief_cli_support import NO_TOKEN, fragment_text, host, pathly, server, stub
 from chief_gate_support import _chief, app, project
 
 USAGE = "usage: pathly"
@@ -36,11 +36,12 @@ BAD_USAGE = [
     pytest.param(("api", "GET", "comms"), id="path-without-slash"),
     pytest.param(("api", "GET", "http://127.0.0.1:1/comms"), id="full-url"),
     pytest.param(("api", "GET", "//other.example/comms"), id="authority"),
-    pytest.param(("api", "GET", "/comms x"), id="space-in-path"),
     pytest.param(("api", "GET", "/comms\r\nX-Evil: 1"), id="newline-in-path"),
     pytest.param(("api", "GET", "/comms", "{}"), id="get-with-a-body"),
     pytest.param(("api", "POST", "/comms/post", "{}", "extra"), id="extra-argument"),
     pytest.param(("api", "POST", "/comms/post", "not json"), id="body-not-json"),
+    pytest.param(("api", "POST", "/comms/post", "[1, 2]"), id="body-a-list"),
+    pytest.param(("api", "POST", "/comms/post", '"text"'), id="body-a-string"),
     pytest.param(("api", "POST", "/comms/post", ""), id="empty-body"),
 ]
 
@@ -70,10 +71,19 @@ def test_an_empty_standard_input_for_a_dash_body_is_a_usage_error(
     assert server.requests == []
 
 
+def test_a_space_or_a_non_ascii_character_in_the_path_is_sent_percent_encoded(
+    stub, pathly
+):
+    ran = pathly("api", "GET", "/runs?project_root=/home/zo\u00eb/my proj", token="tok")
+
+    assert ran.code == 0
+    assert stub.got[0]["target"] == "/runs?project_root=/home/zo%C3%AB/my%20proj"
+
+
 def test_a_lowercase_method_is_accepted(server, pathly, project):
     chief = _chief("operator", project)
 
-    ran = pathly("api", "get", "/comms", token=chief.token)
+    ran = pathly("api", "get", "/runs", token=chief.token)
 
     assert ran.code == 0, ran
     assert server.requests[0].method == "GET"
@@ -151,6 +161,38 @@ def test_a_body_comes_from_the_argument_or_from_standard_input_and_is_sent_as_gi
         assert got["method"] == "POST" and got["target"] == "/comms/post"
         assert got["headers"]["content-type"] == "application/json"
         assert got["headers"]["x-pathly-run-token"] == "tok"
+
+
+def test_an_apostrophe_is_written_as_u0027_inside_the_quoted_body_and_stored_as_one(
+    server, pathly, project
+):
+    # The shell ends a single-quoted argument at the first apostrophe, so the fragment tells the
+    # chief to write the JSON escape; the command sends it as given and the server decodes it.
+    assert "\\u0027" in fragment_text()
+    chief = _chief("planner", project)
+    body = json.dumps(
+        {
+            "from": "chief",
+            "type": "goal",
+            "text": "make it's way",
+            "board": "project",
+            "scope": str(project),
+            "feature": "project",
+            "project_root": str(project),
+        }
+    ).replace("'", "\\u0027")
+    assert "\\u0027" in body and "'" not in body
+
+    posted = pathly("api", "POST", "/comms/post", body, token=chief.token)
+    listed = pathly(
+        "api",
+        "GET",
+        f"/comms?board=project&scope={quote(str(project))}&feature=project&type=goal",
+        token=chief.token,
+    )
+
+    assert (posted.code, listed.code) == (0, 0), (posted, listed)
+    assert [row["text"] for row in json.loads(listed.out)] == ["make it's way"]
 
 
 def test_a_post_without_a_body_sends_none(stub, pathly):
@@ -237,6 +279,21 @@ def test_a_server_that_is_not_there_is_exit_1_with_a_message_not_a_traceback(
     assert str(port) in ran.err
     assert "Traceback" not in ran.err
     assert "tok-not-printed" not in ran.err
+
+
+def test_an_error_that_holds_the_token_is_printed_without_it(pathly, monkeypatch):
+    from pathly_orchestrator import chief_cli
+
+    def refuse(*_args):
+        raise OSError("refused for tok-in-error")
+
+    monkeypatch.setattr(chief_cli, "_send", refuse)
+
+    ran = pathly("api", "GET", "/comms", token="tok-in-error")
+
+    assert ran.code == 1, ran
+    assert "refused for" in ran.err
+    assert "tok-in-error" not in ran.err
 
 
 # --- what a chief may not do, and what it may -------------------------------------------------

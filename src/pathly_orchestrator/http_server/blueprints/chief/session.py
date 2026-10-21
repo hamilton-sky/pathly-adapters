@@ -20,7 +20,7 @@ from flask import Blueprint, jsonify, request
 bp = Blueprint("chief_session", __name__)
 
 CLOSE_REASON = "closed from Studio"
-_OPEN_FIELDS = ("project_root", "engine", "preset", "prompt")
+_OPEN_FIELDS = ("project_root", "engine", "preset")
 
 
 def _refuse_agent(action: str):
@@ -57,9 +57,10 @@ def _kill_tab(session: dict) -> None:
 def chief_open():
     """Open a chief for a project: 201 ``{run_id, tab_id, tier, engine}``.
 
-    400 for a missing or non-string field or an ``open_chief`` ``ValueError`` (its message is
-    passed on), 403 for a live run token, 409 ``{error, run_id, tab_id}`` when the project
-    already has a chief.
+    ``prompt`` is optional (a built-in preset, or the user's ``chief/<preset>`` file, supplies
+    the style). 400 for a missing or non-string field or an ``open_chief`` ``ValueError`` (its
+    message is passed on; ``custom`` with no prompt is one), 403 for a live run token, 409
+    ``{error, run_id, tab_id}`` when the project already has a chief.
     """
     try:
         refused = _refuse_agent("opening a chief")
@@ -71,9 +72,13 @@ def chief_open():
         for field in _OPEN_FIELDS:
             if not isinstance(body.get(field), str):
                 return jsonify({"error": f"Field '{field}' must be a string"}), 400
+        # `model` is optional. So is `prompt`: left out, the style is the user's file for the
+        # preset or the built-in text of status, planner and operator; a key that is present
+        # must be a string.
+        for field in ("model", "prompt"):
+            if field in body and not isinstance(body[field], str):
+                return jsonify({"error": f"Field '{field}' must be a string"}), 400
         model = body.get("model", "")
-        if not isinstance(model, str):
-            return jsonify({"error": "Field 'model' must be a string"}), 400
 
         from ...sse import _broadcast_runner
         from pathly_orchestrator.supervisor.chief_session import (
@@ -86,7 +91,7 @@ def chief_open():
                 project_root=body["project_root"],
                 engine=body["engine"],
                 preset=body["preset"],
-                prompt=body["prompt"],
+                prompt=body.get("prompt"),
                 model=model,
                 broadcast_fn=_broadcast_runner,
             )

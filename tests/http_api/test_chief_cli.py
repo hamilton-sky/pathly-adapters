@@ -202,6 +202,7 @@ def test_a_style_that_lacks_the_cite_and_injection_rules_gets_them_from_the_frag
 
     prompt = host.spawn["prompt"]
     assert "cite=<id>" in prompt
+    assert re.search(r"never run `?/clear", prompt, re.IGNORECASE)
     assert _injection_paragraph(prompt)
 
 
@@ -243,7 +244,11 @@ def test_the_fragment_teaches_the_command_and_its_help():
     text = fragment_text()
 
     assert "pathly help" in text
-    assert re.search(r"\bpathly api (GET|POST) /", text)
+    assert re.search(r"\bpathly api (GET|POST) '?/", text)
+    assert (
+        '`pathly api` sends `-H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN"` for you'
+        in text
+    )
 
 
 def _injection_paragraph(text: str) -> str | None:

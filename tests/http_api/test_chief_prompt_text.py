@@ -14,10 +14,11 @@ from __future__ import annotations
 import json
 import re
 import shlex
-from urllib.parse import parse_qsl
+from urllib.parse import parse_qsl, quote
 
 import pytest
-from chief_cli_support import fragment_text
+from chief_bind_support import record_run
+from chief_cli_support import fragment_text, host, pathly, server
 from chief_gate_support import _chief, app, client, project
 from werkzeug.exceptions import HTTPException
 
@@ -29,6 +30,7 @@ TIER_OF = {
 }
 SPAN = re.compile(r"`([^`\n]+)`")
 PLACEHOLDER = re.compile(r"<[^<>\n]*>")
+METHODS = ("GET", "POST", "PUT", "DELETE")
 ANSWER_TARGETS = {"/runner/agent-answer": "topic", "/comms/answer": "question_id"}
 
 
@@ -53,7 +55,8 @@ def examples(text: str) -> list[list[str]]:
     for span in [*spans, *fenced]:
         if span.startswith("pathly api "):
             words = shlex.split(span)
-            if len(words) >= 4:
+            # `pathly api METHOD /path` in prose is the shape of the command, not a call.
+            if len(words) >= 4 and words[2] in METHODS:
                 found.append(words)
     return found
 
@@ -162,3 +165,124 @@ def test_the_fragment_names_the_limits_by_the_fields_the_session_route_reports(
 
     assert {"max_runs_per_session", "max_cost_usd_per_run", "runs_started"} <= named
     assert named <= set(reported)
+
+
+# --- the examples, run: the gate lets each one through, and the texts' claims about the answers ---
+
+NOT_CITED = "cite a human message from this chief session"
+
+
+def _filled(words: list[str], project, run_id: str) -> list[str]:
+    """An example with its placeholders filled: the real root and run, a number where a cite goes,
+    an id that no row has everywhere else."""
+    out = []
+    for word in words[1:]:
+        word = word.replace("<root>", str(project)).replace("<run_id>", run_id)
+        word = re.sub(r'("cite": )<id>', r"\g<1>1", word)
+        out.append(PLACEHOLDER.sub("x", word))
+    return out
+
+
+def _refused_by_the_gate(ran) -> bool:
+    try:
+        body = json.loads(ran.out)
+    except ValueError:
+        return False
+    return ran.code == 1 and isinstance(body, dict) and "allowed" in body
+
+
+@pytest.fixture()
+def nothing_starts(host):
+    """The examples name goals and runs that do not exist, so no agent may start: the spawn host
+    (``host`` records what a start would send it) must have been sent no spawn at the end.
+    """
+    yield host
+    assert [p for _, p in host.sent if p.get("type") == "TERMINAL_SPAWN"] == []
+
+
+@pytest.mark.parametrize("name", list(TIER_OF))
+def test_no_example_is_refused_by_the_gate_when_run_by_a_chief_of_its_tier(
+    server, pathly, project, nothing_starts, name
+):
+    chief = _chief(TIER_OF[name], project)
+    run_id = record_run(project, "run-1")
+
+    refused = []
+    for words in examples(_text(name)):
+        ran = pathly(*_filled(words, project, run_id), token=chief.token)
+        if _refused_by_the_gate(ran) and json.loads(ran.out)["error"] != NOT_CITED:
+            refused.append((" ".join(words), ran.out))
+
+    assert refused == []
+
+
+def test_a_goal_posted_the_way_the_planner_style_says_is_listed_and_a_task_can_name_it(
+    server, pathly, project
+):
+    chief = _chief("planner", project)
+    goal, task, _ = [
+        words
+        for words in examples(_text("planner"))
+        if words[3] in ("/comms/post", "/comms/goals/decompose")
+    ]
+
+    posted = pathly(*_filled(goal, project, "run-1"), token=chief.token)
+    goal_id = json.loads(posted.out)["message_id"]
+    filled = _filled(task, project, "run-1")
+    body = json.loads(filled[-1])
+    body["goal_id"] = goal_id
+    body["depends_on"] = []
+    tasked = pathly(*filled[:-1], json.dumps(body), token=chief.token)
+    listed = pathly(
+        "api",
+        "GET",
+        f"/comms/goals?board=project&scope={quote(str(project))}&feature=project",
+        token=chief.token,
+    )
+
+    assert (posted.code, tasked.code, listed.code) == (0, 0, 0), (
+        posted,
+        tasked,
+        listed,
+    )
+    goals = json.loads(listed.out)
+    assert [g["id"] for g in goals] == [goal_id]
+    assert goals[0]["tasks"]["total"] == 1
+
+
+def test_a_standing_order_given_the_way_the_operator_style_says_is_listed_as_binding(
+    server, pathly, project
+):
+    chief = _chief("operator", project)
+    order = next(w for w in examples(_text("operator")) if w[3] == "/comms/directives")
+
+    given = pathly(*_filled(order, project, "run-1"), token=chief.token)
+    listed = pathly(
+        "api",
+        "GET",
+        f"/comms?board=project&scope={quote(str(project))}&feature=project&type=decision",
+        token=chief.token,
+    )
+
+    assert given.code == 0, given
+    rows = json.loads(listed.out)
+    assert [(r["id"], r["binding"]) for r in rows] == [(json.loads(given.out)["id"], 1)]
+
+
+def test_a_run_started_for_a_goal_that_does_not_exist_is_a_404_and_costs_no_slot(
+    server, pathly, project, nothing_starts
+):
+    chief = _chief("operator", project)
+    start = next(w for w in examples(_text("operator")) if w[3] == "/runs")
+
+    ran = pathly(*_filled(start, project, "run-1"), token=chief.token)
+
+    assert ran.code == 1
+    assert "not found" in ran.out
+    session = pathly(
+        "api",
+        "GET",
+        f"/chief/session?project_root={quote(str(project))}",
+        token=chief.token,
+    )
+    assert json.loads(session.out)["runs_started"] == 0

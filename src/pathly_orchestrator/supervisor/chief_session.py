@@ -31,6 +31,7 @@ from pathly_orchestrator.db.queries import chief as queries
 from pathly_orchestrator.db.queries.run_tokens import mint_run_token
 from pathly_orchestrator.runner.chief_argv import chief_argv, claude_settings
 
+from .chief_presets import BUILT_IN, compose_prompt, default_style
 from .chief_tiers import resolve_preset_tier, strip_front_matter
 from .registry import create_run, drop_run, get_run
 from .state import logger
@@ -64,7 +65,7 @@ def normalise_project_root(project_root: str) -> str:
 
 
 def _validate(
-    project_root: object, engine: object, preset: object, prompt: object, model: object
+    project_root: object, engine: object, preset: object, model: object
 ) -> None:
     if engine not in ENGINES:
         raise ValueError(f"the chief runs on claude or codex, not {engine!r}")
@@ -74,10 +75,24 @@ def _validate(
         raise ValueError("preset must be a string")
     if not isinstance(model, str) or model.startswith("-"):
         raise ValueError("model must be a string that does not start with '-'")
+
+
+def _style(preset: str, prompt: object, project_root: str) -> str:
+    """The style to paste: the caller's ``prompt``, else the user's file ``chief/<preset>``,
+    else the built-in text of a built-in preset. A style is checked as given, before the fixed
+    rules are appended."""
+    if prompt is None:
+        prompt = default_style(preset, project_root)
+        if prompt is None:
+            raise ValueError(
+                f"prompt is required for preset {preset!r}: only "
+                f"{', '.join(BUILT_IN)} have a built-in text"
+            )
     if not isinstance(prompt, str) or not strip_front_matter(prompt).strip():
         raise ValueError("prompt must be a non-empty string")
     if len(prompt.encode("utf-8")) > MAX_PROMPT_BYTES:
         raise ValueError(f"prompt must be at most {MAX_PROMPT_BYTES} bytes")
+    return prompt
 
 
 def _write_private(path: Path, text: str) -> None:
@@ -132,7 +147,7 @@ def open_chief(
     project_root: str,
     engine: str,
     preset: str,
-    prompt: str,
+    prompt: str | None = None,
     model: str = "",
     broadcast_fn: Callable[[str, dict], None],
     start_timeout: float = 30.0,
@@ -143,9 +158,16 @@ def open_chief(
     and ``ChiefAlreadyOpen`` when the project has an open chief. ``project_root`` is
     normalised (``normalise_project_root``) before anything is stored or compared. Returns
     ``{run_id, tab_id, tier, engine}`` without waiting for the tab.
+
+    ``prompt`` is the chief's style. Left out, the style is the user's file ``chief/<preset>``,
+    else the built-in text of ``status``, ``planner`` or ``operator`` (any other preset needs a
+    prompt). What is pasted is the style without its front matter, the ``chief-connect``
+    fragment and the stored project root (``chief_presets.compose_prompt``); the 64 KiB limit is
+    on the style, checked before anything is appended.
     """
-    _validate(project_root, engine, preset, prompt, model)
+    _validate(project_root, engine, preset, model)
     project_root = normalise_project_root(project_root)
+    pasted = compose_prompt(_style(preset, prompt, project_root), project_root)
     conn = get_db()
     tier = resolve_preset_tier(preset, project_root)
     run_id = "chief-" + secrets.token_hex(6)
@@ -201,7 +223,7 @@ def open_chief(
                 "adapter": engine,
                 "argv": argv,
                 "cwd": project_root,
-                "prompt": strip_front_matter(prompt),
+                "prompt": pasted,
                 "interactive": True,
                 "submit": False,
                 "category": "single",
