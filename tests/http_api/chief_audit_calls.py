@@ -143,6 +143,10 @@ POST_VARIANTS = {
             {"old_id": w.fresh_project_decision, "new_id": w.project_decision},
         )
     ],
+    # A standing order for every role: it is a decision on the chief's own project board.
+    "/comms/directives": lambda w: [
+        Variant("directive", {"to_agent": "*", "text": "No new dependencies."})
+    ],
     "/runs": _runs,
     "/comms/goals/run": _goal_run,
     "/comms/run": _comms_run,

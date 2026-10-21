@@ -16,10 +16,10 @@ from typing import NamedTuple
 
 import pytest
 
-# Rules the table lists before a later ticket adds the route (ticket 12 adds the directives
-# route, and the table already maps it to ``decide``). A rule listed here may be missing from
-# ``app.url_map``; any other listed rule that is missing fails the test.
-PLANNED = {("/comms/directives", "POST")}
+# Rules the table lists before a later ticket adds the route. A rule listed here may be missing
+# from ``app.url_map``; any other listed rule that is missing fails the test. Empty since ticket 12
+# added ``POST /comms/directives``, which the table had mapped to ``decide`` ahead of it.
+PLANNED: set[tuple[str, str]] = set()
 
 TIERS = ("status", "planner", "operator")
 

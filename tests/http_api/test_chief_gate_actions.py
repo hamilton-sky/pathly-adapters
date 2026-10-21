@@ -55,6 +55,7 @@ LISTED = [
     ("/comms/features/decompose", "plan"),
     ("/comms/project/decompose", "plan"),
     ("/comms/supersede", "decide"),
+    ("/comms/directives", "decide"),
     ("/runs", "run"),
     ("/comms/goals/run", "run"),
     ("/comms/run", "run"),

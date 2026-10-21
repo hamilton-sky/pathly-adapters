@@ -344,6 +344,7 @@ REACHES = {
     ("/comms/artifacts/<artifact_id>/section", "GET"): _answered(),
     ("/comms/artifacts/section", "GET"): _answered(),
     ("/comms/supersede", "POST"): _answered(ok=True),
+    ("/comms/directives", "POST"): _answered(),
     ("/runner/agent-answer", "POST"): _answered(status="accepted"),
     ("/runs/<run_id>/stop", "POST"): _answered(stopped=True),
     ("/comms/goals/stop", "POST"): _answered(stopped=True),
