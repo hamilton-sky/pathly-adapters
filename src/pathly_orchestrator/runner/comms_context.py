@@ -18,6 +18,7 @@ from .comms_formatters import (
     _collect_hydrate_channel,
     render_governance_lines,
 )
+from .comms_governance import governance_decisions, standing_orders_only
 from .context_budget import select_within_budget
 from .context_record import record_board_context, render_stats
 from .context_settings import resolve_context_limits
@@ -45,6 +46,7 @@ def retrieve_board_context(
     task_id: str | None = None,
     counts: dict[str, int] | None = None,
     storage_path: str | None = None,
+    role: str = "",
 ) -> str:
     """Return a `## Communication Board` markdown block, or '' when empty.
 
@@ -72,6 +74,9 @@ def retrieve_board_context(
         The run's storage dir. When set, one BOARD_CONTEXT event is recorded for
         this prompt build (see context_record.py). Default None ⇒ no DB write, which
         is what the read-only /comms/agent-context/preview endpoint relies on.
+    role:
+        The agent's role. Picks the standing orders (binding decisions) addressed to it or
+        to `*`; empty ⇒ only those addressed to `*`. See comms_governance.py.
     """
     if board_scope is None:
         board_scope = {"feature": True, "project": True, "global": True}
@@ -94,7 +99,7 @@ def retrieve_board_context(
         enabled_boards.append(("global", "global", limits["k_global"]))
 
     if not enabled_boards:
-        return ""
+        return standing_orders_only(_norm_root, role, stats)
 
     # The agent's OWN board is the highest-priority enabled one — feature for a feature
     # run, but PROJECT for a project-level decompose (feature disabled). The own board
@@ -107,7 +112,6 @@ def retrieve_board_context(
         from pathly_orchestrator.db.connection import get_db
         from pathly_orchestrator.db.queries.comms import (
             get_active_escalations,
-            get_pending_decisions,
             search_by_hybrid,
         )
         from pathly_orchestrator.runner.embeddings import embed
@@ -117,14 +121,14 @@ def retrieve_board_context(
         logger.debug("comms_context: could not open DB — returning empty block")
         return ""
 
-    # --- Governance: pending decisions + active escalations ------------------
+    # --- Governance: pending decisions + standing orders + active escalations ---
     all_boards = [b for b, _, _ in enabled_boards]
     all_scopes = [s for _, s, _ in enabled_boards]
 
     decisions: list[dict] = []
     escalations: list[dict] = []
     try:
-        decisions = get_pending_decisions(conn, boards=all_boards, scopes=all_scopes)
+        decisions = governance_decisions(conn, all_boards, all_scopes, role, _norm_root)
     except Exception:
         decisions = []
     try:
@@ -144,6 +148,10 @@ def retrieve_board_context(
         if msg.get("type", "") == "phase":
             return False
         if msg.get("superseded_by"):
+            return False
+        if msg.get("binding"):
+            # A standing order reaches a prompt through governance, for the role it is
+            # addressed to. Letting it surface here too would hand it to every other role.
             return False
         return True
 
@@ -367,4 +375,5 @@ def board_context_for(
         task_id=task_id,
         counts=counts,
         storage_path=storage_path,
+        role=role,
     )

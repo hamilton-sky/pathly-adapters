@@ -227,6 +227,63 @@ its `AGENT_DONE` under a literal string — mis-keyed event, no projected invoca
 unbilled and absent from the Monitor. The DAG path had no injector at all until Phase E; see the
 prerequisites in the Phase E section below.
 
+**Governance in those prompts — pending decisions and standing orders.** All three paths get
+their board context from `runner/comms_context.retrieve_board_context(..., role)`, and its
+decisions from `runner/comms_governance.governance_decisions`: the `pending` decisions of the
+tiers the run reads (the first `/comms/acknowledge` sets a row `active`, and an ordinary decision
+then leaves the governance block), plus the **standing orders**, the decisions with
+`comms_messages.binding = 1`. A standing order stays in the prompts whatever its status, until it
+is superseded or deleted (`db/queries/comms_directives.get_binding_decisions`: one static
+statement, the board and scope lists passed as one JSON string each and unpacked by `json_each`,
+built into SQLite since 3.38.0). It reaches the prompts of the role it is addressed to
+(`to_agent`, matched exactly), and every prompt when it is addressed to `*`; an empty role gets `*`
+only. It is read from the tiers the run reads **and always from the project board**, even when the
+run's project tier is off, every tier off included (`standing_orders_only`): a context-budget
+toggle does not mute a standing order. "Always" needs a project root: with an empty
+`project_root` there is no project scope, so that extra project-board read is skipped. A pending row with
+`binding = 1` is served by that role-aware query and left out of the pending half, and
+`_is_context` keeps a binding row out of the semantic Context channel, so a directive for the
+builder reaches no other role by either route.
+`render_governance_lines` prints standing orders in a block of their own,
+`**Standing orders (binding; a newer decision does not override them):**` with one
+`BINDING for <role|all roles>: <text>  [id: …]` line each (every run of whitespace in the text,
+line breaks included, becomes one space, so a row's text cannot start a line of its own and forge
+a second entry or a `**Decisions …**` header), before the ranked decisions and not inside them;
+the ranked list's "the one listed FIRST wins" and "post a decision with `supersedes`" rules do not
+apply to it, and the block says only the human, through the chief, replaces one. The formatter
+trusts only the `_binding` mark `comms_governance` sets, never the stored column.
+If the standing-order query raises (no `json_each`, a lock), `governance_decisions` logs a warning
+and serves no order: the pending half is then left as `get_pending_decisions` returned it, so a
+pending `binding = 1` row still reaches the prompt, but as an ordinary pending decision in the
+ranked list (for every role), and an acknowledged order is missing from that prompt; a run with
+every tier off gets no block.
+
+The role each path passes: `fsm_compose.build_prompt` passes `agent_role_of(agent)`, which is
+`_SKILL_AGENT_ROLE` (six skills: `team/build` builder, `team/review` reviewer, `team/test` tester,
+`team/plan` planner, `team/design` designer, `team/retro` planner) and otherwise the agent's last
+`/` segment (`scout` is `scout`; `debug/build` and `fix/build`, the debug and quick-fix fixers,
+are `build`), so a directive addressed to `builder` does not reach those fixers, and only a `*`
+directive does.
+That is the safe direction (nothing reaches the wrong role); `test_binding_directives.py` pins it
+so a change to the table is deliberate. `task_prompt.build_task_prompt` passes `builder`;
+`board_run.start_board_run` passes the run's `agent` (empty, as for a plain single-agent run,
+means `*` only). `POST /comms/agent-context` (board-info mode) still lists pending decisions
+without a role.
+
+**Not enforced yet: two limits until chief-agent tickets 12 and 16 land.** No route sets
+`binding = 1` on purpose yet (`POST /comms/directives`, ticket 12, is planned as the one door), but:
+(1) hydration does not treat the column as special. `db/queries/comms_hydrate.py` keeps every real
+column, so a `BOARD.json` row carrying `"binding": 1` becomes a standing order when
+`POST /comms/hydrate` imports a board the DB holds no rows for (Studio calls it on project open), and
+any headless agent that can write a file in the project can plant one. Ticket 16 makes hydration store
+`binding = 0`. (2) An agent run token can still rewrite or retire a standing order, so the block's
+"only the human, through the chief, replaces a standing order" is what the prompt says, not yet what
+the routes enforce: `POST /comms/edit` rewrites its text (ticket 12 refuses that for a `binding` row),
+and `POST /comms/supersede` (`refuse_agent_supersede` checks only the row type and board), a decision
+posted with `supersedes` and `POST /comms/delete` retire it (ticket 16). Standing orders also have no
+cap yet on their number or size, and one persists after its acknowledgement; ticket 12 caps the text
+at the writer.
+
 ## State machine
 
 Features advance through: `PLANNING -> DESIGNING -> BUILDING -> REVIEWING -> TESTING -> RETRO -> DONE` (the literal state identifiers in `core/flows/team.flow.yaml`; the `-ING` suffix matters — `current_state` is e.g. `"BUILDING"`, not `"BUILD"`). PLANNING is `states[0]` — the seed a new feature starts at. (STORMING was dropped as the team seed — it was headless ceremony for spec-driven work; genuine brainstorming lives in the interactive `/pathly storm` on-ramp and the consultation flows. STORMING still exists as a state in `test.flow.yaml` and maps to `/pathly storm`.)
@@ -401,7 +458,8 @@ replace, by the `[id: …]` the governance block now shows on each decision) and
 `core/skills/planning/evaluate.md` Step 5 (close what your analysis settled — evidence-gated).
 Governance decisions render higher tier first (global > project > feature), newest first within a
 tier: the feature board accepts any role, so recency alone let a newer feature note outrank an
-older project or global call.
+older project or global call. A binding decision sits outside that ranking, in the standing-orders
+block that precedes it (see "Prompt assembly").
 
 **Human escalation gate (`fsm_human_gate.py`).** An unacknowledged escalation with
 `to_agent='human'` on the run's board/scope **blocks the transition it stands in front of**.
@@ -1252,6 +1310,7 @@ pathly_orchestrator/
                            #   bucketing (scope_tier is the board tier, not the run type).
       comms.py             # re-export shim — splits into comms_messages, comms_artifacts, comms_tasks, comms_embeddings, comms_counts, comms_goals_read (import from domain modules for new code)
       comms_messages.py    # board message CRUD; goal_id/executor columns back the Goals->Task-DAG model
+      comms_directives.py  # get_binding_decisions(conn, boards, scopes, role): the binding (`binding = 1`) decisions a prompt carries whatever their status, not deleted or superseded, addressed to the role or `*` (`*` only for an empty role), oldest first; board and scope lists go in as one JSON string each through `json_each`, so the statement is one static literal
       comms_edit.py        # update_message_text: edits a row's text AND sets its three author columns from the editor's stamp (none when no stamp is passed); re-exported from comms_messages / comms
       comms_artifacts.py   # artifact metadata CRUD (attach, list, section index, update_summary)
       comms_tasks.py       # task DAG operations (get_ready, complete, claim, fail, reclaim, goal_refs_coverage)
@@ -1282,13 +1341,16 @@ pathly_orchestrator/
     embeddings.py          # embed()/warm() — local embedding model; embed() has a bounded LRU (check inside _model_lock) so the per-board search fan-out re-embedding one query N+2 times computes the vector once; model load RETRIES transient failures (was a permanent silent latch that disabled semantic search process-wide) and embedder_status() reports {loaded,unavailable,load_attempts} to /health; chunk_summary() splits a summary into child chunks (per-bullet for topic-map, per-### for detailed, none for gist); embed_artifact_async() stores one PARENT vector (whole message text + summary) in comms_embeddings + CHILD vectors per chunk in comms_chunk_embeddings
     board_scope.py         # ONE resolution of which tiers a run may see, serving BOTH directions: the context pushed into the prompt (board_context_for) and the tiers the board-search fragment lets an agent pull (<search_tiers>) — an agent told it may search a tier its own context channel isn't reading would be reaching AROUND the board-scope setting; search_tiers_value() renders board+scope pairs (feature->slug, project->normalized root, global->"global") since a mismatched pair returns [] rather than an error
     read_policy.py         # the role read wall (role-read-policy), defined once: ReadPolicy, BUILTIN_DEFAULTS (reviewer/tester/chief/anonymous), NEVER_WITHHELD_TYPES, row_allowed (pure) + policy_predicate (the same rule as a SQL fragment over type/author_*; tests keep them in agreement) and resolve_read_policy(conn, role, feature, project_root). BUILT BUT NOT WIRED: no read path calls it and nothing reads the read_policy.mode setting, so it withholds nothing from any agent (see "Who wrote a board row, and who may read it")
-    comms_context.py       # assembles board context (governance + referenced + semantic, relevance-gated); tags each kept row _tier from the search loop (authoritative, not row["board"]) so the render can budget per tier; _matched_chunk surfaced as "matched topic: …" via comms_formatters.py
+    comms_context.py       # assembles board context (governance + referenced + semantic, relevance-gated); tags each kept row _tier from the search loop (authoritative, not row["board"]) so the render can budget per tier; _matched_chunk surfaced as "matched topic: …" via comms_formatters.py; takes the prompt's `role` for the standing orders and keeps binding rows out of the Context channel
+    comms_governance.py    # governance_decisions(conn, boards, scopes, role, project_scope): the pending decisions plus the standing orders for the role (from the tiers the run reads and always from the project board when the run has a project root), de-duplicated by id and marked `_binding`; if the standing-order query raises it logs a warning and leaves the pending half unfiltered; standing_orders_only() is the block of a run whose every tier is off
     comms_formatters.py    # pure list[dict]→list[str] rendering for that context, incl.
                            #   render_governance_lines(): decisions NEWEST-FIRST with a LATEST
                            #   marker, minute-precision stamps (same-day decisions are the ones
                            #   that conflict, and "13d ago" cannot order them), an explicit
                            #   precedence line, and — when a decision post-dates an open
-                           #   escalation — a note that only a human acknowledgement closes a gate
+                           #   escalation — a note that only a human acknowledgement closes a gate;
+                           #   decisions marked `_binding` render first in their own
+                           #   "Standing orders" block, outside that ranking
     context_budget.py      # per-tier char budget MATH (pure — no DB on the render path): allocate_budget() splits the configured char_budget by weight (feature .5/project .3/global .2) NORMALISED over the enabled tiers (a feature-only run still gets the whole budget), select_within_budget() charges each line to its own tier then pools the unspent remainder; replaces a single shared budget that let the feature tier (rendered first) starve project/global outright
     context_settings.py    # the two numbers that size every board block, as app_settings keys read at CALL time (same contract as code_context.backend): board_context.char_budget (default 4000, bounds [200,40000]) + board_context.k_{feature,project,global} (defaults 5/3/2, bounds [0,25]). They are a PAIR — k binds first in the intended case, so raising the budget alone is half a change. Garbage/out-of-range FALLS BACK to the default rather than clamping, so the rendered block always matches a documented number; k=0 legally mutes one tier's semantic pull while its governance still injects. Needs NO new route: GET /db/settings + PUT /db/settings/<key> already take arbitrary keys. Replaces bare literals (2000, and 3/2/1 inline in enabled_boards) that had no recorded justification — unlike the cosine cutoffs beside them, which carry a live-board calibration
     context_record.py      # render_stats() + record_board_context() — appends ONE `BOARD_CONTEXT` fsm_event per prompt build carrying the volume actually rendered vs dropped (rendered_entries/chars, per-tier chars, omitted_entries/chars) PLUS the budget+k in force, so the next move on those numbers is made from data. Inert to telemetry: append_event projects only AGENT_DONE/BILLING_UPDATE. Wrapped + never-raising (a telemetry write must never break prompt assembly) and create_dir=False so it can't plant an empty decoy dir that later wins _resolve_storage_path's existence probe. Opt-in via storage_path, which keeps the /comms/agent-context preview write-free

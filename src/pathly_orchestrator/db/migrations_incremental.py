@@ -154,6 +154,10 @@ def _add_additive_migrations(conn: sqlite3.Connection) -> None:
         # claimed before this feature / no allow list.
         ("comms_messages", "claimed_text", "TEXT"),
         ("comms_messages", "floor_allow", "TEXT"),
+        # chief-agent: a binding decision (a standing order) stays in the prompts of the
+        # roles it targets after an acknowledgement. 0 = an ordinary row, which is every
+        # row that exists before this column. Only `POST /comms/directives` sets it to 1.
+        ("comms_messages", "binding", "INTEGER NOT NULL DEFAULT 0"),
     ]:
         try:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {ctype}")

@@ -130,7 +130,11 @@ Two traps this dissolves:
     cutoffs (`{feature:0.75, project:0.55, global:0.50}`) keep tangential cross-tier items out **when
     an embedding is present**. Two deliberate exceptions bypass that gate: (1) **governance** —
     pending decisions + active escalations are injected *unconditionally* across all tiers ("always
-    applies — do not override"); (2) **recency fallback** — when embeddings are unavailable, unscored
+    applies — do not override"), and a *binding* decision (a standing order) stays in the prompts of
+    the roles it targets after it is acknowledged, read from the project board whatever the run's tier
+    toggles say (the prompts read these already, but no route is built to create one yet: the
+    chief's `POST /comms/directives` is still to come, and until it and the later rules land a
+    hydrated `BOARD.json` row can still carry the flag and an agent can still replace one); (2) **recency fallback** — when embeddings are unavailable, unscored
     cross-tier rows are kept so cross-tier context isn't starved. So "only genuinely-close cross-tier
     items" is true for semantic matches, not for governance or the no-embedding path.
 - **A board instance is the `(board, scope)` PAIR, not `scope` alone.** `board` is the tier;
