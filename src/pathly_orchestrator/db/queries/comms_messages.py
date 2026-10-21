@@ -332,15 +332,19 @@ def soft_delete_message(
 ) -> str:
     """Retract a message by soft-deleting it.
 
-    Returns one of: ``"deleted"`` · ``"locked"`` · ``"not_found"``.
-    Pass ``force=True`` to remove ANY board message regardless of who has read it.
+    Returns one of: ``"deleted"`` · ``"locked"`` · ``"not_found"`` · ``"binding"``.
+    Pass ``force=True`` to remove ANY board message regardless of who has read it, except a
+    binding directive (``binding = 1``): that one answers ``"binding"`` and stays, for every
+    caller and with or without ``force``. A directive is retired by superseding it.
     """
     row = conn.execute(
-        "SELECT read_by FROM comms_messages WHERE id=? AND deleted_at IS NULL",
+        "SELECT read_by, binding FROM comms_messages WHERE id=? AND deleted_at IS NULL",
         (message_id,),
     ).fetchone()
     if row is None:
         return "not_found"
+    if row["binding"] == 1:
+        return "binding"
     try:
         read_by = json.loads(row["read_by"] or "[]")
     except (json.JSONDecodeError, TypeError):

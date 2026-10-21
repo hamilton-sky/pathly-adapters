@@ -27,6 +27,25 @@ from pathly_orchestrator.db.queries.comms_messages import (
 logger = logging.getLogger("pathly.board_mirror")
 
 
+def _belongs(msg: object, board: str, scope: str) -> bool:
+    """True when a snapshot row is a row of the board its file was written for.
+
+    The file's own ``board``/``scope`` keys are not read: they are as unverified as the rows.
+    A project scope is compared the way the exporter and ``board_from_scope`` write it, as a
+    normalised root (forward slashes, no trailing one); a feature or global scope exactly.
+    """
+    if not isinstance(msg, dict):
+        return False
+    if msg.get("board") != board or not isinstance(msg.get("scope"), str):
+        return False
+    if board != "project":
+        return msg["scope"] == scope
+    from pathly_orchestrator.board_mirror import _norm_project_root
+
+    own = _norm_project_root(scope)
+    return own is not None and _norm_project_root(msg["scope"]) == own
+
+
 def hydrate_board(conn: sqlite3.Connection, board: str, scope: str, path: Path) -> bool:
     """Import *path* (a BOARD.json snapshot) into the DB for (board, scope).
 
@@ -37,6 +56,12 @@ def hydrate_board(conn: sqlite3.Connection, board: str, scope: str, path: Path) 
     is best-effort re-embedded — the rows landing in the DB are hydration's whole
     value, so a missing/broken embedder must never block or fail it. Rows that carry no
     ``author_source`` (a pre-upgrade snapshot) are then labelled ``legacy``. Never raises.
+
+    Nothing in the file is verified (chief-agent 16): a message row whose ``board`` and
+    ``scope`` are not this file's is left out, with the artifacts that point at it, and the
+    rows that are kept are stored with ``binding = 0`` and no verified author stamp
+    (``comms_hydrate._unverified``). A standing order does not survive a fresh clone: the
+    chief posts it again.
     """
     try:
         if get_all_messages(conn, board, scope):
@@ -49,8 +74,15 @@ def hydrate_board(conn: sqlite3.Connection, board: str, scope: str, path: Path) 
         logger.debug("hydrate_board failed to read %s", path, exc_info=True)
         return False
 
-    messages = snapshot.get("messages") or []
-    artifacts = snapshot.get("artifacts") or []
+    all_messages = snapshot.get("messages") or []
+    messages = [m for m in all_messages if _belongs(m, board, scope)]
+    kept = {m.get("id") for m in messages}
+    left_out = {m.get("id") for m in all_messages if isinstance(m, dict)} - kept
+    artifacts = [
+        a
+        for a in snapshot.get("artifacts") or []
+        if not (isinstance(a, dict) and a.get("message_id") in left_out)
+    ]
 
     for msg in messages:
         insert_message_row(conn, msg)

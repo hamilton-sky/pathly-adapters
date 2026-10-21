@@ -21,7 +21,7 @@ import re
 
 from flask import Blueprint, jsonify, request
 
-from ...run_identity import caller_identity
+from ...run_identity import caller_identity, is_chief_run
 from ...sse import _broadcast_comms
 from ._helpers import read_json_body
 
@@ -63,8 +63,7 @@ def comms_directives():
     other than newline and tab, or cannot be encoded.
     """
     try:
-        identity = caller_identity(request)
-        if identity.kind != "run" or identity.role != "chief":
+        if not is_chief_run(caller_identity(request)):
             return jsonify({"error": "only a chief may post a directive"}), 403
 
         data = read_json_body()

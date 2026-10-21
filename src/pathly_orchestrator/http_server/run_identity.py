@@ -52,3 +52,10 @@ def caller_identity(request) -> CallerIdentity:
         board=row.get("board"),
         scope=row.get("scope"),
     )
+
+
+def is_chief_run(identity: CallerIdentity | None) -> bool:
+    """True for a live run token whose role is ``chief``, and for nobody else: not the server
+    secret (which names no run), not a run of another role, not a request with no token.
+    """
+    return identity is not None and identity.kind == "run" and identity.role == "chief"

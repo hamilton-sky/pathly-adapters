@@ -203,8 +203,9 @@ def _render_standing_orders(standing: list[dict]) -> list[str]:
     The ranked list tells the agent that the decision listed first wins, so a standing order
     inside it would lose to any later note. Here the way out is the human, through the chief,
     which is why there is no `supersedes` hint; the block states that rule, and the routes
-    only start to enforce it with chief-agent tickets 12 and 16. Each order is ONE line, so a
-    row's text cannot start a new line and forge an entry or a header of its own.
+    enforce it: `/comms/supersede`, a post's `supersedes` and `/comms/delete` leave a binding
+    row to a live chief run. Each order is ONE line, so a row's text cannot start a new line and
+    forge an entry or a header of its own.
     """
     lines = [
         "**Standing orders (binding; a newer decision does not override them):**",

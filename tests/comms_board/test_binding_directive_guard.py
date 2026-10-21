@@ -380,6 +380,17 @@ def test_is_binding_reads_the_column_the_standing_orders_query_reads(project):
     assert is_binding(conn, "") is False
 
 
+@pytest.mark.parametrize("flag", [0, 1, 2, -1])
+def test_is_binding_and_the_standing_orders_query_never_disagree(project, flag):
+    from pathly_orchestrator.http_server.blueprints.comms._supersede_on_post import (
+        is_binding,
+    )
+
+    mid = binding_support.post("Never push.", scope=project, binding=flag)
+
+    assert is_binding(get_db(), mid) is (mid in standing_ids(project))
+
+
 def test_apply_supersedes_outside_a_request_does_not_retire_one(project):
     from pathly_orchestrator.http_server.blueprints.comms._supersede_on_post import (
         apply_supersedes,

@@ -18,12 +18,26 @@ from _paths import SRC
 from pathly_orchestrator.db.queries.comms import _DEDUP_PROTECTED_TYPES
 
 PACKAGE = SRC / "pathly_orchestrator"
-RETIRE = re.compile(r"SET\s+(?:\w+\s*=\s*[^,]+,\s*)*(deleted_at|superseded_by)\s*=")
+UPDATE = re.compile(
+    r"UPDATE\s+comms_messages\s+SET\s+(?P<set>.*?)(?:\s+WHERE\b|$)", re.I | re.S
+)
+RETIRING = re.compile(r"\b(deleted_at|superseded_by)\s*=")
+DELETE = re.compile(r"DELETE\s+FROM\s+comms_messages\b", re.I)
+REPLACE = re.compile(r"REPLACE\s+INTO\s+comms_messages\b", re.I)
 
 
 def _sources():
     for path in PACKAGE.rglob("*.py"):
         yield path.relative_to(PACKAGE).as_posix(), path.read_text(encoding="utf-8")
+
+
+def _statements(pattern):
+    """(file, match) for every string literal in ``src`` that ``pattern`` finds a hit in."""
+    for rel, source in _sources():
+        for node in ast.walk(ast.parse(source)):
+            if isinstance(node, ast.Constant) and isinstance(node.value, str):
+                for hit in pattern.finditer(node.value):
+                    yield rel, hit
 
 
 def _users(name):
@@ -46,7 +60,9 @@ def _users(name):
 
 def test_only_two_statements_write_the_columns_that_retire_a_row():
     found = {
-        (rel, column) for rel, source in _sources() for column in RETIRE.findall(source)
+        (rel, column)
+        for rel, hit in _statements(UPDATE)
+        for column in RETIRING.findall(hit.group("set"))
     }
 
     # soft_delete_message (deleted_at), supersede_message (superseded_by) and
@@ -55,6 +71,17 @@ def test_only_two_statements_write_the_columns_that_retire_a_row():
         ("db/queries/comms_messages.py", "deleted_at"),
         ("db/queries/comms_messages.py", "superseded_by"),
     }
+
+
+def test_no_statement_deletes_or_replaces_a_message_row_but_the_trash_purge():
+    """``purge_expired_trash`` removes rows that are already trashed, and a binding row never
+    is; a ``REPLACE`` would overwrite ``binding``, ``deleted_at`` and ``superseded_by`` at once.
+    """
+    deleting = {rel for rel, _ in _statements(DELETE)}
+    replacing = {rel for rel, _ in _statements(REPLACE)}
+
+    assert deleting == {"db/queries/comms_messages.py"}
+    assert replacing == set()
 
 
 def test_soft_delete_message_has_one_user_and_it_is_the_route():

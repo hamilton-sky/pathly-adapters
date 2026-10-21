@@ -631,7 +631,9 @@ def test_hydrating_a_pre_upgrade_snapshot_row_labels_it_legacy(tmp_path):
 
     old, new = _row("old-1"), _row("new-1")
     assert _provenance(old) == ("builder", None, "legacy")
-    assert _provenance(new) == ("explorer", "run-x", "token")  # already stamped: kept
+    # A stamp read from disk cannot be verified, so even a stamped row comes back `legacy`
+    # (chief-agent 16); the role and run id it names are kept.
+    assert _provenance(new) == ("explorer", "run-x", "legacy")
     assert row_allowed(old, BUILTIN_DEFAULTS["reviewer"], None) is False
 
 
@@ -1017,7 +1019,8 @@ _INSERT = re.compile(
 _DYNAMIC_INSERT_ALLOW = {
     # Hydration copies a whole BOARD.json snapshot row, author_* columns included. A row from
     # an export made before the upgrade has none; hydrate_board then runs
-    # add_comms_provenance, which labels it `legacy`. Rows exported after carry their own.
+    # add_comms_provenance, which labels it `legacy`. A row that names a source is stored as
+    # `legacy` too, unless it names `none` (comms_hydrate._unverified).
     "db/queries/comms_hydrate.py",
 }
 

@@ -270,18 +270,32 @@ so a change to the table is deliberate. `task_prompt.build_task_prompt` passes `
 means `*` only). `POST /comms/agent-context` (board-info mode) still lists pending decisions
 without a role.
 
-**Not enforced yet: two limits until chief-agent ticket 16 lands.** `POST /comms/directives` (ticket
-12) is the one route that sets `binding = 1` on purpose, and `POST /comms/edit` refuses a binding row
-(409), but: (1) hydration does not treat the column as special. `db/queries/comms_hydrate.py` keeps
-every real column, so a `BOARD.json` row carrying `"binding": 1` becomes a standing order when
-`POST /comms/hydrate` imports a board the DB holds no rows for (Studio calls it on project open), and
-any headless agent that can write a file in the project can plant one. Ticket 16 makes hydration store
-`binding = 0`. (2) An agent run token can still retire a standing order, so the block's "only the
-human, through the chief, replaces a standing order" is what the prompt says, not yet what the routes
-enforce: `POST /comms/supersede` (`refuse_agent_supersede` checks only the row type and board), a
-decision posted with `supersedes` and `POST /comms/delete` retire it (ticket 16). The writer caps one
-order's text (8 KiB of UTF-8, no control character), but the block has no cap yet on the number of
-orders or on its total size, and an order persists after its acknowledgement.
+**Who retires or forges a standing order (chief-agent 16).** Only a live run token whose role is
+`chief` (`run_identity.is_chief_run`, asked as `_supersede_on_post.chief_may_retire`; not the server
+secret, not another role's token, not a request with no token) retires a standing order, and only by
+superseding it. `is_binding` is `binding = 1`, the flag `get_binding_decisions` reads. Four doors are
+closed for everyone else: a `supersedes` list on `POST /comms/post` skips a `binding = 1` row with
+reason `binding` (the post itself is stored and `supersede_skipped` names the id);
+`POST /comms/supersede` answers 403 `{"error": "only the chief retires a binding directive"}` for it
+(`refuse_agent_supersede`) whether the caller sent another role's run token, no token, or no token and
+the server secret; `POST /comms/delete` answers the same 403 for **every** caller, with or without
+`force` (`soft_delete_message` answers `"binding"`; the chief gate does not list `/comms/delete`, so a
+chief token never gets that far: a directive is superseded, not deleted); and hydration stores
+`binding = 0` for every message row it imports. `POST /comms/hydrate` (the only caller of
+`hydrate_project`) reads a file, so `hydrate_board` leaves out a row whose `board` and `scope` are not
+those of the file it came from (a project scope compared as a normalised root, so an export followed by
+a hydrate keeps every row of its own board), `comms_hydrate._unverified` stores `binding = 0`, and an
+`author_source` the file names other than `none` is stored as `legacy` (`none` stays `none`: the read
+wall withholds a `none` row from a restricted role whatever its `author_role`, which it does not do
+for a `legacy` row). A standing order therefore
+does not survive a fresh clone: its text comes back as an ordinary decision and the chief posts it
+again. The other `author_*` columns of a hydrated row are stored as the file has them.
+
+Still open: the standing-orders block has no cap on the number of orders or on its total size (the
+writer caps one order's text at 8 KiB of UTF-8 and refuses control characters), and Studio can neither
+post nor retire a standing order until the UI token (RRP-2b), because its requests carry no run token.
+`tests/comms_board/test_binding_retire_writers.py` pins the writers of `deleted_at` and
+`superseded_by` and their callers, so a new way to retire a row is decided, not found.
 
 ## State machine
 
@@ -403,7 +417,7 @@ The comms blueprint package (`blueprints/comms/`) backs the Studio comms board �
 humans post messages, ask/answer questions, decompose DAG tasks, and supersede stale notes.
 
 ```
-POST /comms/post            ← post a message (embedding computed for hybrid search); optional `supersedes:[id,…]` retires the decisions this one replaces IN THE SAME CALL (see below)
+POST /comms/post            ← post a message (embedding computed for hybrid search); optional `supersedes:[id,…]` retires the decisions this one replaces IN THE SAME CALL (see below; a binding directive in the list is skipped with reason `binding` unless the caller is a live chief run)
 GET  /comms                 ← list board messages (scoped)
 POST /comms/search          ← hybrid (semantic + keyword) search; semantic arm floored at SEMANTIC_DISTANCE_CEILING, keyword hits bypass; no match → [] (never padded with recent messages). Reached by AGENTS too via the `board-search` fragment (own board only) — the self-authored second query the pushed context can't make; Studio's search box is the other caller
 POST /comms/promote         ← copy a decision/constraint UP a tier (feature→project→global). COPY not move: the source board is the audit record of HOW the decision was reached. Stamps promoted_from/original_scope on the copy + promoted_to on the source (the three columns migrations.py reserved and nothing read). Idempotent, keyed off the COPY's promoted_from so one message can promote to two tiers. Own permission set `_PROMOTE_WRITERS` = {director, evaluator, human, **retro**} — NOT _GLOBAL_WRITERS, else the RETRO stage (the one headless role whose job IS capturing lessons) could never promote. decision/constraint only
@@ -419,12 +433,12 @@ POST /comms/attach          ← attach an artifact to a message
 GET  /comms/artifacts       ← list artifacts linked to a message (comms_artifacts table)
 GET  /comms/trash           ← list trashed messages
 POST /comms/restore         ← restore a trashed message
-POST /comms/supersede       ← mark a message superseded_by another (standalone form, used by Studio's supersede menu and the consolidate skill; an agent run is held to the same decision-only, own-board rules as `/comms/post` + `supersedes`)
+POST /comms/supersede       ← mark a message superseded_by another (standalone form, used by Studio's supersede menu and the consolidate skill; an agent run is held to the same decision-only, own-board rules as `/comms/post` + `supersedes`; a binding directive is 403 `only the chief retires a binding directive` for every caller but a live chief run, a request with no token or only the server secret included)
 POST /comms/directives      ← CHIEF TOKEN ONLY: post a BINDING directive (standing order) `{project_root, to_agent: "*"|<role>, text}` → 201 `{id}`. `blueprints/comms/directives.py`; the only route that sets `comms_messages.binding = 1` (`db/queries/comms_directives.post_directive`: a `decision` from `chief` on the project board, `from_agent="chief"`, flagged under the write lock; the scope is `fsm_compose.resolve_board_scope("project", project_root, "")`). 403 for every other caller: no token, any other role's token, and a request that carries only the server secret (what Studio sends today; the UI path waits for the UI token, RRP-2b). The chief gate has already checked, for a chief token, that the tier may `decide`, that `project_root` is the session's project and that only `project_root`/`to_agent`/`text` are sent. 400 for a `to_agent` that is not `*` or `^[a-z][a-z0-9_-]{0,39}$` (matched exactly against a prompt's role, so no upper case or padding), a blank `project_root`, or a `text` that is blank, over 8 KiB in UTF-8 BYTES, holds a control character other than newline and tab (a NUL would fail every spawn of the role: `subprocess` refuses an embedded null byte), or is not UTF-8 encodable; the text is stored stripped. Broadcasts the `COMMS_UPDATE` a new row gets. A directive is replaced with `/comms/supersede`, never edited
 GET  /comms/scope           ← read the active board scope
 POST /comms/scope           ← set the active board scope
 GET  /comms/permissions     ← role-based write permissions
-POST /comms/delete          ← soft-delete a message
+POST /comms/delete          ← soft-delete a message; a binding directive is refused with 403 `only the chief retires a binding directive` for every caller (it is superseded, never deleted)
 POST /comms/edit            ← edit a message's text (e.g. goal rename); re-stamps the row to the EDITOR (`stamp(caller_identity(request))`: their token's role and run, or `author_source="none"` with no token), not the original author, so words cannot sit under another run's `token` stamp. Anyone may still edit; Studio's goal rename sends no token yet, so it stamps `none`. A row with `binding = 1` is refused with 409 `{"error": "binding directives are superseded, not edited"}` and nothing changes (`update_message_text` answers `"binding"`; replace a directive with `/comms/supersede`)
 POST /comms/tasks/claim     ← claim a ready task (pending → in_progress)
 POST /comms/tasks/fail      ← mark a task failed (cascade-blocks dependents)
@@ -440,7 +454,7 @@ GET  /comms/goals/refs-coverage ← per-goal context_refs coverage stats
 POST /comms/features/decompose ← decompose a feature board into a goal task-DAG (feature-consultation flow)
 POST /comms/project/decompose  ← decompose a project spec into a feature set + scaffold pathly/features/<slug>/ (project-consultation flow)
 POST /comms/consolidate     ← memory consolidation: near-dup dedup; mode=full adds the reflection pass
-POST /comms/hydrate         ← board disk-mirror: import a project's on-disk BOARD.json mirrors into the DB (fresh-clone; DB-authoritative, no-ops non-empty boards)
+POST /comms/hydrate         ← board disk-mirror: import a project's on-disk BOARD.json mirrors into the DB (fresh-clone; DB-authoritative, no-ops non-empty boards). Stores `binding = 0` for every row, leaves out a row of another board or scope than its file's, and stores a claimed `author_source` other than `none` as `legacy` (see "Who retires or forges a standing order")
 GET  /events/comms          ← SSE stream of comms board updates (streams blueprint)
 ```
 
@@ -449,7 +463,7 @@ retires on its own; three write paths make a resolution durable instead of prose
 
 | Resolution | Write path | Guard |
 |---|---|---|
-| this decision replaces that one | `POST /comms/post` with `supersedes:[id,…]` (`blueprints/comms/_supersede_on_post.py`) | explicit ids ONLY — never inferred from text/embedding similarity, because silently retiring the wrong governance is worse than a duplicate. Capped, de-duplicated; only on a `decision`/`constraint` post (else 400), and only targets that are themselves a decision or constraint on the SAME board and scope (`not_a_decision` covers escalations, so a human gate cannot be superseded away; `other_board` stops a feature post retiring a project/global call). Self-reference and bad ids degrade to a per-id `skipped` reason and never fail the post |
+| this decision replaces that one | `POST /comms/post` with `supersedes:[id,…]` (`blueprints/comms/_supersede_on_post.py`) | explicit ids ONLY — never inferred from text/embedding similarity, because silently retiring the wrong governance is worse than a duplicate. Capped, de-duplicated; only on a `decision`/`constraint` post (else 400), and only targets that are themselves a decision or constraint on the SAME board and scope (`not_a_decision` covers escalations, so a human gate cannot be superseded away; `other_board` stops a feature post retiring a project/global call; `binding` leaves a standing order to a live chief run). Self-reference and bad ids degrade to a per-id `skipped` reason and never fail the post |
 | these tasks are settled | `POST /comms/tasks/status` (`blueprints/comms/tasks_status.py`) | needs a live `X-Pathly-Run-Token` (403 otherwise), and each task must sit on the token's board and scope (else `refused`); the status line is stamped as the caller. `done`/`failed` only; unknown ids reported, not dropped |
 | a human gate is closed | `POST /comms/acknowledge` (human; an agent run's live token gets 403 on a human-addressed escalation, as do `/comms/delete` and `/comms/answer` — `_helpers.refuse_agent_on_human_gate` — except a chief's acknowledgement as `agent: "chief"` that cites a human message typed after the escalation ("Cited answers" under the chief gate), which the gate lets through for that one id; and `POST /comms/supersede` holds an agent run to the same decision-only, own-board rules as `supersedes` — `_supersede_on_post.refuse_agent_supersede`) | an agent decision does NOT close an escalation — `runner/comms_formatters.render_governance_lines` says so in the injected block when a decision post-dates an open escalation, and `fsm_human_gate` now makes it structurally true (below) |
 
@@ -1530,7 +1544,7 @@ pathly_orchestrator/
     chief_keys.py          # key_refusal(): refuses a key the entry does not list, and a `flow` or `skill` that is not one name (scope_names.is_flow_name / is_skill_name) — see "Chief gate"
     chief_budget.py        # the cost ceiling and the run limit of a chief session (chief.max_cost_usd_per_run, chief.max_runs_per_session): budget_refusal() is the gate's last check and takes the run slot, refund_run_slot() is the after_request hook that gives it back for a 4xx, ceiling_usd()/run_limit() read the settings — see "Chief gate"
     chief_cite.py          # cite_refusal() / answer_text(): the cite rule for an `answer` action — the chief names a human message of its session by `cite`, the gate checks it (kind human, this session, typed after the question, once; an acknowledgement must say `agent: "chief"`) and keeps its text on flask.g for the answer routes to relay — see "Chief gate"
-    run_identity.py        # caller_identity(request) -> CallerIdentity: kind run|anonymous from the X-Pathly-Run-Token header (body role/run_id/from never read); unknown/revoked token logged at info with the remote addr; `ui` kind reserved (RRP-2b). Nothing applies a policy from it yet
+    run_identity.py        # caller_identity(request) -> CallerIdentity: kind run|anonymous from the X-Pathly-Run-Token header (body role/run_id/from never read); unknown/revoked token logged at info with the remote addr; `ui` kind reserved (RRP-2b); `is_chief_run(identity)`: True for a live run whose role is `chief` and nobody else (the test behind who may post and who may retire a binding directive). Nothing applies a policy from it yet
     sse.py                 # SSE globals (_clients, _runner_clients, _menu_clients) + broadcast helpers
     pricing.py             # MODEL_PRICING, compute_cost_usd()
     feedback.py            # _feedback_watcher, _process_feedback_file

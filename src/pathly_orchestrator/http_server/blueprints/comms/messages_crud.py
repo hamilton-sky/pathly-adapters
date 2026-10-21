@@ -9,7 +9,7 @@ from flask import jsonify, request
 from ...sse import _broadcast_comms
 from ._messages_bp import bp
 from ._helpers import edit_stamp, read_json_body, refuse_agent_on_human_gate
-from ._supersede_on_post import refuse_agent_supersede
+from ._supersede_on_post import BINDING_REFUSED, refuse_agent_supersede
 
 
 @bp.route("/comms", methods=["GET"])
@@ -297,6 +297,8 @@ def comms_delete():
         if refused:
             return refused
         result = _soft_delete(conn, message_id, force=force)
+        if result == "binding":
+            return jsonify(error=BINDING_REFUSED), 403
         if result == "not_found":
             return jsonify({"ok": False, "error": "Message not found"}), 404
         if result == "locked":
