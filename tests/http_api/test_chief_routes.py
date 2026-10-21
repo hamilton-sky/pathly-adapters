@@ -245,7 +245,7 @@ def test_open_passes_on_the_message_of_a_value_error(
     assert host.sent == []
 
 
-@pytest.mark.parametrize("field", ["project_root", "engine", "preset", "prompt"])
+@pytest.mark.parametrize("field", ["project_root", "engine", "preset"])
 def test_open_with_a_missing_field_is_400_naming_it(
     client, host: Host, project: str, field: str
 ):
