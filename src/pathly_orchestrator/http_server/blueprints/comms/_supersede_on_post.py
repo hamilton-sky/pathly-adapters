@@ -22,11 +22,18 @@ invisible to every downstream reader. Supersession is a claim the author makes e
 Best-effort by design: a bad id degrades to a per-id ``skipped`` entry, never a failed post.
 The message is already written by the time this runs, and losing a real decision post because
 it named a stale id would trade a small problem for a large one.
+
+**A binding directive is retired by the chief alone** (chief-agent 16). The governance block
+invites every agent to name an id in ``supersedes``, and ``/comms/supersede`` takes any caller,
+so both would retire a standing order. ``is_binding`` and ``chief_may_retire`` are the one test
+both paths ask: a row with ``binding = 1`` is left alone unless the caller is a live chief run.
 """
 
 from __future__ import annotations
 
 import logging
+
+from ...run_identity import is_chief_run
 
 # Bounded so a malformed/hostile payload can't turn one post into an unbounded write storm.
 MAX_SUPERSEDES = 20
@@ -39,6 +46,10 @@ SUPERSEDABLE_TYPES = ("decision", "constraint")
 _ROW_SQL = (
     "SELECT type, board, scope FROM comms_messages WHERE id=? AND deleted_at IS NULL"
 )
+# Refusal text of every route that would retire a directive for a caller that may not.
+BINDING_REFUSED = "only the chief retires a binding directive"
+# The flag ``get_binding_decisions`` reads and ``post_directive`` sets: the one meaning of "binding".
+_BINDING_SQL = "SELECT 1 FROM comms_messages WHERE id=? AND binding=1"
 
 
 def _request_identity():
@@ -50,6 +61,20 @@ def _request_identity():
     from pathly_orchestrator.http_server.run_identity import caller_identity
 
     return caller_identity(request)
+
+
+def is_binding(conn, message_id: str) -> bool:
+    """True when the row is a binding directive (``binding = 1``); a missing row is not one."""
+    return conn.execute(_BINDING_SQL, (message_id,)).fetchone() is not None
+
+
+def chief_may_retire(identity) -> bool:
+    """True for a live run whose role is ``chief`` (``run_identity.is_chief_run``) and nobody
+    else: not the server secret, not another role's run token, not a request with no token, not
+    a call made outside a request (``identity`` None). The chief gate has already checked that
+    the session's tier may ``decide`` and that the directive is in the chief's project.
+    """
+    return is_chief_run(identity)
 
 
 def _off_token_board(identity, row) -> bool:
@@ -64,11 +89,15 @@ def refuse_agent_supersede(conn, old_id: str):
 
     The direct route checks neither type nor board, so an agent could retire a human-addressed
     escalation (silently opening the human gate) or another board's decision. Studio's
-    supersede menu sends no run token and keeps working until the UI token (RRP-2b).
+    supersede menu sends no run token and keeps working until the UI token (RRP-2b), for every
+    row but a binding directive: that one is 403 for any caller that is not a live chief run,
+    a request with no token and one with only the server secret included.
     """
     from flask import jsonify
 
     identity = _request_identity()
+    if is_binding(conn, old_id) and not chief_may_retire(identity):
+        return jsonify({"error": BINDING_REFUSED}), 403
     if identity is None or identity.kind != "run":
         return None
     row = conn.execute(_ROW_SQL, (old_id,)).fetchone()
@@ -113,8 +142,9 @@ def apply_supersedes(conn, old_ids: list[str], new_id: str) -> dict:
     Returns ``{"superseded": [...], "skipped": [{"id":…, "reason":…}]}``. ``reason`` is
     ``supersede_message``'s own verdict (``not_found`` / ``already_superseded``), passed
     through unchanged so the agent can tell "you named a stale id" from "someone else got
-    there first"; ``self_reference``, ``not_a_decision`` (an escalation, task or note) and
-    ``other_board`` (not the board and scope the post landed on) are refused here.
+    there first"; ``self_reference``, ``not_a_decision`` (an escalation, task or note),
+    ``other_board`` (not the board and scope the post landed on) and ``binding`` (a directive,
+    unless the caller is a live chief run) are refused here.
     """
     result: dict = {"superseded": [], "skipped": []}
     if not old_ids:
@@ -155,6 +185,9 @@ def apply_supersedes(conn, old_ids: list[str], new_id: str) -> dict:
         # The post's board/scope come from the body; an agent run is bound to its token's.
         if _off_token_board(identity, old_row):
             result["skipped"].append({"id": old_id, "reason": "other_board"})
+            continue
+        if is_binding(conn, old_id) and not chief_may_retire(identity):
+            result["skipped"].append({"id": old_id, "reason": "binding"})
             continue
         try:
             verdict = _supersede(conn, old_id=old_id, new_id=new_id)
