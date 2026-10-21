@@ -4,7 +4,7 @@
 
 Comms board / message-board subsystem — messages, tasks, artifacts, goals, context retrieval & relevance, board mirror & hydration.
 
-59 test file(s).
+62 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -39,6 +39,9 @@ Comms board / message-board subsystem — messages, tasks, artifacts, goals, con
 | `test_comms_context_relevance.py` | Relevance gate on the Context channel (memory-consolidation phase) | 8 |
 | `test_comms_dag.py` | Tests for Phase 14 — DAG task decomposition | 14 |
 | `test_comms_delete.py` | Tests for POST /comms/delete — retract a message only while unread by an agent | 5 |
+| `test_comms_directives_fields.py` | chief-agent 12: what ``POST /comms/directives`` accepts in ``to_agent`` and ``text`` | 8 |
+| `test_comms_directives_query.py` | chief-agent 12: ``post_directive``, the edit refusal and who stamps a directive (query layer) | 6 |
+| `test_comms_directives_route.py` | chief-agent 12: ``POST /comms/directives`` is the one door that sets ``binding = 1`` | 20 |
 | `test_comms_edit_restamp.py` | chief-agent 03: ``POST /comms/edit`` stamps the edited row with the editor, not the author | 6 |
 | `test_comms_embed_curation.py` | Tests for Phase 1.4b — write-time embedding curation | 7 |
 | `test_comms_embed_persist.py` | Regression tests for the _VEC_AVAILABLE stale-binding bug (CT6) | 3 |

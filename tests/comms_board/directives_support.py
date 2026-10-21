@@ -43,7 +43,14 @@ def _post(client, opened, **fields):
 
 
 def _rows():
-    return get_db().execute("SELECT * FROM comms_messages").fetchall()
+    """The decisions on the board; a directive is always one. Rows of another type are not
+    counted: a board run an earlier test left on a thread can still post its failure here.
+    """
+    return (
+        get_db()
+        .execute("SELECT * FROM comms_messages WHERE type='decision'")
+        .fetchall()
+    )
 
 
 def _row(message_id):

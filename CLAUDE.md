@@ -320,7 +320,7 @@ blueprints/
   flows/      defs (flow CRUD), stage_configs (per-stage overrides)
   catalog/    items (file-tree catalog)
   skills/     editor (skill notebook routes)
-  comms/      messages, tasks, tasks_status, tasks_floor, artifacts, runs, goals, settings, context (board subsystems)
+  comms/      messages, directives, tasks, tasks_status, tasks_floor, artifacts, runs, goals, settings, context (board subsystems)
   ops/        telemetry, menu, db_api, chat, export (operational/infra)
   code/       query (codebase-intelligence query)
   hq/         context (GET /hq/context — board packet, for inspection) · prompt (POST /hq/prompt — the HQ copilot's model turn: system prompt + board packet + message, or a redirect for an action request; with enabled_actions, the operator turn + the function definitions offered) · actions (GET /hq/actions catalog, PUT /hq/actions/available) · actions_run (POST /hq/actions/check|run|report — operator proposals → confirm cards → execution through the real routes + audit)

@@ -203,13 +203,27 @@ def test_a_chief_cannot_post_to_another_projects_board(
     assert _rows() == []
 
 
-@pytest.mark.parametrize("root", [GONE, "", "  ", None, 5, ["x"]])
-def test_a_chief_that_names_no_project_posts_nothing(client, project, chief_root, root):
+@pytest.mark.parametrize("root", [GONE, "", None], ids=["missing", "empty", "null"])
+def test_a_chief_that_names_no_project_gets_a_400(client, project, chief_root, root):
     opened = open_session(project, chief_root)
 
     resp = _post(client, opened, project_root=root)
 
-    assert resp.status_code in (400, 403), resp.get_data(as_text=True)
+    assert resp.status_code == 400, resp.get_data(as_text=True)
+    assert "project_root" in resp.get_json()["error"]
+    assert _rows() == []
+
+
+@pytest.mark.parametrize("root", ["  ", 5, ["x"], "/nope"], ids=repr)
+def test_a_root_that_is_not_the_sessions_project_is_refused_by_the_gate(
+    client, project, chief_root, root
+):
+    opened = open_session(project, chief_root)
+
+    resp = _post(client, opened, project_root=root)
+
+    assert _gated(resp), resp.get_data(as_text=True)
+    assert "project" in resp.get_json()["error"]
     assert _rows() == []
 
 

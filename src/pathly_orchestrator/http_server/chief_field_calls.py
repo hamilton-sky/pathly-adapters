@@ -113,6 +113,11 @@ CALL_FIELDS: dict[tuple[str, str], Fields] = {
         unbound=("message_id",), keys={"agent": NAME, **_CITE}
     ),
     ("/comms/supersede", "POST"): Fields(unbound=("old_id", "new_id")),
+    # A standing order on the project board of `project_root`; the route answers 400 for a
+    # body that names none, so there is no other project to fall back to.
+    ("/comms/directives", "POST"): Fields(
+        roots=_ROOT, keys={"to_agent": NAME, "text": TEXT}
+    ),
     ("/runs", "POST"): Fields(
         roots=_ROOT,
         names_root=True,

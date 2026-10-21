@@ -261,6 +261,8 @@ def comms_edit():
 
         conn = _get_db()
         result = _update_text(conn, message_id, text.strip(), **edit_stamp(request))
+        if result == "binding":
+            return jsonify(error="binding directives are superseded, not edited"), 409
         if result == "not_found":
             return jsonify({"ok": False, "error": "Message not found"}), 404
         return jsonify({"ok": True}), 200

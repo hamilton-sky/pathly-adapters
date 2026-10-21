@@ -4,6 +4,10 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from typing import Any
+
+from ..connection import _get_write_lock
+from .comms_messages import post_message
 
 
 def get_binding_decisions(
@@ -35,3 +39,32 @@ def get_binding_decisions(
         (json.dumps(list(boards)), json.dumps(list(scopes)), role or "*"),
     ).fetchall()
     return [dict(r) for r in rows]
+
+
+def post_directive(
+    conn: sqlite3.Connection, scope: str, to_agent: str, text: str, **author: Any
+) -> str:
+    """Post a binding directive on the project board of *scope* and return its id.
+
+    The one writer that sets ``binding = 1``: a ``decision`` from ``chief`` to *to_agent*
+    (``*`` or a role), posted through ``post_message`` and then flagged in a second statement,
+    since ``post_message`` has no ``binding`` parameter. Both run under the write lock, so no
+    other writer in the process sees or changes the row between them. *author* is the
+    ``author_*`` stamp of the caller (``runner.provenance.stamp``). *scope* is the project root
+    as ``fsm_compose.resolve_board_scope("project", root, "")`` gives it, which is the scope a
+    prompt reads the standing orders of the project from. The caller checks the fields.
+    """
+    with _get_write_lock(conn):
+        message_id = post_message(
+            conn,
+            board="project",
+            scope=scope,
+            from_agent="chief",
+            to_agent=to_agent,
+            type="decision",
+            text=text,
+            **author,
+        )
+        conn.execute("UPDATE comms_messages SET binding=1 WHERE id=?", (message_id,))
+        conn.commit()
+    return message_id

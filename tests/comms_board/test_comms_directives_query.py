@@ -1,8 +1,11 @@
-"""chief-agent 12: ``post_directive`` and the edit refusal in the query layer."""
+"""chief-agent 12: ``post_directive``, the edit refusal and who stamps a directive (query layer)."""
 
 from __future__ import annotations
 
+import ast
+
 import pytest
+from _paths import SRC
 from directives_support import TEXT, _row, _rows
 
 from pathly_orchestrator.db.connection import get_db
@@ -65,3 +68,81 @@ def test_update_message_text_answers_binding_and_leaves_the_row_alone():
     )
 
     assert dict(_row(mid)) == before
+
+
+# --- who stamps a directive -----------------------------------------------------------
+#
+# ``post_directive`` forwards ``**author``, which the source scan of ``test_comms_provenance``
+# cannot follow, so ``db/queries/comms_directives.py`` is on its allow-list. This scan closes the
+# gap from the other side: every call of ``post_directive`` must pass the server-side stamp of
+# the request, ``**stamp(caller_identity(request))``, and nothing built from the body.
+
+PKG = SRC / "pathly_orchestrator"
+
+
+def _name(call) -> str | None:
+    func = call.func
+    return getattr(func, "id", None) or getattr(func, "attr", None)
+
+
+def _directive_calls(source: str) -> list[ast.Call]:
+    return [
+        n
+        for n in ast.walk(ast.parse(source))
+        if isinstance(n, ast.Call) and _name(n) == "post_directive"
+    ]
+
+
+def _has_the_request_stamp(call: ast.Call) -> bool:
+    splats = [kw.value for kw in call.keywords if kw.arg is None]
+    own = [kw for kw in call.keywords if (kw.arg or "").startswith("author_")]
+    if len(splats) != 1 or own:
+        return False
+    stamp = splats[0]
+    return (
+        isinstance(stamp, ast.Call)
+        and _name(stamp) == "stamp"
+        and not stamp.keywords
+        and len(stamp.args) == 1
+        and isinstance(stamp.args[0], ast.Call)
+        and _name(stamp.args[0]) == "caller_identity"
+    )
+
+
+@pytest.mark.parametrize(
+    "call",
+    [
+        "post_directive(conn, s, '*', t)",
+        "post_directive(conn, s, '*', t, **data)",
+        "post_directive(conn, s, '*', t, **stamp(identity))",
+        "post_directive(conn, s, '*', t, **stamp(caller_identity(r)), author_role='x')",
+        "post_directive(conn, s, '*', t, author_source='token')",
+        "post_directive(conn, s, '*', t, **system_stamp())",
+    ],
+)
+def test_the_scan_catches_a_call_without_the_request_stamp(call):
+    (found,) = _directive_calls(call)
+
+    assert not _has_the_request_stamp(found)
+
+
+def test_the_scan_accepts_the_request_stamp():
+    (found,) = _directive_calls(
+        "post_directive(conn, s, '*', t, **stamp(caller_identity(request)))"
+    )
+
+    assert _has_the_request_stamp(found)
+
+
+def test_every_call_of_post_directive_passes_the_request_stamp():
+    calls = unstamped = 0
+    for path in sorted(PKG.rglob("*.py")):
+        source = path.read_text(encoding="utf-8")
+        if "post_directive" not in source:
+            continue
+        for call in _directive_calls(source):
+            calls += 1
+            unstamped += not _has_the_request_stamp(call)
+
+    assert calls >= 1, "the scan found no call of post_directive; it is not looking"
+    assert unstamped == 0

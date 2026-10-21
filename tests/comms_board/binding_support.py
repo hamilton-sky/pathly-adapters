@@ -1,8 +1,9 @@
 """Shared constants and helpers of the binding-directive tests (chief-agent 11).
 
 ``post`` writes a message through ``post_message`` and sets ``binding`` (and, when given, ``ts``)
-directly: the route that sets ``binding`` is a later ticket, and an explicit ``ts`` keeps an
-ordering assertion off the wall clock. ``render`` renders the board context for a role;
+directly, so a test can make a row of any role, status and age (the route that sets ``binding``,
+``POST /comms/directives``, has its own tests), and an explicit ``ts`` keeps an ordering assertion
+off the wall clock. ``render`` renders the board context for a role;
 ``governance_part``, ``standing_part`` and ``ranked_part`` cut the governance section and its two
 lists out of it. Imported by bare name: with no ``__init__.py`` pytest puts the test file's own
 directory (``tests/comms_board``, where this file sits) on ``sys.path``; ``tests/conftest.py``
