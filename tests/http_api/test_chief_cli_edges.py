@@ -22,15 +22,8 @@ from urllib.parse import quote
 import pytest
 from _paths import REPO_ROOT, SRC
 from chief_cite_support import Session, ask, db
-from chief_cli_support import (
-    NO_TOKEN,
-    _no_watcher_outlives_its_test,
-    fragment_text,
-    host,
-    pathly,
-    server,
-    stub,
-)
+from chief_cli_support import NO_TOKEN, fragment_text, host, pathly, server, stub
+from chief_cli_support import _no_watcher_outlives_its_test
 from chief_gate_support import _chief, app, project
 
 USAGE = "usage: pathly"

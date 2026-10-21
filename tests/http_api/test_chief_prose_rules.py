@@ -76,6 +76,16 @@ def test_a_text_that_offers_a_decompose_says_after_it_that_it_costs_money_and_to
     assert "an agent costs money, so ask the user first" in text[offered:]
 
 
+def test_the_operator_style_shows_how_to_list_the_standing_orders():
+    reads = [
+        target
+        for method, target in pathly_commands(text_of("operator"))
+        if method == "GET"
+    ]
+
+    assert any("type=decision" in target for target in reads)
+
+
 # --- quoting, one command per call, and a root in a query string ------------------------------
 
 
@@ -91,7 +101,7 @@ def test_the_fragment_tells_the_chief_to_run_one_pathly_command_per_call():
 
     assert "one pathly command per call" in fragment
     assert "no pipe" in fragment and "$(...)" in fragment
-    assert "without asking the user" in fragment
+    assert "approved for you ahead of time" in fragment
 
 
 def test_the_fragment_offers_standard_input_only_when_quoting_a_body_is_awkward():
@@ -106,7 +116,16 @@ def test_the_fragment_says_to_percent_encode_a_root_in_a_query_and_not_in_a_body
 
     for escape in ("%2b", "%26", "%25", "%20"):
         assert escape in fragment, escape
-    assert "in a json body send it exactly as written" in fragment
+    assert "in a query string" in fragment
+    assert "a json body keeps it exactly as written" in fragment
+
+
+def test_the_last_line_of_the_prompt_does_not_contradict_the_encoding_rule():
+    # It says "send the root as written"; the fragment before it says a query string is the one
+    # place that is not true, so the line must carry the exception.
+    from pathly_orchestrator.supervisor.chief_presets import ROOT_LINE
+
+    assert "apart from the percent-encoding a query string needs" in norm(ROOT_LINE)
 
 
 @pytest.mark.parametrize("name", TEXT_NAMES)

@@ -45,20 +45,24 @@ pathly sends one request to the Pathly server as this chief and prints the answe
 
 {USAGE}
 
-A path starts with / and may carry a query string. A JSON body is one argument (quote it for
-the shell), or - to read it from standard input. The answer is printed as the server sent it.
+A path starts with / and may carry a query string: quote the path in the shell, or an & ends the
+command. A JSON body is one argument (quote it too), or - to read it from standard input. The
+answer is printed as the server sent it.
 Exit 0: a 2xx answer. Exit 1: any other status (the printed body says why) or no server.
 Exit 2: a usage error, and nothing was sent.
 
-Routes a chief uses most (a refusal is a 403 whose body lists what your tier allows):
-  GET /comms                the board's messages
-  GET /runs                 the runs of the project
-  GET /chief/session        this session: tier, runs started, the run and cost limits
-  POST /comms/post          a message, goal or task on the board (from: "chief")
-  POST /runs                start a run
+Routes a chief uses most (a refusal is a 403 whose body lists what your tier allows).
+<root> is your project root, as the last line of your prompt gives it; in a query string write a
++, & or % of it as %2B, %26 or %25. A route that is left without what it needs answers 400, or,
+for /runs, an empty list.
+  GET /comms?board=project&scope=<root>&feature=project   the project board's messages (add &type= and &status=)
+  GET /runs?project_root=<root>                           the runs of the project
+  GET /chief/session?project_root=<root>                  this session: tier, runs started, the run and cost limits
+  POST /comms/post          a message, goal or task on the project board: {{"from": "chief", "type", "text", "board": "project", "scope": "<root>", "feature": "project"}}
+  POST /runs                start a run: {{"kind", "goal_id", "project_root": "<root>"}}
   POST /comms/answer        answer a board question: send {{"question_id", "cite"}} only
   POST /runner/agent-answer answer a waiting run: send {{"topic", "cite"}} only
-  POST /comms/directives    a standing order for every agent of the project
+  POST /comms/directives    a standing order for every agent of the project: {{"project_root": "<root>", "to_agent", "text"}}
 
 cite is the number Pathly printed when it recorded the user's message in this tab. Pathly
 relays that message's own words; never send an answer of your own.
@@ -93,6 +97,10 @@ def _bad_target(target: str) -> str | None:
         return "the path must start with a single /, not a URL"
     if any(ch < " " or ch == "\x7f" for ch in target):
         return "the path must not hold a control character"
+    try:
+        target.encode("utf-8")
+    except UnicodeError:
+        return "the path is not valid UTF-8"
     return None
 
 
@@ -107,11 +115,21 @@ def _json_object(text: str) -> str | None:
     return None if isinstance(parsed, dict) else "the body must be a JSON object"
 
 
-def _send(method: str, target: str, body: str | None, token: str) -> tuple[int, str]:
+def _body_text(argument: str) -> str:
+    """The body: ``argument``, or standard input for ``-``. A ``UnicodeError`` when it is not
+    UTF-8 (a stream that cannot decode it, or an argument the shell passed as raw bytes).
+    """
+    text = sys.stdin.read() if argument == "-" else argument
+    text.encode("utf-8")
+    return text
+
+
+def _send(
+    method: str, target: str, body: str | None, token: str, secret: str
+) -> tuple[int, str]:
     headers = {TOKEN_HEADER: token}
     if method != "GET":
         headers["Content-Type"] = "application/json"
-    secret = _load_secret()
     if secret:
         headers[SECRET_HEADER] = secret
     connection = http.client.HTTPConnection(DEFAULT_HOST, fsm_port(), timeout=TIMEOUT)
@@ -128,10 +146,15 @@ def _send(method: str, target: str, body: str | None, token: str) -> tuple[int, 
         connection.close()
 
 
-def _print_body(text: str, hide: tuple[str, ...]) -> None:
+def _redact(text: str, hide: tuple[str, ...]) -> str:
     for secret in hide:
         if secret:
             text = text.replace(secret, REDACTED)
+    return text
+
+
+def _print_body(text: str, hide: tuple[str, ...]) -> None:
+    text = _redact(text, hide)
     if text:
         sys.stdout.write(text if text.endswith("\n") else text + "\n")
 
@@ -155,20 +178,27 @@ def _api(args: list[str]) -> int:
         return 2
     body = None
     if extra:
-        body = sys.stdin.read() if extra[0] == "-" else extra[0]
+        try:
+            body = _body_text(extra[0])
+        except UnicodeError:
+            return _usage("the body is not valid UTF-8")
         problem = _json_object(body)
         if problem is not None:
             return _usage(problem)
+    secret = _load_secret()
     try:
-        status, text = _send(method, target, body, token)
+        status, text = _send(method, target, body, token, secret)
     except (OSError, http.client.HTTPException) as exc:
         print(
-            f"pathly: no answer from the Pathly server at {DEFAULT_HOST}:{fsm_port()}: "
-            f"{exc}".replace(token, REDACTED),
+            _redact(
+                f"pathly: no answer from the Pathly server at {DEFAULT_HOST}:{fsm_port()}: "
+                f"{exc}",
+                (token, secret),
+            ),
             file=sys.stderr,
         )
         return 1
-    _print_body(text, (token, _load_secret()))
+    _print_body(text, (token, secret))
     if 200 <= status < 300:
         return 0
     print(f"pathly: HTTP {status}", file=sys.stderr)

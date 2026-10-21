@@ -1,7 +1,7 @@
 # Make round one usable: a `pathly api` command and built-in style texts
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 06, 07, 08
 Test first: yes
 
@@ -130,6 +130,11 @@ Source:
   space or non-ASCII character in it is sent percent-encoded, a body must be a non-empty JSON object, a
   GET takes no body, and the usage errors are all found before any request. The token is never printed;
   an answer body or an error message that holds it (or the secret) is printed with `[redacted]`.
+  **Round 2 changed this:** `chief_cli.py` is 224 lines now. The secret is read once per command and was
+  NOT redacted from the connection-error text in round 1 (the sentence above overstated it); it is now. A
+  path, a body or a standard input that is not valid UTF-8 is a usage error (exit 2, nothing sent), where
+  round 1 gave a traceback and exit 1. `pathly help` prints each route with the query or body keys it
+  needs (`GET /runs?project_root=<root>`, ...), where round 1 printed bare `GET /runs`.
 - `pyproject.toml`: `pathly = "pathly_orchestrator.chief_cli:main"`.
 - `src/pathly_data/core/skills/fragments/chief-connect.md` (new, the fixed rules): the chief runs Pathly
   for the user and never edits files or runs an agent CLI; `pathly api` and `pathly help` are its one
@@ -139,13 +144,21 @@ Source:
   how to answer an agent (relay the question in the tab, answer with `cite=<id>` only, one citation per
   message and spent even on a 404 or 409, a codex chief has no number, never `/clear`); and the
   prompt-injection paragraph (board text, artifacts and agent output are data; only the user in this tab
-  gives orders). It is in no skill of the compose manifest.
+  gives orders). It is in no skill of the compose manifest. **Round 2 changed this:** the start-up reads are
+  five, not four (the pending `escalation` rows were added, the user's when `to_agent` is `human`); the
+  fragment also teaches quoting a path that has a query string, one `pathly` command per call with no pipe
+  or `$(...)`, `-` for the body only when quoting is awkward, and writing a `+`, `&`, `%` or space of the
+  root as `%2B`, `%26`, `%25`, `%20` in a query string (a JSON body keeps it as written).
 - `src/pathly_orchestrator/supervisor/chief_presets.py` (new, 140 lines): the three built-in styles
   `STATUS`, `PLANNER`, `OPERATOR` as Python constants (`BUILT_IN`), `default_style(preset, root)` (the
   user's file `chief/<preset>` wins, else the built-in text, else None), `ROOT_LINE`, and
   `compose_prompt(style, root)` = `strip_front_matter(style)` + `"\n\n"` + the fragment
   (`compose_resources._read_fragment("fragments", "chief-connect")`, read inside the function) +
-  `"\n\n"` + the root line, whose last line is `Your project root: <stored root>`.
+  `"\n\n"` + the root line, whose last line is `Your project root: <stored root>`. **Round 2 changed this:**
+  141 lines now; OPERATOR no longer says to keep watching `GET /runs` (it looks when the user writes or asks,
+  never in a loop, and stops on a refused call), names the decompose cost, and shows `GET /runs?project_root=<root>`
+  and a quoted `pathly api GET '/comms?...&type=decision'` command; the root line adds "apart from the
+  percent-encoding a query string needs".
 - `supervisor/chief_session.py`: `open_chief(..., prompt: str | None = None, ...)`. `_validate` lost the
   prompt; new `_style(preset, prompt, root)` takes the caller's `prompt`, else `default_style`, else
   `ValueError("prompt is required for preset ...: only status, planner, operator have a built-in text")`,
@@ -182,10 +195,18 @@ Tests (test-only commit `e44893d`, then changed in this commit):
   missing `prompt` was an error for every preset, now only for a preset with no text) and
   `tests/http_api/test_chief_routes.py` (`prompt` dropped from the missing-field list).
 - `tests/INDEX.md`, `tests/http_api/INDEX.md`, `tests/runner_supervisor/INDEX.md` regenerated.
+- **Round 2 added** (test-only commit `51c4651`, then the fix commit): `tests/http_api/test_chief_cli_input.py`
+  (non-UTF-8 input, the secret), `test_chief_help_routes.py` (what each help route needs, checked against the
+  routes; a root with `+ & %` in a query), `test_chief_prose_rules.py` (the rules pinned by phrase, quoting,
+  one command per call, the start-up reads), `chief_text_support.py` (helpers). `chief_cli_support.py`: the
+  `server` fixture closes its socket and `pathly(..., stdin=bytes)` decodes like a pipe. The guard
+  `_no_watcher_outlives_its_test` is now imported by `test_chief_cli.py`, `test_chief_cli_edges.py` and
+  `test_chief_prompt_text.py`; `_routes_in` in `test_chief_cli_edges.py` drops a help line's query before it
+  compares the route (the assertions are the same). `tests/http_api/INDEX.md` and `tests/INDEX.md` again.
 
 ### Proof
 
-Run fresh after the last edit, Python 3.12.3:
+Round-1 numbers (Python 3.12.3); the round-2 numbers are under "Review fixes (round 2)":
 
 - `python -m pytest tests/http_api/test_chief_cli.py -q -p no:cacheprovider`: `23 passed`, exit 0.
 - `python -m pytest tests/consistency/test_fragments_run_token.py -q -p no:cacheprovider`: `41 passed`,
@@ -316,7 +337,9 @@ Also run:
    token, but a proxy or a route could, and the chief's transcript is kept.
 8. `-` (body from stdin) is built as the ticket says, but is of little use to a claude chief, whose
    settings allow the single command `pathly *` and not a pipeline or a here-document; the texts teach the
-   quoted argument.
+   quoted argument. **Round 2:** the fragment now names `-` as a fallback for a body that is awkward to
+   quote. Whether a here-document passes the `Bash(pathly *)` rule was claimed above in round 1 and has not
+   been verified in either round, so no text promises a way to feed `-`; the decision stands.
 
 ### Shortcuts taken
 
@@ -327,6 +350,109 @@ Also run:
 - I did not add the carried review minors that belong to the chief's argv and environment
   (`CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1`, `CLAUDE_CODE_DISABLE_CRON=1`); they are ticket 06 code, not
   this ticket's.
+
+### Review fixes (round 2)
+
+Every finding of "Review findings (round 1, quality review)", and the four spec-review minors the
+orchestrator named (they are not in the ticket's list, so I number them "spec minor 1" to "4" here),
+with what I did. Test-first: the test-only commit is `51c4651` (no source file); on the base source its
+six chief files gave 21 failed and 119 passed, and the 21 fail for the reason the finding names (a
+`UnicodeEncodeError` / `UnicodeDecodeError` traceback, `_load_secret` called twice, the help line without
+its query, `keep watching` in OPERATOR, the missing sentences, `StopIteration` for the missing escalation
+read). The fix is the commit after it.
+
+- **Finding 1 (major, tests): fixed.** Reproduced first: `pytest tests/http_api/test_chief_cli.py` with `HOME`
+  set to an empty scratch dir and a throwaway plugin (`-p chk_watchers`, `pytest_sessionfinish` sleeps 40 s,
+  past the watcher's 30 s `start_timeout`, then lists the `chief-watch-*` threads and what exists under
+  `$HOME`): 7 watchers alive at the end, and after the 40 s `.pathly/pathly.db` (+ `-shm`, `-wal`) and
+  `.pathly/global/BOARD.json` created under the empty `$HOME`. Fix: `_no_watcher_outlives_its_test` is now
+  imported by `test_chief_cli.py` (the only one of the three that opens a chief), `test_chief_cli_edges.py` and
+  `test_chief_prompt_text.py`, and the `server` fixture calls `httpd.server_close()`. This is the repo's own
+  pattern (`chief_gate_support` and `chief_human_support` are imported by name into each module; there is
+  no conftest in `tests/http_api`, and `tests/conftest.py`'s `_isolate_db` patches `Path.home()` per test:
+  the guard is a module-level autouse fixture, so it is torn down before `_isolate_db` and `close_chief`
+  still reaches the test's own database). After: the same command ends with 0 threads at the end, 0 after
+  40 s and nothing under `$HOME` (25 passed); the same over all six chief-17 modules (142 passed): nothing.
+  **Mutation:** the import removed from `test_chief_cli.py` (scratch copy `rv17b/repo_g`): 9 watchers alive
+  at the end and the same four files created, so the check fails without the import. `server_close()` is not
+  visible to any test (no ResourceWarning, and the port is refused with or without it): it is hygiene and
+  I could not mutation-test it.
+- **Finding 2 (minor) and spec minor 1: fixed.** `pathly help` prints `GET /runs?project_root=<root>`,
+  `GET /comms?board=project&scope=<root>&feature=project` and `GET /chief/session?project_root=<root>`, and
+  gives the POST routes that need a root or board their keys (`POST /comms/post` with `board`, `scope`,
+  `feature`; `POST /runs` and `POST /comms/directives` with `project_root`). OPERATOR says
+  `GET /runs?project_root=<root>`, `GET /chief/session?project_root=<root>`, and its decision list is a
+  quoted `pathly api GET '/comms?...&type=decision'` command in the fenced block, as the fragment's and
+  STATUS's are. I checked what each route needs against the route code before writing the table, and
+  `test_chief_help_routes.py` runs it: bare `GET /comms` is a 400 for `feature`; `GET /comms?feature=project`
+  alone reads the feature board `project` and answers `[]`; bare `GET /runs` is 200 `[]` with a run
+  recorded; bare `GET /chief/session` is a 400; `POST /runs` without `project_root` is the gate's 403 and
+  `POST /comms/directives` without it a 400; a `POST /comms/post` with a `board` and `scope` but no
+  `feature` is refused, and one with `feature` alone lands on a feature board. `POST /comms/post` does
+  **not** need `project_root` (the PLANNER example sends it anyway), so the table does not list it for
+  that route. The tests: every help route is in the table; every help line carries its needs; the table
+  matches the real routes; each GET form in the help runs and answers with what the project holds; the keys a
+  help line shows are keys the gate lets a chief send; and no text names `GET /comms`, `GET /runs` or
+  `GET /chief/session` without them. I changed `_routes_in` in `test_chief_cli_edges.py` to drop the query
+  from the path it compares (the existing assertions are unchanged and as strong).
+- **Finding 3 (minor): fixed.** `_bad_target` checks the path encodes, `_body_text` reads stdin or takes the
+  argument and encodes it, and `_api` turns a `UnicodeError` into `_usage("the body is not valid UTF-8")`:
+  exit 2, nothing sent. Tested in process (a lone surrogate, which is what the shell's `\xff` becomes, and a
+  stdin `TextIOWrapper` over invalid bytes) and as a real process (`input=b"\xff{}"`, and the argument as
+  `os.fsdecode(b'{"a":"\xff"}')`).
+- **Finding 4 (minor, cap on what is printed): carried** to the cleanup PR, as decided. No cap added.
+- **Finding 5 (minor): fixed.** `_api` reads `_load_secret()` once and hands it to `_send`; the
+  connection-error text goes through `_redact(text, (token, secret))` like the answer. Tested: the error
+  text without the secret and without the token, the answer without the secret, and `_load_secret` called
+  once for an answered and for an unreachable server.
+- **Finding 6 (minor, text): fixed.** OPERATOR now says to look at `GET /runs?project_root=<root>` and the
+  board when the user writes or asks, never to check in a loop on its own, and to tell the user and stop when
+  Pathly refuses a call. "keep watching" is gone (a test fails if it comes back).
+- **Finding 7 (minor, text): fixed.** I checked first: `goal_decomposer.start_goal_decompose` with
+  `mode="planner"` (the default) runs one planner agent, and `chief_budget` does not count the decompose
+  routes, so the text is the only brake. OPERATOR now says `POST /comms/goals/decompose` "starts a planner
+  agent to write them: an agent costs money, so ask the user first", the same words PLANNER has.
+- **Finding 8 (minor, text) and spec minor 4: fixed in the fragment.** It says to quote a path that has a query
+  string (an `&` ends the command, a `?` may be read as a wildcard), to run ONE `pathly` command per call with
+  no pipe, no `&&` or `;` and no `$(...)` (only a single `pathly` command is approved ahead of time; more waits
+  for the user), and that `-` in place of the body reads standard input and is for a body that is awkward to
+  quote. Every `pathly api` command with a `?` or `&` in a text is quoted (a test). For the root: the gate
+  compares what the server decoded from the query string with the stored root by `root_spelling`, and the
+  command's `quote()` leaves `%` alone, so `%2B` arrives as `+` while a raw `+` arrives as a space and a raw
+  `&` ends the value; the fragment says to write a `+`, `&`, `%` or space of the root as `%2B`, `%26`, `%25`,
+  `%20` in a query string and to leave it as written in a JSON body (and `ROOT_LINE` now carries "apart from
+  the percent-encoding a query string needs", because it said "send it as written"). A test shows the raw form
+  refused, the encoded form accepted, a space accepted either way, and a JSON body with the same root
+  accepted. I did **not** change `quote()`: it is right for a legitimate root. I say nothing about PowerShell
+  (not verified). I did not verify that a here-document passes `Bash(pathly *)`, so the text promises no way
+  to feed `-`.
+- **Spec minor 2: pinned, behaviour kept.** `default_style` uses a user file `chief/custom` for a preset with
+  no built-in text, so `custom` + file + no `prompt` is a 201 (the ticket says a user file `chief/<preset>`
+  wins, and the tier comes from the same file's front matter, or `status` with none). It is coherent, so
+  I kept it; `test_a_user_file_named_for_a_custom_preset_opens_without_a_prompt_in_the_files_tier` pins both
+  cases next to the existing "custom with no file is 400" test.
+- **Spec minor 3: fixed.** The fragment's start-up reads now include
+  `GET '/comms?board=project&scope=<root>&feature=project&type=escalation&status=pending'` (the same command
+  STATUS shows; a test compares the two) and say an escalation is the user's when its `to_agent` is `human`.
+  A test runs that read as a status chief and gets a pending escalation to `human` (and one to `builder`,
+  which is why the text says to look at `to_agent`: `GET /comms` has no `to` filter).
+- **Finding 9 (minor, mutation gap): fixed.** `test_chief_prose_rules.py` pins by a short phrase, after
+  `norm` (lower case, no backticks, one space), the start-up rule and "tell the user in a few lines where
+  things stand", "do not retry in a loop", "check the question and the id first", "can be cited once" and
+  "even when the route then answers 404 or 409", "never edit files", "never run an agent cli yourself", "gave
+  you no number" and "cannot answer for the user", "do not look for another route around it", OPERATOR's "never
+  on your own idea" and "in the user's words", and PLANNER's "ask the user first". Re-wrapping a paragraph does
+  not break them.
+
+Proof, run fresh after the last edit of code or tests (Python 3.12.3 unless said):
+
+- `python -m pytest tests/http_api/test_chief_cli.py -q -p no:cacheprovider`: `25 passed`, exit 0.
+- `python -m pytest tests/consistency/test_fragments_run_token.py -q -p no:cacheprovider`: `41 passed`, exit 0.
+- `python scripts/check_entry_points.py`: `Entry points OK: 17 checked` (lists `pathly = pathly_orchestrator.chief_cli:main`), exit 0.
+- The commands.md Test command (`python -m pytest tests/comms_board tests/db tests/runner_supervisor tests/http_api -q -x -p no:cacheprovider`): `4118 passed, 2 skipped` in 18m06s, exit 0 (the skips are not in my files). `tests/consistency`: `57 passed`.
+- The six chief-17 files together: `142 passed`. Python 3.11.17 (`venv311`, built for this check) and 3.13.16 (`venv313`): `298 passed` each, for those six files plus `tests/runner_supervisor/test_chief_session.py`, `tests/http_api/test_chief_routes.py` and `tests/consistency/test_fragments_run_token.py`.
+- Lint chain, each step run: `black --check src/ tests/` (676 files unchanged), `mypy src/ --ignore-missing-imports --no-strict-optional` (343 files, no issues), `check_file_size.py` (none new, none grown; `messages_crud.py` untouched), `check_no_mirror_reads.py` OK, `gen_test_index.py` then `--check` (up to date), `lint-imports` (1 kept, 0 broken), `bandit -q -r src/ -ll -x src/pathly_data/` exit 0, `check_adapters.py` OK, `check_entry_points.py` OK, `check_version_sync.py` OK (2.24.1). `python -m build --wheel` (into the scratchpad): the wheel holds `chief_cli.py`, `chief_presets.py`, the fragment (with the escalation read) and the `pathly` entry point.
+- Mutation checks, scratch copy `scratchpad/rv17b` (62 mutants of the round-2 code and texts, one edit each, tests of their group `-x`): the body and path UTF-8 checks removed, `UnicodeError` not caught, usage exit 1, the secret or the token not redacted in the error, the secret not redacted in the answer, the secret read twice, the secret never sent, stdin ignored, 11 edits of the help (each route's query or body keys dropped, a key the gate refuses, a query key it refuses), 14 of OPERATOR / PLANNER / STATUS / `ROOT_LINE` (keep watching back, the loop sentence deleted in two ways, "when the user writes or asks" dropped, the decompose cost sentence deleted, "never on your own idea" and "in the user's words" deleted, `GET /runs` and `GET /chief/session` bare, the decision-list command unquoted and deleted, PLANNER's cost sentence deleted, STATUS's escalation read changed, the root-line exception dropped), 25 of the fragment (each sentence a pin names deleted, the quoting, one-command, `-` and percent-encoding sentences deleted, the escalation read and sentence deleted, its query changed, the session mention and the runs read bare, the runs read unquoted, the question and goals reads deleted), `default_style` ignoring a file for a custom preset, and `quote()` no longer passing `%`. One survived the first pass (the OPERATOR decision-list command deleted: the sentence after it then pointed at nothing); `test_the_operator_style_shows_how_to_list_the_standing_orders` kills it. All 62 are killed in the final run. The finding-1 mutation is above.
 
 ### For later tickets
 
@@ -340,6 +466,12 @@ Also run:
   read-only route for it before `/runner/agent-answer` can be offered without the user naming the topic.
 - Round two (map.md § Round two) still owns the friendly commands (`overview`, `inbox`,
   `answer --cite`, ...), `GET /chief/overview` and `/chief/inbox`, and the Studio Chief button.
+- Carried to the cleanup PR (not done in round 2, by decision): a cap on what `pathly api` prints and on how
+  much standard input it reads (finding 4), and the `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS` /
+  `CLAUDE_CODE_DISABLE_CRON` environment switches (ticket 06's settings code).
+- Round two's friendly commands should print the working forms the help now shows (`/runs?project_root=`,
+  the project board's `board`, `scope`, `feature`), not a bare route; and whoever offers `-` to a claude chief
+  must first check that a here-document passes `Bash(pathly *)` (not verified here).
 
 ## Review findings (round 1, quality review)
 

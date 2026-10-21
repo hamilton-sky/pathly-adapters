@@ -4,7 +4,7 @@
 
 HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, prompt-event contract.
 
-50 test file(s).
+53 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -19,8 +19,9 @@ HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, 
 | `test_chief_cited_answers.py` | chief-agent 10: a chief answers an agent only by citing a human message of its session | 17 |
 | `test_chief_cited_edges.py` | chief-agent 10: the edges of the cite rule | 17 |
 | `test_chief_cited_escalations.py` | chief-agent 10 (review round 1): a human escalation, from the chief's side | 3 |
-| `test_chief_cli.py` | chief-agent 17: `pathly api`, the three built-in styles and the `chief-connect` fragment | 14 |
+| `test_chief_cli.py` | chief-agent 17: `pathly api`, the three built-in styles and the `chief-connect` fragment | 15 |
 | `test_chief_cli_edges.py` | chief-agent 17: the edges of `pathly api` | 20 |
+| `test_chief_cli_input.py` | chief-agent 17, round 2: input to `pathly api` that is not valid text, and the server secret | 8 |
 | `test_chief_gate.py` | chief-agent 08: the chief gate refuses every call a chief token's tier does not allow | 32 |
 | `test_chief_gate_actions.py` | chief-agent 08: which action a call is, and so which tier may make it | 6 |
 | `test_chief_gate_artifact_section.py` | chief-agent 08 (round 6): the section of an artifact read by id stays inside the named project | 5 |
@@ -43,7 +44,9 @@ HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, 
 | `test_chief_gate_symlinks.py` | chief-agent 08 (round 8): a file a chief names is inside its project once symlinks are followed | 5 |
 | `test_chief_gate_tables.py` | chief-agent 08: the field table is complete and says what each route reads | 12 |
 | `test_chief_gate_unbound_reads.py` | chief-agent 08: the reads that are fleet-wide say so, and no more | 4 |
+| `test_chief_help_routes.py` | chief-agent 17, round 2: `pathly help` and the texts show each route in the form that works | 11 |
 | `test_chief_prompt_text.py` | chief-agent 17: what the chief's prompt texts tell it to do, against the real gate tables | 9 |
+| `test_chief_prose_rules.py` | chief-agent 17, round 2: the rules in the chief's prompt texts, pinned | 14 |
 | `test_chief_routes.py` | chief-agent 07: POST /chief/open, POST /chief/close and GET /chief/session | 32 |
 | `test_config.py` | Tests for Settings.from_env() — specifically bind-host validation | 8 |
 | `test_db_agents_route.py` | GET /db/agents — registry-backed agent list for the spawn-policy Settings model-policy UI | 3 |

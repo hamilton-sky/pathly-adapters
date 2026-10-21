@@ -570,8 +570,11 @@ POST /chief/human-messages  ← {run_id, hook_secret, text, session_id, relayed?
   preset ..."; a blank or non-string one is "prompt must be a non-empty string"). The fragment
   (`src/pathly_data/core/skills/fragments/chief-connect.md`) is appended to **every** chief
   prompt, the user's own style and a request's `prompt` included, so a saved style cannot drop
-  the rules it holds: the one tool (`pathly api`), reading before acting, answering with
-  `cite=<id>` only, and that only the user gives orders. The 64 KiB limit applies to the style,
+  the rules it holds: the one tool (`pathly api`; quote a path that has a query string, one
+  `pathly` command per call with no pipe, a root percent-encoded in a query string and as written
+  in a body), reading before acting (the session, goals, pending questions, pending escalations
+  and runs), answering with `cite=<id>` only, and that only the user gives orders. The 64 KiB
+  limit applies to the style,
   before the fragment and the root line. The root line hands the chief the stored root
   (`normalise_project_root`), the string the gate compares `project_root` with, so it never has
   to read its directory from the shell. The texts name no cost or run number: they point to
@@ -580,16 +583,24 @@ POST /chief/human-messages  ← {run_id, hook_secret, text, session_id, relayed?
   `tests/http_api/test_chief_prompt_text.py` (the route exists, the tier holds the action, every
   key is on the route's list, a post is `from` the chief, an answer carries `cite` and its target
   only), and the fragment's examples must be reads because it goes to every tier.
+  `tests/http_api/test_chief_prose_rules.py` pins the rules by phrase (a deleted sentence fails a
+  test); a path with a query string is quoted in every example, and a route that needs `feature`,
+  `board`/`scope` or `project_root` (`GET /comms`, `GET /runs`, `GET /chief/session`) is shown with
+  them in the help and in every text (`test_chief_help_routes.py`): a bare `GET /runs` answers 200
+  `[]`, which a chief would read as "no runs".
 - **`pathly api METHOD /path [json | -]`** (`chief_cli.py`, the `pathly` console script) is the
   chief's only door to the server, because its settings allow `Bash(pathly *)` and deny `curl`
   and `wget` (`runner/chief_argv.py`). It sends one request to `127.0.0.1:<fsm_port>` with the tab's
   `PATHLY_RUN_TOKEN` as `X-Pathly-Run-Token` (and `X-Pathly-Secret` when the machine has one),
   prints the server's answer to stdout and a `pathly: HTTP <status>` line to stderr for a non-2xx.
   Exit **0** for a 2xx, **1** for any other status or an unreachable server, **2** for a usage error
-  (a missing token, a path that is not `/...`, a body that is not a JSON object, a GET with a body):
-  nothing is sent in that case. The token is never printed (an answer or an error that holds it is
+  (a missing token, a path that is not `/...`, a path or body that is not valid UTF-8, a body that
+  is not a JSON object, a GET with a body): nothing is sent in that case. The token and the server
+  secret (read once per command) are never printed (an answer or an error that holds either is
   redacted). What a chief may do is decided by the chief gate, not here: a refusal is the gate's 403
-  body, printed as it came. `pathly help` lists the routes a chief uses most.
+  body, printed as it came. `pathly help` lists the routes a chief uses most, each with what it
+  needs (`GET /runs?project_root=<root>`, `GET /comms?board=project&scope=<root>&feature=project`,
+  `GET /chief/session?project_root=<root>`).
 - **Close:** 403 for a live run token. It closes the project's open session with reason
   `closed from Studio` (`close_chief`: revokes the token, removes the folder, drops the run) and
   then sends `TERMINAL_KILL {tab_id, run_id}` on topic `chief:<run_id>` so the host closes the
