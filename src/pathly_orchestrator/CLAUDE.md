@@ -545,7 +545,8 @@ human checkpoints to `DONE`.
 
 ### Chief endpoints (chief-agent)
 
-The chief is a long-lived interactive agent a human opens for a project from Studio's launcher.
+The chief is a long-lived interactive agent a human opens for a project. Studio has no launcher for it
+yet (round two), so `POST /chief/open` is called directly.
 `blueprints/chief/session.py` is a thin layer over `supervisor/chief_session.py`:
 
 ```

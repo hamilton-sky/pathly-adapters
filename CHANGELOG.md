@@ -2,6 +2,83 @@
 
 ## Unreleased
 
+### Board — a chief agent that works the board through a gated API (chief-agent)
+
+A person can now open a **chief** for a project: a long-lived interactive agent tab that reads the
+board, posts goals and decisions, answers agents' questions and starts and stops runs, so the
+person talks to one agent instead of driving every board call. The chief itself is not trusted: it
+holds a run token, its only door to the server is the `pathly` command, and the server decides
+every call by the tier the person gave it. Studio has no Chief button yet, so today it is opened
+with `POST /chief/open`. Design: `pathly/features/chief-agent/spec.md`. It builds on the run
+identity of role-read-policy.
+
+- Open, close, session: `POST /chief/open` (`{project_root, engine, preset, prompt?, model?}`),
+  `POST /chief/close` and `GET /chief/session?project_root=`. One chief per project (a second open
+  is 409), and an agent's run token cannot open or close one. The claude tab runs `--restricted`
+  with four tools (`Bash`, `Read`, `Glob`, `Grep`), no MCP server, `pathly *` allowed and `curl`
+  and `wget` denied; a codex chief is read-only and records no typed messages, so it can relay no
+  answer. The session ends when the tab exits, on close, or at the next server start. The prompt
+  is pasted, not submitted: the style, the fixed `chief-connect` rules, `Your project root: <root>`.
+- Tiers: `status` reads; `planner` adds posting and planning (goals, tasks, decompose); `operator`
+  adds deciding, running, stopping and answering. A preset names the tier: the built-in `status`,
+  `planner` and `operator`, or a saved `chief/<preset>` style by its front matter, else `status`.
+  The built-in styles and the fixed rules ship in the package, so a saved style cannot drop them.
+- Chief gate (`http_server/chief_gate.py`): a `before_request` hook that acts only on a `chief`
+  token. `chief_routes.py` classes a call into one of seven actions and the gate answers 403
+  `{error, action, tier, allowed}` unless the tier holds it. A route the table does not list is
+  refused to every tier. Once the session is closed its token is 401, not anonymous.
+- Identity: the token is role `chief` on the project board, minted at open and revoked at close.
+  What the chief posts is stamped `chief` and must say `from: chief`. A run it starts gets its own
+  worker token, as any run does.
+- Cited answers: the chief never words an answer to an agent. It sends `cite=<id>` of a message
+  the person typed in its tab (recorded by a `UserPromptSubmit` hook), and Pathly relays that
+  message's text.
+- Standing orders: `POST /comms/directives` (chief only) posts a decision with `binding = 1`. It
+  goes into the prompts of the role it is addressed to (every role for `*`) and stays there after
+  it is acknowledged, whatever the run's context toggles say.
+- One project: every `project_root`, board scope, file path and run, goal, task or message id a
+  write names must belong to the chief's project. Two settings bound a session:
+  `chief.max_cost_usd_per_run` (default `10.0`) and `chief.max_runs_per_session` (default `20`),
+  which only the person sets, with `PUT /db/settings/<key>`.
+- `pathly api METHOD /path [json]` (the new `pathly` console script) sends one request with the
+  tab's token and prints the answer, never the token.
+
+What is refused: a call outside the tier, and any write the gate does not list (`/db/query`,
+`/db/settings`, `/comms/edit`, `/comms/delete`, `/comms/hydrate`, the routes that force past a human
+gate); an answer that is not a bare `cite`, or that cites a message from before the question, one
+already used, the style prompt, a relayed prompt or another session's message; acknowledging an
+escalation addressed to the human without a cite, or as anyone but `chief`; a run start above the
+cost ceiling or past the run limit (a start the route itself refuses gives its slot back);
+stopping or pausing another project's run; retiring a standing order as anyone but a live chief
+run (another role's `supersedes` skips it with reason `binding`, `/comms/supersede` without a chief
+token is 403, `/comms/delete` is 403 for everyone, `/comms/edit` is 409, and hydrating a
+`BOARD.json` stores `binding = 0`); and the raw run token on any stream but `/events/spawn`.
+`tests/comms_board/test_chief_acceptance.py` runs the main ones end to end against the real app
+and supervisor with a fake spawn host; the rest are in `tests/http_api/test_chief_gate*.py`,
+`test_chief_cited_*.py` and `tests/comms_board/test_binding_*.py`.
+
+Three holes the chief would have walked through are closed, each with its own test: the
+`TERMINAL_SPAWN` payload's `run_token` was sent to `/events/runner` and `/events/runs` clients,
+which need no credentials, and is now stripped from both copies; `POST /db/query` accepted a
+`WITH ... INSERT|UPDATE|DELETE`, which could write a row with a forged stamp, and now runs under
+`PRAGMA query_only` (400); and `POST /comms/edit` kept the old author's stamp on the text it
+replaced, and now re-stamps the row to the editor (a request with no token stores `none`).
+
+Known limits, for round two and RRP-2b (the UI token): the raw run token is still sent to every
+`/events/spawn` client, and one subscribed when a spawn starts can use it until the spawn ends. A
+`human` message is what the hook endpoint recorded, not proof that a person typed it: an operator
+chief can start a headless agent that runs as the same OS user and, if it reads the session's
+secret file and claude session id, could post to `/chief/human-messages` itself, and a scheduled
+task in the project's `.claude` folder is recorded as typed. That agent can also call
+`/runner/agent-answer` with no cite, because the cite rule guards the chief's own token. A fresh
+clone loses its standing orders (hydration never restores the flag), so the chief posts them
+again, and until the UI token Studio can neither post nor retire one. Reads that name an id
+(`GET /runs/<run_id>`, an artifact, a goal's tasks) and the fleet-wide totals of `GET /db/rollup`
+are not bound to the chief's project. The Studio Chief button, the friendly `pathly` commands, the
+overview and inbox calls and the cost of the chief's own token are round two. Every test fakes the
+spawn host: none opens a real `claude`, and spike 19, a hand run with one, is the planned live
+check.
+
 ### Licensed under Apache-2.0
 
 The repository now carries a `LICENSE` (Apache-2.0), declared in `pyproject.toml` (which also gets a description that
@@ -132,8 +209,9 @@ before), so a reviewer still reads the builder's posts. `POST /db/query` runs it
 a row with a forged stamp. Known limits: Studio's own posts carry
 no token yet and are stored `none`; the agent `curl`s to `/code/query` and `/record_phase` send
 none; roles are minted from a flow's `agent_map`, which differs from its `role_map` in some
-states; and a board restored from a `BOARD.json` snapshot (`POST /comms/hydrate`) keeps
-the stamps written in the file. Not included: wiring the policy into the read paths,
+states; and a board restored from a `BOARD.json` snapshot (`POST /comms/hydrate`) keeps the
+`author_role` and `author_run_id` written in the file (any `author_source`
+other than `none` is stored as `legacy`). Not included: wiring the policy into the read paths,
 `(board, scope)` pair binding, the UI token.
 
 ### Code intelligence — `codeintel` backend for `/code/query`

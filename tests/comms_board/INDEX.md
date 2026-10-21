@@ -4,7 +4,7 @@
 
 Comms board / message-board subsystem — messages, tasks, artifacts, goals, context retrieval & relevance, board mirror & hydration.
 
-66 test file(s).
+67 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -27,6 +27,7 @@ Comms board / message-board subsystem — messages, tasks, artifacts, goals, con
 | `test_board_mirror_relative_root.py` | A project board whose scope is a RELATIVE root is no longer mirrored (chief-agent 08, round 6) | 4 |
 | `test_board_mirror_scope.py` | The board mirror writes only for a scope that is a project root or a plain name | 12 |
 | `test_board_run.py` | Tests for start_board_run and POST /comms/run (BOARD-RUNTIME-SPEC §2/US4) | 15 |
+| `test_chief_acceptance.py` | The chief core, proven end to end (chief-agent 13): the bar of the plan's map.md | 15 |
 | `test_chief_human_messages.py` | chief-agent 09: record what the human types in a claude chief tab | 16 |
 | `test_chief_prompt_hook.py` | chief-agent 09: the chief's UserPromptSubmit hook, its edge cases and as a real process | 12 |
 | `test_chief_tiers.py` | chief-agent 04: the chief tiers and the preset-to-tier resolution | 25 |
