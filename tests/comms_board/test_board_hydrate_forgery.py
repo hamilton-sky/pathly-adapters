@@ -237,27 +237,52 @@ def test_a_snapshot_row_that_is_not_an_object_does_not_stop_the_others(tmp_path)
     assert count("own") == 1
 
 
+@pytest.mark.parametrize("root", ["{project}", "C:/proj", "/srv/my proj"])
+def test_a_project_root_is_compared_the_way_the_exporter_writes_it(
+    tmp_path, project, root
+):
+    """``hydrate_project`` hands over the normalised root (forward slashes, no trailing one)
+    and the exporter writes that same spelling into every row, so a row is compared to it
+    exactly. What is stored must be what a board read can see."""
+    root = root.format(project=project)
+    own = message("own", "project", root)
+    path = write_board(tmp_path / "BOARD.json", "project", root, [own])
+    conn = get_db()
+
+    assert hydrate_board(conn, "project", root, path) is True
+
+    assert [m["id"] for m in get_all_messages(conn, "project", root)] == ["own"]
+
+
 @pytest.mark.parametrize(
-    "hydrate_scope, row_scope",
+    "root, spelled",
     [
-        ("{project}/", "{project}"),
         ("{project}", "{project}/"),
-        ("C:\\proj\\", "C:/proj"),
+        ("{project}", "{project}//"),
         ("C:/proj", "C:\\proj"),
+        ("C:/proj", "C:\\proj\\"),
+        ("C:/proj", "C:/Proj"),
+        ("C:/proj", "c:/proj"),
+        ("C:/proj", "C:/proj/"),
+        ("{project}", " {project}"),
     ],
 )
-def test_a_project_root_is_compared_the_way_the_exporter_writes_it(
-    tmp_path, project, hydrate_scope, row_scope
+def test_a_project_row_spelled_another_way_is_skipped_not_stored_out_of_sight(
+    tmp_path, project, root, spelled
 ):
-    """The exporter and ``board_from_scope`` store a project scope as a normalised root:
-    forward slashes, no trailing one. Two spellings of one root are one board."""
-    row_scope = row_scope.format(project=project)
-    own = message("own", "project", row_scope)
-    path = write_board(tmp_path / "BOARD.json", "project", row_scope, [own])
+    """A row whose scope is another spelling of the root would be stored under a scope no board
+    read asks for: the row is invisible and still counts as an import. It is left out.
+    """
+    root, spelled = root.format(project=project), spelled.format(project=project)
+    own = message("own", "project", root)
+    odd = forged("odd", "project", spelled)
+    path = write_board(tmp_path / "BOARD.json", "project", root, [odd, own])
+    conn = get_db()
 
-    hydrate_board(get_db(), "project", hydrate_scope.format(project=project), path)
+    assert hydrate_board(conn, "project", root, path) is True
 
-    assert count("own") == 1
+    assert count("odd") == 0
+    assert [m["id"] for m in get_all_messages(conn, "project", root)] == ["own"]
 
 
 def test_an_artifact_of_a_row_that_was_left_out_is_left_out_too(tmp_path):

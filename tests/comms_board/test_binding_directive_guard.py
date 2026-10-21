@@ -282,6 +282,61 @@ def test_an_ordinary_decision_is_still_deleted(client, project):
     assert row(old)["deleted_at"] is not None
 
 
+def _read_by_a_builder(message_id):
+    """Record that a builder has read the row: the state the ``locked`` answer is about."""
+    conn = get_db()
+    conn.execute(
+        "UPDATE comms_messages SET read_by='[\"builder\"]' WHERE id=?", (message_id,)
+    )
+    conn.commit()
+    assert row(message_id)["read_by"] == '["builder"]'
+
+
+@pytest.mark.parametrize("force", [False, True], ids=["plain", "force"])
+def test_a_directive_a_builder_has_read_is_refused_as_binding_not_as_locked(
+    client, project, chief_root, force
+):
+    """``binding`` is decided before ``locked``: a read directive answers 403 with and without
+    ``force``, not the 409 an ordinary read message answers."""
+    opened = open_session(project, chief_root)
+    old = directive(client, opened)
+    _read_by_a_builder(old)
+
+    resp = delete(client, old, force=force)
+
+    assert resp.status_code == 403, resp.get_data(as_text=True)
+    assert resp.get_json() == {"error": REFUSED}
+    assert "binding" in resp.get_json()["error"]
+    assert untouched(old)
+
+
+@pytest.mark.parametrize("force", [False, True], ids=["plain", "force"])
+def test_the_db_function_answers_binding_for_a_directive_a_builder_has_read(
+    client, project, chief_root, force
+):
+    from pathly_orchestrator.db.queries.comms import soft_delete_message
+
+    opened = open_session(project, chief_root)
+    old = directive(client, opened)
+    _read_by_a_builder(old)
+
+    assert soft_delete_message(get_db(), old, force=force) == "binding"
+    assert untouched(old)
+
+
+def test_an_ordinary_decision_a_builder_has_read_is_still_locked_unless_forced(
+    client, project
+):
+    """The control of the two tests above: the same state on an ordinary row is ``locked``."""
+    old = decision(client, None, project, text="Use tabs.").get_json()["message_id"]
+    _read_by_a_builder(old)
+
+    assert delete(client, old).status_code == 409
+    assert row(old)["deleted_at"] is None
+    assert delete(client, old, force=True).status_code == 200
+    assert row(old)["deleted_at"] is not None
+
+
 # --- hydration cannot forge a standing order -----------------------------------------
 
 
@@ -294,6 +349,46 @@ def test_a_feature_board_file_cannot_plant_a_project_board_directive(project, tm
 
     assert count("planted-1") == 0
     assert count("feat-row") == 1  # the board's own row is restored
+    assert standing_ids(project) == []
+    assert not reaches_builders(project)
+
+
+def test_a_feature_board_file_cannot_plant_an_artifact_on_a_directive(
+    client, project, chief_root, tmp_path
+):
+    """The artifact of a row the file does not hold is not stored: it would hang a file path
+    off a standing order that is already on the board."""
+    opened = open_session(project, chief_root)
+    old = directive(client, opened)
+    feature = message("feat-row", "feature", "feat-x")
+    planted = {
+        "id": "a-planted",
+        "message_id": old,
+        "path": "/etc/hostname",
+        "created_at": "2026-01-01T00:00:00+00:00",
+    }
+    path = write_board(
+        tmp_path / "BOARD.json", "feature", "feat-x", [feature], [planted]
+    )
+
+    assert hydrate_board(get_db(), "feature", "feat-x", path) is True
+
+    stored = get_db().execute("SELECT id FROM comms_artifacts").fetchall()
+    assert stored == []
+    assert untouched(old)
+
+
+@pytest.mark.parametrize("bad_id", [[], [1], {}, {"id": "x"}], ids=repr)
+def test_a_row_id_that_is_a_list_or_a_dict_neither_plants_a_directive_nor_stops_the_file(
+    project, tmp_path, bad_id
+):
+    hostile = forged("hostile", "project", project, id=bad_id)
+    feature = message("feat-row", "feature", "feat-x", text="a real feature note")
+    path = write_board(tmp_path / "BOARD.json", "feature", "feat-x", [hostile, feature])
+
+    assert hydrate_board(get_db(), "feature", "feat-x", path) is True
+
+    assert count("feat-row") == 1  # the rest of the file is still imported
     assert standing_ids(project) == []
     assert not reaches_builders(project)
 
@@ -389,6 +484,22 @@ def test_is_binding_and_the_standing_orders_query_never_disagree(project, flag):
     mid = binding_support.post("Never push.", scope=project, binding=flag)
 
     assert is_binding(get_db(), mid) is (mid in standing_ids(project))
+
+
+@pytest.mark.parametrize("flag", [0, 1, 2, -1])
+def test_the_delete_guard_and_the_standing_orders_query_never_disagree(project, flag):
+    """``soft_delete_message`` reads ``binding`` in its own statement: it must refuse exactly
+    the rows the standing-orders query lists (``force`` or not, so ``locked`` cannot hide it).
+    """
+    from pathly_orchestrator.db.queries.comms import soft_delete_message
+
+    mid = binding_support.post("Never push.", scope=project, binding=flag)
+    standing = mid in standing_ids(project)
+
+    refused = soft_delete_message(get_db(), mid, force=True) == "binding"
+
+    assert refused is standing
+    assert (row(mid)["deleted_at"] is None) is standing
 
 
 def test_apply_supersedes_outside_a_request_does_not_retire_one(project):
