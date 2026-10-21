@@ -304,6 +304,9 @@ def test_session_shows_the_open_chief(client, host: Host, project: str):
         "tier": "operator",
         "engine": "claude",
         "opened_at": session["opened_at"],
+        "runs_started": 0,
+        "max_runs_per_session": 20,
+        "max_cost_usd_per_run": 10.0,
     }
     row = chief_queries.get_session(get_db(), opened["run_id"])
     assert session["opened_at"] == row["opened_at"]
