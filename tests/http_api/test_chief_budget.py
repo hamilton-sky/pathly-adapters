@@ -18,7 +18,6 @@ import sqlite3
 import pytest
 from chief_bind_support import _boards_are_free, project_row, stubs
 from chief_budget_support import (
-    ABOVE,
     CEILING_KEY,
     LIMIT_KEY,
     STARTS,
@@ -122,7 +121,22 @@ def test_a_flow_run_that_states_no_cost_is_judged_at_the_cost_the_route_uses(
 
     assert unstated.status_code == 200, shown(unstated)
     assert is_above(refused, 0.5), shown(refused)
-    assert len(flow_runs.calls) == 1 and "max_cost_usd" not in flow_runs.calls[0]
+    assert [call["max_cost_usd"] for call in flow_runs.calls] == [1.0]
+
+
+def test_the_cost_a_flow_start_runs_at_when_it_states_none_is_start_runs_own():
+    """The gate judges a start that states no cost at ``DEFAULT_FLOW_COST_USD``, the number the
+    route passes ``start_run``; if ``start_run`` changed its default they would part."""
+    import inspect
+
+    from pathly_orchestrator.http_server.blueprints.control._cost import (
+        DEFAULT_FLOW_COST_USD,
+    )
+    from pathly_orchestrator.supervisor.api import start_run
+
+    own = inspect.signature(start_run).parameters["max_cost_usd"].default
+
+    assert DEFAULT_FLOW_COST_USD == own
 
 
 def test_a_start_that_takes_no_cost_is_not_judged_on_one(client, project, stubs):
@@ -272,7 +286,7 @@ def test_a_409_gives_the_slot_back(client, project, flow_runs):
     assert runs_started(chief) == 0
 
 
-def test_an_unknown_goal_or_task_gives_the_slot_back(client, project, stubs):
+def test_an_unknown_goal_or_task_gives_the_slot_back(client, project):
     chief = _chief("operator", project)
     cases = [
         ("/comms/goals/run", {"goal_id": "no-such-goal"}),
@@ -389,7 +403,7 @@ def test_a_read_does_not_count(client, project):
     assert runs_started(chief) == 0
 
 
-@pytest.mark.parametrize(
+REFUSED_BY_THE_GATE = pytest.mark.parametrize(
     "tier,body_update",
     [
         ("planner", {}),
@@ -406,28 +420,55 @@ def test_a_read_does_not_count(client, project):
         "other goal",
     ],
 )
+
+
+def _refused_start(client, chief, project, other_project, body_update):
+    """A ``POST /runs`` the gate refuses for the reason ``body_update`` brings in."""
+    extra = dict(body_update)
+    if extra.get("project_root") == "OTHER":
+        extra["project_root"] = str(other_project)
+    if extra.get("goal_id") == "OTHERS-GOAL":
+        extra["goal_id"] = project_row(other_project, "goal")
+    return start_flow(client, chief, project, **extra)
+
+
+@REFUSED_BY_THE_GATE
 def test_a_call_the_gate_refuses_costs_no_slot(
     client, project, other_project, flow_runs, tier, body_update
 ):
     chief = _chief(tier, project)
-    body = {
-        "kind": "flow",
-        "scope": "demo",
-        "flow": "team",
-        "project_root": str(project),
-    }
-    for key, value in body_update.items():
-        if value == "OTHER":
-            value = str(other_project)
-        if value == "OTHERS-GOAL":
-            value = project_row(other_project, "goal")
-        body[key] = value
 
-    resp = client.post("/runs", json=body, headers=chief.headers)
+    resp = _refused_start(client, chief, project, other_project, body_update)
 
     assert _gated(resp), shown(resp)
     assert runs_started(chief) == 0
     assert flow_runs.calls == []
+
+
+@REFUSED_BY_THE_GATE
+def test_a_session_at_its_limit_is_told_the_other_reason_first(
+    client, project, other_project, flow_runs, tier, body_update
+):
+    """The slot is taken last: a call another rule refuses never reaches the limit check, so
+    the chief hears what is wrong with the call, not that the session is used up."""
+    chief = _chief(tier, project)
+    setting(LIMIT_KEY, "0")
+
+    resp = _refused_start(client, chief, project, other_project, body_update)
+
+    assert _gated(resp), shown(resp)
+    assert not is_maxed(resp, 0), shown(resp)
+
+
+def test_a_cost_above_the_ceiling_is_refused_as_such_at_the_limit(
+    client, project, flow_runs
+):
+    chief = _chief("operator", project)
+    setting(LIMIT_KEY, "0")
+
+    resp = start_flow(client, chief, project, max_cost_usd=11)
+
+    assert is_above(resp), shown(resp)
 
 
 # --- who it applies to ------------------------------------------------------------------------
@@ -555,6 +596,44 @@ def test_the_migration_runs_twice_on_an_old_and_on_a_new_database():
 
         names = [name for name in _columns(conn)]
         assert names.count("runs_started") == 1
+
+
+class _AlterFails(sqlite3.Connection):
+    """A connection whose ``ALTER TABLE`` raises ``OperationalError``; ``also_adds`` first makes
+    the change, as another connection that got there first would have."""
+
+    also_adds = False
+
+    def execute(self, sql, *args):
+        if sql.startswith("ALTER TABLE"):
+            if self.also_adds:
+                super().execute(sql, *args)
+            raise sqlite3.OperationalError("duplicate column name: runs_started")
+        return super().execute(sql, *args)
+
+
+def test_a_failed_alter_that_leaves_the_column_missing_is_not_swallowed():
+    from pathly_orchestrator.db.migrations_chief import add_chief_tables
+
+    conn = sqlite3.connect(":memory:", factory=_AlterFails)
+    conn.execute(OLD_CHIEF_SESSIONS)
+
+    with pytest.raises(sqlite3.OperationalError):
+        add_chief_tables(conn)
+
+    assert "runs_started" not in _columns(conn)
+
+
+def test_a_column_another_connection_added_first_is_not_an_error():
+    from pathly_orchestrator.db.migrations_chief import add_chief_tables
+
+    conn = sqlite3.connect(":memory:", factory=_AlterFails)
+    conn.also_adds = True
+    conn.execute(OLD_CHIEF_SESSIONS)
+
+    add_chief_tables(conn)
+
+    assert list(_columns(conn)).count("runs_started") == 1
 
 
 def test_the_additive_migrations_run_twice_on_the_live_database(project):

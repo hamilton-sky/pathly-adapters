@@ -11,25 +11,28 @@ the session's tier holds that action, names only its own project in the fields i
 inside that project (``chief_bind``), on ``/comms/post`` posts as the chief, and sends only the
 keys its route lists (``chief_keys``). Each check runs over every reading of the body a route may
 get (``_bodies``). An ``answer`` is then held to the cite rule (``chief_cite``): the chief names a
-human message of its session by ``cite`` and Pathly relays that message's own text. Registered in
-``app.py`` right after ``_log_request``, so the secret check and the rate limit run first. Flask
-matches the URL rule before any hook runs, so a path no route matches (``url_rule`` is None)
-passes here and Flask answers 404 or 405.
+human message of its session by ``cite`` and Pathly relays that message's own text. Last, a call
+that starts work is held to the session's cost ceiling and run limit (``chief_budget``), which
+takes the run's slot only after every other check has passed. Registered in ``app.py`` right
+after ``_log_request``, so the secret check and the rate limit run first. Flask matches the URL
+rule before any hook runs, so a path no route matches (``url_rule`` is None) passes here and
+Flask answers 404 or 405.
 """
 
 from __future__ import annotations
 
 from .chief_bind import NOT_IN_PROJECT, is_id, target_in_project
+from .chief_budget import forget_run_slot
 from .chief_keys import key_refusal
 from .chief_project import project_refusal
 from .chief_routes import POSTS_AS_CHIEF, action_for
 from .run_identity import RUN_TOKEN_HEADER
 
 
-def _refuse(tier: str, action: str | None, allowed: list[str], error: str):
+def _refuse(tier: str, action: str | None, allowed: list[str], error: str, **more):
     from flask import jsonify
 
-    body = {"error": error, "action": action, "tier": tier, "allowed": allowed}
+    body = {"error": error, "action": action, "tier": tier, "allowed": allowed, **more}
     return jsonify(body), 403
 
 
@@ -145,10 +148,34 @@ def _cite_refusal(rule, method: str, session: dict, conn, bodies: list[dict]):
     return _refuse(tier, "answer", sorted(actions_for(tier)), error)
 
 
+def _budget_refusal(rule, method: str, session: dict, conn, bodies: list[dict]):
+    """The 403 for a start over the session's cost ceiling or run limit, else None.
+
+    The last check: it takes the run's slot (``chief_budget``), which the response hook gives
+    back if the route then answers with a 4xx. Only a call that starts work is judged
+    (``chief_budget.starts_a_run``); the gate has already checked that the tier may ``run``.
+    """
+    from flask import request
+
+    from pathly_orchestrator.supervisor.chief_tiers import actions_for
+
+    from .chief_budget import budget_refusal
+
+    found = budget_refusal(
+        conn, session["run_id"], rule.rule, method, request.view_args or {}, bodies
+    )
+    if found is None:
+        return None
+    error, more = found
+    tier = str(session.get("tier") or "")
+    return _refuse(tier, "run", sorted(actions_for(tier)), error, **more)
+
+
 def chief_gate():
     """Refuse a chief token's call its tier or project does not allow; None lets it through."""
     from flask import jsonify, request
 
+    forget_run_slot()
     token = (request.headers.get(RUN_TOKEN_HEADER) or "").strip()
     if not token:
         return None
@@ -177,4 +204,7 @@ def chief_gate():
         refused = _refusal(rule, method, session, conn, body)
         if refused is not None:
             return refused
-    return _cite_refusal(rule, method, session, conn, bodies)
+    refused = _cite_refusal(rule, method, session, conn, bodies)
+    if refused is not None:
+        return refused
+    return _budget_refusal(rule, method, session, conn, bodies)

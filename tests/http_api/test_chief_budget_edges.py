@@ -165,6 +165,34 @@ def test_the_other_start_routes_do_not_take_a_cost_at_all(client, project, path)
     assert runs_started(chief) == 0
 
 
+# --- the route itself: `POST /runs` takes the cost for anyone who sends it -----------------------
+
+
+@pytest.mark.parametrize(
+    "cost",
+    ["NaN", "Infinity", "-Infinity", "0", "-1", "true", "null", '"5"', "[]", "{}"],
+)
+def test_the_run_route_refuses_a_cost_that_is_no_number_whoever_asks(
+    client, project, flow_runs, cost
+):
+    """No token: the route is the only check. A cap that is ``NaN`` is never reached."""
+    resp = post_raw(client, "/runs", flow_text(project, cost), {})
+
+    assert resp.status_code == 400, shown(resp)
+    assert "max_cost_usd" in resp.get_json()["error"]
+    assert flow_runs.calls == []
+
+
+def test_the_run_route_takes_a_cost_from_anyone_and_defaults_to_one_dollar(
+    client, project, flow_runs
+):
+    stated = post_raw(client, "/runs", flow_text(project, "250"), {})
+    unstated = client.post("/runs", json=_flow_body(project))
+
+    assert stated.status_code == 200 and unstated.status_code == 200
+    assert [call["max_cost_usd"] for call in flow_runs.calls] == [250.0, 1.0]
+
+
 # --- the settings are text a person typed -----------------------------------------------------
 
 CEILINGS = [
