@@ -81,6 +81,7 @@ def server(monkeypatch: pytest.MonkeyPatch):
         yield recording
     finally:
         httpd.shutdown()
+        httpd.server_close()
         thread.join(timeout=10)
 
 
@@ -154,16 +155,22 @@ def pathly(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture):
     """``pathly("api", "GET", "/comms", token=...)``: run the command, return ``Ran``.
 
     ``token`` is the value of ``PATHLY_RUN_TOKEN`` (``NO_TOKEN``, the default, leaves it unset);
-    ``stdin`` is what the command may read from standard input.
+    ``stdin`` is what the command may read from standard input: text, or bytes that the stream
+    decodes as UTF-8 the way a pipe does (so bytes that are not UTF-8 fail when read).
     """
     from pathly_orchestrator import chief_cli
 
-    def run(*args: str, token=NO_TOKEN, stdin: str = "") -> Ran:
+    def run(*args: str, token=NO_TOKEN, stdin: str | bytes = "") -> Ran:
         if token is NO_TOKEN:
             monkeypatch.delenv("PATHLY_RUN_TOKEN", raising=False)
         else:
             monkeypatch.setenv("PATHLY_RUN_TOKEN", token)
-        monkeypatch.setattr(sys, "stdin", io.StringIO(stdin))
+        source = (
+            io.TextIOWrapper(io.BytesIO(stdin), encoding="utf-8")
+            if isinstance(stdin, bytes)
+            else io.StringIO(stdin)
+        )
+        monkeypatch.setattr(sys, "stdin", source)
         capsys.readouterr()
         code = chief_cli.main(list(args))
         seen = capsys.readouterr()

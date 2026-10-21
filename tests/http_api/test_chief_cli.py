@@ -22,6 +22,7 @@ from chief_cli_support import (
     MISSING_TOKEN,
     NO_TOKEN,
     Host,
+    _no_watcher_outlives_its_test,
     fragment_text,
     host,
     pathly,
@@ -184,6 +185,29 @@ def test_a_user_style_file_is_used_without_a_prompt_and_still_gets_the_fragment(
     prompt = host.spawn["prompt"]
     assert prompt.startswith(_expected_start(USER_STYLE))
     assert _presets().BUILT_IN["operator"].strip() not in prompt
+
+
+@pytest.mark.parametrize(
+    "front_matter,tier",
+    [("---\ntier: planner\n---\n", "planner"), ("", "status")],
+    ids=["names-a-tier", "names-none"],
+)
+def test_a_user_file_named_for_a_custom_preset_opens_without_a_prompt_in_the_files_tier(
+    client, host: Host, project, front_matter, tier
+):
+    # The ticket: a user file `chief/<preset>` wins. A preset with no built-in text but a file
+    # is not the 400 above: the file is its style, and its front matter names its tier.
+    from pathly_orchestrator.skills.prompt_files import write_prompt_file
+
+    write_prompt_file(
+        "chief", "custom", front_matter + USER_STYLE, project_root=str(project)
+    )
+
+    response = _open(client, project, preset="custom")
+
+    assert response.status_code == 201, response.get_json()
+    assert response.get_json()["tier"] == tier
+    assert host.spawn["prompt"].startswith(_expected_start(USER_STYLE))
 
 
 def test_a_prompt_in_the_body_still_gets_the_fragment(client, host: Host, project):

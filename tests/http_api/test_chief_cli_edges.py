@@ -22,7 +22,15 @@ from urllib.parse import quote
 import pytest
 from _paths import REPO_ROOT, SRC
 from chief_cite_support import Session, ask, db
-from chief_cli_support import NO_TOKEN, fragment_text, host, pathly, server, stub
+from chief_cli_support import (
+    NO_TOKEN,
+    _no_watcher_outlives_its_test,
+    fragment_text,
+    host,
+    pathly,
+    server,
+    stub,
+)
 from chief_gate_support import _chief, app, project
 
 USAGE = "usage: pathly"
@@ -104,9 +112,11 @@ LISTED_ROUTES = [
 
 
 def _routes_in(text: str) -> list[tuple[str, str]]:
+    """Each (method, path) a help line lists; the query a line shows is not part of the path."""
     import re
 
-    return re.findall(r"^\s*(GET|POST|PUT|DELETE) (/\S*)", text, re.MULTILINE)
+    found = re.findall(r"^\s*(GET|POST|PUT|DELETE) (/\S*)", text, re.MULTILINE)
+    return [(method, path.split("?")[0]) for method, path in found]
 
 
 @pytest.mark.parametrize("args", [("help",), ("--help",), ("-h",)])

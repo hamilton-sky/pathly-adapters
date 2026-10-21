@@ -18,7 +18,13 @@ from urllib.parse import parse_qsl, quote
 
 import pytest
 from chief_bind_support import record_run
-from chief_cli_support import fragment_text, host, pathly, server
+from chief_cli_support import (
+    _no_watcher_outlives_its_test,
+    fragment_text,
+    host,
+    pathly,
+    server,
+)
 from chief_gate_support import _chief, app, client, project
 from werkzeug.exceptions import HTTPException
 
