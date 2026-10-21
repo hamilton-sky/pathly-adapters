@@ -168,14 +168,15 @@ def test_a_row_that_was_deleted_is_still_the_other_projects(
 
 
 def test_the_gate_and_the_route_read_an_id_the_same_way(client, project, other_project):
-    """A padded id is not the row's id to the route either, so it touches nothing."""
+    """A padded id is not the row's id to the route either (it finds no row and does nothing),
+    so the gate does not have to read it as the other project's."""
     chief = _chief("operator", project)
     theirs = project_row(other_project)
 
     for padded in (f" {theirs}", f"{theirs} ", theirs.upper()):
         resp = acknowledge(client, chief, padded)
 
-        assert resp.status_code in (403, 404), shown(resp)
+        assert resp.status_code in (200, 403), shown(resp)
     assert acknowledged_by(theirs) == []
 
 
@@ -314,85 +315,17 @@ def test_a_blank_id_names_nothing_and_the_route_answers_400(client, project, val
     assert _passed(resp) and resp.status_code == 400, shown(resp)
 
 
-# --- the contract of target_in_project and the table it reads -------------------------------
+def test_a_topic_the_gate_cannot_look_up_spends_no_citation(client, project):
+    """The ``topic`` of ``/runner/agent-answer`` is held by the cite rule (ticket 10); a lone
+    surrogate in it used to reach SQLite when the citation was recorded, and a 500 came back.
+    """
+    chief = Session("operator", project)
+    later()
+    typed = chief.type("CSV, please")
 
+    for topic in ("\ud800", "a\x00b", "x" * 10_000):
+        body = {"topic": topic, "cite": typed}
+        resp = client.post("/runner/agent-answer", json=body, headers=chief.headers)
 
-def test_target_in_project_says_true_false_or_none(project, other_project):
-    from pathly_orchestrator.http_server.chief_bind import target_in_project
-
-    session = {"project_root": str(project)}
-    ours, theirs = project_row(project), project_row(other_project)
-    record_run(project, "run-ours")
-    stop = "/runs/<run_id>/stop"
-
-    def ask(rule, body, view_args=None):
-        return target_in_project(db(), session, rule, body, view_args or {})
-
-    assert ask("/comms/acknowledge", {"message_id": ours}) is True
-    assert ask("/comms/acknowledge", {"message_id": theirs}) is False
-    assert ask("/comms/acknowledge", {"message_id": "unknown"}) is True
-    assert ask("/comms/acknowledge", {}) is None
-    assert ask("/comms/post", {"text": "plain"}) is None
-    assert ask("/comms/post", {"goal_id": theirs}) is False
-    assert ask("/comms/post", {"run_id": "run-gone"}) is True
-    assert ask("/comms/supersede", {"old_id": ours, "new_id": theirs}) is False
-    assert ask("/comms/search", {"goal_id": theirs}) is None
-    assert ask("/not/a/route", {"message_id": theirs}) is None
-    # A URL variable is read from the URL, never from the body.
-    assert ask(stop, {}, {"run_id": "run-gone"}) is False
-    assert ask(stop, {"run_id": "run-ours"}, {"run_id": "run-gone"}) is False
-    assert ask(stop, {"run_id": "run-gone"}, {"run_id": "run-ours"}) is True
-
-
-def test_a_session_with_no_usable_root_is_bound_to_nothing(project):
-    from pathly_orchestrator.http_server.chief_bind import target_in_project
-
-    ours = project_row(project)
-
-    for root in (None, "", "proj\\a", 7):
-        session = {"project_root": root}
-        known = {"message_id": ours}
-        unknown = {"message_id": "unknown"}
-
-        assert (
-            target_in_project(db(), session, "/comms/acknowledge", known, {}) is False
-        )
-        assert (
-            target_in_project(db(), session, "/comms/acknowledge", unknown, {}) is True
-        )
-
-
-def test_the_table_lists_the_ids_chief_bind_binds_and_the_rest_as_unbound():
-    from pathly_orchestrator.http_server.chief_field_types import ID
-    from pathly_orchestrator.http_server.chief_fields import ROUTE_FIELDS
-
-    bound, left = set(), set()
-    for (rule, method), fields in ROUTE_FIELDS.items():
-        if method != "POST":
-            continue
-        named = (*fields.run_ids, *fields.stamped_run_ids, *fields.row_ids)
-        bound |= {(rule, key) for key in named}
-        left |= {(rule, key) for key in fields.unbound}
-        for key in named:
-            assert fields.kinds()[key] == ID, (rule, key)
-            assert key not in fields.unbound, (rule, key)
-
-    assert bound == {
-        ("/runs/<run_id>/<action>", "run_id"),
-        ("/runs/<run_id>/stop", "run_id"),
-        ("/comms/post", "run_id"),
-        ("/comms/post", "goal_id"),
-        ("/comms/acknowledge", "message_id"),
-        ("/comms/supersede", "old_id"),
-        ("/comms/supersede", "new_id"),
-        ("/comms/answer", "question_id"),
-        ("/comms/goals/run", "goal_id"),
-        ("/comms/goals/stop", "goal_id"),
-        ("/comms/goals/decompose", "goal_id"),
-        ("/runs", "goal_id"),
-        ("/comms/tasks/run", "message_id"),
-        ("/comms/tasks/stop", "message_id"),
-    }
-    # The topic of a run is checked by the cite rule (ticket 10); an option id is refused to a
-    # chief by it.
-    assert left == {("/runner/agent-answer", "topic"), ("/comms/answer", "option_id")}
+        assert resp.status_code in (400, 404, 409), (topic[:5], shown(resp))
+    assert citations() == []

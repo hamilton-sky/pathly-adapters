@@ -7,17 +7,19 @@ treatment ``caller_identity`` would give it, because anonymous loopback callers 
 
 For a live chief, the call is classed by ``chief_routes.action_for`` and refused with 403 unless
 the session's tier holds that action, names only its own project in the fields its route reads
-(``chief_fields``, applied by ``chief_project``), on ``/comms/post`` posts as the chief, and sends
-only the keys its route lists (``chief_keys``). Each check runs over every reading of the body a
-route may get (``_bodies``). An ``answer`` is then held to the cite rule (``chief_cite``): the
-chief names a human message of its session by ``cite`` and Pathly relays that message's own text.
-Registered in ``app.py`` right after ``_log_request``, so the secret check and the rate limit run
-first. Flask matches the URL rule before any hook runs, so a path no route matches
-(``url_rule`` is None) passes here and Flask answers 404 or 405.
+(``chief_fields``, applied by ``chief_project``), reaches a run, goal, task or message by id only
+inside that project (``chief_bind``), on ``/comms/post`` posts as the chief, and sends only the
+keys its route lists (``chief_keys``). Each check runs over every reading of the body a route may
+get (``_bodies``). An ``answer`` is then held to the cite rule (``chief_cite``): the chief names a
+human message of its session by ``cite`` and Pathly relays that message's own text. Registered in
+``app.py`` right after ``_log_request``, so the secret check and the rate limit run first. Flask
+matches the URL rule before any hook runs, so a path no route matches (``url_rule`` is None)
+passes here and Flask answers 404 or 405.
 """
 
 from __future__ import annotations
 
+from .chief_bind import NOT_IN_PROJECT, is_id, target_in_project
 from .chief_keys import key_refusal
 from .chief_project import project_refusal
 from .chief_routes import POSTS_AS_CHIEF, action_for
@@ -33,7 +35,7 @@ def _refuse(tier: str, action: str | None, allowed: list[str], error: str):
 
 def _human_escalation_check(conn):
     def check(message_id: object) -> bool:
-        if not isinstance(message_id, str) or not message_id:
+        if not is_id(message_id):
             return False
         row = conn.execute(
             "SELECT type, to_agent FROM comms_messages WHERE id=?", (message_id,)
@@ -103,6 +105,12 @@ def _refusal(rule, method: str, session: dict, conn, body: dict):
     )
     if other is not None:
         return _refuse(tier, action, allowed, other)
+    if method != "GET":
+        in_project = target_in_project(
+            conn, session, rule.rule, body, request.view_args or {}
+        )
+        if in_project is False:
+            return _refuse(tier, action, allowed, NOT_IN_PROJECT)
     if rule.rule in POSTS_AS_CHIEF and body.get("from") != "chief":
         return _refuse(tier, action, allowed, "a chief posts as 'chief'")
     unlisted = key_refusal(rule.rule, method, request.args if method == "GET" else body)

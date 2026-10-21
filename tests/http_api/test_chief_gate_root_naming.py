@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import pytest
 
+from chief_bind_support import record_run
 from chief_gate_support import (
     NAMES_A_PROJECT,
     NAMES_A_PROJECT_READS,
@@ -183,8 +184,9 @@ RETRY_FIELDS = {"flow": "team", "max_iterations": 3, "max_cost_usd": 1}
 
 
 @pytest.fixture()
-def finished_run(monkeypatch):
-    """A finished run of the registry, and a record of the runs a retry starts."""
+def finished_run(monkeypatch, project):
+    """A finished run of the registry (the chief's project's), and a record of the runs a retry
+    starts."""
     from types import SimpleNamespace
 
     from pathly_orchestrator.supervisor import registry
@@ -198,7 +200,7 @@ def finished_run(monkeypatch):
     monkeypatch.setitem(
         registry._registry,
         "retry-topic",
-        SimpleNamespace(run_id="run-own-1", status="done"),
+        SimpleNamespace(run_id="run-own-1", status="done", project_root=str(project)),
     )
     monkeypatch.setattr("pathly_orchestrator.supervisor.api.start_run", fake_start_run)
     return started_runs
@@ -252,6 +254,7 @@ def test_a_retry_in_another_project_is_refused(
 def test_the_other_run_verbs_need_no_root(client, project, verb):
     """They act on a run's own state, not on a directory the body names."""
     chief = _chief("operator", project)
+    record_run(project, "x")  # a chief reaches only a run it can place in its project
 
     resp = client.post(f"/runs/x/{verb}", json={}, headers=chief.headers)
 

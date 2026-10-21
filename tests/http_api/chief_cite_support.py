@@ -197,6 +197,14 @@ def citations() -> list[dict]:
     return [dict(row) for row in rows.fetchall()]
 
 
+@pytest.fixture(autouse=True)
+def _demo_is_a_feature_of_the_chiefs_project(project):
+    """``post_row`` posts on the feature ``demo``. A chief reaches a row only inside its project
+    (ticket 14), and a feature row is the project's when the feature has a folder there.
+    """
+    (project / "pathly" / "features" / "demo").mkdir(parents=True)
+
+
 def post_row(type_: str, to_agent: str = "*", **extra) -> str:
     """A board row posted by an agent on the demo feature."""
     from pathly_orchestrator.db.queries.comms_messages import post_message

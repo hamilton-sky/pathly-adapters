@@ -64,7 +64,10 @@ CALL_FIELDS: dict[tuple[str, str], Fields] = {
         text_paths=(TextPath("artifact_path", "text", "artifact"),),
         # A goal's `slug` is stored as sent and becomes the folder `goals/<slug>`.
         segments=("slug",),
-        unbound=("goal_id", "run_id"),
+        # The goal the row belongs to and the run it is stamped with (`chief_bind`): another
+        # project's is refused, and a run no source knows is not (the chief's own run id).
+        row_ids=("goal_id",),
+        stamped_run_ids=("run_id",),
         keys={
             "from": NAME,
             "type": ENUM,
@@ -89,7 +92,7 @@ CALL_FIELDS: dict[tuple[str, str], Fields] = {
     ("/comms/goals/decompose", "POST"): Fields(
         roots=_ROOT,
         names_root=True,
-        unbound=("goal_id",),
+        row_ids=("goal_id",),
         keys={"mode": ENUM, **_RUN, **_PROMPT, **_STAGES},
         not_for_chief=("ability_ids",),
     ),
@@ -110,9 +113,9 @@ CALL_FIELDS: dict[tuple[str, str], Fields] = {
         keys={"rigor": ENUM, **_ENGINE, **_STAGES},
     ),
     ("/comms/acknowledge", "POST"): Fields(
-        unbound=("message_id",), keys={"agent": NAME, **_CITE}
+        row_ids=("message_id",), keys={"agent": NAME, **_CITE}
     ),
-    ("/comms/supersede", "POST"): Fields(unbound=("old_id", "new_id")),
+    ("/comms/supersede", "POST"): Fields(row_ids=("old_id", "new_id")),
     # A standing order on the project board of `project_root`; the route answers 400 for a
     # body that names none, so there is no other project to fall back to.
     ("/comms/directives", "POST"): Fields(
@@ -124,13 +127,13 @@ CALL_FIELDS: dict[tuple[str, str], Fields] = {
         scopes=(BOARD_SCOPE_ONLY,),
         # `kind=flow` starts the flow named here (`start_run` reads `core/flows/<flow>`).
         flows=("flow",),
-        unbound=("goal_id",),
+        row_ids=("goal_id",),
         keys={"kind": ENUM, **_ENGINE},
     ),
     ("/comms/goals/run", "POST"): Fields(
         roots=_ROOT,
         names_root=True,
-        unbound=("goal_id",),
+        row_ids=("goal_id",),
         keys={"executor": ENUM, **_RUN, **_PROMPT, **_STAGES},
         # The `team` executor makes `pathly/features/<scope>/<flow>/<slug>` of the flow.
         not_for_chief=("flow", "ability_ids"),
@@ -153,7 +156,7 @@ CALL_FIELDS: dict[tuple[str, str], Fields] = {
     ("/comms/tasks/run", "POST"): Fields(
         roots=_ROOT,
         names_root=True,
-        unbound=("message_id",),
+        row_ids=("message_id",),
         keys={**_RUN, **_PROMPT},
         not_for_chief=("ability_ids",),
     ),
@@ -162,7 +165,7 @@ CALL_FIELDS: dict[tuple[str, str], Fields] = {
         # `retry` starts a run in `body["project_root"]`, empty or not; the other verbs act on
         # the registry's run and read no directory from the body.
         names_root_verbs=("retry",),
-        unbound=("run_id",),
+        run_ids=("run_id",),
         # `reroute` reads the engine (and echoes `stage`); `retry` starts the run again.
         flows=("flow",),
         keys={
@@ -174,14 +177,17 @@ CALL_FIELDS: dict[tuple[str, str], Fields] = {
             "autonomy": FLAG,
         },
     ),
-    ("/runs/<run_id>/stop", "POST"): Fields(unbound=("run_id",)),
-    ("/comms/goals/stop", "POST"): Fields(unbound=("goal_id",)),
+    ("/runs/<run_id>/stop", "POST"): Fields(run_ids=("run_id",)),
+    ("/comms/goals/stop", "POST"): Fields(row_ids=("goal_id",)),
     ("/comms/run/stop", "POST"): Fields(scopes=(BOARD_SCOPE_ONLY,)),
-    ("/comms/tasks/stop", "POST"): Fields(unbound=("message_id",)),
+    ("/comms/tasks/stop", "POST"): Fields(row_ids=("message_id",)),
     ("/runner/agent-answer", "POST"): Fields(
         unbound=("topic",), keys={"answer": TEXT, **_CITE}
     ),
     ("/comms/answer", "POST"): Fields(
-        unbound=("question_id", "option_id"), keys={"answer": TEXT, **_CITE}
+        row_ids=("question_id",),
+        # Refused to a chief by the cite rule, which relays a human message's own words.
+        unbound=("option_id",),
+        keys={"answer": TEXT, **_CITE},
     ),
 }

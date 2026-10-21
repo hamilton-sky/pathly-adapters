@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import pytest
 from chief_cite_support import (
+    _demo_is_a_feature_of_the_chiefs_project,
     AS_CHIEF,
     Session,
     acknowledged_by,

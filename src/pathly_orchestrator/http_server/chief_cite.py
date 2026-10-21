@@ -38,7 +38,9 @@ reads it with ``force=True``, the route's strict ``get_json()`` answers 415, the
 ``/comms/answer`` on a human escalation (the route's 403) all use the message up, and the person
 is not told. So a chief, buggy or hostile, can burn any unspent message of its session by naming
 a topic with no run or an idle one; the person types again. A target the route rejects for its
-shape (a blank or non-string ``topic`` or ``question_id``) spends nothing. Both sides of "at or
+shape (a blank or non-string ``topic`` or ``question_id``) spends nothing, and so does one the
+gate cannot look up (``chief_bind.is_id``: over 512 characters, a control character or a lone
+surrogate), which is left to the route. Both sides of "at or
 after" are the wall clock (``time.time()`` for a message and for a run's question, the row's ISO
 ``ts`` for a board row), so a clock stepped backwards lets an older message pass. A codex chief
 records no message, so it can cite nothing.
@@ -53,6 +55,7 @@ from flask import g
 
 from pathly_orchestrator.scope_names import root_spelling
 
+from .chief_bind import is_id
 from .chief_project import NOT_OWN, is_own
 
 NOT_CITED = "cite a human message from this chief session"
@@ -156,8 +159,10 @@ def cite_refusal(
     message = _cited_message(conn, session, cite)
     if message is None:
         return _not_cited(session)
-    if not isinstance(target, str) or not target.strip():
-        return None  # the route answers 400 for its target before it looks at an answer
+    if not is_id(target):
+        # The route answers for a target it rejects (400) or finds nothing for (404, 409); one
+        # the gate cannot look up (a lone surrogate, which SQLite refuses) is the route's too.
+        return None
     floor = _floor(rule, session, conn, target)
     if isinstance(floor, str):
         return floor
