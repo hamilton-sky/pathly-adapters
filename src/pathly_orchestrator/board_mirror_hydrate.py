@@ -31,19 +31,23 @@ def _belongs(msg: object, board: str, scope: str) -> bool:
     """True when a snapshot row is a row of the board its file was written for.
 
     The file's own ``board``/``scope`` keys are not read: they are as unverified as the rows.
-    A project scope is compared the way the exporter and ``board_from_scope`` write it, as a
-    normalised root (forward slashes, no trailing one); a feature or global scope exactly.
+    The row's scope is compared exactly: ``hydrate_project`` hands over the normalised project
+    root and the exporter writes that spelling into every row, so a row that spells its root
+    another way would be stored under a scope no board read asks for. A row whose ``id`` is not
+    a string is not one an export wrote.
     """
-    if not isinstance(msg, dict):
-        return False
-    if msg.get("board") != board or not isinstance(msg.get("scope"), str):
-        return False
-    if board != "project":
-        return msg["scope"] == scope
-    from pathly_orchestrator.board_mirror import _norm_project_root
+    return (
+        isinstance(msg, dict)
+        and isinstance(msg.get("id"), str)
+        and msg.get("board") == board
+        and msg.get("scope") == scope
+    )
 
-    own = _norm_project_root(scope)
-    return own is not None and _norm_project_root(msg["scope"]) == own
+
+def _entries(snapshot: dict, key: str) -> list:
+    """The list the snapshot holds under *key*; a value that is not a list is no entries."""
+    found = snapshot.get(key)
+    return found if isinstance(found, list) else []
 
 
 def hydrate_board(conn: sqlite3.Connection, board: str, scope: str, path: Path) -> bool:
@@ -51,17 +55,21 @@ def hydrate_board(conn: sqlite3.Connection, board: str, scope: str, path: Path) 
 
     DB stays authoritative: if ``get_all_messages`` already returns rows for this
     (board, scope), this is a no-op (returns False) — an existing board is NEVER
-    overwritten by a stale or divergent mirror. Otherwise every message/artifact row
-    in the snapshot is inserted (full-fidelity, idempotent) and each inserted message
-    is best-effort re-embedded — the rows landing in the DB are hydration's whole
-    value, so a missing/broken embedder must never block or fail it. Rows that carry no
-    ``author_source`` (a pre-upgrade snapshot) are then labelled ``legacy``. Never raises.
+    overwritten by a stale or divergent mirror. Otherwise the snapshot's message rows of this
+    board, and the artifacts of those rows, are inserted (idempotent; a row keeps every column
+    it names but ``binding`` and ``author_source``, see below) and each inserted message is
+    best-effort re-embedded — the rows landing in the DB are hydration's whole value, so a
+    missing/broken embedder must never block or fail it. Rows that carry no ``author_source``
+    (a pre-upgrade snapshot) are then labelled ``legacy``. Never raises: a file that is not a
+    JSON object returns False, and an entry that is not what an export writes (a row that is
+    no object, an ``id`` or ``message_id`` that is not a string, a list that is not a list) is
+    left out, not fatal to the file or to the boards after it.
 
     Nothing in the file is verified (chief-agent 16): a message row whose ``board`` and
-    ``scope`` are not this file's is left out, with the artifacts that point at it, and the
-    rows that are kept are stored with ``binding = 0`` and no verified author stamp
-    (``comms_hydrate._unverified``). A standing order does not survive a fresh clone: the
-    chief posts it again.
+    ``scope`` are not this file's is left out, an artifact is kept only when it points at a
+    row that was kept, and the rows that are kept are stored with ``binding = 0`` and no
+    verified author stamp (``comms_hydrate._unverified``). A standing order does not survive
+    a fresh clone: the chief posts it again.
     """
     try:
         if get_all_messages(conn, board, scope):
@@ -74,14 +82,18 @@ def hydrate_board(conn: sqlite3.Connection, board: str, scope: str, path: Path) 
         logger.debug("hydrate_board failed to read %s", path, exc_info=True)
         return False
 
-    all_messages = snapshot.get("messages") or []
-    messages = [m for m in all_messages if _belongs(m, board, scope)]
-    kept = {m.get("id") for m in messages}
-    left_out = {m.get("id") for m in all_messages if isinstance(m, dict)} - kept
+    if not isinstance(snapshot, dict):
+        logger.debug("hydrate_board: %s is not a JSON object", path)
+        return False
+
+    messages = [m for m in _entries(snapshot, "messages") if _belongs(m, board, scope)]
+    kept = {m["id"] for m in messages}
     artifacts = [
         a
-        for a in snapshot.get("artifacts") or []
-        if not (isinstance(a, dict) and a.get("message_id") in left_out)
+        for a in _entries(snapshot, "artifacts")
+        if isinstance(a, dict)
+        and isinstance(a.get("message_id"), str)
+        and a["message_id"] in kept
     ]
 
     for msg in messages:

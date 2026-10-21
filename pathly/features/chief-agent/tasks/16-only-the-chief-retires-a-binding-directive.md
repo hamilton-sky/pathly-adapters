@@ -1,7 +1,7 @@
 # Only the chief retires a binding directive, and hydration cannot forge one
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 11, 12
 Test first: yes
 
@@ -103,7 +103,7 @@ Source:
   becomes `legacy`.
 - `board_mirror_hydrate.py`: `_belongs(msg, board, scope)`; `hydrate_board` stores only the message
   rows that belong to the file's board and scope, leaves out the artifacts of a row it left out,
-  and re-embeds only stored rows.
+  and re-embeds only stored rows. (Reworked in round 2: see Review fixes 1, 2 and 4.)
 - `http_server/blueprints/comms/directives.py` reuses `is_chief_run` (was an inline copy of the
   same test). `runner/comms_formatters.py`: the docstring of `_render_standing_orders` said the
   rule was not enforced; it now says the routes enforce it.
@@ -172,13 +172,14 @@ Also run:
    slashes, no trailing slash), the way the exporter writes it, so `C:\proj\` and `C:/proj` are one
    board and a row for another root, or one that differs in case, is skipped. Other boards are
    compared exactly. A row with no `board` or `scope`, or a non-object entry, is skipped.
+   (Round 2 changed this: a project scope is now compared exactly too, see Review fixes 2.)
 4. `is_binding` lives in `_supersede_on_post.py` as the ticket says; `soft_delete_message` is in
    the db layer, which cannot import upward, so it reads the `binding` column in its own existing
    `SELECT` (the same predicate, `binding == 1`). `test_is_binding_and_the_standing_orders_query_
    never_disagree` pins `is_binding` and `get_binding_decisions` to one answer; the delete guard
    is covered by its own tests (a binding row is refused for every caller and for the db function
    called directly, an ordinary decision is still deleted) and is not tied to `is_binding` by a
-   test.
+   test. (Round 2 added that test, see Review fixes 3.)
 5. `is_chief_run` was added to `run_identity.py` and `directives.py` now calls it, because ticket
    12 had the same test inline and the lead asked to reuse, not copy. `chief_may_retire` is
    `is_chief_run`.
@@ -212,6 +213,94 @@ caller), `dedupe_board` (it never touches a decision), the task and goal routes 
 outside what a route can close. `test_binding_retire_writers.py` pins the set of statements that
 write `deleted_at` or `superseded_by` and the callers of their functions, so a ticket that adds a
 new way to retire a row fails it until the author decides whether a binding row is guarded.
+
+### Review fixes (round 2)
+
+Commits: `07caa7c` (test only: the new and changed tests, nothing else), then the fix commit that
+carries this Answer. At `07caa7c` with the round-1 source, the guard, forgery and hostile files give
+69 failed and 98 passed; the failures are `TypeError: unhashable type`, `AttributeError` on a non-object
+file or entry, a planted artifact stored, a `<root>/` row stored under a scope no read sees.
+
+1. **major, `hydrate_board` raised on a hostile id: fixed.** The cause was `{m.get("id") for ...}`
+   (and `a.get("message_id") in left_out`) hashing values from the file outside any `try`. Now
+   `_belongs` requires `isinstance(msg.get("id"), str)`, `kept = {m["id"] for m in messages}` holds
+   strings only, and an artifact's `message_id` is looked at only when it is a `str`. `left_out` is
+   gone (finding 4 made the artifact filter positive, so nothing needs the other set). The docstring's
+   "Never raises" is now true past the reported input: a file that is not a JSON object returns False
+   (at base `snapshot.get` raised `AttributeError` outside the `try`), a `messages` or `artifacts` value
+   that is not a list reads as empty (`_entries`), and a non-object artifact entry is dropped (at base
+   it raised in the re-embed loop). **Decision:** a message row whose `id` is not a string is left out
+   too, not only left out of `kept`: an export writes string ids, and at base `id: null`, `7` and `true`
+   were stored (as `NULL`, `'7'`, `'1'`), so the stored set and `kept` would have disagreed. Tests, all in
+   `tests/comms_board/test_board_hydrate_hostile.py` (64): a list or dict `id` (`[]`, `[1]`, `{}`, the
+   spec reviewer's two among them) on a kept row, on a row left out for each of the three other boards,
+   and a non-string `message_id` on an artifact; a non-object artifact entry; a file that is not an
+   object; a `messages` or `artifacts` value that is not a list; and `hydrate_project` with five kinds
+   of poison in the project file (the first candidate: a list `id`, a dict `id`, an unhashable `id` on a
+   left-out row, an artifact `message_id` that is a list, and a file that is no object): the feature and
+   global boards import and the project file's good row too. Two more sit in the guard file
+   (`test_a_row_id_that_is_a_list_or_a_dict_neither_plants_a_directive_nor_stops_the_file`).
+2. **minor, project-scope spelling: fixed, compare exactly.** Chosen over storing the normalised scope
+   because no earlier test needed the normalised comparison (the only test of it was my own round-1
+   `test_a_project_root_is_compared_the_way_the_exporter_writes_it`), because the only caller of
+   `hydrate_board` is `hydrate_project`, which passes the normalised root, and the exporter writes that
+   spelling into every row. It is less code (`_belongs` lost its `_norm_project_root` import) and nothing is
+   rewritten on the way in. `test_a_project_root_is_compared_the_way_the_exporter_writes_it` now stores a
+   row on its own root (a temp path, `C:/proj`, a path with a space) and asserts it is VISIBLE through
+   `get_all_messages(conn, "project", root)`; the new `test_a_project_row_spelled_another_way_is_skipped_not_stored_out_of_sight`
+   covers `<root>/`, `<root>//`, `C:\proj`, `C:\proj\`, `C:/proj/`, a different case and a leading space,
+   each left out while the row of the exact spelling is stored and visible. The four spelled-differently
+   cases the old test treated as one board are those skipped cases now, which the finding asks for.
+3. **minor, `locked` against `binding` order: tests only, no production change.** In
+   `test_binding_directive_guard.py`: a directive whose `read_by` is `["builder"]` answers 403 `REFUSED`
+   with and without `force` over HTTP, and `"binding"` from `soft_delete_message` with and without
+   `force`; an ordinary decision with the same `read_by` is still 409 plain and 200 forced (the control);
+   and `test_the_delete_guard_and_the_standing_orders_query_never_disagree` (flags 0, 1, 2, -1) ties
+   `soft_delete_message` to `get_binding_decisions`, so the third spelling of the flag is covered.
+   `messages_crud.py` is untouched and still exactly 400 lines.
+4. **minor, artifact filter: fixed.** An artifact is kept only when its `message_id` is a string in `kept`.
+   Tests: `test_an_artifact_on_an_id_the_file_does_not_hold_is_not_stored` (an artifact on the id of a
+   project-board directive that is in the DB, one on an id nowhere, and the artifact of a kept row, which
+   is stored), `test_every_artifact_of_a_kept_row_is_stored`, and
+   `test_a_feature_board_file_cannot_plant_an_artifact_on_a_directive` in the guard file.
+5. **minor, stale text: fixed after checking each against the code.** `src/pathly_orchestrator/CLAUDE.md`:
+   "until it is superseded or deleted" now says the chief supersedes and nobody deletes (the delete
+   route is 403 for every caller); the hydration sentence says the scope is compared exactly and lists
+   the new leave-outs (non-string `id`, artifact of a row not in the file, a file that is no object) and
+   that `hydrate_board` does not raise; the `run_identity.py` layout line no longer says "Nothing applies
+   a policy from it yet" and names who does (the directive routes, `refuse_agent_on_human_gate`,
+   `comms/tasks_status.py`, `tasks_floor.py`, `core/fsm.py` `force_past_gate`, the chief open and close
+   routes; `chief_gate` reads the token row itself through `lookup_run_token`).
+   `runner/comms_formatters.py`: `/comms/delete` is refused to every caller, the chief included.
+   `board_mirror_hydrate.py` docstring: "full-fidelity" and "Never raises" now match the code.
+   `db/queries/comms_hydrate.py` lines 1-9: "AS-IS ... all preserved" now says two columns of a
+   message row are reset. Nothing else was rewritten.
+6. **minor, move `BINDING_REFUSED` to `comms/_helpers.py`: carried** to the cleanup PR, as told.
+   `_supersede_on_post.py` is untouched.
+7. **minor, `messages_crud.py` at 400 lines: carried** to the cleanup PR, as told. Untouched.
+
+Proof of round 2, run fresh after the last code, test and doc edit (Python 3.12.3 unless noted):
+
+- `python -m pytest tests/comms_board/test_binding_directive_guard.py -q -p no:cacheprovider`: `57 passed`, exit 0.
+- `python -m pytest tests/comms_board/test_board_closure.py -q -p no:cacheprovider`: `34 passed`, exit 0.
+- `python scripts/check_file_size.py`: `OK: 1036 source files checked; 18 known over 400 lines, none new,
+  none grown.`, exit 0.
+- Hostile, forgery, retire-writers, mirror-hydrate and provenance files together: `221 passed`, exit 0.
+  `tests/comms_board` plus `tests/db`: `1427 passed, 2 skipped` (the two skips were there before), exit 0.
+  `tests/http_api/test_chief_gate.py`: `106 passed`.
+- Python 3.13.16 (`venv313`): the guard, forgery, hostile, retire-writers, closure, mirror-hydrate and
+  provenance files: `312 passed`.
+- `black --check src/ tests/` (666 files unchanged), `mypy src/ --ignore-missing-imports --no-strict-optional`
+  (341 files, no issues), `lint-imports` (1 kept, 0 broken), `check_no_mirror_reads.py` OK,
+  `gen_test_index.py --check` up to date, `bandit -q -r src/ -ll` clean, `check_adapters.py`,
+  `check_entry_points.py` and `check_version_sync.py` exit 0.
+- Mutation checks in a scratch copy (a one-line revert each, 14 mutants): the string-only id test removed,
+  `kept` built with `.get` over every row, the artifact `message_id` string test removed, the artifact
+  "in `kept`" test removed, the artifact object test removed, `_entries` without its list test, the
+  snapshot object test removed, project scope compared normalised again, scope not compared, `locked`
+  decided before `binding`, `binding` only when nobody has read the row, `binding >= 1`, and `binding`
+  refused only without `force`. Each was killed by a new test; `board` not compared (a round-1 line) was
+  killed by an older test only, which is not a round-2 target.
 
 ### For later tickets
 

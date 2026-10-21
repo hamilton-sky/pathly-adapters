@@ -232,8 +232,9 @@ their board context from `runner/comms_context.retrieve_board_context(..., role)
 decisions from `runner/comms_governance.governance_decisions`: the `pending` decisions of the
 tiers the run reads (the first `/comms/acknowledge` sets a row `active`, and an ordinary decision
 then leaves the governance block), plus the **standing orders**, the decisions with
-`comms_messages.binding = 1`. A standing order stays in the prompts whatever its status, until it
-is superseded or deleted (`db/queries/comms_directives.get_binding_decisions`: one static
+`comms_messages.binding = 1`. A standing order stays in the prompts whatever its status, until the
+chief supersedes it (nobody can delete one, see "Who retires or forges a standing order" below;
+`db/queries/comms_directives.get_binding_decisions`: one static
 statement, the board and scope lists passed as one JSON string each and unpacked by `json_each`,
 built into SQLite since 3.38.0). It reaches the prompts of the role it is addressed to
 (`to_agent`, matched exactly), and every prompt when it is addressed to `*`; an empty role gets `*`
@@ -283,8 +284,14 @@ the server secret; `POST /comms/delete` answers the same 403 for **every** calle
 chief token never gets that far: a directive is superseded, not deleted); and hydration stores
 `binding = 0` for every message row it imports. `POST /comms/hydrate` (the only caller of
 `hydrate_project`) reads a file, so `hydrate_board` leaves out a row whose `board` and `scope` are not
-those of the file it came from (a project scope compared as a normalised root, so an export followed by
-a hydrate keeps every row of its own board), `comms_hydrate._unverified` stores `binding = 0`, and an
+those of the file it came from (the scope is compared exactly: `hydrate_project` passes the normalised
+root and the exporter writes that spelling into every row, so an export followed by a hydrate keeps
+every row of its own board, and a row that spells its root another way, `<root>/` or `C:\proj`, is left
+out rather than stored under a scope no board read asks for) and a row whose `id` is not a string; an
+artifact is kept only when its `message_id` is a row of the same file that was kept; a file that is not
+a JSON object imports nothing; and `hydrate_board` does not raise on any of it, so one hostile entry
+(an `id` that is a list or a dict, say) cannot stop the boards `hydrate_project` reads after it.
+`comms_hydrate._unverified` stores `binding = 0`, and an
 `author_source` the file names other than `none` is stored as `legacy` (`none` stays `none`: the read
 wall withholds a `none` row from a restricted role whatever its `author_role`, which it does not do
 for a `legacy` row). A standing order therefore
@@ -1544,7 +1551,7 @@ pathly_orchestrator/
     chief_keys.py          # key_refusal(): refuses a key the entry does not list, and a `flow` or `skill` that is not one name (scope_names.is_flow_name / is_skill_name) — see "Chief gate"
     chief_budget.py        # the cost ceiling and the run limit of a chief session (chief.max_cost_usd_per_run, chief.max_runs_per_session): budget_refusal() is the gate's last check and takes the run slot, refund_run_slot() is the after_request hook that gives it back for a 4xx, ceiling_usd()/run_limit() read the settings — see "Chief gate"
     chief_cite.py          # cite_refusal() / answer_text(): the cite rule for an `answer` action — the chief names a human message of its session by `cite`, the gate checks it (kind human, this session, typed after the question, once; an acknowledgement must say `agent: "chief"`) and keeps its text on flask.g for the answer routes to relay — see "Chief gate"
-    run_identity.py        # caller_identity(request) -> CallerIdentity: kind run|anonymous from the X-Pathly-Run-Token header (body role/run_id/from never read); unknown/revoked token logged at info with the remote addr; `ui` kind reserved (RRP-2b); `is_chief_run(identity)`: True for a live run whose role is `chief` and nobody else (the test behind who may post and who may retire a binding directive). Nothing applies a policy from it yet
+    run_identity.py        # caller_identity(request) -> CallerIdentity: kind run|anonymous from the X-Pathly-Run-Token header (body role/run_id/from never read); unknown/revoked token logged at info with the remote addr; `ui` kind reserved (RRP-2b); `is_chief_run(identity)`: True for a live run whose role is `chief` and nobody else (the test behind who may post and who may retire a binding directive). Routes apply a policy from it: who posts and retires a directive, the human-gate refusals (`comms/_helpers.py`), a task's completion and `floor-allow` (`comms/tasks_status.py`, `tasks_floor.py`), `force_past_gate` (`core/fsm.py`) and the chief open/close routes; `chief_gate` reads the token row itself (`lookup_run_token`) instead
     sse.py                 # SSE globals (_clients, _runner_clients, _menu_clients) + broadcast helpers
     pricing.py             # MODEL_PRICING, compute_cost_usd()
     feedback.py            # _feedback_watcher, _process_feedback_file

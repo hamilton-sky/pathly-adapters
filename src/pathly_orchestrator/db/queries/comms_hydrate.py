@@ -3,10 +3,11 @@
 ``post_message`` only inserts the live-write SUBSET of ``comms_messages`` columns (no
 ``status``/``read_by``/``acknowledged_by``/``deleted_at``/``superseded_by``/...), so it
 cannot round-trip a BOARD.json snapshot row without losing fields. ``insert_message_row``
-and ``insert_artifact_row`` take a whole snapshot row dict and insert it AS-IS
-(id/ts/status/... all preserved), filtered to the table's real columns and idempotent
-via ``INSERT OR IGNORE`` — a colliding id (the row is already in the DB) is a no-op, so
-re-hydrating an already-populated board changes nothing. Both are best-effort: never raise.
+and ``insert_artifact_row`` take a whole snapshot row dict and insert it as the file has it
+(id/ts/status/... preserved; two columns of a message row are reset, see below), filtered to
+the table's real columns and idempotent via ``INSERT OR IGNORE`` — a colliding id (the row is
+already in the DB) is a no-op, so re-hydrating an already-populated board changes nothing.
+Both are best-effort: never raise.
 
 Split out of ``comms_messages.py`` / ``comms_artifacts.py`` (each already at the
 project's 400-line-per-file cap) and re-exported from both for the conventional
