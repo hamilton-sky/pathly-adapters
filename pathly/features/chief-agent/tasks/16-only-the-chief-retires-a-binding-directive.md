@@ -1,7 +1,7 @@
 # Only the chief retires a binding directive, and hydration cannot forge one
 
 Type: task
-Status: resolved
+Status: open
 Blocked by: 11, 12
 Test first: yes
 
@@ -227,3 +227,33 @@ new way to retire a row fails it until the author decides whether a binding row 
   names them (only `author_source` and `binding` are reset, as the ticket says; the read wall
   trusts `token` only); `hydrate_board` swallows a per-row insert error and reports success for the
   file, which is its documented behaviour.
+
+## Review findings (round 1, quality review)
+
+QUALITY
+1. major src/pathly_orchestrator/board_mirror_hydrate.py:79-85 - `hydrate_board` now hashes ids from the file (`kept = {m.get("id") ...}`, `left_out`, `a.get("message_id") in left_out`) outside any try. A message row whose `id` is a list or dict raises `TypeError` out of a function documented as "Never raises". Failing input: a feature BOARD.json with messages `[{"id": [1], "board": "feature", "scope": "feat-q", ...}, <good row>]`.
+   - Result at HEAD: `TypeError: unhashable type: 'list'` at line 79, and nothing is imported. At base 5b6c481 the same file imported the good row and returned True. A list/dict id on a row that is left out raises at line 80, and an unhashable artifact `message_id` raises at line 84.
+   - Through `hydrate_project` the exception is swallowed by its outer try. One bad row in the project BOARD.json (the first candidate) silently stops hydration of every later feature board and the global board. I probed this: the feature row was imported at base and absent at HEAD. That is worse than a file of garbage JSON, which only skips its own board.
+   - The ticket treats the mirror file as hostile input, so this is a boundary regression in the code it hardens.
+   - Change: only count ids that are `str` when building `kept` and `left_out` (and compare `message_id` only when it is a `str`), or wrap the filtering in the same try as the read. Add a test with an unhashable `id` on a kept row, on a skipped row and on an artifact.
+2. minor src/pathly_orchestrator/board_mirror_hydrate.py:46 - `_belongs` accepts a row whose project scope is spelled `<root>/` or `C:\proj`, but `insert_message_row` stores it under that spelling. The probe stored scope `'.../proj/'` and `get_all_messages(conn, "project", root)` returned `[]`, so the row never reaches the board. `test_a_project_root_is_compared_the_way_the_exporter_writes_it` only checks `count(id) == 1`, so it passes vacuously. `hydrate_project` already passes the normalised root and the exporter writes normalised scopes. Compare exactly, or store the normalised scope, and have the test assert the row is visible through `get_all_messages`.
+3. minor tests/comms_board/test_binding_directive_guard.py - Nothing pins the order "binding before `locked`" in `soft_delete_message`. Mutants that check `locked` first, or that apply the binding check only when `read_by` is empty, survive the three new files plus closure, mirror-hydrate and provenance. No test deletes a binding row whose `read_by` names an agent. Today only hydration writes `read_by`, so the impact is small. At HEAD my probe gives 403 `REFUSED`; a mutant would give 409 `locked`. The `== 1` in `soft_delete_message` is also a third spelling of the flag, next to `_BINDING_SQL` and `get_binding_decisions`, and the "never disagree" test does not cover it. Add one test with `read_by='["builder"]'`, with and without `force`, expecting 403 and `"binding"`.
+4. minor src/pathly_orchestrator/board_mirror_hydrate.py:81-85 - The artifact filter is negative: it drops only artifacts of rows that were left out. An artifact whose `message_id` is not in the file at all is imported. Probe: a feature BOARD.json planted artifact `a-planted` (path `/etc/hostname`) on the id of an existing project-board directive, and it was stored. This surface existed before the ticket. Keep an artifact only when `message_id in kept`, which loses nothing an export wrote.
+5. minor Stale text, none of it relied on by a later ticket:
+   - src/pathly_orchestrator/CLAUDE.md:235 still says a standing order stays "until it is superseded or deleted"; nobody can delete one now.
+   - src/pathly_orchestrator/runner/comms_formatters.py:205-207 groups `/comms/delete` with the routes that "leave a binding row to a live chief run". Not even the chief can delete one.
+   - board_mirror_hydrate.py:55 says "full-fidelity" and :58 says "Never raises" (see 1). db/queries/comms_hydrate.py:1-9 says rows are inserted "AS-IS (id/ts/status/... all preserved)", which the new paragraph below it contradicts.
+   - src/pathly_orchestrator/CLAUDE.md:1547: the run_identity line that was edited still ends "Nothing applies a policy from it yet", which is false.
+6. minor src/pathly_orchestrator/http_server/blueprints/comms/_supersede_on_post.py:50 - `BINDING_REFUSED` is shared by two route files but defined in one of them. SOLID rule 5 puts shared constants in `comms/_helpers.py`. Low cost to move.
+7. minor src/pathly_orchestrator/http_server/blueprints/comms/messages_crud.py - It is exactly 400 lines. `check_file_size.py` passes, but any later ticket that edits it (17 or round two) has to split it first. Not a defect now.
+
+Checks run (not findings):
+- Range and what I read: I reviewed 5b6c481..6fa0382. `END` is HEAD, so no later commits were excluded. I read the ticket at 5b6c481 and never read its Answer. The diff hunks of `map.md` and `learnings.md` (author notes) reached me after I had formed finding 1 from the code and a probe.
+- Tests: The three new test files pass: 87 on Python 3.12. Under 3.13 those three plus `test_board_closure.py`, `test_board_mirror_hydrate.py` and `test_comms_provenance.py` pass: 227. `tests/comms_board`, `tests/db` and `tests/consistency` pass on 3.12: 1399 passed, 2 skipped.
+- Tooling: `check_file_size.py`, `gen_test_index.py --check` and `check_no_mirror_reads.py` are clean. black, mypy on all of `src/` and lint-imports are clean. Test basenames are unique across `tests/`.
+- Weakened checks: The only loosened existing assertion is `tests/comms_board/test_comms_provenance.py:634` (`token` to `legacy`), plus two comment edits. No other assertion line was removed from `tests/`.
+- Mutations: I ran 29 single-line mutants in a scratch copy; 27 were killed and 2 survived (both in finding 3). Hydration: keeping the file's `binding`, keeping its `author_source`, relabelling only `token`, relabelling `none`, dropping the scope check, ignoring `board`, exact project-scope compare, artifacts of skipped rows kept, artifacts of kept rows dropped, removing the non-dict check, applying `_unverified` to no table. Supersede and delete: dropping the binding skip in `apply_supersedes`; `chief_may_retire` always true, true for any run token, true for anonymous, or checking role only; the binding check removed or reordered in `refuse_agent_supersede`; the route's binding branch removed, 403 changed to 409, or the refusal text changed; the skip reason renamed; `is_binding` as `>= 1`; `soft_delete_message` binding check only without `force`.
+- Callers: A feature-board run token on `/comms/supersede` gets 403 `REFUSED`. On `/comms/post` it gets a skip with reason `other_board`. No token and the server secret alone get 403/`binding`. `chief_may_retire(None)` is False and `is_binding` is False for unknown or empty ids. `is_binding` and the standing-orders query agree for flags 0, 1, 2 and -1. A run token with role `chief` but no chief session is stopped by the chief gate (401) before any route.
+- Other writers: Delete is the only route that can trash a row. `dedupe_board` skips decisions, and consolidate, closure, acknowledge, answer and edit cannot retire a binding row. `/comms/restore` is unauthenticated. It reaches a binding row only to reset an active row's status to `pending`, or to un-trash a row trashed before this fix. It retires nothing. `test_binding_retire_writers.py` pins the writers and their callers.
+
+REVIEW: FAIL
