@@ -15,6 +15,8 @@ from __future__ import annotations
 
 from typing import Optional
 
+from ._cost import flow_cost
+
 ACTIVE_STATUSES = ("running", "paused", "awaiting_decision")
 
 
@@ -236,6 +238,10 @@ def _create_flow_run(body: dict, project_root: str) -> tuple[dict, int]:
             return {"error": f"Field '{field_name}' must be a non-empty string"}, 400
 
     model = body.get("model", "claude-sonnet-4-6") or "claude-sonnet-4-6"
+    try:
+        max_cost_usd = flow_cost(body)
+    except ValueError as exc:
+        return {"error": str(exc)}, 400
 
     from ...sse import _broadcast_runner
     from pathly_orchestrator.supervisor.api import start_run
@@ -246,6 +252,7 @@ def _create_flow_run(body: dict, project_root: str) -> tuple[dict, int]:
             flow=flow,
             project_root=project_root,
             model=model,
+            max_cost_usd=max_cost_usd,
             broadcast_fn=_broadcast_runner,
         )
     except ValueError as exc:

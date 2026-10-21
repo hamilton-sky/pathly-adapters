@@ -128,7 +128,8 @@ CALL_FIELDS: dict[tuple[str, str], Fields] = {
         # `kind=flow` starts the flow named here (`start_run` reads `core/flows/<flow>`).
         flows=("flow",),
         row_ids=("goal_id",),
-        keys={"kind": ENUM, **_ENGINE},
+        # The cap a flow start runs with (`chief_budget` holds it to the session's ceiling).
+        keys={"kind": ENUM, "max_cost_usd": NUMBER, **_ENGINE},
     ),
     ("/comms/goals/run", "POST"): Fields(
         roots=_ROOT,

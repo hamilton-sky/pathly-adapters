@@ -147,7 +147,11 @@ def chief_close():
 @bp.route("/chief/session", methods=["GET"])
 def chief_session_state():
     """The project's open chief: ``{open: false}`` or ``{open: true, run_id, tab_id, tier,
-    engine, opened_at}``. 400 without a ``project_root`` query parameter."""
+    engine, opened_at, runs_started, max_runs_per_session, max_cost_usd_per_run}``.
+
+    The last three say why a chief stopped: the runs the session has started, the limit and the
+    ceiling for the cost of one run (``chief_budget``). 400 without a ``project_root`` query
+    parameter."""
     try:
         project_root = request.args.get("project_root", "")
         if not project_root:
@@ -159,7 +163,10 @@ def chief_session_state():
             normalise_project_root,
         )
 
-        row = open_session_for_project(get_db(), normalise_project_root(project_root))
+        from ...chief_budget import ceiling_usd, run_limit
+
+        conn = get_db()
+        row = open_session_for_project(conn, normalise_project_root(project_root))
         if row is None:
             return jsonify({"open": False}), 200
         return (
@@ -171,6 +178,9 @@ def chief_session_state():
                     "tier": row["tier"],
                     "engine": row["engine"],
                     "opened_at": row["opened_at"],
+                    "runs_started": row["runs_started"],
+                    "max_runs_per_session": run_limit(conn),
+                    "max_cost_usd_per_run": ceiling_usd(conn),
                 }
             ),
             200,

@@ -23,10 +23,9 @@ from chief_gate_support import app
 from chief_walk_support import view_keys_read
 from werkzeug.datastructures import MultiDict
 
-# Keys a later ticket reads. Ticket 15 reads `max_cost_usd` on `POST /runs` (its ceiling), which no
-# view reads yet: the entry does not list it, so a chief that sends it is told the key is not
-# listed. Ticket 15 lists it with the code that reads it, and deletes the line.
-WAITS_FOR_A_TICKET = {("/runs", "max_cost_usd")}
+# Keys a later ticket reads and no view reads yet: listing one here lets the entry carry it ahead
+# of the view. Empty since ticket 15 made `POST /runs` read `max_cost_usd`.
+WAITS_FOR_A_TICKET: set[tuple[str, str]] = set()
 # Keys the chief gate reads and no view does: the cite rule (`chief_cite`, ticket 10) reads `cite`
 # on the three answer routes to find the message a chief relays.
 READ_BY_THE_GATE = {

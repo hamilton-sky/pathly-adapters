@@ -530,7 +530,7 @@ The chief is a long-lived interactive agent a human opens for a project from Stu
 ```
 POST /chief/open            ← {project_root, engine, preset, prompt, model?} → 201 {run_id, tab_id, tier, engine}
 POST /chief/close           ← {project_root} → 200 {closed: true|false}
-GET  /chief/session?project_root=  ← {open: false} | {open: true, run_id, tab_id, tier, engine, opened_at}
+GET  /chief/session?project_root=  ← {open: false} | {open: true, run_id, tab_id, tier, engine, opened_at, runs_started, max_runs_per_session, max_cost_usd_per_run}
 POST /chief/human-messages  ← {run_id, hook_secret, text, session_id, relayed?} → 201 {id, kind}   (blueprints/chief/human.py)
 ```
 
@@ -857,6 +857,49 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
   is not an id is 403 first ("Ids" below). Both sides of "at or after" are the wall clock (`time.time()` for a
   message and for a run's question, the board row's ISO `ts` for a board row), so a clock stepped
   backwards lets an older message pass.
+- **Cost and run limit.** Two per-machine settings in `app_settings`, read on every call, bound an
+  operator chief (`http_server/chief_budget.py`; the person sets them with `PUT
+  /db/settings/<key>`, which no chief token can call, and that route keeps no list of names, so a
+  new key needs no registration). `GET /chief/session` reports both, with `runs_started`.
+  - `chief.max_cost_usd_per_run` (default `10.0`): the cost one run may state. `POST /runs` and the
+    `retry` verb are the only start routes whose body carries `max_cost_usd`, so the ceiling is
+    judged there (the other start routes list no such key and a chief that sends one is told so).
+    Above it is 403 `max_cost_usd above this chief's ceiling` with `ceiling`. A value that is not a
+    finite number above 0 (a boolean, string, list, `null`, zero, a negative, `NaN`, `Infinity`) is
+    403 `max_cost_usd must be a finite number above 0` with `ceiling` too: Python's JSON parser
+    takes `NaN`, a comparison with it is false both ways, and a retry would then run with no cap at
+    all. `POST /runs` of a flow now reads the key (`blueprints/control/_cost.py::flow_cost`, passed
+    to `start_run` as the run's cap; a bad value is the route's 400; it ignored the key before) and
+    a start that states none runs at `start_run`'s own `$1` (`DEFAULT_FLOW_COST_USD`), which the gate
+    judges as stated, so a ceiling under `$1` still holds. A retry that states none is the route's
+    400. A goal, a board run and a task run have no per-run cost: only the count below bounds
+    them, and a goal run's own cap is the separate `goal.max_cost_usd` setting. Judged for every
+    reading of the body (`_bodies`).
+  - `chief.max_runs_per_session` (default `20`): the calls that start work count one each against
+    the session (`chief_sessions.runs_started`): `POST /runs`, `/comms/goals/run`, `/comms/run`,
+    `/comms/tasks/run` and the `retry` verb of `/runs/<run_id>/<action>`. `pause`, `resume`,
+    `advance` and `reroute` are `run` too but act on a run that exists and start nothing; the
+    decompose routes (`plan`), every `stop` and every read do not count
+    (`test_chief_budget_edges.py` fails when a new `run` route is not decided). Past the limit is
+    403 `this chief session has started its maximum number of runs` with `limit`; the person raises
+    the setting or opens a new chief. `0` means no run may start.
+  - **Last, and a conditional UPDATE.** `chief_budget.budget_refusal` is the gate's last check,
+    after the action, project, id, key and cite rules, so a call the gate itself refuses costs no
+    slot. It judges the cost, then `db/queries/chief_run_slots.take_run_slot` runs `UPDATE ... SET
+    runs_started = runs_started + 1 WHERE run_id = ? AND runs_started < ?` under the write lock
+    and refuses when no row changed, so two racing calls cannot both take the last slot. It sets
+    `flask.g.chief_run_slot`; the `after_request` hook `refund_run_slot` (registered in `app.py`)
+    runs `runs_started - 1 WHERE runs_started > 0` for a response of 400 to 499 (the route refused
+    the start: a bad body, an unknown goal or task, nothing ready, a busy board, so nothing began and
+    nothing was spent), once, only for the request that took a slot, and never below zero. A 2xx
+    keeps the slot even if the run fails later (it may have spent), and so does a 5xx (the server
+    cannot tell whether work began), and so does a `retry` of a run that is still active or not in
+    the registry (200 `ok: false`). The gate clears the marker at the start of every request.
+  - Refusals carry the usual `error`, `action` (`run`), `tier` and `allowed`, plus `ceiling` or
+    `limit`. A setting that does not parse, is not finite, or is at or below 0 (the ceiling), or is
+    negative or not a whole number (the limit) falls back to its default, which is a bound too; a
+    limit past 2^62 is read as 2^62. Not here: the chief's own token cost, and a cost summed across
+    a session's runs (round two bills the chief session first).
 - **One project.** `http_server/chief_fields.py::ROUTE_FIELDS` is the inventory: one entry per
   `(rule, method)` a chief can get past the action table (merged from `chief_field_calls.py`, the
   POST routes, and `chief_field_reads.py`, the GETs; each entry is a `Fields` of
@@ -1198,10 +1241,7 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
   stay `read` because a status chief must be able to read artifact sections, query code and list
   prompts; none of them can change a decision, a task or a run.
 - **Not here yet.** The id-addressed reads are not bound to the chief's project (listed under "Not
-  bound"); the cost and run ceiling (15) is a later ticket. Ticket 15 reads `max_cost_usd` on `POST /runs` (no view reads it there today;
-  `POST /runs/<run_id>/retry` and the `/runner/*` routes do), so that key is not on the entry's
-  list: a chief that sends it is told the key is not listed, and ticket 15 lists it with the code
-  that reads it and deletes its line from `WAITS_FOR_A_TICKET` in `test_chief_gate_keys.py`.
+  bound"); the cost and run ceiling is "Cost and run limit" above.
   `/comms/directives` (ticket 12) has both entries (`decide`; `project_root`, `to_agent` and `text`),
   as every route a chief can reach needs; it is not in the "Naming it" list, because the route
   answers 400 for a body with no `project_root` and falls back to no other project. Ticket 17's
@@ -1293,7 +1333,9 @@ pathly_orchestrator/
                            # migrations_incremental._add_additive_migrations: chief_sessions
                            # (one row per chief tab, indexed on project_root), chief_human_messages
                            # (indexed on run_id) and chief_citations (message_id UNIQUE, so a human
-                           # message is citable once). CREATE ... IF NOT EXISTS, idempotent
+                           # message is citable once). CREATE ... IF NOT EXISTS, idempotent;
+                           # chief_sessions.runs_started (the runs a session has started, ticket
+                           # 15) is ALTERed in when the table exists without it, once
     provenance_values.py   # the author_source vocabulary and the `system` stamp, defined ONCE
                            # (AUTHOR_SOURCES = token|system|legacy|none, SYSTEM_ROLE, SYSTEM_AUTHOR,
                            # SYSTEM_PAIR); imported by runner/provenance.py, post_message (rejects
@@ -1352,6 +1394,7 @@ pathly_orchestrator/
                            # close_stale_sessions (reason `server restart`), add_human_message (first message
                            # of a session is `style_prompt`, later ones `human` or `relayed`) / get_human_message,
                            # record_citation (False when the message was already cited). Static SQL, writes under _get_write_lock
+      chief_run_slots.py   # take_run_slot / give_back_run_slot: the run counter of a chief session (chief_sessions.runs_started), each one conditional UPDATE under _get_write_lock (a slot is taken only below the limit, given back only above 0); used by chief_budget
       placement.py         # run_project_root(conn, run_id) (the root run_history recorded) and message_board_scope(conn, message_id) ((board, scope) of the row, deleted or not): what chief_bind places an id by; one static statement each
       run_tokens.py        # mint_run_token / resolve_run_token / revoke_run_tokens — the per-spawn identity (role-read-policy): the raw token is returned once and only its sha256 is stored, next to run_id/role/feature/project_root/board/scope; resolve returns None for an empty, unknown or revoked token; lookup_run_token returns the row whether or not it is revoked (None only for an empty or unknown one), so the chief gate can tell a revoked token from an unknown one; revoked when the spawn settles
   runner/                  # CLI runner, agent invocation, argv, output parsing
@@ -1485,6 +1528,7 @@ pathly_orchestrator/
     chief_project.py       # project_refusal(): applies a ROUTE_FIELDS entry to one request (query string for a GET, body otherwise, the URL's `<action>` for the retry verb) and says whether the project it names is the session's — see "Chief gate"
     chief_bind.py          # target_in_project(): places the run, goal, task or message a chief names by id (`run_ids`, `stamped_run_ids`, `row_ids` of its entry) in the session's project, and is_id() — see "Chief gate"
     chief_keys.py          # key_refusal(): refuses a key the entry does not list, and a `flow` or `skill` that is not one name (scope_names.is_flow_name / is_skill_name) — see "Chief gate"
+    chief_budget.py        # the cost ceiling and the run limit of a chief session (chief.max_cost_usd_per_run, chief.max_runs_per_session): budget_refusal() is the gate's last check and takes the run slot, refund_run_slot() is the after_request hook that gives it back for a 4xx, ceiling_usd()/run_limit() read the settings — see "Chief gate"
     chief_cite.py          # cite_refusal() / answer_text(): the cite rule for an `answer` action — the chief names a human message of its session by `cite`, the gate checks it (kind human, this session, typed after the question, once; an acknowledgement must say `agent: "chief"`) and keeps its text on flask.g for the answer routes to relay — see "Chief gate"
     run_identity.py        # caller_identity(request) -> CallerIdentity: kind run|anonymous from the X-Pathly-Run-Token header (body role/run_id/from never read); unknown/revoked token logged at info with the remote addr; `ui` kind reserved (RRP-2b). Nothing applies a policy from it yet
     sse.py                 # SSE globals (_clients, _runner_clients, _menu_clients) + broadcast helpers
@@ -1525,7 +1569,9 @@ pathly_orchestrator/
                            # (FSM registry) or board-lock stop (board/goal; board-lock runs support
                            # ONLY abort, else {ok:false,reason:unsupported_for_kind}), else
                            # {ok:false,reason:not_active}; board_lock.find_by_holder reverse-lookup;
-                           # _helpers.py holds the shared resolution/abort/retry + create-run bodies);
+                           # _helpers.py holds the shared resolution/abort/retry + create-run bodies;
+                           # _cost.py: as_cost() (a finite number above 0) and flow_cost(body), the
+                           # cap POST /runs gives a flow start — shared with the chief gate);
                            # run_streams.py (GET /events/runs?run_id=<run_id> — unified per-run SSE
                            # feed, T3: mirrors the /events/runner shape incl. the
                            # pathly_sse_clients_active gauge bookkeeping; fed by
