@@ -18,21 +18,25 @@ def update_message_text(
 ) -> str:
     """Edit a message's text in place, stamping the row with the editor.
 
-    Returns ``"updated"`` or ``"not_found"``. The three author columns are set in the same
-    ``UPDATE`` as the text, as ``post_message`` sets them on a new row: the editor's stamp,
-    and ``none`` when ``author_source`` is ``None``. A source outside ``AUTHOR_SOURCES``
-    raises ``ValueError`` before anything is written.
+    Returns ``"updated"``, ``"not_found"`` or ``"binding"``. A binding directive
+    (``binding = 1``) is superseded, never edited: it answers ``"binding"`` and changes
+    nothing. The three author columns are set in the same ``UPDATE`` as the text, as
+    ``post_message`` sets them on a new row: the editor's stamp, and ``none`` when
+    ``author_source`` is ``None``. A source outside ``AUTHOR_SOURCES`` raises ``ValueError``
+    before anything is written.
     """
     if author_source is not None and author_source not in AUTHOR_SOURCES:
         raise ValueError(
             f"unknown author_source {author_source!r}; expected one of {sorted(AUTHOR_SOURCES)}"
         )
     row = conn.execute(
-        "SELECT id FROM comms_messages WHERE id=? AND deleted_at IS NULL",
+        "SELECT binding FROM comms_messages WHERE id=? AND deleted_at IS NULL",
         (message_id,),
     ).fetchone()
     if row is None:
         return "not_found"
+    if row[0] == 1:
+        return "binding"
     with _get_write_lock(conn):
         conn.execute(
             "UPDATE comms_messages SET text=?, author_role=?, author_run_id=?, "

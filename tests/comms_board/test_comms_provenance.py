@@ -928,6 +928,11 @@ _UNSTAMPED_ALLOW = {
     # promote_message: the copy is not a new author; it carries the SOURCE row's three
     # author_* values (taken from the row, not from a stamp call), so a chain keeps them.
     "db/queries/comms_promote.py",
+    # post_directive: forwards the stamp its caller computed (`**author`). db/ cannot import
+    # runner/ to build one, and the scan accepts only a literal stamp expression. Its one caller
+    # is POST /comms/directives, which passes `**stamp(caller_identity(request))`;
+    # test_comms_directives_query.py scans every call of post_directive for that form.
+    "db/queries/comms_directives.py",
 }
 
 

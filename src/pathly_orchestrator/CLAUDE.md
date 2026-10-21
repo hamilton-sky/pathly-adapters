@@ -270,19 +270,18 @@ so a change to the table is deliberate. `task_prompt.build_task_prompt` passes `
 means `*` only). `POST /comms/agent-context` (board-info mode) still lists pending decisions
 without a role.
 
-**Not enforced yet: two limits until chief-agent tickets 12 and 16 land.** No route sets
-`binding = 1` on purpose yet (`POST /comms/directives`, ticket 12, is planned as the one door), but:
-(1) hydration does not treat the column as special. `db/queries/comms_hydrate.py` keeps every real
-column, so a `BOARD.json` row carrying `"binding": 1` becomes a standing order when
+**Not enforced yet: two limits until chief-agent ticket 16 lands.** `POST /comms/directives` (ticket
+12) is the one route that sets `binding = 1` on purpose, and `POST /comms/edit` refuses a binding row
+(409), but: (1) hydration does not treat the column as special. `db/queries/comms_hydrate.py` keeps
+every real column, so a `BOARD.json` row carrying `"binding": 1` becomes a standing order when
 `POST /comms/hydrate` imports a board the DB holds no rows for (Studio calls it on project open), and
 any headless agent that can write a file in the project can plant one. Ticket 16 makes hydration store
-`binding = 0`. (2) An agent run token can still rewrite or retire a standing order, so the block's
-"only the human, through the chief, replaces a standing order" is what the prompt says, not yet what
-the routes enforce: `POST /comms/edit` rewrites its text (ticket 12 refuses that for a `binding` row),
-and `POST /comms/supersede` (`refuse_agent_supersede` checks only the row type and board), a decision
-posted with `supersedes` and `POST /comms/delete` retire it (ticket 16). Standing orders also have no
-cap yet on their number or size, and one persists after its acknowledgement; ticket 12 caps the text
-at the writer.
+`binding = 0`. (2) An agent run token can still retire a standing order, so the block's "only the
+human, through the chief, replaces a standing order" is what the prompt says, not yet what the routes
+enforce: `POST /comms/supersede` (`refuse_agent_supersede` checks only the row type and board), a
+decision posted with `supersedes` and `POST /comms/delete` retire it (ticket 16). The writer caps one
+order's text (8 KiB of UTF-8, no control character), but the block has no cap yet on the number of
+orders or on its total size, and an order persists after its acknowledgement.
 
 ## State machine
 
@@ -421,11 +420,12 @@ GET  /comms/artifacts       ← list artifacts linked to a message (comms_artifa
 GET  /comms/trash           ← list trashed messages
 POST /comms/restore         ← restore a trashed message
 POST /comms/supersede       ← mark a message superseded_by another (standalone form, used by Studio's supersede menu and the consolidate skill; an agent run is held to the same decision-only, own-board rules as `/comms/post` + `supersedes`)
+POST /comms/directives      ← CHIEF TOKEN ONLY: post a BINDING directive (standing order) `{project_root, to_agent: "*"|<role>, text}` → 201 `{id}`. `blueprints/comms/directives.py`; the only route that sets `comms_messages.binding = 1` (`db/queries/comms_directives.post_directive`: a `decision` from `chief` on the project board, `from_agent="chief"`, flagged under the write lock; the scope is `fsm_compose.resolve_board_scope("project", project_root, "")`). 403 for every other caller: no token, any other role's token, and a request that carries only the server secret (what Studio sends today; the UI path waits for the UI token, RRP-2b). The chief gate has already checked, for a chief token, that the tier may `decide`, that `project_root` is the session's project and that only `project_root`/`to_agent`/`text` are sent. 400 for a `to_agent` that is not `*` or `^[a-z][a-z0-9_-]{0,39}$` (matched exactly against a prompt's role, so no upper case or padding), a blank `project_root`, or a `text` that is blank, over 8 KiB in UTF-8 BYTES, holds a control character other than newline and tab (a NUL would fail every spawn of the role: `subprocess` refuses an embedded null byte), or is not UTF-8 encodable; the text is stored stripped. Broadcasts the `COMMS_UPDATE` a new row gets. A directive is replaced with `/comms/supersede`, never edited
 GET  /comms/scope           ← read the active board scope
 POST /comms/scope           ← set the active board scope
 GET  /comms/permissions     ← role-based write permissions
 POST /comms/delete          ← soft-delete a message
-POST /comms/edit            ← edit a message's text (e.g. goal rename); re-stamps the row to the EDITOR (`stamp(caller_identity(request))`: their token's role and run, or `author_source="none"` with no token), not the original author, so words cannot sit under another run's `token` stamp. Anyone may still edit; Studio's goal rename sends no token yet, so it stamps `none`
+POST /comms/edit            ← edit a message's text (e.g. goal rename); re-stamps the row to the EDITOR (`stamp(caller_identity(request))`: their token's role and run, or `author_source="none"` with no token), not the original author, so words cannot sit under another run's `token` stamp. Anyone may still edit; Studio's goal rename sends no token yet, so it stamps `none`. A row with `binding = 1` is refused with 409 `{"error": "binding directives are superseded, not edited"}` and nothing changes (`update_message_text` answers `"binding"`; replace a directive with `/comms/supersede`)
 POST /comms/tasks/claim     ← claim a ready task (pending → in_progress)
 POST /comms/tasks/fail      ← mark a task failed (cascade-blocks dependents)
 GET  /comms/artifacts/<id>/section ← hydrate a named section of a .md artifact (+ path form); context-retrieval HYDRATE tier
@@ -743,7 +743,7 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
 | `read` | every GET except `/events/*` and `/db/settings` (spawn tokens, stored secrets); `POST /comms/search`, `/code/query` |
 | `post` | `POST /comms/post` of any type not below |
 | `plan` | `/comms/post` type `goal` or `task`; `/comms/goals/decompose`, `/comms/features/decompose`, `/comms/project/decompose` |
-| `decide` | `/comms/post` type `decision` or `constraint` (a `supersedes` list included); `/comms/acknowledge` on any row that is not a human-addressed escalation; `/comms/supersede`, `/comms/directives` (the route arrives with ticket 12) |
+| `decide` | `/comms/post` type `decision` or `constraint` (a `supersedes` list included); `/comms/acknowledge` on any row that is not a human-addressed escalation; `/comms/supersede`, `/comms/directives` |
 | `run` | `POST /runs`, `/comms/goals/run`, `/comms/run`, `/comms/tasks/run`; `/runs/<run_id>/<action>` for `pause\|resume\|advance\|reroute\|retry` |
 | `stop` | `/runs/<run_id>/stop`; `/runs/<run_id>/<action>` for `abort`; `/comms/goals/stop`, `/comms/run/stop`, `/comms/tasks/stop` |
 | `answer` | `/runner/agent-answer`, `/comms/answer`; `/comms/acknowledge` on an escalation with `to_agent = "human"` (the gate looks the row up by `message_id`). Held to the cite rule ("Cited answers" below) |
@@ -1174,12 +1174,13 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
   prompts; none of them can change a decision, a task or a run.
 - **Not here yet.** Calls that name a run, a message or a goal by id are not bound to the chief's
   project (ticket 14 binds some of the writes; the rest are listed under "Not bound"); the cost
-  and run ceiling (15) and the directive route (12) are later tickets. Ticket 15 reads `max_cost_usd` on `POST /runs` (no view reads it there today;
+  and run ceiling (15) is a later ticket. Ticket 15 reads `max_cost_usd` on `POST /runs` (no view reads it there today;
   `POST /runs/<run_id>/retry` and the `/runner/*` routes do), so that key is not on the entry's
   list: a chief that sends it is told the key is not listed, and ticket 15 lists it with the code
   that reads it and deletes its line from `WAITS_FOR_A_TICKET` in `test_chief_gate_keys.py`.
-  Ticket 12's `/comms/directives` needs a `ROUTE_FIELDS` entry (with the list of the keys a chief
-  may send) as well as a `ROUTE_ACTIONS` one, or the gate refuses it with `NO_ENTRY`. Ticket 17's
+  `/comms/directives` (ticket 12) has both entries (`decide`; `project_root`, `to_agent` and `text`),
+  as every route a chief can reach needs; it is not in the "Naming it" list, because the route
+  answers 400 for a body with no `project_root` and falls back to no other project. Ticket 17's
   `pathly api` texts (what the chief's prompt teaches) must say: name your `project_root`, spelled
   as the session's (on a POSIX host no backslash), on the routes under "Naming it"; send only the
   keys a route's entry lists (`Fields.allowed`, the 403 names a key that is not listed); post an
@@ -1310,8 +1311,8 @@ pathly_orchestrator/
                            #   bucketing (scope_tier is the board tier, not the run type).
       comms.py             # re-export shim — splits into comms_messages, comms_artifacts, comms_tasks, comms_embeddings, comms_counts, comms_goals_read (import from domain modules for new code)
       comms_messages.py    # board message CRUD; goal_id/executor columns back the Goals->Task-DAG model
-      comms_directives.py  # get_binding_decisions(conn, boards, scopes, role): the binding (`binding = 1`) decisions a prompt carries whatever their status, not deleted or superseded, addressed to the role or `*` (`*` only for an empty role), oldest first; board and scope lists go in as one JSON string each through `json_each`, so the statement is one static literal
-      comms_edit.py        # update_message_text: edits a row's text AND sets its three author columns from the editor's stamp (none when no stamp is passed); re-exported from comms_messages / comms
+      comms_directives.py  # get_binding_decisions(conn, boards, scopes, role): the binding (`binding = 1`) decisions a prompt carries whatever their status, not deleted or superseded, addressed to the role or `*` (`*` only for an empty role), oldest first; board and scope lists go in as one JSON string each through `json_each`, so the statement is one static literal; `post_directive(conn, scope, to_agent, text, **author)`: the one writer of `binding = 1` (a `decision` from `chief` on the project board through `post_message`, then flagged under the write lock)
+      comms_edit.py        # update_message_text: edits a row's text AND sets its three author columns from the editor's stamp (none when no stamp is passed), and answers `"binding"` without changing anything for a row with `binding = 1`; re-exported from comms_messages / comms
       comms_artifacts.py   # artifact metadata CRUD (attach, list, section index, update_summary)
       comms_tasks.py       # task DAG operations (get_ready, complete, claim, fail, reclaim, goal_refs_coverage)
       task_results.py      # build-proof: latest_task_summaries(conn, task_ids) — the newest AGENT_DONE `summary` of each task's `sched-<id>#<n>` runs (a dependent task's prompt shows it)
@@ -1469,7 +1470,7 @@ pathly_orchestrator/
       flows/               # defs.py (flow CRUD); stage_configs.py (per-stage overrides: agent/adapter/skill + layer-3 ability_ids + excluded_sections — the flow-phase-inspector SELECTION, applied FRESH at spawn by fsm_compose.build_prompt, never stored as trimmed text)
       catalog/             # items.py (file-tree catalog)
       skills/              # editor.py re-export shim; editor_render.py (/skills/catalog|parse|preview|compose [returns segments+tokens; accepts ability_ids]|summary-format/<style>); editor_io.py (/skills/save|export); prompt_library.py (/skills/prompts — system-prompts are file-backed via skills/prompt_files.py, kind='ability' stays legacy DB); abilities.py (/skills/abilities — layer-3 ability FILES, see skills/abilities.py)
-      comms/               # board + goals/DAG, split by domain: messages*.py, tasks.py, artifacts*.py, runs.py, goals.py, goals_read.py (GET /comms/goals rollup), settings.py, context.py, features.py (/comms/features/decompose), project.py (/comms/project/decompose) (+ _helpers.py); see "Comms board endpoints" above
+      comms/               # board + goals/DAG, split by domain: messages*.py, tasks.py, artifacts*.py, runs.py, goals.py, goals_read.py (GET /comms/goals rollup), settings.py, context.py, directives.py (POST /comms/directives, chief token only), features.py (/comms/features/decompose), project.py (/comms/project/decompose) (+ _helpers.py); see "Comms board endpoints" above
       ops/                 # telemetry*.py (/record_activity, /record_phase*, /telemetry/*); menu.py (/menu, /metrics); db_api*.py (/db/* read API); chat.py (/chat); export.py
       code/                # query.py (POST /code/query — codebase-intelligence; its answer cache is keyed by (project root, op, target, content hash, backend) and holds nothing for a target with no hash: a directory, a missing file or a symbol)
       hq/                  # the HQ copilot (pathly/features/hq-copilot, local-operator): prompt.py

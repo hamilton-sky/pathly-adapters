@@ -39,6 +39,7 @@ POSTS = [
     ("/comms/acknowledge", {"message_id": "x", "agent": "chief"}),
     ("/comms/answer", {"question_id": "x", "answer": "yes"}),
     ("/comms/supersede", {"old_id": "x", "new_id": "y"}),
+    ("/comms/directives", {"to_agent": "*", "text": "no new dependencies"}),
     ("/runs", {"kind": "single", "scope": "demo"}),
     ("/code/query", {"op": "impact", "target": "a.py", "role": "architect"}),
 ]

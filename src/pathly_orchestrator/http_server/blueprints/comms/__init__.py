@@ -1,6 +1,7 @@
 """Comms board blueprints — aggregated for registration in app.py."""
 
 from .messages import bp as messages_bp
+from .directives import bp as directives_bp
 from .tasks import bp as tasks_bp
 from .tasks_status import bp as tasks_status_bp
 from .tasks_floor import bp as tasks_floor_bp
@@ -29,6 +30,7 @@ from ._helpers import (  # noqa: F401
 
 all_blueprints = [
     messages_bp,
+    directives_bp,
     tasks_bp,
     tasks_status_bp,
     tasks_floor_bp,

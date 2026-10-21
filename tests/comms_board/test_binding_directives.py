@@ -10,8 +10,9 @@ read for every prompt, whatever its status, until it is superseded or deleted:
 - rendered in a standing-orders block of its own, outside the ranked decision list, so a newer
   ordinary decision cannot outrank it.
 
-Rows are inserted through `post_message` and `binding` is set directly: `POST /comms/directives`
-(the only door that sets it) is a later ticket.
+Rows are inserted through `post_message` and `binding` is set directly, because these tests need
+rows of any role, status and `ts`: `POST /comms/directives` (the only door that sets it) is
+tested in `test_comms_directives_route.py`.
 """
 
 from __future__ import annotations
