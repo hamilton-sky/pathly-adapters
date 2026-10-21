@@ -23,6 +23,7 @@ import uuid
 from pathlib import Path
 
 import pytest
+from _paths import SRC
 
 from pathly_orchestrator.db import get_db
 from pathly_orchestrator.db.queries import chief as chief_queries
@@ -41,6 +42,14 @@ from pathly_orchestrator.supervisor.registry import get_run
 
 PROMPT = "---\ntier: operator\n---\nYou are the chief of this project."
 BODY = "You are the chief of this project."
+
+
+def _fragment() -> str:
+    """The fixed rules the server appends to every chief prompt, as the file holds them."""
+    path = SRC / "pathly_data" / "core" / "skills" / "fragments" / "chief-connect.md"
+    return path.read_text(encoding="utf-8").strip()
+
+
 DENY = [
     "Edit",
     "Write",
@@ -223,7 +232,8 @@ def test_open_emits_one_interactive_spawn_that_pastes_without_enter(
     assert payload["type"] == "TERMINAL_SPAWN"
     assert payload["interactive"] is True
     assert payload["submit"] is False
-    assert payload["prompt"] == BODY
+    # The style without its front matter, then the fixed rules the server appends (ticket 17).
+    assert payload["prompt"].startswith(BODY + "\n\n" + _fragment())
     assert payload["label"] == "Chief · Operator"
     assert payload["adapter"] == "claude"
     assert payload["cwd"] == project
@@ -395,7 +405,7 @@ def _bad_inputs(tmp_path: Path):
         ("project_root", None),
         ("prompt", ""),
         ("prompt", "   \n"),
-        ("prompt", None),
+        ("prompt", 3),
         ("prompt", "x" * (64 * 1024 + 1)),
         ("model", "--dangerously-skip-permissions"),
         ("model", 3),
@@ -416,10 +426,39 @@ def test_bad_input_is_a_value_error_and_leaves_nothing_behind(
     assert not chief_root.exists() or not list(chief_root.iterdir())
 
 
-def test_a_prompt_of_exactly_64_kib_is_accepted(project, chief_root):
+def test_a_prompt_of_exactly_64_kib_is_accepted_and_the_fixed_rules_follow_it(
+    project, chief_root
+):
     host = Host()
     _open(project, host, prompt="x" * (64 * 1024))
-    assert len(host.payload["prompt"]) == 64 * 1024
+    # The limit is on the style as given, checked before the fragment is appended.
+    assert host.payload["prompt"].startswith("x" * (64 * 1024) + "\n\n" + _fragment())
+
+
+@pytest.mark.parametrize("preset", ["status", "planner", "operator"])
+def test_without_a_prompt_a_built_in_preset_uses_its_built_in_text(
+    project, chief_root, preset
+):
+    from pathly_orchestrator.supervisor import chief_presets
+
+    host = Host()
+    out = _open(project, host, preset=preset, prompt=None)
+    assert out["tier"] == preset
+    assert host.payload["prompt"].startswith(
+        chief_presets.BUILT_IN[preset].strip() + "\n\n" + _fragment()
+    )
+
+
+@pytest.mark.parametrize("preset", ["custom", "", "Operator", "operator "])
+def test_without_a_prompt_any_other_preset_is_a_value_error_and_leaves_nothing(
+    project, chief_root, preset
+):
+    host = Host()
+    with pytest.raises(ValueError, match="prompt"):
+        _open(project, host, preset=preset, prompt=None)
+    assert host.sent == []
+    assert chief_queries.open_session_for_project(get_db(), project) is None
+    assert not chief_root.exists() or not list(chief_root.iterdir())
 
 
 def test_a_failed_broadcast_rolls_the_whole_open_back(project, chief_root):

@@ -9,7 +9,7 @@ Runner control loop, supervisor, spawn channel, lane/worktree isolation, file-cl
 | File | Covers | Tests |
 | --- | --- | --- |
 | `test_base_smoke.py` | supervisor/base_smoke.py — a red base parks a run before it spawns anything (build-proof 12) | 19 |
-| `test_chief_session.py` | chief-agent 06: opening and closing a chief session in the supervisor | 27 |
+| `test_chief_session.py` | chief-agent 06: opening and closing a chief session in the supervisor | 29 |
 | `test_fan_out.py` | supervisor/fan_out.py — the DAG scheduler as an FSM stage executor (fan-out Phase C) | 19 |
 | `test_file_claims.py` | Unit tests for the cross-feature file-claim overlap registry | 6 |
 | `test_fsm_port_config.py` | PATHLY_FSM_HTTP_PORT reaches every caller, so Pathly can run beside another server on 8765 | 7 |

@@ -31,6 +31,7 @@ pathly-ff   = "pathly_orchestrator.cli.ff:main"
 pathly-studio = "pathly_studio_cli.install:main"
 pathly-design = "pathly_data.core.design.cli:main"
 pathly-otel-export = "pathly_orchestrator.otel_export:cli_main"
+pathly = "pathly_orchestrator.chief_cli:main"
 
 [tool.black]
 # Pin the formatting target to the project's minimum Python so `black --check`

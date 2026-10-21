@@ -196,6 +196,7 @@ python -m build                     # rebuilds all adapters from core
 python3 scripts/check_version_sync.py
 python3 scripts/check_file_size.py    # 400-line SOLID ratchet (--update after a split)
 python scripts/gen_test_index.py    # regenerate tests/*/INDEX.md after adding/moving tests
+pathly api GET '/chief/session?project_root=<root>'  # a chief agent's only door to the server (uses $PATHLY_RUN_TOKEN); `pathly help`
 
 # Install / propagate agent+skill changes to ~/.claude
 pathly-setup claude --apply           # first install

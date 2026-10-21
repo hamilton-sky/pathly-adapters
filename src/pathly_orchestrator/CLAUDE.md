@@ -549,7 +549,7 @@ The chief is a long-lived interactive agent a human opens for a project from Stu
 `blueprints/chief/session.py` is a thin layer over `supervisor/chief_session.py`:
 
 ```
-POST /chief/open            ← {project_root, engine, preset, prompt, model?} → 201 {run_id, tab_id, tier, engine}
+POST /chief/open            ← {project_root, engine, preset, prompt?, model?} → 201 {run_id, tab_id, tier, engine}
 POST /chief/close           ← {project_root} → 200 {closed: true|false}
 GET  /chief/session?project_root=  ← {open: false} | {open: true, run_id, tab_id, tier, engine, opened_at, runs_started, max_runs_per_session, max_cost_usd_per_run}
 POST /chief/human-messages  ← {run_id, hook_secret, text, session_id, relayed?} → 201 {id, kind}   (blueprints/chief/human.py)
@@ -559,7 +559,48 @@ POST /chief/human-messages  ← {run_id, hook_secret, text, session_id, relayed?
   field is missing or not a string, or `open_chief` raises `ValueError` (its message is passed
   on); 409 `{error, run_id, tab_id}` on `ChiefAlreadyOpen`. `open_chief` gets the runner
   broadcaster (`sse._broadcast_runner`), so the `TERMINAL_SPAWN` reaches whichever spawn host
-  is listening.
+  is listening. `engine` and `preset` are required strings; `prompt` and `model` are optional,
+  but a key that is present must be a string (`"prompt": null` is a 400).
+- **The prompt a chief is pasted** (`supervisor/chief_presets.py`, `compose_prompt`) is three
+  parts: the **style**, the `chief-connect` **fragment**, then a last line `Your project root:
+  <root>`. The style is the request's `prompt` when it gave one, else `default_style`: the
+  user's file `chief/<preset>` (project over global) when there is one, else the built-in text
+  of that name (`BUILT_IN`: `status`, `planner`, `operator`). A preset that is neither has no
+  built-in text, so without a `prompt` `open_chief` raises `ValueError` ("prompt is required for
+  preset ..."; a blank or non-string one is "prompt must be a non-empty string"). The fragment
+  (`src/pathly_data/core/skills/fragments/chief-connect.md`) is appended to **every** chief
+  prompt, the user's own style and a request's `prompt` included, so a saved style cannot drop
+  the rules it holds: the one tool (`pathly api`; quote a path that has a query string, one
+  `pathly` command per call with no pipe, a root percent-encoded in a query string and as written
+  in a body), reading before acting (the session, goals, pending questions, pending escalations
+  and runs), answering with `cite=<id>` only, and that only the user gives orders. The 64 KiB
+  limit applies to the style,
+  before the fragment and the root line. The root line hands the chief the stored root
+  (`normalise_project_root`), the string the gate compares `project_root` with, so it never has
+  to read its directory from the shell. The texts name no cost or run number: they point to
+  `GET /chief/session` (`runs_started`, `max_runs_per_session`, `max_cost_usd_per_run`), where the
+  current limits are. Every `pathly api` example in a text is read against the gate's tables by
+  `tests/http_api/test_chief_prompt_text.py` (the route exists, the tier holds the action, every
+  key is on the route's list, a post is `from` the chief, an answer carries `cite` and its target
+  only), and the fragment's examples must be reads because it goes to every tier.
+  `tests/http_api/test_chief_prose_rules.py` pins the rules by phrase (a deleted sentence fails a
+  test); a path with a query string is quoted in every example, and a route that needs `feature`,
+  `board`/`scope` or `project_root` (`GET /comms`, `GET /runs`, `GET /chief/session`) is shown with
+  them in the help and in every text (`test_chief_help_routes.py`): a bare `GET /runs` answers 200
+  `[]`, which a chief would read as "no runs".
+- **`pathly api METHOD /path [json | -]`** (`chief_cli.py`, the `pathly` console script) is the
+  chief's only door to the server, because its settings allow `Bash(pathly *)` and deny `curl`
+  and `wget` (`runner/chief_argv.py`). It sends one request to `127.0.0.1:<fsm_port>` with the tab's
+  `PATHLY_RUN_TOKEN` as `X-Pathly-Run-Token` (and `X-Pathly-Secret` when the machine has one),
+  prints the server's answer to stdout and a `pathly: HTTP <status>` line to stderr for a non-2xx.
+  Exit **0** for a 2xx, **1** for any other status or an unreachable server, **2** for a usage error
+  (a missing token, a path that is not `/...`, a path or body that is not valid UTF-8, a body that
+  is not a JSON object, a GET with a body): nothing is sent in that case. The token and the server
+  secret (read once per command) are never printed (an answer or an error that holds either is
+  redacted). What a chief may do is decided by the chief gate, not here: a refusal is the gate's 403
+  body, printed as it came. `pathly help` lists the routes a chief uses most, each with what it
+  needs (`GET /runs?project_root=<root>`, `GET /comms?board=project&scope=<root>&feature=project`,
+  `GET /chief/session?project_root=<root>`).
 - **Close:** 403 for a live run token. It closes the project's open session with reason
   `closed from Studio` (`close_chief`: revokes the token, removes the folder, drops the run) and
   then sends `TERMINAL_KILL {tab_id, run_id}` on topic `chief:<run_id>` so the host closes the
@@ -1094,7 +1135,8 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
     is read through `chief_cite.answer_text`, which the test's walk follows (`BODY_HELPER_MODULES`
     of `chief_walk_support.py`). A key a view starts to read is refused to a chief until
     someone lists it (`test_chief_gate_keys.py` fails first), so the keys a chief's prompt may name
-    (ticket 17) are the entries' lists.
+    are the entries' lists (the built-in texts' examples are checked against them by
+    `test_chief_prompt_text.py`).
   - **What reaches a path, and what holds it.** Read in round 4 and again in round 6; round 6
     added the key list and the measurement below, which are what lets this list be short. Held at
     the gate **and** at the sink: the board mirror's scope, `features/decompose` and the evaluator
@@ -1265,19 +1307,26 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
   bound"); the cost and run ceiling is "Cost and run limit" above.
   `/comms/directives` (ticket 12) has both entries (`decide`; `project_root`, `to_agent` and `text`),
   as every route a chief can reach needs; it is not in the "Naming it" list, because the route
-  answers 400 for a body with no `project_root` and falls back to no other project. Ticket 17's
-  `pathly api` texts (what the chief's prompt teaches) must say: name your `project_root`, spelled
-  as the session's (on a POSIX host no backslash), on the routes under "Naming it"; send only the
-  keys a route's entry lists (`Fields.allowed`, the 403 names a key that is not listed); post an
-  artifact with an absolute `artifact_path` inside the project (a relative one is refused); and
-  give `/code/query` a file path as `target` (a symbol like `a:b` is read as a drive path and
-  refused). **The chief must be handed the stored root.** The gate compares `project_root` with
-  the string `open_chief` stored (`chief_sessions.project_root`: forward slashes, no trailing
-  slash), by `root_spelling`, and refuses any other spelling of the same directory. Ticket 17 has
-  to pass that exact string to the chief, as an environment variable or in the prompt text. A
-  chief that reads its own root with `pwd` can get another string (a symlinked parent such as
-  macOS `/var` for `/private/var`, a different letter case on Windows, a backslash form) and would
-  be refused (403 `that is not this chief's project`) on every call that names its project.
+  answers 400 for a body with no `project_root` and falls back to no other project. The built-in
+  texts and the `chief-connect` fragment (ticket 17, "The prompt a chief is pasted") teach: name
+  your `project_root`, as the last line of the prompt gives it, on the routes under "Naming it";
+  send only the keys a route's entry lists (`Fields.allowed`, the 403 names a key that is not
+  listed). They do **not** teach posting an artifact or `/code/query`; a text that names them later
+  must say that an artifact is posted with an absolute `artifact_path` inside the project (a
+  relative one is refused) and that `/code/query` takes a file path as `target` (a symbol like
+  `a:b` is read as a drive path and refused). **The chief is handed the stored root.** The gate
+  compares `project_root` with the string `open_chief` stored (`chief_sessions.project_root`:
+  forward slashes, no trailing slash), by `root_spelling`, and refuses any other spelling of the
+  same directory. `chief_presets.ROOT_LINE` puts that exact string on the last line of the pasted
+  prompt. A chief that read its own root with `pwd` could get another string (a symlinked parent
+  such as macOS `/var` for `/private/var`, a different letter case on Windows, a backslash form)
+  and be refused (403 `that is not this chief's project`) on every call that names its project;
+  `tests/http_api/test_chief_cli.py` pins that the pasted prompt ends with the stored root.
+  Not taught either, because no route reports it: a run's pending question (`GET /runs` rows
+  and `RunnerState.public_dict` do not carry it), so `/runner/agent-answer` is shown only for a
+  topic the user names; and `pause` / `resume` (board-lock goal runs do not support them, only
+  `stop`). The chief cannot write the global board (`comms/_helpers.py` `_GLOBAL_WRITERS`), so no
+  text sends it there.
 
 ### SSE events (GET /events/runner)
 
@@ -1536,7 +1585,8 @@ pathly_orchestrator/
     board_run.py           # start_board_run: board-lock + skill compose + async spawn helper
     board_lock.py          # Per-board/scope advisory lock (acquire/release/holder)
     chief_tiers.py         # what a chief may do (chief-agent): ACTIONS, TIERS (status=read; planner=read,post,plan; operator=all seven), actions_for/normalise_tier, and resolve_preset_tier — a user prompt file chief/<preset> names its tier in leading front matter `tier:`, else the built-in names map to themselves, anything else (unknown tier, missing front matter, malformed name) is status. Code, never read from prompt text; strip_front_matter reuses skills/compose_base
-    chief_session.py       # open_chief / close_chief (chief-agent): the chief is a long-lived interactive spawn, so it has its own open path instead of _run_stage_via_terminal (which blocks its caller and gives up after 30 minutes). open_chief validates (engine claude|codex, existing project_root, prompt non-empty and at most 64 KiB, model not starting with `-`), raises ChiefAlreadyOpen(run_id, tab_id) for a project with an open chief, resolves the tier from the preset, writes ~/.pathly/chief/<run_id>/ (hook_secret, and for claude settings.json + an empty mcp.json; mode 0600), registers the chief_sessions row (secret sha256, the claude --session-id), mints a `chief` token on the project board, create_run(run_id), and sends one interactive TERMINAL_SPAWN (topic `chief:<run_id>`, submit false, prompt without front matter); a daemon watcher closes the session as `never started` or `tab closed`. close_chief revokes the token, removes the folder and drops the run (False the second time). normalise_project_root (forward slashes, no trailing slash) keys a project's chief for open_chief and the routes; chief_startup_cleanup() closes every session still open at server start (reason `server restart`) and removes their folders
+    chief_presets.py       # the chief's prompt (chief-agent 17): the built-in styles STATUS / PLANNER / OPERATOR (BUILT_IN), default_style (user file chief/<preset> wins, else the built-in text), compose_prompt (style + the chief-connect fragment, read at call time, + ROOT_LINE with the stored project root)
+    chief_session.py       # open_chief / close_chief (chief-agent): the chief is a long-lived interactive spawn, so it has its own open path instead of _run_stage_via_terminal (which blocks its caller and gives up after 30 minutes). open_chief validates (engine claude|codex, existing project_root, the style non-empty and at most 64 KiB, model not starting with `-`; `prompt` is optional for a preset that has a built-in text), raises ChiefAlreadyOpen(run_id, tab_id) for a project with an open chief, resolves the tier from the preset, writes ~/.pathly/chief/<run_id>/ (hook_secret, and for claude settings.json + an empty mcp.json; mode 0600), registers the chief_sessions row (secret sha256, the claude --session-id), mints a `chief` token on the project board, create_run(run_id), and sends one interactive TERMINAL_SPAWN (topic `chief:<run_id>`, submit false, the prompt from `chief_presets.compose_prompt`: style without front matter, then the `chief-connect` fragment, then the stored root); a daemon watcher closes the session as `never started` or `tab closed`. close_chief revokes the token, removes the folder and drops the run (False the second time). normalise_project_root (forward slashes, no trailing slash) keys a project's chief for open_chief and the routes; chief_startup_cleanup() closes every session still open at server start (reason `server restart`) and removes their folders
   http_server/             # Flask HTTP server: FSM endpoints + SSE + runner routes
     app.py                 # Flask app factory, blueprint registration, main() (which calls supervisor.chief_session.chief_startup_cleanup() before serving; a failure is logged and boot goes on)
     middleware.py          # _log_request, _log_response, rate limiting, metrics
@@ -1602,6 +1652,8 @@ pathly_orchestrator/
                            # /chief/session; human.py: POST /chief/human-messages (the chief hook's
                            # post) — see "Chief endpoints"; __init__.py exposes all_blueprints
                            # (registered in app.py like control/)
+  chief_cli.py             # the `pathly` console script (chief-agent 17): `pathly api METHOD /path
+                           # [json | -]` — the chief's only door to the server; see "Chief endpoints"
 ```
 
 **Layer rules — CI-enforced (`import-linter`, `[tool.importlinter]` in `pyproject.toml`).**
@@ -2939,7 +2991,13 @@ pathly-ff      # fast-forward current feature state one step
 pathly-back    # roll back current feature state one step
 pathly-status  # show all active features and their current FSM state
 pathly-log     # readable timeline of a feature's FSM events
+pathly api GET '/chief/session?project_root=<root>'   # a chief's door to the server (run token from $PATHLY_RUN_TOKEN)
+pathly help    # the routes a chief uses most
 ```
+
+`pathly api` is for a chief agent in its tab, not for a person: it needs `PATHLY_RUN_TOKEN`
+(exit 2 and no request without it) and the server decides what the chief's tier may call
+("Chief endpoints").
 
 Discovery is `cli/_discovery.py`, which globs `STATE.json` off disk across all storage
 layouts, current and legacy. That is sufficient precisely BECAUSE every engine persists its
