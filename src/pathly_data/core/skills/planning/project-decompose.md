@@ -35,7 +35,7 @@ Read the following (skip missing sources silently):
 
 2. **Existing features on the board** — check for features already seeded (idempotency):
    ```bash
-   curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" "http://127.0.0.1:8765/comms?board=project&scope=$PROJECT&feature=project&type=feature"
+   curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" "http://127.0.0.1:8765/comms?board=project&scope=$PROJECT&type=feature&feature=project"
    ```
 
 3. **Project-level artifacts** — produced by the consultation tier (absent in light tier):
@@ -178,7 +178,7 @@ each `pathly/features/<slug>/SPEC.md` locally. Continue to Step 5.
 Count `type=feature` messages on the project board for `$PROJECT`:
 
 ```bash
-curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" "http://127.0.0.1:8765/comms?board=project&scope=$PROJECT&feature=project&type=feature"
+curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" "http://127.0.0.1:8765/comms?board=project&scope=$PROJECT&type=feature&feature=project"
 ```
 
 If the count is **< 2**:
