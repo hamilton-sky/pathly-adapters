@@ -4,7 +4,7 @@
 
 Comms board / message-board subsystem — messages, tasks, artifacts, goals, context retrieval & relevance, board mirror & hydration.
 
-74 test file(s).
+75 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -33,7 +33,7 @@ Comms board / message-board subsystem — messages, tasks, artifacts, goals, con
 | `test_chief_human_messages.py` | chief-agent 09: record what the human types in a claude chief tab | 16 |
 | `test_chief_prompt_hook.py` | chief-agent 09: the chief's UserPromptSubmit hook, its edge cases and as a real process | 12 |
 | `test_chief_tier_lines.py` | chief-agent 20, B18: the tier line is read from the lines the pasted text has | 6 |
-| `test_chief_tiers.py` | chief-agent 04: the chief tiers and the preset-to-tier resolution | 25 |
+| `test_chief_tiers.py` | chief-agent 04: the chief tiers and the preset-to-tier resolution | 28 |
 | `test_comms_agent_context.py` | Tests for POST /comms/agent-context (BLOCK C1 — BOARD-INFO mode) | 6 |
 | `test_comms_agent_context_preview.py` | Tests for board-context-pull Solution C — POST /comms/agent-context/preview | 4 |
 | `test_comms_answer.py` | Tests for POST /comms/answer — the chosen option + answered status must persist | 3 |
@@ -47,9 +47,9 @@ Comms board / message-board subsystem — messages, tasks, artifacts, goals, con
 | `test_comms_context_relevance.py` | Relevance gate on the Context channel (memory-consolidation phase) | 8 |
 | `test_comms_dag.py` | Tests for Phase 14 — DAG task decomposition | 14 |
 | `test_comms_delete.py` | Tests for POST /comms/delete — retract a message only while unread by an agent | 5 |
-| `test_comms_directives_fields.py` | chief-agent 12: what ``POST /comms/directives`` accepts in ``to_agent`` and ``text`` | 8 |
+| `test_comms_directives_fields.py` | chief-agent 12: what ``POST /comms/directives`` accepts in ``to_agent`` and ``text`` | 9 |
 | `test_comms_directives_query.py` | chief-agent 12: ``post_directive``, the edit refusal and who stamps a directive (query layer) | 6 |
-| `test_comms_directives_route.py` | chief-agent 12: ``POST /comms/directives`` is the one door that sets ``binding = 1`` | 20 |
+| `test_comms_directives_route.py` | chief-agent 12: ``POST /comms/directives`` is the one door that sets ``binding = 1`` | 23 |
 | `test_comms_edit_restamp.py` | chief-agent 03: ``POST /comms/edit`` stamps the edited row with the editor, not the author | 6 |
 | `test_comms_embed_curation.py` | Tests for Phase 1.4b — write-time embedding curation | 7 |
 | `test_comms_embed_persist.py` | Regression tests for the _VEC_AVAILABLE stale-binding bug (CT6) | 3 |
@@ -77,6 +77,7 @@ Comms board / message-board subsystem — messages, tasks, artifacts, goals, con
 | `test_governance_decision_precedence.py` | Governance block ordering — decisions render newest-first with explicit precedence | 12 |
 | `test_governance_escalation_note.py` | chief-agent 20, B15: the escalation note ignores standing orders | 9 |
 | `test_hydrate_blank_and_decoy.py` | chief-agent 20, B10 to B12: three holes of board hydration (``BOARD.json`` into an empty board) | 12 |
+| `test_hydrate_unverified_rows.py` | What hydration stores for every kind of stamp a ``BOARD.json`` row can carry | 3 |
 | `test_phase_board_post.py` | unified-ai-routing Conv 6 — /record_phase mirrors phase boundaries onto the board | 3 |
 | `test_post_artifact_indexing.py` | Regression (unified-ai-routing review): /comms/post must call index_artifact_async | 1 |
 | `test_read_policy.py` | Read-policy core: row_allowed, policy_predicate and their agreement | 10 |

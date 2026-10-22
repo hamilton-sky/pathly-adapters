@@ -144,24 +144,41 @@ def test_consultation_dispatch_starts_project_consultation_flow(client, monkeypa
 
 
 def test_scope_defaults_to_normalized_project_root(client, monkeypatch):
-    """No explicit `project` → scope derives from the normalized project_root path."""
+    """No explicit `project` → scope derives from the normalized project_root path.
+
+    The route makes ``<project_root>/pathly/project``. This root is a Windows path, which other
+    systems read as a relative one, so a real ``makedirs`` would leave a folder with a backslash
+    in its name in the folder the tests run from (or, on Windows, in a real user folder). The call
+    is recorded and not made."""
+    import os
+
     import pathly_orchestrator.supervisor.board_run as _br
 
+    root = "C:\\Users\\Yafit\\demo\\"
     seen: dict = {}
+    made: list[str] = []
+    real_makedirs = os.makedirs
 
     def _fake(board, scope, mode, **kw):
         seen["scope"] = scope
         return {"ok": True, "run_id": "r1"}
 
+    def _makedirs(path, *args, **kwargs):
+        if str(path).startswith(root):
+            made.append(str(path))
+            return None
+        return real_makedirs(path, *args, **kwargs)
+
     monkeypatch.setattr(_br, "start_board_run", _fake)
+    monkeypatch.setattr(os, "makedirs", _makedirs)
     r = client.post(
-        "/comms/project/decompose",
-        json={"project_root": "C:\\Users\\Yafit\\demo\\", "rigor": "light"},
+        "/comms/project/decompose", json={"project_root": root, "rigor": "light"}
     )
     assert r.status_code == 200
     assert (
         seen["scope"] == "C:/Users/Yafit/demo"
     )  # backslashes normalized, trailing slash stripped
+    assert made == [os.path.join(root, "pathly", "project")]
 
 
 def test_invalid_rigor_rejected(client):

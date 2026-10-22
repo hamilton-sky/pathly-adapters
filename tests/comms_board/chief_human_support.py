@@ -12,19 +12,18 @@ from __future__ import annotations
 import io
 import json
 import sys
-import threading
-import time
 from pathlib import Path
 from typing import NamedTuple
 
 import pytest
+from chief_session_guard import _no_watcher_outlives_its_test
 
 from pathly_hooks import chief_prompt
 from pathly_orchestrator.db import get_db
 from pathly_orchestrator.db.queries import chief as chief_queries
 from pathly_orchestrator.http_server import sse
 from pathly_orchestrator.supervisor import chief_session
-from pathly_orchestrator.supervisor.chief_session import close_chief, open_chief
+from pathly_orchestrator.supervisor.chief_session import open_chief
 
 PROMPT = "---\ntier: operator\n---\nYou are the chief of this project."
 SESSION_ID = "0b1f2a3c-4d5e-4f60-8a7b-9c0d1e2f3a4b"
@@ -105,22 +104,6 @@ def host(monkeypatch: pytest.MonkeyPatch) -> Host:
     fake = Host()
     monkeypatch.setattr(sse, "_broadcast_runner", fake)
     return fake
-
-
-@pytest.fixture(autouse=True)
-def _no_watcher_outlives_its_test(chief_root: Path):
-    """A chief a test leaves open has a watcher waiting; close it while this test's DB and
-    sessions folder are still patched in."""
-    yield
-    prefix = "chief-watch-"
-    for thread in threading.enumerate():
-        if thread.name.startswith(prefix):
-            close_chief(thread.name[len(prefix) :], "test over")
-    deadline = time.monotonic() + 5
-    while time.monotonic() < deadline and any(
-        t.name.startswith(prefix) for t in threading.enumerate()
-    ):
-        time.sleep(0.01)
 
 
 @pytest.fixture()

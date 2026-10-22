@@ -15,10 +15,10 @@ import time
 from pathlib import Path
 
 import pytest
-from mirror_drain_support import drain_mirrors
+from chief_session_guard import _no_watcher_outlives_its_test
 
 from pathly_orchestrator.supervisor import chief_session
-from pathly_orchestrator.supervisor.chief_session import close_chief, open_chief
+from pathly_orchestrator.supervisor.chief_session import open_chief
 
 PROMPT = "---\ntier: operator\n---\nYou are the chief of this project."
 WATCHER_PREFIX = "chief-watch-"
@@ -61,15 +61,6 @@ def wait(done, seconds: float = 5.0) -> bool:
 
 def watchers() -> list[threading.Thread]:
     return [t for t in threading.enumerate() if t.name.startswith(WATCHER_PREFIX)]
-
-
-@pytest.fixture(autouse=True)
-def _no_watcher_outlives_its_test(chief_root: Path):
-    yield
-    for thread in watchers():
-        close_chief(thread.name[len(WATCHER_PREFIX) :], "test over")
-    assert wait(lambda: not watchers()), [t.name for t in watchers()]
-    drain_mirrors()
 
 
 def open_with(project: str, host: Host, **overrides) -> dict:

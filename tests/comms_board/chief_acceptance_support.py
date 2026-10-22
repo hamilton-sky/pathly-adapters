@@ -26,24 +26,18 @@ from pathlib import Path
 from typing import Callable, Iterator, NamedTuple
 
 import pytest
-
 from _paths import SRC
+from chief_session_guard import (
+    STARTED_BY_TESTS,
+    WORKER_THREADS,
+    _no_watcher_outlives_its_test,
+)
 
 FRAGMENT_PATH = (
     SRC / "pathly_data" / "core" / "skills" / "fragments" / "chief-connect.md"
 )
 TOKEN_HEADER = "X-Pathly-Run-Token"
 WAIT = 15.0
-WATCHER_PREFIX = "chief-watch-"
-# Threads a worker spawn starts, and the ones this file starts. None of them may outlive a test.
-WORKER_THREADS = ("board-run-", "agent-done-watcher-")
-OWN_THREADS = (
-    WATCHER_PREFIX,
-    *WORKER_THREADS,
-    "fake-spawn-host",
-    "asker-",
-    "acceptance-server",
-)
 
 
 def wait_for(condition: Callable[[], object], what: str, timeout: float = WAIT):
@@ -62,7 +56,7 @@ def live_threads() -> list[threading.Thread]:
     return [
         t
         for t in threading.enumerate()
-        if t.is_alive() and t.name.startswith(OWN_THREADS)
+        if t.is_alive() and t.name.startswith(STARTED_BY_TESTS)
     ]
 
 
@@ -77,7 +71,6 @@ class Worker(NamedTuple):
 class SpawnHost:
     def __init__(self) -> None:
         self.inbox: queue.Queue = queue.Queue()
-        self.seen: list[dict] = []
         self.tabs: dict[str, dict] = {}
         self.workers: dict[str, Worker] = {}
         self.kills: list[dict] = []
@@ -132,7 +125,6 @@ class SpawnHost:
         from pathly_orchestrator.db.queries.run_tokens import resolve_run_token
         from pathly_orchestrator.supervisor.registry import get_run
 
-        self.seen.append(payload)
         kind, run_id = payload.get("type"), payload.get("run_id")
         if kind == "TERMINAL_KILL":
             self.kills.append(payload)
@@ -185,34 +177,6 @@ def spawn_host() -> Iterator[SpawnHost]:
         yield host
     finally:
         host.stop()
-
-
-@pytest.fixture(autouse=True)
-def _no_watcher_outlives_its_test():
-    """Close the chiefs a test left open while its DB and sessions folder are still patched in,
-    then fail the test if a thread it started is still alive. A watcher left over would wake
-    after the patch is gone and open the developer's real ``~/.pathly``. The two mirrors are
-    drained here for the same reason: their flusher threads outlive every test, and one that
-    wakes between two tests with a mark still queued opens the DB of the unpatched home.
-    """
-    yield
-    from pathly_orchestrator import board_mirror, event_mirror
-    from pathly_orchestrator.db.connection import get_db
-    from pathly_orchestrator.supervisor import board_lock
-    from pathly_orchestrator.supervisor.chief_session import close_chief
-
-    for thread in threading.enumerate():
-        if thread.name.startswith(WATCHER_PREFIX):
-            close_chief(thread.name[len(WATCHER_PREFIX) :], "test over")
-    deadline = time.monotonic() + 5
-    while time.monotonic() < deadline and live_threads():
-        time.sleep(0.01)
-    with board_lock._lock:
-        board_lock._held.clear()
-    left = [t.name for t in live_threads()]
-    assert left == [], f"threads outlived the test: {left}"
-    board_mirror.flush_dirty(get_db())
-    event_mirror.flush_dirty(get_db())
 
 
 # -- the app, a project, a chief -----------------------------------------------------------

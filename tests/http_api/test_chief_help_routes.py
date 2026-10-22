@@ -22,7 +22,7 @@ import pytest
 from chief_bind_support import project_row, record_run
 from chief_cli_support import NO_TOKEN, pathly, server
 from chief_gate_support import _chief, app, project
-from chief_text_support import TEXT_NAMES, text_of
+from chief_text_support import TEXT_NAMES, norm, text_of
 
 ROOT = "<root>"
 BOARD = ("board=project", f"scope={ROOT}", "feature=project")
@@ -63,6 +63,31 @@ def test_a_help_line_names_what_its_route_needs(pathly):
     for route, needs in NEEDS.items():
         for need in needs:
             assert need in lines[route], (route, need, lines[route])
+
+
+# The keys the help shows for the two routes that take a cited answer, and no others: a key for
+# words of the chief's own is the one thing a line there must never show.
+ANSWER_KEYS = {
+    ("POST", "/comms/answer"): {"question_id", "cite"},
+    ("POST", "/runner/agent-answer"): {"topic", "cite"},
+}
+
+
+@pytest.mark.parametrize("route", sorted(ANSWER_KEYS), ids=lambda r: r[1])
+def test_the_help_line_of_an_answer_route_shows_exactly_the_keys_of_a_cited_answer(
+    pathly, route
+):
+    line = _help_lines(pathly)[route]
+
+    assert set(re.findall(r'"(\w+)"', line)) == ANSWER_KEYS[route], line
+    assert line.rstrip().endswith("only"), line
+
+
+def test_the_help_says_a_chief_never_sends_an_answer_of_its_own(pathly):
+    help_text = norm(pathly("help", token=NO_TOKEN).out)
+
+    assert "never send an answer of your own" in help_text
+    assert "relays that message's own words" in help_text
 
 
 # --- the table, against the routes ---------------------------------------------------------------

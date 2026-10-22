@@ -5,6 +5,12 @@ are code. A preset only names a tier (front matter ``tier:`` of a ``chief/<prese
 file); an unknown or missing tier, an unknown preset or a malformed preset name is ``status``
 (read-only), so editing a preset's text can never grant power.
 
+The tier is read from exactly the block ``strip_front_matter`` removes, so the text a chief is
+given and the text its tier was read from cannot disagree (``test_the_tier_is_read_from_...``). A
+front matter that is not closed by a line of ``---`` and a ``\\n``, such as one with CRLF line ends,
+is not removed and names no tier. A quoted value (``tier: "operator"``) is read with its quotes, is
+not a tier, and is ``status``.
+
 The autouse conftest fixture patches ``Path.home()``, so a ``global`` prompt lands in a temp dir.
 """
 
@@ -16,6 +22,7 @@ from pathly_orchestrator.skills.prompt_files import write_prompt_file
 from pathly_orchestrator.supervisor.chief_tiers import (
     ACTIONS,
     TIERS,
+    _front_matter_tier,
     actions_for,
     normalise_tier,
     resolve_preset_tier,
@@ -199,3 +206,71 @@ def test_strip_front_matter_leaves_text_without_a_block_alone():
 def test_strip_front_matter_removes_one_block_only():
     text = "---\ntier: planner\n---\nBody.\n\n---\nnot: front matter\n---\nMore.\n"
     assert strip_front_matter(text) == "Body.\n\n---\nnot: front matter\n---\nMore.\n"
+
+
+# --- the tier is read from the block that strip_front_matter removes ---------------------------
+
+TIER_BLOCK = "---\ntier: operator\n---\n"
+
+
+def _block(text: str) -> str:
+    """What ``strip_front_matter`` removed from the text: the block the tier is read from."""
+    return text[: len(text) - len(strip_front_matter(text))]
+
+
+@pytest.mark.parametrize(
+    "text, block, raw_tier",
+    [
+        pytest.param(
+            TIER_BLOCK, TIER_BLOCK, " operator", id="ends-at-the-end-of-the-text"
+        ),
+        pytest.param(
+            TIER_BLOCK + "\n\nBody.\n",
+            TIER_BLOCK + "\n\n",
+            " operator",
+            id="trailing-blank-lines-go-with-the-block",
+        ),
+        pytest.param(
+            TIER_BLOCK + "Body.\n", TIER_BLOCK, " operator", id="followed-by-a-body"
+        ),
+        pytest.param(
+            "---\ntier: operator\n---",
+            "",
+            None,
+            id="no-line-break-after-the-closing-line",
+        ),
+        pytest.param(
+            "---\r\ntier: operator\r\n---\r\nBody.\r\n", "", None, id="crlf-is-no-block"
+        ),
+        pytest.param("---\ntier: operator\nBody.\n", "", None, id="never-closed"),
+        pytest.param("Body.\n", "", None, id="no-front-matter"),
+        pytest.param("", "", None, id="empty"),
+    ],
+)
+def test_the_tier_is_read_from_the_block_strip_front_matter_removes(
+    text, block, raw_tier
+):
+    assert _block(text) == block
+    assert _front_matter_tier(text) == raw_tier
+    assert normalise_tier(_front_matter_tier(text)) == (
+        "operator" if raw_tier else "status"
+    )
+
+
+def test_the_text_a_chief_is_given_never_holds_the_block_its_tier_came_from():
+    for text in (TIER_BLOCK + "Body.\n", TIER_BLOCK, TIER_BLOCK + "\n\nBody.\n"):
+        assert _block(text) + strip_front_matter(text) == text
+        assert "tier:" not in strip_front_matter(text)
+
+
+@pytest.mark.parametrize(
+    "quoted", ['"operator"', "'operator'", '"operator', "operator'"]
+)
+def test_a_quoted_tier_is_status(proj, quoted):
+    """The value is read as written, with its quotes, and a quoted name is no tier name."""
+    text = f"---\ntier: {quoted}\n---\nBody.\n"
+    _preset(proj, "mine", text)
+
+    assert _front_matter_tier(text) == f" {quoted}"
+    assert normalise_tier(_front_matter_tier(text)) == "status"
+    assert resolve_preset_tier("mine", proj) == "status"

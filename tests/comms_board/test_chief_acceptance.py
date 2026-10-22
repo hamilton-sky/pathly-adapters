@@ -74,6 +74,17 @@ from chief_acceptance_support import (
     wait_for,
 )
 
+from pathly_orchestrator.http_server import chief_budget
+
+# Numbers of the limits scenarios. The defaults are the module's own, so a changed default moves
+# the numbers built from it and not only the assertions.
+ONE_RUN = 1  # a run limit of one: the second start of a session is the one refused
+CEILING = chief_budget.DEFAULT_CEILING_USD
+ABOVE_THE_CEILING = CEILING * 100  # a cost the default ceiling refuses
+BELOW_THE_CEILING = CEILING / 2  # a cost it allows
+CEILING_THE_PERSON_SETS = ABOVE_THE_CEILING * 2  # lets the refused cost through
+CEILING_THE_CHIEF_TRIES = ABOVE_THE_CEILING * 5  # never stored
+
 STYLE = "You are the chief of this project and you run it for the user."
 PROMPT = f"---\ntier: operator\nname: custom\n---\n{STYLE}\n"
 
@@ -289,8 +300,6 @@ def test_a_planner_chief_plans_but_neither_decides_nor_runs(
 
 # -- 4. an answer to an agent cites a human message ------------------------------------------
 
-# Quotes and a line break: what a shell-quoted JSON argument would mangle if the chief wrote it.
-
 
 def test_an_agent_question_stays_pending_until_the_chief_cites_the_persons_words(
     client, spawn_host, project, ask
@@ -485,26 +494,30 @@ def test_a_start_above_the_cost_ceiling_is_refused_and_the_chief_cannot_raise_it
             "/runs", json={**body, "max_cost_usd": cost}, headers=chief.headers
         )
 
-    over = start(1000)
+    over = start(ABOVE_THE_CEILING)
 
     assert over.status_code == 403, over.get_data(as_text=True)
     assert over.get_json()["error"] == ABOVE
-    assert over.get_json()["ceiling"] == 10.0
-    raised = put_setting(client, "chief.max_cost_usd_per_run", 5000)
-    assert raised.status_code == 200
-    # The chief cannot change its own ceiling: the settings are not its to write.
+    assert over.get_json()["ceiling"] == chief_budget.DEFAULT_CEILING_USD
+    # The chief cannot change its own ceiling: the settings are not its to write. It sends a value
+    # that is not the stored one, so the ceiling it reads back shows nothing was written.
     own = client.put(
-        "/db/settings/chief.max_cost_usd_per_run",
-        json={"value": 5000},
+        f"/db/settings/{chief_budget.CEILING_KEY}",
+        json={"value": CEILING_THE_CHIEF_TRIES},
         headers=chief.headers,
     )
     assert own.status_code == 403 and "allowed" in own.get_json()
-    put_setting(client, "chief.max_cost_usd_per_run", 10)
+    state = session_state(client, root)
+    assert state["max_cost_usd_per_run"] == chief_budget.DEFAULT_CEILING_USD
     # The ceiling is the reason: a lower cost passes the gate (the route's 409 is "busy"), and
-    # so does the same cost once the person raised the ceiling.
-    assert start(5).status_code == 409
-    put_setting(client, "chief.max_cost_usd_per_run", 2000)
-    assert start(1000).status_code == 409
+    # so does the refused cost once the person raised the ceiling.
+    assert start(BELOW_THE_CEILING).status_code == 409
+    raised = put_setting(client, chief_budget.CEILING_KEY, CEILING_THE_PERSON_SETS)
+    assert raised.status_code == 200, raised.get_data(as_text=True)
+    assert session_state(client, root)["max_cost_usd_per_run"] == (
+        CEILING_THE_PERSON_SETS
+    )
+    assert start(ABOVE_THE_CEILING).status_code == 409
     assert (
         session_state(client, root)["runs_started"] == 0
     )  # a refused start costs no slot
@@ -514,7 +527,7 @@ def test_a_start_above_the_cost_ceiling_is_refused_and_the_chief_cannot_raise_it
 def test_a_session_cannot_start_more_runs_than_its_limit(client, spawn_host, project):
     chief = open_chief(client, spawn_host, project, "operator")
     root = str(project)
-    assert put_setting(client, "chief.max_runs_per_session", 1).status_code == 200
+    assert put_setting(client, chief_budget.LIMIT_KEY, ONE_RUN).status_code == 200
     first = start_single_run(client, chief, root)
     assert first.status_code == 200, first.get_data(as_text=True)
     spawn_host.settle(first.get_json()["run_id"])
@@ -523,10 +536,10 @@ def test_a_session_cannot_start_more_runs_than_its_limit(client, spawn_host, pro
 
     assert second.status_code == 403, second.get_data(as_text=True)
     assert second.get_json()["error"] == MAXED
-    assert second.get_json()["limit"] == 1
+    assert second.get_json()["limit"] == ONE_RUN
     assert len(spawn_host.workers) == 1  # nothing was spawned for the second
     state = session_state(client, root)
-    assert (state["runs_started"], state["max_runs_per_session"]) == (1, 1)
+    assert (state["runs_started"], state["max_runs_per_session"]) == (ONE_RUN, ONE_RUN)
 
 
 def test_a_chief_cannot_control_a_run_of_another_project(
@@ -564,6 +577,7 @@ def test_a_chief_cannot_control_a_run_of_another_project(
 
     # The same call on a run of the chief's own project is allowed.
     own = start_single_run(client, chief, root)
+    assert own.status_code == 200, own.get_data(as_text=True)
     own_run = own.get_json()["run_id"]
     spawn_host.worker(own_run)
     stopped = client.post(
@@ -589,7 +603,7 @@ def test_pathly_api_reads_the_session_with_the_chiefs_token(
     target = "/chief/session?project_root=" + quote(root, safe="/")
     goal = {"from": "chief", "type": "goal", "text": "From the tab", "board": "project"}
     goal.update(scope=root, feature="project", project_root=root)
-    ceiling = '{"value": 1000}'
+    new_limit = json.dumps({"value": chief_budget.DEFAULT_RUN_LIMIT + 5})
 
     with serving() as port:
 
@@ -598,7 +612,7 @@ def test_pathly_api_reads_the_session_with_the_chiefs_token(
 
         session = run("GET", target)
         posted = run("POST", "/comms/post", json.dumps(goal))
-        refused = run("PUT", "/db/settings/chief.max_runs_per_session", ceiling)
+        refused = run("PUT", f"/db/settings/{chief_budget.LIMIT_KEY}", new_limit)
 
     assert session.returncode == 0, session.stderr
     state = json.loads(session.stdout)
@@ -616,7 +630,10 @@ def test_pathly_api_reads_the_session_with_the_chiefs_token(
     # A call the gate refuses exits 1 and prints the gate's own answer.
     assert refused.returncode == 1
     assert json.loads(refused.stdout)["error"] == "the chief may not call this route"
-    assert session_state(client, root)["max_runs_per_session"] == 20
+    assert (
+        session_state(client, root)["max_runs_per_session"]
+        == chief_budget.DEFAULT_RUN_LIMIT
+    )
     for done in (session, posted, refused):
         assert chief.token not in done.stdout + done.stderr
 
@@ -636,6 +653,7 @@ def test_the_raw_run_token_is_on_the_spawn_stream_and_on_no_other(
     chief = open_chief(client, spawn_host, project, "operator")
     root = str(project)
     started = start_single_run(client, chief, root)
+    assert started.status_code == 200, started.get_data(as_text=True)
     run_id = started.get_json()["run_id"]
     worker = spawn_host.worker(run_id)
     spawn_host.settle(run_id)

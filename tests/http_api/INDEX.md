@@ -4,7 +4,7 @@
 
 HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, prompt-event contract.
 
-57 test file(s).
+59 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -20,16 +20,17 @@ HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, 
 | `test_chief_cited_edges.py` | chief-agent 10: the edges of the cite rule | 17 |
 | `test_chief_cited_escalations.py` | chief-agent 10 (review round 1): a human escalation, from the chief's side | 3 |
 | `test_chief_cli.py` | chief-agent 17: `pathly api`, the three built-in styles and the `chief-connect` fragment | 15 |
-| `test_chief_cli_edges.py` | chief-agent 17: the edges of `pathly api` | 20 |
-| `test_chief_cli_input.py` | chief-agent 17, round 2: input to `pathly api` that is not valid text, and the server secret | 8 |
+| `test_chief_cli_edges.py` | chief-agent 17: the edges of `pathly api` | 21 |
+| `test_chief_cli_input.py` | chief-agent 17, round 2: input to `pathly api` that is not valid text, and the server secret | 11 |
 | `test_chief_cli_limits.py` | chief-agent 20, B3 to B5: `pathly api` never ends in a traceback, reads and prints a bounded | 22 |
 | `test_chief_gate.py` | chief-agent 08: the chief gate refuses every call a chief token's tier does not allow | 32 |
 | `test_chief_gate_actions.py` | chief-agent 08: which action a call is, and so which tier may make it | 6 |
 | `test_chief_gate_artifact_section.py` | chief-agent 08 (round 6): the section of an artifact read by id stays inside the named project | 5 |
-| `test_chief_gate_audit.py` | chief-agent 08 (rounds 6 and 7): a chief that sends hostile values touches nothing outside its | 6 |
+| `test_chief_gate_audit.py` | chief-agent 08 (rounds 6 and 7): a chief that sends hostile values touches nothing outside its | 7 |
 | `test_chief_gate_board_reads.py` | chief-agent 08: reads of a board are bound by the board and scope they name | 8 |
 | `test_chief_gate_bodies.py` | chief-agent 08: the gate reads the body the way the route will | 12 |
 | `test_chief_gate_code_cache.py` | chief-agent 08 (round 8): a chief's code query is answered from its own project | 3 |
+| `test_chief_gate_fail_closed.py` | The chief gate fails closed: a check that cannot be made is a 500, never a call let through | 7 |
 | `test_chief_gate_feature_names.py` | chief-agent 08 (round 8): a feature name is one name, not a pattern | 2 |
 | `test_chief_gate_files.py` | chief-agent 08: a file a chief names must be inside its project | 9 |
 | `test_chief_gate_flow_skill.py` | chief-agent 08 (round 6): a flow or a skill a request names is one packaged or stored name | 10 |
@@ -37,6 +38,7 @@ HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, 
 | `test_chief_gate_keys.py` | chief-agent 08 (round 6): the key list of every route, read against the code | 18 |
 | `test_chief_gate_kinds.py` | chief-agent 08 (round 7): a key's declared kind fits what its view does with it | 7 |
 | `test_chief_gate_mirror.py` | chief-agent 08 (round 5): a request string that becomes part of a filesystem path | 14 |
+| `test_chief_gate_pins.py` | Pins for three checks of the chief gate that a changed line used to pass unnoticed | 6 |
 | `test_chief_gate_project_scope.py` | chief-agent 08: a board named by ``scope`` is bound to the chief's project | 9 |
 | `test_chief_gate_requests.py` | chief-agent 08: HEAD, redirects, lookalike paths and methods no route has | 5 |
 | `test_chief_gate_root_naming.py` | chief-agent 08: a route that falls back to another project must be told which | 12 |
@@ -45,8 +47,8 @@ HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, 
 | `test_chief_gate_symlinks.py` | chief-agent 08 (round 8): a file a chief names is inside its project once symlinks are followed | 5 |
 | `test_chief_gate_tables.py` | chief-agent 08: the field table is complete and says what each route reads | 12 |
 | `test_chief_gate_unbound_reads.py` | chief-agent 08: the reads that are fleet-wide say so, and no more | 4 |
-| `test_chief_help_routes.py` | chief-agent 17, round 2: `pathly help` and the texts show each route in the form that works | 11 |
-| `test_chief_prompt_text.py` | chief-agent 17: what the chief's prompt texts tell it to do, against the real gate tables | 9 |
+| `test_chief_help_routes.py` | chief-agent 17, round 2: `pathly help` and the texts show each route in the form that works | 13 |
+| `test_chief_prompt_text.py` | chief-agent 17: what the chief's prompt texts tell it to do, against the real gate tables | 13 |
 | `test_chief_prose_rules.py` | chief-agent 17, round 2: the rules in the chief's prompt texts, pinned | 14 |
 | `test_chief_routes.py` | chief-agent 07: POST /chief/open, POST /chief/close and GET /chief/session | 32 |
 | `test_chief_startup_port.py` | chief-agent 20, B7: a second server started on a busy port leaves the first server's chief open | 6 |

@@ -116,6 +116,8 @@ def _folders_that_would_pass_without_the_name_rule(project) -> None:
         ("feature", ""),
         ("feature", "demo\\x"),
         ("feature", "C:"),
+        ("feature", " demo"),
+        ("feature", "demo "),
         ("bogus", DEMO),
     ],
 )

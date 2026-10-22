@@ -12,14 +12,15 @@ from __future__ import annotations
 
 import http.server
 import io
+import socket
 import sys
 import threading
-import time
 from typing import NamedTuple
 
 import pytest
 
 from _paths import SRC
+from chief_session_guard import _no_watcher_outlives_its_test
 
 FRAGMENT_PATH = (
     SRC / "pathly_data" / "core" / "skills" / "fragments" / "chief-connect.md"
@@ -204,22 +205,12 @@ def host(monkeypatch: pytest.MonkeyPatch) -> Host:
     return fake
 
 
-@pytest.fixture(autouse=True)
-def _no_watcher_outlives_its_test():
-    """A chief a test leaves open has a watcher waiting; close it while this test's DB and
-    sessions folder are still patched in, so it cannot wake up in a later test."""
-    yield
-    from pathly_orchestrator.supervisor.chief_session import close_chief
-
-    prefix = "chief-watch-"
-    for thread in threading.enumerate():
-        if thread.name.startswith(prefix):
-            close_chief(thread.name[len(prefix) :], "test over")
-    deadline = time.monotonic() + 5
-    while time.monotonic() < deadline and any(
-        t.name.startswith(prefix) for t in threading.enumerate()
-    ):
-        time.sleep(0.01)
+def released_port() -> int:
+    """A port that was bound and released, so nothing listens on it. (Port 1 can be a service on
+    a machine that runs one; this one was free a moment ago.)"""
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        return probe.getsockname()[1]
 
 
 def fragment_text() -> str:

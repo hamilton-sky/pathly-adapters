@@ -10,13 +10,14 @@
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
 
 import pytest
 from _paths import SRC
-from chief_cli_support import pathly, stub
+from chief_cli_support import pathly, released_port, stub
 
 NOT_UTF8 = os.fsdecode(b'{"a":"\xff"}')
 
@@ -74,7 +75,7 @@ def test_a_standard_input_that_is_valid_utf8_still_goes_through_as_it_is(stub, p
 
 
 def _process(
-    args: list[str], stdin: bytes, port: int, tmp_path
+    args: list[str], stdin: bytes, port: int, tmp_path, more_env: dict | None = None
 ) -> subprocess.CompletedProcess:
     env = {k: v for k, v in os.environ.items() if not k.startswith("PATHLY_")}
     env.update(
@@ -84,6 +85,7 @@ def _process(
         PATHLY_FSM_HTTP_PORT=str(port),
         PATHLY_RUN_TOKEN="tok",
     )
+    env.update(more_env or {})
     return subprocess.run(
         [sys.executable, "-m", "pathly_orchestrator.chief_cli", *args],
         input=stdin,
@@ -111,6 +113,57 @@ def test_the_two_commands_that_used_to_traceback_exit_2_as_a_process(
     assert done.returncode == 2, done
     assert b"Traceback" not in done.stderr
     assert b"UTF-8" in done.stderr
+    assert stub.got == []
+
+
+# --- a console that is not UTF-8 -------------------------------------------------------------
+
+# A Windows console's code page: the streams of a process would be cp1252 unless the command asks
+# for UTF-8 (``_use_utf8``). LC_ALL keeps the arguments UTF-8 on a machine whose locale is not.
+LEGACY_CONSOLE = {"PYTHONIOENCODING": "cp1252", "PYTHONUTF8": "0", "LC_ALL": "C.UTF-8"}
+# Characters cp1252 has no byte for, and ones it has but as one byte, not UTF-8's two or three.
+WORDS = "café \u2014 \u65e5\u672c\u8a9e"
+
+
+def _port() -> int:
+    return int(os.environ["PATHLY_FSM_HTTP_PORT"])
+
+
+def test_a_body_on_standard_input_is_read_as_utf8_whatever_the_console_code_page_is(
+    stub, tmp_path
+):
+    given = json.dumps({"text": WORDS}, ensure_ascii=False)
+
+    done = _process(
+        ["api", "POST", "/comms/post", "-"],
+        given.encode("utf-8"),
+        _port(),
+        tmp_path,
+        LEGACY_CONSOLE,
+    )
+
+    assert done.returncode == 0, done
+    assert stub.got[0]["body"] == given.encode("utf-8")
+    assert json.loads(stub.got[0]["body"])["text"] == WORDS
+
+
+def test_an_answer_is_printed_as_utf8_whatever_the_console_code_page_is(stub, tmp_path):
+    stub.body = json.dumps({"said": WORDS}, ensure_ascii=False).encode("utf-8")
+
+    done = _process(["api", "GET", "/comms"], b"", _port(), tmp_path, LEGACY_CONSOLE)
+
+    assert done.returncode == 0, done
+    assert done.stdout == stub.body + b"\n"
+    assert json.loads(done.stdout)["said"] == WORDS
+
+
+def test_a_usage_error_is_printed_as_utf8_whatever_the_console_code_page_is(
+    stub, tmp_path
+):
+    done = _process([WORDS], b"", _port(), tmp_path, LEGACY_CONSOLE)
+
+    assert done.returncode == 2, done
+    assert WORDS.encode("utf-8") in done.stderr
     assert stub.got == []
 
 
@@ -164,7 +217,7 @@ def test_the_server_secret_is_read_once_per_command(
 
     monkeypatch.setattr(chief_cli, "_load_secret", counted)
     if not reachable:
-        monkeypatch.setenv("PATHLY_FSM_HTTP_PORT", "1")
+        monkeypatch.setenv("PATHLY_FSM_HTTP_PORT", str(released_port()))
 
     ran = pathly("api", "GET", "/comms", token="tok")
 
