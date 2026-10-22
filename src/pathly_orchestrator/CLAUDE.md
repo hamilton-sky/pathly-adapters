@@ -429,7 +429,10 @@ overridden.
 ### Comms board endpoints (multi-agent message board)
 
 The comms blueprint package (`blueprints/comms/`) backs the Studio comms board — agents and
-humans post messages, ask/answer questions, decompose DAG tasks, and supersede stale notes.
+humans post messages, ask/answer questions, decompose DAG tasks, and supersede stale notes. The
+message routes load from `messages.py` (`ROUTE_MODULES`): `messages_read.py` (`GET /comms`,
+`POST /comms/search`), `messages_write.py` (`POST /comms/post`) and `messages_crud.py`
+(acknowledge, answer, edit, delete, supersede, trash, restore).
 
 ```
 POST /comms/post            ← post a message (embedding computed for hybrid search); optional `supersedes:[id,…]` retires the decisions this one replaces IN THE SAME CALL (see below; a binding directive in the list is skipped with reason `binding` unless the caller is a live chief run)
@@ -623,9 +626,11 @@ POST /chief/human-messages  ← {run_id, hook_secret, text, session_id, relayed?
   then sends `TERMINAL_KILL {tab_id, run_id}` on topic `chief:<run_id>` so the host closes the
   tab, because `close_chief` kills no process. `closed` is false, and nothing is killed, when the
   project has no open chief (or the watcher closed it first).
-- **One project, one key:** `chief_session.normalise_project_root` (forward slashes, no trailing
-  slash) is applied by `open_chief` and by all three routes, so `/p` and `/p/` are one project and
-  cannot get two open chiefs.
+- **One project, one key:** `chief_session.normalise_project_root` (`scope_names.normalise_root`:
+  forward slashes, no trailing slash; a bare `/` or `C:/` keeps its one) is applied by `open_chief`
+  and by all three routes, so `/p` and `/p/` are one project and cannot get two open chiefs. The
+  board code (`comms/_helpers.py`, `runner/comms_context.py`, `runner/board_scope.py`) uses the same
+  function, so a root has one spelling on every side.
 - **Restart:** `app.main()` calls `chief_startup_cleanup()` before the server serves, inside a
   `try` that logs a warning and goes on: it closes every session still open (reason `server
   restart`, token revoked) and removes their `~/.pathly/chief/<run_id>/` folders, because a chief
@@ -1451,8 +1456,9 @@ pathly_orchestrator/
                            # 15) is ALTERed in when the table exists without it, once
     provenance_values.py   # the author_source vocabulary and the `system` stamp, defined ONCE
                            # (AUTHOR_SOURCES = token|system|legacy|none, SYSTEM_ROLE, SYSTEM_AUTHOR,
-                           # SYSTEM_PAIR); imported by runner/provenance.py, post_message (rejects
-                           # an unknown source with ValueError) and comms_artifacts.py
+                           # SYSTEM_PAIR) and check_author_source (the one ValueError for an
+                           # unknown source: post_message and update_message_text ask it before
+                           # writing); imported by runner/provenance.py and comms_artifacts.py
     pricing.py             # PRICING + CACHE_RATES tables (cached tokens are a subset of tokens_in,
                            # priced at a multiple of the input rate), cache_tokens_of(),
                            # PricingRegistry, estimate_cost()/infer_provider(),
@@ -1525,6 +1531,7 @@ pathly_orchestrator/
     read_policy.py         # the role read wall (role-read-policy), defined once: ReadPolicy, BUILTIN_DEFAULTS (reviewer/tester/chief/anonymous), NEVER_WITHHELD_TYPES, row_allowed (pure) + policy_predicate (the same rule as a SQL fragment over type/author_*; tests keep them in agreement) and resolve_read_policy(conn, role, feature, project_root). BUILT BUT NOT WIRED: no read path calls it and nothing reads the read_policy.mode setting, so it withholds nothing from any agent (see "Who wrote a board row, and who may read it")
     comms_context.py       # assembles board context (governance + referenced + semantic, relevance-gated); tags each kept row _tier from the search loop (authoritative, not row["board"]) so the render can budget per tier; _matched_chunk surfaced as "matched topic: …" via comms_formatters.py; takes the prompt's `role` for the standing orders and keeps binding rows out of the Context channel
     comms_governance.py    # governance_decisions(conn, boards, scopes, role, project_scope): the pending decisions plus the standing orders for the role (from the tiers the run reads and always from the project board when the run has a project root), de-duplicated by id and marked `_binding`; if the standing-order query raises it logs a warning and leaves the pending half unfiltered; standing_orders_only() is the block of a run whose every tier is off
+    comms_binding.py       # BINDING_MARK (the `_binding` key comms_governance sets on a row) and is_binding_row (`binding == 1`, nothing looser): the one meaning of "binding" that comms_governance, comms_formatters and comms_context share; a leaf module with no package imports
     comms_formatters.py    # pure list[dict]→list[str] rendering for that context, incl.
                            #   render_governance_lines(): decisions NEWEST-FIRST with a LATEST
                            #   marker, minute-precision stamps (same-day decisions are the ones
