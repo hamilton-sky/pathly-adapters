@@ -4,7 +4,7 @@
 
 Comms board / message-board subsystem — messages, tasks, artifacts, goals, context retrieval & relevance, board mirror & hydration.
 
-73 test file(s).
+74 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -13,6 +13,7 @@ Comms board / message-board subsystem — messages, tasks, artifacts, goals, con
 | `test_binding_directive_hardening.py` | Standing orders under bad input and a failing query (chief-agent 11, review round 2) | 9 |
 | `test_binding_directives.py` | Binding decisions (standing orders) keep reaching the prompts of the roles they target | 26 |
 | `test_binding_retire_writers.py` | chief-agent 16: every writer that can take a binding directive out of ``get_binding_decisions`` | 5 |
+| `test_binding_row_predicate.py` | One module says what "binding" means for a board row (``runner/comms_binding.py``) | 5 |
 | `test_board_closure.py` | Board closure — the write paths that let a resolution actually land | 29 |
 | `test_board_context_catalog.py` | Tests for board-context-pull Solution A — the 📚 Catalog channel | 3 |
 | `test_board_context_scope.py` | Tests for board_context_for — scope-aware context honoring the Reads toggle | 3 |

@@ -34,6 +34,7 @@ from __future__ import annotations
 import logging
 
 from ...run_identity import is_chief_run
+from ._helpers import BINDING_REFUSED
 
 # Bounded so a malformed/hostile payload can't turn one post into an unbounded write storm.
 MAX_SUPERSEDES = 20
@@ -46,8 +47,6 @@ SUPERSEDABLE_TYPES = ("decision", "constraint")
 _ROW_SQL = (
     "SELECT type, board, scope FROM comms_messages WHERE id=? AND deleted_at IS NULL"
 )
-# Refusal text of every route that would retire a directive for a caller that may not.
-BINDING_REFUSED = "only the chief retires a binding directive"
 # The flag ``get_binding_decisions`` reads and ``post_directive`` sets: the one meaning of "binding".
 _BINDING_SQL = "SELECT 1 FROM comms_messages WHERE id=? AND binding=1"
 

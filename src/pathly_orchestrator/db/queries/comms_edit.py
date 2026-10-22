@@ -5,7 +5,7 @@ from __future__ import annotations
 import sqlite3
 
 from ..connection import _get_write_lock
-from ..provenance_values import AUTHOR_SOURCES, SOURCE_NONE
+from ..provenance_values import SOURCE_NONE, check_author_source
 
 
 def update_message_text(
@@ -25,10 +25,7 @@ def update_message_text(
     ``author_source`` is ``None``. A source outside ``AUTHOR_SOURCES`` raises ``ValueError``
     before anything is written.
     """
-    if author_source is not None and author_source not in AUTHOR_SOURCES:
-        raise ValueError(
-            f"unknown author_source {author_source!r}; expected one of {sorted(AUTHOR_SOURCES)}"
-        )
+    check_author_source(author_source)
     row = conn.execute(
         "SELECT binding FROM comms_messages WHERE id=? AND deleted_at IS NULL",
         (message_id,),

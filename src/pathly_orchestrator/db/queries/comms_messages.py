@@ -9,7 +9,10 @@ from datetime import datetime, timezone
 from typing import Any
 
 from ..connection import _get_write_lock
-from ..provenance_values import AUTHOR_SOURCES, SOURCE_NONE
+from ..provenance_values import SOURCE_NONE, check_author_source
+
+# update_message_text lives in comms_edit.py (400-line cap); re-exported here.
+from .comms_edit import update_message_text
 
 # Goal-message field accessors live in comms_goal_fields (this file sits on the 400-line
 # ratchet). Re-exported so `from ...comms_messages import set_message_slug` — which
@@ -68,10 +71,7 @@ def post_message(
     ``binding`` (keyword only, default 0) is written in the INSERT itself. Only
     ``comms_directives.post_directive`` passes 1; no route reads it from a body.
     """
-    if author_source is not None and author_source not in AUTHOR_SOURCES:
-        raise ValueError(
-            f"unknown author_source {author_source!r}; expected one of {sorted(AUTHOR_SOURCES)}"
-        )
+    check_author_source(author_source)
     message_id = str(uuid.uuid4())
     task_status = "pending" if type == "task" else None
     with _get_write_lock(conn):
@@ -368,6 +368,3 @@ def soft_delete_message(
 
 # insert_message_row lives in comms_hydrate.py (400-line cap); re-exported here.
 from .comms_hydrate import insert_message_row  # noqa: E402, F401
-
-# update_message_text lives in comms_edit.py (400-line cap); re-exported here.
-from .comms_edit import update_message_text

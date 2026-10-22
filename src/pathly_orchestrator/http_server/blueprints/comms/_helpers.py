@@ -7,7 +7,12 @@ import re
 
 from flask import request
 
+from pathly_orchestrator.scope_names import normalise_root
+
 _LONE_SURROGATE = re.compile("[\ud800-\udfff]")
+
+# Refusal text of every route that would retire a directive for a caller that may not.
+BINDING_REFUSED = "only the chief retires a binding directive"
 
 
 def has_lone_surrogate(value: object) -> bool:
@@ -195,7 +200,7 @@ def guess_artifact_type(path: str) -> str | None:
 
 
 def norm_project_root(project_root: str) -> str:
-    return project_root.replace("\\", "/").rstrip("/")
+    return normalise_root(project_root)
 
 
 def post_task_status(conn, message_id: str, verb: str, reason: str = "") -> None:
