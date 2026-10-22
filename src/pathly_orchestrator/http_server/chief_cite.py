@@ -15,13 +15,13 @@ and, for a run's topic, that the run belongs to the session's project. A body th
 ``answer`` or ``option_id`` is refused: the chief cannot word an answer or pick an option for the
 person. On success the gate spends the message (``record_citation``) and keeps the message's own
 text on ``flask.g`` for the route, which reads its answer through ``answer_text``; so the words an
-agent receives are the person's, whatever the chief does with shell quoting. A caller without a
-chief token is never touched: ``answer_text`` gives it the ``answer`` it sent.
+agent receives are the ones the hook recorded, whatever the chief does with shell quoting. A
+caller without a chief token is never touched: ``answer_text`` gives it the ``answer`` it sent.
 
-What this proves is that the words are the person's, relayed to the question the chief picked.
-Outer whitespace is the one thing a route may change: ``/runner/agent-answer`` strips the answer
-before it supplies it, ``/comms/answer`` stores the cited text unstripped (it strips only to see
-whether it is blank). It does not prove the person meant the words for that question (a chief can
+What this shows is that the words are those of a prompt the hook recorded as one that reached the
+chief's tab, relayed to the question the chief picked. Outer whitespace is the one thing a route
+may change: ``/runner/agent-answer`` strips the answer before it supplies it, ``/comms/answer``
+stores the cited text unstripped (it strips only to see whether it is blank). It does not prove the person meant the words for that question (a chief can
 cite an unrelated later remark). A ``human`` row is what the hook endpoint recorded, not proof of
 who typed it (the hook's own docstring says why): a headless agent an ``operator`` chief starts
 runs as the same OS user and can post a row itself if it reads the session's secret file and

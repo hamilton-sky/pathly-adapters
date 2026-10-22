@@ -1,4 +1,4 @@
-"""Helpers of the tests that read the chief's prompt texts (chief-agent 17, round 2).
+"""Helpers of the tests that read the chief's prompt texts (chief-agent 17).
 
 The chief's prompt is two parts: a built-in style (``status``, ``planner``, ``operator``) and the
 ``chief-connect`` fragment. ``text_of`` returns either; ``norm`` flattens one so a test can look for

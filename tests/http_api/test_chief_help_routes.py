@@ -1,4 +1,4 @@
-"""chief-agent 17, round 2: `pathly help` and the texts show each route in the form that works.
+"""`pathly help` and the chief's texts show each route in the form that works (chief-agent 17).
 
 A bare ``GET /runs`` answers 200 ``[]`` without ``project_root`` (the route returns an empty list
 for a project it was not told), so a chief that followed the help line to the letter would conclude
@@ -9,7 +9,9 @@ project board. The help and every text must therefore print each such route with
 cannot drift from them, and the other tests hold the help and the texts to the table.
 
 A project root that holds ``+``, ``&`` or ``%`` has to be percent-encoded in a query string: the
-gate compares what the server decoded, spelled as the root it stored. A JSON body keeps it as is.
+gate compares what the server decoded, spelled as the root it stored. A JSON body keeps it as is,
+apart from a ``"`` or ``'`` of it, which takes the JSON escape (``\\"``, ``\\u0027``); a ``'`` in
+a query string is written ``%27``, because the shell reads a bare one as the end of the quotes.
 """
 
 from __future__ import annotations
@@ -266,3 +268,24 @@ def test_a_json_body_keeps_such_a_root_exactly_as_written(server, pathly, odd):
     ran = pathly("api", "POST", "/comms/directives", body, token=chief.token)
 
     assert ran.code == 0, ran
+
+
+def test_a_root_with_an_apostrophe_and_a_quote_works_written_the_way_the_fragment_says(
+    server, pathly, tmp_path
+):
+    root = tmp_path / 'it\'s "mine" proj'
+    root.mkdir()
+    chief = _chief("operator", root)
+    in_a_query = f"/chief/session?project_root={quote(str(root), safe='/')}"
+    in_a_body = json.dumps(
+        {"project_root": str(root), "to_agent": "*", "text": "an order"}
+    ).replace("'", "\\u0027")
+
+    read = _get(pathly, chief, in_a_query)
+    posted = pathly("api", "POST", "/comms/directives", in_a_body, token=chief.token)
+
+    assert read.code == 0, read
+    assert json.loads(read.out)["run_id"] == chief.run_id
+    assert "%27" in in_a_query and "'" not in in_a_query
+    assert posted.code == 0, posted
+    assert "\\u0027" in in_a_body and "'" not in in_a_body

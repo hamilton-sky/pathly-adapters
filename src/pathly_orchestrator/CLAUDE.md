@@ -293,8 +293,10 @@ when its `message_id` is a message that is in the database under the file's own 
 rows went in (a file row that reuses the id of a message on another board is not inserted, and an
 artifact for that id used to land on that other message); `hydrate_board` returns True only when at least
 one row of the file is in the database under that board and scope afterwards, so a file that adds
-nothing (every row names another scope, as in a clone at another path) is False and `hydrate_project`
-lists its scope under `skipped`; a file that is not
+nothing is False and `hydrate_project` lists its scope under `skipped`. That is what a clone at a
+different path, or at the same path in a different letter case, gets for the project board: every
+row names the exporter's root, the scope is compared exactly, so no row is imported and the scope is
+under `skipped` (the feature boards are keyed by name and are unaffected); a file that is not
 a JSON object imports nothing; and `hydrate_board` does not raise on any of it, so one hostile entry
 (an `id` that is a list or a dict, say) cannot stop the boards `hydrate_project` reads after it.
 `comms_hydrate._unverified` stores `binding = 0`, and an
@@ -447,7 +449,7 @@ GET  /comms/artifacts       ← list artifacts linked to a message (comms_artifa
 GET  /comms/trash           ← list trashed messages
 POST /comms/restore         ← restore a trashed message
 POST /comms/supersede       ← mark a message superseded_by another (standalone form, used by Studio's supersede menu and the consolidate skill; an agent run is held to the same decision-only, own-board rules as `/comms/post` + `supersedes`; a binding directive is 403 `only the chief retires a binding directive` for every caller but a live chief run, a request with no token or only the server secret included)
-POST /comms/directives      ← CHIEF TOKEN ONLY: post a BINDING directive (standing order) `{project_root, to_agent: "*"|<role>, text}` → 201 `{id}`. `blueprints/comms/directives.py`; the only route that sets `comms_messages.binding = 1` (`db/queries/comms_directives.post_directive`: a `decision` from `chief` on the project board, `from_agent="chief"`, written with `binding = 1` in its one INSERT: `post_message` takes a keyword-only `binding` (default 0) that only `post_directive` passes, and `/comms/post` still ignores a `binding` in a body, so a failure leaves no ordinary decision behind and a retry no second copy; the scope is `fsm_compose.resolve_board_scope("project", project_root, "")`). 403 for every other caller: no token, any other role's token, and a request that carries only the server secret (what Studio sends today; the UI path waits for the UI token, RRP-2b). The chief gate has already checked, for a chief token, that the tier may `decide`, that `project_root` is the session's project and that only `project_root`/`to_agent`/`text` are sent. 400 for a `to_agent` that is not `*` or `^[a-z][a-z0-9_-]{0,39}$` (matched exactly against a prompt's role, so no upper case or padding), a blank `project_root`, or a `text` that is blank, over 8 KiB in UTF-8 BYTES, holds a control character other than newline and tab (a NUL would fail every spawn of the role: `subprocess` refuses an embedded null byte), or is not UTF-8 encodable; the text is stored stripped. Broadcasts the `COMMS_UPDATE` a new row gets. The route looks the caller up once and uses that identity for the check and for the row's stamp (a second lookup could find the session closed and store `author_source` `none`). A directive is replaced with `/comms/supersede`, never edited
+POST /comms/directives      ← CHIEF TOKEN ONLY: post a BINDING directive (standing order) `{project_root, to_agent: "*"|<role>, text}` → 201 `{id}`. `blueprints/comms/directives.py`; the only route that sets `comms_messages.binding = 1` (`db/queries/comms_directives.post_directive`: a `decision` from `chief` on the project board, `from_agent="chief"`, written with `binding = 1` in its one INSERT: `post_message` takes a keyword-only `binding` (default 0) that only `post_directive` passes, and `/comms/post` still ignores a `binding` in a body, so a failure leaves no ordinary decision behind and a retry no second copy; the scope is `fsm_compose.resolve_board_scope("project", project_root, "")`). 403 for every other caller: no token, any other role's token, and a request that carries only the server secret (what Studio sends today; the UI path waits for the UI token, RRP-2b). The chief gate has already checked, for a chief token, that the tier may `decide`, that `project_root` is the session's project and that only `project_root`/`to_agent`/`text` are sent. 400 for a `to_agent` that is not `*` or `^[a-z][a-z0-9_-]{0,39}$` (matched exactly against a prompt's role, so no upper case or padding), a `project_root` that is missing, `null` or the empty string (a `project_root` of only spaces from a chief is the chief gate's 403 `that is not this chief's project` first, since it is not the session's root), or a `text` that is blank, over 8 KiB in UTF-8 BYTES, holds a control character other than newline and tab (a NUL would fail every spawn of the role: `subprocess` refuses an embedded null byte), or is not UTF-8 encodable; the text is stored stripped. Broadcasts the `COMMS_UPDATE` a new row gets. The route looks the caller up once and uses that identity for the check and for the row's stamp (a second lookup could find the session closed and store `author_source` `none`). A directive is replaced with `/comms/supersede`, never edited
 GET  /comms/scope           ← read the active board scope
 POST /comms/scope           ← set the active board scope
 GET  /comms/permissions     ← role-based write permissions
@@ -870,8 +872,9 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
 - **Overrides.** A body with a non-empty `prompt_override` or `stage_overrides`, on any route,
   also needs `run` (the 403 names `run`): the Planner may call the decompose routes but cannot
   hand verbatim prompt text to the agents they start.
-- **Cited answers.** A chief answers an agent only by naming a message the person typed in its
-  own tab; Pathly relays that message's text, so the chief never words the answer
+- **Cited answers.** A chief answers an agent only by naming a message that the hook recorded as
+  typed in its own tab ("What a citation proves" below says what that does and does not show);
+  Pathly relays that message's text, so the chief never words the answer
   (`http_server/chief_cite.py`, called by `chief_gate` once every reading of the body has passed
   the other checks). An `answer` action (`/runner/agent-answer`, `/comms/answer`, and
   `/comms/acknowledge` on an escalation with `to_agent = "human"`) from a chief token must send
@@ -917,10 +920,10 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
   - The gate reads every reading of the body (`_bodies`): the readings must agree on `cite` and on
     the target, and none may carry `answer` or `option_id`.
 
-  **What a citation proves, and what it does not.** It proves the words an agent receives are
-  words that reached the chief's tab as a prompt claude delivered with none of the known wrappers
-  ("Human messages" above is a deny-list, not a test for "typed"), relayed to the question the
-  chief picked, once. It does not prove the person meant them for that question: a chief can cite
+  **What a citation proves, and what it does not.** It shows that the words an agent receives are
+  the text of a prompt the hook recorded as one that reached the chief's tab, delivered by claude
+  with none of the known wrappers ("Human messages" above is a deny-list, not a test for
+  "typed"), relayed to the question the chief picked, once. It does not prove the person meant them for that question: a chief can cite
   an unrelated later remark, and the person reading the board is what catches it. Against an
   `operator` chief, which can start a headless agent, a `human` row is "what the hook endpoint
   recorded", not proof that a person typed it (it need not even have reached the tab), because
@@ -944,7 +947,12 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
   person types again. A `topic` or `question_id` the route rejects for its shape (blank or not a
   string) spends nothing, and so does a `topic` the gate cannot look up (`chief_bind.is_id`: over
   512 characters, a control character or a lone surrogate, left to the route); a `question_id` that
-  is not an id is 403 first ("Ids" below). Both sides of "at or after" are the wall clock (`time.time()` for a
+  is not an id is 403 first ("Ids" below). Two requests that cite two different messages for one
+  waiting question, both before the run's poll takes the first answer, spend both messages and the
+  second answer overwrites the first: `supply_agent_answer` only checks that the run is still
+  awaiting an answer and stores the new one, and `_await_agent_question` clears that flag after
+  its 50 ms poll sees an answer, so the person's first message is lost and the agent reads the
+  second. Both sides of "at or after" are the wall clock (`time.time()` for a
   message and for a run's question, the board row's ISO `ts` for a board row), so a clock stepped
   backwards lets an older message pass.
 - **Cost and run limit.** Two per-machine settings in `app_settings`, read on every call, bound an
@@ -1264,7 +1272,11 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
     is the session's root (`is_own`, the rule a posted scope gets); a `feature` row when its scope
     is one plain folder name and a folder of that name exists under `<root>/pathly/features/` or
     `<root>/pathly/features/.archive/` (a feature scope is a name, not a path, and feature boards
-    are keyed by name only, so a feature that exists in two projects is in both); a `global` row,
+    are keyed by name only, so a feature that exists in two projects is in both, and a planner or
+    operator chief can create that folder itself: `POST /comms/features/decompose` (`plan`) makes
+    `<project_root>/pathly/features/<feature>` for any one-folder `feature` it is given, at every
+    rigor, so for a name that exists in another project the folder check can be made true by the
+    chief; a post to a feature board makes no folder); a `global` row,
     and a row on any other board, never. An id no row has passes and the route answers it (404;
     `/comms/acknowledge` does nothing and answers 200). The `run_id` that a `/comms/post` row
     carries is only a correlation stamp, so there a run placed in another project is refused and a
@@ -1908,8 +1920,10 @@ declared? The *declared scope* is the union of the backtick paths in the gate's 
 (optional; read from the storage dir when the file exists) and the `files` of the board tasks
 claimed since `build_baseline.started_at` (`task_proof.tasks_claimed_since`, goal-scoped when the
 run has a `goal_id`, else `(board, scope)`). Only a task posted before that stamp (its server `ts`)
-and not stamped `author_role: builder` counts, so a builder cannot widen its scope by posting a task
-and claiming it. An entry that names a directory covers everything under it, with or without a
+and not stamped `author_role: builder` counts, so a builder cannot widen its scope by
+posting or editing a task and claiming it (`/comms/edit` changes only the text and re-stamps the
+row to the editor, so a task a builder edited is stamped `builder` and does not count). An entry
+that names a directory covers everything under it, with or without a
 trailing `/`. The *changed paths* are `git diff --name-only HEAD` plus every untracked file
 (`git status --untracked-files=all`, so a new folder is listed file by file). A path in
 `build_baseline.preexisting_dirty` (dirty when BUILDING began; a collapsed `dir/` entry covers the

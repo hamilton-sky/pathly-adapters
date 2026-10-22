@@ -1,11 +1,12 @@
 """POST /chief/open, POST /chief/close and GET /chief/session (chief-agent).
 
-A thin layer over ``supervisor/chief_session.py``. Opening and closing a chief are human acts
-(Studio's launcher), so both refuse a caller that sends a live run token: an agent cannot open
-a chief, and cannot close the one its project has. The limit is the one every human-only route
-has: a caller with no token (or an unknown or revoked one) is treated as a human, because the
-server cannot tell Studio from a local process until the UI token exists. Refusing the chief's
-own token on these routes is the chief gate (ticket 08).
+A thin layer over ``supervisor/chief_session.py``. Opening and closing a chief are human acts,
+so both refuse a caller that sends a live run token: an agent cannot open a chief, and cannot
+close the one its project has. Studio has no Chief button yet; today a person (or a script they
+run) calls ``POST /chief/open`` directly. The limit is the one every human-only route has: a
+caller with no token (or an unknown or revoked one) is treated as a human, because the server
+cannot tell Studio from a local process until the UI token exists. Refusing the chief's own
+token on these routes is the chief gate (ticket 08).
 
 ``project_root`` is normalised (``chief_session.normalise_project_root``) on all three routes,
 so ``/p`` and ``/p/`` are one project.

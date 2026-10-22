@@ -37,9 +37,12 @@ identity of role-read-policy.
   goes into the prompts of the role it is addressed to (every role for `*`) and stays there after
   it is acknowledged, whatever the run's context toggles say.
 - One project: every `project_root`, board scope, file path and run, goal, task or message id a
-  write names must belong to the chief's project. Two settings bound a session:
-  `chief.max_cost_usd_per_run` (default `10.0`) and `chief.max_runs_per_session` (default `20`),
-  which only the person sets, with `PUT /db/settings/<key>`.
+  write names must belong to the chief's project. Two settings limit a session, and only the
+  person sets them, with `PUT /db/settings/<key>`: `chief.max_runs_per_session` (default `20`)
+  counts every call that starts work, and `chief.max_cost_usd_per_run` (default `10.0`) is the
+  most a start may state as its cost. Only `POST /runs` of a flow and the `retry` verb state a
+  cost, so goal, board and task runs are bounded by the run count alone (a goal's own cap is
+  `goal.max_cost_usd`, when the person has set it).
 - `pathly api METHOD /path [json]` (the new `pathly` console script) sends one request with the
   tab's token and prints the answer, never the token.
 
@@ -47,8 +50,9 @@ What is refused: a call outside the tier, and any write the gate does not list (
 `/db/settings`, `/comms/edit`, `/comms/delete`, `/comms/hydrate`, the routes that force past a human
 gate); an answer that is not a bare `cite`, or that cites a message from before the question, one
 already used, the style prompt, a relayed prompt or another session's message; acknowledging an
-escalation addressed to the human without a cite, or as anyone but `chief`; a run start above the
-cost ceiling or past the run limit (a start the route itself refuses gives its slot back);
+escalation addressed to the human without a cite, or as anyone but `chief`; a flow start or retry
+that states a cost above the ceiling, and any run start past the run limit (a start the route
+itself refuses gives its slot back);
 stopping or pausing another project's run; retiring a standing order as anyone but a live chief
 run (another role's `supersedes` skips it with reason `binding`, `/comms/supersede` without a chief
 token is 403, `/comms/delete` is 403 for everyone, `/comms/edit` is 409, and hydrating a
@@ -77,8 +81,17 @@ again, and until the UI token Studio can neither post nor retire one. Reads that
 (`GET /runs/<run_id>`, an artifact, a goal's tasks) and the fleet-wide totals of `GET /db/rollup`
 are not bound to the chief's project. The Studio Chief button, the friendly `pathly` commands, the
 overview and inbox calls and the cost of the chief's own token are round two. Every test fakes the
-spawn host: none opens a real `claude`, and spike 19, a hand run with one, is the planned live
-check.
+spawn host: none opens a real `claude`, and spike 19 part B is the planned live check, eight yes or
+no questions put to a real claude by hand
+(`pathly/features/chief-agent/tasks/19-daycap-guard-coverage-spike.md`). Until it has been run,
+what stays unmeasured is that the claude chief's restricted flags hold (`pathly *` is allowed
+ahead of time, `curl` and `wget` are denied, every other command is claude's to run or ask
+about), that its two switches stop the
+prompts nobody typed, that the hook records a typed message the chief can cite, that `pathly api`
+works from inside the tab, that a cited answer reaches a real waiting agent and an answer without
+a cite does not, that the run limit stops the third run and the chief tells the person, that the
+texts lead a real claude to sensible first commands, and that closing the chief makes its token
+401.
 
 ### Licensed under Apache-2.0
 

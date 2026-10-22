@@ -1,4 +1,4 @@
-"""chief-agent 17, round 2: input to `pathly api` that is not valid text, and the server secret.
+"""Input to `pathly api` that is not valid text, and the server secret (chief-agent 17).
 
 * A body, a path or a standard input that is not valid UTF-8 is a usage error (exit 2, nothing
   sent), never a traceback: ``pathly api POST /x $'{"a":"\\xff"}'`` and ``printf '\\xff{}' |

@@ -131,7 +131,7 @@ For Copilot: stitched files use Copilot-compatible format, deployed to workspace
 | `src/pathly_data/core/` | Source-of-truth agent contracts, skill logic, plan templates — never edited by install |
 | `src/pathly_data/adapters/` | Per-tool YAML metadata (`_meta/`) and plugin manifests |
 | `src/pathly_orchestrator/` | FSM engine package. `http_server/` (blueprint package) exposes `/next_action`, `/complete_stage`, `/record_activity`, `/events/stream` over HTTP (port 8765). Also implements `pathly-events`, `pathly-state`, and `pathly-validate-flow` CLI entry points. |
-| `src/pathly_hooks/` | Hook scripts (`classify_feedback.py`, `inject_feedback_ttl.py`) deployed by install into host tool settings. |
+| `src/pathly_hooks/` | Hook scripts, run as `python -m pathly_hooks.<name>`. `stop_telemetry.py` is the one install wires into a host's settings (the Claude `Stop` hook, `adapters/claude/_meta/install.yaml`). `classify_feedback.py` and `inject_feedback_ttl.py` ship with the package and read `PATHLY_PROJECT_ROOT`; no `install.yaml` wires them. `chief_prompt.py` is not installed: the server writes its command into the `settings.json` of each chief session's own folder. |
 
 ## Host Detection
 

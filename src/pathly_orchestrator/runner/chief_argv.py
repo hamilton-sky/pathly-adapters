@@ -76,11 +76,16 @@ def chief_argv(
 def claude_settings(hook_command: str) -> dict:
     """The session's claude settings: ``pathly`` commands allowed, the rest denied or asked.
 
-    Every Bash command other than ``pathly ...`` asks the human. Most denied tools are already
-    absent under ``--tools``; the rules stay so they still hold if a claude version reads
-    ``--tools`` differently. One ``UserPromptSubmit`` hook runs ``hook_command``. An ``env`` block
-    turns off background-task notifications and the cron scheduler (``_CLAUDE_ENV``), the two
-    ways claude starts a turn nobody typed; measured on claude 2.1.304 only.
+    Only ``Bash(pathly *)`` is allowed ahead of time, and ``curl`` and ``wget`` are denied. For
+    every other Bash command these settings say nothing, so claude applies its own rule under
+    ``--restricted --tools``: a read-only command (``ls``, ``git status``) runs without asking
+    and the rest ask the human in the tab. That rule is claude's, not one of these settings, and
+    it has not been run against this argv in a real tab yet (spike 19 part B, question 1). Most
+    denied tools are already absent under ``--tools``; the rules stay so they still hold if a
+    claude version reads ``--tools`` differently. One ``UserPromptSubmit`` hook runs
+    ``hook_command``. An ``env`` block turns off background-task notifications and the cron
+    scheduler (``_CLAUDE_ENV``), the two ways claude starts a turn nobody typed; measured on
+    claude 2.1.304 only.
     """
     return {
         "permissions": {"allow": list(_CLAUDE_ALLOW), "deny": list(_CLAUDE_DENY)},

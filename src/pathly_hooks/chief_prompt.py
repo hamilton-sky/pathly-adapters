@@ -1,4 +1,4 @@
-"""UserPromptSubmit hook of a claude chief session: record what the human types (chief-agent).
+"""UserPromptSubmit hook of a claude chief session: record prompts that reach its tab (chief-agent).
 
 Claude Code runs ``<python> -m pathly_hooks.chief_prompt --run-id <id> --secret-file <path>
 --port <port>`` (the command ``supervisor/chief_session.py`` writes into the session's claude

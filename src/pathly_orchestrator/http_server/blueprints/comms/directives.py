@@ -57,10 +57,12 @@ def _text_refusal(text: object) -> str | None:
 def comms_directives():
     """Post a binding directive: 201 ``{id}``.
 
-    403 for anything but a live chief run; 400 for a body that is not an object, a blank
-    ``project_root``, a ``to_agent`` that is not ``*`` or a lowercase role name of at most 40
-    characters, or a ``text`` that is blank, over 8 KiB in UTF-8, holds a control character
-    other than newline and tab, or cannot be encoded.
+    403 for anything but a live chief run; 400 for a body that is not an object, a
+    ``project_root`` that is missing, null or the empty string (one of only spaces never gets
+    here from a chief: the chief gate answers 403, since it is not the session's root), a
+    ``to_agent`` that is not ``*`` or a lowercase role name of at most 40 characters, or a
+    ``text`` that is blank, over 8 KiB in UTF-8, holds a control character other than newline
+    and tab, or cannot be encoded.
 
     The caller is looked up once and the row is stamped with that same identity: a second
     lookup could answer "nobody" once the session had closed in between, and the row would be

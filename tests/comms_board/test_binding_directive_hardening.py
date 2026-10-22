@@ -1,4 +1,4 @@
-"""Standing orders under bad input and a failing query (chief-agent 11, review round 2).
+"""Standing orders under bad input and a failing query (chief-agent 11).
 
 - The order they render in is by their own date, oldest first, whatever order they were posted.
 - A standing order is ONE line: a row whose text starts a new line cannot forge a second

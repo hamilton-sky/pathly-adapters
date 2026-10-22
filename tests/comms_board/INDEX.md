@@ -10,7 +10,7 @@ Comms board / message-board subsystem — messages, tasks, artifacts, goals, con
 | --- | --- | --- |
 | `test_artifact_reconcile.py` | T12: ensure_attached idempotency + reconcile + goal-path resolution + complete_stage threading | 5 |
 | `test_binding_directive_guard.py` | chief-agent 16: only the chief retires a binding directive, and hydration cannot forge one | 28 |
-| `test_binding_directive_hardening.py` | Standing orders under bad input and a failing query (chief-agent 11, review round 2) | 9 |
+| `test_binding_directive_hardening.py` | Standing orders under bad input and a failing query (chief-agent 11) | 9 |
 | `test_binding_directives.py` | Binding decisions (standing orders) keep reaching the prompts of the roles they target | 26 |
 | `test_binding_retire_writers.py` | chief-agent 16: every writer that can take a binding directive out of ``get_binding_decisions`` | 5 |
 | `test_binding_row_predicate.py` | One module says what "binding" means for a board row (``runner/comms_binding.py``) | 5 |
@@ -20,7 +20,7 @@ Comms board / message-board subsystem — messages, tasks, artifacts, goals, con
 | `test_board_context_settings.py` | Board-context size is configured and measured, not hardcoded | 16 |
 | `test_board_feed_and_archive_paths.py` | Board-feed structural inclusion (goals/tasks never evicted) + archive-artifacts repo-root path | 3 |
 | `test_board_hydrate_forgery.py` | chief-agent 16: what hydration stores from a ``BOARD.json``, and what it leaves out | 15 |
-| `test_board_hydrate_hostile.py` | chief-agent 16 (round 2): a hostile ``BOARD.json`` cannot stop hydration, or plant an artifact | 10 |
+| `test_board_hydrate_hostile.py` | A hostile ``BOARD.json`` cannot stop hydration, or plant an artifact (chief-agent 16) | 10 |
 | `test_board_lock.py` | Tests for the per-board run-lock (BOARD-RUNTIME-SPEC A2/D1) | 6 |
 | `test_board_mirror.py` | Board disk-mirror P0 — path resolver, atomic exporter, idempotent backfill | 19 |
 | `test_board_mirror_hydrate.py` | Board disk-mirror P2 — hydration (import BOARD.json mirrors back into the DB) | 13 |

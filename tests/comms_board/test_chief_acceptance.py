@@ -13,9 +13,12 @@ tester and only the chief retires it; 6. a run above the ceiling and a call on a
 run are refused; 7. ``pathly api`` works from the chief's tab; 8. the raw run token stays off
 ``/events/runner`` and ``/events/runs``.
 
-What this does not prove is a live claude: the chief's own claude is never started, so that it
-honours the restricted flags, that its hook fires and that the person's words reach the cite are
-not checked here (spike 19 is the planned hand run with a real claude).
+What this does not prove is a live claude: the chief's own claude is never started (spike 19 part B
+is the planned hand run with a real claude). Until it has been run these stay unmeasured: that the
+claude chief honours the restricted flags and its two switches, that its hook fires and records
+what the person types, that `pathly api` works from inside the tab, that a cited answer reaches a
+real waiting agent, that the run limit stops a third run, that the texts lead a real claude to
+sensible first commands, and that closing the chief makes its token 401.
 """
 
 from __future__ import annotations
