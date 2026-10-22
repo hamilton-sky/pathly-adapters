@@ -385,9 +385,8 @@ def test_an_unsupported_engine_is_a_value_error(project, chief_root, engine):
     assert host.sent == []
 
 
-MISSING_FOLDER = (
-    object()
-)  # a project root that does not exist: built from tmp_path in the test
+# A project root that does not exist: the test builds it from tmp_path.
+MISSING_FOLDER = object()
 
 BAD_INPUTS = [
     pytest.param("project_root", MISSING_FOLDER, id="project_root-missing-folder"),

@@ -50,6 +50,7 @@ from chief_gate_support import (
     other_project,
     project,
 )
+from mirror_drain_support import _mirrors_are_drained
 
 TIERS = ("operator", "planner", "status")
 
