@@ -2,7 +2,7 @@
 
 Type: task
 Status: open
-Blocked by: (none — spike)
+Blocked by: 21
 Test first: no (spike; the finding is the deliverable)
 
 daycap's `--guard` is a PreToolUse hook for interactive Claude Code / Codex
