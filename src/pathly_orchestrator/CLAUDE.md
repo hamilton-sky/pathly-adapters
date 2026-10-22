@@ -287,8 +287,14 @@ chief token never gets that far: a directive is superseded, not deleted); and hy
 those of the file it came from (the scope is compared exactly: `hydrate_project` passes the normalised
 root and the exporter writes that spelling into every row, so an export followed by a hydrate keeps
 every row of its own board, and a row that spells its root another way, `<root>/` or `C:\proj`, is left
-out rather than stored under a scope no board read asks for) and a row whose `id` is not a string; an
-artifact is kept only when its `message_id` is a row of the same file that was kept; a file that is not
+out rather than stored under a scope no board read asks for) and a row whose `id` is not a string with
+something in it after stripping (a blank id would be a blank primary key); an artifact is inserted only
+when its `message_id` is a message that is in the database under the file's own board and scope once the
+rows went in (a file row that reuses the id of a message on another board is not inserted, and an
+artifact for that id used to land on that other message); `hydrate_board` returns True only when at least
+one row of the file is in the database under that board and scope afterwards, so a file that adds
+nothing (every row names another scope, as in a clone at another path) is False and `hydrate_project`
+lists its scope under `skipped`; a file that is not
 a JSON object imports nothing; and `hydrate_board` does not raise on any of it, so one hostile entry
 (an `id` that is a list or a dict, say) cannot stop the boards `hydrate_project` reads after it.
 `comms_hydrate._unverified` stores `binding = 0`, and an
@@ -441,7 +447,7 @@ GET  /comms/artifacts       ← list artifacts linked to a message (comms_artifa
 GET  /comms/trash           ← list trashed messages
 POST /comms/restore         ← restore a trashed message
 POST /comms/supersede       ← mark a message superseded_by another (standalone form, used by Studio's supersede menu and the consolidate skill; an agent run is held to the same decision-only, own-board rules as `/comms/post` + `supersedes`; a binding directive is 403 `only the chief retires a binding directive` for every caller but a live chief run, a request with no token or only the server secret included)
-POST /comms/directives      ← CHIEF TOKEN ONLY: post a BINDING directive (standing order) `{project_root, to_agent: "*"|<role>, text}` → 201 `{id}`. `blueprints/comms/directives.py`; the only route that sets `comms_messages.binding = 1` (`db/queries/comms_directives.post_directive`: a `decision` from `chief` on the project board, `from_agent="chief"`, flagged under the write lock; the scope is `fsm_compose.resolve_board_scope("project", project_root, "")`). 403 for every other caller: no token, any other role's token, and a request that carries only the server secret (what Studio sends today; the UI path waits for the UI token, RRP-2b). The chief gate has already checked, for a chief token, that the tier may `decide`, that `project_root` is the session's project and that only `project_root`/`to_agent`/`text` are sent. 400 for a `to_agent` that is not `*` or `^[a-z][a-z0-9_-]{0,39}$` (matched exactly against a prompt's role, so no upper case or padding), a blank `project_root`, or a `text` that is blank, over 8 KiB in UTF-8 BYTES, holds a control character other than newline and tab (a NUL would fail every spawn of the role: `subprocess` refuses an embedded null byte), or is not UTF-8 encodable; the text is stored stripped. Broadcasts the `COMMS_UPDATE` a new row gets. A directive is replaced with `/comms/supersede`, never edited
+POST /comms/directives      ← CHIEF TOKEN ONLY: post a BINDING directive (standing order) `{project_root, to_agent: "*"|<role>, text}` → 201 `{id}`. `blueprints/comms/directives.py`; the only route that sets `comms_messages.binding = 1` (`db/queries/comms_directives.post_directive`: a `decision` from `chief` on the project board, `from_agent="chief"`, written with `binding = 1` in its one INSERT: `post_message` takes a keyword-only `binding` (default 0) that only `post_directive` passes, and `/comms/post` still ignores a `binding` in a body, so a failure leaves no ordinary decision behind and a retry no second copy; the scope is `fsm_compose.resolve_board_scope("project", project_root, "")`). 403 for every other caller: no token, any other role's token, and a request that carries only the server secret (what Studio sends today; the UI path waits for the UI token, RRP-2b). The chief gate has already checked, for a chief token, that the tier may `decide`, that `project_root` is the session's project and that only `project_root`/`to_agent`/`text` are sent. 400 for a `to_agent` that is not `*` or `^[a-z][a-z0-9_-]{0,39}$` (matched exactly against a prompt's role, so no upper case or padding), a blank `project_root`, or a `text` that is blank, over 8 KiB in UTF-8 BYTES, holds a control character other than newline and tab (a NUL would fail every spawn of the role: `subprocess` refuses an embedded null byte), or is not UTF-8 encodable; the text is stored stripped. Broadcasts the `COMMS_UPDATE` a new row gets. The route looks the caller up once and uses that identity for the check and for the row's stamp (a second lookup could find the session closed and store `author_source` `none`). A directive is replaced with `/comms/supersede`, never edited
 GET  /comms/scope           ← read the active board scope
 POST /comms/scope           ← set the active board scope
 GET  /comms/permissions     ← role-based write permissions
@@ -461,7 +467,7 @@ GET  /comms/goals/refs-coverage ← per-goal context_refs coverage stats
 POST /comms/features/decompose ← decompose a feature board into a goal task-DAG (feature-consultation flow)
 POST /comms/project/decompose  ← decompose a project spec into a feature set + scaffold pathly/features/<slug>/ (project-consultation flow)
 POST /comms/consolidate     ← memory consolidation: near-dup dedup; mode=full adds the reflection pass
-POST /comms/hydrate         ← board disk-mirror: import a project's on-disk BOARD.json mirrors into the DB (fresh-clone; DB-authoritative, no-ops non-empty boards). Stores `binding = 0` for every row, leaves out a row of another board or scope than its file's, and stores a claimed `author_source` other than `none` as `legacy` (see "Who retires or forges a standing order")
+POST /comms/hydrate         ← board disk-mirror: import a project's on-disk BOARD.json mirrors into the DB (fresh-clone; DB-authoritative, no-ops non-empty boards). Stores `binding = 0` for every row, leaves out a row of another board or scope than its file's, and stores a claimed `author_source` other than `none` as `legacy` (see "Who retires or forges a standing order"). Answers `{hydrated, skipped}`: a scope is under `hydrated` only when at least one row of its file is in the DB afterwards, and a file that adds nothing (empty, or every row names another scope, as in a clone at another path) is under `skipped`
 GET  /events/comms          ← SSE stream of comms board updates (streams blueprint)
 ```
 
@@ -558,7 +564,9 @@ POST /chief/human-messages  ← {run_id, hook_secret, text, session_id, relayed?
 
 - **Open:** 403 when the caller sends a live run token (an agent cannot open a chief); 400 when a
   field is missing or not a string, or `open_chief` raises `ValueError` (its message is passed
-  on); 409 `{error, run_id, tab_id}` on `ChiefAlreadyOpen`. `open_chief` gets the runner
+  on); 409 `{error, run_id, tab_id}` on `ChiefAlreadyOpen`; 409 `{error, run_id}` on
+  `ChiefClosedWhileOpening` (a close landed after the session row and before the token: the open
+  revoked its token, sent no spawn and left the session closed). `open_chief` gets the runner
   broadcaster (`sse._broadcast_runner`), so the `TERMINAL_SPAWN` reaches whichever spawn host
   is listening. `engine` and `preset` are required strings; `prompt` and `model` are optional,
   but a key that is present must be a string (`"prompt": null` is a 400).
@@ -596,12 +604,18 @@ POST /chief/human-messages  ← {run_id, hook_secret, text, session_id, relayed?
   prints the server's answer to stdout and a `pathly: HTTP <status>` line to stderr for a non-2xx.
   Exit **0** for a 2xx, **1** for any other status or an unreachable server, **2** for a usage error
   (a missing token, a path that is not `/...`, a path or body that is not valid UTF-8, a body that
-  is not a JSON object, a GET with a body): nothing is sent in that case. The token and the server
+  is not a JSON object, a GET with a body, a token or server secret that holds a character an HTTP
+  header cannot carry, a body nested too deeply to parse, a body read from standard input over
+  `MAX_BODY_BYTES`, 1 MiB): nothing is sent in that case, and the last three give one line that names
+  the problem and never the value. The token and the server
   secret (read once per command) are never printed (an answer or an error that holds either is
-  redacted). What a chief may do is decided by the chief gate, not here: a refusal is the gate's 403
+  redacted). At most `MAX_ANSWER_BYTES` (256 KiB) of an answer are read, in bounded reads, and
+  printed; a longer one is cut (never inside a character or half a token), a `pathly: the answer was
+  cut` line on stderr says how many bytes were shown, and the exit code still follows the status. What a chief may do is decided by the chief gate, not here: a refusal is the gate's 403
   body, printed as it came. `pathly help` lists the routes a chief uses most, each with what it
   needs (`GET /runs?project_root=<root>`, `GET /comms?board=project&scope=<root>&feature=project`,
-  `GET /chief/session?project_root=<root>`).
+  `GET /chief/session?project_root=<root>`), and `POST /comms/acknowledge` with `{message_id, agent:
+  "chief", cite}`, how an operator chief closes an escalation addressed to the human.
 - **Close:** 403 for a live run token. It closes the project's open session with reason
   `closed from Studio` (`close_chief`: revokes the token, removes the folder, drops the run) and
   then sends `TERMINAL_KILL {tab_id, run_id}` on topic `chief:<run_id>` so the host closes the
@@ -613,7 +627,13 @@ POST /chief/human-messages  ← {run_id, hook_secret, text, session_id, relayed?
 - **Restart:** `app.main()` calls `chief_startup_cleanup()` before the server serves, inside a
   `try` that logs a warning and goes on: it closes every session still open (reason `server
   restart`, token revoked) and removes their `~/.pathly/chief/<run_id>/` folders, because a chief
-  open across a restart has no watcher left to close it.
+  open across a restart has no watcher left to close it. It asks first whether something already
+  answers on the host and port it is about to serve (`chief_session.something_answers`: a TCP
+  connect, to 127.0.0.1 for a wildcard host; any error is "nothing answers"). If so it logs one
+  warning (`something already answers on <host>:<port>: the chief sessions are left open`), skips
+  the cleanup and goes on to fail in `app.run` ("address already in use"), so a second server
+  started by mistake on the first one's port no longer closes the running server's chief. A second
+  server on another port still does (not protected; not decided).
 - Same limit as the other human-only routes: a caller with no token (or an unknown or revoked
   one) is treated as a human until the UI token (RRP-2b) exists. The chief's own token is refused
   here by the chief gate ("Chief gate" below).
@@ -641,7 +661,8 @@ POST /chief/human-messages  ← {run_id, hook_secret, text, session_id, relayed?
     with the same keys and values as for a typed one (measured on claude 2.1.304 in `claude -p`
     stream-json and in an interactive tab). Only a wrapper around `prompt` differs. The hook
     sends `relayed: true` when `<task-notification` or `<cross-session-message` is anywhere in
-    the prompt, and the server stores kind `relayed`, never citable (a typed prompt that holds
+    the prompt (a tag that starts with either name, `<task-notifications>` and `<task-notification_v2>`
+    too, since the list cannot know every spelling), and the server stores kind `relayed`, never citable (a typed prompt that holds
     the tag is wrongly uncitable too; the human retypes it). **That list is a deny-list of the
     wrappers measured, not a test for "typed":** a prompt without one is stored as `human`
     whether or not anyone typed it. The chief's claude has exactly four tools (the `init`
@@ -655,7 +676,7 @@ POST /chief/human-messages  ← {run_id, hook_secret, text, session_id, relayed?
     | A background command's last output looks like a question (45 s without output) | the wrapper, then `Last output:` and the command's own output after the closing tag | flagged (anywhere in the prompt). Measured: `-p` |
     | Quiet-shell and goal check-ins | built by the same function (read in the binary; the first sits behind a server-side flag) | flagged; not measured switched on |
     | Another claude session's message | `<cross-session-message ...>` | flagged. Measured without `--restricted`; a `--restricted` claude binds no inbox socket, so none arrives |
-    | A task in the project's `.claude/scheduled_tasks.json` (including one another session of that project made with a durable `CronCreate`) | **a bare prompt, nothing to tell it from typing** | **open.** Stored as `human`. Measured in a tab with the chief's flags: fired at the first minute boundary (23-26 s after the typed prompt), also when `createdBySessionId` named another session of the project. The chief cannot write the file (no Write or Edit; Bash is `pathly *`), a same-user process can |
+    | A task in the project's `.claude/scheduled_tasks.json` (including one another session of that project made with a durable `CronCreate`) | **a bare prompt, nothing to tell it from typing** | **closed by `CLAUDE_CODE_DISABLE_CRON=1`, which the chief's settings set** (see "Switches", measured on 2.1.304 only). Without it, stored as `human`: measured in a tab with the chief's flags, fired at the first minute boundary (23-26 s after the typed prompt), also when `createdBySessionId` named another session of the project. The chief cannot write the file (no Write or Edit; Bash is `pathly *`), a same-user process can |
     | Usage-limit auto-continue, worker-restart notice | fixed text in the binary ("Your claude.ai usage limit has reset. Continue the task ...", "This session's worker process was restarted ..."), not chief-controlled | **open**, not measured (needs a usage limit). Would be stored as `human` |
     | The human accepting a suggested prompt (Tab, Enter) | model-written text submitted by a human act | accepted |
 
@@ -669,7 +690,10 @@ POST /chief/human-messages  ← {run_id, hook_secret, text, session_id, relayed?
     timeout die (exit 143) instead of moving to the background, and no `<task-notification>`
     arrives (measured in `-p` and a tab); `CLAUDE_CODE_DISABLE_CRON=1` keeps the scheduler from
     starting, so the file task above never fires (measured in a tab, 110 s). `claude_settings`
-    sets neither today. Not tried: `crossSessionInbound: "refuse"` (documented). A permission
+    sets both, as the `env` block of the `settings.json` a claude chief is started with (a codex
+    chief has no settings file and is unchanged). That a claude honours them was measured on this one
+    version, 2.1.304; on another the hook's deny-list is the only guard against the tags above, and
+    nothing is against the file task. Not tried: `crossSessionInbound: "refuse"` (documented). A permission
     rule is NOT a switch: `Bash(run_in_background:true)` (in the settings `permissions.deny` or as
     `--disallowedTools`, both measured) refuses an explicit `run_in_background` ("Permission to use
     Bash with run_in_background:true has been denied."), but a foreground command with a long
@@ -702,7 +726,10 @@ POST routes with one em-dash in the body:
 `_helpers.read_json_body(default=None)` is now the single reader, used by all 36. It reads
 `request.get_data()` (so a client that omits the JSON content-type is still understood — what
 `/comms/post` always did), tries UTF-8 then cp1252, and returns *default* when the body is
-absent/undecodable/not a JSON object — so each caller keeps its existing contract:
+absent/undecodable/not a JSON object/holds a lone surrogate (`"\\ud800"` in a key or in a string at
+any depth: Python's parser takes it, SQLite cannot store it, and the route answered 500
+`UnicodeEncodeError`; other non-ASCII text, a surrogate pair and a cp1252 body read as before) — so
+each caller keeps its existing contract:
 `read_json_body()` for routes that 400 on a bad body, `read_json_body({})` for routes that
 fall through to their own defaults.
 
@@ -927,6 +954,9 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
   - `chief.max_cost_usd_per_run` (default `10.0`): the cost one run may state. `POST /runs` and the
     `retry` verb are the only start routes whose body carries `max_cost_usd`, so the ceiling is
     judged there (the other start routes list no such key and a chief that sends one is told so).
+    `POST /runner/start`, `POST /runner/retry` and the `retry` verb read the key with the same
+    `as_cost` (a value that is not a finite number above 0 is their 400), so no start route takes a
+    `NaN`, an `Infinity` or a `true` as a cap.
     Above it is 403 `max_cost_usd above this chief's ceiling` with `ceiling`. A value that is not a
     finite number above 0 (a boolean, string, list, `null`, zero, a negative, `NaN`, `Infinity`) is
     403 `max_cost_usd must be a finite number above 0` with `ceiling` too: Python's JSON parser
@@ -1448,7 +1478,7 @@ pathly_orchestrator/
                            #   bucketing (scope_tier is the board tier, not the run type).
       comms.py             # re-export shim — splits into comms_messages, comms_artifacts, comms_tasks, comms_embeddings, comms_counts, comms_goals_read (import from domain modules for new code)
       comms_messages.py    # board message CRUD; goal_id/executor columns back the Goals->Task-DAG model
-      comms_directives.py  # get_binding_decisions(conn, boards, scopes, role): the binding (`binding = 1`) decisions a prompt carries whatever their status, not deleted or superseded, addressed to the role or `*` (`*` only for an empty role), oldest first; board and scope lists go in as one JSON string each through `json_each`, so the statement is one static literal; `post_directive(conn, scope, to_agent, text, **author)`: the one writer of `binding = 1` (a `decision` from `chief` on the project board through `post_message`, then flagged under the write lock)
+      comms_directives.py  # get_binding_decisions(conn, boards, scopes, role): the binding (`binding = 1`) decisions a prompt carries whatever their status, not deleted or superseded, addressed to the role or `*` (`*` only for an empty role), oldest first; board and scope lists go in as one JSON string each through `json_each`, so the statement is one static literal; `post_directive(conn, scope, to_agent, text, **author)`: the one writer of `binding = 1` (a `decision` from `chief` on the project board through `post_message(..., binding=1)`, whose one INSERT sets the flag)
       comms_edit.py        # update_message_text: edits a row's text AND sets its three author columns from the editor's stamp (none when no stamp is passed), and answers `"binding"` without changing anything for a row with `binding = 1`; re-exported from comms_messages / comms
       comms_artifacts.py   # artifact metadata CRUD (attach, list, section index, update_summary)
       comms_tasks.py       # task DAG operations (get_ready, complete, claim, fail, reclaim, goal_refs_coverage)
@@ -1587,9 +1617,9 @@ pathly_orchestrator/
     board_lock.py          # Per-board/scope advisory lock (acquire/release/holder)
     chief_tiers.py         # what a chief may do (chief-agent): ACTIONS, TIERS (status=read; planner=read,post,plan; operator=all seven), actions_for/normalise_tier, and resolve_preset_tier — a user prompt file chief/<preset> names its tier in leading front matter `tier:`, else the built-in names map to themselves, anything else (unknown tier, missing front matter, malformed name) is status. Code, never read from prompt text; strip_front_matter reuses skills/compose_base
     chief_presets.py       # the chief's prompt (chief-agent 17): the built-in styles STATUS / PLANNER / OPERATOR (BUILT_IN), default_style (user file chief/<preset> wins, else the built-in text), compose_prompt (style + the chief-connect fragment, read at call time, + ROOT_LINE with the stored project root)
-    chief_session.py       # open_chief / close_chief (chief-agent): the chief is a long-lived interactive spawn, so it has its own open path instead of _run_stage_via_terminal (which blocks its caller and gives up after 30 minutes). open_chief validates (engine claude|codex, existing project_root, the style non-empty and at most 64 KiB, model not starting with `-`; `prompt` is optional for a preset that has a built-in text), raises ChiefAlreadyOpen(run_id, tab_id) for a project with an open chief, resolves the tier from the preset, writes ~/.pathly/chief/<run_id>/ (hook_secret, and for claude settings.json + an empty mcp.json; mode 0600), registers the chief_sessions row (secret sha256, the claude --session-id), mints a `chief` token on the project board, create_run(run_id), and sends one interactive TERMINAL_SPAWN (topic `chief:<run_id>`, submit false, the prompt from `chief_presets.compose_prompt`: style without front matter, then the `chief-connect` fragment, then the stored root); a daemon watcher closes the session as `never started` or `tab closed`. close_chief revokes the token, removes the folder and drops the run (False the second time). normalise_project_root (forward slashes, no trailing slash) keys a project's chief for open_chief and the routes; chief_startup_cleanup() closes every session still open at server start (reason `server restart`) and removes their folders
+    chief_session.py       # open_chief / close_chief (chief-agent): the chief is a long-lived interactive spawn, so it has its own open path instead of _run_stage_via_terminal (which blocks its caller and gives up after 30 minutes). open_chief validates (engine claude|codex, existing project_root, the style non-empty and at most 64 KiB, model not starting with `-`; `prompt` is optional for a preset that has a built-in text), raises ChiefAlreadyOpen(run_id, tab_id) for a project with an open chief, resolves the tier from the preset, writes ~/.pathly/chief/<run_id>/ (hook_secret, and for claude settings.json + an empty mcp.json; mode 0600), registers the chief_sessions row (secret sha256, the claude --session-id), mints a `chief` token on the project board, create_run(run_id), and sends one interactive TERMINAL_SPAWN (topic `chief:<run_id>`, submit false, the prompt from `chief_presets.compose_prompt`: style without front matter, then the `chief-connect` fragment, then the stored root); once the token is minted the session is read again, and a close that landed in between revokes the token, sends no spawn and raises ChiefClosedWhileOpening (POST /chief/open: 409; a close after that re-read cannot be shut out without a lock across the broadcast, it still revokes the token so the tab gets a dead one); a daemon watcher wakes on the first of the tab's `started` or its result (TerminalRun.wait_started_or_result) and closes the session as `never started` or `tab closed`. close_chief revokes the token, removes the folder and drops the run (False the second time). normalise_project_root (forward slashes, no trailing slash) keys a project's chief for open_chief and the routes; chief_startup_cleanup() closes every session still open at server start (reason `server restart`) and removes their folders; something_answers(host, port) is the TCP probe app.main() runs before it
   http_server/             # Flask HTTP server: FSM endpoints + SSE + runner routes
-    app.py                 # Flask app factory, blueprint registration, main() (which calls supervisor.chief_session.chief_startup_cleanup() before serving; a failure is logged and boot goes on)
+    app.py                 # Flask app factory, blueprint registration, main() (which calls supervisor.chief_session.chief_startup_cleanup() before serving, unless chief_session.something_answers(host, port) finds a server already answering there; a failure is logged and boot goes on)
     middleware.py          # _log_request, _log_response, rate limiting, metrics
     chief_gate.py          # chief_gate(): the before_request hook (registered after _log_request) that refuses a chief token's call its tier, project or poster does not allow, and answers 401 for a closed chief session — see "Chief gate"
     chief_routes.py        # the chief gate's route table as data: ROUTE_ACTIONS ((rule, method) -> action), the GET refusals, the post-type and run-verb refinements and action_for()

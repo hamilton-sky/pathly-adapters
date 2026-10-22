@@ -60,7 +60,8 @@ def chief_open():
     ``prompt`` is optional (a built-in preset, or the user's ``chief/<preset>`` file, supplies
     the style). 400 for a missing or non-string field or an ``open_chief`` ``ValueError`` (its
     message is passed on; ``custom`` with no prompt is one), 403 for a live run token, 409
-    ``{error, run_id, tab_id}`` when the project already has a chief.
+    ``{error, run_id, tab_id}`` when the project already has a chief, and 409 ``{error, run_id}``
+    when a close landed while it was opening (nothing was left live; the session is closed).
     """
     try:
         refused = _refuse_agent("opening a chief")
@@ -83,6 +84,7 @@ def chief_open():
         from ...sse import _broadcast_runner
         from pathly_orchestrator.supervisor.chief_session import (
             ChiefAlreadyOpen,
+            ChiefClosedWhileOpening,
             open_chief,
         )
 
@@ -102,6 +104,8 @@ def chief_open():
                 ),
                 409,
             )
+        except ChiefClosedWhileOpening as exc:
+            return jsonify({"error": str(exc), "run_id": exc.run_id}), 409
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
         return jsonify(result), 201

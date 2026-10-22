@@ -7,6 +7,29 @@ import re
 
 from flask import request
 
+_LONE_SURROGATE = re.compile("[\ud800-\udfff]")
+
+
+def has_lone_surrogate(value: object) -> bool:
+    """True when a string, a key or a string at any depth of *value* holds a lone surrogate.
+
+    Python's JSON parser accepts ``"\\ud800"`` and returns a ``str`` that SQLite cannot store (the
+    write raises ``UnicodeEncodeError``). A valid surrogate pair is one character by now and does
+    not count. The walk is iterative, so a deep body cannot make it recurse.
+    """
+    pending = [value]
+    while pending:
+        item = pending.pop()
+        if isinstance(item, str):
+            if _LONE_SURROGATE.search(item):
+                return True
+        elif isinstance(item, dict):
+            pending.extend(item.keys())
+            pending.extend(item.values())
+        elif isinstance(item, list):
+            pending.extend(item)
+    return False
+
 
 def read_json_body(default: dict | None = None) -> dict | None:
     """Parse this request's JSON body, tolerating a non-UTF-8 encoding.
@@ -34,10 +57,13 @@ def read_json_body(default: dict | None = None) -> dict | None:
     ``/comms/post`` has always done, and an agent's write is worth more than header
     pedantry.
 
-    Returns *default* (``None`` unless given) when the body is absent, undecodable, or not
-    JSON — so a caller keeps whichever contract it already had:
-    ``read_json_body()`` for the routes that 400 on a bad body, and
-    ``read_json_body({})`` for the routes that fall back to their own defaults.
+    Returns *default* (``None`` unless given) when the body is absent, undecodable, not JSON,
+    or holds a lone surrogate (``"\\ud800"``, in a key or in a string at any depth) — so a
+    caller keeps whichever contract it already had: ``read_json_body()`` for the routes that
+    400 on a bad body, and ``read_json_body({})`` for the routes that fall back to their own
+    defaults. A lone surrogate parses, but SQLite cannot store it and the route would answer
+    500 with ``UnicodeEncodeError``; a body with other non-ASCII text, or in cp1252, reads as
+    before.
     """
     raw = request.get_data()
     if not raw:
@@ -47,6 +73,8 @@ def read_json_body(default: dict | None = None) -> dict | None:
             parsed = json.loads(raw.decode(encoding))
         except (UnicodeDecodeError, ValueError):
             continue
+        if has_lone_surrogate(parsed):
+            return default
         return parsed if isinstance(parsed, dict) else default
     return default
 

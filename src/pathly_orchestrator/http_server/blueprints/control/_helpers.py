@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from ._cost import flow_cost
+from ._cost import MESSAGE, as_cost, flow_cost
 
 ACTIVE_STATUSES = ("running", "paused", "awaiting_decision")
 
@@ -147,9 +147,9 @@ def handle_retry(run_id: str, topic: str, state, body: dict) -> tuple[dict, int]
     if not isinstance(max_iterations, int) or max_iterations <= 0:
         return {"error": "Field 'max_iterations' must be a positive integer"}, 400
 
-    max_cost_usd = body.get("max_cost_usd")
-    if not isinstance(max_cost_usd, (int, float)) or max_cost_usd <= 0:
-        return {"error": "Field 'max_cost_usd' must be a positive number"}, 400
+    max_cost_usd = as_cost(body.get("max_cost_usd"))
+    if max_cost_usd is None:
+        return {"error": MESSAGE}, 400
 
     model = body.get("model", "claude-sonnet-4-6") or "claude-sonnet-4-6"
     timeout = body.get("timeout", 600)
@@ -169,7 +169,7 @@ def handle_retry(run_id: str, topic: str, state, body: dict) -> tuple[dict, int]
             model=model,
             timeout=timeout,
             max_iterations=max_iterations,
-            max_cost_usd=float(max_cost_usd),
+            max_cost_usd=max_cost_usd,
             autonomy=autonomy,
             broadcast_fn=_broadcast_runner,
         )

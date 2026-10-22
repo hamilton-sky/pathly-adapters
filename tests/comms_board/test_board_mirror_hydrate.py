@@ -385,12 +385,12 @@ def test_hydrate_project_discovers_and_hydrates_project_and_feature_boards(tmp_p
 
     result = hydrate_project(conn, str(root_dir))
 
-    # "global" also lands in hydrated: db/migrations.py's startup backfill_board_mirrors
-    # always writes an (empty) ~/.pathly/global/BOARD.json, so it exists independently
-    # of this test's project_root and is legitimately picked up too.
-    assert {norm_root, "feat-h"}.issubset(set(result["hydrated"]))
+    # "global" is skipped: db/migrations.py's startup backfill_board_mirrors always writes an
+    # (empty) ~/.pathly/global/BOARD.json, so it exists independently of this test's
+    # project_root, is picked up too and adds nothing.
+    assert result["hydrated"] == [norm_root, "feat-h"]
     assert "feat-already" not in result["hydrated"]
-    assert result["skipped"] == ["feat-already"]
+    assert result["skipped"] == ["feat-already", "global"]
 
     project_messages = get_all_messages(conn, "project", norm_root)
     assert [m["id"] for m in project_messages] == ["pm1"]
@@ -409,8 +409,9 @@ def test_hydrate_project_skips_nonexistent_project_and_feature_files(tmp_path):
 
     # No pathly/project or pathly/features/* on disk -> neither is attempted. "global"
     # is still processed (its BOARD.json always exists via the startup backfill), and
-    # is empty (0 messages/artifacts) since nothing was posted to it in this test.
-    assert result == {"hydrated": ["global"], "skipped": []}
+    # is empty (0 messages/artifacts) since nothing was posted to it in this test: a file
+    # that adds nothing is skipped, not hydrated.
+    assert result == {"hydrated": [], "skipped": ["global"]}
 
 
 def test_hydrate_project_handles_no_root_gracefully():
@@ -418,6 +419,6 @@ def test_hydrate_project_handles_no_root_gracefully():
     # No project_root -> only the always-present (empty) global mirror is processed;
     # it stays empty (0 rows) after each call, so a repeat call behaves identically.
     result = hydrate_project(conn, "")
-    assert result == {"hydrated": ["global"], "skipped": []}
+    assert result == {"hydrated": [], "skipped": ["global"]}
     result_none = hydrate_project(conn, None)
-    assert result_none == {"hydrated": ["global"], "skipped": []}
+    assert result_none == {"hydrated": [], "skipped": ["global"]}

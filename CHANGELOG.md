@@ -68,8 +68,9 @@ Known limits, for round two and RRP-2b (the UI token): the raw run token is stil
 `/events/spawn` client, and one subscribed when a spawn starts can use it until the spawn ends. A
 `human` message is what the hook endpoint recorded, not proof that a person typed it: an operator
 chief can start a headless agent that runs as the same OS user and, if it reads the session's
-secret file and claude session id, could post to `/chief/human-messages` itself, and a scheduled
-task in the project's `.claude` folder is recorded as typed. That agent can also call
+secret file and claude session id, could post to `/chief/human-messages` itself, and, on a claude
+that ignores `CLAUDE_CODE_DISABLE_CRON` (the chief's settings set it; measured on claude 2.1.304
+only), a scheduled task in the project's `.claude` folder would be recorded as typed. That agent can also call
 `/runner/agent-answer` with no cite, because the cite rule guards the chief's own token. A fresh
 clone loses its standing orders (hydration never restores the flag), so the chief posts them
 again, and until the UI token Studio can neither post nor retire one. Reads that name an id

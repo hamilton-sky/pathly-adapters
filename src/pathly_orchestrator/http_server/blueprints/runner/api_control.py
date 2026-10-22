@@ -256,12 +256,11 @@ def runner_retry():
                 400,
             )
 
-        max_cost_usd = data.get("max_cost_usd")
-        if not isinstance(max_cost_usd, (int, float)) or max_cost_usd <= 0:
-            return (
-                jsonify({"error": "Field 'max_cost_usd' must be a positive number"}),
-                400,
-            )
+        from ..control._cost import MESSAGE, as_cost
+
+        max_cost_usd = as_cost(data.get("max_cost_usd"))
+        if max_cost_usd is None:
+            return jsonify({"error": MESSAGE}), 400
 
         model = data.get("model", "claude-sonnet-4-6") or "claude-sonnet-4-6"
         timeout = data.get("timeout", 600)
@@ -278,7 +277,7 @@ def runner_retry():
             model=model,
             timeout=timeout,
             max_iterations=max_iterations,
-            max_cost_usd=float(max_cost_usd),
+            max_cost_usd=max_cost_usd,
             autonomy=autonomy,
             broadcast_fn=_broadcast_runner,
         )

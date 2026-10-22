@@ -4,7 +4,7 @@
 
 Comms board / message-board subsystem — messages, tasks, artifacts, goals, context retrieval & relevance, board mirror & hydration.
 
-67 test file(s).
+73 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -28,8 +28,10 @@ Comms board / message-board subsystem — messages, tasks, artifacts, goals, con
 | `test_board_mirror_scope.py` | The board mirror writes only for a scope that is a project root or a plain name | 12 |
 | `test_board_run.py` | Tests for start_board_run and POST /comms/run (BOARD-RUNTIME-SPEC §2/US4) | 15 |
 | `test_chief_acceptance.py` | The chief core, proven end to end (chief-agent 13): the bar of the plan's map.md | 15 |
+| `test_chief_hook_tags.py` | chief-agent 20, B17: the hook flags every tag that starts with the two names | 3 |
 | `test_chief_human_messages.py` | chief-agent 09: record what the human types in a claude chief tab | 16 |
 | `test_chief_prompt_hook.py` | chief-agent 09: the chief's UserPromptSubmit hook, its edge cases and as a real process | 12 |
+| `test_chief_tier_lines.py` | chief-agent 20, B18: the tier line is read from the lines the pasted text has | 6 |
 | `test_chief_tiers.py` | chief-agent 04: the chief tiers and the preset-to-tier resolution | 25 |
 | `test_comms_agent_context.py` | Tests for POST /comms/agent-context (BLOCK C1 — BOARD-INFO mode) | 6 |
 | `test_comms_agent_context_preview.py` | Tests for board-context-pull Solution C — POST /comms/agent-context/preview | 4 |
@@ -69,7 +71,11 @@ Comms board / message-board subsystem — messages, tasks, artifacts, goals, con
 | `test_comms_tasks_claim_fail.py` | Tests for POST /comms/tasks/claim and POST /comms/tasks/fail (DAG scheduler routes) | 13 |
 | `test_comms_tasks_status.py` | Guaranteed per-task progress for the SINGLE executor (route-level status posts) | 5 |
 | `test_comms_write_perm.py` | Tests for Phase 13 — role-based write permissions | 33 |
+| `test_directive_route_caller.py` | chief-agent 20, B14: a directive is stamped with the caller that was checked | 2 |
+| `test_directive_single_insert.py` | chief-agent 20, B6: a directive is written with one INSERT | 8 |
 | `test_governance_decision_precedence.py` | Governance block ordering — decisions render newest-first with explicit precedence | 12 |
+| `test_governance_escalation_note.py` | chief-agent 20, B15: the escalation note ignores standing orders | 9 |
+| `test_hydrate_blank_and_decoy.py` | chief-agent 20, B10 to B12: three holes of board hydration (``BOARD.json`` into an empty board) | 12 |
 | `test_phase_board_post.py` | unified-ai-routing Conv 6 — /record_phase mirrors phase boundaries onto the board | 3 |
 | `test_post_artifact_indexing.py` | Regression (unified-ai-routing review): /comms/post must call index_artifact_async | 1 |
 | `test_read_policy.py` | Read-policy core: row_allowed, policy_predicate and their agreement | 10 |

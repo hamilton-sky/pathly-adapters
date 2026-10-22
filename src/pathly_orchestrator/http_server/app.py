@@ -142,12 +142,26 @@ def main() -> None:
 
     # A chief open when the last process died has no watcher left: close its session and
     # revoke its token before any request is served. A cleanup failure must not stop boot.
+    # Not when something already answers on this host and port: that is a server that is
+    # running, whose chief this one would close before dying with "address already in use".
     try:
-        from pathly_orchestrator.supervisor.chief_session import chief_startup_cleanup
+        from pathly_orchestrator.supervisor.chief_session import (
+            chief_startup_cleanup,
+            something_answers,
+        )
 
-        stale = chief_startup_cleanup()
-        if stale:
-            logger.info("closed %d chief session(s) left open: %s", len(stale), stale)
+        if something_answers(host, port):
+            logger.warning(
+                "something already answers on %s:%s: the chief sessions are left open",
+                host,
+                port,
+            )
+        else:
+            stale = chief_startup_cleanup()
+            if stale:
+                logger.info(
+                    "closed %d chief session(s) left open: %s", len(stale), stale
+                )
     except Exception:
         logger.warning("chief startup cleanup failed", exc_info=True)
 

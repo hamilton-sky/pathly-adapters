@@ -61,9 +61,14 @@ def comms_directives():
     ``project_root``, a ``to_agent`` that is not ``*`` or a lowercase role name of at most 40
     characters, or a ``text`` that is blank, over 8 KiB in UTF-8, holds a control character
     other than newline and tab, or cannot be encoded.
+
+    The caller is looked up once and the row is stamped with that same identity: a second
+    lookup could answer "nobody" once the session had closed in between, and the row would be
+    stored with ``author_source`` ``none``.
     """
     try:
-        if not is_chief_run(caller_identity(request)):
+        identity = caller_identity(request)
+        if not is_chief_run(identity):
             return jsonify({"error": "only a chief may post a directive"}), 403
 
         data = read_json_body()
@@ -100,7 +105,7 @@ def comms_directives():
 
         scope = resolve_board_scope("project", project_root, "")
         message_id = post_directive(
-            get_db(), scope, to_agent, text.strip(), **stamp(caller_identity(request))
+            get_db(), scope, to_agent, text.strip(), **stamp(identity)
         )
         # The same update comms_post sends for a new row.
         _broadcast_comms(

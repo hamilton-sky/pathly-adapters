@@ -278,11 +278,9 @@ def render_governance_lines(
             lines.append(f"  • {text}  [{meta}]")
     if escalations:
         lines.append("**Open escalations (human input required):**")
-        newest_decision_ts = (
-            max((str(m.get("ts") or "") for m in decisions), default="")
-            if decisions
-            else ""
-        )
+        # Only the ordinary decisions count: a standing order is the chief's, shown in its own
+        # block above, and no ordinary decision claims to resolve an escalation by being one.
+        newest_decision_ts = max((str(m.get("ts") or "") for m in ranked), default="")
         for msg in escalations:
             tier = msg.get("board", "feature")
             text = msg.get("text", "")

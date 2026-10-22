@@ -13,7 +13,9 @@ The hook is also run for prompts nobody typed, and nothing in the hook input say
 same keys and values arrive for a typed prompt and for the two below (measured on claude 2.1.304,
 in ``claude -p`` stream-json and in an interactive tab). What differs is a wrapper around
 ``prompt``, so a prompt holding one of these tags anywhere is sent with ``relayed: true``, the
-server stores it as ``relayed`` and it can never be cited:
+server stores it as ``relayed`` and it can never be cited. A tag counts when it starts with the
+name, so ``<task-notifications>`` and ``<task-notification_v2>`` do too (the list cannot know
+every spelling claude may use):
 
 * ``<task-notification>``: claude's message when a background task ends. A chief can start one
   (Bash with ``run_in_background``, or a foreground command that hits its timeout), and the
@@ -27,7 +29,8 @@ That is a deny-list of the wrappers measured, not a test for "typed": a prompt w
 stored as ``human`` whether or not anyone typed it. Measured on 2.1.304, a task in the
 project's ``.claude/scheduled_tasks.json`` fires in the chief's tab as a bare prompt. The
 chief cannot write that file, another process of the same user can; ``CLAUDE_CODE_DISABLE_CRON``
-and ``CLAUDE_CODE_DISABLE_BACKGROUND_TASKS`` close it and the notifications above (see
+and ``CLAUDE_CODE_DISABLE_BACKGROUND_TASKS`` close it and the notifications above, and the
+settings of a claude chief set both (``runner/chief_argv.claude_settings``; see
 ``src/pathly_orchestrator/CLAUDE.md``, "Human messages"). A typed prompt that happens to hold a
 tag is wrongly uncitable, which the human repairs by retyping; the other mistake would let
 another party's words pass as the human's.
@@ -53,7 +56,7 @@ CITE_LINE = (
     "Pathly recorded this as human message {id}; "
     "cite it with cite={id} when you relay an answer."
 )
-_NOT_TYPED = re.compile(r"<(?:task-notification|cross-session-message)\b")
+_NOT_TYPED = re.compile(r"<(?:task-notification|cross-session-message)")
 
 
 class _Args(argparse.ArgumentParser):

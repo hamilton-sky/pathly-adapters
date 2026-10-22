@@ -38,6 +38,7 @@ NEEDS: dict[tuple[str, str], tuple[str, ...]] = {
     ("POST", "/runs"): (f'"project_root": "{ROOT}"',),
     ("POST", "/comms/directives"): (f'"project_root": "{ROOT}"',),
     ("POST", "/comms/answer"): (),
+    ("POST", "/comms/acknowledge"): ('"agent": "chief"',),
     ("POST", "/runner/agent-answer"): (),
 }
 

@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import socket
 import subprocess
 import sys
 import threading
@@ -551,7 +552,16 @@ print(json.dumps({
 """
 
 
+def _free_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        return sock.getsockname()[1]
+
+
 def _run_main(tmp_path: Path, mode: str) -> tuple[dict, str]:
+    """``main()`` serves on a free port: it leaves the sessions alone when something already
+    answers on the one it would serve (chief-agent 20), and the default is a server that other
+    tests, or a developer, may have running."""
     home = tmp_path / "main-home"
     home.mkdir()
     env = {
@@ -559,6 +569,7 @@ def _run_main(tmp_path: Path, mode: str) -> tuple[dict, str]:
         "HOME": str(home),
         "USERPROFILE": str(home),
         "PYTHONPATH": str(SRC),
+        "PATHLY_FSM_HTTP_PORT": str(_free_port()),
     }
     done = subprocess.run(
         [sys.executable, "-c", MAIN_SCRIPT, mode],

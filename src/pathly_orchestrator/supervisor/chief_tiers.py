@@ -49,10 +49,13 @@ def _front_matter_tier(text: str) -> str | None:
 
     The block is exactly what ``strip_front_matter`` removes, so the text that is pasted and
     the text that was read for the tier cannot disagree. Only an unindented ``tier:`` line
-    counts; every other key is ignored.
+    counts; every other key is ignored. The block is split on ``"\n"`` only, the one line break
+    ``strip_front_matter`` knows: ``str.splitlines`` also breaks at U+2028, U+2029, ``\x85``,
+    ``\x0b``, ``\x0c`` and ``\x1c`` to ``\x1e``, which would read a ``tier:`` out of the middle
+    of a line the pasted text shows whole.
     """
     block = text[: len(text) - len(strip_front_matter(text))]
-    for line in block.splitlines()[1:]:
+    for line in block.split("\n")[1:]:
         if line.startswith("tier:"):
             return line[len("tier:") :]
     return None

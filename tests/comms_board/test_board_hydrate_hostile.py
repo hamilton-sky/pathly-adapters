@@ -157,7 +157,7 @@ def test_a_messages_value_that_is_not_a_list_imports_nothing(tmp_path, bad):
         artifacts=[artifact("a-1", "x")],
     )
 
-    assert hydrate_board(get_db(), "feature", "feat-w", path) is True
+    assert hydrate_board(get_db(), "feature", "feat-w", path) is False
 
     assert message_ids("feature", "feat-w") == []
     assert artifact_ids() == []
