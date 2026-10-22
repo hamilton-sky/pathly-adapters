@@ -48,10 +48,13 @@ def test_a_directive_is_one_statement_that_writes_comms_messages_and_it_is_an_in
         conn, lambda: post_directive(conn, "/proj", "builder", TEXT, **STAMP)
     )
 
-    writes = [s for s in statements if WRITES_MESSAGES.match(s)]
+    # The table has triggers, and the connection reports the statement again for each; a second
+    # statement would be a different text.
+    writes = {s for s in statements if WRITES_MESSAGES.match(s)}
     assert len(writes) == 1, statements
-    assert writes[0].lstrip().upper().startswith("INSERT")
-    assert "binding" in writes[0]
+    (write,) = writes
+    assert write.lstrip().upper().startswith("INSERT")
+    assert "binding" in write
     assert not [s for s in statements if UPDATES_MESSAGES.match(s)], statements
 
 

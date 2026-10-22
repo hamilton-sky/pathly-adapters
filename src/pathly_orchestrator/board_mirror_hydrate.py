@@ -34,11 +34,13 @@ def _belongs(msg: object, board: str, scope: str) -> bool:
     The row's scope is compared exactly: ``hydrate_project`` hands over the normalised project
     root and the exporter writes that spelling into every row, so a row that spells its root
     another way would be stored under a scope no board read asks for. A row whose ``id`` is not
-    a string is not one an export wrote.
+    a string with something in it after stripping is not one an export wrote (a blank id would
+    be a blank primary key).
     """
     return (
         isinstance(msg, dict)
         and isinstance(msg.get("id"), str)
+        and bool(msg["id"].strip())
         and msg.get("board") == board
         and msg.get("scope") == scope
     )
@@ -62,14 +64,20 @@ def hydrate_board(conn: sqlite3.Connection, board: str, scope: str, path: Path) 
     missing/broken embedder must never block or fail it. Rows that carry no ``author_source``
     (a pre-upgrade snapshot) are then labelled ``legacy``. Never raises: a file that is not a
     JSON object returns False, and an entry that is not what an export writes (a row that is
-    no object, an ``id`` or ``message_id`` that is not a string, a list that is not a list) is
-    left out, not fatal to the file or to the boards after it.
+    no object, an ``id`` that is blank or not a string, a ``message_id`` that is not a string,
+    a list that is not a list) is left out, not fatal to the file or to the boards after it.
 
     Nothing in the file is verified (chief-agent 16): a message row whose ``board`` and
-    ``scope`` are not this file's is left out, an artifact is kept only when it points at a
-    row that was kept, and the rows that are kept are stored with ``binding = 0`` and no
-    verified author stamp (``comms_hydrate._unverified``). A standing order does not survive
-    a fresh clone: the chief posts it again.
+    ``scope`` are not this file's is left out, and the rows that are kept are stored with
+    ``binding = 0`` and no verified author stamp (``comms_hydrate._unverified``). A standing
+    order does not survive a fresh clone: the chief posts it again.
+
+    What counts is what is in the database once the rows went in (chief-agent 20): a row whose
+    id already belongs to a message of another board is not inserted (the insert is a no-op),
+    so an artifact is inserted, and a message re-embedded, only for a row that is in the
+    database under this board and scope. Returns True only when at least one row of the file is
+    there; a file that adds nothing (every row names another scope, as in a clone at another
+    path) returns False, so ``hydrate_project`` lists its scope under ``skipped``.
     """
     try:
         if get_all_messages(conn, board, scope):
@@ -86,18 +94,25 @@ def hydrate_board(conn: sqlite3.Connection, board: str, scope: str, path: Path) 
         logger.debug("hydrate_board: %s is not a JSON object", path)
         return False
 
-    messages = [m for m in _entries(snapshot, "messages") if _belongs(m, board, scope)]
-    kept = {m["id"] for m in messages}
+    for msg in _entries(snapshot, "messages"):
+        if _belongs(msg, board, scope):
+            insert_message_row(conn, msg)
+    landed = {m["id"] for m in get_all_messages(conn, board, scope)}
+    messages = [
+        m
+        for m in _entries(snapshot, "messages")
+        if _belongs(m, board, scope) and m["id"] in landed
+    ]
+    if not messages:
+        logger.debug("hydrate_board: %s adds no row to %s/%s", path, board, scope)
+        return False
     artifacts = [
         a
         for a in _entries(snapshot, "artifacts")
         if isinstance(a, dict)
         and isinstance(a.get("message_id"), str)
-        and a["message_id"] in kept
+        and a["message_id"] in landed
     ]
-
-    for msg in messages:
-        insert_message_row(conn, msg)
     for art in artifacts:
         insert_artifact_row(conn, art)
 

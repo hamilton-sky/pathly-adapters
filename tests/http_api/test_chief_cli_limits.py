@@ -19,6 +19,7 @@ import io
 import json
 import re
 import sys
+from pathlib import Path
 
 import pytest
 from chief_cite_support import (
@@ -89,6 +90,19 @@ def test_a_server_secret_a_header_cannot_carry_is_a_usage_error_that_never_shows
         "pathly: the server secret holds a character an HTTP header cannot carry"
     ]
     assert "hide-me" not in ran.err
+
+
+def test_a_secret_file_that_is_not_text_is_a_usage_error_not_a_traceback(stub, pathly):
+    secret_file = Path.home() / ".pathly" / "server_secret.txt"
+    secret_file.parent.mkdir(parents=True, exist_ok=True)
+    secret_file.write_bytes(b"\xff\xfe\x80 not utf-8")
+
+    ran = pathly("api", "GET", "/runs?project_root=/p", token=TOKEN)
+
+    _sent_nothing(ran, stub)
+    assert ran.err.strip().splitlines() == [
+        "pathly: the server secret cannot be read as text"
+    ]
 
 
 def test_an_ordinary_token_and_secret_and_a_latin_1_letter_are_sent_as_before(

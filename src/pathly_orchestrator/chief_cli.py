@@ -9,15 +9,20 @@ gate on the server, which answers a refusal with a 403 body that this command pr
 Exit codes: 0 for a 2xx answer, 1 for any other status or an unreachable server, 2 for a usage
 error (nothing is sent: the token goes to this machine's server and to no other address, and a
 body that is not JSON never reaches a route that could spend a citation on it). The token is
-read from ``PATHLY_RUN_TOKEN``, sent in ``X-Pathly-Run-Token`` and never printed.
+read from ``PATHLY_RUN_TOKEN``, sent in ``X-Pathly-Run-Token`` and never printed. A token or
+server secret an HTTP header cannot carry, a body nested too deeply to parse and a body read from
+standard input over ``MAX_BODY_BYTES`` are usage errors too, one line each that names the problem
+and never the value. At most ``MAX_ANSWER_BYTES`` of an answer are read and printed.
 """
 
 from __future__ import annotations
 
+import codecs
 import http.client
 import json
 import os
 import sys
+from typing import NamedTuple
 from urllib.parse import quote
 
 from pathly_orchestrator.config import fsm_port
@@ -39,6 +44,10 @@ USAGE = (
 # The longest the server may take to answer (a route that starts a run waits for the start).
 TIMEOUT = 120.0
 REDACTED = "[redacted]"
+# Bytes of a body read from standard input, and of an answer read and printed. A chief's
+# transcript carries what the command prints, so neither is left unbounded.
+MAX_BODY_BYTES = 1024 * 1024
+MAX_ANSWER_BYTES = 256 * 1024
 
 HELP = f"""\
 pathly sends one request to the Pathly server as this chief and prints the answer.
@@ -63,6 +72,7 @@ for /runs, an empty list.
   POST /comms/answer        answer a board question: send {{"question_id", "cite"}} only
   POST /runner/agent-answer answer a waiting run: send {{"topic", "cite"}} only
   POST /comms/directives    a standing order for every agent of the project: {{"project_root": "<root>", "to_agent", "text"}}
+  POST /comms/acknowledge   close an escalation addressed to the human (operator tier): {{"message_id", "agent": "chief", "cite"}}
 
 cite is the number Pathly printed when it recorded the user's message in this tab. Pathly
 relays that message's own words; never send an answer of your own.
@@ -71,6 +81,12 @@ relays that message's own words; never send an answer of your own.
 
 def _usage(message: str) -> int:
     print(f"pathly: {message}\n{USAGE}", file=sys.stderr)
+    return 2
+
+
+def _refuse(message: str) -> int:
+    """A usage error that needs no reminder of the usage: one line, and nothing was sent."""
+    print(f"pathly: {message}", file=sys.stderr)
     return 2
 
 
@@ -105,7 +121,8 @@ def _bad_target(target: str) -> str | None:
 
 
 def _json_object(text: str) -> str | None:
-    """Why ``text`` is not a JSON object, or None."""
+    """Why ``text`` is not a JSON object, or None. A ``RecursionError`` (a body nested deeper than
+    the parser goes) is for the caller."""
     if not text.strip():
         return "the body is empty: leave it out, or give a JSON object"
     try:
@@ -115,18 +132,43 @@ def _json_object(text: str) -> str | None:
     return None if isinstance(parsed, dict) else "the body must be a JSON object"
 
 
+class BodyTooLarge(Exception):
+    """The body on standard input is over ``MAX_BODY_BYTES``."""
+
+
 def _body_text(argument: str) -> str:
-    """The body: ``argument``, or standard input for ``-``. A ``UnicodeError`` when it is not
-    UTF-8 (a stream that cannot decode it, or an argument the shell passed as raw bytes).
+    """The body: ``argument``, or standard input for ``-``, of which at most ``MAX_BODY_BYTES``
+    are read (``BodyTooLarge`` past that: one character more than the limit is asked for, so
+    standard input is never read whole). A ``UnicodeError`` when it is not UTF-8 (a stream that
+    cannot decode it, or an argument the shell passed as raw bytes).
     """
-    text = sys.stdin.read() if argument == "-" else argument
-    text.encode("utf-8")
+    text = sys.stdin.read(MAX_BODY_BYTES + 1) if argument == "-" else argument
+    size = len(text.encode("utf-8"))
+    if argument == "-" and size > MAX_BODY_BYTES:
+        raise BodyTooLarge
     return text
+
+
+def _header_unfit(value: str) -> bool:
+    """True when ``value`` cannot be an HTTP header value: ``http.client`` refuses a newline it
+    does not fold and encodes a value as latin-1. Any line break is refused here."""
+    try:
+        value.encode("latin-1")
+    except UnicodeEncodeError:
+        return True
+    return "\r" in value or "\n" in value
+
+
+class Answer(NamedTuple):
+    """What the server answered: the status and at most ``MAX_ANSWER_BYTES`` + 1 bytes of body."""
+
+    status: int
+    data: bytes
 
 
 def _send(
     method: str, target: str, body: str | None, token: str, secret: str
-) -> tuple[int, str]:
+) -> Answer:
     headers = {TOKEN_HEADER: token}
     if method != "GET":
         headers["Content-Type"] = "application/json"
@@ -141,7 +183,13 @@ def _send(
             headers=headers,
         )
         answer = connection.getresponse()
-        return answer.status, answer.read().decode("utf-8", errors="replace")
+        data = b""
+        while len(data) <= MAX_ANSWER_BYTES:  # one byte past the limit says it was cut
+            piece = answer.read(MAX_ANSWER_BYTES + 1 - len(data))
+            if not piece:
+                break
+            data += piece
+        return Answer(answer.status, data)
     finally:
         connection.close()
 
@@ -151,6 +199,27 @@ def _redact(text: str, hide: tuple[str, ...]) -> str:
         if secret:
             text = text.replace(secret, REDACTED)
     return text
+
+
+def _printable(data: bytes, hide: tuple[str, ...]) -> tuple[str, int | None]:
+    """The text of an answer to print, and, when ``data`` held more than ``MAX_ANSWER_BYTES``,
+    how many of its bytes that text is (else None).
+
+    A cut never ends inside a character, and never inside a secret: ``_redact`` finds only a
+    whole one, so the start of one that the limit cut in half is dropped as well.
+    """
+    if len(data) <= MAX_ANSWER_BYTES:
+        return data.decode("utf-8", errors="replace"), None
+    kept = data[:MAX_ANSWER_BYTES]
+    for secret in filter(None, hide):
+        for size in range(len(secret) - 1, 0, -1):
+            part = secret[:size].encode("utf-8")
+            if kept.endswith(part):
+                kept = kept[: -len(part)]
+                break
+    decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
+    text = decoder.decode(kept)
+    return text, len(kept) - len(decoder.getstate()[0])
 
 
 def _print_body(text: str, hide: tuple[str, ...]) -> None:
@@ -176,18 +245,34 @@ def _api(args: list[str]) -> int:
     if not token:
         print(MISSING_TOKEN, file=sys.stderr)
         return 2
+    if _header_unfit(token):
+        return _refuse(f"{TOKEN_ENV} holds a character an HTTP header cannot carry")
     body = None
     if extra:
         try:
             body = _body_text(extra[0])
+        except BodyTooLarge:
+            return _refuse(
+                f"the body from standard input is over {MAX_BODY_BYTES} bytes"
+            )
         except UnicodeError:
             return _usage("the body is not valid UTF-8")
-        problem = _json_object(body)
+        try:
+            problem = _json_object(body)
+        except RecursionError:
+            return _refuse("the body is nested too deeply")
         if problem is not None:
             return _usage(problem)
-    secret = _load_secret()
     try:
-        status, text = _send(method, target, body, token, secret)
+        secret = _load_secret()
+    except UnicodeError:  # a secret file that is not text
+        return _refuse("the server secret cannot be read as text")
+    if _header_unfit(secret):
+        return _refuse(
+            "the server secret holds a character an HTTP header cannot carry"
+        )
+    try:
+        answer = _send(method, target, body, token, secret)
     except (OSError, http.client.HTTPException) as exc:
         print(
             _redact(
@@ -198,10 +283,17 @@ def _api(args: list[str]) -> int:
             file=sys.stderr,
         )
         return 1
+    text, shown = _printable(answer.data, (token, secret))
     _print_body(text, (token, secret))
-    if 200 <= status < 300:
+    if shown is not None:
+        print(
+            f"pathly: the answer was cut: its first {shown} bytes are shown "
+            f"(the limit is {MAX_ANSWER_BYTES})",
+            file=sys.stderr,
+        )
+    if 200 <= answer.status < 300:
         return 0
-    print(f"pathly: HTTP {status}", file=sys.stderr)
+    print(f"pathly: HTTP {answer.status}", file=sys.stderr)
     return 1
 
 

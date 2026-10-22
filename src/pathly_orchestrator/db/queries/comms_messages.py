@@ -51,6 +51,8 @@ def post_message(
     author_role: str | None = None,
     author_run_id: str | None = None,
     author_source: str | None = None,
+    *,
+    binding: int = 0,
 ) -> str:
     """Insert a new message into comms_messages. Returns the new message_id.
 
@@ -62,6 +64,9 @@ def post_message(
     A caller that passes no source (``None``) is stored as ``none`` (unverified), never NULL:
     the startup backfill turns a NULL into ``legacy``, which would hide the unstamped writer.
     Any other value outside ``AUTHOR_SOURCES`` raises ``ValueError`` before anything is written.
+
+    ``binding`` (keyword only, default 0) is written in the INSERT itself. Only
+    ``comms_directives.post_directive`` passes 1; no route reads it from a body.
     """
     if author_source is not None and author_source not in AUTHOR_SOURCES:
         raise ValueError(
@@ -72,8 +77,8 @@ def post_message(
     with _get_write_lock(conn):
         conn.execute(
             "INSERT INTO comms_messages "
-            "(id, board, scope, from_agent, to_agent, type, text, options, reply_to, stage, conv, ts, depends_on, task_status, artifact_path, artifact_type, goal_id, executor, context_refs, files, lane, slug, run_id, author_role, author_run_id, author_source) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "(id, board, scope, from_agent, to_agent, type, text, options, reply_to, stage, conv, ts, depends_on, task_status, artifact_path, artifact_type, goal_id, executor, context_refs, files, lane, slug, run_id, author_role, author_run_id, author_source, binding) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 message_id,
                 board,
@@ -101,6 +106,7 @@ def post_message(
                 author_role,
                 author_run_id,
                 author_source or SOURCE_NONE,
+                1 if binding else 0,
             ),
         )
         conn.commit()

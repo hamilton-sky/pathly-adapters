@@ -55,6 +55,13 @@ class TerminalRun:
         with self._cond:
             return self._cond.wait_for(lambda: self.started, timeout=timeout)
 
+    def wait_started_or_result(self, timeout: float) -> bool:
+        """True once the tab has started or its result is in; False when neither came in time."""
+        with self._cond:
+            return self._cond.wait_for(
+                lambda: self.started or self.pty_result is not None, timeout=timeout
+            )
+
     def wait_pty_result(self, timeout: float) -> bool:
         with self._cond:
             return self._cond.wait_for(

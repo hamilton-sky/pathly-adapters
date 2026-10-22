@@ -156,7 +156,9 @@ def test_a_control_character_is_refused(client, project, chief_root, text):
 
 
 def test_a_lone_surrogate_is_refused(client, project, chief_root):
-    """JSON can carry ``\\ud800``, which no UTF-8 string can hold."""
+    """JSON can carry ``\\ud800``, which no UTF-8 string can hold. ``read_json_body`` refuses
+    such a body before the route reads a field (chief-agent 20), so the 400 is the one of a body
+    that cannot be read."""
     opened = open_session(project, chief_root)
     raw = json.dumps({"project_root": project, "to_agent": "*", "text": "a\ud800b"})
     assert "\\ud800" in raw
@@ -169,7 +171,7 @@ def test_a_lone_surrogate_is_refused(client, project, chief_root):
     )
 
     assert resp.status_code == 400, resp.get_data(as_text=True)
-    assert "text" in resp.get_json()["error"]
+    assert resp.get_json() == {"error": "Missing or invalid JSON body"}
     assert _rows() == []
 
 

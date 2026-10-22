@@ -4,21 +4,23 @@ The chief is a long-lived interactive spawn, so it cannot go through
 ``terminal._run_stage_via_terminal``: that call blocks its caller until the process exits and
 gives up after 30 minutes. ``open_chief`` builds the same pieces by hand (a run token, a run
 registered for the host's callbacks, one ``TERMINAL_SPAWN``) and returns at once; a watcher
-thread closes the session when the host reports the tab started and then exited, or never
-started. Studio's result post and ``pathly-pty-host``'s refusal of an interactive spawn both
-reach the watcher through the existing ``/runner/terminal/result`` handler, which finds the run
-with ``registry.get_run``.
+thread closes the session when the host reports the tab started and then exited (or exited with
+no "started" at all), or never started. Studio's result post and ``pathly-pty-host``'s refusal
+of an interactive spawn both reach the watcher through the existing ``/runner/terminal/result``
+handler, which finds the run with ``registry.get_run``.
 """
 
 from __future__ import annotations
 
 import hashlib
+import ipaddress
 import json
 import os
 import re
 import secrets
 import shlex
 import shutil
+import socket
 import sys
 import threading
 import uuid
@@ -28,7 +30,7 @@ from typing import Callable
 from pathly_orchestrator.config import Settings
 from pathly_orchestrator.db.connection import get_db
 from pathly_orchestrator.db.queries import chief as queries
-from pathly_orchestrator.db.queries.run_tokens import mint_run_token
+from pathly_orchestrator.db.queries.run_tokens import mint_run_token, revoke_run_tokens
 from pathly_orchestrator.runner.chief_argv import chief_argv, claude_settings
 
 from .chief_presets import BUILT_IN, compose_prompt, default_style
@@ -50,6 +52,17 @@ class ChiefAlreadyOpen(Exception):
         super().__init__(f"a chief is already open for this project ({tab_id})")
         self.run_id = run_id
         self.tab_id = tab_id
+
+
+class ChiefClosedWhileOpening(Exception):
+    """The session was closed while ``open_chief`` was opening it; nothing was left live.
+
+    Carries the run id of the closed session. ``POST /chief/open`` answers it as a 409.
+    """
+
+    def __init__(self, run_id: str) -> None:
+        super().__init__(f"the chief {run_id} was closed while it was opening")
+        self.run_id = run_id
 
 
 def _chief_root() -> Path:
@@ -164,6 +177,13 @@ def open_chief(
     prompt). What is pasted is the style without its front matter, the ``chief-connect``
     fragment and the stored project root (``chief_presets.compose_prompt``); the 64 KiB limit is
     on the style, checked before anything is appended.
+
+    ``POST /chief/close`` does not take the lock that guards the session row, so a close can
+    land while this opens. Once the token is minted the session is read again: if it is closed
+    the token is revoked, no spawn is sent and ``ChiefClosedWhileOpening`` is raised. A close
+    that lands after that re-read and before the broadcast cannot be shut out without holding
+    a lock across the broadcast; it still revokes the token, so the tab starts with a dead one
+    and the watcher closes the (already closed) session as soon as the tab reports its end.
     """
     _validate(project_root, engine, preset, model)
     project_root = normalise_project_root(project_root)
@@ -203,6 +223,9 @@ def open_chief(
         token = mint_run_token(
             conn, run_id, "chief", None, project_root, "project", scope
         )
+        if not _is_open(conn, run_id):
+            revoke_run_tokens(conn, run_id)
+            raise ChiefClosedWhileOpening(run_id)
         argv = chief_argv(
             engine,
             model,
@@ -242,10 +265,20 @@ def open_chief(
     return {"run_id": run_id, "tab_id": run_id, "tier": tier, "engine": engine}
 
 
+def _is_open(conn, run_id: str) -> bool:
+    session = queries.get_session(conn, run_id)
+    return session is not None and session["closed_at"] is None
+
+
 def _watch(run, run_id: str, start_timeout: float) -> None:
-    """Close the session when its tab never started, or has exited."""
+    """Close the session when its tab never started, or has exited.
+
+    Waits for whichever comes first, the host's "started" or a result: a tab that ended before
+    it ever started (its result posted without a "started") is noticed at once, not when
+    ``start_timeout`` runs out.
+    """
     try:
-        if not run.wait_started(start_timeout):
+        if not run.wait_started_or_result(start_timeout):
             close_chief(run_id, "never started")
             return
         run.wait_pty_result(None)
@@ -271,6 +304,33 @@ def close_chief(run_id: str, reason: str) -> bool:
             run.mark_started()
             run.mark_pty_result({"closed": reason})
         drop_run(run_id)
+
+
+LOCAL_ADDRESS = "127.0.0.1"
+
+
+def _probe_address(host: str) -> str:
+    """The address to connect to for a server that binds ``host``: this machine for a wildcard
+    host (empty, or the unspecified IPv4 or IPv6 address), which names no one address.
+    """
+    try:
+        wildcard = host == "" or ipaddress.ip_address(host).is_unspecified
+    except ValueError:  # a host name, or not a string at all
+        wildcard = False
+    return LOCAL_ADDRESS if wildcard else host
+
+
+def something_answers(host: str, port: int, timeout: float = 1.0) -> bool:
+    """True when a TCP connection to ``host``:``port`` is accepted.
+
+    A wildcard host is probed on 127.0.0.1. Any error, an unresolvable host or a port out of
+    range included, means nothing answers.
+    """
+    try:
+        with socket.create_connection((_probe_address(host), port), timeout=timeout):
+            return True
+    except (OSError, OverflowError, TypeError, ValueError):
+        return False
 
 
 def chief_startup_cleanup() -> list[str]:

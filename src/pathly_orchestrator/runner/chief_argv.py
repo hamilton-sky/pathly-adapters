@@ -24,6 +24,13 @@ _CLAUDE_DENY = [
     "Bash(curl *)",
     "Bash(wget *)",
 ]
+# claude 2.1.304 (measured): the first stops the ``<task-notification>`` prompts of background
+# tasks, the second stops the scheduler that fires ``.claude/scheduled_tasks.json`` as a bare prompt.
+# A permission rule does neither, so the settings carry them as an ``env`` block.
+_CLAUDE_ENV = {
+    "CLAUDE_CODE_DISABLE_BACKGROUND_TASKS": "1",
+    "CLAUDE_CODE_DISABLE_CRON": "1",
+}
 
 
 def chief_argv(
@@ -71,10 +78,13 @@ def claude_settings(hook_command: str) -> dict:
 
     Every Bash command other than ``pathly ...`` asks the human. Most denied tools are already
     absent under ``--tools``; the rules stay so they still hold if a claude version reads
-    ``--tools`` differently. One ``UserPromptSubmit`` hook runs ``hook_command``.
+    ``--tools`` differently. One ``UserPromptSubmit`` hook runs ``hook_command``. An ``env`` block
+    turns off background-task notifications and the cron scheduler (``_CLAUDE_ENV``), the two
+    ways claude starts a turn nobody typed; measured on claude 2.1.304 only.
     """
     return {
         "permissions": {"allow": list(_CLAUDE_ALLOW), "deny": list(_CLAUDE_DENY)},
+        "env": dict(_CLAUDE_ENV),
         "hooks": {
             "UserPromptSubmit": [
                 {"hooks": [{"type": "command", "command": hook_command}]}

@@ -19,7 +19,8 @@ session's message); the server stores kind ``relayed``, which ticket 10 never ac
 citation. That is a deny-list of wrappers measured on claude 2.1.304: a prompt without one is
 stored as ``human`` whether or not anyone typed it (a scheduled task from the project's
 ``.claude/scheduled_tasks.json`` arrives bare). ``src/pathly_orchestrator/CLAUDE.md`` ("Human
-messages") lists the sources found and the two claude switches that close most of them.
+messages") lists the sources found and the two claude switches that close most of them (the
+chief's claude settings set both).
 """
 
 from __future__ import annotations

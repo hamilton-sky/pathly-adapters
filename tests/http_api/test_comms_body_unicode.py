@@ -5,8 +5,8 @@ Python's JSON parser accepts ``"\\ud800"``, SQLite cannot store it, and the rout
 that holds a lone surrogate, in a key or in a string at any depth, like any other body it cannot
 read: it returns its default, so each route answers what it already answers an unreadable body
 (a 400) and nothing is stored. Other non-ASCII text, a surrogate pair and a cp1252 body read as
-before. The routes are tried for a caller with no token and for an operator chief (the gate has
-already let it through).
+before. All eight routes are tried for a caller with no token; an operator chief reaches the reader
+only through ``/comms/post`` (the gate turns it back on the others), so it is tried there.
 """
 
 from __future__ import annotations
@@ -20,25 +20,53 @@ from mirror_drain_support import _mirrors_are_drained
 
 LONE = "\ud800"
 MESSAGE = {"feature": "demo", "from": "chief", "type": "discovery", "text": "hello"}
-SURROGATE_FIELDS = {
-    "post-text": ("/comms/post", {**MESSAGE, "text": f"a{LONE}b"}),
-    "post-scope": (
-        "/comms/post",
-        {**MESSAGE, "board": "project", "scope": f"/x{LONE}"},
-    ),
-    "post-feature": ("/comms/post", {**MESSAGE, "feature": f"demo{LONE}"}),
-    "acknowledge": ("/comms/acknowledge", {"message_id": f"m{LONE}"}),
-    "supersede": ("/comms/supersede", {"old_id": "old", "new_id": f"n{LONE}"}),
-    "edit": ("/comms/edit", {"message_id": "m", "text": f"t{LONE}"}),
-    "goals-run": ("/comms/goals/run", {"goal_id": f"g{LONE}"}),
-    "delete": ("/comms/delete", {"message_id": f"m{LONE}"}),
-}
+
+
+def _fields(mark: str, seed: str) -> dict[str, tuple[str, dict]]:
+    """Per route, the body that names ``mark`` in the one field that route stores or looks up.
+    ``seed`` is the id of a message that exists, so a route that checks the other id first (the
+    old id of a supersede, the id of an edit) goes on to the one with the mark."""
+    return {
+        "post-text": ("/comms/post", {**MESSAGE, "text": f"a{mark}b"}),
+        "post-scope": (
+            "/comms/post",
+            {**MESSAGE, "board": "project", "scope": f"/x{mark}"},
+        ),
+        "post-feature": ("/comms/post", {**MESSAGE, "feature": f"demo{mark}"}),
+        "acknowledge": (
+            "/comms/acknowledge",
+            {"message_id": f"m{mark}", "agent": "builder"},
+        ),
+        "supersede": ("/comms/supersede", {"old_id": seed, "new_id": f"n{mark}"}),
+        "edit": ("/comms/edit", {"message_id": seed, "text": f"t{mark}"}),
+        "goals-run": ("/comms/goals/run", {"goal_id": f"g{mark}"}),
+        "delete": ("/comms/delete", {"message_id": f"m{mark}"}),
+    }
+
+
+FIELD_NAMES = list(_fields("x", "seed"))
 
 
 @pytest.fixture()
 def demo(project: Path) -> Path:
     (project / "pathly" / "features" / "demo").mkdir(parents=True)
     return project
+
+
+@pytest.fixture()
+def seed(demo: Path) -> str:
+    """The id of a message that exists, on the feature board the bodies name."""
+    from pathly_orchestrator.db.connection import get_db
+    from pathly_orchestrator.db.queries.comms import post_message
+
+    return post_message(
+        get_db(),
+        board="feature",
+        scope="demo",
+        from_agent="builder",
+        type="discovery",
+        text="a message that exists",
+    )
 
 
 @pytest.fixture()
@@ -55,40 +83,66 @@ def _rows() -> int:
     return get_db().execute("SELECT COUNT(*) FROM comms_messages").fetchone()[0]
 
 
-def _send(client, route: str, body, headers: dict, root: Path):
+def _send(client, route: str, body, headers: dict, root: Path, encoding="utf-8"):
     """``body`` as JSON text (``json.dumps`` writes a lone surrogate as ``\\ud800``); a body
     that names a project root gets the chief's own."""
     if isinstance(body, dict) and route == "/comms/goals/run":
         body = {**body, "project_root": str(root)}
-    data = body if isinstance(body, bytes) else json.dumps(body).encode("utf-8")
+    data = body if isinstance(body, bytes) else json.dumps(body).encode(encoding)
     return client.post(
         route, data=data, content_type="application/json", headers=headers
     )
 
 
-def _callers(root: Path) -> dict[str, dict]:
-    return {
-        "no-token": {},
-        "chief": _chief("operator", root).headers,
-    }
+# The gate answers 403 to a chief for the other six before the route reads anything (a surrogate
+# is not an id of its project, ``/comms/edit`` and ``/comms/delete`` are not routes a chief may
+# call), so a chief reaches the reader only through these two fields of ``/comms/post``.
+THROUGH_THE_GATE = ["post-text", "post-feature"]
+CASES = [(field, "no-token") for field in FIELD_NAMES] + [
+    (field, "chief") for field in THROUGH_THE_GATE
+]
 
 
-@pytest.mark.parametrize("who", ["no-token", "chief"])
-@pytest.mark.parametrize("field", list(SURROGATE_FIELDS))
+def _headers(who: str, root: Path) -> dict:
+    return {} if who == "no-token" else _chief("operator", root).headers
+
+
+@pytest.mark.parametrize(
+    "field, who", CASES, ids=[f"{field}-{who}" for field, who in CASES]
+)
 def test_a_lone_surrogate_gets_the_400_an_unreadable_body_gets_and_nothing_is_stored(
-    app, client, demo, field, who
+    app, client, demo, seed, field, who
 ):
-    route, body = SURROGATE_FIELDS[field]
-    headers = _callers(demo)[who]
+    route, body = _fields(LONE, seed)[field]
+    headers = _headers(who, demo)
     before = _rows()
 
-    unreadable = _send(client, route, b"not json at all", headers, demo)
+    # The same body without the surrogate, in UTF-16: ``get_json`` (which the gate also reads)
+    # understands it and ``read_json_body`` does not, so the gate lets it through and the route
+    # answers what it answers a body it cannot read.
+    plain = _fields("x", seed)[field][1]
+    unreadable = _send(client, route, plain, headers, demo, "utf-16")
     answer = _send(client, route, body, headers, demo)
 
+    assert not _gated(unreadable), unreadable.get_json()
     assert unreadable.status_code == 400, unreadable.get_data(as_text=True)
     assert not _gated(answer), answer.get_json()
     assert answer.status_code == 400, answer.get_data(as_text=True)
     assert answer.get_json() == unreadable.get_json()
+    assert _rows() == before
+
+
+@pytest.mark.parametrize("field", [f for f in FIELD_NAMES if f not in THROUGH_THE_GATE])
+def test_the_gate_still_turns_a_chief_back_before_the_route_where_it_did_before(
+    app, client, demo, seed, field
+):
+    """A control, green before this change too: the six routes a chief cannot reach."""
+    route, body = _fields(LONE, seed)[field]
+    before = _rows()
+
+    answer = _send(client, route, body, _headers("chief", demo), demo)
+
+    assert _gated(answer), answer.get_data(as_text=True)
     assert _rows() == before
 
 

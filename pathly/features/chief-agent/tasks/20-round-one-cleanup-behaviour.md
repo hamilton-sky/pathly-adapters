@@ -1,7 +1,7 @@
 # Fix the defects round one left behind
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: —
 Test first: yes
 
@@ -380,3 +380,83 @@ exit 0
   `app.config["PROPAGATE_EXCEPTIONS"] = False`.
 
 ## Answer
+
+### Built
+
+One change per item, each with its own test file that failed on the code at 600f4a0 (the work started at 588dc5d, which differs from it only in planning files).
+
+- **B1** `runner/chief_argv.py`: `claude_settings` carries `"env": {"CLAUDE_CODE_DISABLE_BACKGROUND_TASKS": "1", "CLAUDE_CODE_DISABLE_CRON": "1"}` (`_CLAUDE_ENV`); `open_chief` writes it into `settings.json` through the same function; a codex chief is unchanged.
+- **B2** `http_server/blueprints/comms/_helpers.py`: `read_json_body` returns its default for a body that holds a lone surrogate in a key or in a string at any depth (`has_lone_surrogate`, an iterative walk, so a 300-deep body cannot make it recurse). Other non-ASCII text, a surrogate pair and a cp1252 body read as before.
+- **B3** `chief_cli.py`: a token or server secret that is not latin-1 or holds a CR or LF, and a body nested too deeply (`RecursionError`), are exit 2, nothing sent, one stderr line each that names the problem and not the value (`pathly: PATHLY_RUN_TOKEN holds a character an HTTP header cannot carry`, `pathly: the server secret holds ...`, `pathly: the body is nested too deeply`).
+- **B4** `chief_cli.py`: `MAX_BODY_BYTES = 1024 * 1024` and `MAX_ANSWER_BYTES = 256 * 1024`. Standard input is read with `read(MAX_BODY_BYTES + 1)` and counted in UTF-8 bytes (over the limit is exit 2); an answer is read in a loop of `answer.read(n)` that never asks for more than the limit plus one byte, printed up to the limit (not inside a character, not inside a half token), and `pathly: the answer was cut: its first N bytes are shown (the limit is 262144)` goes to stderr; the exit code follows the status.
+- **B5** `chief_cli.py` `HELP`: a `POST /comms/acknowledge` line with `{"message_id", "agent": "chief", "cite"}`; `test_chief_help_routes.py` lists it; a test sends the line's body as an operator chief and the escalation is closed.
+- **B6** `db/queries/comms_messages.py` `post_message(..., *, binding=0)` writes the flag in the INSERT; `db/queries/comms_directives.py` `post_directive` is one `post_message(..., binding=1)` call (no UPDATE; the lock import went with it).
+- **B7** `supervisor/chief_session.py` `something_answers(host, port, timeout=1.0)`; `http_server/app.py` `main()` asks it first and, if something answers, logs `something already answers on <host>:<port>: the chief sessions are left open` and skips `chief_startup_cleanup()`.
+- **B8** `supervisor/chief_session.py`: after `mint_run_token`, `open_chief` reads the session again; if it is closed it revokes the token (`revoke_run_tokens`) and raises `ChiefClosedWhileOpening(run_id)` before any spawn; `blueprints/chief/session.py` answers 409 `{error, run_id}`. The window after the re-read is in the `open_chief` docstring.
+- **B9** `supervisor/registry.py` `TerminalRun.wait_started_or_result(timeout)`; `_watch` uses it.
+- **B10, B11, B12** `board_mirror_hydrate.py`: `_belongs` needs an `id` that is a string with something in it after `strip()`; the message rows go in, the ids that are in the database under the file's board and scope afterwards (`landed`) are read back, and only those rows get their artifacts inserted (and their re-embed); `hydrate_board` returns False when none landed, so `hydrate_project` lists the scope under `skipped`.
+- **B13** `runner/api_lifecycle.py`, `runner/api_control.py`, `control/_helpers.py`: `max_cost_usd = as_cost(...)`, `MESSAGE` for the 400, passed on as the float `as_cost` returned. `api_lifecycle.py` is 451 lines (452 before).
+- **B14** `comms/directives.py`: `identity = caller_identity(request)` once, used for `is_chief_run(identity)` and `**stamp(identity)`; the scan in `test_comms_directives_query.py` accepts `**stamp(name)` where `name` was assigned `caller_identity(...)` in an enclosing function and still rejects a stamp built any other way.
+- **B15** `runner/comms_formatters.py`: the newest decision for the NOTE is taken from `ranked` (ordinary decisions), not from all of them.
+- **B17** `pathly_hooks/chief_prompt.py`: `_NOT_TYPED` is `<(?:task-notification|cross-session-message)` (no `\b`).
+- **B18** `supervisor/chief_tiers.py`: `_front_matter_tier` splits the block on `"\n"`.
+
+Living docs (verify-then-fix): `src/pathly_orchestrator/CLAUDE.md` (the hydration paragraph, the `POST /comms/directives` and `POST /comms/hydrate` entries, the `POST /chief/open` bullet, "Restart", the hook-tag sentence, the scheduled-task table row, "Switches in claude 2.1.304", the `pathly api` bullet, "Request bodies", "Cost and run limit", and the tree entries of `app.py`, `chief_session.py` and `comms_directives.py`); the `(chief-agent)` entry of `CHANGELOG.md` (its one known-limits sentence, edited in place); docstrings of `read_json_body`, `post_directive`, `post_message`, `open_chief`, `_watch`, `hydrate_board`, `_front_matter_tier`, the directives route, the hook module and `human.py`. Not changed: root `CLAUDE.md`, `studio/CLAUDE.md`, `README.md`, `docs/WHAT_IS_PATHLY.md` (no claim of theirs became false).
+
+Tests: new files `tests/runner_supervisor/test_chief_settings_env.py`, `tests/http_api/test_comms_body_unicode.py`, `tests/http_api/test_chief_cli_limits.py`, `tests/comms_board/test_directive_single_insert.py`, `tests/comms_board/test_directive_route_caller.py`, `tests/http_api/test_chief_startup_port.py`, `tests/runner_supervisor/test_chief_open_close_races.py`, `tests/comms_board/test_hydrate_blank_and_decoy.py`, `tests/http_api/test_run_cost_values.py`, `tests/comms_board/test_governance_escalation_note.py`, `tests/comms_board/test_chief_hook_tags.py`, `tests/comms_board/test_chief_tier_lines.py`, and two support modules (`tests/mirror_drain_support.py` for the mirror-flusher drain and its autouse guard, `tests/runner_supervisor/chief_open_support.py`: `Host`, the project and sessions-folder fixtures, the watcher guard). Existing tests changed because the behaviour did: `test_chief_help_routes.py` (the table), `test_comms_directives_query.py` (the scan), `test_board_hydrate_hostile.py` and `test_board_mirror_hydrate.py` (a file that adds nothing is False and `skipped`), `test_comms_directives_fields.py` (a surrogate in `text` is now the unreadable-body 400, not the route's own "must be valid Unicode"), `test_chief_routes.py` (`main()` runs on a free `PATHLY_FSM_HTTP_PORT`, see Decisions). The per-folder `INDEX.md` files are regenerated.
+
+### Proof
+
+Test-only commit `1f23c23` (`test(chief-agent): 20 failing test`). On its tree the Test command (`python -m pytest tests/comms_board tests/db tests/runner_supervisor tests/http_api -q -x -p no:cacheprovider`) exits 1: `1 failed, 293 passed`, the failure `test_board_hydrate_hostile.py::test_a_messages_value_that_is_not_a_list_imports_nothing[5]`. The 16 new and changed files together: `152 failed, 183 passed`.
+
+What each new file did on the code at 600f4a0, at the state of the tests in this commit (run with `-o pythonpath=<git archive of 588dc5d src>`): `148 failed, 310 passed` for the 18 files, the 148 being:
+
+- `test_chief_settings_env.py` 3 of 4 (the codex control passes): `KeyError: 'env'` and the key set `{hooks, permissions}` without `env`.
+- `test_comms_body_unicode.py` 16 of 24 (the 6 gate controls and 2 ordinary-text tests pass): the 8 no-token rows and the 2 chief rows (`/comms/post` `text` and `feature`) answer 500 `UnicodeEncodeError: surrogates not allowed` (`scope` too); the key, nested and ignored-key bodies and the reader tests get 200 and a stored row, or the parsed dict instead of None.
+- `test_chief_cli_limits.py` 25 of 30: `ValueError: Invalid header value` or `UnicodeEncodeError` (latin-1) from `http.client` for a bad token or secret (a traceback, exit 1); `RecursionError` for the 20,000-deep body; `AttributeError: no attribute 'MAX_BODY_BYTES'`; a standard-input body over 1 MiB is sent (exit 0); an answer over the limit is printed whole with no `cut` line; the answer is read with `read()` and no size; the help line is missing; and `UnicodeDecodeError` for a secret file that is not UTF-8.
+- `test_chief_help_routes.py` 2 of 14: `pathly help has no line for POST /comms/acknowledge`, and the table set differs.
+- `test_directive_single_insert.py` 5: two distinct statements write `comms_messages` (the INSERT and `UPDATE ... SET binding=1`), `not authorized` when UPDATEs are denied, `post_message() got an unexpected keyword argument 'binding'`.
+- `test_directive_route_caller.py` 1 of 2 and `test_comms_directives_query.py` 1: `caller_identity` called twice; the scan rejects the route.
+- `test_chief_startup_port.py` 12 of 14 (the free-port `main()` and the no-argument cleanup pass: controls): `ImportError: cannot import name 'something_answers'` for the probe tests; for the busy port `main()` leaves `open: False, token_live: False` (it closed the first server's chief).
+- `test_chief_open_close_races.py` 7 of 11: `AttributeError: no attribute 'ChiefClosedWhileOpening'`; the route answers 201 with a live session; the watcher thread is still alive after 2 s; `TerminalRun` has no `wait_started_or_result`.
+- `test_hydrate_blank_and_decoy.py` 21 of 24 and the two changed hydration files 8 (5 of 64 and 3 of 13): the blank id is stored (`['\t', 'first', 'second']`), the decoy artifact lands on the other board's message, `hydrate_board` is True for a file that adds nothing, `hydrate_project` lists `['demo', 'feat-ok', 'global']` as hydrated.
+- `test_run_cost_values.py` 15 of 37: `NaN`, `Infinity`, `true`, `1e999` start the run (200) on `/runner/start`, `/runner/retry` and the `retry` verb, and `10**400` is a 500 `OverflowError` (`-Infinity`, `"5"`, `null`, `0`, `-1` were already 400, and `5` and `0.5` start: controls).
+- `test_governance_escalation_note.py` 3 of 9: the NOTE shows after a standing order alone.
+- `test_chief_hook_tags.py` 12 of 28 (`KeyError: 'relayed'`) and `test_chief_tier_lines.py` 16 of 27 (`'operator' == 'status'`).
+- `test_comms_directives_fields.py` 1 (the changed message).
+
+After the fix: the 18 files pass, `458 passed`, on Python 3.11.17, 3.12 and 3.13.16 (each in a fresh venv). With `HOME` and `USERPROFILE` set to an empty directory the run leaves that directory empty. The check block of this ticket: every pytest line exits 0 and prints `passed` (4, 24, 44, 37, 78, 62, 88, 37, 9 and 55 passed); the five greps exit 0.
+
+Lint command, as written in `commands.md`, exit 0: `black --check src/ tests/` (693 files unchanged), `mypy src/ --ignore-missing-imports --no-strict-optional`, `check_file_size.py` (`18 known over 400 lines, none new, none grown`), `check_no_mirror_reads.py`, `gen_test_index.py --check` (`up to date`), `lint-imports`, `bandit -q -r src/ -ll -x src/pathly_data/`, `check_adapters.py`, `check_entry_points.py`; also `check_version_sync.py` (`2.24.1`).
+
+Full suite, `python -m pytest tests/ -q -p no:cacheprovider`: exit 0, `6273 passed, 14 skipped in 1805.57s (0:30:05)`, run on the final production tree. `tests/http_api/test_comms_body_unicode.py` got its last amendment after that run had collected, so the five files amended since the test-only commit (`test_comms_body_unicode.py`, `test_chief_cli_limits.py`, `test_directive_single_insert.py`, `test_chief_routes.py`, `test_comms_directives_fields.py`) were run again on the final tree: `184 passed`. The run leaves a detached real FSM server on 127.0.0.1:8765 (see For later tickets); I killed it and port 8765 is free.
+
+Floor guard: `FLOW_DIR=pathly/features FLOW_TICKETS=tasks python3 scripts/floor-guard.py chief-agent 20 588dc5dd5e9c6f0cbe93cb1426595b32554f32f9` prints `floor guard: clean`. With the base the ticket names, `600f4a0...`, it prints `ticket-edit` findings for tickets 19, 20 and 21, because the two planning commits that added them (`dcaba2b`, `588dc5d`) come after it; no file of mine is named.
+
+### Decisions
+
+- B2: the reader gives up at the first reading that parses (UTF-8, else cp1252) and holds a surrogate; it does not try the other encoding. The chief rows of the test are `/comms/post` `text` and `feature` only: of the six routes the ticket lists for a chief, the gate answers 403 first for the others (a surrogate id is not an id of its project; `/comms/edit` and `/comms/delete` are no chief routes; `scope` is "not this chief's project"), so those six get a control test that pins the 403. The 500 was measured for a caller with no token on all eight bodies.
+- B3: a header value is refused when it is not latin-1 or holds a CR or LF (wider than `http.client`, which folds a newline followed by a space or tab). Added, not in the ticket: a secret file that is not UTF-8 text (`Path.read_text()` raises `UnicodeDecodeError`, not `OSError`) is `pathly: the server secret cannot be read as text`, exit 2, with a test; `fsm_http_client._load_secret` itself is unchanged.
+- B4: the stdin limit is on UTF-8 bytes, measured after asking the stream for `MAX_BODY_BYTES + 1` characters (which can never be fewer bytes than characters, so a body of exactly the limit passes and one byte more is refused). A body given as an argument is not bounded here (the OS bounds it). The cut line is `pathly: the answer was cut: its first N bytes are shown (the limit is 262144)`; N counts the bytes of the answer shown, after an incomplete last character and the start of a secret that the limit cut in half are dropped.
+- B6: `post_directive` takes no lock of its own any more: `post_message` holds the write lock for its one INSERT.
+- B7: the probe lives in `supervisor/chief_session.py` (where the ticket put the startup step), detects a wildcard host with `ipaddress.ip_address(host).is_unspecified` so that no `"0.0.0.0"` literal (bandit B104) and no `# nosec` is needed, uses a 1 second timeout, and the log line is a warning. `test_chief_routes.py` did not set `PATHLY_FSM_HTTP_PORT` (the ticket says it does; line 64 of that file sets 8123 for another test), so its two `main()` tests ran on 8765 and failed in the full suite when a server was listening there (see For later tickets): `_run_main` now sets a free port.
+- B8: the re-read is right after the mint, before the argv and `create_run`, so nothing was created yet for the raise to undo; the existing `except BaseException: close_chief(run_id, "open failed")` removes the folder (it returns False for a session that is already closed and keeps the closer's reason), and the token is revoked by the new branch itself.
+- B10 to B12: the artifacts and the re-embed both go only to the rows that landed. The ticket names the artifacts; the re-embed used the same list, and a row that did not land (an id that belongs to another board's message) would have had that other message re-embedded with the file's text.
+- B13: the three handlers import `MESSAGE` and `as_cost` inside the function, as the ticket says; the `retry` verb takes the import at the top of `control/_helpers.py` (already imports `flow_cost` from the same module).
+
+### Shortcuts taken
+
+- No mutation run for this ticket (earlier tickets ran a harness); the tests were checked red against the old code and green against the new, not mutated.
+- B1 stays "measured on one claude version": no real `claude` was started, as for every test of this feature.
+
+### Review fixes
+
+None yet: this is the first build of the ticket.
+
+### For later tickets
+
+- A body nested deeper than the recursion limit makes `read_json_body` raise `RecursionError` (not a `ValueError`): every comms route answers 500 (measured: a 100,000-deep array to `/comms/post`). One word in the `except` of the reader, but the ticket's B2 is the surrogate.
+- The full suite leaves a real `python -m pathly_orchestrator.http_server` running on 127.0.0.1:8765 (detached, parent 1, started a few minutes into the run by some test that calls `fsm_http_client.ensure_server_running()` unmocked; I did not find which one). Since B7 any `main()` run on the default port sees it. I killed it after the run; it comes back with every full run.
+- `blueprints/comms/directives.py::_text_refusal` still has the branch "Field 'text' must be valid Unicode"; since B2 a surrogate never reaches it through the route (the reader refuses the body first), so it is only defence in depth now.
+- `pathly api`'s body given as an argument is bounded by the operating system only (131072 bytes on Linux); the ticket bounds standard input.
+- The escalation NOTE (B15) still compares timestamps as strings; two rows written in the same second keep the old order.

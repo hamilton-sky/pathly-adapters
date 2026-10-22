@@ -4,7 +4,7 @@
 
 HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, prompt-event contract.
 
-53 test file(s).
+57 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -22,6 +22,7 @@ HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, 
 | `test_chief_cli.py` | chief-agent 17: `pathly api`, the three built-in styles and the `chief-connect` fragment | 15 |
 | `test_chief_cli_edges.py` | chief-agent 17: the edges of `pathly api` | 20 |
 | `test_chief_cli_input.py` | chief-agent 17, round 2: input to `pathly api` that is not valid text, and the server secret | 8 |
+| `test_chief_cli_limits.py` | chief-agent 20, B3 to B5: `pathly api` never ends in a traceback, reads and prints a bounded | 22 |
 | `test_chief_gate.py` | chief-agent 08: the chief gate refuses every call a chief token's tier does not allow | 32 |
 | `test_chief_gate_actions.py` | chief-agent 08: which action a call is, and so which tier may make it | 6 |
 | `test_chief_gate_artifact_section.py` | chief-agent 08 (round 6): the section of an artifact read by id stays inside the named project | 5 |
@@ -48,6 +49,8 @@ HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, 
 | `test_chief_prompt_text.py` | chief-agent 17: what the chief's prompt texts tell it to do, against the real gate tables | 9 |
 | `test_chief_prose_rules.py` | chief-agent 17, round 2: the rules in the chief's prompt texts, pinned | 14 |
 | `test_chief_routes.py` | chief-agent 07: POST /chief/open, POST /chief/close and GET /chief/session | 32 |
+| `test_chief_startup_port.py` | chief-agent 20, B7: a second server started on a busy port leaves the first server's chief open | 6 |
+| `test_comms_body_unicode.py` | chief-agent 20, B2: a lone surrogate in a comms body is a 400, not a 500 | 8 |
 | `test_config.py` | Tests for Settings.from_env() — specifically bind-host validation | 8 |
 | `test_db_agents_route.py` | GET /db/agents — registry-backed agent list for the spawn-policy Settings model-policy UI | 3 |
 | `test_db_features_fields.py` | Tests for the state-one-authority /db/features extension (split-db-api-explorer) | 7 |
@@ -56,6 +59,7 @@ HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, 
 | `test_floor_allow_route.py` | build-proof 03: POST /comms/tasks/floor-allow sets a task's floor allow list, humans only | 9 |
 | `test_http_server.py` | Integration tests for the HTTP server endpoints | 26 |
 | `test_ops_export.py` | POST /ops/export skill selection + GET /ops/export/skills tier listing | 5 |
+| `test_run_cost_values.py` | chief-agent 20, B13: ``max_cost_usd`` is a finite number above 0 on every route that starts a flow | 3 |
 | `test_run_streams.py` | GET /events/runs?run_id= — the unified per-run SSE feed (unified-control-plane T3) | 7 |
 | `test_runs_control.py` | POST /runs/<run_id>/stop, /runs/<run_id>/<action> — the run_id-addressed control surface | 26 |
 | `test_runs_read.py` | Control-plane run read API — GET /runs, GET /runs/<run_id> (unified-control-plane P0, | 6 |
