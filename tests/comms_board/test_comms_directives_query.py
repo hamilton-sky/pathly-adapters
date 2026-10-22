@@ -75,7 +75,10 @@ def test_update_message_text_answers_binding_and_leaves_the_row_alone():
 # ``post_directive`` forwards ``**author``, which the source scan of ``test_comms_provenance``
 # cannot follow, so ``db/queries/comms_directives.py`` is on its allow-list. This scan closes the
 # gap from the other side: every call of ``post_directive`` must pass the server-side stamp of
-# the request, ``**stamp(caller_identity(request))``, and nothing built from the body.
+# the identity the request was checked as, ``**stamp(identity)`` where ``identity`` is a name the
+# enclosing function bound to ``caller_identity(...)`` (one lookup, used for the check and the
+# stamp), and nothing built from the body. A second ``caller_identity`` call inside ``stamp(...)``
+# is a second lookup: it can answer differently once the session has closed.
 
 PKG = SRC / "pathly_orchestrator"
 
@@ -85,15 +88,36 @@ def _name(call) -> str | None:
     return getattr(func, "id", None) or getattr(func, "attr", None)
 
 
-def _directive_calls(source: str) -> list[ast.Call]:
-    return [
-        n
-        for n in ast.walk(ast.parse(source))
-        if isinstance(n, ast.Call) and _name(n) == "post_directive"
-    ]
+def _bound_identities(function) -> frozenset[str]:
+    """The names ``function`` assigns the result of a ``caller_identity(...)`` call."""
+    names: set[str] = set()
+    for node in ast.walk(function):
+        if (
+            isinstance(node, ast.Assign)
+            and isinstance(node.value, ast.Call)
+            and _name(node.value) == "caller_identity"
+        ):
+            names.update(t.id for t in node.targets if isinstance(t, ast.Name))
+    return frozenset(names)
 
 
-def _has_the_request_stamp(call: ast.Call) -> bool:
+def _directive_calls(source: str) -> list[tuple[ast.Call, frozenset[str]]]:
+    """Each call of ``post_directive`` with the identity names its enclosing functions bound."""
+    found: list[tuple[ast.Call, frozenset[str]]] = []
+
+    def visit(node: ast.AST, bound: frozenset[str]) -> None:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            bound = bound | _bound_identities(node)
+        if isinstance(node, ast.Call) and _name(node) == "post_directive":
+            found.append((node, bound))
+        for child in ast.iter_child_nodes(node):
+            visit(child, bound)
+
+    visit(ast.parse(source), frozenset())
+    return found
+
+
+def _has_the_request_stamp(call: ast.Call, bound: frozenset[str]) -> bool:
     splats = [kw.value for kw in call.keywords if kw.arg is None]
     own = [kw for kw in call.keywords if (kw.arg or "").startswith("author_")]
     if len(splats) != 1 or own:
@@ -104,34 +128,66 @@ def _has_the_request_stamp(call: ast.Call) -> bool:
         and _name(stamp) == "stamp"
         and not stamp.keywords
         and len(stamp.args) == 1
-        and isinstance(stamp.args[0], ast.Call)
-        and _name(stamp.args[0]) == "caller_identity"
+        and isinstance(stamp.args[0], ast.Name)
+        and stamp.args[0].id in bound
     )
 
 
+LOOKS_UP_ONCE = "def route(r):\n    identity = caller_identity(r)\n"
+
+
 @pytest.mark.parametrize(
-    "call",
+    "source",
     [
         "post_directive(conn, s, '*', t)",
         "post_directive(conn, s, '*', t, **data)",
         "post_directive(conn, s, '*', t, **stamp(identity))",
-        "post_directive(conn, s, '*', t, **stamp(caller_identity(r)), author_role='x')",
+        "post_directive(conn, s, '*', t, **stamp(caller_identity(r)))",
         "post_directive(conn, s, '*', t, author_source='token')",
         "post_directive(conn, s, '*', t, **system_stamp())",
+        LOOKS_UP_ONCE + "    post_directive(conn, s, '*', t)",
+        LOOKS_UP_ONCE + "    post_directive(conn, s, '*', t, **data)",
+        LOOKS_UP_ONCE + "    post_directive(conn, s, '*', t, **stamp(other))",
+        LOOKS_UP_ONCE
+        + "    post_directive(conn, s, '*', t, **stamp(caller_identity(r)))",
+        LOOKS_UP_ONCE + "    post_directive(conn, s, '*', t, **stamp(identity.x))",
+        LOOKS_UP_ONCE + "    post_directive(conn, s, '*', t, **stamp(identity, 1))",
+        LOOKS_UP_ONCE
+        + "    post_directive(conn, s, '*', t, **stamp(identity), author_role='x')",
+        LOOKS_UP_ONCE
+        + "    post_directive(conn, s, '*', t, **stamp(identity), **more)",
+        LOOKS_UP_ONCE + "    post_directive(conn, s, '*', t, **system_stamp())",
+        "def route(r, identity):\n    post_directive(conn, s, '*', t, **stamp(identity))",
+        "def route(r):\n    identity = data.get('identity')\n"
+        "    post_directive(conn, s, '*', t, **stamp(identity))",
+        "def route(r):\n    identity = stamp_of(r)\n"
+        "    post_directive(conn, s, '*', t, **stamp(identity))",
+        "identity = caller_identity(r)\ndef route(r):\n"
+        "    post_directive(conn, s, '*', t, **stamp(identity))",
+        "def other(r):\n    identity = caller_identity(r)\ndef route(r):\n"
+        "    post_directive(conn, s, '*', t, **stamp(identity))",
     ],
 )
-def test_the_scan_catches_a_call_without_the_request_stamp(call):
-    (found,) = _directive_calls(call)
+def test_the_scan_catches_a_call_without_the_request_stamp(source):
+    ((found, bound),) = _directive_calls(source)
 
-    assert not _has_the_request_stamp(found)
+    assert not _has_the_request_stamp(found, bound)
 
 
-def test_the_scan_accepts_the_request_stamp():
-    (found,) = _directive_calls(
-        "post_directive(conn, s, '*', t, **stamp(caller_identity(request)))"
-    )
+@pytest.mark.parametrize(
+    "source",
+    [
+        LOOKS_UP_ONCE + "    post_directive(conn, s, '*', t, **stamp(identity))",
+        "async def route(r):\n    identity = caller_identity(request)\n"
+        "    post_directive(conn, s, '*', t, **stamp(identity))",
+        "def route(r):\n    identity = caller_identity(request)\n"
+        "    def inner():\n        post_directive(conn, s, '*', t, **stamp(identity))",
+    ],
+)
+def test_the_scan_accepts_the_request_stamp(source):
+    ((found, bound),) = _directive_calls(source)
 
-    assert _has_the_request_stamp(found)
+    assert _has_the_request_stamp(found, bound)
 
 
 def test_every_call_of_post_directive_passes_the_request_stamp():
@@ -140,9 +196,9 @@ def test_every_call_of_post_directive_passes_the_request_stamp():
         source = path.read_text(encoding="utf-8")
         if "post_directive" not in source:
             continue
-        for call in _directive_calls(source):
+        for call, bound in _directive_calls(source):
             calls += 1
-            unstamped += not _has_the_request_stamp(call)
+            unstamped += not _has_the_request_stamp(call, bound)
 
     assert calls >= 1, "the scan found no call of post_directive; it is not looking"
     assert unstamped == 0
