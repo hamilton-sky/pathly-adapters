@@ -342,7 +342,7 @@ $ grep -n "already answers" src/pathly_orchestrator/CLAUDE.md
 exit 0
 $ ! grep -nF 'whose `id` is not a string;' src/pathly_orchestrator/CLAUDE.md
 exit 0
-$ FLOW_DIR=pathly/features FLOW_TICKETS=tasks python3 scripts/floor-guard.py chief-agent 20 600f4a0cc8b2cbcef3bb807a484800aeffce581c
+$ FLOW_DIR=pathly/features FLOW_TICKETS=tasks python3 scripts/floor-guard.py chief-agent 20 $(git log --format=%H -n1 --grep='^docs(chief-agent): plan base for ticket 20$')
 exit 0
 prints floor guard: clean
 $ python -m pytest tests/ -q -p no:cacheprovider

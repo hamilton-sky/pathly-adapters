@@ -273,15 +273,17 @@ Files: root `CLAUDE.md`; `docs/ARCHITECTURE.md`; `docs/API.md`.
   the project root, the op, the target, the content hash and the backend
   (`blueprints/code/query.py`, `_QUERY_CACHE`). Say that.
 
-## D3. The CHANGELOG and the acceptance test promise a live check that no one has planned
+## D3. The CHANGELOG and the acceptance test name spike 19 as the live check
 
 Files: `CHANGELOG.md` (the `(chief-agent)` entry); `tests/comms_board/test_chief_acceptance.py`
 (module docstring).
 
-Both say spike 19, "a hand run with" a real claude, is "the planned live check". Spike 19
-(`tasks/19-daycap-guard-coverage-spike.md`) asks only whether the daycap guard fires on headless
-spawns. Nothing planned runs a real claude against the chief's restricted flags, its hook or its
-cite flow. Say that nothing yet does, and that spike 19 is about the daycap guard. Second, the
+Both say spike 19, "a hand run with" a real claude, is "the planned live check". When they were
+written that was false: spike 19 (`tasks/19-daycap-guard-coverage-spike.md`) asked only whether
+the daycap guard fires on headless spawns. It now has a Part B, eight yes or no questions run with
+a real claude against the chief's restricted flags, its hook, `pathly api`, the cite flow, its
+limits and close, so the claim is true. Reword both sentences to say "spike 19 part B" and to say
+what stays unmeasured until it has been run. Second, the
 entry says two settings "bound a session" and that a run start above the cost ceiling is refused;
 only `POST /runs` of a flow and the `retry` verb state a cost. Say that goal, board and task
 runs are bounded by the run count alone (a goal's own cap is `goal.max_cost_usd`, when set).
@@ -384,8 +386,8 @@ golden snapshots in `tests/snapshots/` that carry the fragment.
 - The route table is the one it was (S1): 177 rules, the same fingerprint as at 600f4a0.
 - No test was edited to make it pass, apart from the ones the items name (T1, T4, T5, T7, T8,
   D6, D7's snapshots).
-- The whole suite and the checks pass; the floor guard is clean (`BASE` is `git rev-parse HEAD`
-  taken before the first commit of this ticket).
+- The whole suite and the checks pass; the floor guard is clean (its check starts from the commit
+  whose subject is `docs(chief-agent): plan base for ticket 21`).
 
 ```check
 $ python -c "import sys; from pathly_orchestrator.http_server import app; v=app.view_functions; ok=all(v['comms_messages.'+n].__module__.endswith('.messages_read') for n in ('comms_get','comms_search')) and v['comms_messages.comms_acknowledge'].__module__.endswith('.messages_crud'); sys.exit(0 if ok else 1)"
@@ -459,9 +461,9 @@ $ grep -q 'chief_prompt' docs/ARCHITECTURE.md
 exit 0
 $ grep -qF 'project root, op, target, content hash, backend' docs/API.md
 exit 0
-$ ! grep -n 'spike 19, a hand run with one' CHANGELOG.md
+$ grep -n 'spike 19 part B' CHANGELOG.md
 exit 0
-$ ! grep -n 'spike 19 is the planned hand run' tests/comms_board/test_chief_acceptance.py
+$ grep -n 'spike 19 part B' tests/comms_board/test_chief_acceptance.py
 exit 0
 $ grep -n 'goal, board and task runs' CHANGELOG.md
 exit 0
@@ -497,7 +499,7 @@ exit 0
 $ python -m pytest tests/install_skills -q -p no:cacheprovider
 exit 0
 prints passed
-$ FLOW_DIR=pathly/features FLOW_TICKETS=tasks python3 scripts/floor-guard.py chief-agent 21 $BASE
+$ FLOW_DIR=pathly/features FLOW_TICKETS=tasks python3 scripts/floor-guard.py chief-agent 21 $(git log --format=%H -n1 --grep='^docs(chief-agent): plan base for ticket 21$')
 exit 0
 prints floor guard: clean
 $ python -c "import pathlib,shutil; [shutil.rmtree(p) for p in pathlib.Path('.').iterdir() if p.name.startswith('C:')]"
