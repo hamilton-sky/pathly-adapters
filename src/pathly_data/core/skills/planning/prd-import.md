@@ -60,7 +60,7 @@ Read project guidance and board context before proposing cards:
 1. Project guidance files and rule files, if present.
 2. Existing project-board features:
    ```bash
-   curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" "http://127.0.0.1:8765/comms?board=project&scope=$PROJECT&type=feature"
+   curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" "http://127.0.0.1:8765/comms?board=project&scope=$PROJECT&type=feature&feature=project"
    ```
 3. Existing artifacts on the project board:
    ```bash
@@ -117,7 +117,7 @@ later dependency names to those ids.
 Before posting features:
 
 ```bash
-curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" "http://127.0.0.1:8765/comms?board=project&scope=$PROJECT&type=feature"
+curl -s -H "X-Pathly-Run-Token: $PATHLY_RUN_TOKEN" "http://127.0.0.1:8765/comms?board=project&scope=$PROJECT&type=feature&feature=project"
 ```
 
 If the project already has 2 or more `type=feature` cards, do not duplicate the

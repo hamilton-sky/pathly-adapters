@@ -13,11 +13,10 @@ from __future__ import annotations
 
 import logging
 
-logger = logging.getLogger(__name__)
+from .comms_binding import BINDING_MARK, is_binding_row
+from .comms_formatters import render_governance_lines
 
-# Set on a row by this module and read by the formatter. The stored ``binding`` column is not
-# what the formatter trusts, so a row that reaches it by any other path renders as ordinary.
-BINDING_MARK = "_binding"
+logger = logging.getLogger(__name__)
 
 
 def _standing_orders(
@@ -68,7 +67,7 @@ def governance_decisions(
     except Exception:
         logger.warning("comms_governance: standing orders unavailable", exc_info=True)
         return rows
-    return [d for d in rows if not d.get("binding")] + standing
+    return [d for d in rows if not is_binding_row(d)] + standing
 
 
 def standing_orders_only(project_scope: str, role: str, stats: dict[str, int]) -> str:
@@ -88,7 +87,5 @@ def standing_orders_only(project_scope: str, role: str, stats: dict[str, int]) -
     stats["governance"] = len(rows)
     if not rows:
         return ""
-    from .comms_formatters import render_governance_lines
-
     lines = ["## Communication Board", "", *render_governance_lines(rows, [])]
     return "\n".join(lines) + "\n"

@@ -32,6 +32,7 @@ from pathly_orchestrator.db.connection import get_db
 from pathly_orchestrator.db.queries import chief as queries
 from pathly_orchestrator.db.queries.run_tokens import mint_run_token, revoke_run_tokens
 from pathly_orchestrator.runner.chief_argv import chief_argv, claude_settings
+from pathly_orchestrator.scope_names import normalise_root
 
 from .chief_presets import BUILT_IN, compose_prompt, default_style
 from .chief_tiers import resolve_preset_tier, strip_front_matter
@@ -72,9 +73,10 @@ def _chief_root() -> Path:
 
 def normalise_project_root(project_root: str) -> str:
     """The key a project's chief is registered and looked up under: forward slashes, no
-    trailing slash (the form the board code uses), so ``/p`` and ``/p/`` are one project.
+    trailing slash (the form the board code uses), so ``/p`` and ``/p/`` are one project; a bare
+    root keeps its one slash (``scope_names.normalise_root``).
     """
-    return project_root.replace("\\", "/").rstrip("/") or project_root
+    return normalise_root(project_root)
 
 
 def _validate(

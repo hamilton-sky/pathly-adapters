@@ -1,4 +1,4 @@
-"""chief-agent 16 (round 2): a hostile ``BOARD.json`` cannot stop hydration, or plant an artifact.
+"""A hostile ``BOARD.json`` cannot stop hydration, or plant an artifact (chief-agent 16).
 
 ``hydrate_board`` reads a file nobody verified and is documented never to raise. The ids in it
 are whatever the file says: a list or a dict is unhashable, so a set or a ``in`` test over the

@@ -102,6 +102,21 @@ def test_a_text_up_to_8_kib_is_stored(client, project, chief_root, text):
     assert _row(resp.get_json()["id"])["text"] == text
 
 
+def test_the_cap_is_on_the_text_without_its_padding(client, project, chief_root):
+    """8,192 bytes with whitespace on both sides is stored (201); 8,193 bytes once stripped is
+    refused (400), whatever padding it has."""
+    opened = open_session(project, chief_root)
+
+    fits = _post(client, opened, text="  \n" + "a" * 8192 + "\t \n")
+    over = _post(client, opened, text="  \n" + "a" * 8193 + "\t \n")
+
+    assert fits.status_code == 201, fits.get_data(as_text=True)
+    assert _row(fits.get_json()["id"])["text"] == "a" * 8192
+    assert over.status_code == 400, over.get_data(as_text=True)
+    assert "8192" in over.get_json()["error"]
+    assert len(_rows()) == 1
+
+
 def test_the_text_is_stored_without_its_padding(client, project, chief_root):
     opened = open_session(project, chief_root)
 
@@ -186,5 +201,5 @@ def test_a_body_that_is_not_an_object_posts_nothing(client, project, chief_root,
         headers={TOKEN: opened.run_token},
     )
 
-    assert resp.status_code in (400, 403), resp.get_data(as_text=True)
+    assert resp.status_code == 400, resp.get_data(as_text=True)
     assert _rows() == []

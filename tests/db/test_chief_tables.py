@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import sqlite3
 
+import pytest
+
 from pathly_orchestrator.db import get_db
 from pathly_orchestrator.db.migrations_chief import add_chief_tables
 from pathly_orchestrator.db.queries import chief
@@ -191,15 +193,12 @@ def test_message_id_unique_in_the_schema() -> None:
         "INSERT INTO chief_citations (run_id, message_id, route, target, ts)"
         " VALUES ('r', 1, '/x', NULL, 1.0)"
     )
-    try:
+    with pytest.raises(sqlite3.IntegrityError):
         conn.execute(
             "INSERT INTO chief_citations (run_id, message_id, route, target, ts)"
             " VALUES ('r', 1, '/y', NULL, 2.0)"
         )
-    except sqlite3.IntegrityError:
-        conn.rollback()
-        return
-    raise AssertionError("a message id was cited twice")
+    conn.rollback()
 
 
 def test_lookup_run_token_sees_revoked_rows() -> None:

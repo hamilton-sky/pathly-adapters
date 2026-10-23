@@ -33,6 +33,7 @@ that are asserted to get to the work their route exists for.
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 import pytest
 from chief_audit_sandbox import drain_the_mirrors, world
@@ -49,8 +50,16 @@ from chief_gate_support import (
     other_project,
     project,
 )
+from mirror_drain_support import _mirrors_are_drained
 
 TIERS = ("operator", "planner", "status")
+
+
+def climbing_value(world: World) -> str:
+    """The relative path from the folder the routes open files from (the server's working
+    directory) to a file in the other project: the way a join leaves the folder it started in.
+    """
+    return os.path.relpath(world.other / "planted", world.server)
 
 
 def hostile_values(world: World) -> dict[str, str]:
@@ -59,7 +68,7 @@ def hostile_values(world: World) -> dict[str, str]:
     return {
         "dotdot": "..",
         "relative climbing": "../..",
-        "climbing": "../../../../proj-b/planted",
+        "climbing": climbing_value(world),
         "other project": str(other),
         "other file": f"{other}/pathly/features/{DEMO}/PLAN.md",
         "server dir": f"{server}/planted",
@@ -138,6 +147,21 @@ def _routes(app):
                 kind = "plain"
             keys.append((key, kind))
         yield rule, method, keys
+
+
+def test_the_climbing_value_is_a_relative_path_that_lands_in_the_other_project(world):
+    """The server joins a value to its working directory: the join, normalised, is a file of the
+    other project, not of a folder that does not exist in the sandbox."""
+    built = world.world
+    value = climbing_value(built)
+
+    joined = Path(os.path.normpath(os.path.join(built.server, value)))
+
+    assert not os.path.isabs(value) and value.startswith("..")
+    assert joined == built.other / "planted"
+    assert joined.is_relative_to(built.other)
+    assert not joined.is_relative_to(built.project)
+    assert hostile_values(built)["climbing"] == value
 
 
 def test_every_url_variable_gets_the_whole_list(app):

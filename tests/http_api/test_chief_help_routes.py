@@ -1,4 +1,4 @@
-"""chief-agent 17, round 2: `pathly help` and the texts show each route in the form that works.
+"""`pathly help` and the chief's texts show each route in the form that works (chief-agent 17).
 
 A bare ``GET /runs`` answers 200 ``[]`` without ``project_root`` (the route returns an empty list
 for a project it was not told), so a chief that followed the help line to the letter would conclude
@@ -9,7 +9,9 @@ project board. The help and every text must therefore print each such route with
 cannot drift from them, and the other tests hold the help and the texts to the table.
 
 A project root that holds ``+``, ``&`` or ``%`` has to be percent-encoded in a query string: the
-gate compares what the server decoded, spelled as the root it stored. A JSON body keeps it as is.
+gate compares what the server decoded, spelled as the root it stored. A JSON body keeps it as is,
+apart from a ``"`` or ``'`` of it, which takes the JSON escape (``\\"``, ``\\u0027``); a ``'`` in
+a query string is written ``%27``, because the shell reads a bare one as the end of the quotes.
 """
 
 from __future__ import annotations
@@ -22,7 +24,7 @@ import pytest
 from chief_bind_support import project_row, record_run
 from chief_cli_support import NO_TOKEN, pathly, server
 from chief_gate_support import _chief, app, project
-from chief_text_support import TEXT_NAMES, text_of
+from chief_text_support import TEXT_NAMES, norm, text_of
 
 ROOT = "<root>"
 BOARD = ("board=project", f"scope={ROOT}", "feature=project")
@@ -63,6 +65,31 @@ def test_a_help_line_names_what_its_route_needs(pathly):
     for route, needs in NEEDS.items():
         for need in needs:
             assert need in lines[route], (route, need, lines[route])
+
+
+# The keys the help shows for the two routes that take a cited answer, and no others: a key for
+# words of the chief's own is the one thing a line there must never show.
+ANSWER_KEYS = {
+    ("POST", "/comms/answer"): {"question_id", "cite"},
+    ("POST", "/runner/agent-answer"): {"topic", "cite"},
+}
+
+
+@pytest.mark.parametrize("route", sorted(ANSWER_KEYS), ids=lambda r: r[1])
+def test_the_help_line_of_an_answer_route_shows_exactly_the_keys_of_a_cited_answer(
+    pathly, route
+):
+    line = _help_lines(pathly)[route]
+
+    assert set(re.findall(r'"(\w+)"', line)) == ANSWER_KEYS[route], line
+    assert line.rstrip().endswith("only"), line
+
+
+def test_the_help_says_a_chief_never_sends_an_answer_of_its_own(pathly):
+    help_text = norm(pathly("help", token=NO_TOKEN).out)
+
+    assert "never send an answer of your own" in help_text
+    assert "relays that message's own words" in help_text
 
 
 # --- the table, against the routes ---------------------------------------------------------------
@@ -241,3 +268,24 @@ def test_a_json_body_keeps_such_a_root_exactly_as_written(server, pathly, odd):
     ran = pathly("api", "POST", "/comms/directives", body, token=chief.token)
 
     assert ran.code == 0, ran
+
+
+def test_a_root_with_an_apostrophe_and_a_quote_works_written_the_way_the_fragment_says(
+    server, pathly, tmp_path
+):
+    root = tmp_path / 'it\'s "mine" proj'
+    root.mkdir()
+    chief = _chief("operator", root)
+    in_a_query = f"/chief/session?project_root={quote(str(root), safe='/')}"
+    in_a_body = json.dumps(
+        {"project_root": str(root), "to_agent": "*", "text": "an order"}
+    ).replace("'", "\\u0027")
+
+    read = _get(pathly, chief, in_a_query)
+    posted = pathly("api", "POST", "/comms/directives", in_a_body, token=chief.token)
+
+    assert read.code == 0, read
+    assert json.loads(read.out)["run_id"] == chief.run_id
+    assert "%27" in in_a_query and "'" not in in_a_query
+    assert posted.code == 0, posted
+    assert "\\u0027" in in_a_body and "'" not in in_a_body

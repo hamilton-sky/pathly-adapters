@@ -21,19 +21,18 @@ import re
 import socket
 import subprocess
 import sys
-import threading
 import time
 from pathlib import Path
 
 import pytest
 from _paths import SRC
+from chief_session_guard import _no_watcher_outlives_its_test
 
 from pathly_orchestrator.db import get_db
 from pathly_orchestrator.db.queries import chief as chief_queries
 from pathly_orchestrator.db.queries.run_tokens import mint_run_token, resolve_run_token
 from pathly_orchestrator.http_server import sse
 from pathly_orchestrator.supervisor import chief_session
-from pathly_orchestrator.supervisor.chief_session import close_chief
 
 PROMPT = "---\ntier: operator\n---\nYou are the chief of this project."
 RUN_ID = re.compile(r"chief-[0-9a-f]{12}")
@@ -73,20 +72,6 @@ def client(host: Host):
     app.config["TESTING"] = True
     with app.test_client() as c:
         yield c
-
-
-@pytest.fixture(autouse=True)
-def _no_watcher_outlives_its_test():
-    """A chief a test leaves open has a watcher waiting; close it while this test's DB and
-    sessions folder are still patched in, so it cannot wake up in a later test."""
-    yield
-    prefix = "chief-watch-"
-    for thread in threading.enumerate():
-        if thread.name.startswith(prefix):
-            close_chief(thread.name[len(prefix) :], "test over")
-    assert _wait(
-        lambda: not [t for t in threading.enumerate() if t.name.startswith(prefix)]
-    )
 
 
 @pytest.fixture()

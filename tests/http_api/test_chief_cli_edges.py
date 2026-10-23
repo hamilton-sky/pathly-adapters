@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import json
 import os
-import socket
 import subprocess
 import sys
 import tomllib
@@ -22,7 +21,15 @@ from urllib.parse import quote
 import pytest
 from _paths import REPO_ROOT, SRC
 from chief_cite_support import Session, ask, db
-from chief_cli_support import NO_TOKEN, fragment_text, host, pathly, server, stub
+from chief_cli_support import (
+    NO_TOKEN,
+    fragment_text,
+    host,
+    pathly,
+    released_port,
+    server,
+    stub,
+)
 from chief_cli_support import _no_watcher_outlives_its_test
 from chief_gate_support import _chief, app, project
 
@@ -59,6 +66,8 @@ def test_a_usage_error_exits_2_with_the_usage_on_stderr_and_sends_nothing(
     assert ran.out == ""
     assert "pathly" in ran.err
     assert server.requests == []
+    # The token is in this process's environment for every one of these, and in none of its output.
+    assert chief.token not in ran.out + ran.err, ran
 
 
 def test_an_empty_standard_input_for_a_dash_body_is_a_usage_error(
@@ -270,9 +279,7 @@ def test_the_server_secret_is_sent_when_one_is_set_and_not_otherwise(
 def test_a_server_that_is_not_there_is_exit_1_with_a_message_not_a_traceback(
     pathly, monkeypatch
 ):
-    with socket.socket() as probe:
-        probe.bind(("127.0.0.1", 0))
-        port = probe.getsockname()[1]
+    port = released_port()
     monkeypatch.setenv("PATHLY_FSM_HTTP_PORT", str(port))
 
     ran = pathly("api", "GET", "/comms", token="tok-not-printed")
@@ -282,6 +289,32 @@ def test_a_server_that_is_not_there_is_exit_1_with_a_message_not_a_traceback(
     assert str(port) in ran.err
     assert "Traceback" not in ran.err
     assert "tok-not-printed" not in ran.err
+
+
+def test_the_token_goes_to_this_machine_and_to_no_other_address(
+    stub, pathly, monkeypatch
+):
+    import http.client
+
+    from pathly_orchestrator import chief_cli, fsm_http_client
+
+    hosts: list[str] = []
+    real = http.client.HTTPConnection
+
+    class Connection(real):
+        def __init__(self, host, *args, **kwargs):
+            hosts.append(host)
+            super().__init__(host, *args, **kwargs)
+
+    monkeypatch.setattr(http.client, "HTTPConnection", Connection)
+
+    ran = pathly("api", "GET", "/comms", token="tok")
+
+    assert ran.code == 0, ran
+    assert fsm_http_client.DEFAULT_HOST == "127.0.0.1"
+    assert chief_cli.DEFAULT_HOST == "127.0.0.1"
+    assert hosts == ["127.0.0.1"]
+    assert stub.got[0]["headers"]["x-pathly-run-token"] == "tok"
 
 
 def test_an_error_that_holds_the_token_is_printed_without_it(pathly, monkeypatch):

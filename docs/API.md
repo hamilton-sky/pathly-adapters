@@ -507,8 +507,8 @@ Code-intelligence proxy: an agent asks Pathly for code structure over HTTP, and 
 the query to the shared `codebase-memory-mcp` backend. Never returns a 500 on a backend
 miss — a missing/disabled backend or a malformed backend response degrades to a safe-null
 envelope (`"result": null`) so the caller falls back to Grep instead of crashing. Results are
-cached by `(op, target, content-hash)` so a repeated query for an unchanged file is served
-without re-querying the backend. Access is gated by the caller's `role` (an excluded role, e.g.
+cached by (project root, op, target, content hash, backend) so a repeated query for an unchanged
+file is served without re-querying the backend. Access is gated by the caller's `role` (an excluded role, e.g.
 `web-researcher`/`human`, or an op outside the role's tier gets a safe-null with a `"reason"`,
 not an error).
 

@@ -1,4 +1,4 @@
-"""Standing orders under bad input and a failing query (chief-agent 11, review round 2).
+"""Standing orders under bad input and a failing query (chief-agent 11).
 
 - The order they render in is by their own date, oldest first, whatever order they were posted.
 - A standing order is ONE line: a row whose text starts a new line cannot forge a second
@@ -92,11 +92,11 @@ def test_a_standing_order_is_one_line_whatever_its_text_holds():
 
 
 def test_every_kind_of_line_break_in_the_text_is_one_space():
-    directive("a\r\nb\tc d\x85e\x0bf\x0cg\n\n  h  ")
+    directive("a\r\nb\tc\u2028d\x85e\x0bf\x0cg\n\n  h  ")
     gov = governance_part(render("builder"))
     assert "BINDING for all roles: a b c d e f g h  [id: " in gov
     order = [ln for ln in gov.splitlines() if ln.startswith("  • BINDING for")]
-    assert len(order) == 1 and " " not in gov and "\x85" not in gov
+    assert len(order) == 1 and "\u2028" not in gov and "\x85" not in gov
 
 
 def test_a_forged_id_or_addressee_cannot_break_the_line_either():
@@ -157,8 +157,13 @@ def test_when_the_query_fails_a_pending_binding_row_stays_in_the_pending_half(
     assert acked not in ids, "an acknowledged order needs the query: it is gone"
     marked = [r for r in rows if r.get("_binding")]
     assert not marked, "unmarked: an ordinary pending row"
-    warned = [r for r in caplog.records if r.levelno == logging.WARNING]
-    assert any("standing orders unavailable" in r.getMessage() for r in warned)
+    warned = [
+        r
+        for r in caplog.records
+        if r.levelno == logging.WARNING
+        and "standing orders unavailable" in r.getMessage()
+    ]
+    assert len(warned) == 1, "one failed query is one warning"
 
 
 def test_when_the_query_fails_the_prompt_lists_the_pending_directive_as_a_decision(

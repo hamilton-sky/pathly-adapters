@@ -7,15 +7,15 @@ Tests are grouped into domain folders that mirror the app's architecture layers.
 | Folder | Purpose | Files |
 | --- | --- | --- |
 | [`code_intel/`](code_intel/INDEX.md) | Code-intelligence query proxy — graph reindex, path resolve, LSP session, query gate & logging. | 9 |
-| [`comms_board/`](comms_board/INDEX.md) | Comms board / message-board subsystem — messages, tasks, artifacts, goals, context retrieval & relevance, board mirror & hydration. | 73 |
-| [`consistency/`](consistency/INDEX.md) |  | 3 |
+| [`comms_board/`](comms_board/INDEX.md) | Comms board / message-board subsystem — messages, tasks, artifacts, goals, context retrieval & relevance, board mirror & hydration. | 75 |
+| [`consistency/`](consistency/INDEX.md) |  | 4 |
 | [`dag_goals/`](dag_goals/INDEX.md) | Goal/DAG decomposition & scheduling — feature/flow/project decompose, goals read-model, PRD import. | 18 |
 | [`db/`](db/INDEX.md) | Database layer — schema/queries, connection isolation, write guard. | 18 |
 | [`fsm_flows/`](fsm_flows/INDEX.md) | FSM engine, gates, transitions, flow definitions, feedback protocol & fix-routing. | 46 |
 | [`hq_copilot/`](hq_copilot/INDEX.md) | HQ copilot — board context packet, HQ model turn & read-only guardrails, model eligibility, /hq/* endpoints. | 5 |
-| [`http_api/`](http_api/INDEX.md) | HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, prompt-event contract. | 57 |
+| [`http_api/`](http_api/INDEX.md) | HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, prompt-event contract. | 59 |
 | [`install_skills/`](install_skills/INDEX.md) | Adapter install/setup, stitch & compose, skill composition / round-trip / export, plugin manifests. | 28 |
 | [`local_operator/`](local_operator/INDEX.md) | HQ operator actions — action catalog & availability, operator turn, proposal check, confirmed execution through real routes, audit. | 4 |
 | [`runner_supervisor/`](runner_supervisor/INDEX.md) | Runner control loop, supervisor, spawn channel, lane/worktree isolation, file-claim registry, services facade. | 24 |
-| [`storage_paths/`](storage_paths/INDEX.md) | Feature/goal storage layout, slugs, canonical artifact paths, storage migrations. | 12 |
+| [`storage_paths/`](storage_paths/INDEX.md) | Feature/goal storage layout, slugs, canonical artifact paths, storage migrations. | 13 |
 | [`telemetry/`](telemetry/INDEX.md) | Cost/token telemetry — invocation projection, pricing, OTel export, observability, log formatting. | 17 |

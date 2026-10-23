@@ -12,7 +12,10 @@ from __future__ import annotations
 
 import logging
 
+from pathly_orchestrator.scope_names import normalise_root
+
 from .board_scope import resolve_board_scope_setting
+from .comms_binding import is_binding_row
 from .comms_formatters import (
     _build_context_entries,
     _collect_hydrate_channel,
@@ -89,7 +92,7 @@ def retrieve_board_context(
     limits = resolve_context_limits()
     stats.update(limits)
 
-    _norm_root = project_root.replace("\\", "/").rstrip("/")
+    _norm_root = normalise_root(project_root)
     enabled_boards: list[tuple[str, str, int]] = []
     if board_scope.get("feature", True):
         enabled_boards.append(("feature", topic, limits["k_feature"]))
@@ -149,7 +152,7 @@ def retrieve_board_context(
             return False
         if msg.get("superseded_by"):
             return False
-        if msg.get("binding"):
+        if is_binding_row(msg):
             # A standing order reaches a prompt through governance, for the role it is
             # addressed to. Letting it surface here too would hand it to every other role.
             return False

@@ -18,6 +18,7 @@ from urllib.parse import parse_qsl, quote
 
 import pytest
 from chief_bind_support import record_run
+from chief_cite_support import db
 from chief_cli_support import (
     _no_watcher_outlives_its_test,
     fragment_text,
@@ -26,6 +27,7 @@ from chief_cli_support import (
     server,
 )
 from chief_gate_support import _chief, app, client, project
+from chief_text_support import norm
 from werkzeug.exceptions import HTTPException
 
 TIER_OF = {
@@ -147,6 +149,59 @@ def test_a_style_shows_the_powers_of_its_tier(app, name, powers):
         shown.add(action_for(rule.rule, method, view_args, body, lambda _id: True))
 
     assert shown & powers, (name, shown)
+
+
+# --- what a style says its tier may and may not do, against the tier table ---------------------
+
+# The opening of the sentence that names what the tier may do, and of the one that names what it
+# may not, in each style (the operator style names no refusal: it holds every action).
+MAY = {
+    "status": "you may read",
+    "planner": "your tier may",
+    "operator": "your tier may",
+}
+MAY_NOT = {"status": "you may not", "planner": "you may not"}
+# `run` is "start" in a sentence of refusals.
+REFUSED_WORD = {"run": "start"}
+
+
+def _sentence(name: str, opening: str) -> set[str]:
+    """The words of the sentence of a style that opens with ``opening``, up to its full stop or
+    colon."""
+    text = norm(_text(name))
+    return set(
+        re.findall(r"[a-z']+", re.match(r"[^.:]*", text[text.index(opening) :])[0])
+    )
+
+
+@pytest.mark.parametrize("name", list(MAY))
+def test_the_actions_a_style_says_its_tier_may_do_are_the_ones_the_tier_table_holds(
+    name,
+):
+    from pathly_orchestrator.supervisor.chief_tiers import ACTIONS, TIERS
+
+    said = {action for action in ACTIONS if action in _sentence(name, MAY[name])}
+
+    assert said == TIERS[TIER_OF[name]]
+
+
+@pytest.mark.parametrize("name", list(MAY_NOT))
+def test_the_actions_a_style_says_its_tier_may_not_do_are_the_ones_the_tier_table_lacks(
+    name,
+):
+    from pathly_orchestrator.supervisor.chief_tiers import ACTIONS, TIERS
+
+    words = _sentence(name, MAY_NOT[name])
+    said = {action for action in ACTIONS if REFUSED_WORD.get(action, action) in words}
+
+    assert said == set(ACTIONS) - TIERS[TIER_OF[name]]
+
+
+def test_the_tier_table_gives_the_operator_every_action_so_its_style_names_no_refusal():
+    from pathly_orchestrator.supervisor.chief_tiers import ACTIONS, TIERS
+
+    assert TIERS["operator"] == frozenset(ACTIONS)
+    assert "operator" not in MAY_NOT
 
 
 def test_the_operator_style_shows_a_cited_answer():
@@ -273,6 +328,44 @@ def test_a_standing_order_given_the_way_the_operator_style_says_is_listed_as_bin
     assert given.code == 0, given
     rows = json.loads(listed.out)
     assert [(r["id"], r["binding"]) for r in rows] == [(json.loads(given.out)["id"], 1)]
+
+
+def test_the_supersede_example_retires_a_standing_order_when_given_real_ids(
+    server, pathly, project
+):
+    chief = _chief("operator", project)
+    shown = examples(_text("operator"))
+    order = next(w for w in shown if w[3] == "/comms/directives")
+    supersede = next(w for w in shown if w[3] == "/comms/supersede")
+
+    def give(text: str) -> str:
+        words = _filled(order, project, "run-1")
+        words[-1] = json.dumps({**json.loads(words[-1]), "text": text})
+        given = pathly(*words, token=chief.token)
+        assert given.code == 0, given
+        return json.loads(given.out)["id"]
+
+    old, new = give("Run the formatter."), give("Run the formatter and the linter.")
+    body = supersede[-1]
+    assert "<old order id>" in body and "<new order id>" in body, supersede
+    body = body.replace("<old order id>", old).replace("<new order id>", new)
+
+    ran = pathly(*_filled(supersede[:-1], project, "run-1"), body, token=chief.token)
+
+    assert ran.code == 0, ran
+
+    def retired_by(message_id: str):
+        row = (
+            db()
+            .execute(
+                "SELECT superseded_by FROM comms_messages WHERE id = ?", (message_id,)
+            )
+            .fetchone()
+        )
+        return row[0]
+
+    assert retired_by(old) == new
+    assert retired_by(new) in (None, "")
 
 
 def test_a_run_started_for_a_goal_that_does_not_exist_is_a_404_and_costs_no_slot(

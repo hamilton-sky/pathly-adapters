@@ -407,9 +407,10 @@ curl -s -X POST http://127.0.0.1:8765/comms/post \
 
 The ids are the `[id: …]` values on the decisions in your injected board context. The response
 echoes `superseded` (retired) and `supersede_skipped` (with a per-id reason — `not_found`,
-`already_superseded`, `not_a_decision` for an escalation, task or note, or `other_board` for a
-decision on another board); a bad id never fails your post, so check the response rather than
-assuming.
+`already_superseded`, `self_reference` for the id of your own post, `not_a_decision` for an
+escalation, task or note, `other_board` for a decision on another board, `binding` for a
+standing order, which only the chief retires, or `error` when the write itself failed); a bad id
+never fails your post, so check the response rather than assuming.
 
 Rules:
 

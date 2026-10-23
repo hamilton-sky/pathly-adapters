@@ -9,6 +9,8 @@ would be reaching AROUND the board-scope governance instead of extending inside 
 
 from __future__ import annotations
 
+from pathly_orchestrator.scope_names import normalise_root
+
 # What a run sees when nothing is configured (or the setting cannot be read at all). Mirrors
 # db/queries/app_settings._BOARD_SCOPE_DEFAULT and retrieve_board_context's own default.
 ALL_TIERS: dict[str, bool] = {"feature": True, "project": True, "global": True}
@@ -60,7 +62,7 @@ def search_tiers_value(
     # Same normalization the board itself keys by (comms/project.py::_project_scope,
     # fsm_compose_paths.resolve_board_scope) — a raw project_root can still carry Windows
     # backslashes, which address no board at all.
-    norm_root = (project_root or "").replace("\\", "/").rstrip("/")
+    norm_root = normalise_root(project_root or "")
     pairs: list[str] = []
     if tiers.get("feature", True) and feature:
         pairs.append(f'board "feature" + scope "{feature}"')

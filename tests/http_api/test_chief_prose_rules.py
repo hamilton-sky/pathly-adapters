@@ -1,4 +1,4 @@
-"""chief-agent 17, round 2: the rules in the chief's prompt texts, pinned.
+"""The rules in the chief's prompt texts, pinned (chief-agent 17).
 
 The texts are the only guide a live chief has, and a test that reads only their commands lets a
 sentence that carries a rule be deleted unnoticed. Each rule the ticket requires is therefore
@@ -6,17 +6,18 @@ pinned by a short phrase, found in the text after ``norm`` has flattened it (low
 backticks, one space between words), so re-wrapping a paragraph or moving a word into backticks
 does not break a test; deleting or rewording the sentence does.
 
-Round two of ticket 17 also fixed what a reader of round one found: the operator text invited a
-poll loop and named a decompose with no word about its cost, the fragment said nothing about
-quoting a path that has a query string or about one command per call, and its start-up reads
-listed the questions waiting but not the escalations to the person.
+The pins also hold what a reader of the texts needs: the operator text does not invite a poll
+loop and says what a decompose costs, the fragment tells the chief to quote a path that has a
+query string and to run one command per call, and its start-up reads list the escalations to the
+person as well as the questions waiting.
 """
 
 from __future__ import annotations
 
 import json
 import re
-from urllib.parse import quote
+import shlex
+from urllib.parse import parse_qs, quote, urlsplit
 
 import pytest
 from chief_bind_support import project_row
@@ -40,6 +41,8 @@ PINS = [
     ("chief-connect", "even when the route then answers 404 or 409"),
     ("chief-connect", "never edit files"),
     ("chief-connect", "never run an agent cli yourself"),
+    ("chief-connect", "if your tier holds answer, answer with cite=<id>"),
+    ("chief-connect", "if your tier does not hold answer"),
     ("chief-connect", "gave you no number"),
     ("chief-connect", "cannot answer for the user"),
     ("chief-connect", "do not look for another route around it"),
@@ -104,28 +107,40 @@ def test_the_fragment_tells_the_chief_to_run_one_pathly_command_per_call():
     assert "approved for you ahead of time" in fragment
 
 
-def test_the_fragment_offers_standard_input_only_when_quoting_a_body_is_awkward():
+def test_the_fragment_does_not_offer_standard_input_but_the_help_still_describes_it():
+    # The one-command rule forbids the pipe that would feed standard input, and the one form
+    # that works under ``Bash(pathly *)`` is unchecked, so the chief is not pointed at it. The
+    # command still accepts ``-``, and ``pathly help`` says so.
+    from pathly_orchestrator.chief_cli import HELP
+
+    assert "standard input" not in norm(text_of("chief-connect"))
+    assert "or - to read it from standard input" in norm(HELP)
+
+
+def test_the_fragment_says_how_a_root_is_written_in_a_query_and_in_a_body():
     fragment = norm(text_of("chief-connect"))
 
-    assert "reads it from standard input" in fragment
-    assert "only when quoting" in fragment
-
-
-def test_the_fragment_says_to_percent_encode_a_root_in_a_query_and_not_in_a_body():
-    fragment = norm(text_of("chief-connect"))
-
-    for escape in ("%2b", "%26", "%25", "%20"):
+    for escape in ("%2b", "%26", "%25", "%20", "%27"):
         assert escape in fragment, escape
     assert "in a query string" in fragment
-    assert "a json body keeps it exactly as written" in fragment
+    assert "a bare ' would end the single quotes the path is in" in fragment
+    assert "keeps it exactly as written" not in fragment
+    assert (
+        'in a json body a " of the root is written \\" and a \' of it \\u0027'
+        in fragment
+    )
 
 
 def test_the_last_line_of_the_prompt_does_not_contradict_the_encoding_rule():
-    # It says "send the root as written"; the fragment before it says a query string is the one
-    # place that is not true, so the line must carry the exception.
+    # It says "send the root as written"; the fragment before it names two places where that is
+    # not true (a query string and a JSON body), so the line must carry both exceptions.
     from pathly_orchestrator.supervisor.chief_presets import ROOT_LINE
 
-    assert "apart from the percent-encoding a query string needs" in norm(ROOT_LINE)
+    line = norm(ROOT_LINE)
+    assert "apart from the percent-encoding a query string needs" in line
+    assert (
+        "and the json escape a body needs for a double quote or an apostrophe" in line
+    )
 
 
 @pytest.mark.parametrize("name", TEXT_NAMES)
@@ -196,3 +211,81 @@ def test_the_start_up_escalation_read_lists_a_pending_escalation_to_the_person(
     rows = {row["id"]: row for row in json.loads(ran.out)}
     assert rows[mine]["to_agent"] == "human"
     assert rows[other]["to_agent"] == "builder"
+
+
+# --- the examples survive the shell with a root that holds an apostrophe and a space ---------
+
+APOSTROPHE_ROOT = "/home/o'brien/my proj"
+VERBS = ("GET", "POST", "PUT", "DELETE")
+
+
+def _examples(name: str) -> list[str]:
+    """Each line of a text that is a whole ``pathly api`` command, as a chief copies it."""
+    return [
+        line.strip()
+        for line in text_of(name).splitlines()
+        if line.strip().startswith("pathly api ")
+    ]
+
+
+def _written(line: str, root: str) -> str:
+    """``line`` with ``<root>`` written the way the fragment says: percent-encoded in a query
+    string, JSON-escaped in a body (the body starts at the first ``'{``)."""
+    head, opening, body = line.partition(" '{")
+    in_a_body = json.dumps(root)[1:-1].replace("'", "\\u0027")
+    return (
+        head.replace("<root>", quote(root, safe="/"))
+        + opening
+        + body.replace("<root>", in_a_body)
+    )
+
+
+@pytest.mark.parametrize("name", TEXT_NAMES)
+def test_every_example_with_a_root_parses_to_its_arguments_for_a_root_with_an_apostrophe(
+    name,
+):
+    examples = [line for line in _examples(name) if "<root>" in line]
+    assert examples, name
+
+    for line in examples:
+        written = _written(line, APOSTROPHE_ROOT)
+        argv = shlex.split(written)
+        plain = shlex.split(_written(line, "/plain"))
+
+        assert argv[:2] == ["pathly", "api"] and argv[2] in VERBS, written
+        assert len(argv) == len(plain), (written, argv)
+        method, target, *rest = argv[2:]
+        roots = []
+        if "?" in target:
+            query = parse_qs(urlsplit(target).query)
+            roots += [v for key, v in query.items() if key in ("scope", "project_root")]
+        if rest:
+            (body,) = rest
+            fields = json.loads(body.replace("<id>", "1"))
+            roots += [
+                [v] for key, v in fields.items() if key in ("scope", "project_root")
+            ]
+        assert roots and all(r == [APOSTROPHE_ROOT] for r in roots), (written, roots)
+
+
+def test_the_examples_with_a_root_include_a_path_and_a_body():
+    """The test above would pass over a list with no body in it; this keeps both forms there."""
+    lines = [
+        line for name in TEXT_NAMES for line in _examples(name) if "<root>" in line
+    ]
+
+    assert any("'{" not in line for line in lines)
+    assert any("'{" in line for line in lines)
+
+
+def test_a_bare_apostrophe_in_a_root_does_not_parse_in_a_quoted_path_or_body():
+    """What the rule is for: one apostrophe ends the single quotes the argument is in."""
+    path = "pathly api GET '/runs?project_root=<root>'"
+    body = 'pathly api POST /runs \'{"project_root": "<root>"}\''
+
+    for line in (path, body):
+        with pytest.raises(ValueError):
+            shlex.split(line.replace("<root>", APOSTROPHE_ROOT))
+        assert len(shlex.split(_written(line, APOSTROPHE_ROOT))) == len(
+            shlex.split(_written(line, "/plain"))
+        )

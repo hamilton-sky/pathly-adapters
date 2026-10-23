@@ -6,7 +6,7 @@ import json
 import logging
 from datetime import datetime, timezone
 
-from .comms_governance import BINDING_MARK
+from .comms_binding import BINDING_MARK
 
 _logger = logging.getLogger(__name__)
 
@@ -229,7 +229,7 @@ def render_governance_lines(
 
     Pure formatting — the caller does the retrieval. Returns [] when there is nothing to
     render, so the caller can `lines.extend(...)` unconditionally. A decision marked
-    ``BINDING_MARK`` (set by ``comms_governance``) is a standing order and renders in its
+    ``BINDING_MARK`` (``comms_binding``; set by ``comms_governance``) is a standing order and renders in its
     own block before the ranked decisions.
     """
     if not decisions and not escalations:

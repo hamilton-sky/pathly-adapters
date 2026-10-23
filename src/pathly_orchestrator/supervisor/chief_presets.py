@@ -111,8 +111,9 @@ BUILT_IN: Mapping[str, str] = MappingProxyType(
 ROOT_LINE = (
     "The <root> of the examples above is your project root, exactly as Pathly stored it. Send "
     "it as written wherever a request names your project (project_root, and scope on the "
-    "project board), apart from the percent-encoding a query string needs; a path you read "
-    "from the shell can be spelled differently, and Pathly then refuses the request.\n"
+    "project board), apart from the percent-encoding a query string needs and the JSON escape "
+    "a body needs for a double quote or an apostrophe of it; a path you read from the shell "
+    "can be spelled differently, and Pathly then refuses the request.\n"
     "Your project root: {root}"
 )
 

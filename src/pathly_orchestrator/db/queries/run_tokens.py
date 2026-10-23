@@ -49,17 +49,13 @@ def mint_run_token(
 
 
 def resolve_run_token(conn: sqlite3.Connection, token: str | None) -> dict | None:
-    """The identity row for a live token, or None (unknown, revoked, empty or missing)."""
-    if not token:
-        return None
-    row = conn.execute(
-        "SELECT * FROM run_tokens WHERE token_hash = ? AND revoked_at IS NULL",
-        (_hash(token),),
-    ).fetchone()
-    if row is None:
-        return None
-    keys = [d[0] for d in conn.execute("SELECT * FROM run_tokens LIMIT 0").description]
-    return dict(zip(keys, tuple(row)))
+    """The identity row for a live token, or None (unknown, revoked, empty or missing).
+
+    It is ``lookup_run_token``'s row when that row is not revoked; it asks the database nothing
+    of its own.
+    """
+    row = lookup_run_token(conn, token)
+    return row if row is not None and row["revoked_at"] is None else None
 
 
 def lookup_run_token(conn: sqlite3.Connection, token: str | None) -> dict | None:

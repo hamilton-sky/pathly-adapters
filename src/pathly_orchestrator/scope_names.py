@@ -29,6 +29,7 @@ import re
 from pathlib import Path
 
 _DRIVE_ROOT = re.compile(r"^[A-Za-z]:/")
+_BARE_DRIVE = re.compile(r"^[A-Za-z]:$")
 _DRIVE_PREFIX = re.compile(r"^[A-Za-z]:")
 _BREAKERS = "/\\:\0"
 
@@ -70,6 +71,22 @@ def root_spelling(value: object) -> str | None:
         return None
     text = _on_this_host(value)
     return None if text is None else text.rstrip("/") or "/"
+
+
+def normalise_root(value: str) -> str:
+    """The key a project root is stored and looked up under: backslashes become ``/`` and
+    trailing ``/`` are dropped (``/p/``, ``C:\\Users\\me\\proj\\`` are ``/p`` and
+    ``C:/Users/me/proj``). A root that is only a separator or a drive keeps one ``/`` (``/``,
+    ``C:\\`` are ``/`` and ``C:/``), because ``C:`` names the current folder of drive C and not
+    its root. The empty string stays empty. Nothing else is changed: no ``.`` or ``..`` collapse,
+    no trimming, no case change. Unlike ``root_spelling`` it does not ask whether the host reads
+    the string as a path, so it is the same on every host.
+    """
+    text = value.replace("\\", "/")
+    stripped = text.rstrip("/")
+    if stripped == text:
+        return text
+    return stripped + "/" if not stripped or _BARE_DRIVE.match(stripped) else stripped
 
 
 def cache_root(project_root: str) -> str:

@@ -28,6 +28,7 @@ from chief_human_support import (
 from directives_support import (
     EDIT_REFUSED,
     GONE,
+    ROUTE,
     TEXT,
     TOKEN,
     _gated,
@@ -180,6 +181,60 @@ def test_the_server_secret_alone_is_not_enough(client, project, monkeypatch, ori
     assert _rows() == []
 
 
+def _raw(client, raw: bytes, **headers):
+    return client.post(
+        ROUTE, data=raw, content_type="application/json", headers=headers
+    )
+
+
+def _invalid_bodies(project) -> dict[str, bytes]:
+    """Three bodies the route would refuse with a 400 if it read them."""
+    whole = {"project_root": project, "to_agent": "*", "text": TEXT}
+    return {
+        "not an object": b"[]",
+        "blank project_root": json.dumps({**whole, "project_root": ""}).encode(),
+        "bad to_agent": json.dumps({**whole, "to_agent": "Builder"}).encode(),
+    }
+
+
+@pytest.mark.parametrize("caller", ["builder", "nobody", "secret"])
+@pytest.mark.parametrize(
+    "which", ["not an object", "blank project_root", "bad to_agent"]
+)
+def test_the_caller_is_checked_before_the_body_is_read(
+    client, project, monkeypatch, caller, which
+):
+    """An invalid body from a caller that may not post is a 403, not a 400: a 400 would tell
+    anyone who can reach the port which fields the route checks."""
+    from pathly_orchestrator.http_server import middleware
+
+    headers: dict[str, str] = {}
+    if caller == "builder":
+        headers[TOKEN] = _token_of("builder", project)
+    elif caller == "secret":
+        monkeypatch.setattr(middleware, "_api_secret", "s3cr3t")
+        headers["X-Pathly-Secret"] = "s3cr3t"
+
+    resp = _raw(client, _invalid_bodies(project)[which], **headers)
+
+    assert resp.status_code == 403, resp.get_data(as_text=True)
+    assert resp.get_json() == {"error": "only a chief may post a directive"}
+    assert _rows() == []
+
+
+@pytest.mark.parametrize(
+    "which", ["not an object", "blank project_root", "bad to_agent"]
+)
+def test_the_same_bodies_are_a_400_for_a_chief(client, project, chief_root, which):
+    """The control of the test above: the bodies are invalid, and a chief is told so."""
+    opened = open_session(project, chief_root)
+
+    resp = _raw(client, _invalid_bodies(project)[which], **{TOKEN: opened.run_token})
+
+    assert resp.status_code == 400, resp.get_data(as_text=True)
+    assert _rows() == []
+
+
 def test_a_closed_chief_session_posts_nothing(client, project, chief_root):
     opened = open_session(project, chief_root)
     close_chief(opened.run_id, "test over")
@@ -211,6 +266,21 @@ def test_a_chief_that_names_no_project_gets_a_400(client, project, chief_root, r
 
     assert resp.status_code == 400, resp.get_data(as_text=True)
     assert "project_root" in resp.get_json()["error"]
+    assert _rows() == []
+
+
+@pytest.mark.parametrize("to_agent", ["Builder", " builder ", "a" * 41], ids=repr)
+def test_a_chief_that_addresses_nobody_valid_gets_a_400(
+    client, project, chief_root, to_agent
+):
+    """Upper case, padding and 41 characters: ``test_comms_directives_fields.py`` holds the whole
+    list; these three are here so the command that runs this file covers the rule."""
+    opened = open_session(project, chief_root)
+
+    resp = _post(client, opened, to_agent=to_agent)
+
+    assert resp.status_code == 400, resp.get_data(as_text=True)
+    assert "to_agent" in resp.get_json()["error"]
     assert _rows() == []
 
 

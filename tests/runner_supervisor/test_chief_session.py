@@ -24,6 +24,7 @@ from pathlib import Path
 
 import pytest
 from _paths import SRC
+from chief_session_guard import _no_watcher_outlives_its_test
 
 from pathly_orchestrator.db import get_db
 from pathly_orchestrator.db.queries import chief as chief_queries
@@ -94,20 +95,6 @@ def chief_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setattr(chief_session, "_chief_root", lambda: root)
     monkeypatch.setenv("PATHLY_FSM_HTTP_PORT", "8123")
     return root
-
-
-@pytest.fixture(autouse=True)
-def _no_watcher_outlives_its_test(chief_root: Path):
-    """A chief a test leaves open has a watcher waiting; close it while this test's DB and
-    sessions folder are still patched in, so it cannot wake up in a later test."""
-    yield
-    prefix = "chief-watch-"
-    for thread in threading.enumerate():
-        if thread.name.startswith(prefix):
-            close_chief(thread.name[len(prefix) :], "test over")
-    assert _wait(
-        lambda: not [t for t in threading.enumerate() if t.name.startswith(prefix)]
-    )
 
 
 def _open(project: str, host: Host, **overrides) -> dict:
@@ -398,26 +385,29 @@ def test_an_unsupported_engine_is_a_value_error(project, chief_root, engine):
     assert host.sent == []
 
 
-def _bad_inputs(tmp_path: Path):
-    return [
-        ("project_root", str(tmp_path / "missing")),
-        ("project_root", ""),
-        ("project_root", None),
-        ("prompt", ""),
-        ("prompt", "   \n"),
-        ("prompt", 3),
-        ("prompt", "x" * (64 * 1024 + 1)),
-        ("model", "--dangerously-skip-permissions"),
-        ("model", 3),
-        ("preset", None),
-    ]
+# A project root that does not exist: the test builds it from tmp_path.
+MISSING_FOLDER = object()
+
+BAD_INPUTS = [
+    pytest.param("project_root", MISSING_FOLDER, id="project_root-missing-folder"),
+    pytest.param("project_root", "", id="project_root-empty"),
+    pytest.param("project_root", None, id="project_root-none"),
+    pytest.param("prompt", "", id="prompt-empty"),
+    pytest.param("prompt", "   \n", id="prompt-blank"),
+    pytest.param("prompt", 3, id="prompt-number"),
+    pytest.param("prompt", "x" * (64 * 1024 + 1), id="prompt-over-64-kib"),
+    pytest.param("model", "--dangerously-skip-permissions", id="model-an-option"),
+    pytest.param("model", 3, id="model-number"),
+    pytest.param("preset", None, id="preset-none"),
+]
 
 
-@pytest.mark.parametrize("index", range(10))
+@pytest.mark.parametrize("field,value", BAD_INPUTS)
 def test_bad_input_is_a_value_error_and_leaves_nothing_behind(
-    project, chief_root, tmp_path, index
+    project, chief_root, tmp_path, field, value
 ):
-    field, value = _bad_inputs(tmp_path)[index]
+    if value is MISSING_FOLDER:
+        value = str(tmp_path / "missing")
     host = Host()
     with pytest.raises(ValueError):
         _open(project, host, **{field: value})

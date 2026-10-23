@@ -20,6 +20,20 @@ AUTHOR_SOURCES = frozenset({SOURCE_TOKEN, SOURCE_SYSTEM, SOURCE_LEGACY, SOURCE_N
 
 SYSTEM_ROLE = "system"
 
+
+def check_author_source(author_source: str | None) -> None:
+    """Raise ``ValueError`` for a source outside ``AUTHOR_SOURCES``; ``None`` passes.
+
+    A caller that gives no source is stored as ``none`` (unverified), so ``None`` is not an
+    unknown source. Every writer that takes an ``author_source`` (``post_message``,
+    ``update_message_text``) asks this before it writes anything.
+    """
+    if author_source is not None and author_source not in AUTHOR_SOURCES:
+        raise ValueError(
+            f"unknown author_source {author_source!r}; expected one of {sorted(AUTHOR_SOURCES)}"
+        )
+
+
 # The three author columns of a server-written row, ready to pass as ``**SYSTEM_AUTHOR``.
 SYSTEM_AUTHOR: Mapping[str, Any] = MappingProxyType(
     {"author_role": SYSTEM_ROLE, "author_run_id": None, "author_source": SOURCE_SYSTEM}
