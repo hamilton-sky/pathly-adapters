@@ -5,6 +5,9 @@ import type { TerminalKind } from '../../store/chatStore'
 import { TERMINAL_OPTIONS } from '../../lib/terminalOptions'
 import styles from './Terminal.module.css'
 
+/** One dropdown row: 6px padding top and bottom around a 13px icon / sm text line. */
+const DROPDOWN_ITEM_H = 30
+
 interface SplitLauncherProps {
   pane: 'left' | 'right'
   onAddTab: (pane: 'left' | 'right') => void
@@ -14,7 +17,9 @@ interface SplitLauncherProps {
 export function SplitLauncher({ pane, onAddTab, onLaunch }: SplitLauncherProps): JSX.Element {
   const [lastUsedKind, setLastUsedKind] = useState<TerminalKind>('shell')
   const [dropdownOpen, setDropdownOpen] = useState(false)
-  const [dropdownPos, setDropdownPos] = useState<{ top: number; right: number } | null>(null)
+  const [dropdownPos, setDropdownPos] = useState<
+    { top: number; right: number } | { bottom: number; right: number } | null
+  >(null)
   const chevronRef = useRef<HTMLButtonElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -35,7 +40,16 @@ export function SplitLauncher({ pane, onAddTab, onLaunch }: SplitLauncherProps):
   function openDropdown(): void {
     if (chevronRef.current) {
       const rect = chevronRef.current.getBoundingClientRect()
-      setDropdownPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right })
+      const right = window.innerWidth - rect.right
+      // The launcher sits at the window's foot when the terminal panel is collapsed, so a menu
+      // that always opens downward lands off-screen. Estimate its height and flip it up.
+      const h = TERMINAL_OPTIONS.length * DROPDOWN_ITEM_H + 8
+      const fitsBelow = rect.bottom + 4 + h <= window.innerHeight - 8
+      setDropdownPos(
+        fitsBelow
+          ? { top: rect.bottom + 4, right }
+          : { bottom: window.innerHeight - rect.top + 4, right }
+      )
     }
     setDropdownOpen((v) => !v)
   }
@@ -83,7 +97,7 @@ export function SplitLauncher({ pane, onAddTab, onLaunch }: SplitLauncherProps):
         <div
           ref={dropdownRef}
           className={styles.launcherDropdown}
-          style={{ position: 'fixed', top: dropdownPos.top, right: dropdownPos.right }}
+          style={{ position: 'fixed', ...dropdownPos }}
         >
           {TERMINAL_OPTIONS.map((opt) => (
             <button
