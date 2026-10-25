@@ -26,6 +26,7 @@ from chief_gate_support import (
     project,
     started,
 )
+from chief_session_guard import _no_watcher_outlives_its_test
 
 
 @pytest.mark.parametrize(
@@ -47,7 +48,11 @@ def test_a_chief_that_names_no_project_is_refused_on_a_run_route(
 @pytest.mark.parametrize(
     "path,body", NAMES_A_PROJECT, ids=[p for p, _ in NAMES_A_PROJECT]
 )
-def test_a_chief_that_names_its_project_passes_a_run_route(client, project, path, body):
+def test_a_chief_that_names_its_project_passes_a_run_route(
+    client, project, started, path, body
+):
+    # ``started`` stands in for start_board_run: the real one spawns on a thread that waits
+    # 30 seconds for a spawn host and so outlives the test.
     chief = _chief("operator", project)
 
     resp = client.post(

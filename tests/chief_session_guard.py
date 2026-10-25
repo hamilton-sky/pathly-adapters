@@ -2,8 +2,9 @@
 
 ``open_chief`` starts a watcher thread, ``chief-watch-<run id>``, that waits up to 30 seconds for
 the tab to report that it started. A test that opens a chief and ends leaves it waiting, and it
-wakes in a later test, with the home that test patched gone, and opens the developer's real
-``~/.pathly`` (see the comment on ``_isolate_db`` in ``tests/conftest.py``). The same goes for the
+wakes in a later test, with the home that test patched gone, and opens the database of whatever
+home is current then: another test's, or the throwaway home ``tests/conftest.py`` gives the whole
+process (``pytest_configure``; before it, the developer's real ``~/.pathly``). The same goes for the
 two mirror flusher threads, which outlive every test: one that wakes with a mark still queued opens
 the database of the unpatched home.
 

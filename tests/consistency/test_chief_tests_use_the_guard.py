@@ -3,8 +3,9 @@
 ``tests/chief_session_guard.py`` holds the one autouse fixture ``_no_watcher_outlives_its_test``.
 An autouse fixture does something only in a module that imports it BY NAME, so a new test file
 that opens a chief and forgets the import leaves its watcher thread waiting; the watcher then wakes
-in a later test, after that test's patched home is gone, and opens the developer's real
-``~/.pathly``. Nothing else notices, so this file does.
+in a later test, after that test's patched home is gone, and writes into another test's database
+or the process's throwaway home (``tests/conftest.py``; before it, the developer's real
+``~/.pathly``). Nothing else notices, so this file does.
 
 The scan reads the text of every ``tests/**/test_*.py``. A module that opens a chief (it calls
 ``open_chief(``, ``open_with(`` or ``open_session(``, or posts to ``"/chief/open"``) must import the

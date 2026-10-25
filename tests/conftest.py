@@ -16,6 +16,39 @@ import pytest
 import _paths  # noqa: E402  (depends on the sys.path insert above)
 
 
+def _tmp_root() -> Path:
+    default_root = r"C:\tmp" if os.name == "nt" else tempfile.gettempdir()
+    tmp_root = Path(os.environ.get("PYTEST_TMPDIR", default_root)).resolve()
+    tmp_root = tmp_root / "pathly-tests"
+    tmp_root.mkdir(parents=True, exist_ok=True)
+    return tmp_root
+
+
+_session_home: Path | None = None
+
+
+def pytest_configure(config):
+    """Point ``Path.home()`` at a throwaway home for the whole test process.
+
+    ``_isolate_db`` patches ``Path.home()`` for each test and restores it at teardown,
+    so between two tests it answered the developer's real home. A thread that outlives
+    its test (the board and event mirror flushers run for the life of the process) then
+    opened the real ``~/.pathly/pathly.db``, migrated it and wrote to it. With this in
+    place the per-test patch restores to the throwaway home, never the real one. It is
+    never undone: a daemon thread can still run while the process exits.
+    """
+    global _session_home
+    _session_home = Path(tempfile.mkdtemp(prefix="session-home-", dir=_tmp_root()))
+    (_session_home / ".pathly").mkdir()
+    home = _session_home.resolve()
+    Path.home = staticmethod(lambda: home)
+
+
+def pytest_unconfigure(config):
+    if _session_home is not None:
+        shutil.rmtree(_session_home, ignore_errors=True)
+
+
 @pytest.fixture
 def tmp_path():
     """Workspace-safe replacement for pytest's default temp path fixture.
@@ -30,11 +63,7 @@ def tmp_path():
     every one of them at the source instead of sprinkling ``.resolve()`` through the
     assertions.
     """
-    default_root = r"C:\tmp" if os.name == "nt" else tempfile.gettempdir()
-    tmp_root = Path(os.environ.get("PYTEST_TMPDIR", default_root)).resolve()
-    tmp_root = tmp_root / "pathly-tests"
-    tmp_root.mkdir(parents=True, exist_ok=True)
-    path = Path(tempfile.mkdtemp(dir=tmp_root)).resolve()
+    path = Path(tempfile.mkdtemp(dir=_tmp_root())).resolve()
     try:
         yield path
     finally:
@@ -97,8 +126,19 @@ def _isolate_db(monkeypatch, request):
         _conn_mod._init_once_done = False
         _conn_mod._prepared_paths.clear()
 
+    def _drop_pending_mirror_writes():
+        # The mirror flushers live for the whole process: a board or event log this test
+        # left dirty would be written on their next tick, into whichever home and project
+        # folders exist then (a later test's, or a deleted temp dir they recreate).
+        from pathly_orchestrator import board_mirror, event_mirror
+
+        for mirror in (board_mirror, event_mirror):
+            with mirror._dirty_lock:
+                mirror._dirty.clear()
+
     _reset_conn_state()
     yield
+    _drop_pending_mirror_writes()
     _reset_conn_state()
 
 

@@ -1,3 +1,6 @@
+import pytest
+
+
 def test_project_root_isolation():
     from pathly_orchestrator.db import get_db, append_event, read_events
 
@@ -87,3 +90,26 @@ def test_get_db_reopens_connection_when_db_path_changes(tmp_path, monkeypatch):
         "db2 was marked prepared but never migrated — a stale per-thread connection "
         f"was reused across a db_path change. Tables present: {sorted(tables)}"
     )
+
+
+@pytest.mark.no_pathly_autouse
+def test_a_thread_that_runs_between_tests_gets_a_throwaway_home_not_the_real_one():
+    """The per-test patch of ``Path.home()`` is undone at teardown, and the mirror flushers and a
+    board run's spawn thread outlive their test; between two tests they used to open the
+    developer's real ``~/.pathly/pathly.db``. ``tests/conftest.py`` points ``Path.home()`` at a
+    throwaway home for the whole process, so what such a thread sees (here, with the per-test
+    patch off) is that home. ``os.path.expanduser`` still reads ``HOME``: the real one.
+    """
+    import os
+    import threading
+    from pathlib import Path
+
+    seen: list[Path] = []
+    thread = threading.Thread(target=lambda: seen.append(Path.home()))
+    thread.start()
+    thread.join(timeout=10)
+
+    real = Path(os.path.expanduser("~")).resolve()
+    assert seen and seen[0].resolve() != real
+    assert "pathly-tests" in seen[0].parts
+    assert (seen[0] / ".pathly").is_dir()

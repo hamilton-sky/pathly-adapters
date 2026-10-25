@@ -13,7 +13,7 @@ Database layer — schema/queries, connection isolation, write guard.
 | `test_chief_tables.py` | chief-agent: the chief session tables, their queries and the revoked-token lookup | 14 |
 | `test_comms_run_id.py` | unified-control-plane: post_message stamps run_id so board posts correlate to their run | 3 |
 | `test_db.py` | Unit tests for pathly_orchestrator.db — all tables and helpers | 20 |
-| `test_db_isolation.py` | covers project root isolation; get db reopens connection when db path changes | 2 |
+| `test_db_isolation.py` | covers project root isolation; get db reopens connection when db path changes; a thread that runs between tests gets a throwaway home not the real one | 3 |
 | `test_db_write_guard.py` | Regression: a write that raises inside `_get_write_lock` must roll back and | 3 |
 | `test_event_mirror.py` | EventMirror — DB -> disk export for EVENTS.jsonl (state-one-authority, additive P1a) | 11 |
 | `test_provenance_backfill.py` | role-read-policy: author_role / author_run_id / author_source on comms_messages, and the | 13 |
