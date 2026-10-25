@@ -93,7 +93,21 @@ never a literal `127.0.0.1:8765`.
 - `PathlyLogo` — corner brand button; clicking it calls `setProjectPath('')` to return to the project picker (replaces the old 'Projects' text button). No hamburger sidebar toggle in the topbar.
 - `ProjectSelector` — dropdown to switch projects, open a project in a new window (per-row ExternalLink icon), or open a folder. Replaced the old `TopicSelector`.
 - CLI Engines toggle uses the `Cpu` icon from lucide-react (was `Activity`).
-- Uniform 28px bar height; topbar content is left (`PathlyLogo`), center (`ProjectSelector`, `EditorLauncher`), right (engine monitor, HQ chat, theme, terminal, publish). Panel switching is **not** in the header — it lives in the sidebar's pinned PANELS nav (`BottomNav`).
+- Uniform 28px bar height; topbar content is left (`PathlyLogo`), center (`ProjectSelector`, `EditorLauncher`), right (engine monitor, Chief, HQ chat, theme, terminal, publish). Panel switching is **not** in the header — it lives in the sidebar's pinned PANELS nav (`BottomNav`).
+
+**Chief launcher** (`topbar/ChiefButton/`, chief-agent): the **Chief** button sits between the CLI
+Engines button and the HQ toggle (icon only below `TOPBAR_COMPACT_BREAKPOINT`) and opens a popover
+for the project selected in Studio (`projectStore.projectPath` is the `project_root`, so a chief is
+always the selected project's). `ChiefLauncher` reuses `PromptActionConfig` (style = preset, the
+editable text, engine, "Save current as prompt") and `services/chiefApi.ts` → `GET /chief/presets`,
+`GET /chief/session`, `POST /chief/open`, `POST /chief/close`. The tier shown is the one the server
+reports for the preset (it resolves the tier itself; Studio never sends one), with a spend line for
+Operator from the server's `limits`. `prompt` is sent only when the text was edited; a saved style
+goes to the prompt library's `chief` category with a `tier:` front-matter line for the tier shown
+(`chiefLauncherUtils.withTierLine`), since a file without one opens as Status. While the project has
+a chief, the popover shows `OpenChiefCard` (Show tab / Close chief) instead; one chief per project.
+Engines: claude and codex only. The chief's prompt is still auto-submitted (paste without Enter is
+not built), and there is no inbox count yet.
 
 **Sidebar collapse/expand** lives inside the sidebar, not the topbar:
 - `TabBar` (`sidebar/shell/TabBar.tsx`) — renders WORKSPACE / LIBRARY tabs plus a `PanelLeft` collapse button at the right of the tab bar.

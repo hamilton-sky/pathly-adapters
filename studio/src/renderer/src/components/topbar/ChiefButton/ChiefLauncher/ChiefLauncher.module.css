@@ -1,0 +1,23 @@
+.note {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.spend { color: var(--amber, #e5c07b); }
+
+.errorText { color: var(--red); overflow-wrap: anywhere; }
+
+.error {
+  padding: 0 12px 12px;
+  font: 400 10.5px/1.4 var(--font-family-base);
+  color: var(--red);
+  overflow-wrap: anywhere;
+}
+
+.loading {
+  padding: 16px 12px;
+  font: 400 11px/1.4 var(--font-family-base);
+  color: var(--text-muted);
+}

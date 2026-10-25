@@ -2,8 +2,8 @@
 
 A thin layer over ``supervisor/chief_session.py``. Opening and closing a chief are human acts,
 so both refuse a caller that sends a live run token: an agent cannot open a chief, and cannot
-close the one its project has. Studio has no Chief button yet; today a person (or a script they
-run) calls ``POST /chief/open`` directly. The limit is the one every human-only route has: a
+close the one its project has. Studio's Chief button (top bar) calls them for the project selected
+in Studio; a person or a script can also call ``POST /chief/open`` directly. The limit is the one every human-only route has: a
 caller with no token (or an unknown or revoked one) is treated as a human, because the server
 cannot tell Studio from a local process until the UI token exists. Refusing the chief's own
 token on these routes is the chief gate (ticket 08).

@@ -556,14 +556,17 @@ human checkpoints to `DONE`.
 
 ### Chief endpoints (chief-agent)
 
-The chief is a long-lived interactive agent a human opens for a project. Studio has no launcher for it
-yet (round two), so `POST /chief/open` is called directly.
-`blueprints/chief/session.py` is a thin layer over `supervisor/chief_session.py`:
+The chief is a long-lived interactive agent a human opens for a project. Studio opens it from the
+top bar's **Chief** button (`studio/CLAUDE.md`, "Chief launcher"), which calls these routes for the
+project selected in Studio; `POST /chief/open` can still be called directly.
+`blueprints/chief/session.py` is a thin layer over `supervisor/chief_session.py`; `presets.py`
+lists the styles:
 
 ```
 POST /chief/open            ← {project_root, engine, preset, prompt?, model?} → 201 {run_id, tab_id, tier, engine}
 POST /chief/close           ← {project_root} → 200 {closed: true|false}
 GET  /chief/session?project_root=  ← {open: false} | {open: true, run_id, tab_id, tier, engine, opened_at, runs_started, max_runs_per_session, max_cost_usd_per_run}
+GET  /chief/presets?project_root=  ← {presets: [{name, label, tier, text, source, scope}], tiers: {tier: [action]}, limits: {max_runs_per_session, max_cost_usd_per_run}}   (blueprints/chief/presets.py)
 POST /chief/human-messages  ← {run_id, hook_secret, text, session_id, relayed?} → 201 {id, kind}   (blueprints/chief/human.py)
 ```
 
@@ -575,6 +578,13 @@ POST /chief/human-messages  ← {run_id, hook_secret, text, session_id, relayed?
   broadcaster (`sse._broadcast_runner`), so the `TERMINAL_SPAWN` reaches whichever spawn host
   is listening. `engine` and `preset` are required strings; `prompt` and `model` are optional,
   but a key that is present must be a string (`"prompt": null` is a 400).
+- **Presets:** `GET /chief/presets` lists the built-in styles (status, planner, operator) and the
+  user's `chief/<name>` prompt files (project over global), each with the tier
+  `chief_tiers.resolve_preset_tier` gives it, the same function `open_chief` uses, so a launcher
+  shows the tier the server will enforce and never picks one itself. `text` keeps the file's front
+  matter, so a saved copy keeps its `tier:` line. `limits` are the run and cost limits a chief
+  opened now gets (`GET /chief/session` reports them only while one is open). A read: the chief
+  gate classes it `read`, and its entry binds `project_root`.
 - **The prompt a chief is pasted** (`supervisor/chief_presets.py`, `compose_prompt`) is three
   parts: the **style**, the `chief-connect` **fragment**, then a last line `Your project root:
   <root>`. The style is the request's `prompt` when it gave one, else `default_style`: the
@@ -1049,7 +1059,8 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
     root in from the session, since the route reads the request's own fields.
     **The exceptions** are the reads whose absent root gives the global or packaged data or no
     rows rather than another project's (`GET /runs`, `/api/*`, `/skills/*`, `/flows/stage-config`,
-    `/db/agents`, `/comms/permissions`, `/comms/scope`, `/hq/context`, `/chief/session`): they
+    `/db/agents`, `/comms/permissions`, `/comms/scope`, `/hq/context`, `/chief/session`,
+    `/chief/presets`): they
     need no root and still refuse another project's.
   - **A project board's scope.** When the board a call reads or writes is `project`, the scope must
     be the session's root. The scope is the first usable value (truthy, not a blank string) of the
@@ -1703,7 +1714,9 @@ pathly_orchestrator/
                            # sse._broadcast_run_event, teed from _broadcast_runner/_broadcast_comms
                            # whenever a payload carries a run_id)
       chief/               # session.py (chief-agent): POST /chief/open, POST /chief/close, GET
-                           # /chief/session; human.py: POST /chief/human-messages (the chief hook's
+                           # /chief/session; presets.py: GET /chief/presets (the styles and the
+                           # tier each gets, for Studio's launcher); human.py: POST
+                           # /chief/human-messages (the chief hook's
                            # post) — see "Chief endpoints"; __init__.py exposes all_blueprints
                            # (registered in app.py like control/)
   chief_cli.py             # the `pathly` console script (chief-agent 17): `pathly api METHOD /path

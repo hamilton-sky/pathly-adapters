@@ -9,6 +9,7 @@ import { PathlyLogo } from './PathlyLogo'
 import { ProjectSelector } from './ProjectSelector'
 import { EditorLauncher } from './EditorLauncher'
 import { TerminalLauncher } from './TerminalLauncher'
+import { ChiefButton } from './ChiefButton/ChiefButton'
 import { PublishControl } from './PublishControl'
 import { PublishLog } from './PublishLog'
 import { useWindowWidth } from '../sidebar/shell/useWindowWidth'
@@ -59,6 +60,7 @@ export function TopBar(): JSX.Element {
             </IconButton>
             {hasRunningEngine && <span className={styles.cliDot} aria-hidden="true" />}
           </div>
+          <ChiefButton compact={compact} />
           <IconButton
             data-testid="topbar-chat-toggle"
             data-label="Chat"

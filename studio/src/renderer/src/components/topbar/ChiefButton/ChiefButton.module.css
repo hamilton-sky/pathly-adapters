@@ -1,0 +1,45 @@
+.wrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.trigger {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 8px;
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font: 500 12px/1 var(--font-family-base);
+  cursor: pointer;
+  transition: color 0.12s, background 0.12s;
+}
+
+.trigger:hover:not(:disabled) { color: var(--accent); background: var(--bg-surface0); }
+.trigger:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+.trigger:disabled { opacity: 0.4; cursor: default; }
+.trigger[aria-expanded='true'] { color: var(--accent); }
+
+.text { white-space: nowrap; }
+
+/* Portal/positioning shell — inner styles live in PromptActionConfig.module.css. */
+.popover {
+  position: fixed;
+  top: var(--pop-top);
+  left: var(--pop-left);
+  z-index: 9999;
+  width: 320px;
+  max-width: calc(100vw - 16px);
+  max-height: calc(100vh - var(--pop-top) - 8px);
+  overflow: auto;
+  background: var(--bg-mantle);
+  border: var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
