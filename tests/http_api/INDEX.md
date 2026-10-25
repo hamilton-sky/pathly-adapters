@@ -26,7 +26,7 @@ HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, 
 | `test_chief_gate.py` | chief-agent 08: the chief gate refuses every call a chief token's tier does not allow | 32 |
 | `test_chief_gate_actions.py` | chief-agent 08: which action a call is, and so which tier may make it | 6 |
 | `test_chief_gate_artifact_section.py` | chief-agent 08 (round 6): the section of an artifact read by id stays inside the named project | 5 |
-| `test_chief_gate_audit.py` | chief-agent 08 (rounds 6 and 7): a chief that sends hostile values touches nothing outside its | 7 |
+| `test_chief_gate_audit.py` | chief-agent 08 (rounds 6 and 7): a chief that sends hostile values touches nothing outside its | 8 |
 | `test_chief_gate_board_reads.py` | chief-agent 08: reads of a board are bound by the board and scope they name | 8 |
 | `test_chief_gate_bodies.py` | chief-agent 08: the gate reads the body the way the route will | 12 |
 | `test_chief_gate_code_cache.py` | chief-agent 08 (round 8): a chief's code query is answered from its own project | 3 |

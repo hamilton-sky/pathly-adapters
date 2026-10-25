@@ -269,6 +269,44 @@ def test_the_audit_sees_a_call_in_each_zone_and_ignores_the_projects_own(world):
     assert any(t.path.endswith("own.txt") for t in audit.seen)
 
 
+@pytest.mark.skipif(
+    not {os.mkdir, os.rmdir} <= os.supports_dir_fd, reason="no dir_fd calls here"
+)
+def test_the_audit_reads_a_dir_fd_call_in_the_directory_it_names(world):
+    """``shutil.rmtree`` and a temporary directory's cleanup remove entries by a name relative
+    to a directory's descriptor. The audit places such a call in that directory, not in the
+    working directory (the server's): in the project it is the project's own, in another
+    project it is a touch there. The tree removed here is flat: to go down into a subdirectory
+    ``rmtree`` calls ``os.open(name, dir_fd=...)``, whose ``open`` event does not carry the
+    descriptor, so the audit still reads that one against the working directory.
+    """
+    import shutil
+
+    w, audit = world.world, world.audit
+    audit.violations.clear()
+
+    def mkdir_and_rmdir(directory):
+        fd = os.open(directory, os.O_RDONLY)
+        try:
+            os.mkdir("by-fd", dir_fd=fd)
+            os.rmdir("by-fd", dir_fd=fd)
+        finally:
+            os.close(fd)
+
+    mkdir_and_rmdir(w.project)
+    (w.project / "tree").mkdir()
+    (w.project / "tree" / "f").write_text("x")
+    shutil.rmtree(w.project / "tree")
+    assert audit.violations == [], _report(audit)
+    assert any(t.path == str(w.project / "by-fd") for t in audit.seen)
+
+    mkdir_and_rmdir(w.other)
+    touched = {(t.event, t.path) for t in audit.violations}
+    assert ("os.mkdir", str(w.other / "by-fd")) in touched
+    assert ("os.rmdir", str(w.other / "by-fd")) in touched
+    assert not any(t.path.startswith(str(w.server)) for t in audit.violations)
+
+
 def test_the_audit_ignores_the_open_cpython_makes_to_quote_a_source_line(world):
     """Python 3.13 formats a logged traceback by compiling source fragments; a syntax error in one
     makes CPython open the code's name, ``<unknown>``, in the working directory (the server's).

@@ -9,8 +9,11 @@ own: another project's tree, the server's working directory, the home directory.
 
 What it cannot see: ``os.stat``, ``os.path.exists`` and the like are not audit events, so a probe
 for a file's existence is invisible; neither is a write the C layer of a library makes (sqlite is
-seen only at ``sqlite3.connect``); and a path rebuilt in a child process is seen only by its working
-directory. A hook cannot be removed once added, so it is installed once and does nothing unless an
+seen only at ``sqlite3.connect``); a path rebuilt in a child process is seen only by its working
+directory; and ``os.open`` with a ``dir_fd`` (what ``shutil.rmtree`` does to go down into a
+subdirectory) raises an ``open`` event that does not carry the descriptor, so its relative path
+is read against the working directory: counted, at the wrong path. Every other call that takes a
+``dir_fd`` is read against the directory it names. A hook cannot be removed once added, so it is installed once and does nothing unless an
 ``Audit`` is active.
 """
 
@@ -21,6 +24,11 @@ import sys
 import threading
 from dataclasses import dataclass, field
 from pathlib import Path
+
+try:
+    import fcntl
+except ImportError:  # Windows: no dir_fd calls to resolve
+    fcntl = None
 
 # audit event -> the positions of its arguments that are paths
 _PATH_ARGUMENTS = {
@@ -53,6 +61,22 @@ _PATH_ARGUMENTS = {
 }
 # These name the working directory when they are given nothing.
 _DEFAULT_TO_CWD = {"os.listdir", "os.scandir", "os.walk"}
+# audit event -> {position of a path argument: position of the dir_fd it is relative to}. A
+# relative path with a dir_fd names a file in that directory, not in the working directory
+# (``shutil.rmtree`` removes the entries of a tree this way). The target of ``os.symlink`` (0)
+# is the text the link holds, so only the link itself (1) is read against its dir_fd.
+_DIR_FD_ARGUMENTS = {
+    "os.mkdir": {0: 2},
+    "os.rename": {0: 2, 1: 3},
+    "os.remove": {0: 1},
+    "os.rmdir": {0: 1},
+    "os.symlink": {1: 2},
+    "os.link": {0: 2, 1: 3},
+    "os.chmod": {0: 2},
+    "os.chown": {0: 3},
+    "os.utime": {0: 3},
+    "shutil.rmtree": {0: 1},
+}
 
 
 @dataclass(frozen=True)
@@ -79,11 +103,12 @@ class Audit:
         wanted = _PATH_ARGUMENTS.get(event)
         if wanted is None:
             return
+        dir_fds = _DIR_FD_ARGUMENTS.get(event, {})
         for position in wanted:
-            raw = args[position] if position < len(args) else None
+            raw = _argument(args, position)
             if raw is None and event not in _DEFAULT_TO_CWD:
                 continue
-            path = _absolute(raw)
+            path = _absolute(raw, _argument(args, dir_fds.get(position)))
             if path is None or _is_pseudo_file(event, raw, path):
                 continue
             touch = Touch(event, path, self.label)
@@ -103,9 +128,30 @@ class Audit:
         _active = None
 
 
-def _absolute(raw: object) -> str | None:
-    """The real absolute path an audit argument names; None for a file descriptor or a value
-    that is not a path. Never raises: a hook that raises breaks the call it watches.
+def _argument(args: tuple, position: int | None) -> object:
+    return args[position] if position is not None and position < len(args) else None
+
+
+def _fd_path(fd: int) -> str | None:
+    """The path an open descriptor names, or None when the platform cannot say."""
+    try:
+        if fcntl is not None and hasattr(
+            fcntl, "F_GETPATH"
+        ):  # macOS: MAXPATHLEN is 1024
+            raw = fcntl.fcntl(fd, fcntl.F_GETPATH, bytes(1024))
+            return os.fsdecode(raw.split(b"\0", 1)[0]) or None
+        return os.readlink(f"/proc/self/fd/{fd}")
+    except Exception:
+        return None
+
+
+def _absolute(raw: object, dir_fd: object = None) -> str | None:
+    """The real absolute path an audit argument names: a relative path is read against
+    ``dir_fd`` when the call names one, else against the working directory, and a descriptor is
+    read as the file it is open on. None for a value that is not a path, or a descriptor the
+    platform cannot name (a pipe, a socket). A ``dir_fd`` it cannot name leaves the path read
+    against the working directory, the server's, so the call is still counted. Never raises: a
+    hook that raises breaks the call it watches.
     """
     try:
         if isinstance(raw, (bytes, bytearray)):
@@ -114,9 +160,14 @@ def _absolute(raw: object) -> str | None:
             raw = os.fspath(raw)
         if raw is None:
             raw = "."
+        if isinstance(raw, int) and not isinstance(raw, bool):
+            raw = _fd_path(raw)
         if not isinstance(raw, str):
             return None
-        joined = os.path.join(os.getcwd(), raw)
+        base = None
+        if isinstance(dir_fd, int) and not isinstance(dir_fd, bool) and dir_fd >= 0:
+            base = _fd_path(dir_fd)  # -1 (none) and AT_FDCWD (negative) are the cwd
+        joined = os.path.join(base or os.getcwd(), raw)
         try:
             return os.path.realpath(joined)
         except ValueError:  # an embedded NUL: nothing for the kernel to resolve

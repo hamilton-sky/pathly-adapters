@@ -1251,7 +1251,11 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
     with the code backend's file read left to the server's directory, it fails each time; with
     only the key list off it passes, because the sinks hold. What it cannot see: `os.stat` and
     `os.path.exists` are not audit events (a probe for a file is invisible), nor is the C layer of
-    a library (sqlite is seen at `connect`) or what a child process opens; a route is only as deep
+    a library (sqlite is seen at `connect`) or what a child process opens; a call relative to a
+    `dir_fd` is read in the directory the descriptor names,
+    except `os.open`'s, whose audit event does not carry it (`shutil.rmtree` going down into a
+    subdirectory), which is read against the working directory and so still counted, at the
+    wrong path; a route is only as deep
     as the requests it is sent, and whether a key has the right kind is not judged by it; and
     other writers (a human's post may store any path) and the feature-board mapping above are
     outside it, since every `demo` run of the sandbox lives in the chief's project. Twenty
