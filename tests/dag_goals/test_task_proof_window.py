@@ -10,6 +10,7 @@ leave each other's declared paths out of the diff, and the error's shape. Setup 
 from __future__ import annotations
 
 import pytest
+from _paths import PYTHON
 from task_proof_support import (
     RED_TEXT,
     SKIPPED_TEST,
@@ -145,7 +146,7 @@ def test_the_error_names_each_failing_part_and_stays_within_4000_characters(tmp_
     repo = make_repo(tmp_path)
     state = State(repo)
     noisy = "import sys; print('x' * 12000); sys.exit(4)"
-    tid = add_task(f'Greet.\n\n```check\n$ python -c "{noisy}"\n```\n')
+    tid = add_task(f'Greet.\n\n```check\n$ {PYTHON} -c "{noisy}"\n```\n')
     assert claim_task(get_db(), tid, run_id=_run_id(tid))
 
     def spawn(state, instructions, adapter, model, run_id, broadcast_fn):

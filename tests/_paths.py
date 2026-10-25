@@ -15,6 +15,8 @@ fixtures from ``conftest.py`` instead.
 
 from __future__ import annotations
 
+import shlex
+import sys
 from pathlib import Path
 
 
@@ -30,3 +32,10 @@ def find_repo_root(start: Path | None = None) -> Path:
 REPO_ROOT = find_repo_root()
 SRC = REPO_ROOT / "src"
 SNAPSHOT_DIR = REPO_ROOT / "tests" / "snapshots"
+
+
+# The interpreter running the tests, spelled for a check block or a verify command. A bare
+# ``python`` is not on PATH everywhere (macOS ships only ``python3``). ``proof.command.to_argv``
+# splits a command with ``shlex.split``, which reads a backslash as an escape, so the path is
+# written with forward slashes (Windows accepts them) and quoted in case it holds a space.
+PYTHON = shlex.quote(Path(sys.executable).as_posix())

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from importlib.resources import files
 from pathlib import Path
+from _paths import PYTHON
 
 import yaml
 from review_packet_support import (
@@ -42,17 +43,17 @@ def text_with(title: str, command: str) -> str:
 
 def red(title: str = "Red task.", marker: str = "red-marker") -> str:
     return text_with(
-        title, "python -c \"import sys; print('%s'); sys.exit(1)\"" % marker
+        title, PYTHON + " -c \"import sys; print('%s'); sys.exit(1)\"" % marker
     )
 
 
 def green(title: str = "Green task.") -> str:
-    return text_with(title, "python -c \"print('green-marker')\"")
+    return text_with(title, PYTHON + " -c \"print('green-marker')\"")
 
 
 def counting(title: str, log: Path, code: int = 0) -> str:
     """A check that appends one character to ``log`` (outside the repo) and exits ``code``."""
-    command = "python -c \"import sys; open('%s', 'a').write('x'); sys.exit(%d)\""
+    command = PYTHON + " -c \"import sys; open('%s', 'a').write('x'); sys.exit(%d)\""
     return text_with(title, command % (log.as_posix(), code))
 
 

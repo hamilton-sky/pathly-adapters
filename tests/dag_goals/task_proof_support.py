@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
+from _paths import PYTHON
 
 from pathly_orchestrator.supervisor.drain import drain_frontier
 from pathly_orchestrator.supervisor.isolation import SerialIsolation
@@ -18,10 +19,10 @@ SAMPLE_TEST = "def test_sample():\n    assert 1 + 1 == 2\n"
 SKIPPED_TEST = (
     "import pytest\n\n\n@pytest.mark.skip\ndef test_sample():\n    assert 1 + 1 == 2\n"
 )
-RED_TEXT = """Add the greeting.
+RED_TEXT = f"""Add the greeting.
 
 ```check
-$ python -c "import sys; print('red-marker'); sys.exit(3)"
+$ {PYTHON} -c "import sys; print('red-marker'); sys.exit(3)"
 ```
 """
 

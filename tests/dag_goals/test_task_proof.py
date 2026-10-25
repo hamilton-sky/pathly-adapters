@@ -15,6 +15,7 @@ file in that temp repo, which is why the ticket carries `Floor: allow skip`. Set
 from __future__ import annotations
 
 from pathlib import Path
+from _paths import PYTHON
 
 import pytest
 from task_proof_support import (
@@ -34,7 +35,9 @@ from task_proof_support import (
     write,
 )
 
-GREEN_TEXT = "Greet.\n\n```check\n$ python -c \"print('green')\"\nprints green\n```\n"
+GREEN_TEXT = (
+    f"Greet.\n\n```check\n$ {PYTHON} -c \"print('green')\"\nprints green\n```\n"
+)
 
 
 @pytest.fixture(autouse=True)
@@ -127,7 +130,7 @@ def test_the_whole_report_survives_into_the_retry_prompt_and_the_final_failure(
     state = State(repo)
     set_app_setting("goal.task_max_attempts", "2")
     noisy = "import sys; print('x' * 3000 + 'EN' + 'D-MARKER'); sys.exit(2)"
-    tid = add_task(f'Greet.\n\n```check\n$ python -c "{noisy}"\n```\n')
+    tid = add_task(f'Greet.\n\n```check\n$ {PYTHON} -c "{noisy}"\n```\n')
     seen: dict = {}
 
     def second_attempt(repo: Path) -> None:

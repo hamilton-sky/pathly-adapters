@@ -16,6 +16,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Iterator, Optional
+from _paths import PYTHON
 
 import pytest
 
@@ -63,7 +64,7 @@ def check_block(command: str) -> str:
 
 def appending(log: Path) -> str:
     """A check that exits 0 and appends one character to ``log`` (outside the repo)."""
-    return "python -c \"open('%s', 'a').write('x')\"" % log.as_posix()
+    return PYTHON + " -c \"open('%s', 'a').write('x')\"" % log.as_posix()
 
 
 class Projects:

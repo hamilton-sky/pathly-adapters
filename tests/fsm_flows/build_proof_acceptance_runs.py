@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Optional
+from _paths import PYTHON
 
 from build_proof_acceptance_support import (
     APP_V2,
@@ -31,9 +32,10 @@ from build_proof_acceptance_support import (
 from pathly_orchestrator.db import get_db
 from pathly_orchestrator.supervisor import RunnerState
 
-RED_CHECK = "python -c \"import sys; print('red-marker'); sys.exit(3)\""
+RED_CHECK = PYTHON + " -c \"import sys; print('red-marker'); sys.exit(3)\""
 FIXED_TEST = (
-    "python -c \"import pathlib,sys; sys.exit(0 if pathlib.Path('src/fixed.txt').exists() "
+    PYTHON
+    + " -c \"import pathlib,sys; sys.exit(0 if pathlib.Path('src/fixed.txt').exists() "
     'else 1)"'
 )
 EDITED_TASK = "Make the build green (an easier version)."
@@ -185,7 +187,7 @@ def run_red_base(projects: Projects) -> Run:
         lambda h, s: None,
         "Add answer() to src/app.py.",
         ["src/app.py"],
-        {"verify.build": 'python -c "raise SystemExit(1)"'},
+        {"verify.build": PYTHON + ' -c "raise SystemExit(1)"'},
     )
 
 
@@ -223,7 +225,10 @@ def run_happy_team(projects: Projects, log: Path) -> Run:
         script,
         text,
         ["src/app.py"],
-        {"verify.build": 'python -c "pass"', "verify.test": 'python -c "pass"'},
+        {
+            "verify.build": PYTHON + ' -c "pass"',
+            "verify.test": PYTHON + ' -c "pass"',
+        },
     )
 
 
