@@ -182,13 +182,24 @@ def test_dispatch_loop_creates_nested_goal_dir(tmp_path):
     goal = _make_goal(conn, scope, executor="loop")
     _make_task(conn, scope, "task-A", goal)
 
+    import types
+
+    started = []
+
+    def fake_start(**kw):
+        # The real start_run starts an FSM loop on a thread that calls /next_action and
+        # outlives the test; the dir this test pins is made before the run starts.
+        started.append(kw)
+        return types.SimpleNamespace(run_id="loop-run-dir")
+
     result = start_goal_run(
         goal,
         project_root=str(tmp_path),
-        spawn_fn=lambda *a, **k: {"ok": True},
+        start_fn=fake_start,
         block=True,
     )
     assert result["ok"] is True
+    assert len(started) == 1
 
     nested = tmp_path / "pathly" / "features" / scope / "goals"
     assert (

@@ -15,6 +15,55 @@ import pytest
 
 import _paths  # noqa: E402  (depends on the sys.path insert above)
 
+# The FSM server's default port (``config.DEFAULT_FSM_PORT``; not imported, so the package is
+# not loaded before the tests patch it). When Studio runs, a live server listens there.
+LIVE_FSM_PORT = 8765
+_LOOPBACK = ("::1", "localhost", "0.0.0.0", "::ffff:127.0.0.1")
+FSM_SERVER_MODULE = "pathly_orchestrator.http_server"
+
+
+def _no_live_fsm_server(event: str, args: tuple) -> None:
+    """Keep the test process away from the developer's FSM server, as if none were running.
+
+    The supervisor loop calls ``/next_action`` on 127.0.0.1:8765 through ``fsm_http_client``;
+    when nothing answers, ``ensure_server_running`` starts ``python -m
+    pathly_orchestrator.http_server`` detached from the test process, with the real HOME. A
+    test that leaves a real loop running (one did) then wrote a fake goal run into the
+    developer's live server, or left a server of its own running after pytest. This refuses
+    both: a connection to a loopback address on 8765 fails as a refused connection, and
+    starting the server module fails as an ``OSError``, so the client falls back to running
+    the FSM in process (``fsm_http_client._inprocess``). A test that needs a server starts its
+    own on a free port. Audit hooks see calls made in this process only, not in a child.
+    """
+    if event == "socket.connect":
+        address = args[1] if len(args) > 1 else None
+        if (
+            isinstance(address, tuple)
+            and len(address) >= 2
+            and address[1] == LIVE_FSM_PORT
+            and isinstance(address[0], str)
+            and (address[0].startswith("127.") or address[0] in _LOOPBACK)
+        ):
+            raise ConnectionRefusedError(
+                f"tests/conftest.py: tests do not connect to the FSM server on "
+                f"{address[0]}:{LIVE_FSM_PORT}"
+            )
+    elif event == "subprocess.Popen":
+        argv = args[1] if len(args) > 1 else None
+        if isinstance(argv, (list, tuple)):
+            words = [str(a) for a in argv]
+            starts_server = any(
+                words[i] == "-m" and words[i + 1] == FSM_SERVER_MODULE
+                for i in range(len(words) - 1)
+            ) or (words and os.path.basename(words[0]) == "pathly-fsm-http")
+            if starts_server:
+                raise PermissionError(
+                    "tests/conftest.py: tests do not start the FSM server process"
+                )
+
+
+sys.addaudithook(_no_live_fsm_server)
+
 
 def _tmp_root() -> Path:
     default_root = r"C:\tmp" if os.name == "nt" else tempfile.gettempdir()
