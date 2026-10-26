@@ -24,6 +24,7 @@ be traced to the run that worked on it.
   `tasks_claim.py` too): mint the run id first, claim with it, then start the board run with it.
   `supervisor/board_run.py::start_board_run` takes no run id today: add an optional `run_id`
   keyword (default: a new uuid4, as now), so claiming after the start cannot race the agent.
+  `board_run.py` is at 484 lines against a baseline of 490: keep the change within that room.
 - The loop scheduler's own claims are unchanged.
 
 ## Not in this ticket

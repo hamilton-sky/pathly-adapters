@@ -42,7 +42,8 @@ fallback is covered too:
   escalation text), and the reason it passes to `fail_task`: redact before the call, because
   `fail_task` lives in `comms_tasks.py`, at its 400-line ratchet baseline.
 
-Keep the scan cheap: skip text with no 43-character run. `eventlog.py` (382 lines) and
+Keep the scan cheap: skip text with no 43-character run. `comms_artifacts.py` is exactly 400
+lines and not in the size baseline, so move code out of it before adding the call. `eventlog.py` (382 lines) and
 `comms_messages.py` (370) have room; if a file would pass 400, move code out first.
 
 Add one line to `src/pathly_data/core/skills/fragments/completion-report.md`: never print

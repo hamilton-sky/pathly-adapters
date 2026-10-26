@@ -18,7 +18,8 @@ overwriting a park, and spends an attempt from the scheduler's own `task_attempt
 In the completion handler, before the success/failure decision, look up the open questions the
 task's spawn posted (`db/queries/task_waits.py::open_questions_by_run` from ticket 06, with the
 `sched-<task>#N` run id). If there are any, `park_task` it, do not call `complete_task` or
-`resolve_task_failure`, do not count the attempt in `task_attempts`, and broadcast a
+`resolve_task_failure`, do not count the attempt in `task_attempts` (and where the handler derives `current_attempt` from
+the stored `attempts`, subtract `waits`), and broadcast a
 `task_waiting` event. The next claim gets a new run id (`attempts` only grows, ticket 06), so the
 asking spawn's run id is never reused.
 

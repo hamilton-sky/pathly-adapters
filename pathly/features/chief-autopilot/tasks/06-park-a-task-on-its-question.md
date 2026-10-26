@@ -5,7 +5,7 @@ Status: open
 Blocked by: 05
 Test first: yes
 Level: 2
-Touches: src/pathly_orchestrator/supervisor/run_task_outcome.py, src/pathly_orchestrator/db/queries/task_waits.py (new), src/pathly_orchestrator/db/migrations_task_waits.py (new), src/pathly_orchestrator/db/migrations.py, src/pathly_orchestrator/db/queries/comms_messages.py, src/pathly_orchestrator/supervisor/task_retry.py, src/pathly_orchestrator/http_server/blueprints/comms/tasks_ready.py (new), src/pathly_orchestrator/http_server/blueprints/comms/tasks.py, src/pathly_data/core/skills/development/drain-dag.md, tests/snapshots/, tests/dag_goals/test_task_waits_for_answer.py, src/pathly_orchestrator/CLAUDE.md, tests/INDEX.md, tests/dag_goals/INDEX.md
+Touches: src/pathly_orchestrator/supervisor/run_task_outcome.py, src/pathly_orchestrator/db/queries/task_waits.py (new), src/pathly_orchestrator/db/migrations_task_waits.py (new), src/pathly_orchestrator/db/migrations_incremental.py, src/pathly_orchestrator/db/queries/comms_messages.py, src/pathly_orchestrator/supervisor/task_retry.py, src/pathly_orchestrator/http_server/blueprints/comms/tasks_ready.py (new), src/pathly_orchestrator/http_server/blueprints/comms/tasks.py, src/pathly_data/core/skills/development/drain-dag.md, tests/snapshots/, tests/dag_goals/test_task_waits_for_answer.py, src/pathly_orchestrator/CLAUDE.md, tests/INDEX.md, tests/dag_goals/INDEX.md
 
 Spike S5: a goal-run agent posted a board `question` and exited; nothing waited for the answer,
 and when the person answered through the chief, no agent received it.
@@ -21,10 +21,15 @@ New `src/pathly_orchestrator/db/queries/task_waits.py`, shared with ticket 12:
 - `park_task(conn, task_id, question_ids)`: `task_status='blocked'`,
   `fail_reason='waiting_for_answer:<id>[,<id>]'`, and `waits = waits + 1` in a new column
   `comms_messages.waits INTEGER NOT NULL DEFAULT 0` (additive migration in a new
-  `src/pathly_orchestrator/db/migrations_task_waits.py` (new), wired where the other migrations run). `attempts` is left alone:
+  `src/pathly_orchestrator/db/migrations_task_waits.py` (new), wired through
+  `src/pathly_orchestrator/db/migrations_incremental.py` the way `migrations_chief` is; `src/pathly_orchestrator/db/migrations.py` is at its
+  baseline). `attempts` is left alone:
   the loop scheduler builds its spawn's run id from it (`sched-<task>#<attempts+1>`), so it must
   only grow. Every attempt-limit check (`task_retry.resolve_task_failure`, ticket 05's limit)
-  compares `attempts - waits` with the limit, so waiting never spends a retry.
+  compares `attempts - waits` with the limit, so waiting never spends a retry. In the loop
+  scheduler that is where it works out `current_attempt` from the stored `attempts` (ticket 12).
+  `release_waiting_tasks` clears the `waiting_for_answer` reason when it frees a task, so
+  `task_retry.build_retry_context` never shows the wait as "the previous attempt failed".
 - `release_waiting_tasks(conn, question_id)`: every task whose reason names the question and has
   no other unanswered one goes back to `pending`, keeping the ids in a `answered_questions` note
   (reason or a JSON field) for the next attempt.
