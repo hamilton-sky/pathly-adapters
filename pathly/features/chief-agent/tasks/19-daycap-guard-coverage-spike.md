@@ -1,7 +1,7 @@
 # Spike: what does daycap's guard actually cover over Pathly spawns?
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 21
 Test first: no (spike; the finding is the deliverable)
 
@@ -236,8 +236,8 @@ lost its prompt, see Surprises). The argv was `claude --restricted --tools Bash,
    `{"action":"answer", …, "error":"send cite only: Pathly relays the cited message's
    text","tier":"operator"}`; no `purple` row, no citation spent. Not measured: an agent
    receiving "blue".
-6. **Limits: YES.** `runs_started` was already 1 (the goal run), so the person set
-   `chief.max_runs_per_session` to 3, not 2 (`PUT /db/settings/chief.max_runs_per_session
+6. **Limits: YES.** `runs_started` was already 1 (the goal run), so the observer (the
+   person's own Claude Code, which wrote the report) set `chief.max_runs_per_session` to 3, not 2 (`PUT /db/settings/chief.max_runs_per_session
    {"value": "3"}`; the session then reported 3), which leaves the same two more runs the ticket
    asks for. Three typed requests for `POST /runs` kind `flow` `explore` with `max_cost_usd: 0.5`:
    N=1 `ok: true` run `411c20b2-…` and N=2 `ok: true` run `b088fca1-…` (each stopped within a
@@ -289,8 +289,8 @@ told).
   2.1.310, that the restricted flags do not hold as written (auto mode), and what stays
   unmeasured (a cited answer reaching a waiting agent, the switches without a positive control,
   daycap's guard on headless spawns). Nothing else in the entry changed.
-- This ticket's Status and Answer; one line appended to `map.md`; six lines appended to
-  `learnings.md`.
+- This ticket's Status and Answer; one line appended to `map.md`; ten lines appended to
+  `learnings.md` (six in the first build, four more in the rebuild).
 
 ### Proof
 
@@ -303,9 +303,15 @@ told).
   Code)`.
 - CHANGELOG: `git diff 9a9200ba -- CHANGELOG.md` shows only the sentence beginning "Every test
   fakes the spawn host" replaced (lines 83 to 97 now).
-- learnings: six `(19)` lines appended, one per surprising finding (auto mode, the trust dialog,
-  the agent echoing its token, a goal run's question never waiting, the hook line not visible in
-  the tab, the explore run's interactive bypass dialog).
+- learnings: ten `(19)` lines appended (`git diff 9a9200ba -- pathly/features/chief-agent/learnings.md`
+  shows ten added lines, all starting `- (19)`, and no line removed or changed), one per surprising
+  finding: auto mode, the trust dialog, the agent echoing its token, a goal run's question never
+  waiting, the hook line not visible in the tab, the explore run's interactive bypass dialog (with
+  `GET /runs` listing it as `kind: single`), the chief's Bash offering `dangerouslyDisableSandbox`,
+  `ls` printing nothing in the tab, the agent reading the `BOARD.json` mirror from disk, and a
+  relayed answer stored as `from_agent: human`, `author_source: none`. The report's last surprise
+  (the chief cannot learn a run finished unless the person writes to it) is by design and is
+  proposed ticket 13 below, so it has no learnings line.
 - Proposed tickets: listed below, security first.
 
 ### Decisions
@@ -320,6 +326,21 @@ told).
 ### Shortcuts taken
 
 None. No claude was run by the builder; every claim above is the report's.
+
+### Review fixes
+
+Rebuild after round 1 (previous build `fd7f7d59`; this rebuild started at `966dc031`).
+
+- **learnings.md missed four surprising findings (spec review, NOT MET).** Agreed. Appended four
+  `(19)` lines, each taken from the report's "Surprises" section (and, for the agent's board
+  reads, its question 5): the chief's Bash offers `dangerouslyDisableSandbox`; `ls` and `ls -la`
+  printed nothing in the tab while `git status` listed files (cause unknown); the goal-run agent
+  read the `pathly/project/BOARD.json` mirror from disk; a relayed answer is stored
+  `from_agent: human`, `author_source: none` and only `chief_citations` shows the chief relayed it.
+  No existing line was edited.
+- **The Proof line said six lines.** Corrected to ten, with the full list; Built corrected too.
+- **Optional: who set the limit in question 6.** Changed: the observer (the person's own Claude
+  Code, which wrote the report and says "I set it to 3") set it, not the person.
 
 ### For later tickets
 
