@@ -1,7 +1,7 @@
 # Spike: what does daycap's guard actually cover over Pathly spawns?
 
 Type: task
-Status: resolved
+Status: open
 Blocked by: 21
 Test first: no (spike; the finding is the deliverable)
 
@@ -363,3 +363,23 @@ spike 19 part B "is the planned hand run" and lists the same items as unmeasured
 Done when names only the CHANGELOG sentence, so it was left; whoever next touches that file
 should bring it in line with the CHANGELOG. The CHANGELOG's earlier sentence that the cron switch
 was "measured on claude 2.1.304 only" is still true and was left.
+
+## Review findings (round 1, spec review)
+
+SPEC
+- Answer says part A was not run (the person's choice, 2026-10-26), the guard question is not measured, no outcome (A/B) holds and no daycap doc line is added: MET. The "Part A: not run" section says all of this; `git diff --stat 9a9200ba..fd7f7d59 -- src/` prints nothing.
+- Part B: a yes or no with evidence for questions 1 to 8, plus the CLI version: MET. 1 NO, 2 YES (no positive control), 3 YES, 4 YES, 5 NOT MEASURED, 6 YES, 7 YES with misreadings, 8 YES (401); CLI `2.1.310 (Claude Code)`. One small attribution change: the report's observer says "I set it to 3" (the limit), the Answer says "the person set".
+- Part B: the CHANGELOG known-limit sentence says what was measured and what stays unmeasured: MET (lines 84-97 the only change; every claim is in the report).
+- Part B: learnings.md gains one `(19)` line per surprising finding: NOT MET. Six `(19)` lines were added (learnings.md lines 100-105). The report's "Surprises" section has findings with no line:
+  - the chief's Bash schema offers `dangerouslyDisableSandbox`;
+  - a relayed answer is stored `from_agent: human`, `author_source: none`, and only `chief_citations` shows the chief relayed it;
+  - the goal-run agent read the `BOARD.json` mirror from disk to look for answers;
+  - `ls` and `ls -la` printed nothing in the tab while `git status` listed files.
+  The Answer's Proof still says "six `(19)` lines appended, one per surprising finding".
+- Part B: the report's proposed tickets are listed under `For later tickets`, security first: MET (all 16 in order, 3 security first, plus "Part A, still open").
+- Scope: OK (CHANGELOG.md, learnings.md, map.md, the ticket).
+- Test first: n/a (`Test first: no`).
+
+To fix: add a `(19)` line to learnings.md for each of the four findings above, or write in the Answer why each one is not a surprising finding, and correct the Proof line. Optional: change the Q6 wording so the observer, not the person, set the limit.
+
+REVIEW: FAIL
