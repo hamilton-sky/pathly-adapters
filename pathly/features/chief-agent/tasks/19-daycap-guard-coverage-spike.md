@@ -17,6 +17,10 @@ question with a real run:
 
 **Does the guard fire on Pathly's headless spawns?**
 
+**Part A was not run.** On 2026-10-26 the person chose to run part B only and leave daycap
+untouched. The Answer says part A is not measured and the guard question stays open; nobody may
+treat daycap as a backstop for Pathly's spawns until a later spike measures it.
+
 Pathly spawns `claude -p '{prompt}' --model ... --output-format json
 --dangerously-skip-permissions` as a subprocess (see root `CLAUDE.md`,
 Studio CLI spawn scheduler). Two sub-questions:
@@ -85,11 +89,13 @@ ticket plans it. This part is one short live session in the same sitting as part
 a measured yes or no per question, not code.
 
 Setup: the Pathly server runs from master with tickets 20 and 21 merged, `claude` is installed and
-signed in, and a scratch project folder has a git repo and one feature folder. Studio has no chief
-launcher yet, so open an operator chief by calling `POST /chief/open` directly. Pathly pastes the
-style and the fixed rules into the new tab and the person presses Enter. Record the exact claude CLI
-version. The person runs this on their own machine (through a Remote Control session if one is
-available), and the builder of this ticket only writes down what was observed.
+signed in, and a scratch project folder has a git repo and one feature folder. Open an operator
+chief with Studio's Chief button (commit 3d9533e1) or by calling `POST /chief/open`. Pathly pastes
+the style and the fixed rules into the new tab and the person presses Enter. Record the exact claude
+CLI version. The person ran this on 2026-10-26 on their own machine with their own Claude Code,
+which wrote the observations to `pathly/features/chief-agent/spike19-part-b-report.md` (commit
+7fc5e73b). The builder of this ticket writes the Answer from that report and adds nothing it did not
+observe.
 
 Answer each question yes or no, with the command and what it printed:
 
@@ -133,10 +139,11 @@ surprising finding.
 
 ## Done when
 
-- The `## Answer` section records: CLI version tested, whether the guard
-  fired at spawn and/or on in-session tool calls, what the over-budget spawn
-  cost, which outcome (A/B) held, and the doc line that was added.
-- `learnings.md` gains the one-line boundary note.
+- The `## Answer` section says part A was not run (the person's choice, 2026-10-26), so whether
+  the guard fires on headless spawns is not measured, no outcome (A/B) holds and no daycap doc
+  line is added.
+- Part B's Done when (above) holds; the report's proposed tickets are listed under
+  `For later tickets` in the Answer, security first.
 
 ## Reference
 
