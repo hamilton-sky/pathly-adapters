@@ -189,8 +189,11 @@ Not in round one:
   body value is kept only for a caller with no token. Rounds three and four need this link.
 - **How a waiting task is marked** — options: a new `task_status` value, or `blocked` with
   `fail_reason='waiting_for_answer:<ids>'`. Chosen: `blocked` with that reason. Why: every reader
-  already treats `blocked` as not ready. The park gives back the attempt the claim counted, and the
-  deadlock guard skips tasks that wait on such a task.
+  already treats `blocked` as not ready. A park adds one to a new `waits` count instead of taking
+  one off `attempts` (the loop scheduler's run ids are built from `attempts`, so it only grows), the
+  attempt limit compares `attempts - waits`, and the deadlock guard skips tasks that wait on such a
+  task. Only questions to `human` (or `*`) park a task: a question to a role is advice the agent
+  was told not to wait for, and nothing answers it until round two.
 - **Which questions a task waits for** — the run's open `question` rows by `author_run_id`
   (`runner/provenance.stamp`), recorded as ids in the reason, so a later re-post by another author
   (round two's `ANSWER: USER`) is still matched by id.
@@ -226,7 +229,10 @@ Not in round one:
 - `POST /runs` `kind: flow`: headless for a chief token or `"interactive": false`;
   `GET /runs` reports packaged flows as `kind: "flow"`.
 - `POST /comms/tasks/claim`, `/comms/tasks/run`: `claimed_by` = the caller's run id.
-- `task_status='blocked'`, `fail_reason='waiting_for_answer:<id>[,<id>]'`.
+- `task_status='blocked'`, `fail_reason='waiting_for_answer:<id>[,<id>]'`, new column
+  `comms_messages.waits`.
+- New `RUN_OUTCOME` event (`run_id`, `outcome`, `error`), read by `GET /runs/<id>` over the
+  `AGENT_DONE` outcome; the invocation projection ignores it.
 - `GET /comms/tasks?ready=true` rows gain `answered_questions: [{question, answer}]` for a task
   that waited.
 - New table `chief_session_runs(session_run_id, run_id, project_root, started_at, read_at)`.

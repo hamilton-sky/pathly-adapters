@@ -5,7 +5,7 @@ Status: open
 Blocked by: —
 Test first: yes
 Level: 3
-Touches: src/pathly_orchestrator/db/secret_scan.py (new), src/pathly_orchestrator/eventlog.py, src/pathly_orchestrator/db/queries/run_log.py, src/pathly_orchestrator/db/queries/comms_messages.py, src/pathly_orchestrator/supervisor/task_retry.py, src/pathly_data/core/skills/fragments/completion-report.md, tests/snapshots/, tests/db/test_secret_scan.py, tests/http_api/test_token_redact_writes.py, src/pathly_orchestrator/CLAUDE.md, tests/INDEX.md, tests/db/INDEX.md, tests/http_api/INDEX.md
+Touches: src/pathly_orchestrator/db/secret_scan.py (new), src/pathly_orchestrator/db/queries/fsm_events.py, src/pathly_orchestrator/db/queries/comms_artifacts.py, src/pathly_orchestrator/db/queries/comms_edit.py, src/pathly_orchestrator/db/queries/run_log.py, src/pathly_orchestrator/db/queries/comms_messages.py, src/pathly_orchestrator/supervisor/task_retry.py, src/pathly_data/core/skills/fragments/completion-report.md, tests/snapshots/, tests/db/test_secret_scan.py, tests/http_api/test_token_redact_writes.py, src/pathly_orchestrator/CLAUDE.md, tests/INDEX.md, tests/db/INDEX.md, tests/http_api/INDEX.md
 
 Spike S3: a headless goal-run agent's first command was `echo "PATHLY_RUN_TOKEN: $PATHLY_RUN_TOKEN"`.
 Its output reached `run_log.stdout`, which any reader of `GET /runs/<id>` (a chief included) sees.
@@ -21,21 +21,26 @@ New `src/pathly_orchestrator/db/secret_scan.py` (layer `db/`, no internal import
   (`secrets.token_urlsafe(32)`'s length) inside a longer run is hashed and looked up in
   `run_tokens.token_hash` (any run, revoked or not), with one static query (`IN (SELECT value FROM
   json_each(?))`). Plus the values after `PATHLY_RUN_TOKEN=` and `PATHLY_RUN_TOKEN:`, whatever
-  they are.
+  they are, but not a shell reference such as `$PATHLY_RUN_TOKEN` or `"$PATHLY_RUN_TOKEN"`
+  (stored prompts in `run_log` contain those).
 - `redact_run_tokens(conn, text) -> str`: replaces each with `[run token]`.
 - `contains_secret_hash(text, sha256_hex) -> bool`: the same window for one hash (ticket 02).
 
 Apply `redact_run_tokens` at the write chokepoints, not per route, so the agent's direct-DB
 fallback is covered too:
 
-- `src/pathly_orchestrator/eventlog.py::append_event`: every string value of the event (`summary`,
-  `error`, `result`), before the insert;
+- `src/pathly_orchestrator/db/queries/fsm_events.py::append_event`, the real event insert (some
+  callers, such as `db_api_feature_detail.py`, call it directly, bypassing
+  `eventlog.append_event`): every string value of the event (`summary`, `error`, `result`);
 - `src/pathly_orchestrator/db/queries/run_log.py::update_run_log_stdout` and
   `write_run_log_spawn`;
 - `src/pathly_orchestrator/db/queries/comms_messages.py::post_message` (text and every stored text
-  field) and the task completion write behind `/comms/tasks/complete` (find it from that route);
-- `src/pathly_orchestrator/supervisor/task_retry.py`'s `fail_reason` writes (`retry_task`,
-  `fail_task`, the escalation text).
+  field), the board-row insert in `src/pathly_orchestrator/db/queries/comms_artifacts.py`, the text rewrite in
+  `src/pathly_orchestrator/db/queries/comms_edit.py`, and the task completion write behind `/comms/tasks/complete` (find it
+  from that route);
+- `src/pathly_orchestrator/supervisor/task_retry.py`'s `fail_reason` writes (`retry_task`, the
+  escalation text), and the reason it passes to `fail_task`: redact before the call, because
+  `fail_task` lives in `comms_tasks.py`, at its 400-line ratchet baseline.
 
 Keep the scan cheap: skip text with no 43-character run. `eventlog.py` (382 lines) and
 `comms_messages.py` (370) have room; if a file would pass 400, move code out first.
@@ -55,7 +60,8 @@ repo's tool (see `tests/install_skills/test_compose.py`). Living docs: the run-t
 
 - `python -m pytest tests/db/test_secret_scan.py tests/http_api/test_token_redact_writes.py -q -p no:cacheprovider`
   passes and covers: a live and a revoked token, alone and inside a longer token-like run, are
-  found, and a random 43-character string is not; both env patterns; after a
+  found, and a random 43-character string is not; both env patterns, and `$PATHLY_RUN_TOKEN` is
+  left alone; a direct `fsm_events.append_event`, an artifact row and an edited post are redacted; after a
   `/runner/terminal/result`, a `/runner/event` `AGENT_DONE` and a direct `append_event` whose text
   holds a run's token, no row in `fsm_events`, `run_log` or `comms_messages` contains it; a task
   failure reason with a token is stored redacted.

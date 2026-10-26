@@ -5,7 +5,7 @@ Status: open
 Blocked by: 10
 Test first: yes
 Level: 3
-Touches: src/pathly_orchestrator/http_server/blueprints/comms/tasks.py, src/pathly_orchestrator/http_server/blueprints/comms/tasks_claim.py (new), src/pathly_orchestrator/http_server/blueprints/comms/__init__.py, scripts/file_size_baseline.txt, tests/dag_goals/test_claim_names_its_run.py, src/pathly_orchestrator/CLAUDE.md, tests/INDEX.md, tests/dag_goals/INDEX.md
+Touches: src/pathly_orchestrator/http_server/blueprints/comms/tasks.py, src/pathly_orchestrator/supervisor/board_run.py, src/pathly_orchestrator/http_server/blueprints/comms/tasks_claim.py (new), src/pathly_orchestrator/http_server/blueprints/comms/__init__.py, scripts/file_size_baseline.txt, tests/dag_goals/test_claim_names_its_run.py, src/pathly_orchestrator/CLAUDE.md, tests/INDEX.md, tests/dag_goals/INDEX.md
 
 The review's B1. `db/queries/comms_tasks.py::claim_task` stores whatever `run_id` its caller
 passes, and `POST /comms/tasks/claim`
@@ -20,9 +20,10 @@ be traced to the run that worked on it.
   (`run_identity.caller_identity(request).run_id`), use that run id as `claimed_by` and ignore the
   body's `run_id` (keep the body value only for a tokenless caller, as today). Move the handler to
   a new `blueprints/comms/tasks_claim.py` first: `tasks.py` is at 413 lines (ratchet baseline).
-- `/comms/tasks/run` (`src/pathly_orchestrator/http_server/blueprints/comms/tasks.py`, move it to `tasks_claim.py` too): claim with
-  the run id the started board run gets, not `"task-<id8>"` (start the run, then claim, or pass the
-  id in).
+- `/comms/tasks/run` (`src/pathly_orchestrator/http_server/blueprints/comms/tasks.py`, move it to
+  `tasks_claim.py` too): mint the run id first, claim with it, then start the board run with it.
+  `supervisor/board_run.py::start_board_run` takes no run id today: add an optional `run_id`
+  keyword (default: a new uuid4, as now), so claiming after the start cannot race the agent.
 - The loop scheduler's own claims are unchanged.
 
 ## Not in this ticket

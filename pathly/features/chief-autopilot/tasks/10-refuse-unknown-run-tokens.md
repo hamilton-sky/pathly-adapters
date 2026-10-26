@@ -35,13 +35,14 @@ agent still running after its run's token was revoked) and what it now gets.
   `/chief/human-messages`; no header is unchanged; a live builder and a live chief token are
   unchanged; a chief whose token was revoked at close gets 401 (already true) and a request with
   the token header empty is treated as no header.
-- All existing `tests/http_api` and `tests/comms_board` tests still pass.
+- All existing `tests/http_api`, `tests/comms_board` and `tests/fsm_flows` tests still pass
+  (`tests/fsm_flows/test_human_escalation_gate.py` sends run tokens).
 
 ```check
 $ python -m pytest tests/http_api/test_unknown_run_token.py -q -p no:cacheprovider
 exit 0
 prints passed
-$ python -m pytest tests/http_api tests/comms_board -q -p no:cacheprovider
+$ python -m pytest tests/http_api tests/comms_board tests/fsm_flows -q -p no:cacheprovider
 exit 0
 ```
 

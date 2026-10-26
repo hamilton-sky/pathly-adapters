@@ -18,8 +18,9 @@ behaviour is the person's, so it stays as it is.
 In `_create_flow_run`, pass `interactive=False` when the caller holds a chief token
 (`run_identity.caller_identity(request)` role `chief`; ticket 10 makes that identity reliable) or
 when the body says `"interactive": false`; otherwise keep today's default. Accept `interactive` as
-a boolean (400 for anything else). A chief cannot ask for an interactive run: leave `interactive`
-out of the chief's allowed keys for `/runs` in `src/pathly_orchestrator/http_server/chief_field_calls.py`.
+a boolean (400 for anything else). A chief cannot ask for an interactive run: list `interactive` under
+`not_for_chief` for `/runs` in `src/pathly_orchestrator/http_server/chief_field_calls.py`, that
+module's convention for keys a chief must not send.
 
 `GET /runs` listed the spike's explore run as `kind: single`:
 `src/pathly_orchestrator/db/queries/run_history_read.py::_classify_kind` calls a run `flow` only

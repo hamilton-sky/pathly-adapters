@@ -24,8 +24,10 @@ round one's story end to end:
 5. A human message is recorded through the hook; the chief answers with its cite. The task is
    `pending`; the chief starts the goal again; the fake agent sees the question and answer in its
    ready-task row, finishes the task; the run ends `success`.
-6. A loop goal (`executor: loop`) whose fake agent asks a question is parked the same way and
-   resumes with the answer in its prompt.
+6. A loop goal (`executor: loop`) whose fake agent asks a question is parked the same way: the
+   run ends with `waiting_for_answer`, and after the answer the task resumes under a new
+   `sched-<task>#N` run id with the answer in its prompt. Both runs have exactly one
+   `agent_invocations` row each.
 7. A chief-token post whose text holds the hook secret is 400. A request with a revoked token is
    401. A chief `POST /runs` kind `flow` (`team`) reaches the spawn host headless and lists as
    `kind: flow`.

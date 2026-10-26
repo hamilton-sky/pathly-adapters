@@ -23,8 +23,8 @@ the tab, so nothing can be cited as typed. This ticket is the server half; ticke
 2. **Read.** `GET /chief/notices?project_root=<root>` (new `blueprints/chief/notices.py`) lists
    the project's recorded runs that reached a terminal status and are unread: `run_id`, `kind`,
    `status`, `outcome` and `error` (tickets 05 and 06: `task_unfinished`, `waiting_for_answer`),
-   `cost_usd`, and the count of open `question`/`escalation` rows addressed to `human` on that
-   run's board. Reuse the read behind `GET /runs/<id>`. The chief gate treats it as a `read`; add
+   `cost_usd`, and the count of open `question`/`escalation` rows addressed to `human` (or `*`) on
+   that run's board (the same rows that park a task, ticket 06). Reuse the read behind `GET /runs/<id>`. The chief gate treats it as a `read`; add
    its fields entry in `chief_field_reads.py`. Rows outlive the session, so the next chief of the
    project sees them.
 3. **Mark read.** `POST /chief/notices/read {"project_root", "run_ids"}` sets `read_at`. It is not

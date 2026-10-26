@@ -175,8 +175,9 @@ questions):
 
 - Re-measure on the person's machine after ticket 01 (spike question 1): the tab shows "don't ask
   on"; `python3 -c 1` and `PATHLY_RUN_TOKEN=x pathly api GET /health` are denied; `cat
-  ~/.pathly/chief/<id>/hook_secret` and `Grep` on `~/.pathly/` are denied; `ls` in the project
-  still runs. Ticket 09 cannot run a real claude.
+  ~/.pathly/chief/<id>/hook_secret` and `Grep` on `~/.pathly/` are denied; `ps e`, `ps auxe` and
+  `printenv` (which could show another process's live token) are denied or show nothing of the
+  kind; `ls` in the project still runs. Ticket 09 cannot run a real claude.
 - What a claude that does not know `dontAsk` does with the flag (exit or ignore): not in the docs.
 - Round four's grant wording, default budgets and the Studio-only credential are the person's call
   when round four is planned.
