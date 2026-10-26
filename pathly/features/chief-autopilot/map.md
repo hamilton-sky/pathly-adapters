@@ -78,12 +78,20 @@ frontier through `AuditedLaneIsolation` (`supervisor/lane_partition.py`), which 
 parallel only when the tasks' declared `files` are disjoint, all in one working tree.
 `WorktreeIsolation` in `supervisor/isolation.py` is a stub.
 
-- `WorktreeIsolation.acquire`: a git worktree under `.pathly/lanes/<goal>/<task>` on branch
-  `pathly/<goal>/<task>` from the goal's integration head; the agent's cwd is the worktree; the DB
-  and server stay shared (spec Decisions).
+- Two kinds of lane, picked per task by the server (the person's decision, 2026-10-26):
+  - **Shared tree:** tasks whose declared `files` are disjoint (for example backend under
+    `src/` and frontend under `studio/`) build at the same time in the one working tree. This is
+    today's `AuditedLaneIsolation`, which already runs lanes in parallel when the partition audits
+    safe; round three makes it the default for disjoint tasks and enforces the footprint.
+  - **Own worktree:** a task whose files overlap a running task's, or that declares none, or that
+    the plan marks `isolation: worktree`, gets a git worktree under `.pathly/lanes/<goal>/<task>`
+    on branch `pathly/<goal>/<task>` from the goal's integration head, instead of waiting. The
+    agent's cwd is the worktree; the DB and server stay shared (spec Decisions).
+  - Several builders at once is the point: disjoint tasks never wait, overlapping ones run apart
+    and meet at the merge.
 - Footprint enforced: a task's diff outside its declared `files` is sent back (per-task
   `scope_gate`), with or without lanes.
-- Fan-in: the supervisor merges a passed task with `git merge --no-ff` in an integration
+- Fan-in (own-worktree tasks): the supervisor merges a passed task with `git merge --no-ff` in an integration
   worktree, one at a time, runs `command_gate` (`verify.build`, then `verify.test` on the last),
   and only then advances the goal's branch. No agent resolves a conflict: a conflict or a red merge
   gate rebuilds the task once from the new head; a second one parks the goal for the person.
@@ -95,9 +103,13 @@ parallel only when the tasks' declared `files` are disjoint, all in one working 
 
 ## Round four: the autopilot (outline)
 
-- The grant: the person types it in the chief tab ("carry goal X to done, at most 5 runs, $3, 2
-  hours"); the chief posts it with a cite, so the recorded consent is the person's own words. It
-  covers that goal (or the goals of one feature, in `SEQUENCING.md` order) and that budget only.
+- The grant is set in Studio, not typed (the person's decision, 2026-10-26): the chief launcher
+  (`ChiefButton` → `ChiefLauncher`, beside engine and style) gets an **Autopilot** switch and
+  budget fields (dollars, runs, hours), with defaults from settings. When the switch is on, the
+  launcher asks which goal (or which feature's goals) it covers. Studio sends the grant through a
+  route a chief token cannot call (like `POST /chief/notices/read`), so the grant is the person's
+  click, recorded with who and when; the chief only reads it (`GET /chief/session` shows it) and
+  can never raise it. A grant can be stopped or changed from the same menu while it runs.
 - The driver is the server, not the chief (spec Decisions): decompose (planner or consultation
   flow) if the goal has no tasks, run with the `team` executor in lanes, retry a failed task within
   the budget, route questions (round two), and move to the next goal.

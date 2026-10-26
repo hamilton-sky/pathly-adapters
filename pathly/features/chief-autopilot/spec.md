@@ -37,9 +37,11 @@ round one is resolved.
 - **Round two: agents answer agents.** A board question addressed to a role is answered by a
   one-shot agent of that role; only questions for the person reach the person.
 - **Round three: parallel lanes.** Tasks with disjoint declared files build at the same time in
-  their own git worktrees, are held to those files, and are merged and gated one at a time.
+  the shared tree; a task that overlaps a running one builds in its own git worktree and is merged
+  and gated after. Every task is held to its declared files.
 - **Round four: the autopilot.** The person grants one goal (or one feature's goals) a budget in
-  the tab; the server carries it to done or to a hard stop, and keeps a record of the run.
+  the chief launcher's Autopilot fields; the server carries it to done or to a hard stop, and
+  keeps a record of the run.
 
 **Round one's bar:** `python -m pytest tests/comms_board/test_autopilot_round_one_acceptance.py -q
 -p no:cacheprovider` passes with a fake spawn host and a fake claude (see ticket 09), and
@@ -173,7 +175,13 @@ Not in round one:
   takes the grant and reports. Chosen: the server drives. Why: the FSM supervisor already drives
   stages without a human; an LLM loop that wakes on injected text is the part with the most
   citation and cost risk, and every step it takes would cost a chief turn. The chief stays the
-  person's interface: it writes the grant, answers questions the person answers, and reports.
+  person's interface: it answers questions the person answers, and reports. The grant (goal,
+  dollars, runs, hours) is set by the person in the chief launcher, through a route a chief token
+  cannot call, so no typed text is the consent and the chief can never raise its own budget.
+- **Lanes (round three)** — options: every parallel task in its own worktree, or only those that
+  need one. Chosen (the person, 2026-10-26): mixed. Tasks with disjoint files share the one tree
+  (no merge step, fastest); a task that overlaps a running one, or declares no files, gets its own
+  worktree and is merged and gated afterwards.
 
 ## Interfaces
 
