@@ -53,3 +53,24 @@ exit 0
 - `src/pathly_orchestrator/runner/chief_argv.py`, `tests/runner_supervisor/test_chief_session.py`
 
 ## Answer
+
+## Attempt note
+
+Attempt 1 (auto, from 430c6aacf1b39b8fb59c38858ecb212ecdc58d67): stopped before any code change, Status left open.
+
+The two Done when bullets cannot both hold inside `Touches:`. The second ("All existing tests
+under `tests/runner_supervisor` still pass") fails as soon as `chief_argv` does what the ticket
+asks, because
+`tests/runner_supervisor/test_chief_session.py::test_claude_argv_is_restricted_with_its_own_tools_settings_mcp_and_session`
+compares the whole claude argv with `==` (lines 141-155), and that file is not in `Touches:`.
+Measured: with `"--permission-mode", "dontAsk"` added after `CLAUDE_TOOLS` and before
+`"--settings"` (then reverted), `python -m pytest tests/runner_supervisor -q -p no:cacheprovider`
+gave `1 failed, 345 passed`, and the failure was that test (AssertionError at line 143). Any
+insertion anywhere in the claude argv breaks an `==` check, so placing it differently does not help.
+No other test pins the whole list (`tests/comms_board/test_chief_acceptance.py:126` checks only
+`argv[:2]`, and the rest look flags up by name).
+
+What is needed: add `tests/runner_supervisor/test_chief_session.py` to `Touches:` so the expected
+list in that one test gains `"--permission-mode", "dontAsk"` between `"Bash,Read,Glob,Grep"` and
+`"--settings"`. That updates the pin to the new contract; it does not weaken it. Everything else
+the ticket asks for fits inside the current `Touches:`.
