@@ -39,6 +39,8 @@ Without the script: read every ticket's `Status:` and `Blocked by:` lines and pi
 - The `## Answer` of every ticket it is blocked by. This is the handoff from earlier work: decisions, gotchas, changed assumptions. Trust it over the original plan.
 - Any `## Review findings` in the ticket. They are mandatory fixes from an independent review or the floor guard. Deal with every one first, then prove them again. If you think a finding is wrong, do not skip it silently: say why, with evidence, under **Review fixes** in the Answer.
 
+If the conductor gave you a folder to work in (a lane: a worktree on its own branch while other tickets are built beside yours), change to it first and do everything there: read, edit, run, commit. Never touch a file outside it, never switch its branch, and never merge or rebase.
+
 ## Step 5: Claim
 
 Run `git rev-parse HEAD` and note the commit: it is where this ticket's work starts, and a reviewer needs it. Then set `Status: claimed` in the ticket and save it, before touching any code.
@@ -58,6 +60,7 @@ Proceed?
 ## Step 7: Implement
 
 - Follow the ticket and the project's conventions (the project's agent instructions file, CLAUDE.md or AGENTS.md, and any rules it points to).
+- **Stay inside `Touches:`.** When the ticket has a `Touches:` line, change only the paths it names (the ticket's own Status and Answer and appended lines in `map.md` and `learnings.md` aside). The conductor sends back a build that changes anything else. If the work cannot be done inside it, say so in the Answer and stop: the plan has to change, not the footprint.
 - Stay inside the ticket. **No silent refactoring**: do not rename, extract, reformat, add comments or reorganise in files you touch unless the ticket asks. Messy neighbouring code stays as it is.
 - **Lazy about the solution, never about reading.** Read every file you will touch first. Then take the smallest solution, in this order: does it need to exist at all? is it already in the codebase? the standard library? a native feature of the platform? a dependency that is already installed? one line? Only then write new code. Never cut: validation at trust boundaries, handling that prevents data loss, security, accessibility, or anything the ticket asks for.
 - **`Test first: yes`**: write the failing test first. Commit the new or changed test files alone first (message `test(<feature>): NN failing test`, no other files), and see the Test command fail for the right reason. Then write the code and commit as Step 10 says. The conductor checks this: it runs the Test command at that commit and sends the ticket back if it passed or if no test-only commit exists. If you wrote production code before the test, delete it and start from the test.
@@ -137,6 +140,7 @@ Continue in a fresh session with the feature-flow skill for <feature>
 
 - **Build or test fails inside the ticket**: fix it and re-run. After two failed fixes of the same error, stop.
 - **The fix needs files outside the ticket**: stop. Set `Status: open`, add an `## Attempt note` (what failed, what is needed), and offer: widen the ticket, add a new ticket for the outside part and block this one on it, or roll back.
+- **A question you should not decide alone**: a design choice the spec does not settle (the architect's), how something should look or behave for its user (the designer's), or what the feature must do where the spec is silent (the product owner's). Do not guess. Commit what you have, leave `Status: open`, and append to the end of the ticket a section `## Ask: architect`, `## Ask: designer` or `## Ask: po` with the question, what you checked, and the options you see. Commit the ticket and stop. The flow asks that role and builds the ticket again with the answer under `## Consulted`. A question only the user can answer is `## Ask: user`.
 - **A test that was already failing**: report it and leave it alone.
 - **The ticket names code that moved**: search for the real location, adapt, and say so in the Answer.
 - **Rollback**: show `git diff --stat` and ask before `git checkout --` (manual). In auto mode never discard work; stop.

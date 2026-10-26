@@ -1,16 +1,19 @@
 """The ticket graph reader, ported from the bash script of the same name.
 
-usage: python3 scripts/flow-status.py <feature> [--next | --counts | --check | --mermaid [plain] | --json]
+usage: python3 scripts/flow-status.py <feature> [--next | --ready | --counts | --check | --lint | --mermaid [plain] | --json | --eval [--later] | --import <tasks.md or folder> [--dry-run]]
 Exit codes for --next: 0 a ready ticket path is printed, 10 all done, 11 unfinished but nothing ready.
+--ready prints every ready ticket path, one per line, with the same exit codes.
 """
 
 import os
 import re
+import shlex
+import shutil
 import sys
 
 from feature_flow import suggest, tickets
 
-USAGE = "usage: python3 scripts/flow-status.py <feature> [--next | --counts | --check | --mermaid [plain] | --json]"
+USAGE = "usage: python3 scripts/flow-status.py <feature> [--next | --ready | --counts | --check | --lint | --mermaid [plain] | --json | --eval [--later] | --import <tasks.md or folder> [--dry-run]]"
 
 
 def _env(name, default):
@@ -55,7 +58,7 @@ def run(argv, out, err):
         err.write("no tickets in %s\n" % folder)
         return 2
 
-    if mode == "--check":
+    if mode in ("--check", "--lint"):
         learnings = "%s/%s/learnings.md" % (root, feature)
         if os.path.isfile(learnings):
             lines = sum(1 for line in tickets.records(learnings) if line.strip(" \t\n\v\f\r") != "")
@@ -64,10 +67,10 @@ def run(argv, out, err):
                           % lines)
 
     g = tickets.Graph(paths)
-    return _report(g, mode, opt, feature, out, err)
+    return _report(g, mode, opt, feature, out, err, root)
 
 
-def _report(g, mode, opt, feature, out, err):
+def _report(g, mode, opt, feature, out, err, root="plans"):
     n = len(g.order)
     count = {"resolved": 0, "open": 0, "claimed": 0, "waiting": 0, "parked": 0, "unknown": 0}
     ready = {}
@@ -85,9 +88,9 @@ def _report(g, mode, opt, feature, out, err):
             unfinished += 1
     nready = sum(1 for t in g.order if ready[t])
 
-    if mode == "--next":
+    if mode in ("--next", "--ready"):
         if first is not None:
-            out.write(g.path[first] + "\n")
+            out.write("\n".join(g.path[t] for t in g.order if ready[t] and (mode == "--ready" or t == first)) + "\n")
             return 0
         if unfinished == 0:
             err.write("COMPLETE\n")
@@ -138,8 +141,9 @@ def _report(g, mode, opt, feature, out, err):
                       "  classDef parked fill:#eeeeee,stroke:#bbbbbb,stroke-dasharray:4 3\n")
         return 0
 
-    if mode == "--check":
-        return _check(g, ready, nready, unfinished, out)
+    if mode in ("--check", "--lint"):
+        extra = lint(g, "%s/%s" % (root, feature)) if mode == "--lint" else ([], [])
+        return _check(g, ready, nready, unfinished, out, extra)
 
     for t in g.order:
         bl = ",".join("%02d" % d for d in g.blk[t])
@@ -148,8 +152,50 @@ def _report(g, mode, opt, feature, out, err):
     return 0
 
 
-def _check(g, ready, nready, unfinished, out):
-    errors = []
+def lint(g, plan_dir):
+    """(errors, warnings) the stricter plan lint adds to --check: every ticket carries a check block or
+    says `Check: none <why>`, and commands.md names a Test command that can be found."""
+    errors, warnings = [], []
+    for t in g.order:
+        lab = g.lab[t]
+        if g.typ.get(t) == "settle":
+            continue
+        if t not in g.haslevel:
+            warnings.append("%s: no `Level:` line. set 1, 2 or 3 (plan guide, ticket rule 8a); without it the "
+                            "ticket gets the review rules of 0.8.0" % lab)
+        lines = tickets.records(g.path[t])
+        has_block = any(line.startswith("```check") for line in lines)
+        none = next((line for line in lines[:20] if line.startswith("Check:")), None)
+        if none is not None:
+            reason = none[len("Check:"):].strip()
+            if not reason.lower().startswith("none") or not reason[4:].strip(" \t:-"):
+                errors.append(lab + ": `Check:` must read `Check: none <why>`")
+        elif not has_block:
+            errors.append(lab + ": no check block. add one under Done when, or `Check: none <why>` in the header")
+        for line in lines:
+            if line.strip().startswith("##"):
+                continue
+            for ref in re.findall(r"`([A-Za-z0-9_./-]+/[A-Za-z0-9_.-]+\.[A-Za-z0-9]+)`", line):
+                if "new" not in line.lower() and "plans/" not in ref and not os.path.exists(ref):
+                    warnings.append("%s: names `%s`, which does not exist here (say `new` if it will be created)" % (lab, ref))
+    commands = "%s/commands.md" % plan_dir
+    test = tickets.commands_value(commands, "Test")
+    if not os.path.isfile(commands):
+        errors.append("commands.md is missing")
+    elif not test:
+        errors.append("commands.md has no Test command (a placeholder in angle brackets does not count)")
+    else:
+        try:
+            first = shlex.split(test, posix=(os.name != "nt"))[0].strip("\"'")
+        except (ValueError, IndexError):
+            first = test.split()[0]
+        if "=" not in first and shutil.which(first) is None and first not in ("cd", "set", "export"):
+            warnings.append("commands.md Test starts with `%s`, which is not on PATH here" % first)
+    return errors, list(dict.fromkeys(warnings))
+
+
+def _check(g, ready, nready, unfinished, out, extra=([], [])):
+    errors = list(extra[0])
     for t in g.order:
         lab = g.lab[t]
         if t in g.dup:
@@ -162,6 +208,12 @@ def _check(g, ready, nready, unfinished, out):
             errors.append(lab + ": no ## Done when section")
         if t in g.hastf and g.tf[t] not in ("yes", "no"):
             errors.append(lab + ": Test first must be yes or no")
+        if t in g.hasreview and g.review[t] not in ("full", "auto"):
+            errors.append(lab + ": Review must be full or auto")
+        if t in g.haslevel and g.level[t] not in ("1", "2", "3"):
+            errors.append(lab + ": Level must be 1, 2 or 3")
+        if t in g.hastouches and not g.touches[t]:
+            errors.append(lab + ": Touches must name at least one path")
         for d in g.blk[t]:
             if d == t:
                 errors.append(lab + ": blocked by itself")
@@ -207,6 +259,8 @@ def _check(g, ready, nready, unfinished, out):
                 continue
             out.write("warning: %s: mentions ticket %s but is not ordered against it. add it to Blocked by, or reword\n"
                       % (g.lab[t], g.lab[m]))
+    for w in extra[1]:
+        out.write("warning: " + w + "\n")
     if errors:
         for e in errors:
             out.write(e + "\n")
@@ -228,5 +282,11 @@ class _Bytes:
 
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
+    if len(argv) > 1 and argv[1] == "--eval":  # the run's record, written by feature_flow/evaluate.py
+        from feature_flow import evaluate
+        return evaluate.main(argv[:1] + argv[2:])
+    if len(argv) > 2 and argv[1] == "--import":  # start the plan from a Spec Kit or OpenSpec task list
+        from feature_flow import importer
+        return importer.main(argv[2:] + argv[:1])
     sys.stdout.flush()
     return run(argv, _Bytes(sys.stdout.buffer), _Bytes(sys.stderr.buffer))

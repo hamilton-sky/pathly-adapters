@@ -16,12 +16,17 @@ def _files(scripts):
     found = [p for p in package.rglob("*.py") if "__pycache__" not in p.parts]
     folder = Path(scripts).resolve()
     found += [folder / name for name in SCRIPTS if (folder / name).is_file()]
-    for phase in ("build", "review", "review-quality"):
+    for phase in ("build", "review", "review-quality", "review-single", "review-feature"):
         for folder, names in (("agents", prompts.ROLES), ("guides", prompts.GUIDES)):
             try:
                 found.append(prompts.find_file(scripts, folder, names[phase]).resolve())
             except FileNotFoundError:
                 pass
+    for name in ("flow-scout.md", "flow-web.md", "flow-architect.md", "flow-designer.md", "flow-po.md"):  # also in prompts
+        try:
+            found.append(prompts.find_file(scripts, "agents", name).resolve())
+        except FileNotFoundError:
+            pass
     try:
         found.append(prompts.find_file(scripts, "guides", "debug.md").resolve())
     except FileNotFoundError:
