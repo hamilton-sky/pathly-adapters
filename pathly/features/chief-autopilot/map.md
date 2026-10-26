@@ -2,11 +2,12 @@
 
 ## Destination
 
-Round one (this folder's tickets) makes an Operator chief safe to leave open: its claude runs
-only `pathly` commands, it cannot read its hook secret, no stored text carries a raw run token, a
-chief-started flow runs headless, a run cannot report success over an unfinished task, an agent's
-question parks its task until answered and the answer reaches the next attempt, and Studio's Chief
-button shows when a chief's run has ended. Rounds two to four (outlined below) build on it to the
+Round one (this folder's tickets) makes an Operator chief on claude safe to leave open: it runs in
+`dontAsk` mode and cannot read outside its project, an unknown run token is refused instead of
+passing as anonymous, no stored text carries a raw run token, a chief-started flow runs headless,
+every task claim names its real run, a run cannot report success over an unfinished task, an
+agent's question parks its task (single and loop) until answered and the answer reaches the next
+attempt, and Studio's Chief button shows when a chief's run has ended. Rounds two to four (outlined below) build on it to the
 autopilot: agents answer agents, tasks run in parallel worktrees, and the server carries a granted
 goal or feature to done.
 
@@ -38,17 +39,21 @@ no:cacheprovider` passes in full.
 
 ## Round one tickets and the spike
 
-| Ticket | Spike |
+| Ticket | Spike / review |
 |---|---|
 | 01 dontAsk permission mode | S1 |
-| 02 hook secret out of the chief's reach | S2 |
-| 03 redact run tokens | S3 |
-| 04 headless flow runs, `kind: flow` in `GET /runs` | S11, S12 |
-| 05 no success over an unfinished task | S6 |
-| 06 a question parks its task | S5 |
+| 02 hook secret out of the chief's reach | S2, review M2, M3 |
+| 03 redact run tokens at the DB writes | S3, review M4, M5, M6 |
+| 04 headless chief flows, `kind: flow` in `GET /runs` | S11, S12, review M7 |
+| 05 no success over an unfinished task (single) | S6, review M11 |
+| 06 park a task on its question, unblock on any answer | S5, review M8, M9, M10, B3 |
 | 07 Operator text fixes | S8, S9, S10 |
-| 08 run notices on the Chief button | S13 (part 1) |
+| 08 record chief runs, `GET /chief/notices` | S13 (part 1) |
 | 09 acceptance | |
+| 10 refuse unknown run tokens | review M1 |
+| 11 `claimed_by` from the caller's run token | review B1 |
+| 12 park and resume loop tasks in the scheduler | review B2 |
+| 13 Chief button badge and the codex note | S13 (part 1), review m3, m4 |
 
 ## Round two: agents answer agents (outline, own folder later)
 
@@ -70,6 +75,11 @@ answers it.
   `Check: none` is refused back to the planner.
 - Leftovers from the spike: S4 (trust dialog on first open), S7 (stamp chief-relayed answers),
   S15 and S16 (measurements).
+- The hook secret out of every same-user process's reach (headless agents run with
+  `--dangerously-skip-permissions` and can read `~/.pathly/chief/`, `blueprints/chief/human.py`
+  says so; a codex chief's read-only sandbox reads the whole file system): the server keeps the
+  secret it generated (`chief_session._write_session_folder`) and hands it to the hook in a way
+  agents cannot read. Then a codex chief can be called safe to leave alone.
 
 ## Round three: parallel lanes in worktrees (outline)
 
@@ -110,6 +120,11 @@ parallel only when the tasks' declared `files` are disjoint, all in one working 
   route a chief token cannot call (like `POST /chief/notices/read`), so the grant is the person's
   click, recorded with who and when; the chief only reads it (`GET /chief/session` shows it) and
   can never raise it. A grant can be stopped or changed from the same menu while it runs.
+  Prerequisite (review M12): "a route a chief token cannot call" is still open to every tokenless
+  loopback caller, headless builders included (they can read the server secret). The grant route
+  needs a credential only Studio holds, for example a per-launch secret kept in Electron main and
+  never written to disk. Round one's ticket 10 closes the unknown-token pass-through it also
+  relies on.
 - The driver is the server, not the chief (spec Decisions): decompose (planner or consultation
   flow) if the goal has no tasks, run with the `team` executor in lanes, retry a failed task within
   the budget, route questions (round two), and move to the next goal.
@@ -132,8 +147,36 @@ scouts (0.12.0), plugin packaging, profiles and Spec Kit import (0.16.0 to 0.18.
 
 ## Decisions so far
 
+Outside facts the tickets rely on, from the Claude Code docs as read on 2026-10-26 (the person's
+claude is 2.1.310; the docs name no version for most of these, so each is re-measured, see Open
+questions):
+
+- `dontAsk` "auto-denies every tool call that would otherwise prompt you"; allow rules still run
+  matching calls. docs: https://code.claude.com/docs/en/permission-modes
+- Claude's built-in read-only commands (`ls`, `cat`, `grep`, `find`, read-only `git`, ...) "run
+  without a permission prompt in every mode"; reads outside the working directories need approval
+  (so `dontAsk` denies them), and `permissions.blockReadsOutsideWorkingDirectories` exists for
+  those paths. docs: https://code.claude.com/docs/en/permissions (Read-only commands)
+- Deny rules win over allow rules, from any scope. docs: same page (Manage permissions,
+  Settings precedence)
+- `Read` deny rules apply to Grep and Glob (to the directory they search), to file commands in
+  Bash such as `cat`, and to `< file` input redirects; not to a program that opens files itself.
+  docs: same page (Read and Edit, Redirections)
+- An allow rule does not match past a leading assignment of a variable outside a known-safe set,
+  so `PATHLY_RUN_TOKEN=x pathly api ...` is not matched by `Bash(pathly *)`; a deny rule matches
+  past any assignment. docs: same page (Compound commands)
+- Deny and ask rules apply to every subcommand, including command substitutions; a compound
+  command needs every part allowed. docs: same page (Compound commands)
+- auto mode is claude's built-in starting mode for interactive sessions from v2.1.283; the
+  `--permission-mode` flag comes first in the order that picks the mode. docs:
+  https://code.claude.com/docs/en/permission-modes (Startup behavior)
+
 ## Open questions
 
-- Ticket 01's `dontAsk` is pinned by tests only; whether claude 2.1.310 then denies `ls` needs a
-  re-measure on the person's machine (spike question 1). Ticket 09 cannot run a real claude.
-- Round four's grant wording and default budgets are the person's call when round four is planned.
+- Re-measure on the person's machine after ticket 01 (spike question 1): the tab shows "don't ask
+  on"; `python3 -c 1` and `PATHLY_RUN_TOKEN=x pathly api GET /health` are denied; `cat
+  ~/.pathly/chief/<id>/hook_secret` and `Grep` on `~/.pathly/` are denied; `ls` in the project
+  still runs. Ticket 09 cannot run a real claude.
+- What a claude that does not know `dontAsk` does with the flag (exit or ignore): not in the docs.
+- Round four's grant wording, default budgets and the Studio-only credential are the person's call
+  when round four is planned.
