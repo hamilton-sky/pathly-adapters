@@ -81,17 +81,20 @@ again, and until the UI token Studio can neither post nor retire one. Reads that
 (`GET /runs/<run_id>`, an artifact, a goal's tasks) and the fleet-wide totals of `GET /db/rollup`
 are not bound to the chief's project. The Studio Chief button, the friendly `pathly` commands, the
 overview and inbox calls and the cost of the chief's own token are round two. Every test fakes the
-spawn host: none opens a real `claude`, and spike 19 part B is the planned live check, eight yes or
-no questions put to a real claude by hand
-(`pathly/features/chief-agent/tasks/19-daycap-guard-coverage-spike.md`). Until it has been run,
-what stays unmeasured is that the claude chief's restricted flags hold (`pathly *` is allowed
-ahead of time, `curl` and `wget` are denied, every other command is claude's to run or ask
-about), that its two switches stop the
-prompts nobody typed, that the hook records a typed message the chief can cite, that `pathly api`
-works from inside the tab, that a cited answer reaches a real waiting agent and an answer without
-a cite does not, that the run limit stops the third run and the chief tells the person, that the
-texts lead a real claude to sensible first commands, and that closing the chief makes its token
-401.
+spawn host: none opens a real `claude`. Spike 19 part B put eight questions to a real claude by
+hand (claude 2.1.310, macOS, 2026-10-26; `pathly/features/chief-agent/spike19-part-b-report.md`,
+answered in `pathly/features/chief-agent/tasks/19-daycap-guard-coverage-spike.md`). Measured: the
+hook records a typed message as `human` and the chief cites it, `pathly api` works from inside the
+tab and a post carries the chief's stamp, an answer without a cite is refused (403) and stores
+nothing, the run limit refuses the extra run (403, no run starts) and the chief tells the person,
+the operator text leads to sensible first reads with no curl, and closing the chief makes its
+token 401. The restricted flags do not hold as written: claude 2.1.310 started the chief in auto
+mode (the argv passes no `--permission-mode`), and its classifier ran `ls`, `git status` and
+`python3 -c` without asking; only `curl` was denied (`wget` was not tried). Still unmeasured: that
+a cited answer reaches a waiting agent (the goal run's agent asked on the board and exited, so no
+run waited), that the two switches are what stops the prompts nobody typed (the Bash tool offered
+no background option and a scheduled task did not fire, but no chief without the switches was
+tried), and whether daycap's guard fires on Pathly's headless spawns (part A was not run).
 
 ### Licensed under Apache-2.0
 
