@@ -22,6 +22,11 @@ __pycache__/
 !.claude/agents/plan-reviewer.md
 !.claude/agents/ticket-builder.md
 !.claude/agents/ticket-reviewer.md
+!.claude/agents/flow-architect.md
+!.claude/agents/flow-designer.md
+!.claude/agents/flow-po.md
+!.claude/agents/flow-scout.md
+!.claude/agents/flow-web.md
 .github/hooks/
 # Environment / secrets
 .env
