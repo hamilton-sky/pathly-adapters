@@ -1,7 +1,7 @@
 # Redact run tokens where Pathly writes text to its database
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: —
 Test first: yes
 Level: 3
@@ -139,6 +139,16 @@ exit 0
   fine for stdout tails, would matter for megabyte base64 blobs (then cap or chunk the windows).
 - `post_message` scans each field separately (up to 8 prefilter regex searches, a query only for a
   field with a 43-character run). One joined scan would save queries if it ever shows up in timing.
+
+**Review fixes**:
+- Floor guard (round 1), `# noqa: F401` on the `insert_artifact` re-export in `comms_artifacts.py`:
+  removed. The module now declares `__all__` with its public functions plus the two re-exports
+  (`insert_artifact`, `insert_artifact_row`), so the re-export is used without any suppression
+  comment (no star import of this module exists). The `comms_hydrate` noqa line predates this
+  ticket and is unchanged. `git diff 2f24667b` outside the ticket file adds no `noqa`,
+  `type: ignore`, `nosec` or skip marker. Re-run: full Lint chain exit 0 (mypy "no issues found in
+  348 source files", lint-imports 1 kept), the Done when tests `15 passed` exit 0,
+  `tests/install_skills` `419 passed, 2 skipped` exit 0. `comms_artifacts.py` is 379 lines.
 
 **For later tickets**:
 - 02: use `db/secret_scan.py::contains_secret_hash(text, sha256_hex)`; it is the same 43-character

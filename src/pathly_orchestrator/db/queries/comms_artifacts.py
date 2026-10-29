@@ -11,7 +11,24 @@ from ..provenance_values import SYSTEM_AUTHOR, SYSTEM_PAIR
 from .comms_messages import _now, post_message
 
 # insert_artifact lives in comms_artifact_rows.py (400-line cap); re-exported here.
-from .comms_artifact_rows import insert_artifact  # noqa: F401
+from .comms_artifact_rows import insert_artifact
+
+__all__ = [
+    "attach_artifact_to_message",
+    "list_artifacts_for_message",
+    "list_artifacts_for_messages",
+    "reindex_artifact_sections",
+    "update_artifact_indexed_mtime",
+    "get_artifact_sections",
+    "get_section",
+    "canonical_artifact_path",
+    "find_or_create_artifact_by_path",
+    "ensure_attached",
+    "list_artifacts_catalog",
+    "update_artifact_summary",
+    "insert_artifact",
+    "insert_artifact_row",
+]
 
 
 def attach_artifact_to_message(
