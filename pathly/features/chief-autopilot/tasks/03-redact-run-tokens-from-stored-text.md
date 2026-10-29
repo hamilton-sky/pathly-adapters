@@ -1,7 +1,7 @@
 # Redact run tokens where Pathly writes text to its database
 
 Type: task
-Status: resolved
+Status: open
 Blocked by: —
 Test first: yes
 Level: 3
@@ -163,3 +163,26 @@ exit 0
 floor guard: the diff weakens the bar instead of meeting it
 suppress: src/pathly_orchestrator/db/queries/comms_artifacts.py: from .comms_artifact_rows import insert_artifact  # noqa: F401
 if a finding is intended, the ticket needs a line like: Floor: allow <category>
+
+## Review findings (round 2, quality review)
+
+Range reviewed: 2f24667b..a5d18053. $END is HEAD, so no later commits were left out. I read the ticket as it stood at the base commit and the round-1 `## Review findings` section on its own. I did not read `## Answer`.
+
+Done when, re-run by me: `tests/db/test_secret_scan.py` with `tests/http_api/test_token_redact_writes.py` gave 15 passed, and `tests/install_skills` gave 419 passed, 2 skipped. Neither left files behind.
+
+Inputs probed as a hostile caller (level 3):
+- event string values via `append_event`
+- run_log prompt, stdin and stdout
+- every text field of `post_message`, and edited text
+- artifact title and summary, on insert and on update
+- task fail reasons from `task_retry`, `/comms/tasks/fail` and `/comms/tasks/status`
+- the env pattern: spaces, quotes, `$` references, JSON escaping
+- scan cost on a 1 MB single run: 0.67 s in memory. That is acceptable, but `post_message` runs the scan inside the write lock.
+
+QUALITY
+1. major src/pathly_orchestrator/http_server/blueprints/comms/tasks.py (`comms_tasks_fail`) and src/pathly_orchestrator/http_server/blueprints/comms/tasks_status.py: both routes pass the caller's `reason` straight to `fail_task`, which writes it unredacted into `comms_messages.fail_reason`. A token-holding agent that posts `/comms/tasks/fail` with the token in `reason` gets it stored, and `get_tasks` (`SELECT *`) hands it to any board reader, a chief included. Only the `task_retry` path redacts before calling `fail_task`. Fix: redact `reason` in both routes before `fail_task`, or move the `fail_reason` write out of `comms_tasks.py` and redact it there, so it is one chokepoint as the ticket intends. Add a route-level test.
+2. major src/pathly_orchestrator/db/queries/comms_artifacts.py (`update_artifact_summary`): the insert path now redacts `summary`, but the overwrite does not. POST `/comms/artifacts/<id>/summary`, reached through `comms_summary.set_artifact_summary`, stores any caller-supplied summary, token included. Fix: redact `summary` in `update_artifact_summary`. The file is at 379 lines, so there is room.
+3. minor src/pathly_orchestrator/http_server/blueprints/comms/tasks_status.py (`_audit_line`): this predates the diff, but it bites now. `reason[:80]` is cut before `post_message` redacts, so a bare token near the cut is stored as a fragment under 43 characters, and the window scan no longer matches it. Fix: redact `reason` before slicing. That falls out of finding 1 if the route redacts first.
+4. minor src/pathly_orchestrator/db/queries/comms_messages.py: `_clean`/`_json` run inside `with _get_write_lock(conn)` (they are evaluated as INSERT parameters), so the hashing of a large message holds the global write lock. Fix: compute the redacted values before taking the lock.
+
+REVIEW: FAIL
