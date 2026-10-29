@@ -1,7 +1,7 @@
 # Start a claude chief with `--permission-mode dontAsk`
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: —
 Test first: yes
 Level: 3
@@ -83,6 +83,15 @@ Work starts at `abc974f8f92f59ac3382dccc69b60d3adfcf0067`; test-only commit `4c9
   is; the new bullet says what changed.
 - **Shortcuts taken**: none. The flag is not measured in a real claude tab here (map Open
   questions: the person's machine re-measures).
+- **Review fixes**:
+  - Round 1, gate (quick), Build failed with `error TS2688: Cannot find type definition file for
+    'vite/client'`: not caused by this ticket (it changes no Studio file). The container had no
+    `studio/node_modules`; the session ran the commands.md Setup step `npm --prefix studio ci`.
+    Re-ran the Build command fresh at `59ea9452`: `python -m build --wheel` exit 0 (`Successfully
+    built pathly_adapters-2.24.1-py3-none-any.whl`), `npm --prefix studio run typecheck` (`tsc
+    --noEmit -p tsconfig.web.json`) exit 0 with no errors. No code change was needed. Re-ran Done
+    when: `test_chief_permission_mode.py` 10 passed, exit 0; `tests/runner_supervisor` 356 passed
+    in 76.44s, exit 0.
 - **For later tickets**: `CLAUDE_PERMISSION_MODE` is importable from `runner/chief_argv.py`
   for ticket 09's acceptance test.
 
