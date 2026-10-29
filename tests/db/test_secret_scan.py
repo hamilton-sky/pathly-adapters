@@ -269,3 +269,74 @@ def test_task_failure_reason_is_stored_redacted() -> None:
     ).fetchall()
     assert any(r[0] and "Task failed after" in r[0] for r in rows)
     assert all(token not in (r[0] or "") + (r[1] or "") for r in rows)
+
+
+def test_fail_task_redacts_the_reason_before_its_length_cap() -> None:
+    from pathly_orchestrator.db.queries.comms import fail_task
+
+    conn = get_db()
+    token = _mint(conn, "run-fail-cap")
+    mid = _task(conn, "feat-fail-cap")
+    # The token straddles fail_task's 4000-character cap.
+    fail_task(conn, mid, reason="word " * 798 + token)
+    stored = conn.execute(
+        "SELECT fail_reason FROM comms_messages WHERE id=?", (mid,)
+    ).fetchone()[0]
+    assert token[:10] not in stored
+    assert stored.startswith("word ") and stored.endswith(REDACTED[:10])
+
+
+def test_update_artifact_summary_stores_the_summary_redacted() -> None:
+    from pathly_orchestrator.db.queries.comms_artifacts import (
+        insert_artifact,
+        update_artifact_summary,
+    )
+    from pathly_orchestrator.db.queries.comms_messages import post_message
+
+    conn = get_db()
+    token = _mint(conn, "run-summary")
+    mid = post_message(conn, "feature", "feat-sum", "builder", text="artifact")
+    art_id = insert_artifact(conn, mid, "pathly/y.md", title="y", summary="old")
+    for count in (None, 7):
+        update_artifact_summary(conn, art_id, f"s {token} e", token_count=count)
+        stored = conn.execute(
+            "SELECT summary FROM comms_artifacts WHERE id=?", (art_id,)
+        ).fetchone()[0]
+        assert stored == f"s {REDACTED} e"
+
+
+def test_post_message_redacts_before_taking_the_write_lock(monkeypatch) -> None:
+    import threading
+
+    from pathly_orchestrator.db import connection
+    from pathly_orchestrator.db.queries import comms_messages
+
+    held: list[bool] = []
+    real = comms_messages.redact_run_tokens
+
+    def _probe(conn, text):
+        result: list[bool] = []
+
+        def _try() -> None:
+            got = connection._global_write_lock.acquire(blocking=False)
+            if got:
+                connection._global_write_lock.release()
+            result.append(not got)
+
+        t = threading.Thread(target=_try)
+        t.start()
+        t.join()
+        held.append(result[0])
+        return real(conn, text)
+
+    monkeypatch.setattr(comms_messages, "redact_run_tokens", _probe)
+    conn = get_db()
+    token = _mint(conn, "run-lock")
+    mid = comms_messages.post_message(
+        conn, "feature", "feat-lock", "builder", text=f"t {token}", stage="s"
+    )
+    assert held and not any(held)
+    text = conn.execute(
+        "SELECT text FROM comms_messages WHERE id=?", (mid,)
+    ).fetchone()[0]
+    assert text == f"t {REDACTED}"

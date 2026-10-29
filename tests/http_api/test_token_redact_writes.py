@@ -127,3 +127,99 @@ def test_no_stored_row_holds_the_runs_token(client):
         assert all(token not in s for s in stored)
     finally:
         drop_run(run_id)
+
+
+def _task_row(conn, scope: str, text: str = "do it") -> str:
+    from pathly_orchestrator.db.queries.comms_messages import post_message
+
+    mid = post_message(conn, "feature", scope, "planner", type="task", text=text)
+    conn.execute(
+        "UPDATE comms_messages SET task_status='in_progress' WHERE id=?", (mid,)
+    )
+    conn.commit()
+    return mid
+
+
+def _scope_text(conn, scope: str) -> list[str]:
+    rows = conn.execute(
+        "SELECT * FROM comms_messages WHERE scope=?", (scope,)
+    ).fetchall()
+    return [str(v) for row in rows for v in tuple(row) if v is not None]
+
+
+def test_tasks_fail_route_stores_the_reason_redacted(client):
+    c, tmp_path = client
+    from pathly_orchestrator.db.connection import get_db
+    from pathly_orchestrator.db.queries.run_tokens import mint_run_token
+    from pathly_orchestrator.db.secret_scan import REDACTED
+
+    conn = get_db()
+    token = mint_run_token(
+        conn, "run-fail-route", "builder", "f", str(tmp_path), "feature", "f"
+    )
+    mid = _task_row(conn, "redact-fail")
+    r = c.post(
+        "/comms/tasks/fail",
+        json={"message_id": mid, "reason": f"PATHLY_RUN_TOKEN={token} broke"},
+    )
+    assert r.status_code == 200
+    stored = conn.execute(
+        "SELECT fail_reason FROM comms_messages WHERE id=?", (mid,)
+    ).fetchone()[0]
+    assert stored == f"PATHLY_RUN_TOKEN={REDACTED} broke"
+    assert all(token not in s for s in _scope_text(conn, "redact-fail"))
+
+
+def test_tasks_status_route_redacts_the_reason_before_slicing_it(client):
+    c, tmp_path = client
+    from pathly_orchestrator.db.connection import get_db
+    from pathly_orchestrator.db.queries.run_tokens import mint_run_token
+    from pathly_orchestrator.db.secret_scan import REDACTED
+
+    conn = get_db()
+    scope = "redact-status"
+    token = mint_run_token(
+        conn, "run-status-route", "evaluator", scope, str(tmp_path), "feature", scope
+    )
+    mid = _task_row(conn, scope)
+    # The token straddles the audit line's 80-character cut: slicing first would store a
+    # fragment under 43 characters that the window scan can no longer match.
+    reason = "word " * 12 + token
+    r = c.post(
+        "/comms/tasks/status",
+        json={"task_ids": [mid], "status": "failed", "reason": reason},
+        headers={"X-Pathly-Run-Token": token},
+    )
+    assert r.status_code == 200, r.data
+    stored = _scope_text(conn, scope)
+    fail_reason = conn.execute(
+        "SELECT fail_reason FROM comms_messages WHERE id=?", (mid,)
+    ).fetchone()[0]
+    assert fail_reason == "word " * 12 + REDACTED
+    assert any(s.startswith("Failed: ") for s in stored)
+    assert all(token[:10] not in s for s in stored)
+
+
+def test_artifact_summary_route_stores_the_summary_redacted(client):
+    c, tmp_path = client
+    from pathly_orchestrator.db.connection import get_db
+    from pathly_orchestrator.db.queries.comms_artifacts import insert_artifact
+    from pathly_orchestrator.db.queries.comms_messages import post_message
+    from pathly_orchestrator.db.queries.run_tokens import mint_run_token
+    from pathly_orchestrator.db.secret_scan import REDACTED
+
+    conn = get_db()
+    token = mint_run_token(
+        conn, "run-summary-route", "builder", "f", str(tmp_path), "feature", "f"
+    )
+    mid = post_message(conn, "feature", "redact-sum", "builder", text="an artifact")
+    art_id = insert_artifact(conn, mid, "pathly/x.md", title="x", summary="old")
+    r = c.post(
+        f"/comms/artifacts/{art_id}/summary",
+        json={"summary": f"summary leaks {token} here"},
+    )
+    assert r.status_code == 200, r.data
+    stored = conn.execute(
+        "SELECT summary FROM comms_artifacts WHERE id=?", (art_id,)
+    ).fetchone()[0]
+    assert stored == f"summary leaks {REDACTED} here"
