@@ -6,6 +6,7 @@ import sqlite3
 
 from ..connection import _get_write_lock
 from ..provenance_values import SOURCE_NONE, check_author_source
+from ..secret_scan import redact_run_tokens
 
 
 def update_message_text(
@@ -23,9 +24,11 @@ def update_message_text(
     nothing. The three author columns are set in the same ``UPDATE`` as the text, as
     ``post_message`` sets them on a new row: the editor's stamp, and ``none`` when
     ``author_source`` is ``None``. A source outside ``AUTHOR_SOURCES`` raises ``ValueError``
-    before anything is written.
+    before anything is written. ``text`` is stored with run tokens redacted
+    (``db/secret_scan.py``).
     """
     check_author_source(author_source)
+    text = redact_run_tokens(conn, text)
     row = conn.execute(
         "SELECT binding FROM comms_messages WHERE id=? AND deleted_at IS NULL",
         (message_id,),

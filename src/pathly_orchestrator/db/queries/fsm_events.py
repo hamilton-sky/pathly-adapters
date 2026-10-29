@@ -6,6 +6,7 @@ import json
 import sqlite3
 
 from ..connection import _get_write_lock
+from ..secret_scan import redact_value
 
 
 def _norm(project_root: str) -> str:
@@ -42,7 +43,12 @@ def _board_scope_of(event_dict: dict) -> str | None:
 def append_event(
     conn: sqlite3.Connection, project_root: str, feature: str, event_dict: dict
 ) -> int:
-    """Insert *event_dict* into fsm_events. Returns the new seq (lastrowid)."""
+    """Insert *event_dict* into fsm_events. Returns the new seq (lastrowid).
+
+    Every string value of the event is stored with run tokens redacted
+    (``db/secret_scan.py``); the caller's dict is not changed.
+    """
+    event_dict = redact_value(conn, event_dict)
     event_type = event_dict.get("type", event_dict.get("event_type", ""))
     ts = event_dict.get("ts", "")
     board_scope = _board_scope_of(event_dict)

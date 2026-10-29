@@ -396,6 +396,7 @@ process to exit. So this is the **last thing you do**, with NOTHING after it:
   the remaining steps, so the DAG you were supposed to seed never gets posted.
 - The skill supplies only the *content* (role, result, conversation, summary, the `*_START` time);
   this fragment owns *when* (last) and *how* (below).
+- Never print environment variables or tokens (`PATHLY_RUN_TOKEN` included) in a command, its output, the `summary` or the `error`: whatever you print can be stored and read back.
 
 ## Set `outcome` — success or failed (REQUIRED)
 
