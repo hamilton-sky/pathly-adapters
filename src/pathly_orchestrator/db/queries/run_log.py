@@ -6,6 +6,7 @@ import sqlite3
 from datetime import datetime, timezone
 
 from ..connection import _get_write_lock
+from ..secret_scan import redact_run_tokens
 
 
 def write_run_log_spawn(
@@ -16,7 +17,13 @@ def write_run_log_spawn(
     board_context_injected: str | None = None,
     stdin: str | None = None,
 ) -> None:
-    """INSERT the spawn-time half (prompt + board context + stdin). Best-effort caller."""
+    """INSERT the spawn-time half (prompt + board context + stdin). Best-effort caller.
+
+    Each text is stored with run tokens redacted (``db/secret_scan.py``).
+    """
+    prompt_sent = redact_run_tokens(conn, prompt_sent)
+    board_context_injected = redact_run_tokens(conn, board_context_injected)
+    stdin = redact_run_tokens(conn, stdin)
     ts = datetime.now(timezone.utc).isoformat()
     with _get_write_lock(conn):
         conn.execute(
@@ -30,7 +37,11 @@ def write_run_log_spawn(
 def update_run_log_stdout(
     conn: sqlite3.Connection, run_id: str, stdout: str | None
 ) -> None:
-    """Fill the result-time half (stdout) for the newest row of run_id. No-op if no spawn row."""
+    """Fill the result-time half (stdout) for the newest row of run_id. No-op if no spawn row.
+
+    ``stdout`` is stored with run tokens redacted (``db/secret_scan.py``).
+    """
+    stdout = redact_run_tokens(conn, stdout)
     with _get_write_lock(conn):
         conn.execute(
             "UPDATE run_log SET stdout=? WHERE id=("

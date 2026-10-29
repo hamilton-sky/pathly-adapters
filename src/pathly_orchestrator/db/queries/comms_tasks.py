@@ -9,6 +9,26 @@ from datetime import datetime, timezone
 from ..connection import _get_write_lock
 from .comms_messages import _now
 
+# fail_task lives in comms_task_fail.py (400-line ratchet); re-exported here.
+from .comms_task_fail import fail_task
+
+__all__ = [
+    "get_ready_tasks",
+    "get_tasks",
+    "complete_task",
+    "claim_task",
+    "fail_task",
+    "count_tasks_for_goal",
+    "count_ready_tasks_for_goal",
+    "count_incomplete_tasks_for_goal",
+    "count_ready_tasks_for_scope",
+    "count_incomplete_tasks_for_scope",
+    "goal_refs_coverage",
+    "reclaim_stale_claims",
+    "feature_task_files",
+    "get_active_file_claims",
+]
+
 
 def get_ready_tasks(
     conn: sqlite3.Connection,
@@ -151,56 +171,6 @@ def claim_task(conn: sqlite3.Connection, message_id: str, run_id: str) -> bool:
         )
         conn.commit()
     return cur.rowcount == 1
-
-
-def fail_task(conn: sqlite3.Connection, message_id: str, reason: str = "") -> list[str]:
-    """Mark a task failed and BFS-cascade transitive dependents to 'blocked'.
-
-    Returns the list of blocked dependent IDs. Idempotent.
-    """
-    row = conn.execute(
-        "SELECT board, scope, task_status FROM comms_messages "
-        "WHERE id=? AND deleted_at IS NULL",
-        (message_id,),
-    ).fetchone()
-    if row is None or row["task_status"] == "failed":
-        return []
-    board, scope = row["board"], row["scope"]
-    now = datetime.now(timezone.utc).isoformat()
-    with _get_write_lock(conn):
-        conn.execute(
-            "UPDATE comms_messages SET task_status='failed', failed_at=?, fail_reason=? "
-            "WHERE id=?",
-            (now, reason[:4000], message_id),
-        )
-        conn.commit()
-
-    all_pending = conn.execute(
-        "SELECT id, depends_on FROM comms_messages "
-        "WHERE board=? AND scope=? AND type='task' "
-        "AND task_status IN ('pending','in_progress') AND deleted_at IS NULL",
-        (board, scope),
-    ).fetchall()
-    dep_index = {r["id"]: json.loads(r["depends_on"] or "[]") for r in all_pending}
-    blocked: list[str] = []
-    frontier: set[str] = {message_id}
-    with _get_write_lock(conn):
-        changed = True
-        while changed:
-            changed = False
-            for tid, deps in list(dep_index.items()):
-                if tid in blocked:
-                    continue
-                if frontier & set(deps):
-                    conn.execute(
-                        "UPDATE comms_messages SET task_status='blocked' WHERE id=?",
-                        (tid,),
-                    )
-                    blocked.append(tid)
-                    frontier.add(tid)
-                    changed = True
-        conn.commit()
-    return blocked
 
 
 def count_tasks_for_goal(conn: sqlite3.Connection, goal_id: str) -> int:

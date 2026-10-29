@@ -61,6 +61,7 @@ def comms_tasks_status():
     """Set a batch of tasks to a terminal state, with a reason, in one call."""
     try:
         from pathly_orchestrator.db.connection import get_db as _get_db
+        from pathly_orchestrator.db.secret_scan import redact_run_tokens
         from pathly_orchestrator.db.queries.comms import (
             complete_task as _complete_task,
             fail_task as _fail_task,
@@ -104,6 +105,8 @@ def comms_tasks_status():
         scope = identity.scope
 
         conn = _get_db()
+        # Redacted once, before the audit line slices it (a cut token escapes the scan).
+        reason = redact_run_tokens(conn, reason)
         updated: list[str] = []
         refused: list[str] = []
         newly_ready: list[str] = []

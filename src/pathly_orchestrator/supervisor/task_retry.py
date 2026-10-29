@@ -52,8 +52,12 @@ def retry_task(conn: sqlite3.Connection, task_id: str, reason: str) -> None:
     """Revert a failed task back to 'pending' so the scheduler's frontier re-schedules
     it, stamping ``reason`` into ``fail_reason`` (reused as "most recent attempt's
     failure" — no new column). Does NOT touch dependents, unlike ``fail_task``: the
-    task is not failed yet, so its dependents' readiness must not change."""
+    task is not failed yet, so its dependents' readiness must not change. ``reason`` is
+    stored with run tokens redacted (``db/secret_scan.py``)."""
     from pathly_orchestrator.db.connection import _get_write_lock
+    from pathly_orchestrator.db.secret_scan import redact_run_tokens
+
+    reason = redact_run_tokens(conn, reason)
 
     with _get_write_lock(conn):
         conn.execute(
@@ -113,7 +117,14 @@ def resolve_task_failure(
     before the worker runs). ``broadcast``/``post_status`` mirror
     ``scheduler.py``'s own ``_broadcast``/``_post_task_status`` shapes (event/payload
     and text respectively) — optional so this stays testable without a live board.
+
+    ``reason`` has run tokens redacted first (``db/secret_scan.py``), so the stored
+    ``fail_reason`` (here or in ``fail_task``), the status line, the broadcast and the
+    escalation text never carry one.
     """
+    from pathly_orchestrator.db.secret_scan import redact_run_tokens
+
+    reason = redact_run_tokens(conn, reason)
     limit = max_attempts if max_attempts is not None else resolve_max_attempts()
     if current_attempt < limit:
         retry_task(conn, task_id, reason)

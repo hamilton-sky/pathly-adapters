@@ -801,6 +801,26 @@ the fragments' header are not links it drives; `tests/runner_supervisor/test_pty
   (`runner/comms_catalog.py`) say the same. An interactive `/pathly` run has no
   `PATHLY_RUN_TOKEN`, so the header expands to nothing, `curl` does not send it, and the call is
   `anonymous`.
+- **Redact (chief-autopilot 03).** No stored text keeps a raw run token. `db/secret_scan.py`
+  finds one without holding it: every 43-character window (`secrets.token_urlsafe(32)`'s length)
+  of a run of `[A-Za-z0-9_-]` is hashed and looked up in `run_tokens` (any run, revoked or not,
+  one static `json_each` query), plus whatever follows `PATHLY_RUN_TOKEN=` / `PATHLY_RUN_TOKEN:`
+  (never a shell reference such as `$PATHLY_RUN_TOKEN`); each is replaced by `[run token]`. Text
+  with no 43-character run and no `PATHLY_RUN_TOKEN` costs one regex search. It runs at the DB
+  write chokepoints, so routes and the agent's direct-DB fallback are covered alike:
+  `fsm_events.append_event` (every string of the event), `run_log.write_run_log_spawn` /
+  `update_run_log_stdout`, `comms_messages.post_message` (text and every stored text field,
+  redacted before the write lock is taken; the `/comms/tasks/complete` status line goes through
+  it), `comms_edit.update_message_text`, `comms_artifact_rows.insert_artifact` (title, summary),
+  `comms_artifacts.update_artifact_summary`, `comms_task_fail.fail_task` (the one `fail_reason`
+  writer for every route, redacted before its 4000-character cap) and
+  `supervisor/task_retry.py`'s failure reason (before `retry_task` and the escalation);
+  `/comms/tasks/status` redacts its `reason` before its audit line slices it. `contains_secret_hash`
+  is the same window test for one hash. The `completion-report` fragment tells agents never to
+  print environment variables or tokens. Known limits: a re-encoded token (base64, split) is not
+  found; a token cut by a slice before it reaches a chokepoint (the `/comms/tasks/fail` status
+  line's `reason[:80]` in `post_task_status`) can leave a fragment; and claude's own session
+  transcript under `~/.claude/projects/` is outside Pathly.
 - **Resolve.** `http_server/run_identity.py::caller_identity(request)`: a live token is
   `kind="run"` with its `run_id`, `role`, `feature`, `project_root`, `board` and `scope`; a
   missing, empty, unknown or revoked one is `anonymous` (unknown and revoked are logged at info
@@ -1473,6 +1493,10 @@ pathly_orchestrator/
                            # message is citable once). CREATE ... IF NOT EXISTS, idempotent;
                            # chief_sessions.runs_started (the runs a session has started, ticket
                            # 15) is ALTERed in when the table exists without it, once
+    secret_scan.py         # find_run_tokens / redact_run_tokens / redact_value / contains_secret_hash:
+                           # run tokens found by hashing 43-char URL-safe windows against run_tokens
+                           # (plus PATHLY_RUN_TOKEN= / : values) and replaced by `[run token]` at the
+                           # DB write chokepoints (chief-autopilot 03); imports nothing internal
     provenance_values.py   # the author_source vocabulary and the `system` stamp, defined ONCE
                            # (AUTHOR_SOURCES = token|system|legacy|none, SYSTEM_ROLE, SYSTEM_AUTHOR,
                            # SYSTEM_PAIR) and check_author_source (the one ValueError for an
@@ -1518,7 +1542,9 @@ pathly_orchestrator/
       comms_directives.py  # get_binding_decisions(conn, boards, scopes, role): the binding (`binding = 1`) decisions a prompt carries whatever their status, not deleted or superseded, addressed to the role or `*` (`*` only for an empty role), oldest first; board and scope lists go in as one JSON string each through `json_each`, so the statement is one static literal; `post_directive(conn, scope, to_agent, text, **author)`: the one writer of `binding = 1` (a `decision` from `chief` on the project board through `post_message(..., binding=1)`, whose one INSERT sets the flag)
       comms_edit.py        # update_message_text: edits a row's text AND sets its three author columns from the editor's stamp (none when no stamp is passed), and answers `"binding"` without changing anything for a row with `binding = 1`; re-exported from comms_messages / comms
       comms_artifacts.py   # artifact metadata CRUD (attach, list, section index, update_summary)
-      comms_tasks.py       # task DAG operations (get_ready, complete, claim, fail, reclaim, goal_refs_coverage)
+      comms_artifact_rows.py # insert_artifact: the comms_artifacts board-row insert (title/summary run-token redacted), moved out of comms_artifacts.py at its 400-line cap; re-exported from comms_artifacts / comms
+      comms_tasks.py       # task DAG operations (get_ready, complete, claim, reclaim, goal_refs_coverage); re-exports fail_task
+      comms_task_fail.py   # fail_task: marks a task failed (fail_reason run-token redacted before its 4000-char cap) and cascades dependents to blocked; moved out of comms_tasks.py at its ratchet baseline; re-exported from comms_tasks / comms
       task_results.py      # build-proof: latest_task_summaries(conn, task_ids) — the newest AGENT_DONE `summary` of each task's `sched-<id>#<n>` runs (a dependent task's prompt shows it)
       task_proof.py        # build-proof task reads: get_task, tasks_claimed_since / tasks_completed_since (goal- else (board, scope)-scoped, parsed-time window), set_floor_allow (the human-set floor_allow JSON list; refreeze re-copies text into claimed_text)
       comms_embeddings.py  # embedding storage + hybrid/semantic search; search_by_embedding() merges parent+child vectors, deduplicates by message_id, returns _matched_chunk for subtopic surfacing; store_chunk_embeddings() writes to comms_chunk_embeddings; SEMANTIC_DISTANCE_CEILING (0.72) + opt-in max_distance= floor scored hits for /comms/search (BM25 hits bypass; comms_context.py keeps its own per-tier gates); _fts_query() quotes each token so raw FTS5 operators (code:query, a OR b, unbalanced ") match literally instead of reparsing; search_by_hybrid() tags each row _match_source (keyword|semantic) for client grouping

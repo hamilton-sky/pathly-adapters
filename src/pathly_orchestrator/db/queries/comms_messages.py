@@ -10,6 +10,7 @@ from typing import Any
 
 from ..connection import _get_write_lock
 from ..provenance_values import SOURCE_NONE, check_author_source
+from ..secret_scan import redact_run_tokens
 
 # update_message_text lives in comms_edit.py (400-line cap); re-exported here.
 from .comms_edit import update_message_text
@@ -70,8 +71,26 @@ def post_message(
 
     ``binding`` (keyword only, default 0) is written in the INSERT itself. Only
     ``comms_directives.post_directive`` passes 1; no route reads it from a body.
+
+    Every stored text (``text``, the JSON of ``options`` / ``context_refs`` / ``files``,
+    ``artifact_path``, ``stage``, ``lane``, ``slug``) has run tokens redacted
+    (``db/secret_scan.py``).
     """
     check_author_source(author_source)
+
+    def _clean(value: str | None) -> str | None:
+        return redact_run_tokens(conn, value)
+
+    def _json(value: Any) -> str | None:
+        return _clean(json.dumps(value)) if value is not None else None
+
+    # Redacted before the write lock is taken: hashing a large text must not hold it.
+    text, stage, artifact_path, lane, slug = (
+        _clean(v) for v in (text, stage, artifact_path, lane, slug)
+    )
+    options_json, refs_json, files_json = (
+        _json(v) for v in (options, context_refs, files)
+    )
     message_id = str(uuid.uuid4())
     task_status = "pending" if type == "task" else None
     with _get_write_lock(conn):
@@ -87,7 +106,7 @@ def post_message(
                 to_agent,
                 type,
                 text,
-                json.dumps(options) if options is not None else None,
+                options_json,
                 reply_to,
                 stage,
                 conv,
@@ -98,8 +117,8 @@ def post_message(
                 artifact_type,
                 goal_id,
                 executor,
-                json.dumps(context_refs) if context_refs is not None else None,
-                json.dumps(files) if files is not None else None,
+                refs_json,
+                files_json,
                 lane,
                 slug,
                 run_id,
