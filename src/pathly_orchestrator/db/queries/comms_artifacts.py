@@ -8,6 +8,7 @@ from typing import Any
 
 from ..connection import _get_write_lock
 from ..provenance_values import SYSTEM_AUTHOR, SYSTEM_PAIR
+from ..secret_scan import redact_run_tokens
 from .comms_messages import _now, post_message
 
 # insert_artifact lives in comms_artifact_rows.py (400-line cap); re-exported here.
@@ -360,7 +361,11 @@ def update_artifact_summary(
     summary: str,
     token_count: int | None = None,
 ) -> None:
-    """Overwrite comms_artifacts.summary (and optionally token_count) for artifact_id."""
+    """Overwrite comms_artifacts.summary (and optionally token_count) for artifact_id.
+
+    The summary is stored with run tokens redacted (``db/secret_scan.py``).
+    """
+    summary = redact_run_tokens(conn, summary)
     with _get_write_lock(conn):
         if token_count is not None:
             conn.execute(

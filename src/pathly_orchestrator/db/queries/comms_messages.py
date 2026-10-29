@@ -84,6 +84,13 @@ def post_message(
     def _json(value: Any) -> str | None:
         return _clean(json.dumps(value)) if value is not None else None
 
+    # Redacted before the write lock is taken: hashing a large text must not hold it.
+    text, stage, artifact_path, lane, slug = (
+        _clean(v) for v in (text, stage, artifact_path, lane, slug)
+    )
+    options_json, refs_json, files_json = (
+        _json(v) for v in (options, context_refs, files)
+    )
     message_id = str(uuid.uuid4())
     task_status = "pending" if type == "task" else None
     with _get_write_lock(conn):
@@ -98,22 +105,22 @@ def post_message(
                 from_agent,
                 to_agent,
                 type,
-                _clean(text),
-                _json(options),
+                text,
+                options_json,
                 reply_to,
-                _clean(stage),
+                stage,
                 conv,
                 _now(),
                 json.dumps(depends_on) if depends_on is not None else None,
                 task_status,
-                _clean(artifact_path),
+                artifact_path,
                 artifact_type,
                 goal_id,
                 executor,
-                _json(context_refs),
-                _json(files),
-                _clean(lane),
-                _clean(slug),
+                refs_json,
+                files_json,
+                lane,
+                slug,
                 run_id,
                 author_role,
                 author_run_id,

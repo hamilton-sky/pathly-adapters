@@ -809,14 +809,18 @@ the fragments' header are not links it drives; `tests/runner_supervisor/test_pty
   with no 43-character run and no `PATHLY_RUN_TOKEN` costs one regex search. It runs at the DB
   write chokepoints, so routes and the agent's direct-DB fallback are covered alike:
   `fsm_events.append_event` (every string of the event), `run_log.write_run_log_spawn` /
-  `update_run_log_stdout`, `comms_messages.post_message` (text and every stored text field; the
-  `/comms/tasks/complete` status line goes through it), `comms_edit.update_message_text`,
-  `comms_artifact_rows.insert_artifact` (title, summary) and `supervisor/task_retry.py`'s
-  failure reason (before `retry_task`, `fail_task` and the escalation). `contains_secret_hash`
+  `update_run_log_stdout`, `comms_messages.post_message` (text and every stored text field,
+  redacted before the write lock is taken; the `/comms/tasks/complete` status line goes through
+  it), `comms_edit.update_message_text`, `comms_artifact_rows.insert_artifact` (title, summary),
+  `comms_artifacts.update_artifact_summary`, `comms_task_fail.fail_task` (the one `fail_reason`
+  writer for every route, redacted before its 4000-character cap) and
+  `supervisor/task_retry.py`'s failure reason (before `retry_task` and the escalation);
+  `/comms/tasks/status` redacts its `reason` before its audit line slices it. `contains_secret_hash`
   is the same window test for one hash. The `completion-report` fragment tells agents never to
   print environment variables or tokens. Known limits: a re-encoded token (base64, split) is not
-  found; `fail_task` called from elsewhere (the `/comms/tasks/fail` route) stores its reason
-  as given; and claude's own session transcript under `~/.claude/projects/` is outside Pathly.
+  found; a token cut by a slice before it reaches a chokepoint (the `/comms/tasks/fail` status
+  line's `reason[:80]` in `post_task_status`) can leave a fragment; and claude's own session
+  transcript under `~/.claude/projects/` is outside Pathly.
 - **Resolve.** `http_server/run_identity.py::caller_identity(request)`: a live token is
   `kind="run"` with its `run_id`, `role`, `feature`, `project_root`, `board` and `scope`; a
   missing, empty, unknown or revoked one is `anonymous` (unknown and revoked are logged at info
@@ -1539,7 +1543,8 @@ pathly_orchestrator/
       comms_edit.py        # update_message_text: edits a row's text AND sets its three author columns from the editor's stamp (none when no stamp is passed), and answers `"binding"` without changing anything for a row with `binding = 1`; re-exported from comms_messages / comms
       comms_artifacts.py   # artifact metadata CRUD (attach, list, section index, update_summary)
       comms_artifact_rows.py # insert_artifact: the comms_artifacts board-row insert (title/summary run-token redacted), moved out of comms_artifacts.py at its 400-line cap; re-exported from comms_artifacts / comms
-      comms_tasks.py       # task DAG operations (get_ready, complete, claim, fail, reclaim, goal_refs_coverage)
+      comms_tasks.py       # task DAG operations (get_ready, complete, claim, reclaim, goal_refs_coverage); re-exports fail_task
+      comms_task_fail.py   # fail_task: marks a task failed (fail_reason run-token redacted before its 4000-char cap) and cascades dependents to blocked; moved out of comms_tasks.py at its ratchet baseline; re-exported from comms_tasks / comms
       task_results.py      # build-proof: latest_task_summaries(conn, task_ids) — the newest AGENT_DONE `summary` of each task's `sched-<id>#<n>` runs (a dependent task's prompt shows it)
       task_proof.py        # build-proof task reads: get_task, tasks_claimed_since / tasks_completed_since (goal- else (board, scope)-scoped, parsed-time window), set_floor_allow (the human-set floor_allow JSON list; refreeze re-copies text into claimed_text)
       comms_embeddings.py  # embedding storage + hybrid/semantic search; search_by_embedding() merges parent+child vectors, deduplicates by message_id, returns _matched_chunk for subtopic surfacing; store_chunk_embeddings() writes to comms_chunk_embeddings; SEMANTIC_DISTANCE_CEILING (0.72) + opt-in max_distance= floor scored hits for /comms/search (BM25 hits bypass; comms_context.py keeps its own per-tier gates); _fts_query() quotes each token so raw FTS5 operators (code:query, a OR b, unbalanced ") match literally instead of reparsing; search_by_hybrid() tags each row _match_source (keyword|semantic) for client grouping

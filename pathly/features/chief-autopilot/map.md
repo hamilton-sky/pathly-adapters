@@ -172,6 +172,7 @@ questions):
   https://code.claude.com/docs/en/permission-modes (Startup behavior)
 - 01 — the claude chief argv carries `--permission-mode dontAsk` (`CLAUDE_PERMISSION_MODE` in `runner/chief_argv.py`), right after `--tools`, before `--settings`; codex unchanged.
 - 03 — run tokens are redacted at the DB writes by `db/secret_scan.py` (43-char window hashes looked up in `run_tokens`, plus `PATHLY_RUN_TOKEN=`/`:` values, never `$PATHLY_RUN_TOKEN`), replaced by `[run token]`; `insert_artifact` moved to `comms_artifact_rows.py`; `contains_secret_hash` is ready for 02.
+- 03 — (round 2) `fail_task` moved to `comms_task_fail.py` and redacts `fail_reason` for every route (re-exported from `comms_tasks` via `__all__`); `update_artifact_summary` redacts; `post_message` redacts before taking the write lock.
 
 ## Open questions
 

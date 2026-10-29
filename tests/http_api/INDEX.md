@@ -68,4 +68,4 @@ HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, 
 | `test_runs_read.py` | Control-plane run read API — GET /runs, GET /runs/<run_id> (unified-control-plane P0, | 6 |
 | `test_spawn_policy_routes.py` | spawn-policy P1 — /comms/model-policy + /comms/logging-config routes | 4 |
 | `test_sse_run_token_strip.py` | `sse._broadcast_runner` sends a spawn's raw run token only on /events/spawn | 6 |
-| `test_token_redact_writes.py` | chief-autopilot 03: a run's token never reaches stored text through the write routes | 1 |
+| `test_token_redact_writes.py` | chief-autopilot 03: a run's token never reaches stored text through the write routes | 4 |

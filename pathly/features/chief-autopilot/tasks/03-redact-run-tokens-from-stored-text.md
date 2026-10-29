@@ -1,7 +1,7 @@
 # Redact run tokens where Pathly writes text to its database
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: —
 Test first: yes
 Level: 3
@@ -99,7 +99,14 @@ exit 0
   all get clean text; `retry_task` redacts too, as its own write).
 - `src/pathly_data/core/skills/fragments/completion-report.md`: one bullet, never print env vars or
   tokens. Six golden snapshots in `tests/snapshots/` regenerated (the ones composing that fragment).
-- Tests: `tests/db/test_secret_scan.py` (14), `tests/http_api/test_token_redact_writes.py` (1);
+- Round 2: `src/pathly_orchestrator/db/queries/comms_task_fail.py` (new): `fail_task` moved out of
+  `comms_tasks.py` (418 -> 388 lines, dropped from `scripts/file_size_baseline.txt` by
+  `check_file_size.py --update`), redacts `reason` before the `[:4000]` cap; re-exported from
+  `comms_tasks.py` through a new `__all__` (so `comms.py` and every caller are unchanged).
+  `comms_artifacts.update_artifact_summary` redacts `summary`. `tasks_status.py` redacts `reason`
+  once after the strip. `comms_messages.post_message` computes the redacted fields before
+  `_get_write_lock`.
+- Tests: `tests/db/test_secret_scan.py` (17), `tests/http_api/test_token_redact_writes.py` (4);
   INDEX files regenerated. Docs: `src/pathly_orchestrator/CLAUDE.md` "Redact" bullet after
   "Carry", plus file-tree lines for `secret_scan.py` and `comms_artifact_rows.py`.
 
@@ -117,6 +124,13 @@ exit 0
 - The test-only commit `b7c6e435` fails at collection (`No module named
   'pathly_orchestrator.db.secret_scan'`).
 - `python -m pytest tests/install_skills -q -p no:cacheprovider` -> `419 passed, 2 skipped`, exit 0.
+- Round 2 re-run after the last edit: the Done when pair -> `21 passed`, exit 0;
+  `tests/install_skills` -> `419 passed, 2 skipped`, exit 0; the fail_task users
+  (`tests/dag_goals/test_dag_scheduler_db.py`, `tests/comms_board/test_comms_tasks_claim_fail.py`,
+  `tests/dag_goals/test_task_retry.py`) -> `44 passed`; full Lint chain exit 0 (mypy "no issues
+  found in 349 source files", check_file_size "17 known over 400 lines, none new, none grown").
+  The round-2 test-only commit fails 6 tests for the right reason (token or a 10-character
+  prefix stored, the write lock held during the redaction).
 - Lint chain from commands.md: all green (black, mypy, check_file_size "none new, none grown",
   mirror reads, gen_test_index --check, lint-imports 1 kept, bandit, adapters, entry points).
 
@@ -150,13 +164,32 @@ exit 0
   348 source files", lint-imports 1 kept), the Done when tests `15 passed` exit 0,
   `tests/install_skills` `419 passed, 2 skipped` exit 0. `comms_artifacts.py` is 379 lines.
 
+- Quality review (round 2) finding 1, `/comms/tasks/fail` and `/comms/tasks/status` store the
+  reason unredacted: `fail_task` moved into `comms_task_fail.py` and redacts there, so it is one
+  chokepoint for both routes and `task_retry`. Tests: `test_tasks_fail_route_stores_the_reason_redacted`,
+  `test_tasks_status_route_redacts_the_reason_before_slicing_it` (route level),
+  `test_fail_task_redacts_the_reason_before_its_length_cap` (a token straddling the 4000 cap).
+  `tasks.py` unchanged.
+- Finding 2, `update_artifact_summary`: redacts `summary` on both UPDATE branches. Tests:
+  `test_update_artifact_summary_stores_the_summary_redacted` (with and without token_count) and
+  `test_artifact_summary_route_stores_the_summary_redacted` (POST `/comms/artifacts/<id>/summary`).
+- Finding 3, `_audit_line` slices before redaction: the route redacts `reason` once before
+  `_fail_task` and `_audit_line`; the status-route test puts the token across the 80-character cut
+  and checks no stored row holds even its first 10 characters.
+- Finding 4, redaction inside the write lock: `post_message` now computes the redacted text,
+  stage, artifact_path, lane, slug and the three JSON fields into locals before `with
+  _get_write_lock(conn)`. Test: `test_post_message_redacts_before_taking_the_write_lock` (each
+  redaction call probes the global lock from another thread; none finds it held).
+
 **For later tickets**:
 - 02: use `db/secret_scan.py::contains_secret_hash(text, sha256_hex)`; it is the same 43-character
   window test.
-- Not covered (outside this ticket's footprint): `fail_task`'s own write from the
-  `/comms/tasks/fail` route (reason stored as given; `comms_tasks.py` is at its baseline), the
-  mirror replay `comms_hydrate.insert_message_row` / `insert_artifact_row`, and
-  `update_artifact_summary`.
+- Not covered (outside this ticket's footprint): the mirror replay
+  `comms_hydrate.insert_message_row` / `insert_artifact_row`, and the `/comms/tasks/fail` status
+  line: `_helpers.post_task_status` slices `reason[:80]` before `post_message` redacts, so a token
+  straddling that cut leaves a fragment (fix: redact in `post_task_status` before slicing).
+- `check_file_size.py --update` also lowered three unrelated baselines that had shrunk on this
+  branch (settings.py 521->519, board_run.py 490->484, api_lifecycle.py 452->451).
 
 ## Review findings (round 1, floor guard)
 
