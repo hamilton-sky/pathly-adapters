@@ -145,6 +145,8 @@ def test_claude_argv_is_restricted_with_its_own_tools_settings_mcp_and_session()
         "--restricted",
         "--tools",
         "Bash,Read,Glob,Grep",
+        "--permission-mode",
+        "dontAsk",
         "--settings",
         "/s/settings.json",
         "--mcp-config",
