@@ -1,7 +1,7 @@
 # Start a claude chief with `--permission-mode dontAsk`
 
 Type: task
-Status: resolved
+Status: open
 Blocked by: —
 Test first: yes
 Level: 3
@@ -92,3 +92,48 @@ Attempt 1 stopped before any code change: `tests/runner_supervisor/test_chief_se
 pins the whole claude argv with `==`, and the file was not in `Touches:`. Plan fix (the person's
 OK, 2026-10-29): the file is now in `Touches:`, so its expected list gains
 `"--permission-mode", "dontAsk"` between `"Bash,Read,Glob,Grep"` and `"--settings"`.
+
+## Review findings (round 1, gate (quick))
+
+gate: Build: python -m build --wheel && npm --prefix studio run typecheck
+gate: Build failed. the last lines of its output:
+adding 'pathly_orchestrator/supervisor/run_budget.py'
+adding 'pathly_orchestrator/supervisor/scheduler.py'
+adding 'pathly_orchestrator/supervisor/slug.py'
+adding 'pathly_orchestrator/supervisor/spawn_policy.py'
+adding 'pathly_orchestrator/supervisor/spawn_window.py'
+adding 'pathly_orchestrator/supervisor/state.py'
+adding 'pathly_orchestrator/supervisor/task_dependencies.py'
+adding 'pathly_orchestrator/supervisor/task_prompt.py'
+adding 'pathly_orchestrator/supervisor/task_proof.py'
+adding 'pathly_orchestrator/supervisor/task_retry.py'
+adding 'pathly_orchestrator/supervisor/terminal.py'
+adding 'pathly_orchestrator/supervisor/terminal_argv.py'
+adding 'pathly_orchestrator/supervisor/terminal_billing.py'
+adding 'pathly_orchestrator/supervisor/terminal_identity.py'
+adding 'pathly_orchestrator/supervisor/terminal_phase.py'
+adding 'pathly_orchestrator/supervisor/terminal_reconcile.py'
+adding 'pathly_studio_cli/__init__.py'
+adding 'pathly_studio_cli/install.py'
+adding 'pathly_telemetry/__init__.py'
+adding 'pathly_telemetry/report.py'
+adding 'pathly_telemetry/storage.py'
+adding 'pathly_adapters-2.24.1.dist-info/METADATA'
+adding 'pathly_adapters-2.24.1.dist-info/WHEEL'
+adding 'pathly_adapters-2.24.1.dist-info/entry_points.txt'
+adding 'pathly_adapters-2.24.1.dist-info/top_level.txt'
+adding 'pathly_adapters-2.24.1.dist-info/RECORD'
+removing build/bdist.linux-x86_64/wheel
+Successfully built pathly_adapters-2.24.1-py3-none-any.whl
+
+> pathly-studio@2.24.1 typecheck
+> tsc --noEmit -p tsconfig.web.json
+
+error TS2688: Cannot find type definition file for 'vite/client'.
+  The file is in the program because:
+    Entry point of type library 'vite/client' specified in compilerOptions
+npm notice
+npm notice New major version of npm available! 10.9.4 -> 12.2.1
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.1
+npm notice To update run: npm install -g npm@12.2.1
+npm notice
