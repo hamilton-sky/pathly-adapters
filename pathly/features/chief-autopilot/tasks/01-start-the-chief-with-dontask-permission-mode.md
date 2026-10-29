@@ -1,7 +1,7 @@
 # Start a claude chief with `--permission-mode dontAsk`
 
 Type: task
-Status: resolved
+Status: open
 Blocked by: —
 Test first: yes
 Level: 3
@@ -203,3 +203,50 @@ tests/http_api/test_chief_routes.py:567: AssertionError
 FAILED tests/http_api/test_chief_routes.py::test_main_closes_a_session_the_last_process_left_open_before_serving
 !!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!
 1 failed, 4301 passed, 2 skipped in 1224.90s (0:20:24)
+
+## Review findings (round 3, gate (quick))
+
+gate: Build: python -m build --wheel && npm --prefix studio run typecheck
+gate: Quick: python -m pytest tests/comms_board tests/db tests/runner_supervisor tests/http_api tests/dag_goals -q -x -p no:cacheprovider
+gate: Lint: black --check src/ tests/ && mypy src/ --ignore-missing-imports --no-strict-optional && python scripts/check_file_size.py && python scripts/check_no_mirror_reads.py && python scripts/gen_test_index.py --check && lint-imports && bandit -q -r src/ -ll -x src/pathly_data/ && python scripts/check_adapters.py && python scripts/check_entry_points.py
+gate: Lint failed. the last lines of its output:
+src/pathly_orchestrator/http_server/blueprints/skills/editor_render.py:294: note: By default the bodies of untyped functions are not checked, consider using --check-untyped-defs  [annotation-unchecked]
+src/pathly_orchestrator/http_server/blueprints/runner/streams.py:41: note: By default the bodies of untyped functions are not checked, consider using --check-untyped-defs  [annotation-unchecked]
+src/pathly_orchestrator/http_server/blueprints/runner/streams.py:75: note: By default the bodies of untyped functions are not checked, consider using --check-untyped-defs  [annotation-unchecked]
+src/pathly_orchestrator/http_server/blueprints/runner/streams.py:106: note: By default the bodies of untyped functions are not checked, consider using --check-untyped-defs  [annotation-unchecked]
+src/pathly_orchestrator/http_server/blueprints/runner/streams.py:186: note: By default the bodies of untyped functions are not checked, consider using --check-untyped-defs  [annotation-unchecked]
+src/pathly_orchestrator/http_server/blueprints/runner/streams.py:253: note: By default the bodies of untyped functions are not checked, consider using --check-untyped-defs  [annotation-unchecked]
+src/pathly_orchestrator/http_server/blueprints/ops/telemetry_phase.py:123: note: By default the bodies of untyped functions are not checked, consider using --check-untyped-defs  [annotation-unchecked]
+src/pathly_orchestrator/http_server/blueprints/ops/telemetry_phase.py:195: note: By default the bodies of untyped functions are not checked, consider using --check-untyped-defs  [annotation-unchecked]
+src/pathly_orchestrator/http_server/blueprints/ops/db_api_invocation.py:77: note: By default the bodies of untyped functions are not checked, consider using --check-untyped-defs  [annotation-unchecked]
+src/pathly_orchestrator/http_server/blueprints/core/health.py:32: note: By default the bodies of untyped functions are not checked, consider using --check-untyped-defs  [annotation-unchecked]
+src/pathly_orchestrator/http_server/blueprints/core/health.py:82: note: By default the bodies of untyped functions are not checked, consider using --check-untyped-defs  [annotation-unchecked]
+src/pathly_orchestrator/http_server/blueprints/core/health.py:83: note: By default the bodies of untyped functions are not checked, consider using --check-untyped-defs  [annotation-unchecked]
+src/pathly_orchestrator/http_server/blueprints/hq/actions_run.py:87: note: By default the bodies of untyped functions are not checked, consider using --check-untyped-defs  [annotation-unchecked]
+src/pathly_orchestrator/http_server/blueprints/hq/actions_run.py:88: note: By default the bodies of untyped functions are not checked, consider using --check-untyped-defs  [annotation-unchecked]
+Success: no issues found in 346 source files
+OK: 1047 source files checked; 18 known over 400 lines, none new, none grown.
+check_no_mirror_reads: OK (8 allow-listed file(s) with markers)
+All test INDEX.md files up to date.
+
+╔══╗─────────▶╔╗ ╔╗      ╔╗◀───┐
+╚╣╠╝◀─────┐  ╔╝╚╗║║────▶╔╝╚╗   │
+ ║║   ╔══╦══╦╩╗╔╝║║  ╔╦═╩╗╔╝╔═╦══╗
+ ║║╔══╣╔╗║╔╗║╔╣║ ║║ ╔╬╣╔╗║║ ║│║╔═╝
+╔╣╠╣║║║╚╝║╚╝║║║╚╗║╚═╝║║║║║╚╗║═╣║
+╚══╩╩╩╣╔═╩══╩╝╚═╝╚═══╩╩╝╚╩═╩╩═╩╝
+  └──▶║║                    ▲ 
+      ╚╝────────────────────┘
+
+
+---------
+Contracts
+---------
+
+Analyzed 321 files, 1053 dependencies.
+--------------------------------------
+
+Orchestrator layer rule (db -> runner -> supervisor -> http_server) KEPT (3 ignored imports)
+
+Contracts: 1 kept, 0 broken.
+bash: line 1: bandit: command not found
