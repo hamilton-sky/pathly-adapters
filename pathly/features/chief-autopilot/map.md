@@ -170,6 +170,7 @@ questions):
 - auto mode is claude's built-in starting mode for interactive sessions from v2.1.283; the
   `--permission-mode` flag comes first in the order that picks the mode. docs:
   https://code.claude.com/docs/en/permission-modes (Startup behavior)
+- 01 — the claude chief argv carries `--permission-mode dontAsk` (`CLAUDE_PERMISSION_MODE` in `runner/chief_argv.py`), right after `--tools`, before `--settings`; codex unchanged.
 
 ## Open questions
 

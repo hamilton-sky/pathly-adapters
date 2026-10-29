@@ -4,12 +4,13 @@
 
 Runner control loop, supervisor, spawn channel, lane/worktree isolation, file-claim registry, services facade.
 
-25 test file(s).
+26 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
 | `test_base_smoke.py` | supervisor/base_smoke.py — a red base parks a run before it spawns anything (build-proof 12) | 19 |
 | `test_chief_open_close_races.py` | chief-agent 20, B8 and B9: a close that lands while a chief is opening, and a tab that ended | 9 |
+| `test_chief_permission_mode.py` | chief-autopilot 01: a claude chief starts in ``dontAsk`` permission mode, never auto mode | 5 |
 | `test_chief_session.py` | chief-agent 06: opening and closing a chief session in the supervisor | 29 |
 | `test_chief_settings_env.py` | chief-agent 20, B1: the chief's claude starts without background-task and scheduled-task prompts | 4 |
 | `test_fan_out.py` | supervisor/fan_out.py — the DAG scheduler as an FSM stage executor (fan-out Phase C) | 19 |

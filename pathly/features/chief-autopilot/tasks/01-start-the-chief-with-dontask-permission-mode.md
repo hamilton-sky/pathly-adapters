@@ -1,7 +1,7 @@
 # Start a claude chief with `--permission-mode dontAsk`
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: —
 Test first: yes
 Level: 3
@@ -53,6 +53,38 @@ exit 0
 - `src/pathly_orchestrator/runner/chief_argv.py`, `tests/runner_supervisor/test_chief_session.py`
 
 ## Answer
+
+Work starts at `abc974f8f92f59ac3382dccc69b60d3adfcf0067`; test-only commit `4c95b64a`.
+
+- **Built**: `src/pathly_orchestrator/runner/chief_argv.py` (new `CLAUDE_PERMISSION_MODE = "dontAsk"`
+  with a spike 19 / claude 2.1.310 comment; claude argv gains `--permission-mode`,
+  `CLAUDE_PERMISSION_MODE` right after `--tools CLAUDE_TOOLS`, before `--settings`; `chief_argv` and
+  `claude_settings` docstrings corrected: other Bash commands are denied, read-only ones still run);
+  new `tests/runner_supervisor/test_chief_permission_mode.py` (10 tests);
+  `tests/runner_supervisor/test_chief_session.py` (exact claude argv list gains the pair);
+  `src/pathly_orchestrator/CLAUDE.md` (the `pathly api` chief paragraph names the mode, why and
+  that read-only commands still run; the `chief_argv.py` tree line lists the flag); `CHANGELOG.md`
+  (one bullet in the chief-agent Unreleased section); `tests/INDEX.md`,
+  `tests/runner_supervisor/INDEX.md` regenerated.
+- **Proof**:
+  - `python -m pytest tests/runner_supervisor/test_chief_permission_mode.py -q -p no:cacheprovider`:
+    `10 passed`, exit 0. Covers: `--permission-mode` count 1 followed by `dontAsk` (count 1), with
+    and without a model; index before `--settings`; the constant equals `dontAsk` and is in the
+    argv; codex argv (with and without model) has no `--permission-mode`/`dontAsk`; no claude or
+    codex argv contains `auto`, `bypassPermissions` or `--dangerously-skip-permissions`. At the
+    test-only commit 4 of those tests failed (no flag / no constant), the codex and forbidden ones
+    passed.
+  - `python -m pytest tests/runner_supervisor -q -p no:cacheprovider`: `356 passed in 182.09s`, exit 0.
+  - Also ran: `tests/comms_board/test_chief_acceptance.py` 15 passed (its `argv[:2]` check holds);
+    `gen_test_index.py --check`, `check_file_size.py`, black, mypy on the module all clean.
+- **Decisions**: the pair goes right after `--tools` so `argv[:2] == ["claude", "--restricted"]`
+  (comms_board acceptance) and the trailing `--model` pair stay true. The spike's record line in
+  `CHANGELOG.md` ("the argv passes no `--permission-mode`") is a dated measurement and was left as
+  is; the new bullet says what changed.
+- **Shortcuts taken**: none. The flag is not measured in a real claude tab here (map Open
+  questions: the person's machine re-measures).
+- **For later tickets**: `CLAUDE_PERMISSION_MODE` is importable from `runner/chief_argv.py`
+  for ticket 09's acceptance test.
 
 ## Attempt note
 
