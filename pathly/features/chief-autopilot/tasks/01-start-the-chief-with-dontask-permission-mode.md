@@ -1,7 +1,7 @@
 # Start a claude chief with `--permission-mode dontAsk`
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: —
 Test first: yes
 Level: 3
@@ -92,6 +92,17 @@ Work starts at `abc974f8f92f59ac3382dccc69b60d3adfcf0067`; test-only commit `4c9
     --noEmit -p tsconfig.web.json`) exit 0 with no errors. No code change was needed. Re-ran Done
     when: `test_chief_permission_mode.py` 10 passed, exit 0; `tests/runner_supervisor` 356 passed
     in 76.44s, exit 0.
+  - Round 2, gate (quick), `tests/http_api/test_chief_routes.py::test_main_closes_a_session_the_last_process_left_open_before_serving`
+    failed with `Error: Flask not installed`: environmental, not this ticket (it changes no
+    http_server file). The test runs a subprocess with `HOME` set to a temp folder, which hides the
+    user site-packages (`~/.local/lib/python3.13/site-packages`), where markupsafe, jinja2 and pyyaml
+    were installed only, so `import flask` failed. The session installed them system-wide. Confirmed
+    at `fcf00836`: `HOME=/tmp/x python -c 'import flask, markupsafe, jinja2, yaml'` resolves all four
+    from `/usr/local/lib/python3.13/dist-packages` / `/usr/lib/python3/dist-packages`;
+    `python -m pytest tests/http_api/test_chief_routes.py -q -p no:cacheprovider` 64 passed;
+    `HOME=/tmp/x ... -k main` 2 passed. No code change. Re-ran Done when:
+    `test_chief_permission_mode.py` 10 passed, exit 0; `tests/runner_supervisor` 356 passed in
+    82.35s, exit 0. The full Quick suite is left to the conductor.
 - **For later tickets**: `CLAUDE_PERMISSION_MODE` is importable from `runner/chief_argv.py`
   for ticket 09's acceptance test.
 
