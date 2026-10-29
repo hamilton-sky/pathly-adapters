@@ -1,7 +1,7 @@
 # Start a claude chief with `--permission-mode dontAsk`
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: —
 Test first: yes
 Level: 3
@@ -103,6 +103,14 @@ Work starts at `abc974f8f92f59ac3382dccc69b60d3adfcf0067`; test-only commit `4c9
     `HOME=/tmp/x ... -k main` 2 passed. No code change. Re-ran Done when:
     `test_chief_permission_mode.py` 10 passed, exit 0; `tests/runner_supervisor` 356 passed in
     82.35s, exit 0. The full Quick suite is left to the conductor.
+  - Round 3, gate (quick), Lint failed with `bash: line 1: bandit: command not found`: environmental,
+    not this ticket (every step of the Lint chain before bandit passed). bandit was missing from the
+    container; the session installed bandit 1.9.4 (the version CI uses). Re-ran the full Lint
+    command from commands.md fresh at `f26316d7`: exit 0 (black, mypy `Success: no issues found in
+    346 source files`, check_file_size OK, check_no_mirror_reads OK, test INDEX up to date,
+    lint-imports `1 kept, 0 broken`, bandit no findings, `Adapter consistency OK`, `Entry points OK:
+    17 checked`). No code change. Re-ran Done when: `test_chief_permission_mode.py` 10 passed, exit 0;
+    `tests/runner_supervisor` 356 passed in 82.28s, exit 0. The full Quick suite is left to the conductor.
 - **For later tickets**: `CLAUDE_PERMISSION_MODE` is importable from `runner/chief_argv.py`
   for ticket 09's acceptance test.
 
