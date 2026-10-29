@@ -5,7 +5,7 @@ Status: open
 Blocked by: —
 Test first: yes
 Level: 3
-Touches: src/pathly_orchestrator/db/secret_scan.py (new), src/pathly_orchestrator/db/queries/fsm_events.py, src/pathly_orchestrator/db/queries/comms_artifacts.py, src/pathly_orchestrator/db/queries/comms_artifact_rows.py (new), src/pathly_orchestrator/db/queries/comms_edit.py, src/pathly_orchestrator/db/queries/run_log.py, src/pathly_orchestrator/db/queries/comms_messages.py, src/pathly_orchestrator/supervisor/task_retry.py, src/pathly_data/core/skills/fragments/completion-report.md, tests/snapshots/, tests/db/test_secret_scan.py, tests/http_api/test_token_redact_writes.py, src/pathly_orchestrator/CLAUDE.md, tests/INDEX.md, tests/db/INDEX.md, tests/http_api/INDEX.md
+Touches: src/pathly_orchestrator/db/secret_scan.py (new), src/pathly_orchestrator/db/queries/fsm_events.py, src/pathly_orchestrator/db/queries/comms_artifacts.py, src/pathly_orchestrator/db/queries/comms_artifact_rows.py (new), src/pathly_orchestrator/db/queries/comms_edit.py, src/pathly_orchestrator/db/queries/run_log.py, src/pathly_orchestrator/db/queries/comms_messages.py, src/pathly_orchestrator/supervisor/task_retry.py, src/pathly_orchestrator/db/queries/comms_tasks.py, src/pathly_orchestrator/db/queries/comms_task_fail.py (new), src/pathly_orchestrator/http_server/blueprints/comms/tasks_status.py, scripts/file_size_baseline.txt, src/pathly_data/core/skills/fragments/completion-report.md, tests/snapshots/, tests/db/test_secret_scan.py, tests/http_api/test_token_redact_writes.py, src/pathly_orchestrator/CLAUDE.md, tests/INDEX.md, tests/db/INDEX.md, tests/http_api/INDEX.md
 
 Spike S3: a headless goal-run agent's first command was `echo "PATHLY_RUN_TOKEN: $PATHLY_RUN_TOKEN"`.
 Its output reached `run_log.stdout`, which any reader of `GET /runs/<id>` (a chief included) sees.
@@ -186,3 +186,12 @@ QUALITY
 4. minor src/pathly_orchestrator/db/queries/comms_messages.py: `_clean`/`_json` run inside `with _get_write_lock(conn)` (they are evaluated as INSERT parameters), so the hashing of a large message holds the global write lock. Fix: compute the redacted values before taking the lock.
 
 REVIEW: FAIL
+
+## Footprint change (round 2)
+
+The quality review's findings 1 to 3 need files that were not in `Touches:`. With the person's OK of
+2026-10-29 for footprint misses, `Touches:` now also names `comms_tasks.py`, a new
+`comms_task_fail.py`, `tasks_status.py` and `scripts/file_size_baseline.txt`. The intended shape:
+move `fail_task` out of `comms_tasks.py` (at its 418-line baseline) into `comms_task_fail.py`, which
+redacts `reason` before the `fail_reason` write (one chokepoint for every route), and re-export it;
+`tasks.py` (413, baseline) does not change. `tasks_status.py` redacts `reason` before it slices it.
