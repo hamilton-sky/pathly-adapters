@@ -614,7 +614,11 @@ POST /chief/human-messages  ← {run_id, hook_secret, text, session_id, relayed?
   `[]`, which a chief would read as "no runs".
 - **`pathly api METHOD /path [json | -]`** (`chief_cli.py`, the `pathly` console script) is the
   chief's only door to the server, because its settings allow `Bash(pathly *)` and deny `curl`
-  and `wget` (`runner/chief_argv.py`). It sends one request to `127.0.0.1:<fsm_port>` with the tab's
+  and `wget` (`runner/chief_argv.py`). The claude chief starts with `--permission-mode dontAsk`
+  (`CLAUDE_PERMISSION_MODE`): with no mode, claude 2.1.310 started it in auto mode, which ran
+  `python3` without asking (spike 19 part B, question 1). `dontAsk` denies every call that would
+  otherwise prompt; claude's built-in read-only commands (`ls`, `git status`) and Read, Glob and
+  Grep inside the project still run, as they do in every mode. It sends one request to `127.0.0.1:<fsm_port>` with the tab's
   `PATHLY_RUN_TOKEN` as `X-Pathly-Run-Token` (and `X-Pathly-Secret` when the machine has one),
   prints the server's answer to stdout and a `pathly: HTTP <status>` line to stderr for a non-2xx.
   Exit **0** for a 2xx, **1** for any other status or an unreachable server, **2** for a usage error
@@ -1533,7 +1537,7 @@ pathly_orchestrator/
       run_tokens.py        # mint_run_token / resolve_run_token / revoke_run_tokens — the per-spawn identity (role-read-policy): the raw token is returned once and only its sha256 is stored, next to run_id/role/feature/project_root/board/scope; resolve returns None for an empty, unknown or revoked token; lookup_run_token returns the row whether or not it is revoked (None only for an empty or unknown one), so the chief gate can tell a revoked token from an unknown one; revoked when the spawn settles
   runner/                  # CLI runner, agent invocation, argv, output parsing
     argv.py                # resolve_argv, resolve_interactive_argv, _storage_path
-    chief_argv.py          # the chief's argv and claude settings (chief-agent), pure: chief_argv(engine, model, settings_path, mcp_path, session_id) — claude `--restricted --tools Bash,Read,Glob,Grep --settings … --mcp-config … --strict-mcp-config --session-id …` (+ `--model` only when given), codex `--sandbox read-only --ask-for-approval on-request`, any other engine ValueError, never a permission-bypass flag, the prompt or the token; claude_settings(hook_command) — allow `Bash(pathly *)`, the deny list, one UserPromptSubmit command hook
+    chief_argv.py          # the chief's argv and claude settings (chief-agent), pure: chief_argv(engine, model, settings_path, mcp_path, session_id) — claude `--restricted --tools Bash,Read,Glob,Grep --permission-mode dontAsk --settings … --mcp-config … --strict-mcp-config --session-id …` (+ `--model` only when given), codex `--sandbox read-only --ask-for-approval on-request`, any other engine ValueError, never a permission-bypass flag, the prompt or the token; claude_settings(hook_command) — allow `Bash(pathly *)`, the deny list, one UserPromptSubmit command hook
     output.py              # parse_result, _extract_json_payload; extract_tokens + the per-adapter
                            # _TOKEN_STRATEGIES registry (Strategy A — token counting; cost is
                            # Strategy B in db/pricing.py); extract_cache_tokens() → the cached

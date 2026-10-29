@@ -9,6 +9,10 @@ the run token reaches the process through ``PATHLY_RUN_TOKEN``, never through ar
 from __future__ import annotations
 
 CLAUDE_TOOLS = "Bash,Read,Glob,Grep"
+# claude 2.1.310 (spike 19 part B, question 1): with no ``--permission-mode`` the chief started in
+# auto mode despite ``--restricted``, and auto mode ran ``python3`` without asking. ``dontAsk``
+# denies every call that would otherwise prompt.
+CLAUDE_PERMISSION_MODE = "dontAsk"
 
 _CLAUDE_ALLOW = ["Bash(pathly *)"]
 _CLAUDE_DENY = [
@@ -44,7 +48,9 @@ def chief_argv(
 
     claude starts in restricted mode: ``--restricted`` ignores the user's, the project's and
     the local settings files (their allow rules would merge into the chief's), and ``--tools``
-    leaves it Bash (for ``pathly``), Read, Glob and Grep. ``--strict-mcp-config`` with an empty
+    leaves it Bash (for ``pathly``), Read, Glob and Grep. ``--permission-mode dontAsk``
+    (``CLAUDE_PERMISSION_MODE``) denies every call that would otherwise prompt, instead of claude's
+    auto mode, which approved arbitrary commands (spike 19, claude 2.1.310). ``--strict-mcp-config`` with an empty
     config file keeps every MCP server away from it. codex runs in a read-only sandbox and asks
     before every command; it has no session id to choose, so ``session_id`` is ignored.
     """
@@ -56,6 +62,8 @@ def chief_argv(
             "--restricted",
             "--tools",
             CLAUDE_TOOLS,
+            "--permission-mode",
+            CLAUDE_PERMISSION_MODE,
             "--settings",
             settings_path,
             "--mcp-config",
@@ -74,13 +82,14 @@ def chief_argv(
 
 
 def claude_settings(hook_command: str) -> dict:
-    """The session's claude settings: ``pathly`` commands allowed, the rest denied or asked.
+    """The session's claude settings: ``pathly`` commands allowed, the rest denied.
 
     Only ``Bash(pathly *)`` is allowed ahead of time, and ``curl`` and ``wget`` are denied. For
     every other Bash command these settings say nothing, so claude applies its own rule under
-    ``--restricted --tools``: a read-only command (``ls``, ``git status``) runs without asking
-    and the rest ask the human in the tab. That rule is claude's, not one of these settings, and
-    it has not been run against this argv in a real tab yet (spike 19 part B, question 1). Most
+    ``--restricted --tools --permission-mode dontAsk``: its built-in read-only commands (``ls``,
+    ``git status``) run without asking in every mode, and every other command is denied without
+    asking. That rule is claude's, not one of these settings, and it has not been re-measured
+    against this argv in a real tab yet (spike 19 part B, question 1). Most
     denied tools are already absent under ``--tools``; the rules stay so they still hold if a
     claude version reads ``--tools`` differently. One ``UserPromptSubmit`` hook runs
     ``hook_command``. An ``env`` block turns off background-task notifications and the cron

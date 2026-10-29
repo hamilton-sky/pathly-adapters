@@ -19,6 +19,9 @@ identity of role-read-policy.
   and `wget` denied; a codex chief is read-only and records no typed messages, so it can relay no
   answer. The session ends when the tab exits, on close, or at the next server start. The prompt
   is pasted, not submitted: the style, the fixed `chief-connect` rules, `Your project root: <root>`.
+- The claude chief starts with `--permission-mode dontAsk` (chief-autopilot 01): claude 2.1.310
+  started it in auto mode, which ran `python3` without asking (spike 19). Now every call that would
+  prompt is denied; `pathly` commands and claude's read-only commands still run.
 - Tiers: `status` reads; `planner` adds posting and planning (goals, tasks, decompose); `operator`
   adds deciding, running, stopping and answering. A preset names the tier: the built-in `status`,
   `planner` and `operator`, or a saved `chief/<preset>` style by its front matter, else `status`.

@@ -1,11 +1,11 @@
 # Start a claude chief with `--permission-mode dontAsk`
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: —
 Test first: yes
 Level: 3
-Touches: src/pathly_orchestrator/runner/chief_argv.py, tests/runner_supervisor/test_chief_permission_mode.py, src/pathly_orchestrator/CLAUDE.md, CHANGELOG.md, tests/INDEX.md, tests/runner_supervisor/INDEX.md
+Touches: src/pathly_orchestrator/runner/chief_argv.py, tests/runner_supervisor/test_chief_permission_mode.py, tests/runner_supervisor/test_chief_session.py, src/pathly_orchestrator/CLAUDE.md, CHANGELOG.md, tests/INDEX.md, tests/runner_supervisor/INDEX.md
 
 Spike 19 question 1 (spike S1): claude 2.1.310 started the chief in auto mode despite
 `--restricted`, and auto mode ran `python3` without asking. `src/pathly_orchestrator/runner/chief_argv.py::chief_argv`
@@ -53,3 +53,208 @@ exit 0
 - `src/pathly_orchestrator/runner/chief_argv.py`, `tests/runner_supervisor/test_chief_session.py`
 
 ## Answer
+
+Work starts at `abc974f8f92f59ac3382dccc69b60d3adfcf0067`; test-only commit `4c95b64a`.
+
+- **Built**: `src/pathly_orchestrator/runner/chief_argv.py` (new `CLAUDE_PERMISSION_MODE = "dontAsk"`
+  with a spike 19 / claude 2.1.310 comment; claude argv gains `--permission-mode`,
+  `CLAUDE_PERMISSION_MODE` right after `--tools CLAUDE_TOOLS`, before `--settings`; `chief_argv` and
+  `claude_settings` docstrings corrected: other Bash commands are denied, read-only ones still run);
+  new `tests/runner_supervisor/test_chief_permission_mode.py` (10 tests);
+  `tests/runner_supervisor/test_chief_session.py` (exact claude argv list gains the pair);
+  `src/pathly_orchestrator/CLAUDE.md` (the `pathly api` chief paragraph names the mode, why and
+  that read-only commands still run; the `chief_argv.py` tree line lists the flag); `CHANGELOG.md`
+  (one bullet in the chief-agent Unreleased section); `tests/INDEX.md`,
+  `tests/runner_supervisor/INDEX.md` regenerated.
+- **Proof**:
+  - `python -m pytest tests/runner_supervisor/test_chief_permission_mode.py -q -p no:cacheprovider`:
+    `10 passed`, exit 0. Covers: `--permission-mode` count 1 followed by `dontAsk` (count 1), with
+    and without a model; index before `--settings`; the constant equals `dontAsk` and is in the
+    argv; codex argv (with and without model) has no `--permission-mode`/`dontAsk`; no claude or
+    codex argv contains `auto`, `bypassPermissions` or `--dangerously-skip-permissions`. At the
+    test-only commit 4 of those tests failed (no flag / no constant), the codex and forbidden ones
+    passed.
+  - `python -m pytest tests/runner_supervisor -q -p no:cacheprovider`: `356 passed in 182.09s`, exit 0.
+  - Also ran: `tests/comms_board/test_chief_acceptance.py` 15 passed (its `argv[:2]` check holds);
+    `gen_test_index.py --check`, `check_file_size.py`, black, mypy on the module all clean.
+- **Decisions**: the pair goes right after `--tools` so `argv[:2] == ["claude", "--restricted"]`
+  (comms_board acceptance) and the trailing `--model` pair stay true. The spike's record line in
+  `CHANGELOG.md` ("the argv passes no `--permission-mode`") is a dated measurement and was left as
+  is; the new bullet says what changed.
+- **Shortcuts taken**: none. The flag is not measured in a real claude tab here (map Open
+  questions: the person's machine re-measures).
+- **Review fixes**:
+  - Round 1, gate (quick), Build failed with `error TS2688: Cannot find type definition file for
+    'vite/client'`: not caused by this ticket (it changes no Studio file). The container had no
+    `studio/node_modules`; the session ran the commands.md Setup step `npm --prefix studio ci`.
+    Re-ran the Build command fresh at `59ea9452`: `python -m build --wheel` exit 0 (`Successfully
+    built pathly_adapters-2.24.1-py3-none-any.whl`), `npm --prefix studio run typecheck` (`tsc
+    --noEmit -p tsconfig.web.json`) exit 0 with no errors. No code change was needed. Re-ran Done
+    when: `test_chief_permission_mode.py` 10 passed, exit 0; `tests/runner_supervisor` 356 passed
+    in 76.44s, exit 0.
+  - Round 2, gate (quick), `tests/http_api/test_chief_routes.py::test_main_closes_a_session_the_last_process_left_open_before_serving`
+    failed with `Error: Flask not installed`: environmental, not this ticket (it changes no
+    http_server file). The test runs a subprocess with `HOME` set to a temp folder, which hides the
+    user site-packages (`~/.local/lib/python3.13/site-packages`), where markupsafe, jinja2 and pyyaml
+    were installed only, so `import flask` failed. The session installed them system-wide. Confirmed
+    at `fcf00836`: `HOME=/tmp/x python -c 'import flask, markupsafe, jinja2, yaml'` resolves all four
+    from `/usr/local/lib/python3.13/dist-packages` / `/usr/lib/python3/dist-packages`;
+    `python -m pytest tests/http_api/test_chief_routes.py -q -p no:cacheprovider` 64 passed;
+    `HOME=/tmp/x ... -k main` 2 passed. No code change. Re-ran Done when:
+    `test_chief_permission_mode.py` 10 passed, exit 0; `tests/runner_supervisor` 356 passed in
+    82.35s, exit 0. The full Quick suite is left to the conductor.
+  - Round 3, gate (quick), Lint failed with `bash: line 1: bandit: command not found`: environmental,
+    not this ticket (every step of the Lint chain before bandit passed). bandit was missing from the
+    container; the session installed bandit 1.9.4 (the version CI uses). Re-ran the full Lint
+    command from commands.md fresh at `f26316d7`: exit 0 (black, mypy `Success: no issues found in
+    346 source files`, check_file_size OK, check_no_mirror_reads OK, test INDEX up to date,
+    lint-imports `1 kept, 0 broken`, bandit no findings, `Adapter consistency OK`, `Entry points OK:
+    17 checked`). No code change. Re-ran Done when: `test_chief_permission_mode.py` 10 passed, exit 0;
+    `tests/runner_supervisor` 356 passed in 82.28s, exit 0. The full Quick suite is left to the conductor.
+- **For later tickets**: `CLAUDE_PERMISSION_MODE` is importable from `runner/chief_argv.py`
+  for ticket 09's acceptance test.
+
+## Attempt note
+
+Attempt 1 stopped before any code change: `tests/runner_supervisor/test_chief_session.py::test_claude_argv_is_restricted_with_its_own_tools_settings_mcp_and_session`
+pins the whole claude argv with `==`, and the file was not in `Touches:`. Plan fix (the person's
+OK, 2026-10-29): the file is now in `Touches:`, so its expected list gains
+`"--permission-mode", "dontAsk"` between `"Bash,Read,Glob,Grep"` and `"--settings"`.
+
+## Review findings (round 1, gate (quick))
+
+gate: Build: python -m build --wheel && npm --prefix studio run typecheck
+gate: Build failed. the last lines of its output:
+adding 'pathly_orchestrator/supervisor/run_budget.py'
+adding 'pathly_orchestrator/supervisor/scheduler.py'
+adding 'pathly_orchestrator/supervisor/slug.py'
+adding 'pathly_orchestrator/supervisor/spawn_policy.py'
+adding 'pathly_orchestrator/supervisor/spawn_window.py'
+adding 'pathly_orchestrator/supervisor/state.py'
+adding 'pathly_orchestrator/supervisor/task_dependencies.py'
+adding 'pathly_orchestrator/supervisor/task_prompt.py'
+adding 'pathly_orchestrator/supervisor/task_proof.py'
+adding 'pathly_orchestrator/supervisor/task_retry.py'
+adding 'pathly_orchestrator/supervisor/terminal.py'
+adding 'pathly_orchestrator/supervisor/terminal_argv.py'
+adding 'pathly_orchestrator/supervisor/terminal_billing.py'
+adding 'pathly_orchestrator/supervisor/terminal_identity.py'
+adding 'pathly_orchestrator/supervisor/terminal_phase.py'
+adding 'pathly_orchestrator/supervisor/terminal_reconcile.py'
+adding 'pathly_studio_cli/__init__.py'
+adding 'pathly_studio_cli/install.py'
+adding 'pathly_telemetry/__init__.py'
+adding 'pathly_telemetry/report.py'
+adding 'pathly_telemetry/storage.py'
+adding 'pathly_adapters-2.24.1.dist-info/METADATA'
+adding 'pathly_adapters-2.24.1.dist-info/WHEEL'
+adding 'pathly_adapters-2.24.1.dist-info/entry_points.txt'
+adding 'pathly_adapters-2.24.1.dist-info/top_level.txt'
+adding 'pathly_adapters-2.24.1.dist-info/RECORD'
+removing build/bdist.linux-x86_64/wheel
+Successfully built pathly_adapters-2.24.1-py3-none-any.whl
+
+> pathly-studio@2.24.1 typecheck
+> tsc --noEmit -p tsconfig.web.json
+
+error TS2688: Cannot find type definition file for 'vite/client'.
+  The file is in the program because:
+    Entry point of type library 'vite/client' specified in compilerOptions
+npm notice
+npm notice New major version of npm available! 10.9.4 -> 12.2.1
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.1
+npm notice To update run: npm install -g npm@12.2.1
+npm notice
+
+## Review findings (round 2, gate (quick))
+
+gate: Build: python -m build --wheel && npm --prefix studio run typecheck
+gate: Quick: python -m pytest tests/comms_board tests/db tests/runner_supervisor tests/http_api tests/dag_goals -q -x -p no:cacheprovider
+gate: Quick failed. the last lines of its output:
+>       report, _ = _run_main(tmp_path, "ok")
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/http_api/test_chief_routes.py:572: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/tmp/pathly-tests/tmp1dob7pmr'), mode = 'ok'
+
+    def _run_main(tmp_path: Path, mode: str) -> tuple[dict, str]:
+        """``main()`` serves on a free port: it leaves the sessions alone when something already
+        answers on the one it would serve (chief-agent 20), and the default is a server that other
+        tests, or a developer, may have running."""
+        home = tmp_path / "main-home"
+        home.mkdir()
+        env = {
+            **os.environ,
+            "HOME": str(home),
+            "USERPROFILE": str(home),
+            "PYTHONPATH": str(SRC),
+            "PATHLY_FSM_HTTP_PORT": str(_free_port()),
+        }
+        done = subprocess.run(
+            [sys.executable, "-c", MAIN_SCRIPT, mode],
+            env=env,
+            cwd=str(tmp_path),
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+>       assert done.returncode == 0, done.stderr
+E       AssertionError: Error: Flask not installed. Install with: pip install flask
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/python', '-c', '\nimport importlib, json, sys\napp_module = importlib.import_module("... None,\n}))\n', 'ok'], returncode=1, stdout='', stderr='Error: Flask not installed. Install with: pip install flask\n').returncode
+
+tests/http_api/test_chief_routes.py:567: AssertionError
+=========================== short test summary info ============================
+FAILED tests/http_api/test_chief_routes.py::test_main_closes_a_session_the_last_process_left_open_before_serving
+!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!
+1 failed, 4301 passed, 2 skipped in 1224.90s (0:20:24)
+
+## Review findings (round 3, gate (quick))
+
+gate: Build: python -m build --wheel && npm --prefix studio run typecheck
+gate: Quick: python -m pytest tests/comms_board tests/db tests/runner_supervisor tests/http_api tests/dag_goals -q -x -p no:cacheprovider
+gate: Lint: black --check src/ tests/ && mypy src/ --ignore-missing-imports --no-strict-optional && python scripts/check_file_size.py && python scripts/check_no_mirror_reads.py && python scripts/gen_test_index.py --check && lint-imports && bandit -q -r src/ -ll -x src/pathly_data/ && python scripts/check_adapters.py && python scripts/check_entry_points.py
+gate: Lint failed. the last lines of its output:
+src/pathly_orchestrator/http_server/blueprints/skills/editor_render.py:294: note: By default the bodies of untyped functions are not checked, consider using --check-untyped-defs  [annotation-unchecked]
+src/pathly_orchestrator/http_server/blueprints/runner/streams.py:41: note: By default the bodies of untyped functions are not checked, consider using --check-untyped-defs  [annotation-unchecked]
+src/pathly_orchestrator/http_server/blueprints/runner/streams.py:75: note: By default the bodies of untyped functions are not checked, consider using --check-untyped-defs  [annotation-unchecked]
+src/pathly_orchestrator/http_server/blueprints/runner/streams.py:106: note: By default the bodies of untyped functions are not checked, consider using --check-untyped-defs  [annotation-unchecked]
+src/pathly_orchestrator/http_server/blueprints/runner/streams.py:186: note: By default the bodies of untyped functions are not checked, consider using --check-untyped-defs  [annotation-unchecked]
+src/pathly_orchestrator/http_server/blueprints/runner/streams.py:253: note: By default the bodies of untyped functions are not checked, consider using --check-untyped-defs  [annotation-unchecked]
+src/pathly_orchestrator/http_server/blueprints/ops/telemetry_phase.py:123: note: By default the bodies of untyped functions are not checked, consider using --check-untyped-defs  [annotation-unchecked]
+src/pathly_orchestrator/http_server/blueprints/ops/telemetry_phase.py:195: note: By default the bodies of untyped functions are not checked, consider using --check-untyped-defs  [annotation-unchecked]
+src/pathly_orchestrator/http_server/blueprints/ops/db_api_invocation.py:77: note: By default the bodies of untyped functions are not checked, consider using --check-untyped-defs  [annotation-unchecked]
+src/pathly_orchestrator/http_server/blueprints/core/health.py:32: note: By default the bodies of untyped functions are not checked, consider using --check-untyped-defs  [annotation-unchecked]
+src/pathly_orchestrator/http_server/blueprints/core/health.py:82: note: By default the bodies of untyped functions are not checked, consider using --check-untyped-defs  [annotation-unchecked]
+src/pathly_orchestrator/http_server/blueprints/core/health.py:83: note: By default the bodies of untyped functions are not checked, consider using --check-untyped-defs  [annotation-unchecked]
+src/pathly_orchestrator/http_server/blueprints/hq/actions_run.py:87: note: By default the bodies of untyped functions are not checked, consider using --check-untyped-defs  [annotation-unchecked]
+src/pathly_orchestrator/http_server/blueprints/hq/actions_run.py:88: note: By default the bodies of untyped functions are not checked, consider using --check-untyped-defs  [annotation-unchecked]
+Success: no issues found in 346 source files
+OK: 1047 source files checked; 18 known over 400 lines, none new, none grown.
+check_no_mirror_reads: OK (8 allow-listed file(s) with markers)
+All test INDEX.md files up to date.
+
+╔══╗─────────▶╔╗ ╔╗      ╔╗◀───┐
+╚╣╠╝◀─────┐  ╔╝╚╗║║────▶╔╝╚╗   │
+ ║║   ╔══╦══╦╩╗╔╝║║  ╔╦═╩╗╔╝╔═╦══╗
+ ║║╔══╣╔╗║╔╗║╔╣║ ║║ ╔╬╣╔╗║║ ║│║╔═╝
+╔╣╠╣║║║╚╝║╚╝║║║╚╗║╚═╝║║║║║╚╗║═╣║
+╚══╩╩╩╣╔═╩══╩╝╚═╝╚═══╩╩╝╚╩═╩╩═╩╝
+  └──▶║║                    ▲ 
+      ╚╝────────────────────┘
+
+
+---------
+Contracts
+---------
+
+Analyzed 321 files, 1053 dependencies.
+--------------------------------------
+
+Orchestrator layer rule (db -> runner -> supervisor -> http_server) KEPT (3 ignored imports)
+
+Contracts: 1 kept, 0 broken.
+bash: line 1: bandit: command not found
