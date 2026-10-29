@@ -5,7 +5,7 @@ Status: open
 Blocked by: —
 Test first: yes
 Level: 3
-Touches: src/pathly_orchestrator/db/secret_scan.py (new), src/pathly_orchestrator/db/queries/fsm_events.py, src/pathly_orchestrator/db/queries/comms_artifacts.py, src/pathly_orchestrator/db/queries/comms_edit.py, src/pathly_orchestrator/db/queries/run_log.py, src/pathly_orchestrator/db/queries/comms_messages.py, src/pathly_orchestrator/supervisor/task_retry.py, src/pathly_data/core/skills/fragments/completion-report.md, tests/snapshots/, tests/db/test_secret_scan.py, tests/http_api/test_token_redact_writes.py, src/pathly_orchestrator/CLAUDE.md, tests/INDEX.md, tests/db/INDEX.md, tests/http_api/INDEX.md
+Touches: src/pathly_orchestrator/db/secret_scan.py (new), src/pathly_orchestrator/db/queries/fsm_events.py, src/pathly_orchestrator/db/queries/comms_artifacts.py, src/pathly_orchestrator/db/queries/comms_artifact_rows.py (new), src/pathly_orchestrator/db/queries/comms_edit.py, src/pathly_orchestrator/db/queries/run_log.py, src/pathly_orchestrator/db/queries/comms_messages.py, src/pathly_orchestrator/supervisor/task_retry.py, src/pathly_data/core/skills/fragments/completion-report.md, tests/snapshots/, tests/db/test_secret_scan.py, tests/http_api/test_token_redact_writes.py, src/pathly_orchestrator/CLAUDE.md, tests/INDEX.md, tests/db/INDEX.md, tests/http_api/INDEX.md
 
 Spike S3: a headless goal-run agent's first command was `echo "PATHLY_RUN_TOKEN: $PATHLY_RUN_TOKEN"`.
 Its output reached `run_log.stdout`, which any reader of `GET /runs/<id>` (a chief included) sees.
@@ -43,7 +43,7 @@ fallback is covered too:
   `fail_task` lives in `comms_tasks.py`, at its 400-line ratchet baseline.
 
 Keep the scan cheap: skip text with no 43-character run. `comms_artifacts.py` is exactly 400
-lines and not in the size baseline, so move code out of it before adding the call. `eventlog.py` (382 lines) and
+lines and not in the size baseline, so move code out of it (into `comms_artifact_rows.py`, re-exported) before adding the call. `eventlog.py` (382 lines) and
 `comms_messages.py` (370) have room; if a file would pass 400, move code out first.
 
 Add one line to `src/pathly_data/core/skills/fragments/completion-report.md`: never print
