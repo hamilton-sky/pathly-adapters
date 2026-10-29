@@ -1,7 +1,7 @@
 # Start a claude chief with `--permission-mode dontAsk`
 
 Type: task
-Status: resolved
+Status: open
 Blocked by: —
 Test first: yes
 Level: 3
@@ -146,3 +146,49 @@ npm notice New major version of npm available! 10.9.4 -> 12.2.1
 npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.1
 npm notice To update run: npm install -g npm@12.2.1
 npm notice
+
+## Review findings (round 2, gate (quick))
+
+gate: Build: python -m build --wheel && npm --prefix studio run typecheck
+gate: Quick: python -m pytest tests/comms_board tests/db tests/runner_supervisor tests/http_api tests/dag_goals -q -x -p no:cacheprovider
+gate: Quick failed. the last lines of its output:
+>       report, _ = _run_main(tmp_path, "ok")
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/http_api/test_chief_routes.py:572: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+tmp_path = PosixPath('/tmp/pathly-tests/tmp1dob7pmr'), mode = 'ok'
+
+    def _run_main(tmp_path: Path, mode: str) -> tuple[dict, str]:
+        """``main()`` serves on a free port: it leaves the sessions alone when something already
+        answers on the one it would serve (chief-agent 20), and the default is a server that other
+        tests, or a developer, may have running."""
+        home = tmp_path / "main-home"
+        home.mkdir()
+        env = {
+            **os.environ,
+            "HOME": str(home),
+            "USERPROFILE": str(home),
+            "PYTHONPATH": str(SRC),
+            "PATHLY_FSM_HTTP_PORT": str(_free_port()),
+        }
+        done = subprocess.run(
+            [sys.executable, "-c", MAIN_SCRIPT, mode],
+            env=env,
+            cwd=str(tmp_path),
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+>       assert done.returncode == 0, done.stderr
+E       AssertionError: Error: Flask not installed. Install with: pip install flask
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/usr/bin/python', '-c', '\nimport importlib, json, sys\napp_module = importlib.import_module("... None,\n}))\n', 'ok'], returncode=1, stdout='', stderr='Error: Flask not installed. Install with: pip install flask\n').returncode
+
+tests/http_api/test_chief_routes.py:567: AssertionError
+=========================== short test summary info ============================
+FAILED tests/http_api/test_chief_routes.py::test_main_closes_a_session_the_last_process_left_open_before_serving
+!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!
+1 failed, 4301 passed, 2 skipped in 1224.90s (0:20:24)
