@@ -1,7 +1,7 @@
 # Redact run tokens where Pathly writes text to its database
 
 Type: task
-Status: resolved
+Status: open
 Blocked by: —
 Test first: yes
 Level: 3
@@ -147,3 +147,9 @@ exit 0
   `/comms/tasks/fail` route (reason stored as given; `comms_tasks.py` is at its baseline), the
   mirror replay `comms_hydrate.insert_message_row` / `insert_artifact_row`, and
   `update_artifact_summary`.
+
+## Review findings (round 1, floor guard)
+
+floor guard: the diff weakens the bar instead of meeting it
+suppress: src/pathly_orchestrator/db/queries/comms_artifacts.py: from .comms_artifact_rows import insert_artifact  # noqa: F401
+if a finding is intended, the ticket needs a line like: Floor: allow <category>
