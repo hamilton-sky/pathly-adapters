@@ -5,7 +5,7 @@ Status: open
 Blocked by: —
 Test first: yes
 Level: 3
-Touches: src/pathly_orchestrator/http_server/run_token_guard.py (new), src/pathly_orchestrator/http_server/app.py, tests/http_api/test_unknown_run_token.py, src/pathly_orchestrator/CLAUDE.md, tests/INDEX.md, tests/http_api/INDEX.md
+Touches: src/pathly_orchestrator/http_server/run_token_guard.py (new), src/pathly_orchestrator/http_server/app.py, src/pathly_orchestrator/http_server/chief_gate.py, tests/http_api/test_chief_gate.py, tests/http_api/test_chief_routes.py, tests/http_api/test_floor_allow_route.py, tests/comms_board/test_comms_provenance.py, tests/comms_board/test_comms_edit_restamp.py, tests/http_api/test_unknown_run_token.py, src/pathly_orchestrator/CLAUDE.md, tests/INDEX.md, tests/http_api/INDEX.md
 
 The review's M1. `src/pathly_orchestrator/http_server/chief_gate.py::chief_gate` acts only on a
 live chief token; a request with no token, an unknown token or a revoked one passes untouched and
@@ -52,3 +52,14 @@ exit 0
 - `src/pathly_orchestrator/http_server/run_identity.py::caller_identity`
 
 ## Answer
+
+## Footprint change (before the build)
+
+A scout found existing tests that pin today's rule (an invented or revoked token passes as
+anonymous): `test_chief_gate.py` (the "nope" and revoked-builder cases), `test_chief_routes.py`
+(`"not-a-token"` on `/chief/open`), `test_floor_allow_route.py`, `test_comms_provenance.py` and
+`test_comms_edit_restamp.py` (revoked tokens). They contradict this ticket, so with the person's OK
+of 2026-10-29 for footprint misses `Touches:` now names them and `chief_gate.py` (its docstring
+says unknown tokens pass untouched). Update each to the new rule: expect 401 where the token is
+invented or revoked, or drop the header where the test is about an anonymous caller. Never delete
+or skip one.
