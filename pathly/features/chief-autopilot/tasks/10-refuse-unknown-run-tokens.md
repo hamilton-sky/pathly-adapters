@@ -1,7 +1,7 @@
 # Refuse a request whose run token Pathly does not know
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: —
 Test first: yes
 Level: 3
@@ -52,6 +52,55 @@ exit 0
 - `src/pathly_orchestrator/http_server/run_identity.py::caller_identity`
 
 ## Answer
+
+**Built** (attempt 1, b340adf4 + d027287c; attempt 2, b56b28e6 + this commit):
+- `src/pathly_orchestrator/http_server/run_token_guard.py` (new): a `before_request` hook,
+  registered in `app.py` between `_log_request` and `chief_gate`. A non-empty
+  `X-Pathly-Run-Token` that is never minted, or revoked, gets 401 `{"error": "unknown run token"}`
+  (after `forget_run_slot()`, logged at info). A revoked `chief` token is left to `chief_gate`,
+  which keeps its 401 `{"error": "chief session closed"}`. No header, an empty header and any live
+  token pass on unchanged.
+- `chief_gate.py` docstring and `src/pathly_orchestrator/CLAUDE.md` describe the new rule.
+- Tests pinning the old rule updated to it (401 for an invented or revoked token, no header for an
+  anonymous caller): `test_chief_gate.py`, `test_chief_routes.py`, `test_floor_allow_route.py`,
+  `test_comms_provenance.py`, `test_comms_edit_restamp.py`, and now `test_rrp_acceptance.py`
+  (`test_token_resolves_to_none_once_the_spawn_settles`: the late post is 401 `unknown run token`
+  and stores nothing).
+- `tests/http_api/test_unknown_run_token.py` (new, 10 tests), plus `tests/http_api/INDEX.md`.
+- `tests/http_api/chief_audit_support.py::_fd_path`: a readlink target that is not an absolute
+  path (`pipe:[N]`, `socket:[N]`, `anon_inode:...`) is None, so `_absolute()` no longer joins it to
+  the cwd. Pinned by `test_the_audit_does_not_read_a_pipe_as_a_file_in_the_cwd` (`os.pipe()`).
+
+**Proof**:
+- `python -m pytest tests/http_api/test_unknown_run_token.py -q -p no:cacheprovider`: 10 passed,
+  exit 0 (invented and revoked tokens 401 on `GET /db/settings`, `/comms/post`,
+  `/chief/human-messages`; nothing written; no header and empty header anonymous; live builder and
+  live chief unchanged; a chief revoked at close 401). At b56b28e6 the pipe test failed with
+  `assert 'pipe:[89228]' is None`, the rest passed.
+- `python -m pytest tests/http_api tests/comms_board tests/fsm_flows -q -p no:cacheprovider`:
+  4726 passed, 9 skipped, exit 0 (a first run had one failure, `test_build_proof_acceptance.py::test_6_dependent_task_prompt_carries_its_dependency_result`, a timing flake: that harness sends no run token, the file passes alone and `tests/fsm_flows` passed 3 runs of 3; the rerun was clean).
+- `python -m pytest tests/http_api/test_chief_gate_audit.py -k operator`: 1 passed.
+- Lint chain from commands.md: exit 0.
+
+**Decisions**:
+- A revoked chief token keeps `chief session closed` (left to `chief_gate`) rather than the
+  generic `unknown run token`: `test_chief_gate.py::test_a_revoked_chief_token_gets_401` pins that body.
+- The guard runs after `_log_request` and before `chief_gate`, so the gate never sees a dead token.
+- `_fd_path` treats any non-absolute readlink result as unnamed, the meaning `_absolute()`'s
+  docstring already gave it; macOS `F_GETPATH` is unchanged.
+
+**Callers that can send a stale token**: only agent processes send the header, from
+`$PATHLY_RUN_TOKEN` (the fragments' curl calls in `src/pathly_data/core/skills/fragments/`,
+`pathly api` in `chief_cli.py::_api`, the board-run and catalog prompt text). Studio
+(`spawnEnv.ts` only sets the env var), the hooks in `src/pathly_hooks/` and `pathly-fsm-call` send
+none. A process still running after its spawn settled (a backgrounded child of a headless agent)
+and a chief tab's `pathly api` after close now get 401 instead of acting as anonymous.
+
+**Shortcuts taken**: none.
+
+**For later tickets**: any test that posts with a revoked or invented token now gets 401; send no
+header for an anonymous caller. `test_chief_gate_audit.py[operator]` failed only when it was the
+first test in its process to import torch; it is fixed in the support module, not the test.
 
 ## Footprint change (before the build)
 

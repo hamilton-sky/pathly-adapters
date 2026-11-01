@@ -1,8 +1,9 @@
 """The chief gate: a ``before_request`` hook that refuses what a chief token may not do.
 
 It acts only on a request whose ``X-Pathly-Run-Token`` belongs to a token row with role
-``chief``; every other caller (a builder token, an unknown token, no token) passes untouched.
-A chief whose token is revoked or whose session is closed gets 401, never the anonymous
+``chief``; every other caller (a live token of another role, no token) passes untouched. An
+unknown token, and a revoked one of another role, never reach it: ``run_token_guard`` answers them
+401 first. A chief whose token is revoked or whose session is closed gets 401, never the anonymous
 treatment ``caller_identity`` would give it, because anonymous loopback callers can do everything.
 
 For a live chief, the call is classed by ``chief_routes.action_for`` and refused with 403 unless
@@ -13,8 +14,8 @@ keys its route lists (``chief_keys``). Each check runs over every reading of the
 get (``_bodies``). An ``answer`` is then held to the cite rule (``chief_cite``): the chief names a
 human message of its session by ``cite`` and Pathly relays that message's own text. Last, a call
 that starts work is held to the session's cost ceiling and run limit (``chief_budget``), which
-takes the run's slot only after every other check has passed. Registered in ``app.py`` right
-after ``_log_request``, so the secret check and the rate limit run first. Flask matches the URL
+takes the run's slot only after every other check has passed. Registered in ``app.py`` after
+``_log_request`` and ``run_token_guard``, so the secret check and the rate limit run first. Flask matches the URL
 rule before any hook runs, so a path no route matches (``url_rule`` is None) passes here and
 Flask answers 404 or 405.
 """
