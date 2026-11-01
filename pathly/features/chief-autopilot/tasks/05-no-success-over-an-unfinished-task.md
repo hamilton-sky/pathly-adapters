@@ -1,7 +1,7 @@
 # Fail a single run that leaves its task unfinished, and free the task
 
 Type: task
-Status: resolved
+Status: open
 Blocked by: 11
 Test first: yes
 Level: 2
@@ -102,3 +102,19 @@ exit 0
 **For later tickets**:
 - 06: add the "open question" exception in `settle_run_tasks` (return None and leave the task parked when the task has an open question) and subtract `waits` in `counted_attempts`.
 - 12: loop tasks are skipped by `_owns_its_tasks` (`goal-loop` flow, `sched-` ids).
+
+## Review findings (round 1, single review)
+
+SPEC
+- Done when 1: MET. 6 passed; covers no AGENT_DONE -> synthetic failed/task_unfinished; agent's own success on PTY-first and early-advance paths -> GET /runs/<id> failed with exactly 1 agent_invocations row; task back to pending and the next run claims it (attempts=2); at the limit failed, dependent blocked, one escalation; done task keeps success.
+- Done when 2: MET.
+- scope: OK (map.md and learnings.md are the feature's bookkeeping).
+- test first: OK (a5a79e5f before the code; fails without it).
+
+QUALITY
+1. major src/pathly_orchestrator/supervisor/terminal.py: settle_run_tasks runs only on a clean end (early-advance return, and _synthesize_agent_done_if_missing on PTY-first and slow paths). A single run that exits non-zero (rate limit after retries, crash), times out, or is stopped raises before either call, so its claimed task stays in_progress with claimed_by = the dead run. Nothing frees it (reclaim_stale_claims is loop-scheduler only) and claim_task needs pending, so the next goal start can never claim it: the stuck-task outcome this ticket exists to remove. Fix: free the run's unfinished tasks on the exception path too (e.g. in the finally before _settle_spawn_identity, guarded by sys.exc_info()), free only, no extra AGENT_DONE or RUN_OUTCOME (run_history already becomes error there). Add a test with a non-zero exit_code.
+2. minor terminal.py: the early-advance path still returns result_for_fsm with the agent's outcome success, and the PTY path's _pty_return carries no error, so on_done posts "goal run finished" phase done for a run that GET /runs/<id> and run_history call failed. Fix: put outcome failed / error task_unfinished on the returned result when settle_run_tasks returns an error.
+3. minor terminal.py: on the early-advance path agent_done_data comes from read_last_agent_done(storage_path), the feature's latest AGENT_DONE, not necessarily this run's; it is passed as own_agent_done without checking run_id. Fix: pass it only when agent_done_data.get("run_id") == run_id, as terminal_reconcile does.
+4. minor src/pathly_orchestrator/supervisor/terminal_identity.py: _settle_spawn_identity returns early when identity is falsy before take_run_failure, leaking the id in the module-level _failed_runs set; also an edited docstring line is over-long. Fix: call take_run_failure(run_id) before the `if not identity: return`, and rewrap.
+
+REVIEW: FAIL
