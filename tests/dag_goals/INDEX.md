@@ -4,10 +4,11 @@
 
 Goal/DAG decomposition & scheduling — feature/flow/project decompose, goals read-model, PRD import.
 
-18 test file(s).
+19 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
+| `test_claim_names_its_run.py` | chief-autopilot 11: a task's ``claimed_by`` names the run that works on it | 5 |
 | `test_cost_cap.py` | Tests for supervisor/cost_cap.py — aggregate cost enforcement for the loop executor | 14 |
 | `test_dag_scheduler.py` | Tests for supervisor/scheduler.py — DAG frontier loop (Phase 2a) | 4 |
 | `test_dag_scheduler_db.py` | Tests for P2 DAG scheduler DB layer | 9 |
