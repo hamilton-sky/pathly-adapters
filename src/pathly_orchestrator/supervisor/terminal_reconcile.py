@@ -19,7 +19,7 @@ from pathly_orchestrator import eventlog as _eventlog
 
 from .state import RunnerState, logger
 from .registry import TerminalRun, drop_run, _TERMINAL_RESULT_TIMEOUT
-from .run_task_outcome import settle_run_tasks
+from .run_task_outcome import mark_pty_failed, settle_run_tasks
 from .terminal_identity import _run_board_scope
 
 
@@ -199,7 +199,8 @@ def _synthesize_agent_done_if_missing(
     BEFORE _reconcile_billing_now so _patch_last_agent_done sees this as the last event.
     First it runs ``run_task_outcome.settle_run_tasks``: a run that left a claimed task
     in_progress gets ``outcome: failed`` + ``error: task_unfinished`` here (or a RUN_OUTCOME
-    beside the agent's own AGENT_DONE), and the task is freed.
+    beside the agent's own AGENT_DONE), the task is freed, and ``data['result']`` (what the
+    spawn returns) is marked failed.
     Best-effort; never raises into the loop.
     """
     if not getattr(state, "executor_owned_telemetry", False):
@@ -219,6 +220,8 @@ def _synthesize_agent_done_if_missing(
         own = last if last and last.get("run_id") == run_id else None
         # chief-autopilot 05: a run that left its task in_progress is failed, not success.
         error = settle_run_tasks(state, run_id, storage, own)
+        if error:
+            mark_pty_failed(data, error)  # the spawn's returned result says failed too
         if own is not None:
             return  # the agent self-reported this run — nothing to synthesize
         billing = (data or {}).get("result") or {}

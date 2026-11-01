@@ -1,7 +1,7 @@
 # Fail a single run that leaves its task unfinished, and free the task
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 11
 Test first: yes
 Level: 2
@@ -102,6 +102,29 @@ exit 0
 **For later tickets**:
 - 06: add the "open question" exception in `settle_run_tasks` (return None and leave the task parked when the task has an open question) and subtract `waits` in `counted_attempts`.
 - 12: loop tasks are skipped by `_owns_its_tasks` (`goal-loop` flow, `sched-` ids).
+
+**Round 2** (work started at b39f5ea4; failing test 774daa1e):
+
+**Built**:
+- `supervisor/run_task_outcome.py`: `_free_unfinished` (shared freeing), `settle_run_tasks(..., always_record=)`, new `settle_early_advance`, `mark_failed`, `mark_pty_failed`, `free_tasks_of_failed_spawn`.
+- `supervisor/terminal.py`: the early-advance path calls `settle_early_advance(...)` after `result_for_fsm` is built (396 -> 398 lines).
+- `supervisor/terminal_reconcile.py`: marks `data['result']` failed (`mark_pty_failed`) when `settle_run_tasks` returns an error.
+- `supervisor/terminal_identity.py::_settle_spawn_identity`: reads `sys.exc_info()` first; on an exception calls `free_tasks_of_failed_spawn`; calls `take_run_failure` before the `if not identity: return`; docstring rewrapped.
+- `src/pathly_orchestrator/CLAUDE.md`: the section and the file-list line updated.
+- `tests/runner_supervisor/test_unfinished_task_outcome.py`: 2 new tests, result assertions in 2 existing ones (8 tests), INDEX regenerated.
+
+**Proof (round 2)**:
+- `python -m pytest tests/runner_supervisor/test_unfinished_task_outcome.py -q -p no:cacheprovider`: 8 passed, exit 0. At 774daa1e (tests only) 5 failed for the right reasons: no `outcome` in the returned result, `success` from early advance on another run's AGENT_DONE, task left `in_progress` after a non-zero exit.
+- `python -m pytest tests/runner_supervisor tests/dag_goals -q -p no:cacheprovider`: 606 passed, exit 0.
+- Lint chain (black, mypy, check_file_size, check_no_mirror_reads, gen_test_index --check, lint-imports, bandit): exit 0.
+
+**Review fixes**:
+1. major (no free on the exception path): `_settle_spawn_identity` runs in the spawn's `finally`; when `sys.exc_info()` holds an exception it calls `run_task_outcome.free_tasks_of_failed_spawn`, which frees the run's `in_progress` tasks (pending / failed + escalation past the limit) and writes nothing else. Test `test_a_run_that_exits_nonzero_frees_its_task`: exit code 1 raises `terminal_exit_nonzero`, the task is `pending` with `task_unfinished`, attempts 1, no AGENT_DONE and no RUN_OUTCOME for the run, run_history `error`, and the next run claims it.
+2. minor (returned result said success): early advance marks `result_for_fsm` via `settle_early_advance`; the PTY-first and slow paths get `outcome: failed` / `error: task_unfinished` on `data['result']` from `_synthesize_agent_done_if_missing` (`mark_pty_failed`), which `_pty_return` copies. Asserted in the no-AGENT_DONE test and both cases of the own-success test.
+3. minor (another run's AGENT_DONE taken as own): `settle_early_advance` treats it as own only when its `run_id` is this run's; otherwise it records a `RUN_OUTCOME` anyway (`always_record`), since no synthetic AGENT_DONE is written on this path. Test `test_early_advance_on_another_runs_agent_done_still_reports_failed` (another run's `failed` AGENT_DONE used to suppress the RUN_OUTCOME).
+4. minor (`_failed_runs` leak, long line): `take_run_failure` now runs before the `if not identity: return`; docstring rewrapped.
+
+**Shortcuts (round 2)**: none new. `mark_pty_failed` replaces a non-dict `data['result']` with a dict (`_pty_return` already treated a non-dict as `{}`).
 
 ## Review findings (round 1, single review)
 

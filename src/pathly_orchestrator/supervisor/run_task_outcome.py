@@ -17,7 +17,9 @@ end ``success`` and leave the task stuck for good (chief-autopilot 05, spike S6)
   the projection ignores ``RUN_OUTCOME``, and ``GET /runs/<id>`` reads it over the AGENT_DONE.
 
 It returns the error (``task_unfinished``) so the caller's synthetic ``AGENT_DONE`` can carry
-``outcome: failed``, or None when the run is unchanged. Loop tasks are the scheduler's
+``outcome: failed``, or None when the run is unchanged. A spawn that raises (non-zero exit,
+timeout, stop) never reaches it: ``free_tasks_of_failed_spawn`` frees its tasks from the
+spawn's ``finally`` instead. Loop tasks are the scheduler's
 (``sched-`` run ids, the ``goal-loop`` flow) and are never touched here. Best-effort: never
 raises into the spawn path.
 """
@@ -87,46 +89,112 @@ def _record_run_outcome(storage: Path, run_id: str, error: str) -> None:
     )
 
 
+def _free_unfinished(run_id: str) -> int:
+    """Free every task the run left ``in_progress``; the number freed."""
+    from pathly_orchestrator.db.connection import get_db
+    from pathly_orchestrator.db.queries.comms_tasks_by_run import (
+        get_unfinished_tasks_of_run,
+    )
+
+    from .task_retry import resolve_max_attempts
+
+    conn = get_db()
+    tasks = get_unfinished_tasks_of_run(conn, run_id)
+    if tasks:
+        limit = resolve_max_attempts()
+        for task in tasks:
+            _free_task(conn, task, limit)
+    return len(tasks)
+
+
 def settle_run_tasks(
     state: RunnerState,
     run_id: str,
     storage: Path,
     own_agent_done: Optional[dict] = None,
+    *,
+    always_record: bool = False,
 ) -> Optional[str]:
     """Free the tasks this run left ``in_progress`` and mark the run failed (module doc).
 
     ``own_agent_done`` is the agent's own ``AGENT_DONE`` for this run, or None when it wrote
-    none (the caller then writes the synthetic one with the returned error)."""
+    none (the caller then writes the synthetic one with the returned error). With
+    ``always_record`` the ``RUN_OUTCOME`` is written even without one, for a caller that
+    writes no synthetic ``AGENT_DONE``."""
     if not _owns_its_tasks(state, run_id):
         return None
     try:
-        from pathly_orchestrator.db.connection import get_db
-        from pathly_orchestrator.db.queries.comms_tasks_by_run import (
-            get_unfinished_tasks_of_run,
-        )
-
-        from .task_retry import resolve_max_attempts
-
-        conn = get_db()
-        tasks = get_unfinished_tasks_of_run(conn, run_id)
-        if not tasks:
+        freed = _free_unfinished(run_id)
+        if not freed:
             return None
-        limit = resolve_max_attempts()
-        for task in tasks:
-            _free_task(conn, task, limit)
         with _failed_lock:
             _failed_runs.add(run_id)
-        if own_agent_done is not None and own_agent_done.get("outcome") != "failed":
+        own_failed = (own_agent_done or {}).get("outcome") == "failed"
+        if (own_agent_done is not None or always_record) and not own_failed:
             _record_run_outcome(storage, run_id, TASK_UNFINISHED)
         logger.info(
             "run %s left %d task(s) unfinished: run failed, tasks freed",
             run_id[:8],
-            len(tasks),
+            freed,
         )
         return TASK_UNFINISHED
     except Exception:
         logger.warning("settle_run_tasks failed for run %s", run_id, exc_info=True)
         return None
+
+
+def settle_early_advance(
+    state: RunnerState,
+    run_id: str,
+    storage: Path,
+    agent_done: Optional[dict],
+    result: dict,
+) -> None:
+    """The early-advance path: the feature's latest ``AGENT_DONE`` counts as this run's own
+    only when its ``run_id`` is this run's. No synthetic ``AGENT_DONE`` follows here, so the
+    failure is always recorded as a ``RUN_OUTCOME``, and ``result`` (what the spawn returns)
+    is marked failed so the caller does not report success."""
+    own = agent_done if (agent_done or {}).get("run_id") == run_id else None
+    error = settle_run_tasks(state, run_id, storage, own, always_record=True)
+    if error:
+        mark_failed(result, error)
+
+
+def mark_failed(result: dict, error: str) -> None:
+    """Put ``outcome: failed`` and ``error`` on a spawn's returned result dict."""
+    result["outcome"] = "failed"
+    result["error"] = error
+
+
+def mark_pty_failed(data: Optional[dict], error: str) -> None:
+    """Mark a PTY result (``data['result']`` is what the spawn returns) failed."""
+    if not isinstance(data, dict):
+        return
+    result = data.get("result")
+    if not isinstance(result, dict):
+        result = {}
+        data["result"] = result
+    mark_failed(result, error)
+
+
+def free_tasks_of_failed_spawn(state: RunnerState, run_id: str) -> None:
+    """A spawn that raised (non-zero exit, timeout, stop) frees the tasks it left
+    ``in_progress``, free only: its ``run_history`` row already says ``error``, and no
+    ``AGENT_DONE`` or ``RUN_OUTCOME`` is written. Best-effort."""
+    if not _owns_its_tasks(state, run_id):
+        return
+    try:
+        freed = _free_unfinished(run_id)
+        if freed:
+            logger.info(
+                "failed run %s left %d task(s) unfinished: tasks freed",
+                run_id[:8],
+                freed,
+            )
+    except Exception:
+        logger.warning(
+            "free_tasks_of_failed_spawn failed for run %s", run_id, exc_info=True
+        )
 
 
 def take_run_failure(run_id: str) -> bool:

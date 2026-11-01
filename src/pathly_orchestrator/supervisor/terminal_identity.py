@@ -114,9 +114,16 @@ def _settle_spawn_identity(
 ) -> None:
     """Settle the spawn's identity row when the spawn ends: done, or error when the
     stage is unwinding an exception (read via sys.exc_info() — this runs inside the
-    caller's finally) or ``run_task_outcome`` failed the run for an unfinished task. Identity fields COALESCE in upsert_run, so this never
-    overwrites the issued board_scope. Best-effort.
+    caller's finally) or ``run_task_outcome`` failed the run for an unfinished task.
+    A spawn that is unwinding an exception also frees the tasks it left in_progress.
+    Identity fields COALESCE in upsert_run, so this never overwrites the issued
+    board_scope. Best-effort.
     """
+    import sys as _sys
+
+    from .run_task_outcome import free_tasks_of_failed_spawn, take_run_failure
+
+    raised = _sys.exc_info()[0] is not None
     try:
         from pathly_orchestrator.db.connection import get_db
         from pathly_orchestrator.db.queries.run_tokens import revoke_run_tokens
@@ -124,20 +131,20 @@ def _settle_spawn_identity(
         revoke_run_tokens(get_db(), run_id)
     except Exception:
         logger.debug("revoke_run_tokens skipped", exc_info=True)
+    # chief-autopilot 05: a crashed, timed-out or stopped run frees its tasks.
+    if raised:
+        free_tasks_of_failed_spawn(state, run_id)
+    failed = take_run_failure(run_id)  # chief-autopilot 05: left a task unfinished
     if not identity:
         return
     try:
-        import sys as _sys
         import time as _time
 
         from pathly_orchestrator.db.connection import get_db
         from pathly_orchestrator.db.queries.run_history import upsert_run
 
-        from .run_task_outcome import take_run_failure
-
         slug, scope = identity
-        failed = take_run_failure(run_id)  # chief-autopilot 05: left a task unfinished
-        status = "error" if _sys.exc_info()[0] or failed else "done"
+        status = "error" if raised or failed else "done"
         upsert_run(
             get_db(),
             state.project_root,

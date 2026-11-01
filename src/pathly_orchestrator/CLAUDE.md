@@ -1634,7 +1634,7 @@ pathly_orchestrator/
     terminal_argv.py       # _resolve_spawn_argv — the seam a NEW ADAPTER touches
     terminal_identity.py   # _record_spawn_identity/_record_spawn_prompt/_settle_spawn_identity, _run_board_scope; _issue_spawn_token/_spawn_role mint the spawn's run token (revoked in _settle_spawn_identity)
     terminal_reconcile.py  # _agent_done_watcher, _reconciliation_window, _synthesize_agent_done_if_missing (outcome failed + error task_unfinished when run_task_outcome says so)
-    run_task_outcome.py    # settle_run_tasks: at the end of a board/single run, frees the tasks it left in_progress and fails the run (see "No success over an unfinished task")
+    run_task_outcome.py    # settle_run_tasks / settle_early_advance / free_tasks_of_failed_spawn: at the end of a board/single run, frees the tasks it left in_progress and fails the run (see "No success over an unfinished task")
     terminal_billing.py    # _emit_executor_telemetry, _reconcile_billing_now (were spawn-local closures)
     terminal_phase.py      # _write_supervisor_phase_summary
     interactions.py        # _await_agent_question (keeps the pending question on RunnerState._agent_question: question, options, every question of the ask, asked_at; cleared on every exit)
@@ -2558,8 +2558,9 @@ A board or single run (`executor_owned_telemetry`) has no per-task retry of its 
 `claim_task` needs `pending`, so a run that claimed a task and ended with it still `in_progress`
 used to end `success` and leave the task stuck. `settle_run_tasks(state, run_id, storage,
 own_agent_done)` runs at the end of every such run: from `_synthesize_agent_done_if_missing` (the
-PTY-first and slow paths) and from the early-advance path in `terminal.py` (the agent's own
-`AGENT_DONE` won). It reads the tasks still `in_progress` with `claimed_by` = the run id
+PTY-first and slow paths) and through `settle_early_advance` from the early-advance path in
+`terminal.py` (an `AGENT_DONE` won; it counts as the run's own only when its `run_id` is this
+run's, and with none of its own the failure is still recorded as a `RUN_OUTCOME`). It reads the tasks still `in_progress` with `claimed_by` = the run id
 (`comms_tasks_by_run.get_unfinished_tasks_of_run`; ticket 11 made `claimed_by` the run). When
 there is one:
 
@@ -2573,7 +2574,14 @@ there is one:
   invocation row per `AGENT_DONE`); a `RUN_OUTCOME` event `{run_id, outcome, error}` is appended,
   which the projection ignores;
 - `_settle_spawn_identity` writes the run's `run_history` status `error`
-  (`run_task_outcome.take_run_failure`).
+  (`run_task_outcome.take_run_failure`);
+- the spawn's returned result carries `outcome: "failed"`, `error: "task_unfinished"`
+  (`mark_failed` / `mark_pty_failed`), so the goal run's `on_done` does not report success.
+
+A spawn that raises (non-zero exit, timeout, stop) reaches neither call: `_settle_spawn_identity`,
+in the spawn's `finally`, sees the exception and calls `free_tasks_of_failed_spawn`, which frees
+the run's `in_progress` tasks the same way and writes nothing else (no `AGENT_DONE`, no
+`RUN_OUTCOME`; `run_history` already says `error`).
 
 `GET /runs/<id>` reports `run.outcome` / `run.error` (`run_history_read._run_outcome`): the latest
 `RUN_OUTCOME` for the run over its latest `AGENT_DONE` (an `AGENT_DONE` with no outcome reads
