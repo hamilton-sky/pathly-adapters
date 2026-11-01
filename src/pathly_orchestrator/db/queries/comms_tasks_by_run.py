@@ -13,13 +13,14 @@ import sqlite3
 def get_unfinished_tasks_of_run(conn: sqlite3.Connection, run_id: str) -> list[dict]:
     """The tasks still ``in_progress`` with ``claimed_by`` = ``run_id``, oldest first.
 
-    Each row carries what freeing or failing it needs: id, board, scope, goal_id, text and
-    attempts (the count the claim already raised). A blank ``run_id`` matches nothing.
+    Each row carries what freeing, parking or failing it needs: id, board, scope, goal_id,
+    text, attempts (the count the claim already raised) and waits (the parks on a question,
+    chief-autopilot 06). A blank ``run_id`` matches nothing.
     """
     if not run_id:
         return []
     rows = conn.execute(
-        "SELECT id, board, scope, goal_id, text, attempts FROM comms_messages "
+        "SELECT id, board, scope, goal_id, text, attempts, waits FROM comms_messages "
         "WHERE type='task' AND task_status='in_progress' AND claimed_by=? "
         "AND deleted_at IS NULL ORDER BY ts ASC",
         (run_id,),

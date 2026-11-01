@@ -16,10 +16,16 @@ end ``success`` and leave the task stuck for good (chief-autopilot 05, spike S6)
   ``RUN_OUTCOME`` event. A second ``AGENT_DONE`` would give the run a second invocation row;
   the projection ignores ``RUN_OUTCOME``, and ``GET /runs/<id>`` reads it over the AGENT_DONE.
 
-It returns the error (``task_unfinished``) so the caller's synthetic ``AGENT_DONE`` can carry
-``outcome: failed``, or None when the run is unchanged. A spawn that raises (non-zero exit,
-timeout, stop) never reaches it: ``free_tasks_of_failed_spawn`` frees its tasks from the
-spawn's ``finally`` instead. Loop tasks are the scheduler's
+A run that posted a question to ``human`` (or ``*``) that is still unanswered parks those tasks
+instead (chief-autopilot 06, ``db/queries/task_waits.py``): ``blocked`` with
+``fail_reason='waiting_for_answer:<ids>'`` and ``waits + 1``, freed by any answer; the run is
+failed with ``waiting_for_answer``. ``counted_attempts`` is ``attempts - waits``, so a wait never
+spends a retry.
+
+It returns the error (``task_unfinished`` or ``waiting_for_answer``) so the caller's synthetic
+``AGENT_DONE`` can carry ``outcome: failed``, or None when the run is unchanged. A spawn that raises (non-zero exit,
+timeout, stop) never reaches it: ``free_tasks_of_failed_spawn`` frees (or parks) its tasks
+from the spawn's ``finally`` instead. Loop tasks are the scheduler's
 (``sched-`` run ids, the ``goal-loop`` flow) and are never touched here. Best-effort: never
 raises into the spawn path.
 """
@@ -34,15 +40,16 @@ from typing import Optional
 from .state import RunnerState, logger
 
 TASK_UNFINISHED = "task_unfinished"
+WAITING_FOR_ANSWER = "waiting_for_answer"
 
 _failed_runs: set[str] = set()
 _failed_lock = threading.Lock()
 
 
 def counted_attempts(task: dict) -> int:
-    """The attempts that count against ``goal.task_max_attempts``: every claim, for now.
-    (Ticket 06 subtracts the attempts that only waited on a question.)"""
-    return int(task.get("attempts") or 0)
+    """The attempts that count against ``goal.task_max_attempts``: every claim minus the
+    ones that only waited on a question (``waits``)."""
+    return int(task.get("attempts") or 0) - int(task.get("waits") or 0)
 
 
 def _owns_its_tasks(state: RunnerState, run_id: str) -> bool:
@@ -89,22 +96,33 @@ def _record_run_outcome(storage: Path, run_id: str, error: str) -> None:
     )
 
 
-def _free_unfinished(run_id: str) -> int:
-    """Free every task the run left ``in_progress``; the number freed."""
+def _free_unfinished(run_id: str) -> tuple[Optional[str], int]:
+    """Park (open question) or free every task the run left ``in_progress``: the error and
+    the number of tasks, or ``(None, 0)`` when it left none."""
     from pathly_orchestrator.db.connection import get_db
     from pathly_orchestrator.db.queries.comms_tasks_by_run import (
         get_unfinished_tasks_of_run,
+    )
+    from pathly_orchestrator.db.queries.task_waits import (
+        open_questions_by_run,
+        park_task,
     )
 
     from .task_retry import resolve_max_attempts
 
     conn = get_db()
     tasks = get_unfinished_tasks_of_run(conn, run_id)
-    if tasks:
-        limit = resolve_max_attempts()
+    if not tasks:
+        return None, 0
+    questions = open_questions_by_run(conn, run_id)
+    if questions:
         for task in tasks:
-            _free_task(conn, task, limit)
-    return len(tasks)
+            park_task(conn, task["id"], questions)
+        return WAITING_FOR_ANSWER, len(tasks)
+    limit = resolve_max_attempts()
+    for task in tasks:
+        _free_task(conn, task, limit)
+    return TASK_UNFINISHED, len(tasks)
 
 
 def settle_run_tasks(
@@ -124,20 +142,21 @@ def settle_run_tasks(
     if not _owns_its_tasks(state, run_id):
         return None
     try:
-        freed = _free_unfinished(run_id)
-        if not freed:
+        error, freed = _free_unfinished(run_id)
+        if not error:
             return None
         with _failed_lock:
             _failed_runs.add(run_id)
         own_failed = (own_agent_done or {}).get("outcome") == "failed"
         if (own_agent_done is not None or always_record) and not own_failed:
-            _record_run_outcome(storage, run_id, TASK_UNFINISHED)
+            _record_run_outcome(storage, run_id, error)
         logger.info(
-            "run %s left %d task(s) unfinished: run failed, tasks freed",
+            "run %s left %d task(s) unfinished: run failed (%s)",
             run_id[:8],
             freed,
+            error,
         )
-        return TASK_UNFINISHED
+        return error
     except Exception:
         logger.warning("settle_run_tasks failed for run %s", run_id, exc_info=True)
         return None
@@ -179,17 +198,18 @@ def mark_pty_failed(data: Optional[dict], error: str) -> None:
 
 def free_tasks_of_failed_spawn(state: RunnerState, run_id: str) -> None:
     """A spawn that raised (non-zero exit, timeout, stop) frees the tasks it left
-    ``in_progress``, free only: its ``run_history`` row already says ``error``, and no
-    ``AGENT_DONE`` or ``RUN_OUTCOME`` is written. Best-effort."""
+    ``in_progress`` (or parks them on its open questions), nothing else: its ``run_history``
+    row already says ``error``, and no ``AGENT_DONE`` or ``RUN_OUTCOME`` is written."""
     if not _owns_its_tasks(state, run_id):
         return
     try:
-        freed = _free_unfinished(run_id)
+        error, freed = _free_unfinished(run_id)
         if freed:
             logger.info(
-                "failed run %s left %d task(s) unfinished: tasks freed",
+                "failed run %s left %d task(s) unfinished: %s",
                 run_id[:8],
                 freed,
+                error,
             )
     except Exception:
         logger.warning(

@@ -7,6 +7,7 @@ import uuid
 
 from .migrations_chief import add_chief_tables
 from .migrations_provenance import add_comms_provenance, add_run_tokens
+from .migrations_task_waits import add_task_waits
 
 
 def _backfill_comms_artifacts(conn: sqlite3.Connection) -> None:
@@ -189,3 +190,4 @@ def _add_additive_migrations(conn: sqlite3.Connection) -> None:
     add_run_tokens(conn)
     add_comms_provenance(conn)
     add_chief_tables(conn)
+    add_task_waits(conn)

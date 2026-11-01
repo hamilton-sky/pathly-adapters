@@ -121,12 +121,16 @@ def resolve_task_failure(
     ``reason`` has run tokens redacted first (``db/secret_scan.py``), so the stored
     ``fail_reason`` (here or in ``fail_task``), the status line, the broadcast and the
     escalation text never carry one.
+
+    The limit is compared with ``current_attempt`` minus the task's ``waits`` (the attempts
+    that only parked on a question, chief-autopilot 06), so waiting never spends a retry.
     """
+    from pathly_orchestrator.db.queries.task_waits import task_waits
     from pathly_orchestrator.db.secret_scan import redact_run_tokens
 
     reason = redact_run_tokens(conn, reason)
     limit = max_attempts if max_attempts is not None else resolve_max_attempts()
-    if current_attempt < limit:
+    if current_attempt - task_waits(conn, task_id) < limit:
         retry_task(conn, task_id, reason)
         logger.info(
             "task_retry: retrying task %s (attempt %d/%d): %s",
@@ -215,12 +219,20 @@ def detect_deadlocks(
     drain can return a clean-looking result while work sits stuck forever. Shared by
     every drain path with DB access; ``scheduler_loop`` was the first and only
     caller until this extraction.
+
+    A pending task whose dependency chain reaches a task parked on a question
+    (``waiting_for_answer``, chief-autopilot 06) is waiting for an answer, not deadlocked,
+    and is left alone.
     """
     from pathly_orchestrator.db.queries.comms import get_tasks
+    from pathly_orchestrator.db.queries.task_waits import tasks_behind_waiting
 
+    waiting = tasks_behind_waiting(conn, board, scope)
     deadlocked: list[str] = []
     for row in get_tasks(conn, board, scope, task_status="pending", goal_id=goal_id):
         tid = row["id"]
+        if tid in waiting:
+            continue
         conn.execute(
             "UPDATE comms_messages SET task_status='blocked', fail_reason=? WHERE id=?",
             ("deadlocked: unsatisfiable dependency (cycle or missing depends_on)", tid),
