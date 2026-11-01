@@ -15,7 +15,6 @@ src/pathly_orchestrator/db/migrations.py:438
 src/pathly_orchestrator/supervisor/goal_decomposer.py:436
 src/pathly_orchestrator/http_server/blueprints/skills/editor_render.py:428
 studio/src/renderer/src/components/sidebar/Sidebar.tsx:425
-src/pathly_orchestrator/http_server/blueprints/comms/tasks.py:413
 src/pathly_orchestrator/http_server/blueprints/comms/goals.py:408
 src/pathly_orchestrator/http_server/blueprints/comms/project.py:402
 studio/src/renderer/src/components/shared/SkillSplitModal/SkillSplitModal.tsx:401
