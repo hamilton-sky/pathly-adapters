@@ -5,7 +5,7 @@ Status: open
 Blocked by: 10
 Test first: yes
 Level: 3
-Touches: src/pathly_orchestrator/http_server/blueprints/comms/tasks.py, src/pathly_orchestrator/supervisor/board_run.py, src/pathly_orchestrator/http_server/blueprints/comms/tasks_claim.py (new), src/pathly_orchestrator/http_server/blueprints/comms/__init__.py, scripts/file_size_baseline.txt, tests/dag_goals/test_claim_names_its_run.py, src/pathly_orchestrator/CLAUDE.md, tests/INDEX.md, tests/dag_goals/INDEX.md
+Touches: src/pathly_orchestrator/http_server/blueprints/comms/tasks.py, src/pathly_orchestrator/supervisor/board_run.py, src/pathly_orchestrator/http_server/blueprints/comms/tasks_claim.py (new), src/pathly_orchestrator/http_server/blueprints/comms/__init__.py, scripts/file_size_baseline.txt, tests/dag_goals/test_claim_names_its_run.py, src/pathly_orchestrator/CLAUDE.md, CLAUDE.md, tests/INDEX.md, tests/dag_goals/INDEX.md
 
 The review's B1. `db/queries/comms_tasks.py::claim_task` stores whatever `run_id` its caller
 passes, and `POST /comms/tasks/claim`
