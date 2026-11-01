@@ -19,6 +19,7 @@ from pathly_orchestrator import eventlog as _eventlog
 
 from .state import RunnerState, logger
 from .registry import TerminalRun, drop_run, _TERMINAL_RESULT_TIMEOUT
+from .run_task_outcome import settle_run_tasks
 from .terminal_identity import _run_board_scope
 
 
@@ -196,6 +197,9 @@ def _synthesize_agent_done_if_missing(
     spawner knows both), so the projector creates a fully-identified invocation and the
     reconciliation BILLING_UPDATE folds onto IT — not a stale same-feature AGENT_DONE. Runs
     BEFORE _reconcile_billing_now so _patch_last_agent_done sees this as the last event.
+    First it runs ``run_task_outcome.settle_run_tasks``: a run that left a claimed task
+    in_progress gets ``outcome: failed`` + ``error: task_unfinished`` here (or a RUN_OUTCOME
+    beside the agent's own AGENT_DONE), and the task is freed.
     Best-effort; never raises into the loop.
     """
     if not getattr(state, "executor_owned_telemetry", False):
@@ -212,7 +216,10 @@ def _synthesize_agent_done_if_missing(
             else _resolve_storage_path(None, state.project_root, state.topic)
         )
         last = _read_last(storage)
-        if last and last.get("run_id") == run_id:
+        own = last if last and last.get("run_id") == run_id else None
+        # chief-autopilot 05: a run that left its task in_progress is failed, not success.
+        error = settle_run_tasks(state, run_id, storage, own)
+        if own is not None:
             return  # the agent self-reported this run — nothing to synthesize
         billing = (data or {}).get("result") or {}
         if not isinstance(billing, dict):
@@ -233,7 +240,7 @@ def _synthesize_agent_done_if_missing(
             ),
             "conversation": 0,
             "result": "DONE",
-            "outcome": "success",
+            "outcome": "failed" if error else "success",
             "summary": str(billing.get("summary") or "")[:2000],
             "cost_usd": float(billing.get("cost_usd") or 0.0),
             "tokens_in": tin,
@@ -245,6 +252,8 @@ def _synthesize_agent_done_if_missing(
             "schema_version": 1,
             "synthetic": True,
         }
+        if error:
+            event["error"] = error
         _eventlog.append_event(str(storage), event)
         logger.info(
             "synthesized AGENT_DONE for executor run %s (agent wrote none)",

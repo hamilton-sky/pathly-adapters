@@ -114,7 +114,7 @@ def _settle_spawn_identity(
 ) -> None:
     """Settle the spawn's identity row when the spawn ends: done, or error when the
     stage is unwinding an exception (read via sys.exc_info() — this runs inside the
-    caller's finally). Identity fields COALESCE in upsert_run, so this never
+    caller's finally) or ``run_task_outcome`` failed the run for an unfinished task. Identity fields COALESCE in upsert_run, so this never
     overwrites the issued board_scope. Best-effort.
     """
     try:
@@ -133,8 +133,11 @@ def _settle_spawn_identity(
         from pathly_orchestrator.db.connection import get_db
         from pathly_orchestrator.db.queries.run_history import upsert_run
 
+        from .run_task_outcome import take_run_failure
+
         slug, scope = identity
-        status = "error" if _sys.exc_info()[0] else "done"
+        failed = take_run_failure(run_id)  # chief-autopilot 05: left a task unfinished
+        status = "error" if _sys.exc_info()[0] or failed else "done"
         upsert_run(
             get_db(),
             state.project_root,

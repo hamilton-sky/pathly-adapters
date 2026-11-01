@@ -39,6 +39,7 @@ from .terminal_reconcile import (
     _reconciliation_window,
     _synthesize_agent_done_if_missing,
 )
+from .run_task_outcome import settle_run_tasks
 from .terminal_argv import _resolve_spawn_argv
 from .terminal_billing import _emit_executor_telemetry, _reconcile_billing_now
 from .terminal_phase import _write_supervisor_phase_summary
@@ -222,6 +223,7 @@ def _run_stage_via_terminal(
                     else _resolve_storage_path(None, state.project_root, state.topic)
                 )
                 agent_done_data = read_last_agent_done(storage_path) or {}
+                settle_run_tasks(state, run_id, storage_path, agent_done_data)
                 result_for_fsm = {
                     "cost_usd": agent_done_data.get("cost_usd", 0.0),
                     "session_id": agent_done_data.get("session_id"),
