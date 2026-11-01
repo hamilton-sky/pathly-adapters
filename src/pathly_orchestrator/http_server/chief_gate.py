@@ -11,7 +11,8 @@ the session's tier holds that action, names only its own project in the fields i
 (``chief_fields``, applied by ``chief_project``), reaches a run, goal, task or message by id only
 inside that project (``chief_bind``), on ``/comms/post`` posts as the chief, and sends only the
 keys its route lists (``chief_keys``). Each check runs over every reading of the body a route may
-get (``_bodies``). An ``answer`` is then held to the cite rule (``chief_cite``): the chief names a
+get (``_bodies``). A body holding the session's own hook secret is then refused with 400
+(``chief_secret_text``). An ``answer`` is then held to the cite rule (``chief_cite``): the chief names a
 human message of its session by ``cite`` and Pathly relays that message's own text. Last, a call
 that starts work is held to the session's cost ceiling and run limit (``chief_budget``), which
 takes the run's slot only after every other check has passed. Registered in ``app.py`` after
@@ -205,6 +206,12 @@ def chief_gate():
         refused = _refusal(rule, method, session, conn, body)
         if refused is not None:
             return refused
+    if method != "GET":
+        from .chief_secret_text import secret_refusal
+
+        secret_error = secret_refusal(session, bodies)
+        if secret_error is not None:
+            return jsonify({"error": secret_error}), 400
     refused = _cite_refusal(rule, method, session, conn, bodies)
     if refused is not None:
         return refused

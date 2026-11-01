@@ -614,7 +614,10 @@ POST /chief/human-messages  ← {run_id, hook_secret, text, session_id, relayed?
   `[]`, which a chief would read as "no runs".
 - **`pathly api METHOD /path [json | -]`** (`chief_cli.py`, the `pathly` console script) is the
   chief's only door to the server, because its settings allow `Bash(pathly *)` and deny `curl`
-  and `wget` (`runner/chief_argv.py`). The claude chief starts with `--permission-mode dontAsk`
+  and `wget` (`runner/chief_argv.py`). They also deny `Read`, `Grep` and `Glob` on `~/.pathly/**`
+  and set `permissions.blockReadsOutsideWorkingDirectories`, so the chief has no read path to its
+  session folder's `hook_secret` (chief-autopilot 02; no redirect rule, since `Bash(pathly *<*)`
+  would deny ordinary bodies holding `<`). The claude chief starts with `--permission-mode dontAsk`
   (`CLAUDE_PERMISSION_MODE`): with no mode, claude 2.1.310 started it in auto mode, which ran
   `python3` without asking (spike 19 part B, question 1). `dontAsk` denies every call that would
   otherwise prompt; claude's built-in read-only commands (`ls`, `git status`) and Read, Glob and
@@ -816,7 +819,7 @@ the fragments' header are not links it drives; `tests/runner_supervisor/test_pty
   writer for every route, redacted before its 4000-character cap) and
   `supervisor/task_retry.py`'s failure reason (before `retry_task` and the escalation);
   `/comms/tasks/status` redacts its `reason` before its audit line slices it. `contains_secret_hash`
-  is the same window test for one hash. The `completion-report` fragment tells agents never to
+  is the same window test for one hash (the chief gate uses it for the hook secret, "Chief gate"). The `completion-report` fragment tells agents never to
   print environment variables or tokens. Known limits: a re-encoded token (base64, split) is not
   found; a token cut by a slice before it reaches a chokepoint (the `/comms/tasks/fail` status
   line's `reason[:80]` in `post_task_status`) can leave a fragment; and claude's own session
@@ -921,6 +924,14 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
   declared as a scope, a root declared as a path): that is left to the audit.
   `test_chief_gate_audit.py` covers what a reading of the source misses (see "What was
   measured").
+- **Hook secret in a body.** After the per-body checks and before the cite and budget checks, a
+  non-GET chief-token request any of whose JSON string values (at any depth, every reading of the
+  body) holds the session's own hook secret is **400** `{"error": "the body contains this chief's
+  hook secret"}` (`http_server/chief_secret_text.py`, chief-autopilot 02): nothing is stored, no
+  citation spent, no run slot taken. It is `contains_secret_hash` against
+  `chief_sessions.hook_secret_hash`, so `x<secret>` is caught, but a re-encoded secret is not: it is
+  defence in depth beside the settings' deny rules, not the guarantee. A session with no stored hash
+  (a codex chief) is not checked.
 - **Overrides.** A body with a non-empty `prompt_override` or `stage_overrides`, on any route,
   also needs `run` (the 403 names `run`): the Planner may call the decompose routes but cannot
   hand verbatim prompt text to the agents they start.
@@ -1576,7 +1587,7 @@ pathly_orchestrator/
       run_tokens.py        # mint_run_token / resolve_run_token / revoke_run_tokens — the per-spawn identity (role-read-policy): the raw token is returned once and only its sha256 is stored, next to run_id/role/feature/project_root/board/scope; resolve returns None for an empty, unknown or revoked token; lookup_run_token returns the row whether or not it is revoked (None only for an empty or unknown one), so the chief gate can tell a revoked token from an unknown one; revoked when the spawn settles
   runner/                  # CLI runner, agent invocation, argv, output parsing
     argv.py                # resolve_argv, resolve_interactive_argv, _storage_path
-    chief_argv.py          # the chief's argv and claude settings (chief-agent), pure: chief_argv(engine, model, settings_path, mcp_path, session_id) — claude `--restricted --tools Bash,Read,Glob,Grep --permission-mode dontAsk --settings … --mcp-config … --strict-mcp-config --session-id …` (+ `--model` only when given), codex `--sandbox read-only --ask-for-approval on-request`, any other engine ValueError, never a permission-bypass flag, the prompt or the token; claude_settings(hook_command) — allow `Bash(pathly *)`, the deny list, one UserPromptSubmit command hook
+    chief_argv.py          # the chief's argv and claude settings (chief-agent), pure: chief_argv(engine, model, settings_path, mcp_path, session_id) — claude `--restricted --tools Bash,Read,Glob,Grep --permission-mode dontAsk --settings … --mcp-config … --strict-mcp-config --session-id …` (+ `--model` only when given), codex `--sandbox read-only --ask-for-approval on-request`, any other engine ValueError, never a permission-bypass flag, the prompt or the token; claude_settings(hook_command) — allow `Bash(pathly *)`, the deny list (incl. Read/Grep/Glob on `~/.pathly/**`), `blockReadsOutsideWorkingDirectories`, one UserPromptSubmit command hook
     output.py              # parse_result, _extract_json_payload; extract_tokens + the per-adapter
                            # _TOKEN_STRATEGIES registry (Strategy A — token counting; cost is
                            # Strategy B in db/pricing.py); extract_cache_tokens() → the cached
@@ -1708,6 +1719,7 @@ pathly_orchestrator/
     chief_bind.py          # target_in_project(): places the run, goal, task or message a chief names by id (`run_ids`, `stamped_run_ids`, `row_ids` of its entry) in the session's project, and is_id() — see "Chief gate"
     chief_keys.py          # key_refusal(): refuses a key the entry does not list, and a `flow` or `skill` that is not one name (scope_names.is_flow_name / is_skill_name) — see "Chief gate"
     chief_budget.py        # the cost ceiling and the run limit of a chief session (chief.max_cost_usd_per_run, chief.max_runs_per_session): budget_refusal() is the gate's last check and takes the run slot, refund_run_slot() is the after_request hook that gives it back for a 4xx, ceiling_usd()/run_limit() read the settings — see "Chief gate"
+    chief_secret_text.py   # secret_refusal(): the gate's 400 for a chief-token body whose string values hold the session's hook secret (contains_secret_hash; a re-encoded secret is not caught) — see "Chief gate"
     chief_cite.py          # cite_refusal() / answer_text(): the cite rule for an `answer` action — the chief names a human message of its session by `cite`, the gate checks it (kind human, this session, typed after the question, once; an acknowledgement must say `agent: "chief"`) and keeps its text on flask.g for the answer routes to relay — see "Chief gate"
     run_identity.py        # caller_identity(request) -> CallerIdentity: kind run|anonymous from the X-Pathly-Run-Token header (body role/run_id/from never read); unknown/revoked token logged at info with the remote addr; `ui` kind reserved (RRP-2b); `is_chief_run(identity)`: True for a live run whose role is `chief` and nobody else (the test behind who may post and who may retire a binding directive). Routes apply a policy from it: who posts and retires a directive, the human-gate refusals (`comms/_helpers.py`), a task's completion and `floor-allow` (`comms/tasks_status.py`, `tasks_floor.py`), `force_past_gate` (`core/fsm.py`) and the chief open/close routes; `chief_gate` reads the token row itself (`lookup_run_token`) instead
     run_token_guard.py     # run_token_guard(): the before_request hook (after _log_request, before chief_gate) that answers 401 {"error": "unknown run token"} for an X-Pathly-Run-Token that is unknown or revoked (a revoked chief token is left to chief_gate); no header or an empty one passes — see "Unknown run tokens"
