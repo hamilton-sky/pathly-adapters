@@ -1,7 +1,7 @@
 # Run a chief-started flow headless, and list packaged flows as `flow`
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 10
 Test first: yes
 Level: 2
@@ -56,3 +56,47 @@ exit 0
 - `src/pathly_orchestrator/supervisor/api.py::start_run`, `src/pathly_orchestrator/supervisor/registry.py::_record_run_history`
 
 ## Answer
+
+**Built** (work started at f1c89b75; failing test a9604ce5, then the change):
+- `http_server/blueprints/control/_helpers.py::_create_flow_run`: reads `interactive` (default
+  `True`); anything but a JSON boolean is 400 `Field 'interactive' must be a boolean`; a caller
+  whose token is a live chief (`run_identity.is_chief_run(caller_identity(request))`, lazy
+  imports) gets `False`. `start_run` is now always called with `interactive=` (`True` when no
+  field and no chief, which is `start_run`'s own default, so Studio's New-run button is unchanged).
+- `http_server/chief_field_calls.py`: `/runs` POST has `not_for_chief=("interactive",)`; module
+  docstring lists it.
+- `db/queries/run_history_read.py`: `FLOW_NAMES` is built at import by `_packaged_flow_names()`
+  from the `flow:` key of every packaged `core/flows/*.flow.yaml` (found with
+  `catalog_items._find_data_root`, a db sibling), minus `goal-loop`. Today: consultation, debug,
+  explore, feature-consultation, project-consultation, quick-fix, team, team-build, test.
+- `tests/http_api/test_runs_flow_headless.py` (new, 13 tests), `tests/INDEX.md`,
+  `tests/http_api/INDEX.md`, `src/pathly_orchestrator/CLAUDE.md` (not_for_chief list, the RunSpec
+  line of the control blueprint, `FLOW_NAMES`).
+
+**Proof**:
+- `python -m pytest tests/http_api/test_runs_flow_headless.py -q -p no:cacheprovider`: 13 passed,
+  exit 0 (chief token -> `interactive=False`; tokenless no field -> `True`; tokenless `false` ->
+  `False`; `"false"`, 0, 1, null, [], {} -> 400 and no start; a chief sending `true` or `false`
+  -> the gate's 403 naming `interactive`; all 10 packaged flows seeded as bare-uuid rows list as
+  `flow`, `goal-loop` as `loop`). At a9604ce5 it was 9 failed, 4 passed (the gate case and the
+  default case already held).
+- `python -m pytest tests/http_api -q -p no:cacheprovider`: 2564 passed, exit 0.
+- Extra: `python -m pytest tests/db tests/dag_goals -q -p no:cacheprovider`: 401 passed, 2
+  skipped, exit 0 (they import `FLOW_NAMES` and `_classify_kind`).
+- Lint chain from commands.md: exit 0 (mypy clean, file sizes none grown, lint-imports kept).
+
+**Decisions**:
+- An explicit `null` for `interactive` is 400 (only a missing key takes the default), so a body
+  that names the key must give a boolean.
+- A chief token wins over the body; the gate already refuses a chief's `interactive` key, so the
+  two never meet in practice.
+- `FLOW_NAMES` keeps its name and type (a set) so the db and dag_goals tests that import it hold;
+  the `flow:` key is read with a line regex rather than YAML, so the read-model needs no YAML parse.
+
+**Shortcuts taken**: `FLOW_NAMES` is read once at import, so a flow file added while the server
+runs is not seen until restart (packaged flows change only with a release). A project-local or
+DB-only flow definition is not included; worth it if user-defined flows start running through
+`start_run`.
+
+**For later tickets**: `POST /runs` with a chief token now always passes `interactive=False`; a
+test that stubs `start_run` sees an `interactive` keyword on every flow start.

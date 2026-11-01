@@ -4,8 +4,9 @@ body. See ``chief_field_types`` for what an entry says and ``chief_fields`` for 
 Each entry was written from the view and every helper it calls, and lists the body keys a chief
 may send. The keys a view reads and no chief flow needs are in ``not_for_chief``: ``ability_ids``
 (composition packs picked in Studio), ``system_prompt`` and ``interactive`` of ``/comms/run``, the
-client-drop switches of ``/comms/post``, and the ``flow`` of ``/comms/goals/run`` (the goal's
-executor picks the flow; a chief that wants another one starts it with ``POST /runs``).
+client-drop switches of ``/comms/post``, the ``flow`` of ``/comms/goals/run`` (the goal's
+executor picks the flow; a chief that wants another one starts it with ``POST /runs``), and the
+``interactive`` of ``POST /runs`` (a chief's flow always runs headless).
 """
 
 from __future__ import annotations
@@ -130,6 +131,8 @@ CALL_FIELDS: dict[tuple[str, str], Fields] = {
         row_ids=("goal_id",),
         # The cap a flow start runs with (`chief_budget` holds it to the session's ceiling).
         keys={"kind": ENUM, "max_cost_usd": NUMBER, **_ENGINE},
+        # A chief's flow always runs headless; it cannot ask for an interactive one.
+        not_for_chief=("interactive",),
     ),
     ("/comms/goals/run", "POST"): Fields(
         roots=_ROOT,

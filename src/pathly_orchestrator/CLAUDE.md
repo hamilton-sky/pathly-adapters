@@ -1225,8 +1225,9 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
     chief flow needs is not listed but put in `not_for_chief`, so a test can tell "left out on
     purpose" from "forgotten": `ability_ids` (composition packs picked in Studio), the
     `system_prompt` and `interactive` of `/comms/run`, the `summary_backend` and `embed_summary`
-    of `/comms/post`, and the `flow` of `/comms/goals/run` (the goal's executor picks its flow; a
-    chief that wants another one starts it with `POST /runs`). Every listed key has a kind
+    of `/comms/post`, the `flow` of `/comms/goals/run` (the goal's executor picks its flow; a
+    chief that wants another one starts it with `POST /runs`), and the `interactive` of
+    `POST /runs` (a chief's flow always runs headless). Every listed key has a kind
     (`Fields.kinds()`): text, number, flag, enum, name or id (opaque to the gate, never joined into
     a path by design; `test_chief_gate_kinds.py` and the audit's plain values check it), or one of the kinds that can reach a file or a folder, each with a rule the
     gate applies and, where the key reaches a sink, the sink applies as well: `root` (the
@@ -1749,9 +1750,12 @@ pathly_orchestrator/
                            # line); _helpers.manifest / available_actions.
       control/             # runs_read.py (GET /runs, /runs/<run_id> — unified run read API; P0);
                            # runs_control.py (POST /runs — the unified launcher: a thin RunSpec
-                           # {kind, board, scope, flow?, goal_id?, adapter?, model?} validated
-                           # then routed to the matching EXISTING facade — kind=flow →
-                           # supervisor.api.start_run, kind=single|evaluator →
+                           # {kind, board, scope, flow?, goal_id?, adapter?, model?,
+                           # interactive?} validated then routed to the matching EXISTING
+                           # facade — kind=flow → supervisor.api.start_run (interactive=False
+                           # for a chief token or a body "interactive": false, a non-boolean
+                           # is 400; else start_run's interactive default, as Studio's New-run
+                           # button sends), kind=single|evaluator →
                            # supervisor.board_run.start_board_run, kind=goal →
                            # supervisor.goal_executor.start_goal_run; route only, never
                            # reimplements a runner; POST /runs/<run_id>/stop AND
@@ -3286,7 +3290,8 @@ both now land as columns instead of being re-derived. The pieces:
 - **FSM-flow PARENT row carries the FLOW NAME as `adapter`** (spawn-tracking) — the
   bare-uuid parent run's `adapter` column is the flow name (`team`/`team-build`/`consultation`/…),
   NOT the last stage's CLI adapter, because the read-model (`run_history_read._classify_kind`)
-  keys a bare-uuid run's kind off that column: a flow name in `FLOW_NAMES` → `flow` (cost summed
+  keys a bare-uuid run's kind off that column: a flow name in `FLOW_NAMES` (the `flow:` key of
+  every packaged `core/flows/*.flow.yaml` but `goal-loop`, read at import) → `flow` (cost summed
   over the stage time-window), a real adapter → `single` with $0 (no invocation carries the parent
   uuid). `supervisor/registry._record_run_history` (shared by `_set_status`'s terminal write AND
   `start_run`'s **early `running` row**) writes `state.flow` there — fixing (1) completed flows

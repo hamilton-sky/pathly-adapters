@@ -1,6 +1,7 @@
 """Unified run read-model: list top-level runs + per-run detail (unified-control-plane P0).
 
-db/ layer — imports only db/connection-siblings (``fsm_events._norm``, ``run_log``). Read
+db/ layer — imports only db/connection-siblings (``fsm_events._norm``, ``run_log``, and
+``catalog_items._find_data_root`` to read the packaged flow names). Read
 only: every function takes a ``conn`` and never writes, never locks. Backs ``GET /runs`` and
 ``GET /runs/<run_id>`` (the new ``control`` blueprint).
 
@@ -21,16 +22,30 @@ from datetime import datetime, timezone
 from .fsm_events import _norm
 from .run_log import get_run_log
 
+_FLOW_KEY_RE = re.compile(r"^flow:[ \t]*([A-Za-z0-9_.-]+)[ \t]*$", re.MULTILINE)
+
+
+def _packaged_flow_names() -> set[str]:
+    """The ``flow:`` key of every packaged ``pathly_data/core/flows/*.flow.yaml``, except
+    ``goal-loop`` (its parent run is a ``loop``, see ``_classify_kind``)."""
+    from .catalog_items import _find_data_root
+
+    data_root = _find_data_root()
+    if data_root is None:
+        return set()
+    names = set()
+    for path in (data_root / "core" / "flows").glob("*.flow.yaml"):
+        found = _FLOW_KEY_RE.search(path.read_text(encoding="utf-8"))
+        if found:
+            names.add(found.group(1))
+    names.discard("goal-loop")
+    return names
+
+
 # Flow-style adapters: a bare-uuid run_history row whose adapter is one of these is a flow
 # PARENT (its stages are separate per-stage rows, folded into detail). Any other bare-uuid
-# run is a board ``single``.
-FLOW_NAMES = {
-    "team",
-    "team-build",
-    "consultation",
-    "feature-consultation",
-    "project-consultation",
-}
+# run is a board ``single``. Read once, at import, from the packaged flow files.
+FLOW_NAMES = _packaged_flow_names()
 
 # A per-stage (CHILD-of-a-flow) run_id: ``{topic}-{N}-{ts}`` with an optional retry suffix
 # ``-q{n}`` / ``-fb{n}`` (orchestrator.py stage ids). Matched as a SUFFIX (no ^ anchor).

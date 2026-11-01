@@ -175,6 +175,7 @@ questions):
 - 03 — (round 2) `fail_task` moved to `comms_task_fail.py` and redacts `fail_reason` for every route (re-exported from `comms_tasks` via `__all__`); `update_artifact_summary` redacts; `post_message` redacts before taking the write lock.
 - 10 — `http_server/run_token_guard.py` (before `chief_gate`) answers 401 `unknown run token` to a non-empty `X-Pathly-Run-Token` that is unknown or revoked; a revoked chief token keeps `chief session closed`; no header or an empty one stays anonymous.
 - 02 — the chief's settings deny `Read`/`Grep`/`Glob` on `~/.pathly/**` and set `permissions.blockReadsOutsideWorkingDirectories`; `http_server/chief_secret_text.py` makes the gate answer 400 to a non-GET chief body whose string values (any depth, every reading) hold the session's hook secret, after the per-body 403 checks and before cite and budget.
+- 04 — `POST /runs` kind=flow passes `interactive=False` for a chief token or a body `"interactive": false` (non-boolean 400, `interactive` is `not_for_chief`); `FLOW_NAMES` is read from the packaged flow files' `flow:` keys minus `goal-loop`.
 
 ## Open questions
 
