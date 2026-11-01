@@ -5,7 +5,7 @@ Status: open
 Blocked by: 05
 Test first: yes
 Level: 2
-Touches: src/pathly_orchestrator/supervisor/run_task_outcome.py, src/pathly_orchestrator/db/queries/task_waits.py (new), src/pathly_orchestrator/db/migrations_task_waits.py (new), src/pathly_orchestrator/db/migrations_incremental.py, src/pathly_orchestrator/db/queries/comms_messages.py, src/pathly_orchestrator/supervisor/task_retry.py, src/pathly_orchestrator/http_server/blueprints/comms/tasks_ready.py (new), src/pathly_orchestrator/http_server/blueprints/comms/tasks.py, src/pathly_data/core/skills/development/drain-dag.md, tests/snapshots/, tests/dag_goals/test_task_waits_for_answer.py, src/pathly_orchestrator/CLAUDE.md, tests/INDEX.md, tests/dag_goals/INDEX.md
+Touches: src/pathly_orchestrator/supervisor/run_task_outcome.py, src/pathly_orchestrator/db/queries/comms_tasks_by_run.py, src/pathly_orchestrator/db/queries/task_waits.py (new), src/pathly_orchestrator/db/migrations_task_waits.py (new), src/pathly_orchestrator/db/migrations_incremental.py, src/pathly_orchestrator/db/queries/comms_messages.py, src/pathly_orchestrator/supervisor/task_retry.py, src/pathly_orchestrator/http_server/blueprints/comms/tasks_ready.py (new), src/pathly_orchestrator/http_server/blueprints/comms/tasks.py, src/pathly_data/core/skills/development/drain-dag.md, tests/snapshots/, tests/dag_goals/test_task_waits_for_answer.py, src/pathly_orchestrator/CLAUDE.md, tests/INDEX.md, tests/dag_goals/INDEX.md
 
 Spike S5: a goal-run agent posted a board `question` and exited; nothing waited for the answer,
 and when the person answered through the chief, no agent received it.
