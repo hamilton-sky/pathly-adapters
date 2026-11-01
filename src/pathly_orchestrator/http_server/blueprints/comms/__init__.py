@@ -3,6 +3,7 @@
 from .messages import bp as messages_bp
 from .directives import bp as directives_bp
 from .tasks import bp as tasks_bp
+from .tasks_claim import bp as tasks_claim_bp
 from .tasks_status import bp as tasks_status_bp
 from .tasks_floor import bp as tasks_floor_bp
 from .artifacts import bp as artifacts_bp
@@ -32,6 +33,7 @@ all_blueprints = [
     messages_bp,
     directives_bp,
     tasks_bp,
+    tasks_claim_bp,
     tasks_status_bp,
     tasks_floor_bp,
     artifacts_bp,

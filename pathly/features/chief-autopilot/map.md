@@ -176,6 +176,7 @@ questions):
 - 10 — `http_server/run_token_guard.py` (before `chief_gate`) answers 401 `unknown run token` to a non-empty `X-Pathly-Run-Token` that is unknown or revoked; a revoked chief token keeps `chief session closed`; no header or an empty one stays anonymous.
 - 02 — the chief's settings deny `Read`/`Grep`/`Glob` on `~/.pathly/**` and set `permissions.blockReadsOutsideWorkingDirectories`; `http_server/chief_secret_text.py` makes the gate answer 400 to a non-GET chief body whose string values (any depth, every reading) hold the session's hook secret, after the per-body 403 checks and before cite and budget.
 - 04 — `POST /runs` kind=flow passes `interactive=False` for a chief token or a body `"interactive": false` (non-boolean 400, `interactive` is `not_for_chief`); `FLOW_NAMES` is read from the packaged flow files' `flow:` keys minus `goal-loop`.
+- 11 — `/comms/tasks/claim` and `/run` live in `blueprints/comms/tasks_claim.py`; a live run token's run id is `claimed_by` (body `run_id` only when tokenless); `/run` mints a uuid4, claims, then `start_board_run(run_id=…)` (new optional kwarg).
 
 ## Open questions
 

@@ -275,6 +275,7 @@ def start_board_run(
     on_start: Optional[Callable] = None,
     on_done: Optional[Callable] = None,
     block: bool = False,
+    run_id: str = "",
 ) -> dict:
     """Acquire the board lock and spawn a single-agent run.
 
@@ -309,14 +310,13 @@ def start_board_run(
     Returns
     -------
     dict
-        ``{"ok": True, "run_id": ..., "mode": ..., "result": ...}``
-        or ``{"ok": False, "error": "board_busy", "holder": <run_id>}`` when the
-        board is already locked.
+        ``{"ok": True, "run_id": run_id or a new uuid4, "mode": ..., "result": ...}``, or
+        ``{"ok": False, "error": "board_busy", "holder": <run_id>}`` when the board is locked.
     """
     from pathly_orchestrator.runner.comms_context import board_context_for
     from pathly_orchestrator.supervisor import board_lock
 
-    run_id = str(uuid.uuid4())
+    run_id = run_id or str(uuid.uuid4())
 
     # Lock is acquired synchronously so the caller can answer 409 immediately.
     if not board_lock.acquire(board, scope, run_id):
