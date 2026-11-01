@@ -11,3 +11,4 @@ ticket number. Never edit or delete another line. Keep it short; a human prunes 
 - (03) Golden snapshots have no regen script: write `compose_skill(skill, "claude")` into each `tests/snapshots/<skill with / as __>.claude.md` that differs (sys.path src + tests for `_paths.SNAPSHOT_DIR`).
 - (03) To re-export a moved function without a `# noqa`, give the old module an `__all__` listing its public functions plus the re-export; `check_file_size.py --update` also lowers any other baseline that shrank on the branch.
 - (10) A test that audits file opens can see `pipe:[N]` from `/proc/self/fd` readlink when torch is first imported in the process (`ctypes.util.find_library` runs `ldconfig` through a pipe): treat a non-absolute readlink target as no file.
+- (02) `python -m pytest tests/http_api tests/runner_supervisor -q -k chief` takes about 16 minutes (2413 tests): run it in the background.

@@ -25,6 +25,8 @@ _CLAUDE_DENY = [
     "WebFetch",
     "WebSearch",
     "Read(~/.pathly/**)",
+    "Grep(~/.pathly/**)",
+    "Glob(~/.pathly/**)",
     "Bash(curl *)",
     "Bash(wget *)",
 ]
@@ -95,9 +97,19 @@ def claude_settings(hook_command: str) -> dict:
     ``hook_command``. An ``env`` block turns off background-task notifications and the cron
     scheduler (``_CLAUDE_ENV``), the two ways claude starts a turn nobody typed; measured on
     claude 2.1.304 only.
+
+    The session folder under ``~/.pathly/chief/`` holds the hook secret, so ``Read``, ``Grep``
+    and ``Glob`` are denied on ``~/.pathly/**`` (claude applies a ``Read`` rule to Grep, Glob,
+    Bash file commands and ``< file`` redirects too; the explicit rules cost nothing) and
+    ``blockReadsOutsideWorkingDirectories`` is set. There is no redirect rule: ``Bash(pathly *<*)``
+    would deny an ordinary body holding ``<``.
     """
     return {
-        "permissions": {"allow": list(_CLAUDE_ALLOW), "deny": list(_CLAUDE_DENY)},
+        "permissions": {
+            "allow": list(_CLAUDE_ALLOW),
+            "deny": list(_CLAUDE_DENY),
+            "blockReadsOutsideWorkingDirectories": True,
+        },
         "env": dict(_CLAUDE_ENV),
         "hooks": {
             "UserPromptSubmit": [
