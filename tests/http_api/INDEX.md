@@ -4,7 +4,7 @@
 
 HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, prompt-event contract.
 
-62 test file(s).
+63 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -52,6 +52,7 @@ HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, 
 | `test_chief_prompt_text.py` | chief-agent 17: what the chief's prompt texts tell it to do, against the real gate tables | 13 |
 | `test_chief_prose_rules.py` | The rules in the chief's prompt texts, pinned (chief-agent 17) | 17 |
 | `test_chief_routes.py` | chief-agent 07: POST /chief/open, POST /chief/close and GET /chief/session | 32 |
+| `test_chief_secret_in_body.py` | chief-autopilot 02: a chief-token body holding the chief's own hook secret is refused | 8 |
 | `test_chief_startup_port.py` | chief-agent 20, B7: a second server started on a busy port leaves the first server's chief open | 6 |
 | `test_comms_body_unicode.py` | chief-agent 20, B2: a lone surrogate in a comms body is a 400, not a 500 | 8 |
 | `test_config.py` | Tests for Settings.from_env() — specifically bind-host validation | 8 |

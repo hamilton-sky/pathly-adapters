@@ -61,6 +61,8 @@ DENY = [
     "WebFetch",
     "WebSearch",
     "Read(~/.pathly/**)",
+    "Grep(~/.pathly/**)",
+    "Glob(~/.pathly/**)",
     "Bash(curl *)",
     "Bash(wget *)",
 ]
