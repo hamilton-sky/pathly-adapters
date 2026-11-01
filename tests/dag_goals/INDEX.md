@@ -4,7 +4,7 @@
 
 Goal/DAG decomposition & scheduling — feature/flow/project decompose, goals read-model, PRD import.
 
-19 test file(s).
+20 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -27,3 +27,4 @@ Goal/DAG decomposition & scheduling — feature/flow/project decompose, goals re
 | `test_task_proof.py` | A goal-loop task is proven after it reports success (build-proof 05) | 10 |
 | `test_task_proof_window.py` | `supervisor/task_proof.wrap` on its own (build-proof 05) | 6 |
 | `test_task_retry.py` | Tests for supervisor/task_retry.py — per-task retry/escalation + deadlock detection | 19 |
+| `test_task_waits_for_answer.py` | chief-autopilot 06: a single run's task parks on its open question and is freed by any answer | 10 |

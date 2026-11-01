@@ -9,7 +9,7 @@ Tests are grouped into domain folders that mirror the app's architecture layers.
 | [`code_intel/`](code_intel/INDEX.md) | Code-intelligence query proxy — graph reindex, path resolve, LSP session, query gate & logging. | 9 |
 | [`comms_board/`](comms_board/INDEX.md) | Comms board / message-board subsystem — messages, tasks, artifacts, goals, context retrieval & relevance, board mirror & hydration. | 75 |
 | [`consistency/`](consistency/INDEX.md) |  | 4 |
-| [`dag_goals/`](dag_goals/INDEX.md) | Goal/DAG decomposition & scheduling — feature/flow/project decompose, goals read-model, PRD import. | 19 |
+| [`dag_goals/`](dag_goals/INDEX.md) | Goal/DAG decomposition & scheduling — feature/flow/project decompose, goals read-model, PRD import. | 20 |
 | [`db/`](db/INDEX.md) | Database layer — schema/queries, connection isolation, write guard. | 19 |
 | [`fsm_flows/`](fsm_flows/INDEX.md) | FSM engine, gates, transitions, flow definitions, feedback protocol & fix-routing. | 46 |
 | [`hq_copilot/`](hq_copilot/INDEX.md) | HQ copilot — board context packet, HQ model turn & read-only guardrails, model eligibility, /hq/* endpoints. | 5 |
