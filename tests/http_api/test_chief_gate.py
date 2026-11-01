@@ -2,8 +2,9 @@
 
 ``chief_gate`` is a ``before_request`` hook registered right after ``_log_request``. It acts only
 on a request that carries ``X-Pathly-Run-Token`` whose token row has role ``chief``; a builder
-token, an unknown token and no token at all are untouched. For a chief it answers 401 when the
-session is closed (a revoked chief token must never fall back to anonymous, because anonymous
+token and no token at all are untouched (an unknown or revoked token never reaches it:
+``run_token_guard`` answers 401 first, see ``test_unknown_run_token.py``; a revoked chief token is
+left to this gate). For a chief it answers 401 when the session is closed (a revoked chief token must never fall back to anonymous, because anonymous
 loopback callers can do everything), 403 when the route is not listed or the tier lacks the
 action, and 403 when the call names another project or posts as someone other than the chief.
 
@@ -566,14 +567,14 @@ def test_an_unknown_path_is_a_404_and_a_wrong_method_a_405(client, project):
 # --- other callers are untouched ----------------------------------------------------------
 
 
-def test_builder_unknown_and_missing_tokens_are_unaffected(client, project):
+def test_builder_and_missing_tokens_are_unaffected(client, project):
     from pathly_orchestrator.db.connection import get_db
     from pathly_orchestrator.db.queries.run_tokens import mint_run_token
 
     builder = mint_run_token(
         get_db(), "run-b", "builder", "demo", str(project), "feature", "demo"
     )
-    callers = [{}, {"X-Pathly-Run-Token": builder}, {"X-Pathly-Run-Token": "nope"}]
+    callers = [{}, {"X-Pathly-Run-Token": builder}]
 
     for headers in callers:
         query = client.post("/db/query", json={"sql": "SELECT 1 AS n"}, headers=headers)
@@ -586,7 +587,16 @@ def test_builder_unknown_and_missing_tokens_are_unaffected(client, project):
         assert post.status_code == 200, headers
 
 
-def test_a_revoked_builder_token_is_still_anonymous_not_401(client, project):
+def test_an_unknown_token_is_401_not_anonymous(client):
+    resp = client.post(
+        "/db/query", json={"sql": "SELECT 1"}, headers={"X-Pathly-Run-Token": "nope"}
+    )
+
+    assert resp.status_code == 401
+    assert resp.get_json() == {"error": "unknown run token"}
+
+
+def test_a_revoked_builder_token_is_401_not_anonymous(client, project):
     from pathly_orchestrator.db.connection import get_db
     from pathly_orchestrator.db.queries.run_tokens import (
         mint_run_token,
@@ -603,7 +613,8 @@ def test_a_revoked_builder_token_is_still_anonymous_not_401(client, project):
         "/db/query", json={"sql": "SELECT 1"}, headers={"X-Pathly-Run-Token": token}
     )
 
-    assert resp.status_code == 200
+    assert resp.status_code == 401
+    assert resp.get_json() == {"error": "unknown run token"}
 
 
 # --- the table ----------------------------------------------------------------------------

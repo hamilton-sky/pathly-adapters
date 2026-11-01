@@ -4,7 +4,7 @@
 
 HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, prompt-event contract.
 
-61 test file(s).
+62 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -23,7 +23,7 @@ HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, 
 | `test_chief_cli_edges.py` | chief-agent 17: the edges of `pathly api` | 21 |
 | `test_chief_cli_input.py` | Input to `pathly api` that is not valid text, and the server secret (chief-agent 17) | 11 |
 | `test_chief_cli_limits.py` | chief-agent 20, B3 to B5: `pathly api` never ends in a traceback, reads and prints a bounded | 22 |
-| `test_chief_gate.py` | chief-agent 08: the chief gate refuses every call a chief token's tier does not allow | 32 |
+| `test_chief_gate.py` | chief-agent 08: the chief gate refuses every call a chief token's tier does not allow | 33 |
 | `test_chief_gate_actions.py` | chief-agent 08: which action a call is, and so which tier may make it | 6 |
 | `test_chief_gate_artifact_section.py` | chief-agent 08 (round 6): the section of an artifact read by id stays inside the named project | 5 |
 | `test_chief_gate_audit.py` | chief-agent 08 (rounds 6 and 7): a chief that sends hostile values touches nothing outside its | 8 |
@@ -69,3 +69,4 @@ HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, 
 | `test_spawn_policy_routes.py` | spawn-policy P1 — /comms/model-policy + /comms/logging-config routes | 4 |
 | `test_sse_run_token_strip.py` | `sse._broadcast_runner` sends a spawn's raw run token only on /events/spawn | 6 |
 | `test_token_redact_writes.py` | chief-autopilot 03: a run's token never reaches stored text through the write routes | 4 |
+| `test_unknown_run_token.py` | chief-autopilot 10: a run token Pathly does not know is refused, not treated as anonymous | 8 |

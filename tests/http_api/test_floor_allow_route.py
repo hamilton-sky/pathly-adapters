@@ -83,8 +83,8 @@ def test_a_live_run_token_is_refused_and_nothing_is_stored(client) -> None:
     assert _row(tid)["floor_allow"] is None
 
 
-def test_a_revoked_token_is_treated_like_no_token(client) -> None:
-    """The documented limit: the server cannot tell a human from a caller with no live token."""
+def test_a_revoked_token_is_refused_not_treated_like_no_token(client) -> None:
+    """A run's token after the run ended is 401 (``run_token_guard``), so it cannot pass as a human."""
     tid = _task()
     token = _token("run-gone")
     revoke_run_tokens(get_db(), "run-gone")
@@ -93,8 +93,9 @@ def test_a_revoked_token_is_treated_like_no_token(client) -> None:
         headers={"X-Pathly-Run-Token": token},
         json={"message_id": tid, "allow": ["config"]},
     )
-    assert r.status_code == 200
-    assert json.loads(_row(tid)["floor_allow"]) == ["config"]
+    assert r.status_code == 401
+    assert r.get_json() == {"error": "unknown run token"}
+    assert _row(tid)["floor_allow"] is None
 
 
 def test_an_unknown_category_is_a_400_naming_the_valid_ones(client) -> None:

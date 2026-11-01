@@ -128,21 +128,20 @@ def test_the_body_cannot_name_the_editor(client):
     assert row["author_run_id"] is None
 
 
-def test_a_revoked_token_edits_as_none(client):
+def test_a_revoked_token_cannot_edit(client):
     from pathly_orchestrator.db.connection import get_db
     from pathly_orchestrator.db.queries.run_tokens import revoke_run_tokens
 
     builder = _mint("run-builder", "builder")
     message_id = _post(client, builder)
+    before = _row(message_id)
     revoke_run_tokens(get_db(), "run-builder")
 
     resp = _edit(client, message_id, builder, "after the run ended")
 
-    assert resp.status_code == 200, resp.data
-    row = _row(message_id)
-    assert row["text"] == "after the run ended"
-    assert row["author_source"] == "none"
-    assert row["author_run_id"] is None
+    assert resp.status_code == 401, resp.data
+    assert resp.get_json() == {"error": "unknown run token"}
+    assert _row(message_id) == before
 
 
 @pytest.mark.parametrize("with_token", [False, True])

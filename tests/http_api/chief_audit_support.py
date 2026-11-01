@@ -140,7 +140,9 @@ def _fd_path(fd: int) -> str | None:
         ):  # macOS: MAXPATHLEN is 1024
             raw = fcntl.fcntl(fd, fcntl.F_GETPATH, bytes(1024))
             return os.fsdecode(raw.split(b"\0", 1)[0]) or None
-        return os.readlink(f"/proc/self/fd/{fd}")
+        target = os.readlink(f"/proc/self/fd/{fd}")
+        # Linux names a pipe, socket or anon inode as ``pipe:[N]``: no file, not a path.
+        return target if os.path.isabs(target) else None
     except Exception:
         return None
 
