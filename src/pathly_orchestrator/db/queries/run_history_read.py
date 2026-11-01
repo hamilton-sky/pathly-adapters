@@ -15,6 +15,7 @@ runs appear, which RECENT cannot show).
 
 from __future__ import annotations
 
+import json
 import re
 import sqlite3
 from datetime import datetime, timezone
@@ -315,6 +316,26 @@ def _artifacts(
     return [dict(r) for r in rows]
 
 
+def _run_outcome(conn: sqlite3.Connection, feature: str, run_id: str) -> dict:
+    """The run's outcome: the latest ``RUN_OUTCOME`` for it, over its latest ``AGENT_DONE``
+    (chief-autopilot 05: a run that left its task unfinished is failed even when the agent
+    said success). An AGENT_DONE without an outcome reads as success; no event, None."""
+    row = conn.execute(
+        "SELECT payload FROM fsm_events WHERE feature=? "
+        "AND event_type IN ('RUN_OUTCOME', 'AGENT_DONE') "
+        "AND json_extract(payload, '$.run_id')=? "
+        "ORDER BY event_type='RUN_OUTCOME' DESC, seq DESC LIMIT 1",
+        (feature, run_id),
+    ).fetchone()
+    if row is None:
+        return {"outcome": None, "error": None}
+    payload = json.loads(row["payload"])
+    return {
+        "outcome": payload.get("outcome") or "success",
+        "error": payload.get("error") or None,
+    }
+
+
 def get_run_detail(conn: sqlite3.Connection, run_id: str) -> dict:
     """Full RunDetail for one run (ARCHITECTURE §4.2): identity+lifecycle, stages, per-stage
     ``run_log`` logs, correlated board posts + artifacts, and cost. Unknown run_id →
@@ -353,6 +374,7 @@ def get_run_detail(conn: sqlite3.Connection, run_id: str) -> dict:
 
     run = dict(row)
     run.update({"kind": kind, "cost_usd": cost_usd, "tokens_total": tokens_total})
+    run.update(_run_outcome(conn, row["feature"], row["run_id"]))
     return {
         "run": run,
         "stages": stages,

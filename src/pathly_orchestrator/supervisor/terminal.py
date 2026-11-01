@@ -39,6 +39,7 @@ from .terminal_reconcile import (
     _reconciliation_window,
     _synthesize_agent_done_if_missing,
 )
+from .run_task_outcome import settle_early_advance
 from .terminal_argv import _resolve_spawn_argv
 from .terminal_billing import _emit_executor_telemetry, _reconcile_billing_now
 from .terminal_phase import _write_supervisor_phase_summary
@@ -236,6 +237,9 @@ def _run_stage_via_terminal(
                     _v = agent_done_data.get(_k)
                     if _v:
                         result_for_fsm[_k] = _v
+                settle_early_advance(
+                    state, run_id, storage_path, agent_done_data, result_for_fsm
+                )
 
                 if broadcast_fn:
                     broadcast_fn(

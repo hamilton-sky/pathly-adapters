@@ -1570,6 +1570,7 @@ pathly_orchestrator/
       comms_artifacts.py   # artifact metadata CRUD (attach, list, section index, update_summary)
       comms_artifact_rows.py # insert_artifact: the comms_artifacts board-row insert (title/summary run-token redacted), moved out of comms_artifacts.py at its 400-line cap; re-exported from comms_artifacts / comms
       comms_tasks.py       # task DAG operations (get_ready, complete, claim, reclaim, goal_refs_coverage); re-exports fail_task
+      comms_tasks_by_run.py # get_unfinished_tasks_of_run(conn, run_id): the tasks still in_progress with claimed_by = the run (chief-autopilot 05), read only; kept out of comms_tasks.py
       comms_task_fail.py   # fail_task: marks a task failed (fail_reason run-token redacted before its 4000-char cap) and cascades dependents to blocked; moved out of comms_tasks.py at its ratchet baseline; re-exported from comms_tasks / comms
       task_results.py      # build-proof: latest_task_summaries(conn, task_ids) — the newest AGENT_DONE `summary` of each task's `sched-<id>#<n>` runs (a dependent task's prompt shows it)
       task_proof.py        # build-proof task reads: get_task, tasks_claimed_since / tasks_completed_since (goal- else (board, scope)-scoped, parsed-time window), set_floor_allow (the human-set floor_allow JSON list; refreeze re-copies text into claimed_text)
@@ -1632,7 +1633,8 @@ pathly_orchestrator/
                            #   so it must be called as a bare name, never via its own module).
     terminal_argv.py       # _resolve_spawn_argv — the seam a NEW ADAPTER touches
     terminal_identity.py   # _record_spawn_identity/_record_spawn_prompt/_settle_spawn_identity, _run_board_scope; _issue_spawn_token/_spawn_role mint the spawn's run token (revoked in _settle_spawn_identity)
-    terminal_reconcile.py  # _agent_done_watcher, _reconciliation_window, _synthesize_agent_done_if_missing
+    terminal_reconcile.py  # _agent_done_watcher, _reconciliation_window, _synthesize_agent_done_if_missing (outcome failed + error task_unfinished when run_task_outcome says so)
+    run_task_outcome.py    # settle_run_tasks / settle_early_advance / free_tasks_of_failed_spawn: at the end of a board/single run, frees the tasks it left in_progress and fails the run (see "No success over an unfinished task")
     terminal_billing.py    # _emit_executor_telemetry, _reconcile_billing_now (were spawn-local closures)
     terminal_phase.py      # _write_supervisor_phase_summary
     interactions.py        # _await_agent_question (keeps the pending question on RunnerState._agent_question: question, options, every question of the ask, asked_at; cleared on every exit)
@@ -2549,6 +2551,42 @@ hyphens only). Every place that previously parsed a bare task_id back out of a `
 (`test_dag_scheduler.py`, `test_golden_path.py`, `test_comms_goals_run.py`) now also strips the
 `#<attempt>` suffix; production code was already unaffected since it only ever checked the
 `sched-` PREFIX (`run_history_read._classify_kind`/`_is_parent`), never parsed the remainder.
+
+## No success over an unfinished task (`supervisor/run_task_outcome.py`, chief-autopilot 05)
+
+A board or single run (`executor_owned_telemetry`) has no per-task retry of its own, and
+`claim_task` needs `pending`, so a run that claimed a task and ended with it still `in_progress`
+used to end `success` and leave the task stuck. `settle_run_tasks(state, run_id, storage,
+own_agent_done)` runs at the end of every such run: from `_synthesize_agent_done_if_missing` (the
+PTY-first and slow paths) and through `settle_early_advance` from the early-advance path in
+`terminal.py` (an `AGENT_DONE` won; it counts as the run's own only when its `run_id` is this
+run's, and with none of its own the failure is still recorded as a `RUN_OUTCOME`). It reads the tasks still `in_progress` with `claimed_by` = the run id
+(`comms_tasks_by_run.get_unfinished_tasks_of_run`; ticket 11 made `claimed_by` the run). When
+there is one:
+
+- each task goes back to `pending` with `fail_reason='task_unfinished'`
+  (`task_retry.retry_task`), the claim's attempt counted; when `counted_attempts` (today
+  `attempts`; ticket 06 subtracts the waits) has reached `goal.task_max_attempts`
+  (`task_retry.resolve_max_attempts`) it is failed instead (`fail_task`, dependents blocked) and
+  an escalation is posted (`task_retry._post_escalation`);
+- the synthetic `AGENT_DONE` says `outcome: "failed"`, `error: "task_unfinished"`. When the agent
+  wrote its own `AGENT_DONE` that does not say failed, no second `AGENT_DONE` is written (one
+  invocation row per `AGENT_DONE`); a `RUN_OUTCOME` event `{run_id, outcome, error}` is appended,
+  which the projection ignores;
+- `_settle_spawn_identity` writes the run's `run_history` status `error`
+  (`run_task_outcome.take_run_failure`);
+- the spawn's returned result carries `outcome: "failed"`, `error: "task_unfinished"`
+  (`mark_failed` / `mark_pty_failed`), so the goal run's `on_done` does not report success.
+
+A spawn that raises (non-zero exit, timeout, stop) reaches neither call: `_settle_spawn_identity`,
+in the spawn's `finally`, sees the exception and calls `free_tasks_of_failed_spawn`, which frees
+the run's `in_progress` tasks the same way and writes nothing else (no `AGENT_DONE`, no
+`RUN_OUTCOME`; `run_history` already says `error`).
+
+`GET /runs/<id>` reports `run.outcome` / `run.error` (`run_history_read._run_outcome`): the latest
+`RUN_OUTCOME` for the run over its latest `AGENT_DONE` (an `AGENT_DONE` with no outcome reads
+`success`; no event, null). A run whose tasks are all `done` is unchanged. Loop tasks (`sched-`
+run ids, the `goal-loop` flow) are the scheduler's and are not touched.
 
 ## Task proof in the goal-loop drain (`supervisor/task_proof.py`, build-proof)
 
