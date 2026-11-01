@@ -205,7 +205,7 @@ _GOAL_RUN_STATUS = {
 def create_run(body: dict) -> tuple[dict, int]:
     """Validate a thin RunSpec and dispatch to the matching EXISTING facade.
 
-    RunSpec: ``{kind, board, scope, flow?, goal_id?, adapter?, model?}`` (+ ``project_root``,
+    RunSpec: ``{kind, board, scope, flow?, goal_id?, adapter?, model?, interactive?}`` (+ ``project_root``,
     needed by every facade below). ``kind`` selects the destination — ``flow`` ->
     ``supervisor.api.start_run``, ``single``/``evaluator`` -> ``supervisor.board_run.
     start_board_run``, ``goal`` -> ``supervisor.goal_executor.start_goal_run``. Route only —
@@ -243,8 +243,20 @@ def _create_flow_run(body: dict, project_root: str) -> tuple[dict, int]:
     except ValueError as exc:
         return {"error": str(exc)}, 400
 
+    interactive = body.get("interactive", True)
+    if not isinstance(interactive, bool):
+        return {"error": "Field 'interactive' must be a boolean"}, 400
+
+    from flask import request
+
+    from ...run_identity import caller_identity, is_chief_run
     from ...sse import _broadcast_runner
     from pathly_orchestrator.supervisor.api import start_run
+
+    # A chief's flow, or one the body asks to run headless, spawns each stage headless; any other
+    # start stays interactive, start_run's default (Studio's New-run button sends no field).
+    if is_chief_run(caller_identity(request)):
+        interactive = False
 
     try:
         state = start_run(
@@ -254,6 +266,7 @@ def _create_flow_run(body: dict, project_root: str) -> tuple[dict, int]:
             model=model,
             max_cost_usd=max_cost_usd,
             broadcast_fn=_broadcast_runner,
+            interactive=interactive,
         )
     except ValueError as exc:
         return {"error": str(exc)}, 409
