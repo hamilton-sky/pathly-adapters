@@ -5,7 +5,7 @@ Status: open
 Blocked by: 01, 03, 10
 Test first: yes
 Level: 3
-Touches: src/pathly_orchestrator/runner/chief_argv.py, src/pathly_orchestrator/http_server/chief_secret_text.py (new), src/pathly_orchestrator/http_server/chief_gate.py, tests/runner_supervisor/test_chief_secret_reach.py, tests/http_api/test_chief_secret_in_body.py, src/pathly_orchestrator/CLAUDE.md, tests/INDEX.md, tests/runner_supervisor/INDEX.md, tests/http_api/INDEX.md
+Touches: src/pathly_orchestrator/runner/chief_argv.py, src/pathly_orchestrator/http_server/chief_secret_text.py (new), src/pathly_orchestrator/http_server/chief_gate.py, tests/runner_supervisor/test_chief_secret_reach.py, tests/runner_supervisor/test_chief_session.py, tests/http_api/test_chief_secret_in_body.py, src/pathly_orchestrator/CLAUDE.md, tests/INDEX.md, tests/runner_supervisor/INDEX.md, tests/http_api/INDEX.md
 
 Spike S2. A chief's session folder `~/.pathly/chief/<run_id>/`
 (`src/pathly_orchestrator/supervisor/chief_session.py::_write_session_folder`) holds
