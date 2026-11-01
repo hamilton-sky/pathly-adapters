@@ -445,7 +445,7 @@ GET  /comms/tasks           ← list DAG tasks
 POST /comms/tasks/complete  ← mark a task complete
 POST /comms/tasks/status    ← BULK terminal write-back (done|failed) for a resolving agent: `{task_ids,status,reason,from}`; reports updated/newly_ready/blocked/unknown. Re-opening (→pending) is deliberately NOT offered — that is a supervisory act
 POST /comms/tasks/floor-allow ← HUMAN only (403 for a live run token): set one task's floor allow list `{message_id, allow:[…], refreeze}`; `refreeze` re-copies the live text into `claimed_text` (see "Frozen task text" below)
-POST /comms/tasks/run       ← run ONE task headlessly: claim it, spawn a builder on its prompt, complete on success
+POST /comms/tasks/run       ← run ONE task headlessly: mint a run id (uuid4), claim the task with it, start the builder's board run under that same id (`start_board_run(run_id=…)`), complete on success (`blueprints/comms/tasks_claim.py`)
 POST /comms/tasks/stop      ← stop a single-task run: kill its board run and revert the task to pending
 POST /comms/attach          ← attach an artifact to a message
 GET  /comms/artifacts       ← list artifacts linked to a message (comms_artifacts table)
@@ -458,7 +458,7 @@ POST /comms/scope           ← set the active board scope
 GET  /comms/permissions     ← role-based write permissions
 POST /comms/delete          ← soft-delete a message; a binding directive is refused with 403 `only the chief retires a binding directive` for every caller (it is superseded, never deleted)
 POST /comms/edit            ← edit a message's text (e.g. goal rename); re-stamps the row to the EDITOR (`stamp(caller_identity(request))`: their token's role and run, or `author_source="none"` with no token), not the original author, so words cannot sit under another run's `token` stamp. Anyone may still edit; Studio's goal rename sends no token yet, so it stamps `none`. A row with `binding = 1` is refused with 409 `{"error": "binding directives are superseded, not edited"}` and nothing changes (`update_message_text` answers `"binding"`; replace a directive with `/comms/supersede`)
-POST /comms/tasks/claim     ← claim a ready task (pending → in_progress)
+POST /comms/tasks/claim     ← claim a ready task (pending → in_progress); `claimed_by` is the caller's live run token's run id (the body's `run_id` is ignored then), the body `run_id` only for a tokenless caller (400 if blank). `blueprints/comms/tasks_claim.py`
 POST /comms/tasks/fail      ← mark a task failed (cascade-blocks dependents)
 GET  /comms/artifacts/<id>/section ← hydrate a named section of a .md artifact (+ path form); context-retrieval HYDRATE tier
 POST /comms/run             ← single-agent / evaluator board run
@@ -535,8 +535,9 @@ human checkpoints to `DONE`.
   (`task_retry.retry_task` back to pending, then a new claim) keeps the first copy, so a builder
   that edits its own task between attempts does not change what it is proven against. Every
   claim goes through `claim_task`: the scheduler's `sched-<id>#<n>` claims,
-  `POST /comms/tasks/claim` (team-flow builders claim with `run_id: "build"`) and
-  `/comms/tasks/run`.
+  `POST /comms/tasks/claim` (`claimed_by` is the caller's run token's run id, so a team builder's
+  `run_id: "build"` or drain-dag's `"$GOAL_ID-single"` is replaced by its real run; the body value
+  only for a tokenless caller) and `/comms/tasks/run` (claims with the id of the run it starts).
 - **`floor_allow`** — a JSON list of `proof.floor.CATEGORIES` names a human allowed for that one
   task. Its only writer is `POST /comms/tasks/floor-allow` (`blueprints/comms/tasks_floor.py`),
   body `{message_id, allow: [...], refreeze: false}` → 200 `{ok: true, allow: [...]}` (sorted).
@@ -1702,7 +1703,7 @@ pathly_orchestrator/
                            #   escalation for a parked run (a human checkpoint, a red base)
     base_smoke.py          # check_base — smoke the base before the first spawn (see "Run guard rails")
     run_budget.py          # refresh — raise a goal run's max_iterations from its DAG (see "Run guard rails")
-    board_run.py           # start_board_run: board-lock + skill compose + async spawn helper
+    board_run.py           # start_board_run: board-lock + skill compose + async spawn helper; optional `run_id` (default a new uuid4)
     board_lock.py          # Per-board/scope advisory lock (acquire/release/holder)
     chief_tiers.py         # what a chief may do (chief-agent): ACTIONS, TIERS (status=read; planner=read,post,plan; operator=all seven), actions_for/normalise_tier, and resolve_preset_tier — a user prompt file chief/<preset> names its tier in leading front matter `tier:`, else the built-in names map to themselves, anything else (unknown tier, missing front matter, malformed name) is status. Code, never read from prompt text; strip_front_matter reuses skills/compose_base
     chief_presets.py       # the chief's prompt (chief-agent 17): the built-in styles STATUS / PLANNER / OPERATOR (BUILT_IN), default_style (user file chief/<preset> wins, else the built-in text), compose_prompt (style + the chief-connect fragment, read at call time, + ROOT_LINE with the stored project root)
@@ -1733,7 +1734,7 @@ pathly_orchestrator/
       flows/               # defs.py (flow CRUD); stage_configs.py (per-stage overrides: agent/adapter/skill + layer-3 ability_ids + excluded_sections — the flow-phase-inspector SELECTION, applied FRESH at spawn by fsm_compose.build_prompt, never stored as trimmed text)
       catalog/             # items.py (file-tree catalog)
       skills/              # editor.py re-export shim; editor_render.py (/skills/catalog|parse|preview|compose [returns segments+tokens; accepts ability_ids]|summary-format/<style>); editor_io.py (/skills/save|export); prompt_library.py (/skills/prompts — system-prompts are file-backed via skills/prompt_files.py, kind='ability' stays legacy DB); abilities.py (/skills/abilities — layer-3 ability FILES, see skills/abilities.py)
-      comms/               # board + goals/DAG, split by domain: messages*.py, tasks.py, artifacts*.py, runs.py, goals.py, goals_read.py (GET /comms/goals rollup), settings.py, context.py, directives.py (POST /comms/directives, chief token only), features.py (/comms/features/decompose), project.py (/comms/project/decompose) (+ _helpers.py); see "Comms board endpoints" above
+      comms/               # board + goals/DAG, split by domain: messages*.py, tasks.py, tasks_claim.py (POST /comms/tasks/claim and /comms/tasks/run), artifacts*.py, runs.py, goals.py, goals_read.py (GET /comms/goals rollup), settings.py, context.py, directives.py (POST /comms/directives, chief token only), features.py (/comms/features/decompose), project.py (/comms/project/decompose) (+ _helpers.py); see "Comms board endpoints" above
       ops/                 # telemetry*.py (/record_activity, /record_phase*, /telemetry/*); menu.py (/menu, /metrics); db_api*.py (/db/* read API); chat.py (/chat); export.py
       code/                # query.py (POST /code/query — codebase-intelligence; its answer cache is keyed by (project root, op, target, content hash, backend) and holds nothing for a target with no hash: a directory, a missing file or a symbol)
       hq/                  # the HQ copilot (pathly/features/hq-copilot, local-operator): prompt.py
