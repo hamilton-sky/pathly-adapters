@@ -5,7 +5,7 @@ Status: open
 Blocked by: 11
 Test first: yes
 Level: 2
-Touches: src/pathly_orchestrator/supervisor/terminal_reconcile.py, src/pathly_orchestrator/supervisor/run_task_outcome.py (new), src/pathly_orchestrator/db/queries/comms_tasks_by_run.py (new), src/pathly_orchestrator/db/queries/run_history_read.py, tests/runner_supervisor/test_unfinished_task_outcome.py, src/pathly_orchestrator/CLAUDE.md, tests/INDEX.md, tests/runner_supervisor/INDEX.md
+Touches: src/pathly_orchestrator/supervisor/terminal_reconcile.py, src/pathly_orchestrator/supervisor/terminal.py, src/pathly_orchestrator/supervisor/terminal_identity.py, src/pathly_orchestrator/supervisor/run_task_outcome.py (new), src/pathly_orchestrator/db/queries/comms_tasks_by_run.py (new), src/pathly_orchestrator/db/queries/run_history_read.py, tests/runner_supervisor/test_unfinished_task_outcome.py, src/pathly_orchestrator/CLAUDE.md, tests/INDEX.md, tests/runner_supervisor/INDEX.md
 
 Spike S6: a goal run with the default `single` executor ended `done` with a synthetic
 `AGENT_DONE` `outcome: "success"` while the task it claimed stayed `in_progress`.
