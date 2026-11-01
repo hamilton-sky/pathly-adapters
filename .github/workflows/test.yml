@@ -22,11 +22,21 @@ jobs:
       - name: Install dependencies
         run: pip install -e ".[dev]" pytest-cov
 
+      # Coverage is measured on 3.12, not 3.11: CPython 3.11 guards sys.settrace with one
+      # process-wide flag, so when coverage installs its tracer in two threads at once the
+      # loser raises "Cannot install a trace function while another trace function is being
+      # installed" and that thread dies before it runs. 3.12 dropped the flag. 3.11 still runs
+      # every test, without the tracer.
       - name: Run tests
+        if: matrix.python-version != '3.12'
+        run: pytest
+
+      - name: Run tests with coverage
+        if: matrix.python-version == '3.12'
         run: pytest --cov=src --cov-report=xml --cov-report=term-missing
 
       - name: Upload coverage
-        if: matrix.python-version == '3.11'
+        if: matrix.python-version == '3.12'
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report

@@ -281,9 +281,26 @@ def test_token_resolves_to_none_once_the_spawn_settles(scenario, client):
 
     for spawn in (scenario.builder, scenario.reviewer):
         assert resolve_run_token(get_db(), spawn.payload["run_token"]) is None
-    # A run that outlives its token still gets its post stored, but unverified.
-    late = _post(client, scenario.builder.payload["run_token"], text="too late")
-    assert _stamp(late) == (None, None, "none")
+    # A run that outlives its token is refused, and its post is not stored.
+    late = client.post(
+        "/comms/post",
+        json={
+            "feature": FEATURE,
+            "board": "feature",
+            "scope": FEATURE,
+            "from": "explorer",
+            "type": "discovery",
+            "text": "too late",
+        },
+        headers={RUN_TOKEN_HEADER: scenario.builder.payload["run_token"]},
+    )
+    assert late.status_code == 401, late.data
+    assert late.get_json() == {"error": "unknown run token"}
+    assert (
+        not get_db()
+        .execute("SELECT 1 FROM comms_messages WHERE text = ?", ("too late",))
+        .fetchone()
+    )
 
 
 # ── what the stamps must survive ────────────────────────────────────────────────

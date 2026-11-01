@@ -17,6 +17,7 @@ from pathly_orchestrator.api import api_bp
 from .middleware import _log_request, _log_response, _setup_logging
 from .chief_budget import refund_run_slot
 from .chief_gate import chief_gate
+from .run_token_guard import run_token_guard
 from .feedback import _feedback_watcher
 from .blueprints.core.health import bp as health_bp
 from .blueprints.core.fsm import bp as fsm_bp
@@ -70,6 +71,7 @@ for _chief_bp in chief_blueprints:
 
 # Register request/response hooks
 app.before_request(_log_request)
+app.before_request(run_token_guard)
 app.before_request(chief_gate)
 app.after_request(_log_response)
 # A chief start the route refused with a 4xx gives its run slot back (after_request hooks run in

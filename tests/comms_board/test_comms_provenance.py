@@ -185,21 +185,38 @@ def test_a_body_run_id_without_a_token_is_not_provenance(client):
     assert _provenance(_row(mid)) == (None, None, "none")
 
 
-def test_a_post_with_a_revoked_token_is_none_and_logged(client, caplog):
+def _messages() -> int:
+    from pathly_orchestrator.db.connection import get_db
+
+    return get_db().execute("SELECT COUNT(*) FROM comms_messages").fetchone()[0]
+
+
+def _refused_post(client, token: str):
+    body = {"feature": "feat-a", "from": "explorer", "type": "discovery", "text": "x"}
+    return client.post("/comms/post", json=body, headers={"X-Pathly-Run-Token": token})
+
+
+def test_a_post_with_a_revoked_token_is_refused_and_logged(client, caplog):
     from pathly_orchestrator.db.connection import get_db
     from pathly_orchestrator.db.queries.run_tokens import revoke_run_tokens
 
     token = _mint("run-gone", "builder")
     revoke_run_tokens(get_db(), "run-gone")
+    before = _messages()
     with caplog.at_level(logging.INFO):
-        mid = _post(client, token=token)
-    assert _provenance(_row(mid)) == (None, None, "none")
+        r = _refused_post(client, token)
+    assert r.status_code == 401
+    assert r.get_json() == {"error": "unknown run token"}
+    assert _messages() == before
     assert any("run token" in r.getMessage() for r in caplog.records)
 
 
-def test_a_post_with_an_unknown_token_is_none_not_refused(client):
-    mid = _post(client, token="not-a-real-token")
-    assert _provenance(_row(mid)) == (None, None, "none")
+def test_a_post_with_an_unknown_token_is_refused(client):
+    before = _messages()
+    r = _refused_post(client, "not-a-real-token")
+    assert r.status_code == 401
+    assert r.get_json() == {"error": "unknown run token"}
+    assert _messages() == before
 
 
 def test_a_role_less_token_post_is_none_and_the_reviewer_does_not_see_it(client):

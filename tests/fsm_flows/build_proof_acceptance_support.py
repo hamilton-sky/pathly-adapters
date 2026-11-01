@@ -175,9 +175,14 @@ class Harness:
     ):
         feedback_dir = self.storage / "feedback"
         pending = sorted(p.name for p in feedback_dir.glob("*.md"))
-        kind = "task" if run_id.startswith("sched-") else "stage"
-        if _FEEDBACK_RUN.search(run_id):
+        # A task's run id is sched-<uuid4>#n, and a uuid group can read -fb<digits>-, so the
+        # task check must win over the feedback pattern.
+        if run_id.startswith("sched-"):
+            kind = "task"
+        elif _FEEDBACK_RUN.search(run_id):
             kind = "feedback"
+        else:
+            kind = "stage"
         spawn = Spawn(run_id, kind, state.current_state, instructions, session, pending)
         with self._lock:
             self.spawns.append(spawn)

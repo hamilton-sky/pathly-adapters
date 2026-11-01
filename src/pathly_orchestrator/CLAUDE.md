@@ -545,8 +545,8 @@ human checkpoints to `DONE`.
   a row that is not a task; 404 for a missing row. `refreeze: true` also copies the live `text`
   into `claimed_text`: how a human corrects a broken check without allowing `task-edit`. Task
   text is agent-written, so an allow line there would let the planner excuse the builder.
-- **Limit:** as for `force_past_gate`, a caller with no token (or an unknown or revoked one) is
-  treated as a human. Studio has no control for the list yet; set it with `curl` from a shell.
+- **Limit:** as for `force_past_gate`, a caller with no token is treated as a human (an unknown
+  or revoked token is 401 before the route, "Unknown run tokens" below). Studio has no control for the list yet; set it with `curl` from a shell.
 - Reads live in `db/queries/task_proof.py`: `get_task` (any live row; the caller checks the
   type), `tasks_claimed_since` / `tasks_completed_since` (goal-scoped when `goal_id` is given,
   else `(board, scope)`, as `require_tasks_done` scopes; the window compares parsed times, since
@@ -655,8 +655,8 @@ POST /chief/human-messages  ← {run_id, hook_secret, text, session_id, relayed?
   the cleanup and goes on to fail in `app.run` ("address already in use"), so a second server
   started by mistake on the first one's port no longer closes the running server's chief. A second
   server on another port still does (not protected; not decided).
-- Same limit as the other human-only routes: a caller with no token (or an unknown or revoked
-  one) is treated as a human until the UI token (RRP-2b) exists. The chief's own token is refused
+- Same limit as the other human-only routes: a caller with no token is treated as a human until
+  the UI token (RRP-2b) exists (an unknown or revoked token is 401 before the route). The chief's own token is refused
   here by the chief gate ("Chief gate" below).
 - **Human messages:** `POST /chief/human-messages` is written to by the chief's
   UserPromptSubmit hook only, `python -m pathly_hooks.chief_prompt --run-id <id> --secret-file
@@ -824,7 +824,9 @@ the fragments' header are not links it drives; `tests/runner_supervisor/test_pty
 - **Resolve.** `http_server/run_identity.py::caller_identity(request)`: a live token is
   `kind="run"` with its `run_id`, `role`, `feature`, `project_root`, `board` and `scope`; a
   missing, empty, unknown or revoked one is `anonymous` (unknown and revoked are logged at info
-  with the remote address). `caller_identity` never reads the body's `role`, `run_id` or `from`.
+  with the remote address). Through the app an unknown or revoked one never gets that far:
+  `run_token_guard` answers it 401 first ("Unknown run tokens" below), so in a route only a missing
+  or empty header is anonymous. `caller_identity` never reads the body's `role`, `run_id` or `from`.
   Studio's own requests send no token yet, so UI posts are `anonymous` too.
 - **Stamp.** `POST /comms/post` stores `stamp(caller_identity(request))` as `author_role`,
   `author_run_id` and `author_source` on the `comms_messages` row (rules under "Author provenance
@@ -836,7 +838,17 @@ the fragments' header are not links it drives; `tests/runner_supervisor/test_pty
   (`check_write_permission`; the feature board accepts any `from`), and `run_id` still correlates
   the post to a run for RunDetail's Board tab and the `/events/runs` live push.
 - **Revoke.** `_settle_spawn_identity` revokes the spawn's tokens in the spawn's `finally`. A run
-  that outlives its token is not refused: its post is stored with `author_source="none"`.
+  that outlives its token is refused: every call it makes with that token is 401.
+- **Unknown run tokens (chief-autopilot 10).** `http_server/run_token_guard.py::run_token_guard`
+  is a `before_request` hook registered in `app.py` after `_log_request` and before `chief_gate`.
+  A request whose `X-Pathly-Run-Token` does not resolve to a live token (never minted, or
+  `revoked_at` set) gets **401** `{"error": "unknown run token"}` on every route, logged at info
+  with the remote address, because a leaked or invented token falling back to anonymous was a way
+  around the chief gate. No header, or an empty one, is anonymous as before; a live token of any
+  role passes on. A revoked `chief` token is left to `chief_gate` (401 `chief session closed`).
+  Callers that can send a stale token: a headless agent (fragments' `$PATHLY_RUN_TOKEN`, `pathly
+  api`) still running after its spawn settled, and a chief tab's `pathly api` after the session
+  closed; both now get 401 instead of acting as anonymous.
 
 **2. The read policy (built, not wired).** `runner/read_policy.py` holds `ReadPolicy` (the tier
 booleans plus optional `exclude_types` / `exclude_authors`), `BUILTIN_DEFAULTS` (`reviewer`,
@@ -854,10 +866,11 @@ first) is a later plan.
 
 ### Chief gate (chief-agent)
 
-`http_server/chief_gate.py::chief_gate` is a `before_request` hook registered in `app.py` right
-after `_log_request`, so the secret check and the rate limit run first. It acts only on a request
-whose `X-Pathly-Run-Token` belongs to a token row with role `chief` (`lookup_run_token`, live or
-revoked); a builder token, an unknown token and no token pass untouched. A `chief` token whose
+`http_server/chief_gate.py::chief_gate` is a `before_request` hook registered in `app.py` after
+`_log_request` and `run_token_guard`, so the secret check and the rate limit run first. It acts
+only on a request whose `X-Pathly-Run-Token` belongs to a token row with role `chief`
+(`lookup_run_token`, live or revoked); a live token of another role and no token pass untouched
+(an unknown token, or a revoked one of another role, is 401 from `run_token_guard` before it). A `chief` token whose
 row is revoked, or whose session (`chief_sessions`) is missing or closed, gets **401**
 `{"error": "chief session closed"}`, never `caller_identity`'s anonymous fallback, because
 anonymous loopback callers can do everything. A path no route matches (`request.url_rule` is
@@ -1685,7 +1698,7 @@ pathly_orchestrator/
   http_server/             # Flask HTTP server: FSM endpoints + SSE + runner routes
     app.py                 # Flask app factory, blueprint registration, main() (which calls supervisor.chief_session.chief_startup_cleanup() before serving, unless chief_session.something_answers(host, port) finds a server already answering there; a failure is logged and boot goes on)
     middleware.py          # _log_request, _log_response, rate limiting, metrics
-    chief_gate.py          # chief_gate(): the before_request hook (registered after _log_request) that refuses a chief token's call its tier, project or poster does not allow, and answers 401 for a closed chief session — see "Chief gate"
+    chief_gate.py          # chief_gate(): the before_request hook (registered after _log_request and run_token_guard) that refuses a chief token's call its tier, project or poster does not allow, and answers 401 for a closed chief session — see "Chief gate"
     chief_routes.py        # the chief gate's route table as data: ROUTE_ACTIONS ((rule, method) -> action), the GET refusals, the post-type and run-verb refinements and action_for()
     chief_fields.py        # the chief gate's second route table: ROUTE_FIELDS ((rule, method) -> Fields), merged from CALL_FIELDS and READ_FIELDS; per route the complete list of the keys a chief may send (and the ones deliberately left out), each with a kind, and which of them the route reads as a project root, a board scope (a folder name where the route joins it into a path), a file, a flow or a skill, when the root must be named (always, for some verbs, or unless a feature is given), the names the root bounds (`under_root`) and the ids it leaves unbound (with a note for the fleet-wide reads); a test fails when a reachable route has no entry
     chief_field_types.py   # what an entry can say: the kinds of a key (text, number, flag, enum, name, id; root, scope, segment, path, ref, flow, skill), `Fields` (kinds(), declared(), allowed(rule)), `ScopeRead`, `TextPath` and `url_variables(rule)`
@@ -1697,6 +1710,7 @@ pathly_orchestrator/
     chief_budget.py        # the cost ceiling and the run limit of a chief session (chief.max_cost_usd_per_run, chief.max_runs_per_session): budget_refusal() is the gate's last check and takes the run slot, refund_run_slot() is the after_request hook that gives it back for a 4xx, ceiling_usd()/run_limit() read the settings — see "Chief gate"
     chief_cite.py          # cite_refusal() / answer_text(): the cite rule for an `answer` action — the chief names a human message of its session by `cite`, the gate checks it (kind human, this session, typed after the question, once; an acknowledgement must say `agent: "chief"`) and keeps its text on flask.g for the answer routes to relay — see "Chief gate"
     run_identity.py        # caller_identity(request) -> CallerIdentity: kind run|anonymous from the X-Pathly-Run-Token header (body role/run_id/from never read); unknown/revoked token logged at info with the remote addr; `ui` kind reserved (RRP-2b); `is_chief_run(identity)`: True for a live run whose role is `chief` and nobody else (the test behind who may post and who may retire a binding directive). Routes apply a policy from it: who posts and retires a directive, the human-gate refusals (`comms/_helpers.py`), a task's completion and `floor-allow` (`comms/tasks_status.py`, `tasks_floor.py`), `force_past_gate` (`core/fsm.py`) and the chief open/close routes; `chief_gate` reads the token row itself (`lookup_run_token`) instead
+    run_token_guard.py     # run_token_guard(): the before_request hook (after _log_request, before chief_gate) that answers 401 {"error": "unknown run token"} for an X-Pathly-Run-Token that is unknown or revoked (a revoked chief token is left to chief_gate); no header or an empty one passes — see "Unknown run tokens"
     sse.py                 # SSE globals (_clients, _runner_clients, _menu_clients) + broadcast helpers
     pricing.py             # MODEL_PRICING, compute_cost_usd()
     feedback.py            # _feedback_watcher, _process_feedback_file

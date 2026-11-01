@@ -199,7 +199,7 @@ def test_open_with_a_live_builder_token_is_403_and_opens_nothing(
     assert _no_session(project)
 
 
-def test_open_with_a_revoked_or_unknown_token_is_not_refused_as_an_agent(
+def test_open_with_an_unknown_token_is_401_and_opens_nothing(
     client, host: Host, project: str
 ):
     response = client.post(
@@ -207,7 +207,10 @@ def test_open_with_a_revoked_or_unknown_token_is_not_refused_as_an_agent(
         json=_body(project),
         headers={"X-Pathly-Run-Token": "not-a-token"},
     )
-    assert response.status_code == 201, response.get_json()
+    assert response.status_code == 401
+    assert response.get_json() == {"error": "unknown run token"}
+    assert host.sent == []
+    assert _no_session(project)
 
 
 def test_open_with_engine_copilot_is_400_and_names_the_supported_engines(
