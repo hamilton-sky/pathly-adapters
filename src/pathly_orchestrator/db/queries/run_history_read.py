@@ -49,10 +49,10 @@ FLOW_NAMES = _packaged_flow_names()
 
 # A per-stage (CHILD-of-a-flow) run_id: ``{topic}-{N}-{ts}`` with an optional retry suffix
 # ``-q{n}`` / ``-fb{n}`` (orchestrator.py stage ids). Matched as a SUFFIX (no ^ anchor).
-# Edge accepted per ARCHITECTURE §1/§1.1: a bare uuid whose last TWO groups are both
-# all-numeric (e.g. ``...-4444-555566667777``) also matches — vanishingly rare for real
-# hex uuids, and made exact in P1 by stamping the parent run_id onto stage rows.
+# A bare uuid whose last TWO groups are all digits (``...-4444-555566667777``) also matches the
+# suffix, so a canonical uuid is checked first and is never a stage.
 _STAGE_RE = re.compile(r"-\d+-\d{10,}(-(?:q|fb)\d+)?$")
+_UUID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 
 # run_log columns surfaced in a RunDetail "logs" entry (ARCHITECTURE §4.2).
 _LOG_KEYS = ("stage", "prompt_sent", "board_context_injected", "stdin", "stdout", "ts")
@@ -81,7 +81,7 @@ def _classify_kind(run_id: str, adapter: str | None) -> str:
     rid = run_id or ""
     if rid.startswith("sched-"):
         return "loop"
-    if _STAGE_RE.search(rid):
+    if _STAGE_RE.search(rid) and not _UUID_RE.fullmatch(rid):
         return "stage"
     a = adapter or ""
     if a in FLOW_NAMES:

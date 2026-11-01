@@ -243,3 +243,16 @@ def test_legacy_parentless_loop_still_shows_tasks() -> None:
     )
     byid = {r["run_id"]: r for r in list_runs(conn, PR)}
     assert TASK1 in byid and byid[TASK1]["kind"] == "loop"
+
+
+# --- a bare uuid is never a stage ----------------------------------------------------------
+def test_bare_uuid_with_all_digit_tail_is_not_a_stage() -> None:
+    """A uuid4 whose last two groups are all digits looks like a stage id's ``-N-<ms>`` tail.
+    It is a parent run, so it must keep its kind (seen as a flow run missing from GET /runs).
+    """
+    rid = "e23f2fe0-9a2e-4932-8624-751394377511"
+    assert _classify_kind(rid, "explore") == "flow"
+    assert _classify_kind(rid, "goal-loop") == "loop"
+    assert _classify_kind(rid, "claude") == "single"
+    assert _classify_kind("demo-3-1730000000000", "claude") == "stage"
+    assert _classify_kind("demo-3-1730000000000-fb1", "claude") == "stage"
