@@ -35,4 +35,4 @@ Runner control loop, supervisor, spawn channel, lane/worktree isolation, file-cl
 | `test_spawn_run_token.py` | A spawn mints a run token, sends it in TERMINAL_SPAWN, and revokes it when the spawn ends | 5 |
 | `test_spawn_window.py` | supervisor/spawn_window.py — a ``SPAWN_WINDOW`` event per single-path stage spawn (build-proof 04) | 11 |
 | `test_supervisor.py` | Tests for pathly_orchestrator.supervisor (Conv 2 — Phases 5-7) | 28 |
-| `test_unfinished_task_outcome.py` | chief-autopilot 05: a single run that leaves its task unfinished is failed, and the task is freed | 5 |
+| `test_unfinished_task_outcome.py` | chief-autopilot 05: a single run that leaves its task unfinished is failed, and the task is freed | 7 |

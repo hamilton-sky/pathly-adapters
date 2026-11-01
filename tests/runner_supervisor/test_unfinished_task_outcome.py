@@ -114,6 +114,9 @@ def _spawn(
     own_agent_done: bool = False,
     finish_task: bool = False,
     pty_first: bool = True,
+    exit_code: int = 0,
+    agent_done_run_id: str = "",
+    agent_done_outcome: str = "success",
 ) -> dict:
     """Run one board spawn. Its agent claims ``tid`` with drain-dag's literal body and its run
     token, optionally marks it done, optionally writes its own success AGENT_DONE, then ends.
@@ -146,8 +149,8 @@ def _spawn(
                 {
                     "type": "AGENT_DONE",
                     "agent": "builder",
-                    "run_id": run_id,
-                    "outcome": "success",
+                    "run_id": agent_done_run_id or run_id,
+                    "outcome": agent_done_outcome,
                     "summary": "all done",
                     "cost_usd": 0.5,
                     "tokens_in": 10,
@@ -158,7 +161,7 @@ def _spawn(
         assert run is not None
         run.mark_started()
         if pty_first:
-            run.mark_pty_result({"result": {}, "exit_code": 0})
+            run.mark_pty_result({"result": {}, "exit_code": exit_code})
 
     seen["result"] = _run_stage_via_terminal(
         state, "drain the dag", "claude", "m", run_id, broadcast
@@ -207,6 +210,8 @@ def test_no_agent_done_and_task_in_progress_fails_the_run(client, tmp_path):
     tid = _task()
     seen = _spawn(client, tmp_path, RUN_A, tid)
     assert seen["claim"]["claimed"] is True
+    assert seen["result"]["outcome"] == "failed"
+    assert seen["result"]["error"] == "task_unfinished"
 
     synthetic = _last_agent_done(RUN_A)
     assert synthetic.get("synthetic") is True
@@ -230,7 +235,12 @@ def test_agents_own_success_is_reported_failed_with_one_invocation(
     client, tmp_path, pty_first
 ):
     tid = _task()
-    _spawn(client, tmp_path, RUN_A, tid, own_agent_done=True, pty_first=pty_first)
+    seen = _spawn(
+        client, tmp_path, RUN_A, tid, own_agent_done=True, pty_first=pty_first
+    )
+    # The spawn's own result says failed too, so the caller does not report success.
+    assert seen["result"]["outcome"] == "failed"
+    assert seen["result"]["error"] == "task_unfinished"
 
     # No second AGENT_DONE: the agent's own one is still the last, and still says success.
     own = _last_agent_done(RUN_A)
@@ -303,3 +313,65 @@ def test_a_run_whose_task_is_done_keeps_success(client, tmp_path):
     assert run["status"] == "done"
     assert run["outcome"] == "success"
     assert _row(tid)["task_status"] == "done"
+
+
+def _events_of(event_type: str, run_id: str) -> list:
+    from pathly_orchestrator.db.connection import get_db
+
+    rows = (
+        get_db()
+        .execute(
+            "SELECT payload FROM fsm_events WHERE event_type=? ORDER BY seq",
+            (event_type,),
+        )
+        .fetchall()
+    )
+    return [
+        p for p in (json.loads(r["payload"]) for r in rows) if p.get("run_id") == run_id
+    ]
+
+
+def test_a_run_that_exits_nonzero_frees_its_task(client, tmp_path):
+    """A crash, a rate limit after retries: the spawn raises, and the task is still freed
+    (free only: no AGENT_DONE and no RUN_OUTCOME; run_history already says error)."""
+    tid = _task()
+    with pytest.raises(RuntimeError, match="terminal_exit_nonzero"):
+        _spawn(client, tmp_path, RUN_A, tid, exit_code=1)
+
+    row = _row(tid)
+    assert row["task_status"] == "pending"
+    assert row["claimed_by"] is None
+    assert row["fail_reason"] == "task_unfinished"
+    assert row["attempts"] == 1
+    assert _events_of("AGENT_DONE", RUN_A) == []
+    assert _events_of("RUN_OUTCOME", RUN_A) == []
+    assert _detail(client, RUN_A)["status"] == "error"
+
+    seen = _spawn(client, tmp_path, RUN_B, tid, finish_task=True)
+    assert seen["claim"]["claimed"] is True
+    assert _row(tid)["claimed_by"] == RUN_B
+
+
+def test_early_advance_on_another_runs_agent_done_still_reports_failed(
+    client, tmp_path
+):
+    """The feature's latest AGENT_DONE belongs to another run (and says failed): it is not
+    this run's own report, so it must not stand in for one."""
+    tid = _task()
+    seen = _spawn(
+        client,
+        tmp_path,
+        RUN_A,
+        tid,
+        own_agent_done=True,
+        pty_first=False,
+        agent_done_run_id=RUN_B,
+        agent_done_outcome="failed",
+    )
+    assert seen["result"]["outcome"] == "failed"
+    assert seen["result"]["error"] == "task_unfinished"
+    run = _detail(client, RUN_A)
+    assert run["outcome"] == "failed"
+    assert run["error"] == "task_unfinished"
+    assert run["status"] == "error"
+    assert _row(tid)["task_status"] == "pending"
