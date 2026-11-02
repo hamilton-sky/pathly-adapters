@@ -157,23 +157,34 @@ def _merge_drain_result(drained: dict, cost_usd: float) -> dict:
     is ``require_tasks_done``, which blocks the transition on exactly these tasks, and the
     plain-failure path already reports a self-reported failure as a RUNNER_WARNING while
     letting the gate decide. "Frontier drained, these escalated" is the honest report.
+
+    ``outcome="failed"`` too when tasks WAIT on a question (``task_wait_outcome``): a parked task
+    is not done, and ``_drain`` records it on the run so the stage ends the run with
+    ``waiting_for_answer`` instead of handing the join's ``INCOMPLETE_TASKS`` to a builder.
     """
     escalated = list(drained.get("failed") or [])
     deadlocked = list(drained.get("deadlocked") or [])
     completed = list(drained.get("completed") or [])
+    waiting = list(drained.get("waiting") or [])
     merged: dict = {
         "cost_usd": cost_usd,
         "session_id": None,
-        "outcome": "failed" if (escalated or deadlocked) else "success",
+        "outcome": "failed" if (escalated or deadlocked or waiting) else "success",
         "result": {
             "fan_out": True,
             "completed": completed,
             "failed": escalated,
             "blocked": list(drained.get("blocked") or []),
             "deadlocked": deadlocked,
+            "waiting": waiting,
         },
     }
-    if escalated or deadlocked:
+    if waiting:
+        merged["error"] = (
+            f"waiting_for_answer: {len(waiting)} task(s) wait for an answer to a question "
+            f"({len(completed)} completed)"
+        )
+    elif escalated or deadlocked:
         merged["error"] = (
             f"fan-out drained with {len(escalated)} escalated and "
             f"{len(deadlocked)} deadlocked task(s) "
@@ -192,6 +203,7 @@ def _drain(
     """Drain this state's ready tasks through ``scheduler_loop`` and merge the result."""
     import pathly_orchestrator.supervisor as _sup
     from pathly_orchestrator.supervisor.drain import drain_frontier
+    from pathly_orchestrator.supervisor.task_wait_outcome import note_run_waits
 
     board = "feature"
     goal_id = getattr(state, "goal_id", "") or None
@@ -231,6 +243,7 @@ def _drain(
         goal_id=goal_id,
     )
     merged = _merge_drain_result(drained, tracker.total)
+    note_run_waits(state, merged["result"]["waiting"])
     tracker.report(merged)  # stamps error/cost_cap_exceeded when the cap was breached
     return merged
 

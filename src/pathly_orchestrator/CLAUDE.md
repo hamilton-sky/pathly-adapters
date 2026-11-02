@@ -1692,12 +1692,15 @@ pathly_orchestrator/
     goal_decomposer.py     # start_goal_decompose() bridges an analyzed goal into a DAG
                            #   (mode='planner' or mode='consultation')
     scheduler.py           # DAG frontier loop (scheduler_loop): event-driven, blocks on completion_q;
-                           #   at most one worker per lane; goal_id= scopes the frontier to one goal's tasks
+                           #   at most one worker per lane; goal_id= scopes the frontier to one goal's tasks;
+                           #   a task whose spawn left an open question is parked (result key `waiting`)
+    task_wait_outcome.py   # park_if_asked / note_run_waits / take_run_waits / answered_questions_block —
+                           #   a loop task that waits on its question (see "A task waits on its question")
     task_prompt.py         # build_task_prompt — ONE assembly of a DAG task's prompt: the composed
                            #   development/execute-task body with its fragment placeholders
                            #   SUBSTITUTED (the DAG path had no injector at all — see Phase E),
                            #   plus the dependency-results block, the runner contract, the retry
-                           #   ladder (+ the root-cause-debug guide) and board context
+                           #   ladder (+ the root-cause-debug guide), the answered questions and board context
     task_dependencies.py   # dependency_results_block(task) — `## Results of the tasks this one
                            #   depends on`: per direct depends_on id a `### <its first text line>`
                            #   heading and its latest AGENT_DONE summary (see "Dependency results")
@@ -2639,7 +2642,24 @@ best-effort: an answer to a question whose task was deleted is stored and nothin
 `GET /comms/tasks` rows carry `answered_questions: [{question, answer}]`
 (`blueprints/comms/tasks_ready.py`), and `drain-dag` tells the agent to read them before it works.
 `task_retry.detect_deadlocks` leaves a pending task alone when its dependency chain reaches a
-parked task (`tasks_behind_waiting`). Loop tasks are ticket 12 (the scheduler).
+parked task (`tasks_behind_waiting`).
+
+**Loop tasks** (`supervisor/task_wait_outcome.py`, chief-autopilot 12). A goal-loop task runs
+inside the `DRAINING` fan-out stage and the scheduler, not the agent, completes or retries it. The
+scheduler's completion handler first calls `park_if_asked`: when the spawn's run
+(`sched-<task>#N`, `sched_run_id`) left an open question, the task is `park_task`ed whatever the
+spawn reported, and the handler calls neither `complete_task` nor `resolve_task_failure`, so no
+attempt is counted (`resolve_task_failure` already subtracts `waits`; the scheduler does not). It
+broadcasts `task_waiting` (`task_id`, `run_id`, `questions`) and the drain result carries
+`waiting`. `fan_out._merge_drain_result` reports a drain with waiting tasks as `outcome: failed`,
+and `_drain` records them on the run (`note_run_waits`); once the other ready tasks have drained,
+`orchestrator_stage._resolve_stage_supervised` takes them (`take_run_waits`) before
+`complete_stage` and ends the run in error with `waiting_for_answer` (`run_history` status
+`error`, the run's `on_done` error `waiting_for_answer`) instead of letting `require_tasks_done`
+send `INCOMPLETE_TASKS` to a builder. After an answer the task is claimed with a new run id
+(`attempts` only grows), and `build_task_prompt` adds `## Answers to your questions` with each
+answered question and its answer (`answered_questions_block`, from `answered_questions` through
+`task_waits.question_answers`).
 
 ## Task proof in the goal-loop drain (`supervisor/task_proof.py`, build-proof)
 

@@ -9,6 +9,7 @@ from . import run_budget
 from .human_escalation import post_human_escalation
 from .registry import _lock, _set_status
 from .state import MAX_FEEDBACK_ROUNDS, RunnerState, logger
+from .task_wait_outcome import WAITING_FOR_ANSWER, take_run_waits
 
 
 def _checkpoint_text(topic: str, file_name: str, res: dict) -> str:
@@ -96,6 +97,16 @@ def _resolve_stage_supervised(
             if state._abort_flag:
                 _set_status(state, "aborted", broadcast_fn)
                 return None
+
+        # A fan-out drain that parked loop tasks on their questions ends the run here: the join
+        # would send INCOMPLETE_TASKS to a builder over a task that waits for a person.
+        waiting = take_run_waits(state)
+        if waiting:
+            _fail(
+                WAITING_FOR_ANSWER,
+                f"{len(waiting)} task(s) wait for an answer to a question: {waiting}",
+            )
+            return None
 
         try:
             result = fhc.complete_stage(
