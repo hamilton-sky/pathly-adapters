@@ -3,11 +3,14 @@
 A chief token's call that starts work records a row (``record_session_run``, from the
 ``after_request`` hook in ``http_server/chief_run_record.py``). ``ended_unread_runs`` lists the
 project's rows whose run reached a terminal status in ``run_history`` (``done``, ``error``,
-``aborted``: the ends ``registry._set_status`` and ``terminal_identity`` write; ``parked`` waits
-for a human and may resume, so it is not one) and that nobody marked
-read; ``mark_runs_read`` marks them. ``open_questions_on_board`` counts the questions and
-escalations to the person (``human`` or ``*``) still open on a board: the rows that park a task
-(ticket 06). Rows outlive the session that made them, so the next chief of the project sees them.
+``aborted`` and ``parked``: the ends ``registry._set_status`` and ``terminal_identity`` write; a
+parked run's row is final too, because resuming it starts a NEW run id,
+``supervisor/api.resume_parked_run``) and that nobody marked read; ``mark_runs_read`` marks them.
+``run_notice`` reads what a notice shows of one run with the helpers behind ``GET /runs/<id>``,
+without its stages, logs, board posts or artifacts. ``open_questions_on_board`` counts the
+questions and escalations to the person (``human`` or ``*``) still open on a board: the rows that
+park a task (ticket 06). Rows outlive the session that made them, so the next chief of the project
+sees them.
 
 Every SQL here is one literal.
 """
@@ -18,6 +21,7 @@ import sqlite3
 import time
 
 from ..connection import _get_write_lock
+from .run_history_read import _classify_kind, _run_cost, _run_outcome
 
 
 def record_session_run(
@@ -49,11 +53,33 @@ def ended_unread_runs(conn: sqlite3.Connection, project_root: str) -> list[dict]
         "SELECT s.run_id, s.session_run_id, s.started_at FROM chief_session_runs s"
         " JOIN run_history h ON h.run_id = s.run_id"
         " WHERE s.project_root = ? AND s.read_at IS NULL"
-        " AND h.status IN ('done', 'error', 'aborted')"
+        " AND h.status IN ('done', 'error', 'aborted', 'parked')"
         " ORDER BY s.started_at ASC, s.run_id ASC",
         (project_root,),
     ).fetchall()
     return [dict(r) for r in rows]
+
+
+def run_notice(conn: sqlite3.Connection, run_id: str) -> dict | None:
+    """What a notice shows of ``run_id``: ``{kind, status, outcome, error, cost_usd,
+    finished_at, board}``, read as ``GET /runs/<id>`` reads them (``run_history_read``), or None
+    for a run with no ``run_history`` row. ``board`` is the run's ``board_scope``, else its
+    feature."""
+    row = conn.execute(
+        "SELECT * FROM run_history WHERE run_id = ?", (run_id,)
+    ).fetchone()
+    if row is None:
+        return None
+    kind = _classify_kind(row["run_id"], row["adapter"])
+    notice = {
+        "kind": kind,
+        "status": row["status"],
+        "cost_usd": _run_cost(conn, row, kind)[0],
+        "finished_at": row["finished_at"],
+        "board": row["board_scope"] or row["feature"],
+    }
+    notice.update(_run_outcome(conn, row["feature"], row["run_id"]))
+    return notice
 
 
 def mark_runs_read(
@@ -82,6 +108,9 @@ def open_questions_on_board(conn: sqlite3.Connection, scope: str) -> int:
 
     Open: live, not superseded, ``pending`` or ``active`` (acknowledged), and no live
     ``type: answer`` row replies to it. A blank scope matches nothing.
+
+    ``comms_messages`` has no project column: a board is its scope, so two projects with a
+    feature of the same name share one board in the database, and the count includes both.
     """
     if not scope:
         return 0

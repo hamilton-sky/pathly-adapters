@@ -1,11 +1,12 @@
 """GET /chief/notices and POST /chief/notices/read (chief-autopilot 08).
 
 The runs a chief session started are recorded (``http_server/chief_run_record.py``) so the person
-can be told when one ends: Studio's Chief button shows the unread count (ticket 13), and nothing
-enters the chief's tab. The notices are the project's recorded runs that reached a terminal status
-and are unread, each with what ``GET /runs/<id>`` says of it (``run_history_read.get_run_detail``)
-and the count of open questions and escalations to the person on the run's board. Rows outlive
-the session, so the next chief of the project sees them.
+can be told when one ends: Studio's Chief button will show the unread count (ticket 13), and
+nothing enters the chief's tab. The notices are the project's recorded runs that reached a terminal
+status (``parked`` included) and are unread, each with what ``GET /runs/<id>`` says of its kind,
+status, outcome and cost (``chief_session_runs.run_notice``, which reads only the run, not its
+stages, logs or board posts) and the count of open questions and escalations to the person on the
+run's board. Rows outlive the session, so the next chief of the project sees them.
 
 ``GET /chief/notices`` is a read, which the chief gate lets a chief call for its own project.
 ``POST /chief/notices/read`` is the person's: it is not in ``chief_routes.ROUTE_ACTIONS``, so the
@@ -26,24 +27,23 @@ def _notice(conn, row: dict) -> dict | None:
     """One notice: the run as ``GET /runs/<id>`` reads it, plus the open questions on its board."""
     from pathly_orchestrator.db.queries.chief_session_runs import (
         open_questions_on_board,
+        run_notice,
     )
-    from pathly_orchestrator.db.queries.run_history_read import get_run_detail
 
-    run = get_run_detail(conn, row["run_id"]).get("run")
-    if not run:
+    run = run_notice(conn, row["run_id"])
+    if run is None:
         return None
-    board = run.get("board_scope") or run.get("feature") or ""
     return {
         "run_id": row["run_id"],
         "session_run_id": row["session_run_id"],
         "started_at": row["started_at"],
-        "kind": run.get("kind"),
-        "status": run.get("status"),
-        "outcome": run.get("outcome"),
-        "error": run.get("error"),
-        "cost_usd": run.get("cost_usd"),
-        "finished_at": run.get("finished_at"),
-        "open_questions": open_questions_on_board(conn, board),
+        "kind": run["kind"],
+        "status": run["status"],
+        "outcome": run["outcome"],
+        "error": run["error"],
+        "cost_usd": run["cost_usd"],
+        "finished_at": run["finished_at"],
+        "open_questions": open_questions_on_board(conn, run["board"] or ""),
     }
 
 

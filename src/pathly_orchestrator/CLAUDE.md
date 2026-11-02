@@ -589,14 +589,17 @@ POST /chief/notices/read    ← {project_root, run_ids} → 200 {marked}
   `refund_run_slot` (hooks run in reverse order, and the refund pops the mark); the project root is
   the session's, never the body's; a 4xx, a 5xx and a 200 `ok: false` (a `retry` of a run still
   active names the old run) record nothing; a failure is logged and never turns the answer into a
-  500. `GET /chief/notices` lists the project's rows whose `run_history.status` is `done`, `error`
-  or `aborted` (not `parked`, which may resume) and that are unread, each read through
-  `run_history_read.get_run_detail` (the read behind `GET /runs/<id>`) plus `open_questions`: the
-  `question` and `escalation` rows to `human` or `*` still open on the run's board. Rows outlive the
+  500. `GET /chief/notices` lists the project's rows whose `run_history.status` is `done`, `error`,
+  `aborted` or `parked` (a parked run's row is final: resuming it starts a new run id) and that are
+  unread, each read by `chief_session_runs.run_notice` (kind, status, outcome, error and cost through
+  the `run_history_read` helpers behind `GET /runs/<id>`, without stages, logs or board posts) plus
+  `open_questions`: the `question` and `escalation` rows to `human` or `*` still open on the run's
+  board (by scope: the board has no project column, so a same-named feature of another project
+  counts too). Rows outlive the
   session, so the next chief of the project sees them. The chief gate classes the GET `read` (its
   entry binds `project_root`); `POST /chief/notices/read` is not in `ROUTE_ACTIONS`, so a chief
-  token is refused, and the view refuses any other live run token. Studio's Chief button shows the
-  count (ticket 13); nothing enters the chief's tab.
+  token is refused, and the view refuses any other live run token. Studio's Chief button will show
+  the count (ticket 13); nothing enters the chief's tab.
 - **Presets:** `GET /chief/presets` lists the built-in styles (status, planner, operator) and the
   user's `chief/<name>` prompt files (project over global), each with the tier
   `chief_tiers.resolve_preset_tier` gives it, the same function `open_chief` uses, so a launcher

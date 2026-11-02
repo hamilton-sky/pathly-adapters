@@ -1,7 +1,7 @@
 # Record a chief's runs and list the finished ones at `GET /chief/notices`
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 05, 06, 10
 Test first: yes
 Level: 3
@@ -61,13 +61,14 @@ prints passed
 
 ## Answer
 
-**Built** (work started at 8adefaf0; failing test 789b6638):
+**Built** (work started at 8adefaf0; failing test 789b6638; round 2 started at 9e3a0361, failing test 1844c7a3):
 - `src/pathly_orchestrator/db/migrations_chief.py`: `add_chief_tables` also creates
   `chief_session_runs(run_id PRIMARY KEY, session_run_id, project_root, started_at, read_at)` and
   an index on `project_root`.
 - `src/pathly_orchestrator/db/queries/chief_session_runs.py` (new): `record_session_run`
-  (INSERT OR IGNORE), `ended_unread_runs` (join `run_history`, status `done`/`error`/`aborted`,
-  `read_at IS NULL`), `mark_runs_read` (one UPDATE per id, scoped to the project),
+  (INSERT OR IGNORE), `ended_unread_runs` (join `run_history`, status `done`/`error`/`aborted`/
+  `parked`, `read_at IS NULL`), `run_notice` (the run row, kind, cost and outcome through the
+  `run_history_read` helpers behind `GET /runs/<id>`, nothing else), `mark_runs_read` (one UPDATE per id, scoped to the project),
   `open_questions_on_board` (question/escalation to `human`/`*` on a scope, live, not superseded,
   `pending`/`active`, no live answer reply). Every SQL one literal.
 - `src/pathly_orchestrator/http_server/chief_run_record.py` (new): `record_chief_run`
@@ -76,14 +77,14 @@ prints passed
   string `run_id`; project root from `chief_sessions`; try/except + warning log.
 - `src/pathly_orchestrator/http_server/blueprints/chief/notices.py` (new): `GET /chief/notices`
   (reads only `request.args`, 400 without `project_root`; each notice is
-  `get_run_detail(...)["run"]` plus `open_questions` on the run's `board_scope` or `feature`) and
+  `run_notice(...)` plus `open_questions` on the run's `board_scope` or `feature`) and
   `POST /chief/notices/read` (`{project_root, run_ids}` → `{marked}`; 400 on bad fields; 403 for
   any live run token; a chief token is already refused by the gate since the route is not in
   `ROUTE_ACTIONS`). Added to `blueprints/chief/__init__.py`.
 - `http_server/chief_field_reads.py`: `("/chief/notices", "GET"): Fields(roots=_ROOT)`.
 - Docs: root `CLAUDE.md` blueprint map `chief/` line; `src/pathly_orchestrator/CLAUDE.md` chief
   route list and a "Notices" bullet.
-- `tests/http_api/test_chief_notices.py` (new, 16 tests) + `tests/INDEX.md`, `tests/http_api/INDEX.md`.
+- `tests/http_api/test_chief_notices.py` (new, 20 tests) + `tests/INDEX.md`, `tests/http_api/INDEX.md`.
 
 **STARTS_A_RUN check**: every start route answers its 2xx with `ok: true` and `run_id`:
 `POST /runs` (flow, single/evaluator, goal: `control/_helpers.py`), `/comms/goals/run`
@@ -92,7 +93,15 @@ returns `run_id`), `/comms/tasks/run` (`tasks_claim.py`), `retry` (new id on suc
 needed a change.
 
 **Proof**:
-- `python -m pytest tests/http_api/test_chief_notices.py -q -p no:cacheprovider`: 16 passed,
+- Round 2: `python -m pytest tests/http_api/test_chief_notices.py -q -p no:cacheprovider`: 20 passed,
+  exit 0. At 1844c7a3 (test only) 2 failed for the right reasons (`test_a_parked_run_is_a_notice`:
+  no notice; `test_a_notice_reads_the_run_not_its_full_detail`: 500 from the patched
+  `get_run_detail`), 18 passed. `tests/http_api -k "chief_gate or chief_notices"`: 1506 passed,
+  1090 deselected. `tests/http_api -k chief`: 2356 passed, 240 deselected.
+  `tests/db/test_chief_tables.py`: 14 passed. Lint chain (black --check, mypy,
+  check_file_size "none new, none grown", check_no_mirror_reads, gen_test_index --check,
+  lint-imports 1 kept, bandit): exit 0.
+- Round 1: `python -m pytest tests/http_api/test_chief_notices.py -q -p no:cacheprovider`: 16 passed,
   exit 0. Covers: chief's 2xx `POST /runs` flow and `/comms/goals/run` each record one row with the
   session's root; a route 400 (`/comms/goals/run` with a not-ok result, `POST /runs` with a blank
   scope) records none; a retry answering 200 `ok: false` (already_active, old run id) records none;
@@ -114,8 +123,9 @@ needed a change.
 **Decisions**:
 - The hook keys off the gate's slot mark (`g.chief_run_slot`), which is set exactly for a chief
   token's `STARTS_A_RUN`/`retry` call that took a slot, so no rule list is duplicated.
-- Terminal = `done`, `error`, `aborted`. `parked` (a flow at a human checkpoint) is left out
-  because it can resume; see Shortcuts.
+- Terminal = `done`, `error`, `aborted`, `parked`. A parked run's row is final:
+  `registry._set_status` finalises `run_history` on `parked`, and `api.resume_parked_run` starts a
+  new run id (round 2, finding 1).
 - `open_questions` counts by the run's board (`run_history.board_scope`, else `feature`), not by
   `author_run_id`: a flow's questions are posted by its stage runs, whose ids differ from the parent.
 - `run_id` is the primary key: a run is recorded once.
@@ -123,12 +133,40 @@ needed a change.
   `/chief/open` and `/chief/close`: the read mark is the person's act.
 
 **Shortcuts taken**:
-- A `parked` run is not a notice; the person learns of it from its escalation. If Studio should
-  badge parked runs, add `parked` to the status list in `ended_unread_runs` (and decide what a
-  resumed-then-ended run shows, since `read_at` is set once).
+- Resuming a parked run starts a new run id, and `resume` is not a starting verb
+  (`chief_budget.STARTING_VERBS` is `retry` only), so the resumed run is not recorded and its end
+  is not a notice. Recording it would mean treating a resume of a parked run as a start.
 - `open_questions` counts every open question/escalation on the board, not only the run's own;
-  two runs on one board show the same count.
-- Each notice calls `get_run_detail` (logs, board posts): fine for a handful of unread runs.
+  two runs on one board show the same count. The board has no project column, so a same-named
+  feature of another project counts too (round 2, finding 3).
+- Unread rows are never pruned and every notice is listed: each costs a few indexed reads
+  (run row, cost sum, latest outcome event, question count). Add a cap if a project piles up
+  hundreds of unread notices.
+
+**Review fixes** (round 1, quality review):
+1. major, parked never a notice: verified first. `registry._set_status` finalises `run_history`
+   for `parked` (registry.py:273-275, "resuming a parked run starts a NEW run_id"), and
+   `supervisor/api.resume_parked_run` calls `start_run`, which mints a fresh run id. So the finding
+   is right. `ended_unread_runs` now includes `parked`; new test `test_a_parked_run_is_a_notice`
+   (status `parked`, its open escalation counted). Wording fixed in the module docstring,
+   `src/pathly_orchestrator/CLAUDE.md` Notices paragraph, and a new map.md line (map lines are
+   append-only, so the old 08 line stays and the new one corrects it).
+2. minor, full `get_run_detail` per notice: `chief_session_runs.run_notice` reads the run row and
+   calls only `_classify_kind`, `_run_cost` and `_run_outcome` (the helpers `get_run_detail` uses
+   for those fields, so the figures still match `GET /runs/<id>`); stages, logs, board posts and
+   artifacts are no longer read. New test `test_a_notice_reads_the_run_not_its_full_detail` patches
+   `get_run_detail` to raise and checks kind, status, outcome, error and cost. No cap: see Shortcuts.
+3. minor, same-named feature across projects: noted, not filtered. `comms_messages` has no project
+   column (only `board` and `scope`), and `run_history` stores no board kind, so there is nothing to
+   filter by; the board itself is shared between such projects. Written in the
+   `open_questions_on_board` docstring, the CLAUDE.md Notices paragraph and Shortcuts.
+4. minor, missing tests: added `test_a_failure_to_record_lets_the_start_through`
+   (`record_session_run` raising `OperationalError`: the start still answers 200 with `run-1`,
+   nothing recorded) and `test_an_agents_run_token_may_not_mark_notices_read` (a builder token:
+   403, notice still unread). Both pass against the round-1 code, as the review said the behaviour
+   was there and only the tests were missing.
+5. minor, "shows the count": now "will show the count (ticket 13)" in
+   `src/pathly_orchestrator/CLAUDE.md` and the `notices.py` docstring.
 
 **For later tickets**:
 - 13: read `GET /chief/notices?project_root=<root>` (`notices` list; badge = its length) and mark

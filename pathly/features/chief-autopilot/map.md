@@ -192,3 +192,4 @@ questions):
 - What a claude that does not know `dontAsk` does with the flag (exit or ignore): not in the docs.
 - Round four's grant wording, default budgets and the Studio-only credential are the person's call
   when round four is planned.
+- 08 (round 2) — `parked` is a notice too: `run_history` is final on park and a resume starts a new run id; a notice reads the run through `chief_session_runs.run_notice` (the `run_history_read` kind/cost/outcome helpers), not the full `get_run_detail`; question counts are by board scope, which has no project column.
