@@ -115,6 +115,7 @@ READ_FIELDS: dict[tuple[str, str], Fields] = {
     ),
     ("/chief/session", "GET"): Fields(roots=_ROOT),
     ("/chief/presets", "GET"): Fields(roots=_ROOT),
+    ("/chief/notices", "GET"): Fields(roots=_ROOT),
     # The legacy /api read API: it filters by the exact `project_root` it is given.
     ("/api/agents", "GET"): Fields(roots=_ROOT),
     ("/api/features", "GET"): Fields(roots=_ROOT),

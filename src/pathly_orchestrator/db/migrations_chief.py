@@ -1,4 +1,4 @@
-"""Additive schema for the chief agent's sessions, human messages and citations.
+"""Additive schema for the chief agent's sessions, human messages, citations and runs.
 
 ``chief_sessions.runs_started`` (the runs a session has started, counted by the chief gate) is a
 column added after the table existed, so it is added with ``ALTER TABLE`` to a database that has
@@ -35,7 +35,8 @@ def _add_runs_started(conn: sqlite3.Connection) -> None:
 
 
 def add_chief_tables(conn: sqlite3.Connection) -> None:
-    """Create chief_sessions, chief_human_messages and chief_citations. Idempotent.
+    """Create chief_sessions, chief_human_messages, chief_citations and chief_session_runs.
+    Idempotent.
 
     The columns of ``chief_sessions`` that came later (``runs_started``) are added to a table
     made before them, once.
@@ -81,5 +82,19 @@ def add_chief_tables(conn: sqlite3.Connection) -> None:
         " route TEXT NOT NULL,"
         " target TEXT,"
         " ts REAL NOT NULL)"
+    )
+    # The runs a chief session started (chief-autopilot 08). Kept after the session closes, so
+    # the next chief of the project and the person see the ones that ended.
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS chief_session_runs ("
+        " run_id TEXT PRIMARY KEY,"
+        " session_run_id TEXT NOT NULL,"
+        " project_root TEXT NOT NULL,"
+        " started_at REAL NOT NULL,"
+        " read_at REAL)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_chief_session_runs_project_root"
+        " ON chief_session_runs(project_root)"
     )
     conn.commit()

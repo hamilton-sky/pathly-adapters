@@ -180,6 +180,7 @@ questions):
 - 05 — at the end of a board/single run `supervisor/run_task_outcome.settle_run_tasks` frees tasks still `in_progress` with `claimed_by` = the run (pending, `task_unfinished`; failed + escalation at `goal.task_max_attempts`), fails the run (synthetic AGENT_DONE `failed`, or a `RUN_OUTCOME` event beside the agent's own; run_history `error`); `GET /runs/<id>` has `run.outcome`/`run.error`.
 - 06 — a single run's open question to `human`/`*` parks its `in_progress` task (`blocked`, `fail_reason='waiting_for_answer:<ids>'`, `waits+1`; run error `waiting_for_answer`); `post_message` frees it on any answer (`db/queries/task_waits.py`); limits compare `attempts - waits`; `GET /comms/tasks` rows carry `answered_questions`.
 - 07 — the Operator text shows the goal/task post bodies, which runs take `max_cost_usd` (flow start, retry), the no-workaround rule, `team`/`team-build` headless and waiting tasks; the `from` 403 says `send "from": "chief"`; `pathly help` names the post types by action.
+- 08 — a chief token's 2xx start with `ok` + `run_id` records `chief_session_runs` (hook `http_server/chief_run_record.py`, registered after `refund_run_slot`); `GET /chief/notices` lists ended (`done`/`error`/`aborted`) unread runs via `get_run_detail` + open human questions on the run's board; `POST /chief/notices/read` refuses any run token.
 
 ## Open questions
 
@@ -191,3 +192,4 @@ questions):
 - What a claude that does not know `dontAsk` does with the flag (exit or ignore): not in the docs.
 - Round four's grant wording, default budgets and the Studio-only credential are the person's call
   when round four is planned.
+- 08 (round 2) — `parked` is a notice too: `run_history` is final on park and a resume starts a new run id; a notice reads the run through `chief_session_runs.run_notice` (the `run_history_read` kind/cost/outcome helpers), not the full `get_run_detail`; question counts are by board scope, which has no project column.
