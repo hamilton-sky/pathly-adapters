@@ -1,7 +1,7 @@
 # Drain a loop goal's tasks from the goal's own board
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 12
 Test first: yes
 Level: 2
@@ -44,3 +44,33 @@ exit 0
 - `tests/dag_goals/test_loop_task_waits.py` (a real goal-loop run in process)
 
 ## Answer
+
+Work started at commit `872fce37b9768f756898fd1583d45a21a1ec8d82`.
+
+- **Built**: `src/pathly_orchestrator/supervisor/fan_out.py` (new `_goal_board(goal_id)`; `_drain`
+  uses it for `drain_frontier` and `_resolve_isolation` instead of the hardcoded `"feature"`),
+  `tests/dag_goals/test_loop_drains_goal_board.py` (new, 2 tests), `src/pathly_orchestrator/CLAUDE.md`
+  (the fan-out diagram and the `fan_out.py` file-map entry name the board source),
+  `tests/INDEX.md`, `tests/dag_goals/INDEX.md` (regenerated).
+- **Proof**:
+  - `python -m pytest tests/dag_goals/test_loop_drains_goal_board.py -q -p no:cacheprovider` →
+    `2 passed`, exit 0. At the test-only commit it failed for the right reason: the project-board
+    goal's spawns were `project/goals/goal-…-fb1/fb2/fb3` (feedback builders with no task), not
+    `sched-<task>#1`; the feature-board test passed there too.
+  - `python -m pytest tests/dag_goals -q -p no:cacheprovider` → `255 passed`, exit 0.
+  - Lint pieces: `black --check src/ tests/` clean, mypy on `fan_out.py` clean, `check_file_size.py`
+    "none new, none grown" (fan_out.py 321 lines), `check_no_mirror_reads.py` OK,
+    `gen_test_index.py --check` up to date, `lint-imports` 1 kept 0 broken, bandit on fan_out.py
+    clean.
+- **Decisions**: reused `db/queries/comms_goal_fields.get_goal_board_scope` (the same
+  `comms_messages.board` column `goal_executor` reads; also requires a live `type='goal'` row), so
+  no new SQL. It returns None when board or scope is empty, which maps to `"feature"` as the ticket
+  asks; a lookup error also falls back to `"feature"` (logged at debug), matching
+  `_frontier_scope`'s best-effort style. Only the board comes from the row; the scope still comes
+  from `_frontier_scope` (it already resolves the project root for a project-board goal). The tests
+  drive the real `start_goal_run(executor_override="loop")` path, not `start_run` directly, so the
+  run's topic and board scope are what a chief's goal really gets.
+- **Shortcuts taken**: none.
+- **For later tickets**: ticket 09 can now run a chief's project-board `loop` goal; its first
+  spawn is `sched-<task>#1`. Ruff's UP rules flag 6 pre-existing `Optional[...]` uses in
+  `fan_out.py`; untouched (not in this ticket, and ruff is not in the Lint chain).

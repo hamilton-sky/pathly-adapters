@@ -139,6 +139,29 @@ def _frontier_scope(state) -> str:
         return state.topic
 
 
+def _goal_board(goal_id: str | None) -> str:
+    """The board whose ready tasks this stage drains: the goal's own, else ``"feature"``.
+
+    A chief posts its goals and tasks on the project board, where ``_frontier_scope``
+    resolves the project root; asking for ``("feature", <root>)`` found nothing, so a
+    project-board loop goal drained no task. ``"feature"`` stays the answer for a run with no
+    goal, or a goal row with no board.
+    """
+    if not goal_id:
+        return "feature"
+    try:
+        from pathly_orchestrator.db.connection import get_db
+        from pathly_orchestrator.db.queries.comms_goal_fields import (
+            get_goal_board_scope,
+        )
+
+        found = get_goal_board_scope(get_db(), goal_id)
+        return found[0] if found else "feature"
+    except Exception:
+        logger.debug("fan_out: goal board lookup failed", exc_info=True)
+        return "feature"
+
+
 def _merge_drain_result(drained: dict, cost_usd: float) -> dict:
     """Fold a ``scheduler_loop`` result into the shape a single spawn returns.
 
@@ -205,8 +228,8 @@ def _drain(
     from pathly_orchestrator.supervisor.drain import drain_frontier
     from pathly_orchestrator.supervisor.task_wait_outcome import note_run_waits
 
-    board = "feature"
     goal_id = getattr(state, "goal_id", "") or None
+    board = _goal_board(goal_id)
     scope = _frontier_scope(state)
 
     def _spawn(task_state, instructions, adapter, model, task_run_id, task_broadcast):

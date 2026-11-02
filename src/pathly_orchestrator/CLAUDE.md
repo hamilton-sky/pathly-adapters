@@ -77,6 +77,9 @@ path entirely (see its own section below).
           |                               +- scope = _frontier_scope(state)
           |                               |    the run's BOARD scope, NOT state.topic
           |                               |    (a goal run's topic is its own slug)
+          |                               +- board = _goal_board(goal_id)
+          |                               |    the goal row's own board (a chief's
+          |                               |    project-board goal), else "feature"
           |                               |
           |                               +- isolation <- YAML
           |                               |    lane -> AuditedLaneIsolation
@@ -1674,6 +1677,8 @@ pathly_orchestrator/
                            #   Phase E: the ONLY drain — `executor: loop` reaches it as the
                            #   goal-loop flow's DRAINING state. Frontier scope = the run's
                            #   BOARD scope, not state.topic (a goal run's topic is its own slug).
+                           #   Frontier board = the goal row's own board (`_goal_board`), so a
+                           #   project-board loop goal drains; "feature" with no goal/board.
     spawn_window.py        # observe — wraps the single-path spawns (run_stage's and the feedback
                            #   spawn): a SPAWN_WINDOW event (role, tree + HEAD before/after) when
                            #   the flow has a floor/scope/reviewer gate (see "Spawn windows" below)
