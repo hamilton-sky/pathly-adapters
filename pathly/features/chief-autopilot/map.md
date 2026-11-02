@@ -54,6 +54,7 @@ no:cacheprovider` passes in full.
 | 11 `claimed_by` from the caller's run token | review B1 |
 | 12 park and resume loop tasks in the scheduler | review B2 |
 | 13 Chief button badge and the codex note | S13 (part 1), review m3, m4 |
+| 14 loop goals drain from the goal's own board | found by 09 |
 
 ## Round two: agents answer agents (outline, own folder later)
 
