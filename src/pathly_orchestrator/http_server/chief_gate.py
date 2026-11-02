@@ -117,7 +117,9 @@ def _refusal(rule, method: str, session: dict, conn, body: dict):
         if in_project is False:
             return _refuse(tier, action, allowed, NOT_IN_PROJECT)
     if rule.rule in POSTS_AS_CHIEF and body.get("from") != "chief":
-        return _refuse(tier, action, allowed, "a chief posts as 'chief'")
+        return _refuse(
+            tier, action, allowed, 'a chief posts as \'chief\': send "from": "chief"'
+        )
     unlisted = key_refusal(rule.rule, method, request.args if method == "GET" else body)
     if unlisted is not None:
         return _refuse(tier, action, allowed, unlisted)

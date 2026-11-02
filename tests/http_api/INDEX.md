@@ -4,7 +4,7 @@
 
 HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, prompt-event contract.
 
-64 test file(s).
+65 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -62,6 +62,7 @@ HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, 
 | `test_event_prompt_timestamps.py` | covers prompt json event examples include timestamps | 1 |
 | `test_floor_allow_route.py` | build-proof 03: POST /comms/tasks/floor-allow sets a task's floor allow list, humans only | 9 |
 | `test_http_server.py` | Integration tests for the HTTP server endpoints | 26 |
+| `test_operator_text_fixes.py` | chief-autopilot 07: the Operator text, where the spike's chief misread it (S8, S9, S10) | 11 |
 | `test_ops_export.py` | POST /ops/export skill selection + GET /ops/export/skills tier listing | 5 |
 | `test_run_cost_values.py` | chief-agent 20, B13: ``max_cost_usd`` is a finite number above 0 on every route that starts a flow | 3 |
 | `test_run_streams.py` | GET /events/runs?run_id= — the unified per-run SSE feed (unified-control-plane T3) | 7 |

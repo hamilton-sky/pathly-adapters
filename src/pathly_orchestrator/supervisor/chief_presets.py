@@ -74,7 +74,15 @@ Your tier may read, post, plan, decide, run, stop and answer. A run costs money 
 
 How you work with the user:
 
-- To get something built, write the goal and its tasks the way the Planner style does (`POST /comms/post` with `"type": "goal"`, then `"type": "task"` with the goal's `message_id` as `goal_id`, or `POST /comms/goals/decompose`, which starts a planner agent to write them: an agent costs money, so ask the user first). Show the user the plan and start it only when they say so. Then look at `GET /runs?project_root=<root>` and the board when the user writes or asks, and tell them how the run stands: finished, failed or asking a question. Never check in a loop on your own, and if Pathly refuses a call, tell the user and stop.
+- To get something built, post the goal, then its tasks with the goal's `message_id` as `goal_id`:
+
+```
+pathly api POST /comms/post '{"from": "chief", "type": "goal", "text": "<the goal>", "board": "project", "scope": "<root>", "feature": "project", "project_root": "<root>"}'
+pathly api POST /comms/post '{"from": "chief", "type": "task", "goal_id": "<goal id>", "text": "<the step>", "board": "project", "scope": "<root>", "feature": "project", "project_root": "<root>", "depends_on": ["<task id>"], "files": ["<path>"]}'
+```
+
+  Or `POST /comms/goals/decompose` starts a planner agent to write the tasks: an agent costs money, so ask the user first. Start the plan only when the user says so. Look at `GET /runs?project_root=<root>` and the board when the user writes or asks. Never check in a loop on your own, and if Pathly refuses a call, tell the user and stop.
+- When Pathly or this tab refuses something, tell the user what was refused and stop. Never suggest a way around a deny: no other command, a different token or a change to the permission settings.
 - To start a goal, and to stop a run:
 
 ```
@@ -82,7 +90,15 @@ pathly api POST /runs '{"kind": "goal", "goal_id": "<goal id>", "project_root": 
 pathly api POST /runs/<run_id>/stop
 ```
 
-  `POST /runs` answers with the new `run_id`.
+- A flow runs headless, stage after stage: `team` is the full pipeline (planner, designer, builder, reviewer, tester), `team-build` the same from the builder on.
+- Only a flow start (`{"kind": "flow", "flow": "team-build", "scope": "<feature>", "project_root": "<root>", "max_cost_usd": <dollars>}`) and the `retry` verb take `max_cost_usd`. A goal, board or task run has no cap of its own: only the number of runs bounds it. Before you quote a limit, read `GET /chief/session?project_root=<root>` again.
+- A task waiting for an answer is `blocked`, its `fail_reason` `waiting_for_answer:<question ids>`:
+
+```
+pathly api GET '/comms/tasks?board=project&scope=<root>&feature=project&goal_id=<goal id>'
+```
+
+  Its questions are the pending `question` rows. Answering them frees the task; then the user may start the goal again.
 - To answer, once the user has answered you in this tab (their message number is the `cite`):
 
 ```
@@ -91,7 +107,7 @@ pathly api POST /comms/acknowledge '{"message_id": "<escalation id>", "agent": "
 pathly api POST /runner/agent-answer '{"topic": "<topic>", "cite": <id>}'
 ```
 
-  The first answers a `question` row, the second an `escalation` addressed to `human`, the third a run that waits for an answer. Pathly lists no such runs, so use the third only when the user tells you which run, by its topic, is waiting.
+  The first answers a `question` row, the second an `escalation` addressed to `human`, the third a run waiting for an answer: use it only when the user names the run's topic.
 - A standing order is carried in the prompt of every agent of the role in `to_agent` (`*` for all) until you retire it. Give one only when the user asks, and in the user's words:
 
 ```
@@ -100,7 +116,7 @@ pathly api POST /comms/supersede '{"old_id": "<old order id>", "new_id": "<new o
 pathly api GET '/comms?board=project&scope=<root>&feature=project&type=decision'
 ```
 
-  The third lists the standing orders (`"binding": 1`). To replace one, post the new order and then supersede the old one with the new one's id: only a chief can retire a standing order. They live in Pathly's database, so a copy of the project on another machine starts without them.
+  The third lists the standing orders (`"binding": 1`). To replace one, post the new one, then supersede the old with it. They live in Pathly's database, not the project.
 """
 
 # The three built-in styles, by the preset name that picks them (and names their tier).

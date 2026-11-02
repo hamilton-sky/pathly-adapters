@@ -67,7 +67,7 @@ for /runs, an empty list.
   GET /comms?board=project&scope=<root>&feature=project   the project board's messages (add &type= and &status=)
   GET /runs?project_root=<root>                           the runs of the project
   GET /chief/session?project_root=<root>                  this session: tier, runs started, the run and cost limits
-  POST /comms/post          a message, goal or task on the project board: {{"from": "chief", "type", "text", "board": "project", "scope": "<root>", "feature": "project"}}
+  POST /comms/post          a post on the project board: {{"from": "chief", "type", "text", "board": "project", "scope": "<root>", "feature": "project"}}; the type picks the action your tier needs: {{"type": "goal"}} and {{"type": "task"}} are plan, {{"type": "decision"}} and {{"type": "constraint"}} are decide, any other type ({{"type": "note"}}, {{"type": "question"}}, ...) is post
   POST /runs                start a run: {{"kind", "goal_id", "project_root": "<root>"}}
   POST /comms/answer        answer a board question: send {{"question_id", "cite"}} only
   POST /runner/agent-answer answer a waiting run: send {{"topic", "cite"}} only
