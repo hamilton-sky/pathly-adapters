@@ -1,7 +1,7 @@
 # Acceptance: a claude chief left alone runs a goal safely
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 01, 02, 03, 04, 05, 06, 07, 08, 10, 11, 12, 13, 14
 Test first: no
 Level: 1
@@ -57,3 +57,31 @@ exit 0
 - `tests/comms_board/test_chief_acceptance.py`, `tests/comms_board/chief_acceptance_support.py`
 
 ## Answer
+
+Work started at commit `7c03124ec4c8a2888c71acf84dfed7c61ecee83b`.
+
+- **Built**: `tests/comms_board/test_autopilot_round_one_acceptance.py` (new, 4 tests),
+  `tests/comms_board/autopilot_acceptance_support.py` (new: `AgentHost`, a spawn host whose worker
+  spawns run a fake agent with the spawn's own run token and report the exit through
+  `POST /runner/terminal/result`; drain-dag and goal-loop fake agents; DB readers),
+  `tests/INDEX.md`, `tests/comms_board/INDEX.md` (regenerated).
+- **Proof**:
+  - `python -m pytest tests/comms_board/test_autopilot_round_one_acceptance.py -q -p no:cacheprovider`
+    → `4 passed in 2.29s`, exit 0.
+  - `python -m pytest tests/ -q -p no:cacheprovider` → `6628 passed, 14 skipped in 1663.01s`, exit 0.
+  - `black --check` clean on both files; `gen_test_index.py --check` up to date;
+    `check_file_size.py` "none new, none grown" (274 and 318 lines).
+- **Decisions**: one test per story slice (1; 2-5; 6; 7), each opening its own chief, so a failure
+  names the step. Step 1 reads the chief's real `--settings` file. Step 3 checks the raw token is in
+  no `fsm_events`/`run_log`/`comms_messages` row and that its redacted form `[run token]` is, so the
+  token reached the store and was redacted rather than lost. Step 5 reads the notice by run id. Step 6
+  runs on the project board, as the Operator text posts (needs ticket 14). Step 7 proves the 401 token
+  was live during the stage and has `revoked_at` set afterwards, so the 401 is for a revoked token,
+  not an unknown one.
+- **Shortcuts taken**: step 6 reads `GET /runner/status` (`error_kind: waiting_for_answer`) for the
+  parked loop run, because a parked goal-loop run writes no `RUN_OUTCOME`: `GET /runs/<id>` and so
+  `GET /chief/notices` show `outcome`/`error` null for it. Non-blocking for round one; worth a ticket
+  if the chief must see a parked loop run in its notices.
+- **For later tickets**: the gap above (ticket 12's park writes no `RUN_OUTCOME` for goal-loop runs).
+  The first build attempt was blocked on `fan_out._drain` hardcoding the `feature` board; ticket 14
+  fixed it, and the test needed no change for it.
