@@ -179,6 +179,7 @@ questions):
 - 11 — `/comms/tasks/claim` and `/run` live in `blueprints/comms/tasks_claim.py`; a live run token's run id is `claimed_by` (body `run_id` only when tokenless); `/run` mints a uuid4, claims, then `start_board_run(run_id=…)` (new optional kwarg).
 - 05 — at the end of a board/single run `supervisor/run_task_outcome.settle_run_tasks` frees tasks still `in_progress` with `claimed_by` = the run (pending, `task_unfinished`; failed + escalation at `goal.task_max_attempts`), fails the run (synthetic AGENT_DONE `failed`, or a `RUN_OUTCOME` event beside the agent's own; run_history `error`); `GET /runs/<id>` has `run.outcome`/`run.error`.
 - 06 — a single run's open question to `human`/`*` parks its `in_progress` task (`blocked`, `fail_reason='waiting_for_answer:<ids>'`, `waits+1`; run error `waiting_for_answer`); `post_message` frees it on any answer (`db/queries/task_waits.py`); limits compare `attempts - waits`; `GET /comms/tasks` rows carry `answered_questions`.
+- 07 — the Operator text shows the goal/task post bodies, which runs take `max_cost_usd` (flow start, retry), the no-workaround rule, `team`/`team-build` headless and waiting tasks; the `from` 403 says `send "from": "chief"`; `pathly help` names the post types by action.
 
 ## Open questions
 

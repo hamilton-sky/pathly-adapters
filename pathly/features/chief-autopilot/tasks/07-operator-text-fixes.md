@@ -1,7 +1,7 @@
 # Fix the Operator text where the spike's chief misread it
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 04, 06
 Test first: yes
 Level: 1
@@ -53,3 +53,53 @@ prints passed
 - `src/pathly_orchestrator/http_server/chief_routes.py`
 
 ## Answer
+
+**Built** (work started at b9327688, the merge on top of 482f71c8 with the same tree; failing
+test af03642c):
+- `supervisor/chief_presets.py` (`OPERATOR` only, 2758 -> 3797 characters; `test_chief_cli.py`
+  holds a built-in style under 4000, so the old prose was tightened to make room): the full
+  `POST /comms/post` goal and task bodies as fenced `pathly api` examples (`"from": "chief"`,
+  project board); a rule that a refusal by Pathly or the tab is reported and the chief stops,
+  never suggesting a way around a deny, a different token or a permission-settings change;
+  `team` (planner, designer, builder, reviewer, tester) and `team-build` (the same from the
+  builder on) as headless flows; that only a flow start (body shown) and the `retry` verb take
+  `max_cost_usd`, that goal, board and task runs are bounded by the run count only, and to read
+  `GET /chief/session?project_root=<root>` again before quoting a limit; a waiting task
+  (`blocked`, `fail_reason` `waiting_for_answer:<question ids>`, a `GET /comms/tasks` example,
+  its questions the pending `question` rows), that answering frees it and the user may then
+  start the goal again.
+- `http_server/chief_gate.py`: the 403 is now `a chief posts as 'chief': send "from": "chief"`.
+- `chief_cli.py` (`HELP`): the `/comms/post` line says the type picks the action:
+  `{"type": "goal"}`/`task` plan, `decision`/`constraint` decide, any other type post (the
+  gate's `POST_TYPE_ACTIONS`). Written as `{"type": "..."}` because
+  `test_chief_help_routes.py` reads a bare quoted word on a help line as a body key.
+- `tests/http_api/test_operator_text_fixes.py` (new, 11 tests) + `tests/INDEX.md`,
+  `tests/http_api/INDEX.md`.
+
+**Proof**:
+- `python -m pytest tests/http_api/test_chief_prompt_text.py tests/http_api/test_operator_text_fixes.py -q -p no:cacheprovider`:
+  35 passed, exit 0. At af03642c the new file was 11 failed (e.g. `assert '"from": "chief"' in
+  "a chief posts as 'chief'"`, "the Operator text shows no flow start body").
+- `python -m pytest tests/http_api -q -p no:cacheprovider -k chief`: 2335 passed, 240 deselected, exit 0 (a first run before the text was shortened failed `test_chief_cli.py` on the 4000-character limit and `test_chief_help_routes.py` on quoted type words in the help line; both fixed).
+- `python -m pytest tests/runner_supervisor -q -p no:cacheprovider -k chief`: 82 passed.
+- Lint chain (black, mypy, check_file_size "none new, none grown", mirror reads, INDEX check,
+  lint-imports 1 kept, bandit): exit 0.
+
+**Decisions**:
+- The flow start body is shown in prose, not as a `pathly api` example:
+  `test_chief_prompt_text.py` runs every example as an operator chief against a real server and
+  asserts no spawn, and a flow start would start a run. The new test holds that body to the same
+  gate tables (`problems`). The retry body is not shown (length); `retry` is named as the verb.
+- `team-build` starts at BUILDING (its flow yaml has no planner or designer state), so the text
+  says `team` is the full pipeline and `team-build` the same from the builder on, rather than
+  calling both the full pipeline as the ticket worded it.
+- The decompose example body and the pending-question read were left out of the Operator text
+  to stay under the 4000-character limit (the `chief-connect` fragment already shows that read).
+
+**Shortcuts taken**: none.
+
+**For later tickets**: the Operator text is at 3797 of the 4000 characters
+`test_chief_cli.py::test_a_built_in_style_is_short_plain_text_that_starts_without_front_matter`
+allows; a later addition has to cut something. The gate's 403 for a wrong `from` changed text.
+`src/pathly_orchestrator/CLAUDE.md` needed no change: it says only that a wrong `from` is 403 and
+that the texts name no cost number, both still true.
