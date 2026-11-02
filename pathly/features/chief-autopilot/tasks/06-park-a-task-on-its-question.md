@@ -1,11 +1,11 @@
 # Park a single run's task on its open question, and free it on any answer
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 05
 Test first: yes
 Level: 2
-Touches: src/pathly_orchestrator/supervisor/run_task_outcome.py, src/pathly_orchestrator/db/queries/task_waits.py (new), src/pathly_orchestrator/db/migrations_task_waits.py (new), src/pathly_orchestrator/db/migrations_incremental.py, src/pathly_orchestrator/db/queries/comms_messages.py, src/pathly_orchestrator/supervisor/task_retry.py, src/pathly_orchestrator/http_server/blueprints/comms/tasks_ready.py (new), src/pathly_orchestrator/http_server/blueprints/comms/tasks.py, src/pathly_data/core/skills/development/drain-dag.md, tests/snapshots/, tests/dag_goals/test_task_waits_for_answer.py, src/pathly_orchestrator/CLAUDE.md, tests/INDEX.md, tests/dag_goals/INDEX.md
+Touches: src/pathly_orchestrator/supervisor/run_task_outcome.py, src/pathly_orchestrator/db/queries/comms_tasks_by_run.py, src/pathly_orchestrator/db/queries/task_waits.py (new), src/pathly_orchestrator/db/migrations_task_waits.py (new), src/pathly_orchestrator/db/migrations_incremental.py, src/pathly_orchestrator/db/queries/comms_messages.py, src/pathly_orchestrator/supervisor/task_retry.py, src/pathly_orchestrator/http_server/blueprints/comms/tasks_ready.py (new), src/pathly_orchestrator/http_server/blueprints/comms/tasks.py, src/pathly_data/core/skills/development/drain-dag.md, tests/snapshots/, tests/dag_goals/test_task_waits_for_answer.py, src/pathly_orchestrator/CLAUDE.md, tests/INDEX.md, tests/dag_goals/INDEX.md
 
 Spike S5: a goal-run agent posted a board `question` and exited; nothing waited for the answer,
 and when the person answered through the chief, no agent received it.
@@ -88,3 +88,73 @@ exit 0
 - `src/pathly_orchestrator/runner/provenance.py`, `src/pathly_orchestrator/db/queries/comms_tasks.py::claim_task`
 
 ## Answer
+
+**Built** (work started at 1339379e; failing test 5c068e06):
+- `src/pathly_orchestrator/db/queries/task_waits.py` (new): `open_questions_by_run`, `park_task`,
+  `release_waiting_tasks` (+ best-effort `release_on_answer`), `waiting_question_ids`,
+  `task_waits`, `tasks_behind_waiting`, `question_answers`. Every SQL one literal.
+- `src/pathly_orchestrator/db/migrations_task_waits.py` (new): `add_task_waits` adds
+  `comms_messages.waits INTEGER NOT NULL DEFAULT 0` and `answered_questions TEXT`; wired last in
+  `db/migrations_incremental.py`.
+- `db/queries/comms_messages.py::post_message`: after the write lock, `type == "answer"` with
+  `reply_to` calls `release_on_answer` (389 -> 392 lines). Covers `/comms/answer`
+  (`answer_question` posts through `post_message`) and `/comms/post`.
+- `db/queries/comms_tasks_by_run.py`: the unfinished-task read returns `waits`.
+- `supervisor/run_task_outcome.py`: `_free_unfinished` parks the run's `in_progress` tasks on
+  its open questions (error `waiting_for_answer`) before the unfinished check, else frees them
+  (`task_unfinished`); used by `settle_run_tasks` and `free_tasks_of_failed_spawn`.
+  `counted_attempts` = `attempts - waits`.
+- `supervisor/task_retry.py`: `resolve_task_failure` compares `current_attempt - waits` (read
+  from the DB) with the limit; `detect_deadlocks` skips tasks behind a parked task.
+- `http_server/blueprints/comms/tasks_ready.py` (new) + `tasks.py`: every `GET /comms/tasks` row
+  carries `answered_questions: [{question, answer}]` (`[]` when it never waited).
+- `src/pathly_data/core/skills/development/drain-dag.md`: step 3 tells the agent to read
+  `answered_questions` first. No snapshot composes drain-dag (none regenerated).
+- `src/pathly_orchestrator/CLAUDE.md`: route lines, file list, the 05 section's
+  `counted_attempts`, new section "A task waits on its question".
+- `tests/dag_goals/test_task_waits_for_answer.py` (new, 11 tests) + INDEX files.
+
+**Proof**:
+- `python -m pytest tests/dag_goals/test_task_waits_for_answer.py -q -p no:cacheprovider`:
+  11 passed, exit 0. At 5c068e06 (test only) all 11 failed (`no such column: waits`). Covered:
+  run that asked and left its task `in_progress` -> task `blocked`,
+  `fail_reason='waiting_for_answer:<qid>'`, attempts 1, waits 1, result and `GET /runs/<id>`
+  failed with `waiting_for_answer`, status error; three park-and-answer cycles with
+  `goal.task_max_attempts=2` then an unfinished fourth run -> `attempts - waits == 1`, task
+  `pending`, no escalation; `resolve_task_failure(current_attempt=4)` with waits 3 and limit 2
+  -> `retried`; a question to `architect` -> `task_unfinished`, waits 0; `/comms/answer` and a
+  `type: answer` post with `reply_to` both free the task; two questions (`human` and `*`) -> blocked
+  after the first answer, pending after the second; child and grandchild of the parked task not
+  deadlocked; ready row carries `[{question, answer}]`; answer after the task was deleted is
+  stored, task row unchanged, no error; open question with the task `done` keeps success.
+- `python -m pytest tests/dag_goals tests/comms_board tests/install_skills -q -p no:cacheprovider`:
+  2141 passed, 2 skipped, exit 0.
+- Lint chain: exit 0 (black, mypy, check_file_size "none new, none grown", mirror reads, INDEX
+  check, lint-imports 1 kept, bandit, adapters, entry points). `tests/consistency`: 89 passed.
+- Extra: `tests/db tests/runner_supervisor tests/http_api`: 3105 passed, 2 skipped, exit 0.
+
+**Decisions**:
+- The answered ids live in a new JSON column `answered_questions` (the ticket allowed "reason or
+  a JSON field"): keeping them in `fail_reason` would make `build_retry_context` show them as a
+  failed attempt. The release sets `fail_reason` NULL.
+- One release hook in `post_message` (after its lock, best-effort) covers both answer paths, so
+  `answer_question` needs no second call (it posts through `post_message`, and the answer row is
+  what `_is_answered` checks; the status update comes after).
+- `park_task` only parks an `in_progress` task and clears `claimed_by`, like `retry_task`.
+- A crashed spawn (`free_tasks_of_failed_spawn`) with an open question parks its task too: freeing
+  it would re-run it without the answer.
+- `resolve_task_failure` reads `waits` itself, so the loop path is covered without touching
+  `scheduler.py` (ticket 12).
+- `answered_questions` is decorated on every `GET /comms/tasks` row (both branches share the
+  loop), so no row ever returns the raw JSON string.
+
+**Shortcuts taken**:
+- `release_waiting_tasks` finds candidates with `instr(fail_reason, ?)` and confirms by parsing;
+  fine for a board's task count, not indexed.
+- `tasks_behind_waiting` loads the board/scope's tasks once per `detect_deadlocks` call; fine for
+  a DAG of tens of tasks.
+
+**For later tickets**:
+- 12: use `task_waits.park_task` / `open_questions_by_run`; `resolve_task_failure` already
+  subtracts `waits`, so the scheduler's `current_attempt` can stay `attempts`-based; a parked loop
+  task's `claimed_by` is NULL after `park_task`.

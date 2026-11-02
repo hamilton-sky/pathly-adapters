@@ -52,6 +52,10 @@ def comms_tasks_get():
 
         for _t in tasks:
             _t["duration_seconds"] = _duration(_t)
+        # The answers a task waited for (chief-autopilot 06), for its next attempt.
+        from .tasks_ready import add_answered_questions
+
+        add_answered_questions(conn, tasks)
         return jsonify(tasks), 200
     except Exception as exc:
         logging.exception("comms_tasks_get error")

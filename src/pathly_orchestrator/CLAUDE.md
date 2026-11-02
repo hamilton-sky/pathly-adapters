@@ -440,8 +440,8 @@ GET  /comms                 ← list board messages (scoped)
 POST /comms/search          ← hybrid (semantic + keyword) search; semantic arm floored at SEMANTIC_DISTANCE_CEILING, keyword hits bypass; no match → [] (never padded with recent messages). Reached by AGENTS too via the `board-search` fragment (own board only) — the self-authored second query the pushed context can't make; Studio's search box is the other caller
 POST /comms/promote         ← copy a decision/constraint UP a tier (feature→project→global). COPY not move: the source board is the audit record of HOW the decision was reached. Stamps promoted_from/original_scope on the copy + promoted_to on the source (the three columns migrations.py reserved and nothing read). Idempotent, keyed off the COPY's promoted_from so one message can promote to two tiers. Own permission set `_PROMOTE_WRITERS` = {director, evaluator, human, **retro**} — NOT _GLOBAL_WRITERS, else the RETRO stage (the one headless role whose job IS capturing lessons) could never promote. decision/constraint only
 POST /comms/acknowledge     ← mark a message acknowledged
-POST /comms/answer          ← answer a posted question
-GET  /comms/tasks           ← list DAG tasks
+POST /comms/answer          ← answer a posted question (frees the tasks parked on it, see "A task waits on its question")
+GET  /comms/tasks           ← list DAG tasks; each row carries `answered_questions: [{question, answer}]` (`[]` when it never waited; `blueprints/comms/tasks_ready.py`)
 POST /comms/tasks/complete  ← mark a task complete
 POST /comms/tasks/status    ← BULK terminal write-back (done|failed) for a resolving agent: `{task_ids,status,reason,from}`; reports updated/newly_ready/blocked/unknown. Re-opening (→pending) is deliberately NOT offered — that is a supervisory act
 POST /comms/tasks/floor-allow ← HUMAN only (403 for a live run token): set one task's floor allow list `{message_id, allow:[…], refreeze}`; `refreeze` re-copies the live text into `claimed_text` (see "Frozen task text" below)
@@ -1519,6 +1519,9 @@ pathly_orchestrator/
                            # message is citable once). CREATE ... IF NOT EXISTS, idempotent;
                            # chief_sessions.runs_started (the runs a session has started, ticket
                            # 15) is ALTERed in when the table exists without it, once
+    migrations_task_waits.py # add_task_waits() (chief-autopilot 06), called after add_chief_tables:
+                           # comms_messages.waits (INTEGER NOT NULL DEFAULT 0) and
+                           # answered_questions (TEXT, JSON ids), ALTERed in once
     secret_scan.py         # find_run_tokens / redact_run_tokens / redact_value / contains_secret_hash:
                            # run tokens found by hashing 43-char URL-safe windows against run_tokens
                            # (plus PATHLY_RUN_TOKEN= / : values) and replaced by `[run token]` at the
@@ -1570,7 +1573,8 @@ pathly_orchestrator/
       comms_artifacts.py   # artifact metadata CRUD (attach, list, section index, update_summary)
       comms_artifact_rows.py # insert_artifact: the comms_artifacts board-row insert (title/summary run-token redacted), moved out of comms_artifacts.py at its 400-line cap; re-exported from comms_artifacts / comms
       comms_tasks.py       # task DAG operations (get_ready, complete, claim, reclaim, goal_refs_coverage); re-exports fail_task
-      comms_tasks_by_run.py # get_unfinished_tasks_of_run(conn, run_id): the tasks still in_progress with claimed_by = the run (chief-autopilot 05), read only; kept out of comms_tasks.py
+      comms_tasks_by_run.py # get_unfinished_tasks_of_run(conn, run_id): the tasks still in_progress with claimed_by = the run, with attempts and waits (chief-autopilot 05), read only; kept out of comms_tasks.py
+      task_waits.py        # open_questions_by_run / park_task / release_waiting_tasks (+ best-effort release_on_answer, called by post_message for an answer with reply_to) / tasks_behind_waiting / question_answers (chief-autopilot 06, see "A task waits on its question")
       comms_task_fail.py   # fail_task: marks a task failed (fail_reason run-token redacted before its 4000-char cap) and cascades dependents to blocked; moved out of comms_tasks.py at its ratchet baseline; re-exported from comms_tasks / comms
       task_results.py      # build-proof: latest_task_summaries(conn, task_ids) — the newest AGENT_DONE `summary` of each task's `sched-<id>#<n>` runs (a dependent task's prompt shows it)
       task_proof.py        # build-proof task reads: get_task, tasks_claimed_since / tasks_completed_since (goal- else (board, scope)-scoped, parsed-time window), set_floor_allow (the human-set floor_allow JSON list; refreeze re-copies text into claimed_text)
@@ -2565,8 +2569,8 @@ run's, and with none of its own the failure is still recorded as a `RUN_OUTCOME`
 there is one:
 
 - each task goes back to `pending` with `fail_reason='task_unfinished'`
-  (`task_retry.retry_task`), the claim's attempt counted; when `counted_attempts` (today
-  `attempts`; ticket 06 subtracts the waits) has reached `goal.task_max_attempts`
+  (`task_retry.retry_task`), the claim's attempt counted; when `counted_attempts`
+  (`attempts - waits`) has reached `goal.task_max_attempts`
   (`task_retry.resolve_max_attempts`) it is failed instead (`fail_task`, dependents blocked) and
   an escalation is posted (`task_retry._post_escalation`);
 - the synthetic `AGENT_DONE` says `outcome: "failed"`, `error: "task_unfinished"`. When the agent
@@ -2587,6 +2591,34 @@ the run's `in_progress` tasks the same way and writes nothing else (no `AGENT_DO
 `RUN_OUTCOME` for the run over its latest `AGENT_DONE` (an `AGENT_DONE` with no outcome reads
 `success`; no event, null). A run whose tasks are all `done` is unchanged. Loop tasks (`sched-`
 run ids, the `goal-loop` flow) are the scheduler's and are not touched.
+
+## A task waits on its question (`db/queries/task_waits.py`, chief-autopilot 06)
+
+A single run whose agent posted a board `question` to `human` (or `*`) and ended with its task
+still `in_progress` parks the task instead of freeing it: `settle_run_tasks` (and
+`free_tasks_of_failed_spawn`) first read `open_questions_by_run(conn, run_id)`, the questions
+whose `author_run_id` is the run (`runner/provenance.stamp`) with status not `answered` and no
+live `type: answer` row replying to them. When there is one, each unfinished task is
+`park_task`ed: `task_status='blocked'`, `fail_reason='waiting_for_answer:<id>[,<id>]'`, claim
+released, `waits = waits + 1` (`comms_messages.waits`, `db/migrations_task_waits.py`). The run is
+failed with `error: "waiting_for_answer"` the same way as `task_unfinished`. Questions to a role
+(`to: architect`, the `consult` fragment) never park a task.
+
+`attempts` only grows (the loop scheduler's run ids are built from it); every limit compares
+`attempts - waits`: `run_task_outcome.counted_attempts` and `task_retry.resolve_task_failure`
+(which reads the task's `waits`), so a wait never spends a retry.
+
+Any answer frees the task: `post_message` calls `task_waits.release_on_answer` after its write
+for `type == "answer"` with `reply_to`, which covers `/comms/answer` (`answer_question` posts
+through `post_message`) and an answer posted through `/comms/post`. `release_waiting_tasks`
+puts every live task parked on the question whose questions are now all answered back to
+`pending`, clears the reason (so `task_retry.build_retry_context` never shows the wait as a
+failed attempt) and adds the ids to `comms_messages.answered_questions` (a JSON list). It is
+best-effort: an answer to a question whose task was deleted is stored and nothing else changes.
+`GET /comms/tasks` rows carry `answered_questions: [{question, answer}]`
+(`blueprints/comms/tasks_ready.py`), and `drain-dag` tells the agent to read them before it works.
+`task_retry.detect_deadlocks` leaves a pending task alone when its dependency chain reaches a
+parked task (`tasks_behind_waiting`). Loop tasks are ticket 12 (the scheduler).
 
 ## Task proof in the goal-loop drain (`supervisor/task_proof.py`, build-proof)
 

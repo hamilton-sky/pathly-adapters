@@ -39,6 +39,10 @@ If the response is `{"claimed": false}`, someone else took it — go back to ste
 Read the task's `text` (what to build) and `artifact_path` (the plan/spec to work
 from — open it for context).
 
+If the task's `answered_questions` is not empty, read every `{question, answer}` in it
+before you work: an earlier attempt asked the person those questions, and the answers
+decide how you do the task. Follow them.
+
 If the task has `context_refs`, for each `{artifact, anchor}` call:
 ```
 GET /comms/artifacts/section?scope=$SCOPE&artifact=<artifact>&anchor=<anchor>

@@ -14,6 +14,7 @@ from ..secret_scan import redact_run_tokens
 
 # update_message_text lives in comms_edit.py (400-line cap); re-exported here.
 from .comms_edit import update_message_text
+from .task_waits import release_on_answer
 
 # Goal-message field accessors live in comms_goal_fields (this file sits on the 400-line
 # ratchet). Re-exported so `from ...comms_messages import set_message_slug` — which
@@ -129,6 +130,8 @@ def post_message(
             ),
         )
         conn.commit()
+    if type == "answer" and reply_to:  # frees tasks parked on the question (task_waits)
+        release_on_answer(conn, reply_to)
     return message_id
 
 
