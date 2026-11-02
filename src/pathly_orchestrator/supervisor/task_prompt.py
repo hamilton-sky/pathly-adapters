@@ -32,6 +32,7 @@ from typing import Optional
 
 from . import task_retry as _task_retry
 from .task_dependencies import dependency_results_block
+from .task_wait_outcome import answered_questions_block
 from ..fsm_compose import RUNNER_CONTRACT_BLOCK
 
 logger = logging.getLogger("pathly.task_prompt")
@@ -100,7 +101,9 @@ def build_task_prompt(
     2. the results of the tasks it depends on (none for a task without dependencies);
     3. the runner contract, so a task agent never tries to advance the FSM itself;
     4. the retry ladder, from the second attempt on;
-    5. the scope-aware board context.
+    5. the questions an earlier attempt waited on, with their answers (none for a task that
+       never waited);
+    6. the scope-aware board context.
 
     The runner contract is appended AFTER the compose try/except deliberately: the raw-text
     fallback is the path where the agent has the LEAST guidance, so it must not be the one
@@ -130,6 +133,7 @@ def build_task_prompt(
     instructions += dependency_results_block(task)
     instructions += f"\n\n{RUNNER_CONTRACT_BLOCK}"
     instructions += _task_retry.build_retry_context(task)
+    instructions += answered_questions_block(task)
 
     # The same scope-aware board context (governance + memory, honoring the Reads toggle)
     # the FSM/team path gets, so a task agent isn't blind to the board.

@@ -181,6 +181,7 @@ questions):
 - 06 — a single run's open question to `human`/`*` parks its `in_progress` task (`blocked`, `fail_reason='waiting_for_answer:<ids>'`, `waits+1`; run error `waiting_for_answer`); `post_message` frees it on any answer (`db/queries/task_waits.py`); limits compare `attempts - waits`; `GET /comms/tasks` rows carry `answered_questions`.
 - 07 — the Operator text shows the goal/task post bodies, which runs take `max_cost_usd` (flow start, retry), the no-workaround rule, `team`/`team-build` headless and waiting tasks; the `from` 403 says `send "from": "chief"`; `pathly help` names the post types by action.
 - 08 — a chief token's 2xx start with `ok` + `run_id` records `chief_session_runs` (hook `http_server/chief_run_record.py`, registered after `refund_run_slot`); `GET /chief/notices` lists ended (`done`/`error`/`aborted`) unread runs via `get_run_detail` + open human questions on the run's board; `POST /chief/notices/read` refuses any run token.
+- 12 — the scheduler's completion handler parks a loop task whose `sched-<task>#N` spawn left an open human question (`supervisor/task_wait_outcome.park_if_asked`, no attempt counted, `task_waiting` event, result key `waiting`); `fan_out` records the parked tasks on the run and `orchestrator_stage` ends the goal-loop run `error`/`waiting_for_answer` before `complete_stage`; the next claim's prompt has `## Answers to your questions`.
 
 ## Open questions
 

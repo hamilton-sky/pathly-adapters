@@ -21,7 +21,7 @@ import queue
 import threading
 from typing import Any, Callable, Optional
 
-from . import task_retry as _task_retry
+from . import task_retry as _task_retry, task_wait_outcome as _task_wait
 from .task_prompt import build_task_prompt
 
 logger = logging.getLogger("pathly.scheduler")
@@ -172,6 +172,7 @@ def scheduler_loop(
     result_completed: list[str] = []
     result_failed: list[str] = []
     result_blocked: list[str] = []
+    result_waiting: list[str] = []
     aborted = False
 
     def _worker(task: dict, task_run_id: str, ws) -> None:
@@ -236,7 +237,7 @@ def scheduler_loop(
             # (invocation_projection matches a BILLING_UPDATE to the MOST RECENT
             # AGENT_DONE sharing its run_id) — silently mis-billing retried tasks. "#" is
             # a safe separator: task_id is a uuid4 (hex + hyphens only).
-            task_run_id = f"sched-{task_id}#{prior_attempts + 1}"
+            task_run_id = _task_wait.sched_run_id(task_id, prior_attempts)
             won = claim_task(conn, task_id, run_id=task_run_id)
             if not won:
                 # Another scheduler instance (or a race) claimed it first.
@@ -300,7 +301,11 @@ def scheduler_loop(
         # Success requires BOTH: the worker did not raise AND its outcome does not report failure.
         # (silent-failure guard #2 — a clean process exit over broken work is not "done".)
         succeeded = exc is None and not _outcome_is_failure(outcome)
-        if not succeeded:
+        if _task_wait.park_if_asked(
+            conn, task_id, task_attempts, task_texts, event_broadcast_fn, scope
+        ):
+            result_waiting.append(task_id)
+        elif not succeeded:
             if exc is not None:
                 reason = str(exc)[:4000]
             else:
@@ -373,6 +378,7 @@ def scheduler_loop(
         "failed": result_failed,
         "blocked": result_blocked,
         "deadlocked": result_deadlocked,
+        "waiting": result_waiting,
     }
 
 
