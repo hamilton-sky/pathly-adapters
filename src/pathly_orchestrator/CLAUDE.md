@@ -569,6 +569,8 @@ POST /chief/close           ← {project_root} → 200 {closed: true|false}
 GET  /chief/session?project_root=  ← {open: false} | {open: true, run_id, tab_id, tier, engine, opened_at, runs_started, max_runs_per_session, max_cost_usd_per_run}
 GET  /chief/presets?project_root=  ← {presets: [{name, label, tier, text, source, scope}], tiers: {tier: [action]}, limits: {max_runs_per_session, max_cost_usd_per_run}}   (blueprints/chief/presets.py)
 POST /chief/human-messages  ← {run_id, hook_secret, text, session_id, relayed?} → 201 {id, kind}   (blueprints/chief/human.py)
+GET  /chief/notices?project_root=  ← {notices: [{run_id, session_run_id, started_at, kind, status, outcome, error, cost_usd, finished_at, open_questions}]}   (blueprints/chief/notices.py)
+POST /chief/notices/read    ← {project_root, run_ids} → 200 {marked}
 ```
 
 - **Open:** 403 when the caller sends a live run token (an agent cannot open a chief); 400 when a
@@ -579,6 +581,22 @@ POST /chief/human-messages  ← {run_id, hook_secret, text, session_id, relayed?
   broadcaster (`sse._broadcast_runner`), so the `TERMINAL_SPAWN` reaches whichever spawn host
   is listening. `engine` and `preset` are required strings; `prompt` and `model` are optional,
   but a key that is present must be a string (`"prompt": null` is a 400).
+- **Notices** (chief-autopilot 08): a chief token's call that starts work (`chief_budget.STARTS_A_RUN`
+  and the `retry` verb) answered 2xx with `ok` and a `run_id` records a `chief_session_runs` row
+  `(run_id, session_run_id, project_root, started_at, read_at)` (`db/migrations_chief.py`, queries
+  in `db/queries/chief_session_runs.py`). The `after_request` hook `http_server/chief_run_record.py`
+  does it: it reads the gate's slot mark (`g.chief_run_slot`), so `app.py` registers it after
+  `refund_run_slot` (hooks run in reverse order, and the refund pops the mark); the project root is
+  the session's, never the body's; a 4xx, a 5xx and a 200 `ok: false` (a `retry` of a run still
+  active names the old run) record nothing; a failure is logged and never turns the answer into a
+  500. `GET /chief/notices` lists the project's rows whose `run_history.status` is `done`, `error`
+  or `aborted` (not `parked`, which may resume) and that are unread, each read through
+  `run_history_read.get_run_detail` (the read behind `GET /runs/<id>`) plus `open_questions`: the
+  `question` and `escalation` rows to `human` or `*` still open on the run's board. Rows outlive the
+  session, so the next chief of the project sees them. The chief gate classes the GET `read` (its
+  entry binds `project_root`); `POST /chief/notices/read` is not in `ROUTE_ACTIONS`, so a chief
+  token is refused, and the view refuses any other live run token. Studio's Chief button shows the
+  count (ticket 13); nothing enters the chief's tab.
 - **Presets:** `GET /chief/presets` lists the built-in styles (status, planner, operator) and the
   user's `chief/<name>` prompt files (project over global), each with the tier
   `chief_tiers.resolve_preset_tier` gives it, the same function `open_chief` uses, so a launcher

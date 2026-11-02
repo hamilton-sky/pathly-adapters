@@ -16,6 +16,7 @@ except ImportError:
 from pathly_orchestrator.api import api_bp
 from .middleware import _log_request, _log_response, _setup_logging
 from .chief_budget import refund_run_slot
+from .chief_run_record import record_chief_run
 from .chief_gate import chief_gate
 from .run_token_guard import run_token_guard
 from .feedback import _feedback_watcher
@@ -77,6 +78,9 @@ app.after_request(_log_response)
 # A chief start the route refused with a 4xx gives its run slot back (after_request hooks run in
 # reverse order of registration, so this one sees the response before `_log_response` does).
 app.after_request(refund_run_slot)
+# A chief start answered 2xx with a run id is recorded for the notices. Registered after the
+# refund, so it runs before it and still sees the slot mark the refund pops.
+app.after_request(record_chief_run)
 
 
 def main() -> None:
