@@ -25,6 +25,17 @@
 
 .text { white-space: nowrap; }
 
+.badge {
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--bg-base, #fff);
+  font: 600 10px/15px var(--font-family-base);
+  text-align: center;
+}
+
 /* Portal/positioning shell — inner styles live in PromptActionConfig.module.css. */
 .popover {
   position: fixed;

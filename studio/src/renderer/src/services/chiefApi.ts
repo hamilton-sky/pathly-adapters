@@ -1,5 +1,6 @@
 // The chief's session routes (pathly/features/chief-agent): GET /chief/presets, GET
-// /chief/session, POST /chief/open, POST /chief/close. The server resolves a chief's tier from the
+// /chief/session, POST /chief/open, POST /chief/close, and its notices (chief-autopilot 08):
+// GET /chief/notices, POST /chief/notices/read. The server resolves a chief's tier from the
 // preset name and enforces it; Studio only shows what these routes report. Reads are fail-soft
 // (null on error); open reports the server's error text so the launcher can show it.
 import { apiFetch } from '../lib/config'
@@ -44,6 +45,21 @@ export interface OpenChiefRequest {
   preset: string
   /** Sent only when the user edited the style; otherwise the server uses the preset's text. */
   prompt?: string
+}
+
+/** A run a chief started that has ended and is unread (GET /chief/notices). */
+export interface ChiefNotice {
+  run_id: string
+  session_run_id: string
+  started_at: number
+  kind: string
+  status: string
+  outcome: string | null
+  error: string | null
+  cost_usd: number
+  finished_at: number | null
+  /** Open questions and escalations to the person on the run's board. */
+  open_questions: number
 }
 
 export type OpenChiefResult =
@@ -109,6 +125,37 @@ export async function closeChief(projectRoot: string): Promise<boolean | null> {
     if (!res.ok) return null
     const data = (await res.json()) as { closed?: boolean }
     return Boolean(data.closed)
+  } catch {
+    return null
+  }
+}
+
+/** The project's ended, unread chief runs, oldest first; null when the server cannot answer. */
+export async function getChiefNotices(projectRoot: string): Promise<ChiefNotice[] | null> {
+  try {
+    const res = await apiFetch(`/chief/notices?${q(projectRoot)}`)
+    if (!res.ok) return null
+    const data = (await res.json()) as { notices?: ChiefNotice[] }
+    return Array.isArray(data.notices) ? data.notices : null
+  } catch {
+    return null
+  }
+}
+
+/** Mark the project's notices of `runIds` read: the number marked, or null on failure. */
+export async function markChiefNoticesRead(
+  projectRoot: string,
+  runIds: string[],
+): Promise<number | null> {
+  try {
+    const res = await apiFetch('/chief/notices/read', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project_root: projectRoot, run_ids: runIds }),
+    })
+    if (!res.ok) return null
+    const data = (await res.json()) as { marked?: number }
+    return typeof data.marked === 'number' ? data.marked : 0
   } catch {
     return null
   }

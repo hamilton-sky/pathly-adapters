@@ -100,14 +100,21 @@ Engines button and the HQ toggle (icon only below `TOPBAR_COMPACT_BREAKPOINT`) a
 for the project selected in Studio (`projectStore.projectPath` is the `project_root`, so a chief is
 always the selected project's). `ChiefLauncher` reuses `PromptActionConfig` (style = preset, the
 editable text, engine, "Save current as prompt") and `services/chiefApi.ts` → `GET /chief/presets`,
-`GET /chief/session`, `POST /chief/open`, `POST /chief/close`. The tier shown is the one the server
+`GET /chief/session`, `POST /chief/open`, `POST /chief/close`, `GET /chief/notices`,
+`POST /chief/notices/read`. The tier shown is the one the server
 reports for the preset (it resolves the tier itself; Studio never sends one), with a spend line for
 Operator from the server's `limits`. `prompt` is sent only when the text was edited; a saved style
 goes to the prompt library's `chief` category with a `tier:` front-matter line for the tier shown
 (`chiefLauncherUtils.withTierLine`), since a file without one opens as Status. While the project has
 a chief, the popover shows `OpenChiefCard` (Show tab / Close chief) instead; one chief per project.
-Engines: claude and codex only. The chief's prompt is still auto-submitted (paste without Enter is
-not built), and there is no inbox count yet.
+Engines: claude and codex only; picking codex adds a note under the engine that a codex chief can
+read files outside the project and is not safe to leave alone yet (its read-only sandbox reads the
+whole disk). The chief's prompt is still auto-submitted (paste without Enter is not built).
+**Notices** (chief-autopilot 13): `hooks/useChiefNotices` reads `GET /chief/notices` for the
+selected project on mount, every 15 s while the window has focus, and on regaining focus; the
+button shows the unread count as a badge (`topbar-chief-badge`, none at zero). Opening the popover
+lists those runs above the launcher (`ChiefNotices`: kind and run id, status, cost, error, questions
+waiting) and marks them read with `POST /chief/notices/read` (`markChiefNoticesRead`).
 
 **Sidebar collapse/expand** lives inside the sidebar, not the topbar:
 - `TabBar` (`sidebar/shell/TabBar.tsx`) — renders WORKSPACE / LIBRARY tabs plus a `PanelLeft` collapse button at the right of the tab bar.
