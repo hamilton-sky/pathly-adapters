@@ -17,7 +17,7 @@ from types import SimpleNamespace
 import pytest
 from chief_bind_support import _boards_are_free, feature_row, project_row, stubs
 from chief_budget_support import flow_runs, retry, shown, start_flow
-from chief_cite_support import db
+from chief_cite_support import builder_headers, db
 from chief_gate_support import _chief, _gated, app, client, other_project, project
 
 
@@ -152,6 +152,24 @@ def test_a_retry_that_answers_ok_false_records_nothing(client, project, flow_run
     assert recorded() == []
 
 
+def test_a_failure_to_record_lets_the_start_through(
+    client, project, flow_runs, monkeypatch
+):
+    from pathly_orchestrator.db.queries import chief_session_runs
+
+    def broken(*args, **kwargs):
+        raise sqlite3.OperationalError("disk I/O error")
+
+    monkeypatch.setattr(chief_session_runs, "record_session_run", broken)
+    chief = _chief("operator", project)
+
+    resp = start_flow(client, chief, project)
+
+    assert resp.status_code == 200, shown(resp)
+    assert resp.get_json()["run_id"] == "run-1"
+    assert recorded() == []
+
+
 def test_a_call_without_a_chief_token_records_nothing(client, project, flow_runs):
     body = {
         "kind": "flow",
@@ -193,6 +211,44 @@ def test_an_ended_run_is_listed_with_its_outcome_cost_and_questions(
     assert notice["cost_usd"] == pytest.approx(0.25)
     assert notice["open_questions"] == 2
     assert notice["kind"] == "single"
+
+
+def test_a_parked_run_is_a_notice(client, project, flow_runs):
+    """Parking ends the run's row: resuming a parked run starts a new run id."""
+    chief = _chief("operator", project)
+    start_flow(client, chief, project)
+    finish(project, "run-1", "parked")
+    feature_row("demo", "escalation", to_agent="human")
+
+    (notice,) = notices(client, chief, project)
+
+    assert notice["run_id"] == "run-1"
+    assert notice["status"] == "parked"
+    assert notice["open_questions"] == 1
+
+
+def test_a_notice_reads_the_run_not_its_full_detail(
+    client, project, flow_runs, monkeypatch
+):
+    """Stages, logs, board posts and artifacts are not read for a notice."""
+    from pathly_orchestrator.db.queries import run_history_read
+
+    def full_detail(*args, **kwargs):
+        raise AssertionError("a notice read the full run detail")
+
+    monkeypatch.setattr(run_history_read, "get_run_detail", full_detail)
+    chief = _chief("operator", project)
+    start_flow(client, chief, project)
+    finish(project, "run-1", "error", outcome="failed", error="task_unfinished")
+    cost(project, "run-1", 0.5)
+
+    (notice,) = notices(client, chief, project)
+
+    assert notice["kind"] == "single"
+    assert notice["status"] == "error"
+    assert notice["outcome"] == "failed"
+    assert notice["error"] == "task_unfinished"
+    assert notice["cost_usd"] == pytest.approx(0.5)
 
 
 def test_an_answered_question_is_not_counted(client, project, flow_runs):
@@ -239,6 +295,17 @@ def test_a_chief_token_may_not_mark_notices_read(client, project, flow_runs):
 
     assert resp.status_code == 403, shown(resp)
     assert _gated(resp)
+    assert [n["run_id"] for n in notices(client, chief, project)] == ["run-1"]
+
+
+def test_an_agents_run_token_may_not_mark_notices_read(client, project, flow_runs):
+    chief = _chief("operator", project)
+    start_flow(client, chief, project)
+    finish(project, "run-1", "done", outcome="success")
+
+    resp = mark_read(client, project, ["run-1"], headers=builder_headers(project))
+
+    assert resp.status_code == 403, shown(resp)
     assert [n["run_id"] for n in notices(client, chief, project)] == ["run-1"]
 
 
