@@ -5,7 +5,7 @@ Status: open
 Blocked by: 06
 Test first: yes
 Level: 2
-Touches: src/pathly_orchestrator/supervisor/scheduler.py, src/pathly_orchestrator/supervisor/fan_out.py, src/pathly_orchestrator/supervisor/task_wait_outcome.py (new), src/pathly_orchestrator/supervisor/task_prompt.py, tests/dag_goals/test_loop_task_waits.py, src/pathly_orchestrator/CLAUDE.md, tests/INDEX.md, tests/dag_goals/INDEX.md
+Touches: src/pathly_orchestrator/supervisor/scheduler.py, src/pathly_orchestrator/supervisor/orchestrator.py, src/pathly_orchestrator/supervisor/orchestrator_stage.py, src/pathly_orchestrator/supervisor/fan_out.py, src/pathly_orchestrator/supervisor/task_wait_outcome.py (new), src/pathly_orchestrator/supervisor/task_prompt.py, tests/dag_goals/test_loop_task_waits.py, src/pathly_orchestrator/CLAUDE.md, tests/INDEX.md, tests/dag_goals/INDEX.md
 
 The review's B2. Loop tasks are not executor-owned: under fsm-fan-out Phase E they run inside an
 FSM stage (`src/pathly_orchestrator/supervisor/task_prompt.py` docstring), the `execute-task` skill tells the agent not to
