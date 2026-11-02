@@ -5,7 +5,7 @@ Status: open
 Blocked by: 05, 06, 10
 Test first: yes
 Level: 3
-Touches: src/pathly_orchestrator/db/migrations_chief.py, src/pathly_orchestrator/db/queries/chief_session_runs.py (new), src/pathly_orchestrator/http_server/chief_run_record.py (new), src/pathly_orchestrator/http_server/app.py, src/pathly_orchestrator/http_server/blueprints/chief/notices.py (new), src/pathly_orchestrator/http_server/blueprints/chief/__init__.py, src/pathly_orchestrator/http_server/chief_field_reads.py, tests/http_api/test_chief_notices.py, src/pathly_orchestrator/CLAUDE.md, tests/INDEX.md, tests/http_api/INDEX.md
+Touches: src/pathly_orchestrator/db/migrations_chief.py, CLAUDE.md, src/pathly_orchestrator/db/queries/chief_session_runs.py (new), src/pathly_orchestrator/http_server/chief_run_record.py (new), src/pathly_orchestrator/http_server/app.py, src/pathly_orchestrator/http_server/blueprints/chief/notices.py (new), src/pathly_orchestrator/http_server/blueprints/chief/__init__.py, src/pathly_orchestrator/http_server/chief_field_reads.py, tests/http_api/test_chief_notices.py, src/pathly_orchestrator/CLAUDE.md, tests/INDEX.md, tests/http_api/INDEX.md
 
 Spike S13 and "Plan discussed" part 1. A chief cannot learn that a run ended unless the person
 writes to it, and the person expected to be told. Tell the person, not the chief: nothing enters
