@@ -1,7 +1,7 @@
 # Record a chief's runs and list the finished ones at `GET /chief/notices`
 
 Type: task
-Status: resolved
+Status: open
 Blocked by: 05, 06, 10
 Test first: yes
 Level: 3
@@ -134,3 +134,15 @@ needed a change.
 - 13: read `GET /chief/notices?project_root=<root>` (`notices` list; badge = its length) and mark
   with `POST /chief/notices/read {project_root, run_ids}` with no run token.
 - 09: the record is made by the hook only for a chief token; tokenless starts are not notices.
+
+## Review findings (round 1, quality review)
+
+QUALITY
+Probed: hook records only with g.chief_run_slot (chief gate only), reads it before refund pops it, records nothing on 4xx/5xx/ok:false (retry's old run id), project root from the session, failures caught (no 500). GET /chief/notices root bound to the session's root (403 otherwise). POST /chief/notices/read refused to chief and other run tokens, fields type-checked. SQL static. Layer rules and 400-line limit kept.
+1. major src/pathly_orchestrator/db/queries/chief_session_runs.py (ended_unread_runs): a chief's run that parks is never a notice. The query excludes parked because it "may resume", but resume never reopens that run id: registry._set_status finalises run_history on parked and supervisor/api.resume_parked_run starts a new run with a fresh id. A chief's headless flow parks at a human checkpoint, and a team goal run can park too: exactly the run the person must come back to. Fix: add 'parked' to the terminal statuses, test a parked run, correct the "parked ... may resume" wording here, in src/pathly_orchestrator/CLAUDE.md (Notices paragraph) and in map.md.
+2. minor src/pathly_orchestrator/http_server/blueprints/chief/notices.py (_notice): each notice calls get_run_detail in full (stages, logs, board posts, artifacts) and throws most away; rows are never pruned and ticket 13 will poll this route. Fix: read only the run row, outcome and cost, or cap the number of notices per call.
+3. minor chief_session_runs.py (open_questions_on_board): count matches scope only; two projects with a same-named feature add to each other's count. Note it, or also filter by board where known.
+4. minor tests/http_api/test_chief_notices.py: no test that a failure inside the hook still lets the 2xx through (e.g. record_session_run raising), and none that a non-chief run token gets 403 from POST /chief/notices/read. Add both.
+5. minor src/pathly_orchestrator/CLAUDE.md (Notices paragraph): "Studio's Chief button shows the count (ticket 13)" describes unbuilt work; say "will show".
+
+REVIEW: FAIL
