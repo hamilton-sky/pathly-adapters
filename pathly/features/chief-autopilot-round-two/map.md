@@ -125,3 +125,4 @@ Outside facts relied on (tickets 13 to 15, 18):
   (exit 0), which loses citations but forges nothing.
 - 04 — `supervisor/consult_router.on_question` (none/person/routed/no_host) is called by the `after_request` hook `http_server/consult_trigger.py` on `POST /comms/post` for a question; `start_consult` runs on a `consult-<qid[:8]>` thread (a raise, or not started while still queued → route `failed` + `hand_to_person`); `app.main` runs `end_stale_routes` in its own try before `chief_startup_cleanup`.
 - 04 (round 1) — the consult's project root, board and scope come from the asking run's token row (`caller_identity`), never the body; no root, or a board/scope other than the question's, hands it to the person.
+- 04 (round 2) — the gate's review-packet failure is a pre-existing flake (event mirror temp file racing `git add -A` in `tree.snapshot`), reproduced at base 601ff64; no code changed.

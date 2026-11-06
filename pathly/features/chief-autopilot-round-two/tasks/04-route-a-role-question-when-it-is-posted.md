@@ -1,7 +1,7 @@
 # Route a run's role question to a consult when it is posted
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 01, 02
 Test first: yes
 Level: 3
@@ -189,6 +189,39 @@ Proof after the fixes:
 For later tickets: `on_question` now requires `board` and `scope` (the asking token's); a test
 that posts a role question must mint its token with the same board and scope as the post body and
 a project root, or the question goes to the person.
+
+**Review fixes (round 2, gate (quick))**
+
+1. `tests/fsm_flows/test_review_packet_notes.py::test_the_notes_use_the_latest_task_proof_of_a_task`
+   ("the project could not be snapshotted"): not caused by 04, so no code changed. What I ran
+   (work at 972270d):
+   - Suite order, `pytest tests/comms_board/test_consult_router.py tests/fsm_flows -p no:cacheprovider -q -x`:
+     `734 passed, 9 skipped`, exit 0.
+   - The full Quick list at HEAD, with a scratch pytest plugin (not committed) that logged every
+     `consult_router.on_question` outcome and any live `consult-*` thread after each test:
+     `5934 passed, 11 skipped in 1374.80s`, exit 0. Outside `test_consult_router.py` the router
+     answered 403 `none`, 14 `person`, 1 `no_host`, never `routed`, so no other test started a
+     consult; no `consult-*` thread outlived any test. 04's module and hook set no env var and
+     change no cwd; `app.main()` only runs in a subprocess with its own env.
+   - The full Quick list at the base 601ff64 (a detached worktree, `PYTHONPATH` its own `src`):
+     `5914 passed, 11 skipped in 1467.58s`, exit 0.
+   - `git diff 601ff64 HEAD` is empty for `proof/`, `event_mirror.py`, `fsm_compose_review.py`,
+     `tests/fsm_flows` and `tests/conftest.py`: 04 touches nothing on that test's path.
+   - The cause, shown on base code: the test's storage folder is inside its git repo, and the
+     event mirror flusher (a process-wide daemon, every 0.5 s) rewrites `EVENTS.jsonl` there via
+     `EVENTS.tmp` + `os.replace`. When that lands during `tree.snapshot`'s `git add -A`, git
+     fails with `fatal: unable to stat 'pathly/EVENTS.tmp': No such file or directory` (exit
+     128), `_git` returns None, and the packet says "could not be snapshotted". A scratch script
+     with a writer thread doing the same: 35 of 200 `tree.snapshot` calls returned None. The test
+     appends two `TASK_PROOF` events just before `_packet`, so the flusher is due right then; a
+     slow git (cold cache after a container restart) widens the window.
+   - `test_review_packet_notes.py` + `test_review_packet.py` at base, with 6 CPU-burning
+     processes on 4 cores: 1 failed run in 15 (output not captured), then 55 clean runs.
+   A fix belongs in the mirror or the snapshot (or that test's fixture), outside Touches.
+
+Proof after round 2: `python -m pytest tests/comms_board/test_consult_router.py -q -p no:cacheprovider`
+`20 passed`, exit 0; `python -m pytest tests/comms_board tests/http_api -q -p no:cacheprovider`
+`4151 passed in 1059.47s`, exit 0.
 
 ## Review findings (round 1, quality review)
 
