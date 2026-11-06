@@ -1546,6 +1546,10 @@ pathly_orchestrator/
     migrations_task_waits.py # add_task_waits() (chief-autopilot 06), called after add_chief_tables:
                            # comms_messages.waits (INTEGER NOT NULL DEFAULT 0) and
                            # answered_questions (TEXT, JSON ids), ALTERed in once
+    migrations_consult.py  # add_consult_routes() (chief-autopilot-round-two 01), called last, after
+                           # add_task_waits: the consult_routes table (one row per routed or
+                           # handed-on question, question_id PRIMARY KEY) and its goal_key index;
+                           # CREATE ... IF NOT EXISTS, idempotent
     secret_scan.py         # find_run_tokens / redact_run_tokens / redact_value / contains_secret_hash:
                            # run tokens found by hashing 43-char URL-safe windows against run_tokens
                            # (plus PATHLY_RUN_TOKEN= / : values) and replaced by `[run token]` at the
@@ -1599,6 +1603,7 @@ pathly_orchestrator/
       comms_tasks.py       # task DAG operations (get_ready, complete, claim, reclaim, goal_refs_coverage); re-exports fail_task
       comms_tasks_by_run.py # get_unfinished_tasks_of_run(conn, run_id): the tasks still in_progress with claimed_by = the run, with attempts and waits (chief-autopilot 05), read only; kept out of comms_tasks.py
       task_waits.py        # open_questions_by_run / park_task / release_waiting_tasks (+ best-effort release_on_answer, called by post_message for an answer with reply_to) / tasks_behind_waiting / question_answers (chief-autopilot 06, see "A task waits on its question")
+      consult_routes.py    # CONSULT_ROLES / consult_limits / asking_task / route_decision / record_route / set_route_status / hand_to_person / routes_for_questions / pending_routes / goal_consult_cost / end_stale_routes (chief-autopilot-round-two 01, see "Consult routes"); imports nothing above db/
       comms_task_fail.py   # fail_task: marks a task failed (fail_reason run-token redacted before its 4000-char cap) and cascades dependents to blocked; moved out of comms_tasks.py at its ratchet baseline; re-exported from comms_tasks / comms
       task_results.py      # build-proof: latest_task_summaries(conn, task_ids) — the newest AGENT_DONE `summary` of each task's `sched-<id>#<n>` runs (a dependent task's prompt shows it)
       task_proof.py        # build-proof task reads: get_task, tasks_claimed_since / tasks_completed_since (goal- else (board, scope)-scoped, parsed-time window), set_floor_allow (the human-set floor_allow JSON list; refreeze re-copies text into claimed_text)
@@ -2665,6 +2670,52 @@ send `INCOMPLETE_TASKS` to a builder. After an answer the task is claimed with a
 (`attempts` only grows), and `build_task_prompt` adds `## Answers to your questions` with each
 answered question and its answer (`answered_questions_block`, from `answered_questions` through
 `task_waits.question_answers`).
+
+## Consult routes (`db/queries/consult_routes.py`, chief-autopilot-round-two 01)
+
+A board `question` a running agent addresses to a role is answered by a consult run of that role,
+not by the person. This module is the store and the rules; nothing calls it yet (later round-two
+tickets start the consult run, call `route_decision` when a question is posted and
+`end_stale_routes` at start). `consult_routes` (`db/migrations_consult.py`) keeps one row per
+routed or handed-on question: `question_id`, `role`, `task_id`, `goal_key`, `asking_run_id`,
+`consult_run_id`, `status` (`queued`, `running`, `answered`, `to_person`, `withheld`, `failed`),
+`reason`, `created_at`, `ended_at` (set by an end status).
+
+`route_decision(conn, question_id)` returns a frozen `Decision` (`kind` `route`, `person` or
+`none`, with `reason`, `role`, `task_id`, `goal_key`, `asking_run_id`):
+
+- `none`: not a live `question` row, no `author_run_id`, `to_agent` `human` or `*` (round one's
+  park, "A task waits on its question"), an author run that is itself a consult run (`consult-`
+  prefix: no consult of a consult), or a question already in `consult_routes`.
+- `person`: a role outside `CONSULT_ROLES` (`architect`, `designer`, `po`, `planner`, `tester`,
+  `reviewer`, the roles the `consult` fragment lists) — `unknown role <to>`; the asking task (or,
+  with no task, the asking run) already has `consult.max_per_task` routes not `to_person` —
+  `routed question limit (<n>) reached for task <id>`; `consult.goal_cost_usd` is 0 or
+  `goal_consult_cost` is at or above it — `consult cost line $<x> reached for <goal_key>`.
+- `route` otherwise.
+
+The asking task (`asking_task`) is `<task>` of a loop run `sched-<task>#<n>` (the pattern of
+`supervisor/task_proof._RUN_ID`, copied), else the newest `in_progress` claim of the run. A
+question's `goal_key` is its task's `goal_id`, else the asking run id; `goal_consult_cost` sums
+`agent_invocations.cost_usd` over the `consult_run_id`s of that key. Settings, read like
+`goal.task_max_attempts` (a missing, non-numeric or negative value gives the default):
+`consult.max_per_task` (default 3) and `consult.goal_cost_usd` (default 2.0; 0 routes nothing).
+The per-task cap is hard: `record_route` counts again inside its insert, so of two questions
+decided at the same moment only the ones under the cap are recorded (it returns False for the
+rest, and `route_decision` then says `person` with the limit reason). The cost line is soft: it is
+checked against consult costs already billed, so consults started together under it can end
+past it. An agent-written `to_agent` is echoed into a reason or a route row only as one line of
+at most 40 characters (`ROLE_ECHO_MAX`).
+
+`hand_to_person(conn, question_id, why, *, by)` re-addresses the same row (`to_agent='human'`, so
+a task parked on it still names it and round one's readers see a human question) and sets its
+route `to_person` with the reason (inserting it when there is none), in one write lock, then posts
+a system-stamped `status` reply `<by> handed this question to the person: <why>`. A `status` row
+never frees a parked task: only `type: answer` does. `by` and `why` are made one line (`why` at
+most 300 characters). A route that already ended (`answered`, `failed`, `withheld`) keeps its
+status and reason; a deleted or missing question changes nothing and returns False.
+`end_stale_routes` hands every `queued` or `running` route to the person with reason
+`server restart` (a route whose question is deleted or gone is only set `to_person`).
 
 ## Task proof in the goal-loop drain (`supervisor/task_proof.py`, build-proof)
 
