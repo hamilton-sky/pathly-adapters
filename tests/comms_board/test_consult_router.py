@@ -106,13 +106,15 @@ def _task(goal_id: str | None = "goal-1") -> str:
     )
 
 
-def _token(run_id: str, root: Path) -> dict:
-    token = mint_run_token(db(), run_id, "builder", SCOPE, str(root), "feature", SCOPE)
+def _token(run_id: str, root: Path | None, scope: str = SCOPE) -> dict:
+    token = mint_run_token(
+        db(), run_id, "builder", scope, str(root) if root else None, "feature", scope
+    )
     return {TOKEN_HEADER: token}
 
 
-def _body(to: str, root: Path, text: str = "Which store?") -> dict:
-    return {
+def _body(to: str, root: Path | None, text: str = "Which store?", **extra) -> dict:
+    body = {
         "feature": SCOPE,
         "board": "feature",
         "scope": SCOPE,
@@ -120,12 +122,18 @@ def _body(to: str, root: Path, text: str = "Which store?") -> dict:
         "to": to,
         "type": "question",
         "text": text,
-        "project_root": str(root),
+        **extra,
     }
+    if root is not None:
+        body["project_root"] = str(root)
+    return body
 
 
-def _ask(client, to: str, root: Path, headers: dict | None = None) -> str:
-    resp = client.post("/comms/post", json=_body(to, root), headers=headers or {})
+def _ask(
+    client, to: str, root: Path | None, headers: dict | None = None, **extra
+) -> str:
+    body = _body(to, root, **extra)
+    resp = client.post("/comms/post", json=body, headers=headers or {})
     assert resp.status_code == 200, resp.get_data(as_text=True)
     _join_router_threads()
     return resp.get_json()["message_id"]
@@ -171,6 +179,59 @@ def test_a_question_to_architect_records_one_route_and_starts_once(
     assert call["block"] is False
     assert call["thread"] == f"consult-{qid[:8]}"
     assert _to_agent(qid) == "architect"
+
+
+def test_a_question_with_no_root_in_the_body_starts_with_the_tokens_root(
+    client, project, spawn_host, fake_start
+):
+    tid = _task()
+    qid = _ask(client, "architect", None, _token(f"sched-{tid}#1", project))
+    assert [c["project_root"] for c in fake_start.calls] == [str(project)]
+    assert _routes(qid)[0]["status"] == "queued"
+
+
+def test_a_question_naming_another_root_starts_with_the_tokens_root(
+    client, project, spawn_host, fake_start, tmp_path
+):
+    elsewhere = tmp_path / "another-project"
+    elsewhere.mkdir()
+    tid = _task()
+    qid = _ask(client, "architect", elsewhere, _token(f"sched-{tid}#1", project))
+    assert [c["project_root"] for c in fake_start.calls] == [str(project)]
+    assert _routes(qid)[0]["status"] == "queued"
+
+
+def test_a_token_with_no_root_hands_the_question_to_the_person(
+    client, project, spawn_host, fake_start
+):
+    tid = _task()
+    qid = _ask(client, "architect", project, _token(f"sched-{tid}#1", None))
+    assert fake_start.calls == []
+    assert _to_agent(qid) == "human"
+    route = _routes(qid)[0]
+    assert route["status"] == "to_person"
+    assert route["reason"] == "the asking run's token names no project root"
+
+
+def test_a_question_on_another_board_than_the_tokens_goes_to_the_person(
+    client, project, spawn_host, fake_start
+):
+    tid = _task()
+    qid = _ask(
+        client,
+        "architect",
+        project,
+        _token(f"sched-{tid}#1", project),
+        scope="other-feature",
+    )
+    assert fake_start.calls == []
+    assert _to_agent(qid) == "human"
+    route = _routes(qid)[0]
+    assert route["status"] == "to_person"
+    assert route["reason"] == (
+        "the question is on board feature/other-feature, "
+        "the asking run's is feature/demo"
+    )
 
 
 def test_the_hook_twice_for_one_message_starts_once(
@@ -300,6 +361,8 @@ def test_no_spawn_host_leaves_the_question_as_posted(client, project, fake_start
     said = on_question(
         qid,
         project_root=str(project),
+        board="feature",
+        scope=SCOPE,
         broadcast_fn=sse._broadcast_spawn,
         host_present=False,
     )
@@ -345,7 +408,13 @@ def _on(qid: str, start) -> str:
     from pathly_orchestrator.supervisor.consult_router import on_question
 
     said = on_question(
-        qid, project_root="/p", broadcast_fn=None, host_present=True, start=start
+        qid,
+        project_root="/p",
+        board="feature",
+        scope=SCOPE,
+        broadcast_fn=None,
+        host_present=True,
+        start=start,
     )
     _join_router_threads()
     return said
