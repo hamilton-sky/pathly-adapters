@@ -1,7 +1,7 @@
 # Record routed questions and decide who answers each one
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: —
 Test first: yes
 Level: 3
@@ -175,6 +175,38 @@ Work started at `62b7d06d1675c75b331adff0c79bd487c0a1cff6`; test-only commit `20
 - 02, 16: `goal_consult_cost` counts only invocations whose `run_id` is some route's
   `consult_run_id`, so store the consult run id on the route (`set_route_status(...,
   consult_run_id=...)`) when the run starts, or its cost never reaches the goal's line.
+
+**Review fixes (round 1)** — rework started at `1a345bd`; test-only commit `13c9086` (8 new
+tests failed: `True is False` for the recount, newlines in the reason/reply, `to_person` instead
+of the ended status).
+
+1. Race past the cap: `record_route` now counts again inside the insert (`INSERT OR IGNORE ...
+   SELECT ... WHERE :cap IS NULL OR (SELECT COUNT(*) ... ) < :cap`, under the write lock, cap read
+   there) for a `route` decision not inserted as `to_person`; over the cap it inserts nothing and
+   returns False. Tests: two questions both decided `route` with `consult.max_per_task` 1, the
+   second `record_route` returns False and `route_decision` then gives the limit reason; same for
+   a taskless run.
+2. Agent text in a system row: `to_agent` goes through `_one_line` (whitespace runs one space,
+   non-printables dropped) and is capped at `ROLE_ECHO_MAX` = 40 before it reaches the decision's
+   role/reason or the route row; `hand_to_person` makes `by` (40) and `why` (`WHY_MAX` = 300) one
+   line too, so no caller can put a multi-line block into the `SYSTEM_AUTHOR` reply. Tests: a
+   newline-laden 236-char role gives a one-line reason of at most 53 chars; the reply is one line.
+3. `hand_to_person` reads only `deleted_at IS NULL` questions, so a deleted question returns
+   False and `end_stale_routes` takes the `set_route_status` path (no re-address, no reply).
+4. The upsert's `DO UPDATE` has `WHERE consult_routes.status IN ('queued','running')`: an
+   `answered`, `failed` or `withheld` route keeps its status and reason (spec's failure table
+   wants `failed`/`withheld` kept while the question goes to the person; the question is still
+   re-addressed and the reply posted).
+5. CLAUDE.md "Consult routes" now says the per-task cap is hard (recounted at insert) and the cost
+   line is soft (checked against billed costs, so concurrent consults can end past it), plus the
+   one-line echo and the ended-route/deleted-question behaviour.
+
+Proof after the fixes: `test_consult_routes.py` `43 passed`, exit 0; `tests/db tests/comms_board`
+`1693 passed, 2 skipped`, exit 0; Lint chain exit 0 (`tests/comms_board/INDEX.md` regenerated
+for the new tests); `consult_routes.py` 360 lines.
+
+For 04: when `record_route` returns False for a `route` decision, call `route_decision` again:
+`none` (another call routed it) or `person` with the limit reason (hand it on).
 
 
 ## Review findings (round 1, quality review)

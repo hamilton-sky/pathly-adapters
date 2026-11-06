@@ -2700,13 +2700,22 @@ question's `goal_key` is its task's `goal_id`, else the asking run id; `goal_con
 `agent_invocations.cost_usd` over the `consult_run_id`s of that key. Settings, read like
 `goal.task_max_attempts` (a missing, non-numeric or negative value gives the default):
 `consult.max_per_task` (default 3) and `consult.goal_cost_usd` (default 2.0; 0 routes nothing).
+The per-task cap is hard: `record_route` counts again inside its insert, so of two questions
+decided at the same moment only the ones under the cap are recorded (it returns False for the
+rest, and `route_decision` then says `person` with the limit reason). The cost line is soft: it is
+checked against consult costs already billed, so consults started together under it can end
+past it. An agent-written `to_agent` is echoed into a reason or a route row only as one line of
+at most 40 characters (`ROLE_ECHO_MAX`).
 
 `hand_to_person(conn, question_id, why, *, by)` re-addresses the same row (`to_agent='human'`, so
 a task parked on it still names it and round one's readers see a human question) and sets its
 route `to_person` with the reason (inserting it when there is none), in one write lock, then posts
 a system-stamped `status` reply `<by> handed this question to the person: <why>`. A `status` row
-never frees a parked task: only `type: answer` does. `end_stale_routes` hands every `queued` or
-`running` route to the person with reason `server restart`.
+never frees a parked task: only `type: answer` does. `by` and `why` are made one line (`why` at
+most 300 characters). A route that already ended (`answered`, `failed`, `withheld`) keeps its
+status and reason; a deleted or missing question changes nothing and returns False.
+`end_stale_routes` hands every `queued` or `running` route to the person with reason
+`server restart` (a route whose question is deleted or gone is only set `to_person`).
 
 ## Task proof in the goal-loop drain (`supervisor/task_proof.py`, build-proof)
 

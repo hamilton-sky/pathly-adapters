@@ -38,10 +38,20 @@ END_STATUSES = frozenset({"answered", "to_person", "withheld", "failed"})
 CONSULT_RUN_PREFIX = "consult-"
 DEFAULT_MAX_PER_TASK = 3
 DEFAULT_GOAL_COST_USD = 2.0
+# How much of an agent-written ``to_agent`` (or a caller's reason) is echoed into a route row or a
+# system-stamped reply: one line, capped, so an agent cannot write a forged block of text there.
+ROLE_ECHO_MAX = 40
+WHY_MAX = 300
 
 # The loop scheduler's run id, ``sched-<task>#<attempt>`` (same pattern as
 # ``supervisor/task_proof._RUN_ID``; copied, since ``db/`` may not import ``supervisor/``).
 _SCHED_RUN_ID = re.compile(r"sched-(?P<task>[^#]+)#[0-9]+")
+
+
+def _one_line(text: str | None, limit: int) -> str:
+    """``text`` as one printable line (every whitespace run one space), at most ``limit`` chars."""
+    line = " ".join(str(text or "").split())
+    return "".join(ch for ch in line if ch.isprintable())[:limit]
 
 
 @dataclass(frozen=True)
@@ -144,7 +154,7 @@ def route_decision(conn: sqlite3.Connection, question_id: str) -> Decision:
     run_id = q["author_run_id"]
     if not run_id:
         return Decision("none", "no asking run")
-    to = (q["to_agent"] or "*").strip().lower()
+    to = _one_line((q["to_agent"] or "*").lower(), ROLE_ECHO_MAX)
     if to in ("human", "*"):
         return Decision("none", "a question to the person")
     if run_id.startswith(CONSULT_RUN_PREFIX):
@@ -174,26 +184,39 @@ def record_route(
     question_id: str,
     status: str = "queued",
 ) -> bool:
-    """Insert the route row for ``question_id`` once; True when this call inserted it."""
+    """Insert the route row for ``question_id`` once; True when this call inserted it.
+
+    A ``route`` decision is counted again inside the insert: when the asking task (or taskless
+    run) already holds ``consult.max_per_task`` routes not ``to_person``, nothing is inserted and
+    the call returns False, so questions decided at the same moment cannot pass the cap
+    (``route_decision`` then says ``person`` with the limit reason)."""
     if status not in STATUSES:
         raise ValueError(f"unknown consult route status {status!r}")
     now = time.time()
     with _get_write_lock(conn):
+        cap = None
+        if decision.kind == "route" and status != "to_person":
+            cap = consult_limits(conn)[0]
         cur = conn.execute(
             "INSERT OR IGNORE INTO consult_routes "
             "(question_id, role, task_id, goal_key, asking_run_id, status, reason, "
-            "created_at, ended_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (
-                question_id,
-                decision.role or "",
-                decision.task_id,
-                decision.goal_key,
-                decision.asking_run_id,
-                status,
-                decision.reason or None,
-                now,
-                now if status in END_STATUSES else None,
-            ),
+            "created_at, ended_at) "
+            "SELECT :qid, :role, :task, :goal, :run, :status, :reason, :now, :ended "
+            "WHERE :cap IS NULL OR (SELECT COUNT(*) FROM consult_routes "
+            "WHERE status != 'to_person' AND ((:task IS NOT NULL AND task_id = :task) "
+            "OR (:task IS NULL AND task_id IS NULL AND asking_run_id = :run))) < :cap",
+            {
+                "qid": question_id,
+                "role": decision.role or "",
+                "task": decision.task_id,
+                "goal": decision.goal_key,
+                "run": decision.asking_run_id,
+                "status": status,
+                "reason": decision.reason or None,
+                "now": now,
+                "ended": now if status in END_STATUSES else None,
+                "cap": cap,
+            },
         )
         conn.commit()
     return cur.rowcount == 1
@@ -228,11 +251,15 @@ def hand_to_person(
 ) -> bool:
     """Hand ``question_id`` to the person: the same row re-addressed ``to_agent='human'``, its
     route ``to_person`` with ``why`` (inserted when none exists), then a system ``status`` reply
-    ``<by> handed this question to the person: <why>``. False when the question does not exist.
+    ``<by> handed this question to the person: <why>`` (``by`` and ``why`` made one capped line).
+    A route that already ended (``answered``, ``failed``, ``withheld``) keeps its status and
+    reason. False, and nothing changed, when the question does not exist or is deleted.
     """
+    why = _one_line(why, WHY_MAX)
+    by = _one_line(by, ROLE_ECHO_MAX)
     q = conn.execute(
         "SELECT board, scope, to_agent, author_run_id FROM comms_messages "
-        "WHERE id=? AND type='question'",
+        "WHERE id=? AND type='question' AND deleted_at IS NULL",
         (question_id,),
     ).fetchone()
     if q is None:
@@ -249,10 +276,11 @@ def hand_to_person(
             "(question_id, role, task_id, goal_key, asking_run_id, status, reason, "
             "created_at, ended_at) VALUES (?, ?, ?, ?, ?, 'to_person', ?, ?, ?) "
             "ON CONFLICT(question_id) DO UPDATE SET status='to_person', "
-            "reason=excluded.reason, ended_at=excluded.ended_at",
+            "reason=excluded.reason, ended_at=excluded.ended_at "
+            "WHERE consult_routes.status IN ('queued', 'running')",
             (
                 question_id,
-                (q["to_agent"] or "").strip().lower(),
+                _one_line((q["to_agent"] or "").lower(), ROLE_ECHO_MAX),
                 task["id"] if task else None,
                 goal_key(task, run_id),
                 run_id,
@@ -326,7 +354,7 @@ def end_stale_routes(conn: sqlite3.Connection) -> list[str]:
     for row in rows:
         qid = row["question_id"]
         if not hand_to_person(conn, qid, "server restart", by="the server"):
-            # The question row is gone: end the route all the same.
+            # The question row is gone or deleted: end the route all the same.
             set_route_status(conn, qid, "to_person", reason="server restart")
         handed.append(qid)
     return handed
