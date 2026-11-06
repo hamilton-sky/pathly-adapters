@@ -4,7 +4,7 @@
 
 Runner control loop, supervisor, spawn channel, lane/worktree isolation, file-claim registry, services facade.
 
-29 test file(s).
+30 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -14,6 +14,7 @@ Runner control loop, supervisor, spawn channel, lane/worktree isolation, file-cl
 | `test_chief_secret_reach.py` | chief-autopilot 02: the chief's settings give it no read path to ``~/.pathly`` | 4 |
 | `test_chief_session.py` | chief-agent 06: opening and closing a chief session in the supervisor | 29 |
 | `test_chief_settings_env.py` | chief-agent 20, B1: the chief's claude starts without background-task and scheduled-task prompts | 4 |
+| `test_consult_read_only.py` | chief-autopilot-round-two 03: the answer of a consult that changed the project is withheld | 21 |
 | `test_consult_run.py` | chief-autopilot-round-two 02: a consult run answers a routed question and its answer is posted | 18 |
 | `test_fan_out.py` | supervisor/fan_out.py — the DAG scheduler as an FSM stage executor (fan-out Phase C) | 19 |
 | `test_file_claims.py` | Unit tests for the cross-feature file-claim overlap registry | 6 |

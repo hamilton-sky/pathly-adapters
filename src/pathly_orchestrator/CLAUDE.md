@@ -1746,6 +1746,7 @@ pathly_orchestrator/
     board_run.py           # start_board_run: board-lock + skill compose + async spawn helper; optional `run_id` (default a new uuid4)
     board_lock.py          # Per-board/scope advisory lock (acquire/release/holder)
     consult_run.py         # start_consult(question_id, *, project_root, broadcast_fn, spawn_fn=None, block=False) (chief-autopilot-round-two 02): one headless `consult-<12 hex>` run of a queued route's role (planning/consult-answer), its AGENT_DONE summary delivered — see "Consult runs"; no board lock
+    consult_window.py      # open_window(project_root, *, scope=None) / blamed(window) / withhold / noted (chief-autopilot-round-two 03): a consult that changed the project is withheld — see "Consult runs"
     chief_tiers.py         # what a chief may do (chief-agent): ACTIONS, TIERS (status=read; planner=read,post,plan; operator=all seven), actions_for/normalise_tier, and resolve_preset_tier — a user prompt file chief/<preset> names its tier in leading front matter `tier:`, else the built-in names map to themselves, anything else (unknown tier, missing front matter, malformed name) is status. Code, never read from prompt text; strip_front_matter reuses skills/compose_base
     chief_presets.py       # the chief's prompt (chief-agent 17): the built-in styles STATUS / PLANNER / OPERATOR (BUILT_IN), default_style (user file chief/<preset> wins, else the built-in text), compose_prompt (style + the chief-connect fragment, read at call time, + ROOT_LINE with the stored project root)
     chief_session.py       # open_chief / close_chief (chief-agent): the chief is a long-lived interactive spawn, so it has its own open path instead of _run_stage_via_terminal (which blocks its caller and gives up after 30 minutes). open_chief validates (engine claude|codex, existing project_root, the style non-empty and at most 64 KiB, model not starting with `-`; `prompt` is optional for a preset that has a built-in text), raises ChiefAlreadyOpen(run_id, tab_id) for a project with an open chief, resolves the tier from the preset, writes ~/.pathly/chief/<run_id>/ (hook_secret, and for claude settings.json + an empty mcp.json; mode 0600), registers the chief_sessions row (secret sha256, the claude --session-id), mints a `chief` token on the project board, create_run(run_id), and sends one interactive TERMINAL_SPAWN (topic `chief:<run_id>`, submit false, the prompt from `chief_presets.compose_prompt`: style without front matter, then the `chief-connect` fragment, then the stored root); once the token is minted the session is read again, and a close that landed in between revokes the token, sends no spawn and raises ChiefClosedWhileOpening (POST /chief/open: 409; a close after that re-read cannot be shut out without a lock across the broadcast, it still revokes the token so the tab gets a dead one); a daemon watcher wakes on the first of the tab's `started` or its result (TerminalRun.wait_started_or_result) and closes the session as `never started` or `tab closed`. close_chief revokes the token, removes the folder and drops the run (False the second time). normalise_project_root (forward slashes, no trailing slash) keys a project's chief for open_chief and the routes; chief_startup_cleanup() closes every session still open at server start (reason `server restart`) and removes their folders; something_answers(host, port) is the TCP probe app.main() runs before it
@@ -2755,8 +2756,33 @@ spawns nothing), then (on a daemon thread unless `block`) one headless spawn of 
   - Every end is a compare-and-set from this consult's `running` route. A question handed to the
     person while the consult ran keeps its route and gets nothing; one answered meanwhile gets no
     second answer (route `answered`).
-- `_measured_ok(...)` is called right before delivery and returns True (ticket 03 measures the
-  tree there). Nothing calls `start_consult` yet (ticket 04 does when a question is posted).
+- Read-only, measured (`supervisor/consult_window.py`, ticket 03): `open_window(project_root,
+  scope=, run_id=)` before the spawn (git tree via `proof/tree.snapshot`, `HEAD`, the ids of the
+  task rows and the declared `files` (`task_proof._declared`) of every task `in_progress` on the
+  project's boards: the project board (scope == the normalized root) and the feature boards whose
+  `pathly/features/<scope>/` exists under the root, the path from `board_mirror.board_mirror_path`,
+  so a scope that is not one plain folder name or is reserved is no board of the project).
+  `_default_spawn` goes through `consult_window.spawn_until_stopped`: with early advance on, the
+  terminal returns on the AGENT_DONE while the PTY runs, so it waits for the PTY's exit
+  (`registry.get_run(run_id).wait_pty_result`, `EXIT_WAIT` 600 s); no exit in time raises
+  `consult_exit_unconfirmed` (not measured, so not delivered: route `failed`, question to the
+  person). `blamed(window)` runs after the spawn returns or raises, before `AGENT_DONE` and the
+  summary are read (a consult that changed the project and then failed or gave no `ANSWER:` line
+  is still withheld):
+  `HEAD moved from <a> to <b>` and `<status> <path>` for each
+  changed path not under the board storage's `feedback/`, not under `pathly/`
+  (`provenance._is_own_storage`) and not inside the declared `files` of a task `in_progress` at
+  the window's start, or of a task posted before the window and `in_progress` at its end with a
+  `claimed_by` that is set and not the consult's run id (a task the consult posted or claimed
+  exempts nothing). Findings → `withhold`: no answer or decision row, route
+  `withheld` (findings in its reason), `hand_to_person("the <role> consult changed the project",
+  by=<role>)`, and one system-stamped `escalation` to `human` replying to the question (at most 20
+  findings, then `... and N more`; nothing reverted, the person decides). The escalation is posted
+  even when the route had moved on meanwhile. `None` (not a repo top, git failed) → delivered,
+  then a system `status` reply `answer not measured: <project> is not a git repository top` (or
+  `answer not measured: git could not snapshot <project>` when it is a repo top) when
+  this consult's answer row was posted (fail-open). Nothing calls `start_consult` yet (ticket 04
+  does when a question is posted).
 
 ## Task proof in the goal-loop drain (`supervisor/task_proof.py`, build-proof)
 
