@@ -1,7 +1,7 @@
 # Route a run's role question to a consult when it is posted
 
 Type: task
-Status: resolved
+Status: open
 Blocked by: 01, 02
 Test first: yes
 Level: 3
@@ -205,3 +205,49 @@ QUALITY
 4. minor src/pathly_orchestrator/supervisor/consult_router.py: the router thread only calls start_consult(block=False), which already does its own spawn on a daemon thread. The extra thread exists because the ticket asks for it, but it means two threads per consult. If the ticket allows it, call start inline.
 
 REVIEW: FAIL
+
+## Review findings (round 2, gate (quick))
+
+gate: Build: python -m build --wheel && npm --prefix studio run typecheck
+gate: Quick: python -m pytest tests/comms_board tests/db tests/runner_supervisor tests/http_api tests/dag_goals tests/fsm_flows tests/telemetry tests/consistency -q -x -p no:cacheprovider
+gate: Quick failed. the last lines of its output:
+........................................................................ [ 92%]
+..................................................................F
+=================================== FAILURES ===================================
+______________ test_the_notes_use_the_latest_task_proof_of_a_task ______________
+
+repo = PosixPath('/tmp/pathly-tests/tmplflnhyap/repo')
+flow = {'_comments': [], 'adapter_map': {'BUILDING': 'claude', 'REVIEWING': 'claude', 'TESTING': 'claude', 'default': 'claude...test'}, 'escalation_routing': {'REVIEW_FAILURES': 'planner', 'SCOPE_VIOLATION': 'planner', 'TEST_FAILURES': 'po'}, ...}
+
+    def test_the_notes_use_the_latest_task_proof_of_a_task(repo, flow):
+        task_id = _build(repo, flow)
+        fsm_ops.complete_stage(_args(repo))
+        _task_proof(repo, task_id, "failed")
+        _task_proof(repo, task_id, "passed")
+    
+>       notes = _section(_packet(repo), "Supervisor notes")
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/fsm_flows/test_review_packet_notes.py:69: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+packet = '\n## Review packet\n\nNo review packet for this run: the project could not be snapshotted (git is not available). The...account is still left out. The stage orchestrator runs `git diff HEAD` itself and passes the output to the reviewer.\n'
+heading = 'Supervisor notes'
+
+    def _section(packet: str, heading: str) -> str:
+        found = re.search(
+            r"^### %s\n(.*?)(?=^### |\Z)" % re.escape(heading), packet, re.S | re.M
+        )
+>       assert found, "no '### %s' section in:\n%s" % (heading, packet[:2000])
+               ^^^^^
+E       AssertionError: no '### Supervisor notes' section in:
+E       
+E       ## Review packet
+E       
+E       No review packet for this run: the project could not be snapshotted (git is not available). The builder's own account is still left out. The stage orchestrator runs `git diff HEAD` itself and passes the output to the reviewer.
+
+tests/fsm_flows/review_packet_support.py:153: AssertionError
+=========================== short test summary info ============================
+FAILED tests/fsm_flows/test_review_packet_notes.py::test_the_notes_use_the_latest_task_proof_of_a_task
+!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!
+1 failed, 5527 passed, 11 skipped in 1404.23s (0:23:24)
