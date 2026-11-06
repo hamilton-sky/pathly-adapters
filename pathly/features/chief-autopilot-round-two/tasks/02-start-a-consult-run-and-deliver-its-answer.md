@@ -1,7 +1,7 @@
 # Start a consult run for a routed question and post its answer
 
 Type: task
-Status: resolved
+Status: open
 Blocked by: 01
 Test first: yes
 Level: 3
@@ -211,3 +211,16 @@ consult_run.py" scan finds no caller), 99 passing.
   says `single`.
 - 12/person: a real agent may put `DECISION:` on the same line as `ANSWER:` inside the
   completion-report string; it is then part of the answer text, not a decision row.
+
+## Review findings (round 1, quality review)
+
+Reviewed 8ce520a..b341060 (END is HEAD; no later commits left out). I read the ticket at the base commit, so I did not see its Answer. Both Done when commands passed when I re-ran them (13 passed; 893 passed, 2 skipped), and so did tests/comms_board/test_comms_provenance.py (106 passed). The tree is clean afterwards. This is a level 3 review. Inputs probed: the question row (text, from_agent, author_run_id), the route (status, task_id, role), the asking run's run_history.adapter, the consult's AGENT_DONE summary (ANSWER/USER/DECISION parsing), the question and task text placed in the prompt, and concurrent calls to start_consult.
+
+QUALITY
+1. major src/pathly_orchestrator/supervisor/consult_run.py: anyone can forge the answer. start_consult delivers the newest AGENT_DONE whose payload.run_id is the consult run. POST /runner/event has no authentication and accepts any payload, and the consult-<hex> run id can be read through run_history (GET /runs, GET /runs/<id>). So any agent on the machine, including the builder that asked, can append an AGENT_DONE with that run_id during the spawn's window, up to 600 s. The server then posts that text as the architect (or po, or designer), with author_source=token and an optional DECISION row, and frees the parked tasks. This gets around the very check that ticket 17's 403 is meant to protect, and it breaks consult_stamp's claim that the row comes from the consult run. Fix: take the summary only from a result the consult spawn itself produced. That can be the result _run_stage_via_terminal returns (it is ignored now), or an AGENT_DONE written with the consult's own run token. At the least, fail the consult when more than one AGENT_DONE carries the run id. If changing the spec's "Where the answer comes from" is out of scope here, raise it with the architect.
+2. major src/pathly_orchestrator/supervisor/consult_run.py: start_consult reads status == "queued" and then calls set_route_status(..., "running"). That UPDATE has no condition, and its return value is ignored, so the check and the set are not atomic. Two callers for the same question, for example ticket 04's post hook racing a retry or a second post path, both pass the check. Both then spawn a consult (twice the cost, which gets past the consult caps) and both post an answer. Fix: claim the route with a compare-and-set (UPDATE ... SET status='running' ... WHERE question_id=? AND status='queued', checking rowcount) and return started False when the claim loses.
+3. minor src/pathly_orchestrator/supervisor/consult_run.py: _deliver and _fail do not check that the route is still `running` with this consult_run_id before they post and set `answered` or `failed`. A question that was handed to the person or answered while the consult ran gets a second answer, and its end status is overwritten. Fix: re-read the route and the question before delivering, and drop the result if either has moved on.
+4. minor src/pathly_orchestrator/supervisor/consult_run.py: the DECISION row is posted before the answer row. If the answer post then fails, the route becomes `failed` and the question goes to the person, but the orphan decision stays on the board. Fix: post the answer first, or remove the decision on failure.
+5. minor src/pathly_orchestrator/supervisor/consult_run.py: _run_consult throws away the spawn's return value. A consult that exits non-zero with no AGENT_DONE is reported only as "no AGENT_DONE". Fix: put the exit code or error from the returned dict into the failure reason.
+
+REVIEW: FAIL
