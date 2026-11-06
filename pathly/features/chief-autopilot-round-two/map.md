@@ -102,6 +102,7 @@ Outside facts relied on (tickets 13 to 15, 18):
   confirm · Esc to cancel", as a user quotes it in
   https://github.com/anthropics/claude-code/issues/40002 (fetched 2026-11-06; the issue names no
   claude version). Ticket 14 matches it and the old wording.
+- 03 (round 2) — the consult window counts only the in-progress files of the project's own boards (project board + its feature boards) and is measured right after the spawn, before AGENT_DONE and the summary are read
 
 ## Open questions
 

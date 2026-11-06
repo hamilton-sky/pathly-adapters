@@ -9,8 +9,8 @@ reads the summary of that run's own ``AGENT_DONE`` and delivers it:
   ``DECISION: <approach> — <why>`` line from architect, po or designer adds a ``decision`` row
   (binding 0). Route ``answered``.
 - ``ANSWER: USER <why>``: the question goes to the person (``hand_to_person``).
-- a consult that changed the project (``consult_window``, ticket 03): no answer, route
-  ``withheld``, the question to the person and an escalation listing the changes.
+- a consult that changed the project (``consult_window``, ticket 03), whatever its summary says:
+  no answer, route ``withheld``, the question to the person and an escalation of the changes.
 - anything else (no ``ANSWER:`` line, no ``AGENT_DONE`` or more than one, a spawn that raised or
   timed out): route ``failed`` and the question goes to the person.
 
@@ -320,8 +320,9 @@ def _run_consult(
 
     conn = get_db()
     qid, role = question["id"], route["role"]
+    window = cw.open_window(project_root, scope=question["scope"])  # never raises
+    raised, returned = "", None
     try:
-        window = cw.open_window(project_root, scope=question["scope"])
         adapter, model = consult_engine(conn, question.get("author_run_id"), role)
         task = _task_of(conn, route, question)
         prompt = build_prompt(question, task, role, project_root, adapter)
@@ -338,16 +339,18 @@ def _run_consult(
         )
     except Exception as exc:
         logger.warning("consult %s for question %s failed: %s", run_id, qid, exc)
-        return _fail(conn, qid, role, run_id, f"{type(exc).__name__}: {exc}")
+        raised = f"{type(exc).__name__}: {exc}"
+    findings = cw.blamed(window)  # before the summary: a failed consult is measured too
+    if findings:
+        return cw.withhold(conn, question, role, run_id, findings)
+    if raised:
+        return _fail(conn, qid, role, run_id, raised)
     done, why = _agent_done(conn, run_id)
     if done is None:
         return _fail(conn, qid, role, run_id, why + _spawn_said(returned))
     kind, text, decision = parse_summary(done.get("summary"))
     if kind == "none":
         return _fail(conn, qid, role, run_id, "no ANSWER: line in its summary")
-    findings = cw.blamed(window)
-    if findings:
-        return cw.withhold(conn, question, role, run_id, findings)
     try:
         status = _deliver(conn, question, role, run_id, kind, text, decision)
         return cw.noted(conn, question, run_id, findings, project_root, status)

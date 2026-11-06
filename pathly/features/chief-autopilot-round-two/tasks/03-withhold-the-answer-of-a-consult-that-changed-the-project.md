@@ -1,7 +1,7 @@
 # Withhold the answer of a consult that changed the project
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 02
 Test first: yes
 Level: 3
@@ -123,9 +123,11 @@ on top of it). Test-only commit `22c91ee`: at that commit the Test command fails
   storage outside `pathly/`.
 - `blamed` returns the HEAD finding even when the tree diff fails (as the reviewer gate does: a
   moved HEAD needs no diff); None only when nothing could be measured.
-- Withholding runs after the summary is parsed (no AGENT_DONE or no `ANSWER:` line still fails
-  the route as in 02). A withhold whose route move loses (handed on or answered meanwhile) still
-  posts the escalation, because the change is in the project either way; it does not hand on again.
+- (round 2) The window is measured right after the spawn returns or raises, before `AGENT_DONE`
+  and the summary are read, so findings withhold whatever the summary says. With no findings the
+  02 failures (spawn raised, no AGENT_DONE, no `ANSWER:` line) fail the route as before. A
+  withhold whose route move loses (handed on or answered meanwhile) still posts the escalation,
+  because the change is in the project either way; it does not hand on again.
 - The "not measured" status is posted only when this consult's own answer row was posted
   (`author_run_id` = the consult run), so an `ANSWER: USER` hand-off or a question answered
   meanwhile gets none, and 02's tests that count status replies keep their counts.
@@ -133,12 +135,11 @@ on top of it). Test-only commit `22c91ee`: at that commit the Test command fails
 
 **Shortcuts taken**
 
-- "Every task `in_progress` on the project's boards" reads every in-progress task in the DB:
-  `comms_messages` has no project column. Exempting another project's declared files can only
-  leave a change unblamed when the paths coincide; a project column (or board -> project map)
-  would make it exact.
-- The not-measured text always says "is not a git repository top", also when git itself failed
-  (the ticket's wording).
+- (round 2) "The project's boards" are resolved as `board_mirror.export_project_boards` does:
+  the project board whose scope is the normalized root, and a feature board whose
+  `pathly/features/<scope>/` folder exists under the root. A same-named feature folder in two
+  projects still matches both (the same ambiguity the mirror has; `comms_messages` has no
+  project column).
 - Concurrent builders whose change is outside every declared footprint withhold the answer (spec
   Decisions, fail-safe); round three's worktree per consult closes it.
 
@@ -147,6 +148,51 @@ on top of it). Test-only commit `22c91ee`: at that commit the Test command fails
 - 04: unchanged entry point; a consult can now end `withheld` (the question is then to the person).
 - 09/10: a `withheld` route has an `escalation` reply to `human` on its question.
 - 17: delivery stays in `consult_run._deliver`; `consult_window.withhold` never posts an answer.
+
+**Review fixes (round 1, quality review)** — fix commits after test-only `abe3d5f`.
+
+1. major, cross-project exemptions: `consult_window._in_progress_files(root)` now keeps only
+   tasks on this project's boards (`_on_project_board`: project board with scope == the
+   normalized root via `board_mirror._norm_project_root`, or a feature board whose
+   `pathly/features/<scope>/` is a folder under the root, as `export_project_boards` matches).
+   New test `test_another_projects_in_progress_files_do_not_exempt_a_change[feature|project]`:
+   another project's in-progress task declares `app.py` and the edit is withheld (failed at
+   `abe3d5f`, passes now); `test_an_in_progress_task_on_the_project_board_exempts_its_files`
+   guards the project-board match.
+2. major, measuring after the summary: `_run_consult` opens the window before the try (it never
+   raises), records a raised spawn instead of returning, then runs `blamed` before
+   `_agent_done`/`parse_summary`; findings -> `withhold`. New test
+   `test_a_consult_that_edits_and_then_fails_is_still_withheld[no-answer-line|raised]`: one
+   escalation listing `M app.py`, route `withheld`, question to `human`, task still `blocked`.
+   consult_run.py is 400 lines.
+3. minor, whole `pathly/` exempt: kept as is. The ticket names `runner/provenance._is_own_storage`
+   for the exports and run storage, and that helper's docstring gives the reason a narrower
+   prefix breaks: in a project whose `pathly/` was never committed, `git status` collapses the
+   untracked tree to `?? pathly/`, so an exports-only rule would blame Pathly's own mirror
+   writes on every consult in a fresh project. Narrowing it is a spec change (spec Decisions
+   "What the read-only check blames"), not this ticket's.
+4. minor, the feedback test cannot fail for its rule alone: noted in the test's docstring that
+   it covers both the feedback and the own-storage rule (the reviewer's suggestion while 3
+   stands).
+5. minor, wording when git fails in a repo: `noted` now says `answer not measured: git could not
+   snapshot <project>` when the root is a git top (`proof/tree._is_top`), and keeps the
+   ticket's `<project> is not a git repository top` otherwise. New test
+   `test_when_git_fails_inside_a_repo_the_status_says_so` (snapshot patched to None).
+6. minor, two-way lazy import and private helpers: skipped. Moving `_move`/`_status` into
+   `db/queries/consult_routes.py` or renaming `task_proof._declared` /
+   `provenance._is_own_storage` changes files outside Touches. Both imports stay lazy (inside
+   functions), so there is no import cycle at load time.
+
+**Proof (round 2, fresh after the last edit)**
+
+- `python -m pytest tests/runner_supervisor/test_consult_read_only.py -q -p no:cacheprovider`:
+  `18 passed`, exit 0 (5 of them failed at `abe3d5f` for the right reasons).
+- `python -m pytest tests/runner_supervisor -q -p no:cacheprovider`: `410 passed`, exit 0.
+- `python -m pytest tests/comms_board/test_comms_provenance.py -q -p no:cacheprovider`: `106
+  passed`; `consult_stamp` is still called only in `consult_run.py`.
+- black `743 files would be left unchanged`; mypy `no issues found in 365 source files`;
+  `check_file_size.py` "none new, none grown" (consult_run.py 400, consult_window.py 245);
+  `gen_test_index.py` regenerated then `--check` "All test INDEX.md files up to date".
 
 ## Review findings (round 1, quality review)
 

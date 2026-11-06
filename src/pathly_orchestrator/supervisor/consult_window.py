@@ -3,7 +3,7 @@
 A consult is read-only: it may write only under its board's ``feedback/`` folder and post board
 rows. ``supervisor/consult_run`` does not trust that. It calls :func:`open_window` before the
 spawn (the git working tree, ``HEAD`` and the declared ``files`` of every task ``in_progress``
-now) and :func:`blamed` after it, the way ``fsm/gates/reviewer.py`` measures a reviewer. A change
+on the project's boards now) and :func:`blamed` after it, the way ``fsm/gates/reviewer.py`` measures a reviewer. A change
 is blamed on the consult unless it is under the feedback folder, under Pathly's own ``pathly/``
 storage (``runner/provenance._is_own_storage``: the mirror exports and run storage), or inside
 the declared ``files`` of a task ``in_progress`` at the window's start or end (a builder running
@@ -38,22 +38,40 @@ class Window:
     feedback: str | None = None
 
 
-def _in_progress_files() -> set[str]:
-    """The declared ``files`` of every task ``in_progress`` on the boards now."""
+def _on_project_board(root: str, board: str, scope: str | None) -> bool:
+    """A board of the project at ``root``: its project board (scope == the normalized root) or
+    a feature board whose ``pathly/features/<scope>/`` folder exists under it, matched the way
+    ``board_mirror.export_project_boards`` matches them."""
+    from pathlib import Path
+
+    from ..board_mirror import _norm_project_root
+
+    norm = _norm_project_root(root)
+    if not norm or not scope:
+        return False
+    if board == "project":
+        return scope == norm
+    return (Path(norm) / "pathly" / "features" / scope).is_dir()
+
+
+def _in_progress_files(root: str) -> set[str]:
+    """The declared ``files`` of every task ``in_progress`` on the project's boards now."""
     from ..db.connection import get_db
     from .task_proof import _declared
 
     rows = (
         get_db()
         .execute(
-            "SELECT files FROM comms_messages WHERE type='task' "
-            "AND task_status='in_progress' AND deleted_at IS NULL"
+            "SELECT board, scope, files FROM comms_messages WHERE type='task' "
+            "AND task_status='in_progress' AND deleted_at IS NULL "
+            "AND board IN ('project', 'feature')"
         )
         .fetchall()
     )
     files: set[str] = set()
     for row in rows:
-        files |= _declared({"files": row["files"]})
+        if _on_project_board(root, row["board"], row["scope"]):
+            files |= _declared({"files": row["files"]})
     return files
 
 
@@ -87,7 +105,7 @@ def open_window(project_root: str, *, scope: str | None = None) -> Window | None
             root=str(project_root),
             before=before,
             head=tree.head(project_root),
-            declared=_in_progress_files(),
+            declared=_in_progress_files(str(project_root)),
             feedback=_feedback(str(project_root), scope),
         )
     except Exception:
@@ -127,7 +145,7 @@ def blamed(window: Window | None) -> list[str] | None:
         diff = tree.changes_or_none(window.root, window.before, after)
         if diff is None:
             return found or None
-        window.declared |= _in_progress_files()
+        window.declared |= _in_progress_files(window.root)
         found += [
             "%s %s" % (status, path)
             for status, path in diff
@@ -191,6 +209,12 @@ def withhold(conn, question: dict, role: str, run_id: str, findings: list[str]) 
     return _status(conn, qid)
 
 
+def _why_unmeasured(project_root: str) -> str:
+    if not tree._is_top(project_root):
+        return f"{project_root} is not a git repository top"
+    return f"git could not snapshot {project_root}"
+
+
 def noted(
     conn, question: dict, run_id: str, findings, project_root: str, status: str
 ) -> str:
@@ -213,7 +237,7 @@ def noted(
             scope=question["scope"],
             from_agent="system",
             type="status",
-            text=f"answer not measured: {project_root} is not a git repository top",
+            text=f"answer not measured: {_why_unmeasured(project_root)}",
             reply_to=question["id"],
         )
     except Exception as exc:

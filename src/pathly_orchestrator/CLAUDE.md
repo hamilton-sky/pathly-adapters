@@ -2758,8 +2758,12 @@ spawns nothing), then (on a daemon thread unless `block`) one headless spawn of 
     second answer (route `answered`).
 - Read-only, measured (`supervisor/consult_window.py`, ticket 03): `open_window(project_root,
   scope=)` before the spawn (git tree via `proof/tree.snapshot`, `HEAD`, and the declared `files`
-  (`task_proof._declared`) of every task `in_progress` on the boards); `blamed(window)` after the
-  summary is parsed, before delivery: `HEAD moved from <a> to <b>` and `<status> <path>` for each
+  (`task_proof._declared`) of every task `in_progress` on the project's boards: the project board
+  (scope == the normalized root) and the feature boards whose `pathly/features/<scope>/` exists
+  under the root, matched as `board_mirror.export_project_boards` does); `blamed(window)` right
+  after the spawn returns or raises, before `AGENT_DONE` and the summary are read (a consult that
+  changed the project and then failed or gave no `ANSWER:` line is still withheld):
+  `HEAD moved from <a> to <b>` and `<status> <path>` for each
   changed path not under the board storage's `feedback/`, not under `pathly/`
   (`provenance._is_own_storage`) and not inside the declared `files` of a task `in_progress` at
   the window's start or end (re-read). Findings → `withhold`: no answer or decision row, route
@@ -2767,7 +2771,8 @@ spawns nothing), then (on a daemon thread unless `block`) one headless spawn of 
   by=<role>)`, and one system-stamped `escalation` to `human` replying to the question (at most 20
   findings, then `... and N more`; nothing reverted, the person decides). The escalation is posted
   even when the route had moved on meanwhile. `None` (not a repo top, git failed) → delivered,
-  then a system `status` reply `answer not measured: <project> is not a git repository top` when
+  then a system `status` reply `answer not measured: <project> is not a git repository top` (or
+  `answer not measured: git could not snapshot <project>` when it is a repo top) when
   this consult's answer row was posted (fail-open). Nothing calls `start_consult` yet (ticket 04
   does when a question is posted).
 
