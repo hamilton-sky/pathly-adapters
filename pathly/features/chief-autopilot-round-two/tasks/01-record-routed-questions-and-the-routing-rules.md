@@ -1,7 +1,7 @@
 # Record routed questions and decide who answers each one
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: —
 Test first: yes
 Level: 3
@@ -99,3 +99,80 @@ exit 0
   `src/pathly_orchestrator/db/provenance_values.py`
 
 ## Answer
+
+Work started at `62b7d06d1675c75b331adff0c79bd487c0a1cff6`; test-only commit `20db563`.
+
+**Built**
+
+- `src/pathly_orchestrator/db/migrations_consult.py` (new): `add_consult_routes(conn)`, the
+  `consult_routes` table as specified plus an index on `goal_key`; `CREATE ... IF NOT EXISTS`.
+- `src/pathly_orchestrator/db/migrations_incremental.py`: import + `add_consult_routes(conn)` as
+  the last call of `_add_additive_migrations`.
+- `src/pathly_orchestrator/db/queries/consult_routes.py` (new, 332 lines): `CONSULT_ROLES`,
+  `STATUSES`, `END_STATUSES`, `Decision`, `consult_limits`, `asking_task`, `goal_key`,
+  `route_decision`, `record_route`, `set_route_status`, `hand_to_person`, `routes_for_questions`,
+  `pending_routes`, `goal_consult_cost`, `end_stale_routes`. Imports only `db/` modules.
+- `tests/comms_board/test_consult_routes.py` (new, 35 tests).
+- `src/pathly_orchestrator/CLAUDE.md`: package tree entries for both files and a "Consult routes"
+  section (after "A task waits on its question") with the rules and the two settings.
+- `tests/INDEX.md`, `tests/comms_board/INDEX.md`: regenerated with `scripts/gen_test_index.py`.
+
+**Proof**
+
+- `python -m pytest tests/comms_board/test_consult_routes.py -q -p no:cacheprovider`: `35 passed`,
+  exit 0. Before the code it failed at collection with
+  `ModuleNotFoundError: No module named 'pathly_orchestrator.db.migrations_consult'`. Covers every
+  `none` case (missing / non-question / deleted row, no author run, `human`, `*`, ` Human `, a
+  `consult-` author, already routed), `person` for `unknown role wizard`, the per-task limit with
+  three routed rows and one `to_person` row (fourth question: `routed question limit (3) reached
+  for task <id>`; with two counted + one `to_person` it routes), the limit for a taskless run,
+  `goal_cost_usd` 0 (`consult cost line $0.00 reached for goal-1`) and a goal over its line
+  ($2.25 of consult invocations: `$2.00`), `route` with role/task/goal, `sched-T#2` and a single
+  run's newest claim finding their task, `record_route` twice inserting once, `hand_to_person`
+  keeping the id with `to_agent` `human`, one system `status` reply, the parked task still
+  `blocked` on `waiting_for_answer:<id>`, `end_stale_routes` handing `queued` and `running` to the
+  person and leaving `answered` alone, and bad settings (`abc`/`x`, `-1`/`-0.5`, empty, `2.5`/`nan`)
+  giving `(3, 2.0)`.
+- `python -m pytest tests/db tests/comms_board -q -p no:cacheprovider`: `1685 passed, 2 skipped`,
+  exit 0.
+- Lint (commands.md) exit 0: black unchanged, mypy no issues, file size "none new, none grown",
+  mirror reads OK, test indexes up to date, lint-imports 1 kept 0 broken, bandit no findings in the
+  new files (only the existing `nosec` warnings), adapters and entry points OK. Smoke exit 0.
+
+**Decisions**
+
+- "Live question row" = `type='question' AND deleted_at IS NULL`, as `task_waits` reads "live";
+  an already-answered question is not excluded (not in the rules).
+- Role matching trims and lower-cases `to_agent` (as `open_questions_by_run` does); the decision's
+  `role` is that normalised value.
+- The per-task count uses `task_id` when there is a task, else `task_id IS NULL AND
+  asking_run_id=?`; the limit reason names the task id, or the run id when there is none.
+- `$<x>` in the cost reason is the line, two decimals (`$2.00`).
+- `consult.max_per_task` 0 is accepted (routes nothing per task); only missing, non-numeric
+  (including `2.5`, as `int()` reads it) or negative values fall back. A non-finite cost (`nan`,
+  `inf`) falls back too.
+- `record_route` and `set_route_status` raise `ValueError` on an unknown status. `record_route`
+  stores the decision's `reason` (empty -> NULL) and sets `ended_at` when inserted with an end
+  status. `set_route_status` keeps the existing `consult_run_id`/`reason` when given None.
+- `hand_to_person` returns False when the question row does not exist; it fills role, task, goal
+  key and asking run from the question when it inserts a route. The status reply has `from_agent`
+  `system`, `to_agent` `*`, board and scope of the question. `end_stale_routes` uses
+  `by="the server"`; a route whose question row is gone is still set `to_person`.
+- `IN (SELECT value FROM json_each(?))` keeps the id-list queries one literal (no f-string SQL).
+
+**Shortcuts taken**
+
+- `asking_task` and `goal_key` are re-read in `hand_to_person` for an insert rather than passed in;
+  fine at board sizes.
+
+**For later tickets**
+
+- 04: call `route_decision` then `record_route(conn, decision, qid)` for `route`, and
+  `hand_to_person(conn, qid, decision.reason, by=...)` for `person`; `end_stale_routes(conn)` at
+  start returns the handed ids.
+- 02: `set_route_status(conn, qid, "running", consult_run_id=...)` then an end status; consult run
+  ids must start with `consult-` so `route_decision` never routes a consult's own question.
+- 02, 16: `goal_consult_cost` counts only invocations whose `run_id` is some route's
+  `consult_run_id`, so store the consult run id on the route (`set_route_status(...,
+  consult_run_id=...)`) when the run starts, or its cost never reaches the goal's line.
+
