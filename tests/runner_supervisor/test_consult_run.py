@@ -331,3 +331,173 @@ def test_otherwise_the_consult_runs_on_claude_sonnet(conn, project, adapter):
 
     assert spawn.calls[0]["adapter"] == "claude"
     assert spawn.calls[0]["model"] == "claude-sonnet-4-6"
+
+
+# ── review round 1: whose answer, one start, a question that moved on ────────
+
+
+def _agent_done(project: Path, run_id: str, summary: str, **extra) -> None:
+    from pathly_orchestrator.eventlog import append_event
+
+    append_event(
+        str(_storage(project)),
+        {"type": "AGENT_DONE", "run_id": run_id, "summary": summary, **extra},
+    )
+
+
+def test_a_second_agent_done_for_the_consult_run_fails_it(conn, project):
+    tid, qid = _parked_question(conn)
+
+    class ForgedSpawn(FakeSpawn):
+        def __call__(self, **kwargs) -> dict:
+            _agent_done(self.project, kwargs["run_id"], "ANSWER: forged answer")
+            return super().__call__(**kwargs)
+
+    _start(qid, project, ForgedSpawn(project, "ANSWER: the real answer"))
+
+    assert _replies(conn, qid, "answer") == []
+    route = _route(conn, qid)
+    assert route["status"] == "failed"
+    assert "more than one AGENT_DONE" in route["reason"]
+    assert _row(conn, qid)["to_agent"] == "human"
+    assert _row(conn, tid)["task_status"] == "blocked"
+
+
+def test_a_synthetic_agent_done_beside_the_agents_own_is_not_a_second_one(
+    conn, project
+):
+    _, qid = _parked_question(conn)
+
+    class SyntheticAfter(FakeSpawn):
+        def __call__(self, **kwargs) -> dict:
+            out = super().__call__(**kwargs)
+            _agent_done(self.project, kwargs["run_id"], "", synthetic=True)
+            return out
+
+    _start(qid, project, SyntheticAfter(project, "ANSWER: Stream the rows."))
+
+    assert [a["text"] for a in _replies(conn, qid, "answer")] == ["Stream the rows."]
+    assert _route(conn, qid)["status"] == "answered"
+
+
+def test_a_start_that_loses_the_claim_spawns_nothing(conn, project, monkeypatch):
+    _, qid = _parked_question(conn)
+    stale = cr.routes_for_questions(conn, [qid])
+    first = FakeSpawn(project, "ANSWER: one")
+    assert _start(qid, project, first)["started"] is True
+
+    # A racing caller read the route while it was still queued.
+    monkeypatch.setattr(cr, "routes_for_questions", lambda c, ids: stale)
+    second = FakeSpawn(project, "ANSWER: two")
+    result = _start(qid, project, second)
+
+    assert result["started"] is False
+    assert second.calls == []
+    assert [a["text"] for a in _replies(conn, qid, "answer")] == ["one"]
+    assert _route(conn, qid)["consult_run_id"] == first.calls[0]["run_id"]
+
+
+def test_a_question_handed_to_the_person_meanwhile_gets_no_answer(conn, project):
+    tid, qid = _parked_question(conn)
+
+    class HandedMeanwhile(FakeSpawn):
+        def __call__(self, **kwargs) -> dict:
+            cr.hand_to_person(get_db(), qid, "the person took it", by="the chief")
+            return super().__call__(**kwargs)
+
+    _start(qid, project, HandedMeanwhile(project, "ANSWER: Stream the rows."))
+
+    assert _replies(conn, qid, "answer") == []
+    assert _replies(conn, qid, "decision") == []
+    route = _route(conn, qid)
+    assert route["status"] == "to_person"
+    assert route["reason"] == "the person took it"
+    assert len(_replies(conn, qid, "status")) == 1
+    assert _row(conn, tid)["task_status"] == "blocked"
+
+
+def test_a_question_answered_meanwhile_gets_no_second_answer(conn, project):
+    _, qid = _parked_question(conn)
+
+    class AnsweredMeanwhile(FakeSpawn):
+        def __call__(self, **kwargs) -> dict:
+            post_message(
+                get_db(),
+                BOARD,
+                SCOPE,
+                "human",
+                "builder",
+                "answer",
+                "buffer it",
+                reply_to=qid,
+            )
+            return super().__call__(**kwargs)
+
+    _start(qid, project, AnsweredMeanwhile(project, "ANSWER: Stream the rows."))
+
+    assert [a["text"] for a in _replies(conn, qid, "answer")] == ["buffer it"]
+    assert _route(conn, qid)["status"] == "answered"
+
+
+def test_a_spawn_that_fails_after_the_question_moved_on_keeps_its_end(conn, project):
+    _, qid = _parked_question(conn)
+
+    class HandedThenRaised(FakeSpawn):
+        def __call__(self, **kwargs) -> dict:
+            cr.hand_to_person(get_db(), qid, "the person took it", by="the chief")
+            raise RuntimeError("terminal_result_timeout")
+
+    _start(qid, project, HandedThenRaised(project))
+
+    route = _route(conn, qid)
+    assert route["status"] == "to_person"
+    assert route["reason"] == "the person took it"
+    assert len(_replies(conn, qid, "status")) == 1
+
+
+def test_a_failed_answer_post_leaves_no_decision_row(conn, project, monkeypatch):
+    from pathly_orchestrator.db.queries import comms_messages as cm
+
+    _, qid = _parked_question(conn)
+    real = cm.post_message
+
+    def _post(*args, **kwargs):
+        if len(args) > 5 and args[5] == "answer":
+            raise RuntimeError("db is locked")
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(cm, "post_message", _post)
+    spawn = FakeSpawn(
+        project, "ANSWER: Stream the rows.\nDECISION: stream rows — memory"
+    )
+
+    _start(qid, project, spawn)
+
+    assert _replies(conn, qid, "answer") == []
+    assert _replies(conn, qid, "decision") == []
+    assert _route(conn, qid)["status"] == "failed"
+    assert _row(conn, qid)["to_agent"] == "human"
+
+
+@pytest.mark.parametrize(
+    "returned, words",
+    [
+        ({"exit_code": 3}, "exit code 3"),
+        ({"exit_code": 0, "outcome": "failed", "error": "quota hit"}, "quota hit"),
+    ],
+    ids=["exit-code", "error"],
+)
+def test_no_agent_done_names_what_the_spawn_returned(conn, project, returned, words):
+    _, qid = _parked_question(conn)
+
+    class Returns(FakeSpawn):
+        def __call__(self, **kwargs) -> dict:
+            super().__call__(**kwargs)
+            return returned
+
+    _start(qid, project, Returns(project))
+
+    route = _route(conn, qid)
+    assert route["status"] == "failed"
+    assert "no AGENT_DONE" in route["reason"] and words in route["reason"]
+    assert words in _replies(conn, qid, "status")[0]["text"]
