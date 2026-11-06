@@ -1,7 +1,7 @@
 # Start a consult run for a routed question and post its answer
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 01
 Test first: yes
 Level: 3
@@ -109,3 +109,105 @@ exit 0
 - round one learnings (05): driving a whole board spawn in a test
 
 ## Answer
+
+Work started at `8ce520a67eff69d2573c166a11fa15a5ade268a5` (restart after Touches gained
+`tests/comms_board/INDEX.md`). Test-only commit `99c421b`: attempt 2's `eaaa878` cherry-picked
+unchanged (attempt 1's `af46ab3` plus the `consult_stamp` tests in
+`tests/comms_board/test_comms_provenance.py`); the code commit is attempt 2's `7a12cd5`.
+Re-confirmed at `99c421b`: at that commit
+`test_consult_run.py` fails at collection (`ImportError: cannot import name 'consult_run'`) and
+the provenance file fails 7 tests (`cannot import name 'consult_stamp'`, and the new "only in
+consult_run.py" scan finds no caller), 99 passing.
+
+**Built**
+
+- `src/pathly_orchestrator/supervisor/consult_run.py` (new, 357 lines), from attempt 1's
+  `c9365f0`: `start_consult`, `parse_summary`, `consult_engine`, `build_prompt`, `_default_spawn`,
+  `_measured_ok` (returns True), `_agent_done`, `_deliver`, `_fail`. Lazy imports only. Changed
+  from attempt 1: `_deliver._post` stamps both rows with `**consult_stamp(role, run_id)` instead of
+  three `author_*` keywords.
+- `src/pathly_orchestrator/runner/provenance.py`: `consult_stamp(role, run_id) -> dict` beside
+  `system_stamp` (role, run, `SOURCE_TOKEN`; `ValueError` unless the run id starts with
+  `CONSULT_RUN_PREFIX` and the role is in `CONSULT_ROLES`, both imported lazily from
+  `db/queries/consult_routes`); module docstring names it.
+- `tests/comms_board/test_comms_provenance.py`: `_is_stamp_expr` accepts `consult_stamp` with
+  exactly two positional (non-starred) arguments and no keywords; new
+  `test_consult_stamp_is_called_only_where_the_consult_run_is_started` (every `.py` under the
+  package; the set of calling files must be exactly `supervisor/consult_run.py`); five negative
+  call-scan cases (one arg, three args, a keyword, `*args`, an extra `author_role=`) and one
+  positive; `consult_stamp` unit tests (the dict; `ValueError` for `sched-T1#1`, `""`, `builder`,
+  `human`, `""` role). `_UNSTAMPED_ALLOW` unchanged.
+- `src/pathly_data/core/skills/planning/consult-answer.md` (new, runner-only, empty front matter,
+  no `/comms` calls) and its `composition.yaml` entry (`code-query`, `comms-post`,
+  `completion-report`).
+- `tests/runner_supervisor/test_consult_run.py` (new, 10 functions / 13 cases).
+- `src/pathly_orchestrator/CLAUDE.md`: file-list entry, a "Consult runs" section (summary format,
+  delivery, engine), and `consult_stamp` in the author-provenance paragraph.
+  `src/pathly_data/CLAUDE.md`: planning tree line, the manifest list, a runner-only note.
+- `tests/INDEX.md`, `tests/runner_supervisor/INDEX.md`, `tests/comms_board/INDEX.md`: regenerated
+  (the test count of `test_comms_provenance.py` changed, 58 -> 61). The changed-file set is
+  exactly Touches plus this ticket, `map.md` and `learnings.md`.
+
+**Proof**
+
+- `python -m pytest tests/runner_supervisor/test_consult_run.py -q -p no:cacheprovider`:
+  `13 passed`, exit 0. Covers: an `ANSWER:` summary posts one answer row (from architect, to
+  builder, `reply_to` the question, `author_run_id` the `consult-` + 12 hex run, source `token`),
+  the parked task goes `pending`, route `answered` with its `consult_run_id`; an architect
+  `DECISION:` adds one decision row, binding 0, same stamp; a tester's adds none; `ANSWER: USER
+  <why>` sets `to_agent` `human`, posts one status with the reason, no answer, task still
+  `blocked` (and "no reason given" without a why); no `ANSWER:` line, no AGENT_DONE and a raising
+  spawn each hand to the person with route `failed`; the prompt holds the question id and text,
+  the task text, `<storage>/feedback`, no `<run_category>`, does not start with `---`.
+- Same file, engine: codex asking run -> adapter `codex`, model `gpt-5-codex` (configured) or
+  `""` (none); no `run_history` row and `copilot` -> `claude` + `claude-sonnet-4-6`.
+- `python -m pytest tests/runner_supervisor tests/install_skills tests/consistency -q -p no:cacheprovider`:
+  `893 passed, 2 skipped`, exit 0.
+- `python -m pytest tests/comms_board/test_comms_provenance.py -q -p no:cacheprovider` (with the
+  consult tests): `106 passed`, exit 0.
+- Quick (commands.md), fresh at this restart: `5879 passed, 11 skipped`, exit 0. Lint chain exit 0 (black, mypy no issues, file size
+  "none new, none grown", mirror reads OK, indexes up to date, lint-imports 1 kept 0 broken,
+  bandit no findings, adapters + entry points OK). Smoke exit 0. Build exit 0 (wheel built, web
+  typecheck clean).
+
+**Decisions**
+
+- Architect ruling (Consulted, recorded on `backup-02-attempt1`): the answer and decision rows are
+  stamped by a named server stamp `runner/provenance.consult_stamp(role, run_id)` with
+  `author_source=token`, not `system_stamp()` (it would set `author_run_id` None and lose the
+  role as author) and not the token path (needs ticket 16, conflicts with ticket 17). The scan's
+  `_is_stamp_expr` stays file-blind; a separate test pins the only caller to
+  `supervisor/consult_run.py`; negative cases for a wrong arg count or keyword; `_UNSTAMPED_ALLOW`
+  unchanged.
+- `consult_stamp` also rejects `*args` in the scan (a starred argument could hide the count).
+- Everything else as attempt 1 decided: only a `queued` route starts (else `{"started": False,
+  "reason"}`); `spawn_fn` keywords `board, scope, prompt, run_id, project_root, model, adapter,
+  agent, broadcast_fn`; the asking task is the route's `task_id` row, else `asking_task`; the
+  AGENT_DONE is the newest one whose `run_id` is the consult run (one literal query); the first
+  `ANSWER:` line, `USER` as the whole first word; empty answer = no answer; decision row first,
+  then the answer, then route `answered`; on failure `set_route_status(failed)` then
+  `hand_to_person(..., by="the server")`; `ANSWER: USER` uses `by=<role>`; placeholders are filled
+  in the skill body only, never in board text.
+
+**Shortcuts taken**
+
+- The `queued` check and the switch to `running` are two statements; two concurrent
+  `start_consult` calls for one question could both start. Ticket 04 is the only caller (once per
+  recorded route). A conditional `UPDATE ... WHERE status='queued'` would make it exact.
+- `_measured_ok` returning False only returns `withheld` (ticket 03 owns that branch).
+
+**For later tickets**
+
+- 03: `_measured_ok(question_id, run_id, *, role, project_root)` runs after parsing, before
+  `_deliver`, in `_run_consult`; open the measuring window before `spawn_fn` there; the
+  `withheld` branch needs its own route status and hand-off.
+- 04: call `start_consult(qid, project_root=..., broadcast_fn=...)` after `record_route` returned
+  True; the route must be `queued`.
+- 11 (edits `test_comms_provenance.py` too): this ticket changed only `_is_stamp_expr`, the
+  call-scan parametrize lists, and added the `consult_stamp` tests after the accept-list test and
+  one scan test before `test_every_post_message_call_is_stamped_or_on_the_allow_list`. Any new
+  caller of `consult_stamp` must be added to `_CONSULT_STAMP_FILES` (a reviewed guard change).
+- 16: TERMINAL_SPAWN `category` is still `flow` for `flow="consult"`; the synthetic AGENT_DONE
+  says `single`.
+- 12/person: a real agent may put `DECISION:` on the same line as `ANSWER:` inside the
+  completion-report string; it is then part of the answer text, not a decision row.

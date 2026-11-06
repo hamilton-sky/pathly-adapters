@@ -77,6 +77,7 @@ The router, delivery, caps and lint are decided by the codebase.
   (the brief's Decided line, 2026-11-06; spec Decisions).
 - 01 — `consult_routes` table + `db/queries/consult_routes.py`: `route_decision` (none/person/route with reasons), caps from `consult.max_per_task`/`consult.goal_cost_usd`, `hand_to_person` re-addresses the same row to `human` with a system status reply.
 - 01 (rework) — the per-task cap is recounted inside `record_route`'s insert (False over the cap); the cost line is soft; agent-written `to_agent` is echoed only as one line of at most 40 chars; `hand_to_person` skips deleted questions and keeps an ended route's status.
+- 02 — `supervisor/consult_run.start_consult` spawns a `consult-<12hex>` headless run (`planning/consult-answer`, flow `consult`, asking run's headless adapter else claude-sonnet-4-6), reads its AGENT_DONE by run id and posts `ANSWER:` stamped `**runner.provenance.consult_stamp(role, run_id)` (token, the role, the consult run; callable only from `consult_run.py`) (+ architect/po/designer `DECISION:` row), `ANSWER: USER`/no answer → `hand_to_person` (no answer: route `failed`).
 
 Outside facts relied on (tickets 13 to 15, 18):
 
