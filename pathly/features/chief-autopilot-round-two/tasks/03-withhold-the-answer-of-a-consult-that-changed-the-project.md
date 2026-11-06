@@ -1,7 +1,7 @@
 # Withhold the answer of a consult that changed the project
 
 Type: task
-Status: resolved
+Status: open
 Blocked by: 02
 Test first: yes
 Level: 3
@@ -205,5 +205,28 @@ QUALITY
 4. minor tests/runner_supervisor/test_consult_read_only.py (test_a_consult_that_writes_only_its_feedback_folder_is_delivered): the feedback folder sits under pathly/, so the test passes even with the feedback rule deleted. It cannot fail for the rule it names. - Once item 3 is narrowed, this test discriminates. Until then, note in the test that it covers both rules.
 5. minor src/pathly_orchestrator/supervisor/consult_window.py (blamed/noted): blamed returns None both outside a repo top and when snapshot, head or changes_or_none fails or raises inside a repo. noted then always posts "<project> is not a git repository top", which is wrong in the second case. - Word the status as "answer not measured: git could not snapshot <project>", or carry the reason on the window.
 6. minor src/pathly_orchestrator/supervisor/consult_window.py: a two-way lazy import (consult_window imports consult_run._move/_status, and consult_run imports consult_window), plus private helpers taken from three other modules (task_proof._declared, provenance._is_own_storage, fsm_ops._resolve_storage_path). Rule #5 says shared helpers belong in a shared helper module. - Move _move/_status into the consult_routes query module or a supervisor _helpers, and give _declared/_is_own_storage public names.
+
+REVIEW: FAIL
+
+## Review findings (round 2, quality review)
+
+Scope of this pass: quality round 2 of ticket 03. Ticket read cut at ## Answer, plus its "## Review findings (round 1, quality review)" section; the Answer was not read, so any reasons the author gave for declining round 1 items are not known to me. Code reviewed as `git diff f71e7ab HEAD`, and the round 2 fixes as `git diff e612cfb HEAD` (commits abe3d5f and 7c382c9). 7c382c9 is HEAD and the newest commit touching the ticket, so no later commits were left out. Status in the ticket hunk: open -> resolved. Re-ran: test_consult_read_only.py (18 passed), tests/runner_supervisor (410 passed), gen_test_index.py --check (up to date), check_file_size.py (OK). No files left behind, working tree clean.
+
+Round 1 findings:
+- 1 (major, in_progress files from every project): fixed. `_in_progress_files(root)` keeps only the project board (scope == normalized root) and feature boards whose `pathly/features/<scope>/` exists under the root. Tests for another project's feature board and project board (both withheld) and for this project's board (exempt) are added and can fail.
+- 2 (major, a failed consult was never measured): fixed. `open_window` now runs outside the try, and `blamed` runs right after the spawn returns or raises, before `_agent_done`/`parse_summary`. Findings withhold whatever the summary says. There are parametrized tests for "no ANSWER line" and "spawn raised".
+- 3 (minor, all of pathly/ is exempt): not changed. It is still minor.
+- 4 (minor, the feedback test cannot fail): handled the way round 1 offered, with a docstring saying the test covers both rules.
+- 5 (minor, wrong "not a git repository top" wording): fixed with `_why_unmeasured`, and a test is added.
+- 6 (minor, circular lazy import and private helpers): not changed, and now extended (`tree._is_top`). It is still minor.
+
+Level 3 probe: I probed the inputs the consult controls (the board rows and task claims it can make over HTTP, the files it edits, its commits, when it writes AGENT_DONE, whether the spawn returns or raises) and the task rows' `board`/`scope`/`files` read for exemptions.
+
+QUALITY
+1. major src/pathly_orchestrator/supervisor/consult_window.py (blamed re-reading _in_progress_files at window end): the consult can exempt its own edits. It runs headless with permissions skipped and can call the server. `/comms/tasks/claim` accepts an anonymous caller with any body `run_id` (tasks_claim.py), and nothing stops a run posting a `type=task` row. So a consult can post (or claim an existing pending) task on its own project or feature board that declares `app.py`, claim it to `in_progress`, and edit `app.py`. The end re-read then adds `app.py` to `window.declared` and the answer is delivered unblamed. Round 2 narrowed the boards, but the question's own board always passes that filter. - At the end, exempt only files of tasks that were already `in_progress` when the window opened, plus tasks claimed during the window by a run other than this consult (`claimed_by` is not this `run_id` and the task row was posted before the window). Anything else counts against the consult, which keeps the fail-safe direction. Add a test where the fake spawn posts and claims a task declaring app.py and then edits it: the answer must still be withheld. If the spec's "re-read at its end" is meant to allow this, that is a question for the architect, not something to leave silent.
+2. major src/pathly_orchestrator/supervisor/consult_run.py (_run_consult -> _default_spawn -> terminal._run_stage_via_terminal): the measurement is taken when the spawn returns, but that is not when the consult stops. `PATHLY_RUNNER_EARLY_ADVANCE` defaults to on (feature_flags.py), and then the spawn returns as soon as an AGENT_DONE appears, while the PTY keeps running. On the 1800 s result timeout it raises without killing the process. So a consult that writes its AGENT_DONE first and then edits or commits (or keeps running past the timeout) is measured clean and its answer is delivered. Round 2's "measure right after the spawn" fix also depends on this. - Have the consult spawn wait for the PTY to exit before `blamed` (early advance off for flow `consult`, or wait on the PTY result after an early AGENT_DONE). When the spawn timed out, or the process could not be confirmed stopped, treat the window as unmeasurable and do not deliver silently. Add a test whose fake spawn edits app.py after writing AGENT_DONE, if the seam allows it.
+3. minor src/pathly_orchestrator/supervisor/consult_window.py (_on_project_board): the docstring says feature boards are matched "the way board_mirror.export_project_boards matches them", but there is no `is_segment` or reserved-name check (board_mirror_path refuses those). A task row whose feature scope is `../..` or an absolute path makes `Path(norm)/"pathly"/"features"/scope` name any existing folder, so another project's task counts as this project's. - Reuse `board_mirror.board_mirror_path` (None means not this project), or check `is_segment(scope)` first.
+4. minor src/pathly_orchestrator/supervisor/consult_run.py: now exactly 400 lines. Ticket 04 (which wires `start_consult`) cannot add a line without splitting first. - Move the delivery helpers (`_deliver`/`_post`/`_fail`) out now, together with round 1 item 6 (`_move`/`_status` into a shared helper, and public names for `_declared`, `_is_own_storage` and now `tree._is_top`).
+5. minor src/pathly_orchestrator/supervisor/consult_window.py (_may_write): round 1 item 3 still stands. The whole of `pathly/` is exempt, so a consult that rewrites IMPLEMENTATION_PLAN.md or ticket text goes unreported, and the feedback/ rule is dead code while storage is under pathly/. - Narrow the rule as round 1 said, or record it in followups.md.
 
 REVIEW: FAIL
