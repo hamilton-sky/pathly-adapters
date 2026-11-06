@@ -336,17 +336,65 @@ def test_a_change_inside_an_in_progress_tasks_files_is_left_out(conn, repo, when
     tid, qid = _parked_question(conn)
     if when == "at-start":
         _in_progress_task(conn, ["app.py"])
+    else:  # posted before the window, claimed during it by another run
+        pending = post_message(
+            conn, BOARD, SCOPE, "planner", type="task", text="Junk.", files=["junk/"]
+        )
 
     def builder_edits(project: Path) -> None:
         if when == "at-start":
             _edit_app(project)
-        else:  # a builder claims a task declaring a folder and writes inside it
-            _in_progress_task(get_db(), ["junk/"])
+        else:  # a builder claims the task declaring a folder and writes inside it
+            assert claim_task(get_db(), pending, f"sched-{pending}#1")
             _write(project, "junk/new.py", "x = 1\n")
 
     _start(qid, repo, EditingSpawn(repo, builder_edits))
 
     _assert_delivered(conn, qid, tid)
+
+
+@pytest.mark.parametrize("claimer", ["the-consult", "another-run"])
+def test_a_consult_cannot_exempt_its_own_edit_with_a_task_it_posts(conn, repo, claimer):
+    """A task posted during the window (by the consult) and claimed, whoever the claim names,
+    does not exempt its files: the consult could post and claim one itself."""
+    tid, qid = _parked_question(conn)
+    spawn = EditingSpawn(repo)
+
+    def post_claim_and_edit(project: Path) -> None:
+        db = get_db()
+        own = post_message(
+            db, BOARD, SCOPE, "architect", type="task", text="Mine.", files=["app.py"]
+        )
+        run_id = spawn.calls[-1]["run_id"] if claimer == "the-consult" else "sched-x#1"
+        assert claim_task(db, own, run_id)
+        _edit_app(project)
+
+    spawn.edit = post_claim_and_edit
+    _start(qid, repo, spawn)
+
+    assert _replies(conn, qid, "answer") == []
+    route = _route(conn, qid)
+    assert route["status"] == "withheld"
+    assert "app.py" in route["reason"]
+    assert _row(conn, tid)["task_status"] == "blocked"
+
+
+def test_a_pending_task_the_consult_claims_does_not_exempt_its_files(conn, repo):
+    """A task posted before the window but claimed during it by the consult itself."""
+    tid, qid = _parked_question(conn)
+    pending = post_message(
+        conn, BOARD, SCOPE, "planner", type="task", text="Old.", files=["app.py"]
+    )
+    spawn = EditingSpawn(repo)
+
+    def claim_and_edit(project: Path) -> None:
+        assert claim_task(get_db(), pending, spawn.calls[-1]["run_id"])
+        _edit_app(project)
+
+    spawn.edit = claim_and_edit
+    _start(qid, repo, spawn)
+
+    assert _route(conn, qid)["status"] == "withheld"
 
 
 def test_a_change_outside_the_in_progress_files_is_still_blamed(conn, repo):
@@ -391,3 +439,104 @@ def test_blamed_without_a_window_cannot_measure():
 
 def test_open_window_outside_a_repo_is_none(plain):
     assert consult_window.open_window(str(plain)) is None
+
+
+# ── measured only once the consult's process stopped ────────────────────────
+
+
+class EarlyAdvanceTerminal:
+    """Stands in for ``terminal._run_stage_via_terminal`` with early advance on: it writes the
+    consult's AGENT_DONE and returns while the PTY still runs. ``after`` runs on a thread once it
+    returned (the consult keeps working), then the PTY reports its exit, unless ``exits`` is
+    False (the process is never confirmed stopped)."""
+
+    def __init__(self, project: Path, after=None, *, exits: bool = True):
+        self.project = project
+        self.after = after
+        self.exits = exits
+        self.threads: list = []
+
+    def __call__(self, state, prompt, adapter, model, run_id, broadcast_fn) -> dict:
+        import threading
+        import time
+
+        from pathly_orchestrator.eventlog import append_event
+        from pathly_orchestrator.supervisor.registry import create_run, drop_run
+
+        run = create_run(run_id)
+        append_event(
+            str(_storage(self.project)),
+            {
+                "type": "AGENT_DONE",
+                "agent": state.current_state,
+                "run_id": run_id,
+                "outcome": "success",
+                "error": "",
+                "summary": ANSWER,
+            },
+        )
+
+        def still_running() -> None:
+            time.sleep(0.3)
+            if self.after is not None:
+                self.after(self.project)
+            if self.exits:
+                run.mark_pty_result({"exit_code": 0, "result": {}})
+                drop_run(run_id)
+
+        t = threading.Thread(target=still_running, daemon=True)
+        t.start()
+        self.threads.append(t)
+        return {"result": ANSWER}
+
+
+def _start_default(qid: str, project: Path, terminal, monkeypatch) -> dict:
+    from pathly_orchestrator.supervisor import terminal as terminal_mod
+
+    monkeypatch.setattr(terminal_mod, "_run_stage_via_terminal", terminal)
+    try:
+        return _start(qid, project, None)
+    finally:
+        for t in terminal.threads:
+            t.join(timeout=5)
+
+
+def test_an_edit_after_an_early_agent_done_is_still_withheld(conn, repo, monkeypatch):
+    tid, qid = _parked_question(conn)
+
+    result = _start_default(
+        qid, repo, EarlyAdvanceTerminal(repo, _edit_app), monkeypatch
+    )
+
+    assert result["status"] == "withheld"
+    assert _replies(conn, qid, "answer") == []
+    assert "M app.py" in _replies(conn, qid, "escalation")[0]["text"]
+    assert _row(conn, tid)["task_status"] == "blocked"
+
+
+def test_a_consult_that_stops_cleanly_after_an_early_agent_done_is_delivered(
+    conn, repo, monkeypatch
+):
+    tid, qid = _parked_question(conn)
+
+    _start_default(qid, repo, EarlyAdvanceTerminal(repo), monkeypatch)
+
+    _assert_delivered(conn, qid, tid)
+
+
+def test_a_consult_whose_exit_is_not_confirmed_is_not_delivered(
+    conn, repo, monkeypatch
+):
+    tid, qid = _parked_question(conn)
+    monkeypatch.setattr(consult_window, "EXIT_WAIT", 0.5)
+
+    result = _start_default(
+        qid, repo, EarlyAdvanceTerminal(repo, exits=False), monkeypatch
+    )
+
+    assert result["status"] == "failed"
+    assert _replies(conn, qid, "answer") == []
+    route = _route(conn, qid)
+    assert "not confirmed stopped" in route["reason"]
+    assert _row(conn, qid)["to_agent"] == "human"
+    assert _row(conn, tid)["task_status"] == "blocked"
