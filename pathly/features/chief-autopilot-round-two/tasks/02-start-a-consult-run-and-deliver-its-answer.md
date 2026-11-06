@@ -5,7 +5,7 @@ Status: open
 Blocked by: 01
 Test first: yes
 Level: 3
-Touches: src/pathly_orchestrator/supervisor/consult_run.py (new), src/pathly_data/core/skills/planning/consult-answer.md (new), src/pathly_data/core/skills/composition.yaml, tests/runner_supervisor/test_consult_run.py (new), src/pathly_orchestrator/CLAUDE.md, src/pathly_data/CLAUDE.md, tests/INDEX.md, tests/runner_supervisor/INDEX.md, src/pathly_orchestrator/runner/provenance.py, tests/comms_board/test_comms_provenance.py
+Touches: src/pathly_orchestrator/supervisor/consult_run.py (new), src/pathly_data/core/skills/planning/consult-answer.md (new), src/pathly_data/core/skills/composition.yaml, tests/runner_supervisor/test_consult_run.py (new), src/pathly_orchestrator/CLAUDE.md, src/pathly_data/CLAUDE.md, tests/INDEX.md, tests/runner_supervisor/INDEX.md, src/pathly_orchestrator/runner/provenance.py, tests/comms_board/test_comms_provenance.py, tests/comms_board/INDEX.md
 
 The consult run itself: given a question that ticket 01's `route_decision` said to route, start a
 one-shot headless agent of the role, read its answer, and post it. Not through
