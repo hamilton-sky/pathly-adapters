@@ -9,6 +9,8 @@ reads the summary of that run's own ``AGENT_DONE`` and delivers it:
   ``DECISION: <approach> — <why>`` line from architect, po or designer adds a ``decision`` row
   (binding 0). Route ``answered``.
 - ``ANSWER: USER <why>``: the question goes to the person (``hand_to_person``).
+- a consult that changed the project (``consult_window``, ticket 03): no answer, route
+  ``withheld``, the question to the person and an escalation listing the changes.
 - anything else (no ``ANSWER:`` line, no ``AGENT_DONE`` or more than one, a spawn that raised or
   timed out): route ``failed`` and the question goes to the person.
 
@@ -245,13 +247,6 @@ def _spawn_said(returned) -> str:
     return f" ({r['error']})" if r.get("error") else ""
 
 
-def _measured_ok(
-    question_id: str, run_id: str, *, role: str, project_root: str
-) -> bool:
-    """Whether the consult may be delivered (ticket 03 measures what it changed)."""
-    return True
-
-
 def _fail(conn, question_id, role, run_id, reason, *, frm="running") -> str:
     """Route ``failed`` and the question to the person, unless the route moved on."""
     from ..db.queries.consult_routes import hand_to_person
@@ -321,10 +316,12 @@ def _run_consult(
 ) -> str:
     """Spawn the consult, read its summary and deliver it. Returns the route's end status."""
     from ..db.connection import get_db
+    from . import consult_window as cw
 
     conn = get_db()
     qid, role = question["id"], route["role"]
     try:
+        window = cw.open_window(project_root, scope=question["scope"])
         adapter, model = consult_engine(conn, question.get("author_run_id"), role)
         task = _task_of(conn, route, question)
         prompt = build_prompt(question, task, role, project_root, adapter)
@@ -348,10 +345,12 @@ def _run_consult(
     kind, text, decision = parse_summary(done.get("summary"))
     if kind == "none":
         return _fail(conn, qid, role, run_id, "no ANSWER: line in its summary")
-    if not _measured_ok(qid, run_id, role=role, project_root=project_root):
-        return "withheld"
+    findings = cw.blamed(window)
+    if findings:
+        return cw.withhold(conn, question, role, run_id, findings)
     try:
-        return _deliver(conn, question, role, run_id, kind, text, decision)
+        status = _deliver(conn, question, role, run_id, kind, text, decision)
+        return cw.noted(conn, question, run_id, findings, project_root, status)
     except Exception as exc:
         logger.warning("consult %s: delivering the answer failed: %s", run_id, exc)
         return _fail(conn, qid, role, run_id, f"delivery failed: {type(exc).__name__}")
