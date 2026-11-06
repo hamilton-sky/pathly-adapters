@@ -1,7 +1,7 @@
 # Record routed questions and decide who answers each one
 
 Type: task
-Status: resolved
+Status: open
 Blocked by: —
 Test first: yes
 Level: 3
@@ -176,3 +176,16 @@ Work started at `62b7d06d1675c75b331adff0c79bd487c0a1cff6`; test-only commit `20
   `consult_run_id`, so store the consult run id on the route (`set_route_status(...,
   consult_run_id=...)`) when the run starts, or its cost never reaches the goal's line.
 
+
+## Review findings (round 1, quality review)
+
+Reviewed 62b7d06..e587bb8. Both Done when commands pass (35 passed; tests/db tests/comms_board 1685 passed, 2 skipped).
+
+QUALITY
+1. major src/pathly_orchestrator/db/queries/consult_routes.py: a race lets a task go past the per-task cap. route_decision counts a task's routes with no lock held, and record_route then inserts with INSERT OR IGNORE on question_id alone, without counting again. Questions posted at the same moment from one run (each /comms/post is its own Flask thread) can all see count < max_per_task and all be recorded and routed. Fix: move the cap check into the write: inside _get_write_lock, count again before inserting, or INSERT ... SELECT ... WHERE (SELECT COUNT(*) ...) < ?; or one decide_and_record that holds the lock around both steps.
+2. major src/pathly_orchestrator/db/queries/consult_routes.py: an agent can put its own text into a row stamped as the system. to_agent has no length or character check (messages_write.py takes data.get("to") as is). It becomes the reason "unknown role <to>", and when ticket 04 passes that reason to hand_to_person it goes into a status reply stamped SYSTEM_AUTHOR. Fix: make the role one line and cap its length (e.g. first 40 chars, newlines removed, or repr) before it goes into a reason, or use a fixed reason that does not echo the input.
+3. minor consult_routes.py: hand_to_person reads the question without deleted_at IS NULL, so end_stale_routes can re-address a deleted question and post a status reply to it. Fix: filter deleted rows so a deleted question takes the set_route_status path.
+4. minor consult_routes.py: hand_to_person's upsert sets any existing route to to_person, even one already answered. Fix: add WHERE consult_routes.status IN ('queued','running') to the DO UPDATE.
+5. minor consult_routes.py: the cost line is checked only against costs already billed, so concurrent consults can start under it and end past consult.goal_cost_usd. The CLAUDE.md "Consult routes" paragraph should say the line is soft.
+
+REVIEW: FAIL
