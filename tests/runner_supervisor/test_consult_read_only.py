@@ -105,9 +105,11 @@ def _parked_question(conn, *, to: str = "architect"):
     return tid, qid
 
 
-def _in_progress_task(conn, files: list[str]) -> str:
+def _in_progress_task(
+    conn, files: list[str], *, board: str = BOARD, scope: str = SCOPE
+) -> str:
     tid = post_message(
-        conn, BOARD, SCOPE, "planner", type="task", text="Other work.", files=files
+        conn, board, scope, "planner", type="task", text="Other work.", files=files
     )
     assert claim_task(conn, tid, f"sched-{tid}#1")
     return tid
@@ -117,7 +119,7 @@ class EditingSpawn:
     """A spawn_fn that runs ``edit(project)`` (the consult's side effects), then writes the
     consult's own AGENT_DONE."""
 
-    def __init__(self, project: Path, edit=None, summary: str = ANSWER):
+    def __init__(self, project: Path, edit=None, summary: str | None = ANSWER):
         self.project = project
         self.edit = edit
         self.summary = summary
@@ -127,6 +129,8 @@ class EditingSpawn:
         self.calls.append(kwargs)
         if self.edit is not None:
             self.edit(self.project)
+        if self.summary is None:  # the consult crashed after its edits
+            raise RuntimeError("the consult crashed")
         from pathly_orchestrator.eventlog import append_event
 
         append_event(
@@ -258,10 +262,58 @@ def test_the_escalation_lists_at_most_twenty_findings(conn, repo):
     assert "- ... and 5 more" in text
 
 
+@pytest.mark.parametrize(
+    "summary", ["I changed app.py instead.", None], ids=["no-answer-line", "raised"]
+)
+def test_a_consult_that_edits_and_then_fails_is_still_withheld(conn, repo, summary):
+    tid, qid = _parked_question(conn)
+
+    result = _start(qid, repo, EditingSpawn(repo, _edit_app, summary=summary))
+
+    assert result["status"] == "withheld"
+    assert _replies(conn, qid, "answer") == []
+    assert _route(conn, qid)["status"] == "withheld"
+    assert _row(conn, qid)["to_agent"] == "human"
+    escalations = _replies(conn, qid, "escalation")
+    assert len(escalations) == 1
+    assert "M app.py" in escalations[0]["text"]
+    assert _row(conn, tid)["task_status"] == "blocked"
+
+
+@pytest.mark.parametrize("board", ["feature", "project"])
+def test_another_projects_in_progress_files_do_not_exempt_a_change(
+    conn, repo, tmp_path, board
+):
+    """A task on another project's board declaring ``app.py`` does not exempt this
+    project's ``app.py``: only the project board and its own feature boards count."""
+    _, qid = _parked_question(conn)
+    other = tmp_path / "other"
+    (other / "pathly" / "features" / "feat-elsewhere").mkdir(parents=True)
+    scope = "feat-elsewhere" if board == "feature" else str(other)
+    _in_progress_task(conn, ["app.py"], board=board, scope=scope)
+
+    _start(qid, repo, EditingSpawn(repo, _edit_app))
+
+    route = _route(conn, qid)
+    assert route["status"] == "withheld"
+    assert "app.py" in route["reason"]
+
+
+def test_an_in_progress_task_on_the_project_board_exempts_its_files(conn, repo):
+    tid, qid = _parked_question(conn)
+    _in_progress_task(conn, ["app.py"], board="project", scope=str(repo))
+
+    _start(qid, repo, EditingSpawn(repo, _edit_app))
+
+    _assert_delivered(conn, qid, tid)
+
+
 # ── delivered ────────────────────────────────────────────────────────────────
 
 
 def test_a_consult_that_writes_only_its_feedback_folder_is_delivered(conn, repo):
+    """The feedback folder sits under ``pathly/``, so this covers both the feedback rule
+    and the own-storage rule (``_is_own_storage``): either one alone lets it through."""
     tid, qid = _parked_question(conn)
     notes = _storage(repo).relative_to(repo) / "feedback" / "NOTES.md"
 
@@ -318,6 +370,19 @@ def test_outside_a_git_repo_the_answer_is_delivered_unmeasured(conn, plain):
         f"answer not measured: {plain} is not a git repository top"
     )
     assert statuses[0]["author_source"] == "system"
+
+
+def test_when_git_fails_inside_a_repo_the_status_says_so(conn, repo, monkeypatch):
+    tid, qid = _parked_question(conn)
+    monkeypatch.setattr(consult_window.tree, "snapshot", lambda root: None)
+
+    _start(qid, repo, EditingSpawn(repo, _edit_app))
+
+    _assert_delivered(conn, qid, tid)
+    statuses = [s for s in _replies(conn, qid, "status") if "not measured" in s["text"]]
+    assert [s["text"] for s in statuses] == [
+        f"answer not measured: git could not snapshot {repo}"
+    ]
 
 
 def test_blamed_without_a_window_cannot_measure():
