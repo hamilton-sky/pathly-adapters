@@ -1,7 +1,7 @@
 # Start a consult run for a routed question and post its answer
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 01
 Test first: yes
 Level: 3
@@ -119,6 +119,13 @@ Re-confirmed at `99c421b`: at that commit
 the provenance file fails 7 tests (`cannot import name 'consult_stamp'`, and the new "only in
 consult_run.py" scan finds no caller), 99 passing.
 
+Rework (review round 1, quality) started at `26f8a2e`. Test-only commit `557b30d`: 9 new cases in
+`test_consult_run.py`, all failing at that commit for the findings' reasons (an answer posted
+despite a second AGENT_DONE or a hand-off meanwhile, a second answer, the synthetic AGENT_DONE
+taken over the agent's, a lost claim still spawning, `failed` overwriting `to_person`, the reason
+lacking the spawn's exit code or error); 13 passed. One test bug fixed after that commit
+(`monkeypatch.undo()` before reading the route back; the assertion is unchanged).
+
 **Built**
 
 - `src/pathly_orchestrator/supervisor/consult_run.py` (new, 357 lines), from attempt 1's
@@ -148,7 +155,27 @@ consult_run.py" scan finds no caller), 99 passing.
   (the test count of `test_comms_provenance.py` changed, 58 -> 61). The changed-file set is
   exactly Touches plus this ticket, `map.md` and `learnings.md`.
 
-**Proof**
+- Rework: `consult_run.py` (398 lines): `_move` (compare-and-set route move keyed on the consult
+  run id; the claim and every end), `_status`, `_spawn_said`; `_agent_done` returns `(payload,
+  why)` and refuses two non-synthetic AGENT_DONEs; `_deliver` re-reads the route and drops the
+  result when it moved on, ends the route before posting, posts the answer before the decision;
+  `_fail` only acts when its own move wins. `test_consult_run.py` +9 cases (22).
+  `src/pathly_orchestrator/CLAUDE.md` "Consult runs" updated. `tests/runner_supervisor/INDEX.md`,
+  `tests/INDEX.md` regenerated.
+
+**Proof (rework, fresh at the rework commit)**
+
+- `python -m pytest tests/runner_supervisor/test_consult_run.py -q -p no:cacheprovider`:
+  `22 passed`, exit 0.
+- `python -m pytest tests/runner_supervisor tests/install_skills tests/consistency -q -p no:cacheprovider`:
+  `902 passed, 2 skipped`, exit 0.
+- `python -m pytest tests/comms_board/test_comms_provenance.py -q -p no:cacheprovider`:
+  `106 passed`, exit 0.
+- Lint chain exit 0: black clean, mypy "no issues found in 364 source files", file size "none new,
+  none grown", mirror reads OK, indexes up to date, lint-imports 1 kept 0 broken, bandit clean,
+  adapters OK, entry points OK.
+
+**Proof (round 0)**
 
 - `python -m pytest tests/runner_supervisor/test_consult_run.py -q -p no:cacheprovider`:
   `13 passed`, exit 0. Covers: an `ANSWER:` summary posts one answer row (from architect, to
@@ -191,10 +218,47 @@ consult_run.py" scan finds no caller), 99 passing.
 
 **Shortcuts taken**
 
-- The `queued` check and the switch to `running` are two statements; two concurrent
-  `start_consult` calls for one question could both start. Ticket 04 is the only caller (once per
-  recorded route). A conditional `UPDATE ... WHERE status='queued'` would make it exact.
+- (Rework) A forged `AGENT_DONE` for a consult whose own agent writes none is still read and
+  delivered: `/runner/event` takes any payload with no token, and completion-report's fallback
+  writes the DB directly. Closing it needs an `AGENT_DONE` bound to the consult's run token at
+  `/runner/event` (and `completion-report` sending the token), outside this ticket's Touches; an
+  architect call (see Review fixes 1).
+- `consult_run.py` is at 398 lines (limit 400): ticket 03 adds `_measured_ok`'s body, so 03 will
+  need to put its measuring code in its own module.
 - `_measured_ok` returning False only returns `withheld` (ticket 03 owns that branch).
+
+**Review fixes**
+
+1. Forged answer (major): partly fixed inside Touches. `_agent_done` now takes the consult's
+   AGENT_DONE only when the agent wrote exactly one (the supervisor's `synthetic: true` one is
+   used only when the agent wrote none); a second one fails the consult (`more than one AGENT_DONE
+   carries its run id`) and hands the question to the person. Tests:
+   `test_a_second_agent_done_for_the_consult_run_fails_it`,
+   `test_a_synthetic_agent_done_beside_the_agents_own_is_not_a_second_one`. Not closed: when the
+   real agent writes none, a forged one is still read. The returned result of
+   `_run_stage_via_terminal` is no independent source (on early advance it is itself read from the
+   newest DB AGENT_DONE of the storage; on PTY exit it is the CLI envelope, not the summary), and
+   binding AGENT_DONE to the run token needs `/runner/event` and `completion-report`, outside
+   Touches and against spec Decisions "Where the answer comes from" as written. Raised for the
+   architect (and tickets 16/17, which own the consult token's role and the 403).
+2. Check-then-set start (major): fixed. The claim is `UPDATE ... SET status='running',
+   consult_run_id=? WHERE question_id=? AND status='queued'`, rowcount checked; a lost claim
+   returns `{"started": False, "reason": "another start claimed the route"}` and spawns nothing.
+   Test: `test_a_start_that_loses_the_claim_spawns_nothing`.
+3. Moved-on question (minor): fixed. Every end is a compare-and-set from this run's `running`;
+   `_deliver` returns the current status without posting when the route is no longer `running`,
+   and when an answer already replies to the question it ends the route `answered` and posts
+   nothing; `_fail` hands nothing on when its move loses. Tests:
+   `test_a_question_handed_to_the_person_meanwhile_gets_no_answer`,
+   `test_a_question_answered_meanwhile_gets_no_second_answer`,
+   `test_a_spawn_that_fails_after_the_question_moved_on_keeps_its_end`.
+4. Orphan decision (minor): fixed. The answer is posted first; a failed answer post moves the route
+   `answered` -> `failed` and hands the question on, and no decision is posted; a failed decision
+   post after the answer only logs. Test: `test_a_failed_answer_post_leaves_no_decision_row`.
+5. Spawn result ignored (minor): fixed. With no AGENT_DONE the reason adds the returned non-zero
+   `exit_code` or `error` (`no AGENT_DONE (exit code 3)`). A non-zero exit already raised
+   `terminal_exit_nonzero` in `_run_stage_via_terminal`, which the reason names. Test:
+   `test_no_agent_done_names_what_the_spawn_returned`.
 
 **For later tickets**
 

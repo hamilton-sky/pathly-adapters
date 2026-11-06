@@ -2722,8 +2722,9 @@ status and reason; a deleted or missing question changes nothing and returns Fal
 
 `start_consult(question_id, *, project_root, broadcast_fn, spawn_fn=None, block=False)` starts
 the consult for a question whose route is `queued` (else `{"started": False, "reason"}`): run id
-`consult-` + 12 hex digits, route `running` with that `consult_run_id`, then (on a daemon thread
-unless `block`) one headless spawn of the route's role. It does not use `board_run.start_board_run`
+`consult-` + 12 hex digits, route `running` with that `consult_run_id` by compare-and-set
+(`UPDATE ... WHERE status='queued'`: a start that loses the claim returns `started` False and
+spawns nothing), then (on a daemon thread unless `block`) one headless spawn of the route's role. It does not use `board_run.start_board_run`
 (that takes the board lock the asking goal run already holds); `_default_spawn` builds the
 `RunnerState` as `board_run._default_spawn` does (`flow="consult"`, `current_state=<role>`,
 `board_scope`, `timeout=600`, executor-owned telemetry) and calls `_run_stage_via_terminal`.
@@ -2735,18 +2736,25 @@ unless `block`) one headless spawn of the route's role. It does not use `board_r
   in the skill body only), `## The question` (id, from, text), `## The asking task` (the route's
   task, else `asking_task` of the asking run), the feedback folder (`<board storage>/feedback/`)
   and `board_context_for(..., role=role)`.
-- Result: the newest `AGENT_DONE` whose `run_id` is the consult run (the synthetic one counts).
-  Its `summary` starts with `ANSWER: <text>` or `ANSWER: USER <why>`; architect, po or designer
+- Result: the one `AGENT_DONE` whose `run_id` is the consult run. The supervisor's synthetic one
+  (`synthetic: true`) counts only when the agent wrote none; two from the agent fail the consult
+  (`more than one AGENT_DONE carries its run id`: someone else wrote one too). This bounds a forged
+  answer but does not close it: `/runner/event` takes an `AGENT_DONE` from anyone, so one written
+  for a consult whose agent writes none is still read. Its `summary` starts with `ANSWER: <text>` or `ANSWER: USER <why>`; architect, po or designer
   may add a line `DECISION: <approach> — <why>`.
   - `ANSWER: <text>` → an `answer` row replying to the question, from the role to the question's
     `from_agent`, stamped `**runner.provenance.consult_stamp(role, run_id)` (`author_role=<role>`,
     `author_run_id=<consult run>`, `author_source=token`; its `release_on_answer` frees the
-    parked tasks), route `answered`; a
-    `DECISION:` line from architect, po or designer is posted first as a `decision` row (binding
-    0, `reply_to` the question, same stamp); from any other role it is ignored.
+    parked tasks), route `answered`; then a `DECISION:` line from architect, po or designer is
+    posted as a `decision` row (binding 0, `reply_to` the question, same stamp); from any other
+    role it is ignored. A failed answer post fails the route and posts no decision.
   - `ANSWER: USER <why>` → `hand_to_person(why or "no reason given", by=<role>)`.
-  - no `ANSWER:` line, no `AGENT_DONE`, a spawn that raised or timed out → route `failed`, then
+  - no `ANSWER:` line, no `AGENT_DONE` (the reason adds the spawn's returned exit code or
+    error), a spawn that raised or timed out → route `failed`, then
     `hand_to_person("the <role> consult did not answer: <reason>", by="the server")`.
+  - Every end is a compare-and-set from this consult's `running` route. A question handed to the
+    person while the consult ran keeps its route and gets nothing; one answered meanwhile gets no
+    second answer (route `answered`).
 - `_measured_ok(...)` is called right before delivery and returns True (ticket 03 measures the
   tree there). Nothing calls `start_consult` yet (ticket 04 does when a question is posted).
 

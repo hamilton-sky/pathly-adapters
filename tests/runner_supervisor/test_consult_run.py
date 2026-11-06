@@ -393,6 +393,7 @@ def test_a_start_that_loses_the_claim_spawns_nothing(conn, project, monkeypatch)
 
     assert result["started"] is False
     assert second.calls == []
+    monkeypatch.undo()
     assert [a["text"] for a in _replies(conn, qid, "answer")] == ["one"]
     assert _route(conn, qid)["consult_run_id"] == first.calls[0]["run_id"]
 
