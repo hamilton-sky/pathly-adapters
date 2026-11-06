@@ -1745,6 +1745,7 @@ pathly_orchestrator/
     run_budget.py          # refresh — raise a goal run's max_iterations from its DAG (see "Run guard rails")
     board_run.py           # start_board_run: board-lock + skill compose + async spawn helper; optional `run_id` (default a new uuid4)
     board_lock.py          # Per-board/scope advisory lock (acquire/release/holder)
+    consult_run.py         # start_consult(question_id, *, project_root, broadcast_fn, spawn_fn=None, block=False) (chief-autopilot-round-two 02): one headless `consult-<12 hex>` run of a queued route's role (planning/consult-answer), its AGENT_DONE summary delivered — see "Consult runs"; no board lock
     chief_tiers.py         # what a chief may do (chief-agent): ACTIONS, TIERS (status=read; planner=read,post,plan; operator=all seven), actions_for/normalise_tier, and resolve_preset_tier — a user prompt file chief/<preset> names its tier in leading front matter `tier:`, else the built-in names map to themselves, anything else (unknown tier, missing front matter, malformed name) is status. Code, never read from prompt text; strip_front_matter reuses skills/compose_base
     chief_presets.py       # the chief's prompt (chief-agent 17): the built-in styles STATUS / PLANNER / OPERATOR (BUILT_IN), default_style (user file chief/<preset> wins, else the built-in text), compose_prompt (style + the chief-connect fragment, read at call time, + ROOT_LINE with the stored project root)
     chief_session.py       # open_chief / close_chief (chief-agent): the chief is a long-lived interactive spawn, so it has its own open path instead of _run_stage_via_terminal (which blocks its caller and gives up after 30 minutes). open_chief validates (engine claude|codex, existing project_root, the style non-empty and at most 64 KiB, model not starting with `-`; `prompt` is optional for a preset that has a built-in text), raises ChiefAlreadyOpen(run_id, tab_id) for a project with an open chief, resolves the tier from the preset, writes ~/.pathly/chief/<run_id>/ (hook_secret, and for claude settings.json + an empty mcp.json; mode 0600), registers the chief_sessions row (secret sha256, the claude --session-id), mints a `chief` token on the project board, create_run(run_id), and sends one interactive TERMINAL_SPAWN (topic `chief:<run_id>`, submit false, the prompt from `chief_presets.compose_prompt`: style without front matter, then the `chief-connect` fragment, then the stored root); once the token is minted the session is read again, and a close that landed in between revokes the token, sends no spawn and raises ChiefClosedWhileOpening (POST /chief/open: 409; a close after that re-read cannot be shut out without a lock across the broadcast, it still revokes the token so the tab gets a dead one); a daemon watcher wakes on the first of the tab's `started` or its result (TerminalRun.wait_started_or_result) and closes the session as `never started` or `tab closed`. close_chief revokes the token, removes the folder and drops the run (False the second time). normalise_project_root (forward slashes, no trailing slash) keys a project's chief for open_chief and the routes; chief_startup_cleanup() closes every session still open at server start (reason `server restart`) and removes their folders; something_answers(host, port) is the TCP probe app.main() runs before it
@@ -2717,6 +2718,46 @@ status and reason; a deleted or missing question changes nothing and returns Fal
 `end_stale_routes` hands every `queued` or `running` route to the person with reason
 `server restart` (a route whose question is deleted or gone is only set `to_person`).
 
+## Consult runs (`supervisor/consult_run.py`, chief-autopilot-round-two 02)
+
+`start_consult(question_id, *, project_root, broadcast_fn, spawn_fn=None, block=False)` starts
+the consult for a question whose route is `queued` (else `{"started": False, "reason"}`): run id
+`consult-` + 12 hex digits, route `running` with that `consult_run_id` by compare-and-set
+(`UPDATE ... WHERE status='queued'`: a start that loses the claim returns `started` False and
+spawns nothing), then (on a daemon thread unless `block`) one headless spawn of the route's role. It does not use `board_run.start_board_run`
+(that takes the board lock the asking goal run already holds); `_default_spawn` builds the
+`RunnerState` as `board_run._default_spawn` does (`flow="consult"`, `current_state=<role>`,
+`board_scope`, `timeout=600`, executor-owned telemetry) and calls `_run_stage_via_terminal`.
+
+- Engine: `run_history.adapter` of the question's `author_run_id` when `adapters.headless_capable`,
+  else `claude`. Model: `spawn_policy.effective_model(role, adapter, "")`, else
+  `claude-sonnet-4-6` on claude and `""` (the engine's own default) elsewhere.
+- Prompt: the `planning/consult-answer` skill (placeholders filled with `run_category="consult"`,
+  in the skill body only), `## The question` (id, from, text), `## The asking task` (the route's
+  task, else `asking_task` of the asking run), the feedback folder (`<board storage>/feedback/`)
+  and `board_context_for(..., role=role)`.
+- Result: the one `AGENT_DONE` whose `run_id` is the consult run. The supervisor's synthetic one
+  (`synthetic: true`) counts only when the agent wrote none; two from the agent fail the consult
+  (`more than one AGENT_DONE carries its run id`: someone else wrote one too). This bounds a forged
+  answer but does not close it: `/runner/event` takes an `AGENT_DONE` from anyone, so one written
+  for a consult whose agent writes none is still read. Its `summary` starts with `ANSWER: <text>` or `ANSWER: USER <why>`; architect, po or designer
+  may add a line `DECISION: <approach> — <why>`.
+  - `ANSWER: <text>` → an `answer` row replying to the question, from the role to the question's
+    `from_agent`, stamped `**runner.provenance.consult_stamp(role, run_id)` (`author_role=<role>`,
+    `author_run_id=<consult run>`, `author_source=token`; its `release_on_answer` frees the
+    parked tasks), route `answered`; then a `DECISION:` line from architect, po or designer is
+    posted as a `decision` row (binding 0, `reply_to` the question, same stamp); from any other
+    role it is ignored. A failed answer post fails the route and posts no decision.
+  - `ANSWER: USER <why>` → `hand_to_person(why or "no reason given", by=<role>)`.
+  - no `ANSWER:` line, no `AGENT_DONE` (the reason adds the spawn's returned exit code or
+    error), a spawn that raised or timed out → route `failed`, then
+    `hand_to_person("the <role> consult did not answer: <reason>", by="the server")`.
+  - Every end is a compare-and-set from this consult's `running` route. A question handed to the
+    person while the consult ran keeps its route and gets nothing; one answered meanwhile gets no
+    second answer (route `answered`).
+- `_measured_ok(...)` is called right before delivery and returns True (ticket 03 measures the
+  tree there). Nothing calls `start_consult` yet (ticket 04 does when a question is posted).
+
 ## Task proof in the goal-loop drain (`supervisor/task_proof.py`, build-proof)
 
 A DAG task used to pass on its own `AGENT_DONE` outcome. `drain.drain_frontier` now builds its
@@ -3403,7 +3444,10 @@ carries no role, which is also logged as a warning naming the run: `token` with 
 pass every role wall). `system_stamp()` gives `system`/`system` for rows the server writes itself,
 and `post_system(conn, **fields)` is `post_message` with that stamp applied (the three size-frozen
 blueprints `comms/goals.py`, `project.py` and `settings.py` import it `as _post_message`, so their
-call sites need no stamp argument). The values (`AUTHOR_SOURCES`, the `system` constants) are
+call sites need no stamp argument). `consult_stamp(role, run_id)` gives `<role>`/`<run_id>`/`token`
+for a row the server posts on behalf of its own consult run (`supervisor/consult_run.py`, the only
+caller, which a provenance test checks); it raises `ValueError` unless the run id starts with
+`consult-` and the role is one of `consult_routes.CONSULT_ROLES`. The values (`AUTHOR_SOURCES`, the `system` constants) are
 defined once in `db/provenance_values.py`. `POST /comms/post` computes
 `stamp(caller_identity(request))` (`caller_identity` is in `http_server/`, so the identity is a
 parameter here), and the body's `from` / `run_id` are still stored in `from_agent` / `run_id` but

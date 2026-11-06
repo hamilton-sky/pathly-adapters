@@ -1,0 +1,398 @@
+"""A consult run: one headless agent of a role answers one routed question (round two, 02).
+
+``start_consult`` takes a question whose route (``db/queries/consult_routes``) is ``queued``,
+starts a ``consult-<12 hex>`` run of the route's role with the ``planning/consult-answer`` skill,
+reads the summary of that run's own ``AGENT_DONE`` and delivers it:
+
+- ``ANSWER: <text>``: an ``answer`` row replying to the question, from the role to the asker,
+  stamped with the consult run (``post_message`` frees the tasks parked on the question); a
+  ``DECISION: <approach> — <why>`` line from architect, po or designer adds a ``decision`` row
+  (binding 0). Route ``answered``.
+- ``ANSWER: USER <why>``: the question goes to the person (``hand_to_person``).
+- anything else (no ``ANSWER:`` line, no ``AGENT_DONE`` or more than one, a spawn that raised or
+  timed out): route ``failed`` and the question goes to the person.
+
+The route moves (``queued`` -> ``running`` -> an end) by compare-and-set on the consult's run id:
+two starts spawn once, and a question that moved on while the consult ran keeps its end.
+
+It does not go through ``board_run.start_board_run``: that takes the board lock the asking goal
+run already holds. The spawn is built here the way ``board_run._default_spawn`` builds one.
+The consult runs on the asking run's adapter when that adapter has a headless mode, else claude.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import re
+import secrets
+import threading
+from pathlib import Path
+
+logger = logging.getLogger("pathly.supervisor")
+
+SKILL = "planning/consult-answer"
+DEFAULT_ADAPTER = "claude"
+DEFAULT_CLAUDE_MODEL = "claude-sonnet-4-6"
+# The roles whose DECISION: line becomes a decision row.
+DECISION_ROLES = frozenset({"architect", "po", "designer"})
+
+_USER = re.compile(r"USER(?:\s+(?P<why>.*))?", re.DOTALL)
+
+
+def parse_summary(summary: str | None) -> tuple[str, str, str | None]:
+    """``(kind, text, decision)``: ``answer`` (the first ``ANSWER:`` line's rest plus the lines
+    after it, less ``DECISION:``), ``user`` (the reason, maybe empty) or ``none`` (no or empty
+    ``ANSWER:``); ``decision`` is the first ``DECISION:`` line's text, else None."""
+    lines = str(summary or "").splitlines()
+    decision = None
+    for line in lines:
+        if line.strip().startswith("DECISION:"):
+            decision = line.strip()[len("DECISION:") :].strip() or None
+            break
+    start = next(
+        (i for i, line in enumerate(lines) if line.strip().startswith("ANSWER:")), None
+    )
+    if start is None:
+        return "none", "", decision
+    first = lines[start].strip()[len("ANSWER:") :].strip()
+    user = _USER.fullmatch(first)
+    if user:
+        return "user", (user.group("why") or "").strip(), decision
+    rest = [ln for ln in lines[start + 1 :] if not ln.strip().startswith("DECISION:")]
+    text = "\n".join([first, *rest]).strip()
+    if not text:
+        return "none", "", decision
+    return "answer", text, decision
+
+
+def consult_engine(conn, asking_run_id: str | None, role: str) -> tuple[str, str]:
+    """``(adapter, model)`` for a consult: the asking run's adapter when it can run headless,
+    else claude; the role's configured model for that adapter, else ``claude-sonnet-4-6`` on
+    claude and ``""`` (the engine's own default) on any other adapter."""
+    from ..adapters import headless_capable
+    from .spawn_policy import effective_model
+
+    adapter = ""
+    if asking_run_id:
+        row = conn.execute(
+            "SELECT adapter FROM run_history WHERE run_id = ?", (asking_run_id,)
+        ).fetchone()
+        adapter = str(row["adapter"] or "") if row is not None else ""
+    if not adapter or not headless_capable(adapter):
+        adapter = DEFAULT_ADAPTER
+    model = effective_model(role, adapter, "")
+    if not model and adapter == DEFAULT_ADAPTER:
+        model = DEFAULT_CLAUDE_MODEL
+    return adapter, model
+
+
+def _default_spawn(
+    *,
+    board,
+    scope,
+    prompt,
+    run_id,
+    project_root,
+    model,
+    adapter,
+    agent,
+    broadcast_fn=None,
+) -> dict:
+    """A headless one-shot of ``agent``, as ``board_run._default_spawn`` builds one (no lock)."""
+    from .state import RunnerState
+    from .terminal import _run_stage_via_terminal
+    from ..runner.telemetry import new_trace_id, scope_tier_for
+
+    state = RunnerState(
+        topic=scope,
+        flow="consult",
+        project_root=project_root,
+        model=model,
+        timeout=600,
+        run_id=run_id,
+        current_state=agent,
+        current_adapter=adapter,
+        interactive=False,
+        board_scope=scope,
+    )
+    state.executor_owned_telemetry = True
+    state.scope_tier = scope_tier_for(board)
+    state.goal_trace_id = new_trace_id()
+    return _run_stage_via_terminal(state, prompt, adapter, model, run_id, broadcast_fn)
+
+
+def _live_question(conn, question_id: str) -> dict | None:
+    row = conn.execute(
+        "SELECT * FROM comms_messages WHERE id=? AND type='question' "
+        "AND deleted_at IS NULL",
+        (question_id,),
+    ).fetchone()
+    return dict(row) if row is not None else None
+
+
+def _task_of(conn, route: dict, question: dict) -> dict | None:
+    """The asking task: the route's task when it names one, else the asking run's task."""
+    from ..db.queries.consult_routes import asking_task
+
+    if route.get("task_id"):
+        row = conn.execute(
+            "SELECT * FROM comms_messages WHERE id=? AND type='task'",
+            (route["task_id"],),
+        ).fetchone()
+        if row is not None:
+            return dict(row)
+    return asking_task(conn, question.get("author_run_id"))
+
+
+def build_prompt(
+    question: dict, task: dict | None, role: str, project_root: str, adapter: str
+) -> str:
+    """The consult's prompt: the skill, the question, the asking task, the feedback folder and
+    the board context. Placeholders are filled in the skill body only, never in board text.
+    """
+    from ..fsm_compose import _inject_prompt_vars
+    from ..fsm_ops import _resolve_storage_path
+    from ..runner.comms_context import board_context_for
+    from ..skills.compose import compose_skill
+
+    board, scope = question["board"], question["scope"]
+    storage = Path(str(_resolve_storage_path(None, project_root, scope)))
+    body = compose_skill(SKILL, adapter or DEFAULT_ADAPTER, board_default=True)
+    body = _inject_prompt_vars(
+        body,
+        feature=scope,
+        project_root=project_root,
+        agent_role=role,
+        storage_path=storage,
+        skill=SKILL,
+        board_tier=board if board in ("feature", "project", "global") else "feature",
+        run_category="consult",
+    )
+    parts = [
+        body.rstrip("\n"),
+        "## The question",
+        f"- id: {question['id']}\n- from: {question.get('from_agent') or '?'}",
+        str(question.get("text") or ""),
+    ]
+    if task is not None:
+        parts += ["## The asking task", str(task.get("text") or "")]
+    parts += [
+        "## The feedback folder",
+        f"You may write files only under `{storage / 'feedback'}` (and you must not commit).",
+    ]
+    context = board_context_for(
+        board, scope, project_root, str(question.get("text") or ""), role=role
+    )
+    if context:
+        parts.append(context.rstrip("\n"))
+    return "\n\n".join(parts) + "\n"
+
+
+def _agent_done(conn, run_id: str) -> tuple[dict | None, str]:
+    """``(payload, why)``: the one ``AGENT_DONE`` whose ``run_id`` is the consult run, else
+    ``(None, why)``. The supervisor's synthetic one counts only when the agent wrote none; two
+    from the agent mean someone else wrote one too, so neither is trusted."""
+    rows = conn.execute(
+        "SELECT payload FROM fsm_events WHERE event_type='AGENT_DONE' "
+        "AND json_extract(payload, '$.run_id')=? ORDER BY seq DESC",
+        (run_id,),
+    ).fetchall()
+    payloads = []
+    for row in rows:
+        try:
+            payloads.append(dict(json.loads(row["payload"])))
+        except (TypeError, ValueError):
+            payloads.append({})
+    own = [p for p in payloads if p.get("synthetic") is not True]
+    if len(own) > 1:
+        return None, "more than one AGENT_DONE carries its run id"
+    picked = own or payloads[:1]
+    return (picked[0], "") if picked else (None, "no AGENT_DONE")
+
+
+def _move(conn, question_id, run_id, frm, to, reason=None) -> bool:
+    """Route ``frm`` -> ``to`` for this consult run only (compare-and-set); an end sets
+    ``ended_at``. ``queued`` has no run yet, so the claim also records it."""
+    import time
+
+    from ..db.connection import _get_write_lock
+
+    ended = None if to == "running" else time.time()
+    with _get_write_lock(conn):
+        cur = conn.execute(
+            "UPDATE consult_routes SET status=?, consult_run_id=?, "
+            "reason=COALESCE(?, reason), ended_at=COALESCE(?, ended_at) "
+            "WHERE question_id=? AND status=? AND COALESCE(consult_run_id, ?)=?",
+            (to, run_id, reason, ended, question_id, frm, run_id, run_id),
+        )
+        conn.commit()
+    return cur.rowcount == 1
+
+
+def _status(conn, question_id: str) -> str:
+    row = conn.execute(
+        "SELECT status FROM consult_routes WHERE question_id=?", (question_id,)
+    ).fetchone()
+    return str(row["status"]) if row is not None else "gone"
+
+
+def _spawn_said(returned) -> str:
+    """The exit code or error the spawn returned, for a failure reason."""
+    r = returned if isinstance(returned, dict) else {}
+    if r.get("exit_code") not in (None, 0):
+        return f" (exit code {r['exit_code']})"
+    return f" ({r['error']})" if r.get("error") else ""
+
+
+def _measured_ok(
+    question_id: str, run_id: str, *, role: str, project_root: str
+) -> bool:
+    """Whether the consult may be delivered (ticket 03 measures what it changed)."""
+    return True
+
+
+def _fail(conn, question_id, role, run_id, reason, *, frm="running") -> str:
+    """Route ``failed`` and the question to the person, unless the route moved on."""
+    from ..db.queries.consult_routes import hand_to_person
+
+    if not _move(conn, question_id, run_id, frm, "failed", reason):
+        return _status(conn, question_id)
+    why = f"the {role} consult did not answer: {reason}"
+    hand_to_person(conn, question_id, why, by="the server")
+    return "failed"
+
+
+def _deliver(
+    conn, question: dict, role: str, run_id: str, kind: str, text: str, decision
+) -> str:
+    from ..db.queries.comms_messages import post_message
+    from ..db.queries.consult_routes import hand_to_person
+    from ..runner.provenance import consult_stamp
+
+    qid = question["id"]
+    status = _status(conn, qid)
+    if status != "running":  # handed to the person (or ended) while the consult ran
+        return status
+    if conn.execute(
+        "SELECT 1 FROM comms_messages WHERE reply_to=? AND type='answer' "
+        "AND deleted_at IS NULL LIMIT 1",
+        (qid,),
+    ).fetchone():
+        _move(conn, qid, run_id, "running", "answered", "answered while it ran")
+        return _status(conn, qid)
+    if kind == "user":
+        hand_to_person(conn, qid, text or "no reason given", by=role)
+        return "to_person"
+    board, scope = question["board"], question["scope"]
+
+    def _post(to_agent: str, type_: str, body: str) -> None:
+        post_message(
+            conn,
+            board,
+            scope,
+            role,
+            to_agent,
+            type_,
+            body,
+            reply_to=qid,
+            run_id=run_id,
+            **consult_stamp(role, run_id),
+        )
+
+    if not _move(conn, qid, run_id, "running", "answered"):
+        return _status(conn, qid)
+    try:
+        _post(question.get("from_agent") or "*", "answer", text)
+    except Exception as exc:
+        logger.warning("consult %s: posting the answer failed: %s", run_id, exc)
+        reason = f"delivery failed: {type(exc).__name__}"
+        return _fail(conn, qid, role, run_id, reason, frm="answered")
+    if decision and role in DECISION_ROLES:
+        try:
+            _post("*", "decision", decision)
+        except Exception as exc:  # the answer is out; the decision is advice on top
+            logger.warning("consult %s: posting the decision failed: %s", run_id, exc)
+    return "answered"
+
+
+def _run_consult(
+    question: dict, route: dict, run_id: str, *, project_root, broadcast_fn, spawn_fn
+) -> str:
+    """Spawn the consult, read its summary and deliver it. Returns the route's end status."""
+    from ..db.connection import get_db
+
+    conn = get_db()
+    qid, role = question["id"], route["role"]
+    try:
+        adapter, model = consult_engine(conn, question.get("author_run_id"), role)
+        task = _task_of(conn, route, question)
+        prompt = build_prompt(question, task, role, project_root, adapter)
+        returned = spawn_fn(
+            board=question["board"],
+            scope=question["scope"],
+            prompt=prompt,
+            run_id=run_id,
+            project_root=project_root,
+            model=model,
+            adapter=adapter,
+            agent=role,
+            broadcast_fn=broadcast_fn,
+        )
+    except Exception as exc:
+        logger.warning("consult %s for question %s failed: %s", run_id, qid, exc)
+        return _fail(conn, qid, role, run_id, f"{type(exc).__name__}: {exc}")
+    done, why = _agent_done(conn, run_id)
+    if done is None:
+        return _fail(conn, qid, role, run_id, why + _spawn_said(returned))
+    kind, text, decision = parse_summary(done.get("summary"))
+    if kind == "none":
+        return _fail(conn, qid, role, run_id, "no ANSWER: line in its summary")
+    if not _measured_ok(qid, run_id, role=role, project_root=project_root):
+        return "withheld"
+    try:
+        return _deliver(conn, question, role, run_id, kind, text, decision)
+    except Exception as exc:
+        logger.warning("consult %s: delivering the answer failed: %s", run_id, exc)
+        return _fail(conn, qid, role, run_id, f"delivery failed: {type(exc).__name__}")
+
+
+def start_consult(
+    question_id: str, *, project_root: str, broadcast_fn, spawn_fn=None, block=False
+) -> dict:
+    """Start the consult run for ``question_id``, whose route must be ``queued``.
+
+    Returns ``{"started": False, "reason": ...}`` when it cannot start, else ``{"started": True,
+    "run_id", "role", "status"}``: ``status`` is the route's end status with ``block=True`` and
+    ``running`` otherwise (the consult then runs on a daemon thread).
+    """
+    from ..db.connection import get_db
+    from ..db.queries import consult_routes
+
+    conn = get_db()
+    question = _live_question(conn, question_id)
+    if question is None:
+        return {"started": False, "reason": "not a live question"}
+    routes = consult_routes.routes_for_questions(conn, [question_id])
+    if not routes or routes[0]["status"] != "queued":
+        return {"started": False, "reason": "no queued route"}
+    route = routes[0]
+    run_id = consult_routes.CONSULT_RUN_PREFIX + secrets.token_hex(6)
+    if not _move(conn, question_id, run_id, "queued", "running"):
+        return {"started": False, "reason": "another start claimed the route"}
+    kwargs = {
+        "project_root": project_root,
+        "broadcast_fn": broadcast_fn,
+        "spawn_fn": spawn_fn or _default_spawn,
+    }
+    result = {"started": True, "run_id": run_id, "role": route["role"]}
+    if block:
+        return {**result, "status": _run_consult(question, route, run_id, **kwargs)}
+    threading.Thread(
+        target=_run_consult,
+        args=(question, route, run_id),
+        kwargs=kwargs,
+        name=run_id,
+        daemon=True,
+    ).start()
+    return {**result, "status": "running"}

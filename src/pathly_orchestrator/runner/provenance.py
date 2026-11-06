@@ -19,7 +19,8 @@ such in the event this writes.
 The same module holds the other half of "provenance": who wrote a board row.
 ``stamp`` / ``system_stamp`` give the three ``comms_messages`` author columns
 (role-read-policy, SPEC C1), taken from the caller's run token or the code path, never
-from the request body; ``post_system`` is ``post_message`` with the system stamp applied.
+from the request body; ``consult_stamp`` gives them for the server's own consult run;
+``post_system`` is ``post_message`` with the system stamp applied.
 """
 
 from __future__ import annotations
@@ -147,6 +148,29 @@ def system_stamp() -> dict:
     A separate function, never chosen from a request field: only server code calls it.
     """
     return dict(SYSTEM_AUTHOR)
+
+
+def consult_stamp(role: str, run_id: str) -> dict:
+    """Author columns for a row the server posts on behalf of its own consult run.
+
+    A consult run (``supervisor/consult_run.py``) answers a routed question; the server reads
+    the answer from the run's ``AGENT_DONE`` and posts it as the consulted role, stamped with
+    that run: ``author_role=<role>``, ``author_run_id=<the consult run>``,
+    ``author_source="token"``. Only server code calls it, with the run it started, never with
+    a value chosen from a request field. Raises ``ValueError`` unless ``run_id`` is a
+    ``consult-`` run and ``role`` one of the consult roles.
+    """
+    from ..db.queries.consult_routes import CONSULT_ROLES, CONSULT_RUN_PREFIX
+
+    if not (isinstance(run_id, str) and run_id.startswith(CONSULT_RUN_PREFIX)):
+        raise ValueError(f"not a consult run: {run_id!r}")
+    if role not in CONSULT_ROLES:
+        raise ValueError(f"not a consult role: {role!r}")
+    return {
+        "author_role": role,
+        "author_run_id": run_id,
+        "author_source": SOURCE_TOKEN,
+    }
 
 
 def post_system(conn, **fields) -> str:
