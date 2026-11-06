@@ -17,6 +17,7 @@ from pathly_orchestrator.api import api_bp
 from .middleware import _log_request, _log_response, _setup_logging
 from .chief_budget import refund_run_slot
 from .chief_run_record import record_chief_run
+from .consult_trigger import trigger_consult
 from .chief_gate import chief_gate
 from .run_token_guard import run_token_guard
 from .feedback import _feedback_watcher
@@ -81,6 +82,9 @@ app.after_request(refund_run_slot)
 # A chief start answered 2xx with a run id is recorded for the notices. Registered after the
 # refund, so it runs before it and still sees the slot mark the refund pops.
 app.after_request(record_chief_run)
+# A role question a run posted is routed to a consult. Registered last, so it runs first; it
+# reads only the response and the request body and never changes either.
+app.after_request(trigger_consult)
 
 
 def main() -> None:
@@ -163,6 +167,23 @@ def main() -> None:
                 port,
             )
         else:
+            # No consult run survives a restart: a route left queued or running goes to the
+            # person. Its own try, so it and the chief cleanup cannot skip each other.
+            try:
+                from pathly_orchestrator.db.connection import get_db
+                from pathly_orchestrator.db.queries.consult_routes import (
+                    end_stale_routes,
+                )
+
+                handed = end_stale_routes(get_db())
+                if handed:
+                    logger.info(
+                        "handed %d routed question(s) left open to the person: %s",
+                        len(handed),
+                        handed,
+                    )
+            except Exception:
+                logger.warning("consult startup cleanup failed", exc_info=True)
             stale = chief_startup_cleanup()
             if stale:
                 logger.info(

@@ -1,7 +1,7 @@
 # Route a run's role question to a consult when it is posted
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 01, 02
 Test first: yes
 Level: 3
@@ -70,3 +70,78 @@ exit 0
   response), `src/pathly_orchestrator/http_server/sse.py` (read-only)
 
 ## Answer
+
+Work started at 601ff64e27d03cece4c92e7764be252b593bad6f (HEAD b0299f8, a merge of master whose tree equals it).
+
+**Built**
+
+- `src/pathly_orchestrator/supervisor/consult_router.py` (new): `on_question(question_id, *,
+  project_root, broadcast_fn, host_present, start=None) -> none|person|routed|no_host`, and the
+  `consult-<qid[:8]>` thread body `_start` / `_fail`.
+- `src/pathly_orchestrator/http_server/consult_trigger.py` (new): `trigger_consult(response)`,
+  the `after_request` hook on `POST /comms/post`.
+- `src/pathly_orchestrator/http_server/app.py`: registers `trigger_consult` after
+  `record_chief_run`; `main()` calls `end_stale_routes` in its own `try` inside the "nothing
+  answers" branch, before `chief_startup_cleanup`, and logs the handed-on ids.
+- `tests/comms_board/test_consult_router.py` (new, 16 tests), `tests/INDEX.md`,
+  `tests/comms_board/INDEX.md` (regenerated).
+- `src/pathly_orchestrator/CLAUDE.md`: the two "nothing calls ... yet" sentences, a new
+  "Consult router" section, two module-map lines.
+
+**Proof**
+
+- `python -m pytest tests/comms_board/test_consult_router.py -q -p no:cacheprovider`: `16 passed`,
+  exit 0. Through `POST /comms/post` with a minted run token, the `SpawnHost` fixture and a fake
+  `start`: architect → one `queued` route, `start` called once with the body's project root,
+  `sse._broadcast_spawn`, `block=False`, on thread `consult-<qid[:8]>`; the hook called a second
+  time with the same message id → still one call, one route; `human` and tokenless → no route, no
+  call; `builder` → `to_agent` human, route `to_person` "unknown role builder"; the fourth question
+  of one task → human, limit reason, 3 calls; a goal at its $2.00 line → human, no call; no host
+  (`sse._spawn_clients == []`) → no route, `to_agent` unchanged, no reply, `on_question` says
+  `no_host`; `app.main()` in a subprocess (both with the chief cleanup ok and raising) hands a
+  `running` route to the person (`to_person`, "server restart", `to_agent` human, the id in the
+  log). Also: a raising start → route `failed` + handed on; `{"started": False}` with the route
+  still queued → same; a route another start claimed → left; `record_route` False → asks
+  `route_decision` again → `person`.
+- The test commit 90b390d failed at setup with `ImportError: cannot import name 'consult_router'`.
+- `python -m pytest tests/comms_board tests/http_api -q -p no:cacheprovider`: `4147 passed in 1074.94s`, exit 0.
+- Also run: `tests/dag_goals/test_task_waits_for_answer.py tests/comms_board/test_comms_provenance.py
+  tests/consistency` 208 passed; `tests/http_api/test_chief_routes.py test_chief_startup_port.py` 78
+  passed; `black --check src/ tests/`, `mypy src/` (no issues, 367 files), `check_file_size.py`
+  (none new, none grown), `lint-imports` (1 kept), `check_no_mirror_reads.py`, `bandit` on the
+  new files, `gen_test_index.py` then `--check` (up to date), `check_adapters.py`,
+  `check_entry_points.py`: all exit 0.
+
+**Decisions**
+
+- `start=None` resolves `consult_run.start_consult` at call time (a module global), not a
+  `start=start_consult` default bound at definition: the hook passes no `start`, so the tests
+  replace `consult_router.start_consult` to inject the fake through `POST /comms/post`.
+- The hook reads the body with the comms `read_json_body` (the route's own lenient decoder), so
+  a cp1252 question is routed too; the project root is the body's value, stripped (may be "").
+- A raising start: `set_route_status(failed, reason="consult start failed: <Type>: <msg>")`
+  first, then `hand_to_person` (which keeps an ended route's status but re-addresses and replies).
+  `start_consult` answering `{"started": False}`: the same, only while the route is still
+  `queued` (a "claimed by another start" route is `running` and left to it).
+- `record_route` False → `route_decision` again; `person` is handed on, anything else is `none`
+  (a duplicate says "already routed").
+- `end_stale_routes` runs before `chief_startup_cleanup` in the else branch, in its own `try`, so
+  neither failure skips the other's work or boot; it does not run when something already answers.
+- `consult_run.py` (400 lines) is unchanged.
+
+**Shortcuts taken**
+
+- The `only_queued` check in `_fail` reads the route and then sets it in two statements, not a
+  compare-and-set; a start claiming the route between them would see it failed. Only reachable
+  when `start_consult` already said it did not start; a CAS in `consult_routes` would close it.
+- No spawn host means no route at all, so such a question is never routed later even when a host
+  connects (spec Decisions, "No spawn host").
+
+**For later tickets**
+
+- The router thread is `consult-<qid[:8]>`, the consult run's own thread `consult-<12 hex>`;
+  neither is in `tests/chief_session_guard.STARTED_BY_TESTS`. A test that posts a role question
+  with a spawn host registered now starts a real consult unless it replaces
+  `supervisor.consult_router.start_consult` (06, 07, 12): join `consult-` threads before the test
+  ends (see `_join_router_threads` in `tests/comms_board/test_consult_router.py`).
+- 09: `on_question`'s outcomes are not recorded anywhere but the route row and the status reply.

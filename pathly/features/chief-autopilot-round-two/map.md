@@ -123,3 +123,4 @@ Outside facts relied on (tickets 13 to 15, 18):
 - Whether `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB` (if a person sets it) strips
   `PATHLY_CHIEF_HOOK_SECRET` from the hook is not measured; ticket 15's hook then records nothing
   (exit 0), which loses citations but forges nothing.
+- 04 — `supervisor/consult_router.on_question` (none/person/routed/no_host) is called by the `after_request` hook `http_server/consult_trigger.py` on `POST /comms/post` for a question; `start_consult` runs on a `consult-<qid[:8]>` thread (a raise, or not started while still queued → route `failed` + `hand_to_person`); `app.main` runs `end_stale_routes` in its own try before `chief_startup_cleanup`.

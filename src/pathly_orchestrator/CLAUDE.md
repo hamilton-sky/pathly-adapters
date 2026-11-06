@@ -1746,6 +1746,7 @@ pathly_orchestrator/
     board_run.py           # start_board_run: board-lock + skill compose + async spawn helper; optional `run_id` (default a new uuid4)
     board_lock.py          # Per-board/scope advisory lock (acquire/release/holder)
     consult_run.py         # start_consult(question_id, *, project_root, broadcast_fn, spawn_fn=None, block=False) (chief-autopilot-round-two 02): one headless `consult-<12 hex>` run of a queued route's role (planning/consult-answer), its AGENT_DONE summary delivered — see "Consult runs"; no board lock
+    consult_router.py      # on_question(question_id, *, project_root, broadcast_fn, host_present, start=None) -> none|person|routed|no_host (chief-autopilot-round-two 04): routes a posted role question, start_consult on a `consult-<qid[:8]>` thread — see "Consult router"
     consult_window.py      # open_window(project_root, *, scope=None) / blamed(window) / withhold / noted (chief-autopilot-round-two 03): a consult that changed the project is withheld — see "Consult runs"
     chief_tiers.py         # what a chief may do (chief-agent): ACTIONS, TIERS (status=read; planner=read,post,plan; operator=all seven), actions_for/normalise_tier, and resolve_preset_tier — a user prompt file chief/<preset> names its tier in leading front matter `tier:`, else the built-in names map to themselves, anything else (unknown tier, missing front matter, malformed name) is status. Code, never read from prompt text; strip_front_matter reuses skills/compose_base
     chief_presets.py       # the chief's prompt (chief-agent 17): the built-in styles STATUS / PLANNER / OPERATOR (BUILT_IN), default_style (user file chief/<preset> wins, else the built-in text), compose_prompt (style + the chief-connect fragment, read at call time, + ROOT_LINE with the stored project root)
@@ -1763,6 +1764,7 @@ pathly_orchestrator/
     chief_bind.py          # target_in_project(): places the run, goal, task or message a chief names by id (`run_ids`, `stamped_run_ids`, `row_ids` of its entry) in the session's project, and is_id() — see "Chief gate"
     chief_keys.py          # key_refusal(): refuses a key the entry does not list, and a `flow` or `skill` that is not one name (scope_names.is_flow_name / is_skill_name) — see "Chief gate"
     chief_budget.py        # the cost ceiling and the run limit of a chief session (chief.max_cost_usd_per_run, chief.max_runs_per_session): budget_refusal() is the gate's last check and takes the run slot, refund_run_slot() is the after_request hook that gives it back for a 4xx, ceiling_usd()/run_limit() read the settings — see "Chief gate"
+    consult_trigger.py     # trigger_consult(): the after_request hook on POST /comms/post that calls consult_router.on_question for a stored question (chief-autopilot-round-two 04) — see "Consult router"
     chief_secret_text.py   # secret_refusal(): the gate's 400 for a chief-token body whose string values hold the session's hook secret (contains_secret_hash; a re-encoded secret is not caught) — see "Chief gate"
     chief_cite.py          # cite_refusal() / answer_text(): the cite rule for an `answer` action — the chief names a human message of its session by `cite`, the gate checks it (kind human, this session, typed after the question, once; an acknowledgement must say `agent: "chief"`) and keeps its text on flask.g for the answer routes to relay — see "Chief gate"
     run_identity.py        # caller_identity(request) -> CallerIdentity: kind run|anonymous from the X-Pathly-Run-Token header (body role/run_id/from never read); unknown/revoked token logged at info with the remote addr; `ui` kind reserved (RRP-2b); `is_chief_run(identity)`: True for a live run whose role is `chief` and nobody else (the test behind who may post and who may retire a binding directive). Routes apply a policy from it: who posts and retires a directive, the human-gate refusals (`comms/_helpers.py`), a task's completion and `floor-allow` (`comms/tasks_status.py`, `tasks_floor.py`), `force_past_gate` (`core/fsm.py`) and the chief open/close routes; `chief_gate` reads the token row itself (`lookup_run_token`) instead
@@ -2676,9 +2678,9 @@ answered question and its answer (`answered_questions_block`, from `answered_que
 ## Consult routes (`db/queries/consult_routes.py`, chief-autopilot-round-two 01)
 
 A board `question` a running agent addresses to a role is answered by a consult run of that role,
-not by the person. This module is the store and the rules; nothing calls it yet (later round-two
-tickets start the consult run, call `route_decision` when a question is posted and
-`end_stale_routes` at start). `consult_routes` (`db/migrations_consult.py`) keeps one row per
+not by the person. This module is the store and the rules; `supervisor/consult_router.py` calls
+`route_decision` when a question is posted and `app.main` calls `end_stale_routes` at start (see
+"Consult router"). `consult_routes` (`db/migrations_consult.py`) keeps one row per
 routed or handed-on question: `question_id`, `role`, `task_id`, `goal_key`, `asking_run_id`,
 `consult_run_id`, `status` (`queued`, `running`, `answered`, `to_person`, `withheld`, `failed`),
 `reason`, `created_at`, `ended_at` (set by an end status).
@@ -2781,8 +2783,36 @@ spawns nothing), then (on a daemon thread unless `block`) one headless spawn of 
   even when the route had moved on meanwhile. `None` (not a repo top, git failed) → delivered,
   then a system `status` reply `answer not measured: <project> is not a git repository top` (or
   `answer not measured: git could not snapshot <project>` when it is a repo top) when
-  this consult's answer row was posted (fail-open). Nothing calls `start_consult` yet (ticket 04
-  does when a question is posted).
+  this consult's answer row was posted (fail-open). `supervisor/consult_router.py` calls
+  `start_consult` when a question is posted (see "Consult router").
+
+## Consult router (`supervisor/consult_router.py`, `http_server/consult_trigger.py`, chief-autopilot-round-two 04)
+
+Server-driven, no chief turn. `http_server/consult_trigger.trigger_consult` is an `after_request`
+hook, registered in `app.py` after `record_chief_run` (so it runs first: hooks run in reverse
+order). For `POST /comms/post` answered 200 with `ok` and a `message_id`, when the request body's
+`type` is `question` (read with `read_json_body`), it calls `on_question(message_id,
+project_root=<the body's>, broadcast_fn=sse._broadcast_spawn, host_present=bool(sse._spawn_clients))`.
+It never changes the response and never raises (a failure is logged to `pathly.http`).
+
+`on_question(question_id, *, project_root, broadcast_fn, host_present, start=None) -> str` (`start`
+defaults to `consult_run.start_consult`, read at call time) returns what it did:
+
+- `none`: `route_decision` said `none` (to `human` or `*`, tokenless, a consult's own, already
+  routed).
+- `person`: `hand_to_person(..., decision.reason, by="pathly")` (unknown role, per-task limit,
+  goal cost line). When `record_route` returns False (a duplicate, or a racing question reached
+  the cap) `route_decision` is asked again, and a `person` answer is handed on.
+- `no_host`: a `route` with no spawn host listening; the question stays as posted, no route row.
+- `routed`: `record_route` inserted a `queued` route, and `start(question_id, project_root=...,
+  broadcast_fn=..., block=False)` runs on a daemon thread `consult-<question id[:8]>`. A start
+  that raises sets the route `failed` (reason `consult start failed: <error>`) and hands the
+  question to the person; a start that answers `{"started": False}` does the same only while the
+  route is still `queued` (one another start claimed is left to it).
+
+At server start, `app.main` calls `end_stale_routes` in its own `try` in the branch where nothing
+already answers on the host and port (before `chief_startup_cleanup`), and logs the handed-on
+question ids.
 
 ## Task proof in the goal-loop drain (`supervisor/task_proof.py`, build-proof)
 
