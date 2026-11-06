@@ -1,7 +1,7 @@
 # Withhold the answer of a consult that changed the project
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 02
 Test first: yes
 Level: 3
@@ -193,6 +193,98 @@ on top of it). Test-only commit `22c91ee`: at that commit the Test command fails
 - black `743 files would be left unchanged`; mypy `no issues found in 365 source files`;
   `check_file_size.py` "none new, none grown" (consult_run.py 400, consult_window.py 245);
   `gen_test_index.py` regenerated then `--check` "All test INDEX.md files up to date".
+
+**Review fixes (round 2, quality review)**: the test-only commit is `abc7ae7` (work started at
+`220938c`). At `abc7ae7` the Test command fails 5 cases for the right reasons: the answer is
+delivered (`answered`), and `consult_window` has no `EXIT_WAIT`.
+
+1. major, the consult can exempt its own edits: fixed. `open_window(..., run_id=)` now also
+   records the consult's run id and the ids of every task row on the project's boards
+   (`Window.known`). At the end, `blamed` adds only `_claimed_by_others(window)`: the `files` of
+   tasks that are in `known` (posted before the window), are `in_progress` now and have a
+   `claimed_by` that is set and is not the consult's run id. Tasks `in_progress` at the start stay
+   exempt as before. New tests: `test_a_consult_cannot_exempt_its_own_edit_with_a_task_it_posts`
+   with `[the-consult|another-run]` (the fake spawn posts a task declaring `app.py`, claims it
+   with the consult's run id or another run id, then edits `app.py`: withheld, no answer, task
+   still `blocked`), and `test_a_pending_task_the_consult_claims_does_not_exempt_its_files` (a
+   task posted before the window that the consult claims: withheld). The old `during-the-window`
+   case posted its task inside the window, which the new rule blames by design. It now posts the
+   task before the window and claims it during it with another run (`sched-<id>#1`): still
+   delivered. I narrowed that test case's setup, not its claim: it still proves the rule it
+   names, that a builder claiming during the window is left out.
+2. major, measuring before the process stopped: fixed inside Touches. `terminal.py` has no
+   per-call early-advance override (`FeatureFlags()` reads the env var on each call, and setting
+   it would change every concurrent spawn). But on the early-advance `agent_done` path,
+   `_run_stage_via_terminal` keeps the `TerminalRun` in `supervisor/registry` until the PTY
+   reports (the reconciliation window drops it), and every other return path drops it first. So
+   the new `consult_window.spawn_until_stopped` calls the terminal, then waits on
+   `registry.get_run(run_id).wait_pty_result(EXIT_WAIT)` when the run is still registered.
+   `EXIT_WAIT` is 600 s. If no exit arrives in time it raises
+   `consult_exit_unconfirmed: its process was not confirmed stopped within 600s, so what it
+   changed could not be measured`. `_run_consult` then measures (findings withhold), else fails
+   the route with that reason and hands the question to the person, so nothing is delivered
+   silently. The terminal's own `terminal_result_timeout` (1800 s, process not killed) already
+   raises into the same path: route `failed`, question to the person with the timeout reason.
+   `consult_run._default_spawn` calls `spawn_until_stopped` in place of `_run_stage_via_terminal`.
+   New tests patch `supervisor.terminal._run_stage_via_terminal` with an early-advance fake that
+   writes AGENT_DONE, returns, then edits on a thread and reports the PTY exit 0.3 s later:
+   - `test_an_edit_after_an_early_agent_done_is_still_withheld`: withheld, `M app.py` escalated.
+   - `test_a_consult_that_stops_cleanly_after_an_early_agent_done_is_delivered`.
+   - `test_a_consult_whose_exit_is_not_confirmed_is_not_delivered`: `EXIT_WAIT` 0.5, the PTY never
+     reports. Route `failed` with "not confirmed stopped", no answer, question `to: human`, task
+     `blocked`.
+3. minor, `../..` or reserved feature scopes: fixed. `_on_project_board` takes the feature path
+   from `board_mirror.board_mirror_path` (None for a reserved or non-segment scope), and its
+   parent must be a folder. New test
+   `test_a_feature_scope_that_is_not_a_plain_folder_name_exempts_nothing[../..|project]` fails on
+   the round 2 code and passes now.
+4. minor, consult_run.py at 400 lines: not split. Moving `_deliver`/`_post`/`_fail` needs a new
+   module, and Touches allows only one new file, `consult_window.py`, whose concern is measuring
+   the consult, not delivering its answer. The round 3 change is line-neutral: consult_run.py is
+   still 400 lines and consult_window.py is 309. Ticket 04 must split consult_run.py (for example
+   into a `consult_deliver.py` holding `_deliver`, `_fail`, `_move` and `_status`, which also ends
+   the two-way lazy import) before adding a line. Public names for `_declared`,
+   `_is_own_storage` and `tree._is_top` change files outside Touches, so they are left as they are.
+5. minor, all of `pathly/` exempt: kept, for the reason in round 1 item 3 (an untracked
+   `pathly/` collapses to `?? pathly/` in `git status`, so an exports-only rule would blame
+   Pathly's own mirror writes in every fresh project). Narrowing it is a spec change. Recording it
+   in `followups.md` is outside Touches, so it is recorded here for the person instead: a consult
+   that edits `IMPLEMENTATION_PLAN.md` or ticket text under `pathly/` is not reported.
+
+**Shortcuts taken (round 3)**
+
+- A consult can still claim a task that was posted before the window if it passes a fake
+  `run_id` in the body of `/comms/tasks/claim`: the claim route does not tie `claimed_by` to the
+  caller's token. The task's files then count as another run's. Closing that needs the claim
+  route to stamp the authenticated run (`tasks_claim.py`, outside Touches) or round three's
+  worktree per consult.
+- `_project_tasks` reads every live task row on project and feature boards on each open and
+  close. It checks the folder once per (board, scope), not once per row, so it stays cheap until
+  the shared DB holds tens of thousands of tasks.
+- If the reconciliation window times out (600 s) and drops the run while the consult's own wait
+  is still running, the consult's wait still holds the run object and keeps waiting on it. If the
+  drop happens before the consult reads the registry, the consult reads "exited". That needs a
+  600 s gap between the terminal returning and the next line, so it is not handled.
+
+**Proof (round 3, fresh after the last edit)**
+
+- `python -m pytest tests/runner_supervisor/test_consult_read_only.py -q -p no:cacheprovider`:
+  `26 passed`, exit 0.
+- `python -m pytest tests/runner_supervisor -q -p no:cacheprovider`: `418 passed`, exit 0.
+- `python -m pytest tests/comms_board/test_comms_provenance.py -q -p no:cacheprovider`:
+  `106 passed`. `consult_stamp(` is still called only at `consult_run.py:295`.
+- `black --check src/ tests/`: `743 files would be left unchanged`.
+- `mypy src/ --ignore-missing-imports --no-strict-optional`: `no issues found in 365 source
+  files`.
+- `check_file_size.py`: "none new, none grown".
+- `gen_test_index.py` regenerated, then `--check`: "All test INDEX.md files up to date".
+- `lint-imports`: 1 kept, 0 broken. bandit exit 0. `check_no_mirror_reads.py` OK.
+
+**For later tickets (round 3)**
+
+- 04: consult_run.py is at 400 lines. Split it before wiring `start_consult` (see item 4 above).
+- Any caller that spawns a consult some other way than `_default_spawn` must wait for the
+  process exit itself, as `consult_window.spawn_until_stopped` does.
 
 ## Review findings (round 1, quality review)
 

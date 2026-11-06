@@ -101,9 +101,9 @@ def _default_spawn(
     agent,
     broadcast_fn=None,
 ) -> dict:
-    """A headless one-shot of ``agent``, as ``board_run._default_spawn`` builds one (no lock)."""
+    """A headless one-shot of ``agent`` (as ``board_run._default_spawn``), once it exited."""
+    from .consult_window import spawn_until_stopped
     from .state import RunnerState
-    from .terminal import _run_stage_via_terminal
     from ..runner.telemetry import new_trace_id, scope_tier_for
 
     state = RunnerState(
@@ -121,7 +121,7 @@ def _default_spawn(
     state.executor_owned_telemetry = True
     state.scope_tier = scope_tier_for(board)
     state.goal_trace_id = new_trace_id()
-    return _run_stage_via_terminal(state, prompt, adapter, model, run_id, broadcast_fn)
+    return spawn_until_stopped(state, prompt, adapter, model, run_id, broadcast_fn)
 
 
 def _live_question(conn, question_id: str) -> dict | None:
@@ -320,7 +320,7 @@ def _run_consult(
 
     conn = get_db()
     qid, role = question["id"], route["role"]
-    window = cw.open_window(project_root, scope=question["scope"])  # never raises
+    window = cw.open_window(project_root, scope=question["scope"], run_id=run_id)
     raised, returned = "", None
     try:
         adapter, model = consult_engine(conn, question.get("author_run_id"), role)

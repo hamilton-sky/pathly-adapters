@@ -103,6 +103,7 @@ Outside facts relied on (tickets 13 to 15, 18):
   https://github.com/anthropics/claude-code/issues/40002 (fetched 2026-11-06; the issue names no
   claude version). Ticket 14 matches it and the old wording.
 - 03 (round 2) — the consult window counts only the in-progress files of the project's own boards (project board + its feature boards) and is measured right after the spawn, before AGENT_DONE and the summary are read
+- 03 (round 3) — a task the consult posted or claimed exempts nothing (end-of-window exemptions: tasks posted before the window, claimed by another named run); the consult spawn (`consult_window.spawn_until_stopped`) waits for the PTY exit after an early AGENT_DONE, and an unconfirmed exit fails the route instead of delivering
 
 ## Open questions
 

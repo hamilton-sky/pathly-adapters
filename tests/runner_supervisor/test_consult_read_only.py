@@ -4,7 +4,9 @@ A consult may write only under its board's ``feedback/`` folder and post board r
 supervisor does not trust that: ``supervisor/consult_window`` snapshots the git working tree and
 ``HEAD`` before and after the consult's spawn and blames each change that is not under the
 feedback folder, not Pathly's own ``pathly/`` storage, and not inside the declared ``files`` of a
-task ``in_progress`` at the window's start or end. A blamed consult gets no answer row: its route
+task ``in_progress`` at the window's start or posted before it and claimed during it by another
+run. The window closes only once the consult's process exited. A blamed consult gets no answer
+row: its route
 is ``withheld``, its question goes to the person, and one escalation lists what changed. When git
 cannot measure (not a repo top), the answer is delivered with an "answer not measured" status.
 """
@@ -297,6 +299,21 @@ def test_another_projects_in_progress_files_do_not_exempt_a_change(
     route = _route(conn, qid)
     assert route["status"] == "withheld"
     assert "app.py" in route["reason"]
+
+
+@pytest.mark.parametrize("scope", ["../..", "project"])
+def test_a_feature_scope_that_is_not_a_plain_folder_name_exempts_nothing(
+    conn, repo, scope
+):
+    """``pathly/features/../..`` names the project root itself, and ``project`` is reserved:
+    neither is a feature board of this project."""
+    (repo / "pathly" / "features" / "project").mkdir()
+    _, qid = _parked_question(conn)
+    _in_progress_task(conn, ["app.py"], board="feature", scope=scope)
+
+    _start(qid, repo, EditingSpawn(repo, _edit_app))
+
+    assert _route(conn, qid)["status"] == "withheld"
 
 
 def test_an_in_progress_task_on_the_project_board_exempts_its_files(conn, repo):

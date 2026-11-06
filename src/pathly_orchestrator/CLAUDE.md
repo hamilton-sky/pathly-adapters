@@ -2757,16 +2757,24 @@ spawns nothing), then (on a daemon thread unless `block`) one headless spawn of 
     person while the consult ran keeps its route and gets nothing; one answered meanwhile gets no
     second answer (route `answered`).
 - Read-only, measured (`supervisor/consult_window.py`, ticket 03): `open_window(project_root,
-  scope=)` before the spawn (git tree via `proof/tree.snapshot`, `HEAD`, and the declared `files`
-  (`task_proof._declared`) of every task `in_progress` on the project's boards: the project board
-  (scope == the normalized root) and the feature boards whose `pathly/features/<scope>/` exists
-  under the root, matched as `board_mirror.export_project_boards` does); `blamed(window)` right
-  after the spawn returns or raises, before `AGENT_DONE` and the summary are read (a consult that
-  changed the project and then failed or gave no `ANSWER:` line is still withheld):
+  scope=, run_id=)` before the spawn (git tree via `proof/tree.snapshot`, `HEAD`, the ids of the
+  task rows and the declared `files` (`task_proof._declared`) of every task `in_progress` on the
+  project's boards: the project board (scope == the normalized root) and the feature boards whose
+  `pathly/features/<scope>/` exists under the root, the path from `board_mirror.board_mirror_path`,
+  so a scope that is not one plain folder name or is reserved is no board of the project).
+  `_default_spawn` goes through `consult_window.spawn_until_stopped`: with early advance on, the
+  terminal returns on the AGENT_DONE while the PTY runs, so it waits for the PTY's exit
+  (`registry.get_run(run_id).wait_pty_result`, `EXIT_WAIT` 600 s); no exit in time raises
+  `consult_exit_unconfirmed` (not measured, so not delivered: route `failed`, question to the
+  person). `blamed(window)` runs after the spawn returns or raises, before `AGENT_DONE` and the
+  summary are read (a consult that changed the project and then failed or gave no `ANSWER:` line
+  is still withheld):
   `HEAD moved from <a> to <b>` and `<status> <path>` for each
   changed path not under the board storage's `feedback/`, not under `pathly/`
   (`provenance._is_own_storage`) and not inside the declared `files` of a task `in_progress` at
-  the window's start or end (re-read). Findings → `withhold`: no answer or decision row, route
+  the window's start, or of a task posted before the window and `in_progress` at its end with a
+  `claimed_by` that is set and not the consult's run id (a task the consult posted or claimed
+  exempts nothing). Findings → `withhold`: no answer or decision row, route
   `withheld` (findings in its reason), `hand_to_person("the <role> consult changed the project",
   by=<role>)`, and one system-stamped `escalation` to `human` replying to the question (at most 20
   findings, then `... and N more`; nothing reverted, the person decides). The escalation is posted
