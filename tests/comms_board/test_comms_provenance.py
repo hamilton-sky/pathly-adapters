@@ -819,7 +819,9 @@ def _call_name(node):
 
 def _is_stamp_expr(node):
     """The only `**` values a post_message call may carry: `stamp(caller_identity(request))`,
-    `system_stamp()`, or the db-layer constant SYSTEM_AUTHOR (db/ cannot import runner).
+    `system_stamp()`, `consult_stamp(role, run_id)` (the server's own consult run; only
+    supervisor/consult_run.py may call it, a test below checks), or the db-layer constant
+    SYSTEM_AUTHOR (db/ cannot import runner).
     """
     if isinstance(node, ast.Name):
         return node.id == "SYSTEM_AUTHOR"
@@ -828,6 +830,10 @@ def _is_stamp_expr(node):
     name = _call_name(node)
     if name == "system_stamp":
         return not node.args
+    if name == "consult_stamp":
+        return len(node.args) == 2 and not any(
+            isinstance(a, ast.Starred) for a in node.args
+        )
     if name == "stamp":
         return (
             len(node.args) == 1
@@ -953,6 +959,23 @@ _UNSTAMPED_ALLOW = {
     # test_comms_directives_query.py scans every call of post_directive for that form.
     "db/queries/comms_directives.py",
 }
+
+
+# consult_stamp gives a run's author columns from the server's own consult run, not from a
+# token, so it is accepted as a stamp only where that run is started.
+_CONSULT_STAMP_FILES = {"supervisor/consult_run.py"}
+
+
+def test_consult_stamp_is_called_only_where_the_consult_run_is_started():
+    where = set()
+    for rel, text in _src_files():
+        tree = ast.parse(text)
+        if any(
+            isinstance(n, ast.Call) and _call_name(n) == "consult_stamp"
+            for n in ast.walk(tree)
+        ):
+            where.add(rel)
+    assert where == _CONSULT_STAMP_FILES, where
 
 
 def test_every_post_message_call_is_stamped_or_on_the_allow_list():
@@ -1175,6 +1198,11 @@ def test_the_insert_scan_passes_a_sound_statement(sql):
         'post_message(conn, **{"author_source": "token"})',
         'post_message(conn, **dict(author_source="token"))',
         "post_message(conn, **stamp(caller_identity(request), extra=1))",
+        "post_message(conn, **consult_stamp(role))",
+        "post_message(conn, **consult_stamp(role, run_id, x))",
+        "post_message(conn, **consult_stamp(role, run_id=run_id))",
+        "post_message(conn, **consult_stamp(*args))",
+        "post_message(conn, **consult_stamp(role, run_id), author_role=role)",
     ],
 )
 def test_the_call_scan_rejects_a_stamp_that_could_come_from_the_body(call):
@@ -1188,10 +1216,38 @@ def test_the_call_scan_rejects_a_stamp_that_could_come_from_the_body(call):
         "post_message(conn, **system_stamp())",
         "post_message(conn, **SYSTEM_AUTHOR)",
         'post_message(conn, author_source="system", author_role="system")',
+        "post_message(conn, **consult_stamp(role, run_id))",
     ],
 )
 def test_the_call_scan_accepts_a_server_side_stamp(call):
     assert _unstamped(call + "\n") == []
+
+
+def test_consult_stamp_stamps_the_consult_run_as_a_token_author():
+    from pathly_orchestrator.runner.provenance import consult_stamp
+
+    assert consult_stamp("architect", "consult-0123456789ab") == {
+        "author_role": "architect",
+        "author_run_id": "consult-0123456789ab",
+        "author_source": "token",
+    }
+
+
+@pytest.mark.parametrize(
+    "role, run_id",
+    [
+        ("architect", "sched-T1#1"),  # not a consult run
+        ("architect", ""),
+        ("builder", "consult-0123456789ab"),  # not a consult role
+        ("human", "consult-0123456789ab"),
+        ("", "consult-0123456789ab"),
+    ],
+)
+def test_consult_stamp_refuses_a_run_or_role_that_is_not_a_consult(role, run_id):
+    from pathly_orchestrator.runner.provenance import consult_stamp
+
+    with pytest.raises(ValueError):
+        consult_stamp(role, run_id)
 
 
 @pytest.mark.parametrize(
