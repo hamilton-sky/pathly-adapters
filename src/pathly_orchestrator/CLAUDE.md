@@ -1746,7 +1746,7 @@ pathly_orchestrator/
     board_run.py           # start_board_run: board-lock + skill compose + async spawn helper; optional `run_id` (default a new uuid4)
     board_lock.py          # Per-board/scope advisory lock (acquire/release/holder)
     consult_run.py         # start_consult(question_id, *, project_root, broadcast_fn, spawn_fn=None, block=False) (chief-autopilot-round-two 02): one headless `consult-<12 hex>` run of a queued route's role (planning/consult-answer), its AGENT_DONE summary delivered — see "Consult runs"; no board lock
-    consult_router.py      # on_question(question_id, *, project_root, broadcast_fn, host_present, start=None) -> none|person|routed|no_host (chief-autopilot-round-two 04): routes a posted role question, start_consult on a `consult-<qid[:8]>` thread — see "Consult router"
+    consult_router.py      # on_question(question_id, *, project_root, board, scope, broadcast_fn, host_present, start=None) -> none|person|routed|no_host (chief-autopilot-round-two 04): routes a posted role question, start_consult on a `consult-<qid[:8]>` thread — see "Consult router"
     consult_window.py      # open_window(project_root, *, scope=None) / blamed(window) / withhold / noted (chief-autopilot-round-two 03): a consult that changed the project is withheld — see "Consult runs"
     chief_tiers.py         # what a chief may do (chief-agent): ACTIONS, TIERS (status=read; planner=read,post,plan; operator=all seven), actions_for/normalise_tier, and resolve_preset_tier — a user prompt file chief/<preset> names its tier in leading front matter `tier:`, else the built-in names map to themselves, anything else (unknown tier, missing front matter, malformed name) is status. Code, never read from prompt text; strip_front_matter reuses skills/compose_base
     chief_presets.py       # the chief's prompt (chief-agent 17): the built-in styles STATUS / PLANNER / OPERATOR (BUILT_IN), default_style (user file chief/<preset> wins, else the built-in text), compose_prompt (style + the chief-connect fragment, read at call time, + ROOT_LINE with the stored project root)
@@ -2792,11 +2792,14 @@ Server-driven, no chief turn. `http_server/consult_trigger.trigger_consult` is a
 hook, registered in `app.py` after `record_chief_run` (so it runs first: hooks run in reverse
 order). For `POST /comms/post` answered 200 with `ok` and a `message_id`, when the request body's
 `type` is `question` (read with `read_json_body`), it calls `on_question(message_id,
-project_root=<the body's>, broadcast_fn=sse._broadcast_spawn, host_present=bool(sse._spawn_clients))`.
+project_root=, board=, scope=, broadcast_fn=sse._broadcast_spawn, host_present=bool(sse._spawn_clients))`
+with the project root, board and scope of the asking run's token row (`caller_identity(request)`,
+`run_tokens`), never the body's: the root is where the consult spawns and what `consult_window`
+measures, so a run must not pick it (the rule of `chief_run_record.py`).
 It never changes the response and never raises (a failure is logged to `pathly.http`).
 
-`on_question(question_id, *, project_root, broadcast_fn, host_present, start=None) -> str` (`start`
-defaults to `consult_run.start_consult`, read at call time) returns what it did:
+`on_question(question_id, *, project_root, board, scope, broadcast_fn, host_present, start=None) -> str`
+(`start` defaults to `consult_run.start_consult`, read at call time) returns what it did:
 
 - `none`: `route_decision` said `none` (to `human` or `*`, tokenless, a consult's own, already
   routed).
@@ -2804,11 +2807,20 @@ defaults to `consult_run.start_consult`, read at call time) returns what it did:
   goal cost line). When `record_route` returns False (a duplicate, or a racing question reached
   the cap) `route_decision` is asked again, and a `person` answer is handed on.
 - `no_host`: a `route` with no spawn host listening; the question stays as posted, no route row.
+- `person` too, for a `route` whose token names no project root (`the asking run's token names
+  no project root`) or whose token's board and scope are not the question's (`the question is on
+  board <b>/<s>, the asking run's is <b>/<s>`); checked after the host, before `record_route`.
 - `routed`: `record_route` inserted a `queued` route, and `start(question_id, project_root=...,
   broadcast_fn=..., block=False)` runs on a daemon thread `consult-<question id[:8]>`. A start
   that raises sets the route `failed` (reason `consult start failed: <error>`) and hands the
   question to the person; a start that answers `{"started": False}` does the same only while the
-  route is still `queued` (one another start claimed is left to it).
+  route is still `queued` (one another start claimed is left to it). `start_consult(block=False)`
+  spawns on its own thread, so a routed question has two short-lived threads (the ticket asks for
+  the router's).
+
+The goal cost line counts only consult costs already billed, so up to `consult.max_per_task`
+consults of one task (and that many per task for a run with several) can start before any cost
+lands and end past the line; the per-task cap is what bounds it.
 
 At server start, `app.main` calls `end_stale_routes` in its own `try` in the branch where nothing
 already answers on the host and port (before `chief_startup_cleanup`), and logs the handed-on

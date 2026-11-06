@@ -1,7 +1,7 @@
 # Route a run's role question to a consult when it is posted
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 01, 02
 Test first: yes
 Level: 3
@@ -118,7 +118,9 @@ Work started at 601ff64e27d03cece4c92e7764be252b593bad6f (HEAD b0299f8, a merge 
   `start=start_consult` default bound at definition: the hook passes no `start`, so the tests
   replace `consult_router.start_consult` to inject the fake through `POST /comms/post`.
 - The hook reads the body with the comms `read_json_body` (the route's own lenient decoder), so
-  a cp1252 question is routed too; the project root is the body's value, stripped (may be "").
+  a cp1252 question is routed too. ~~the project root is the body's value, stripped (may be "").~~
+  (Round 1: the project root, board and scope now come from the asking run's token row; see
+  Review fixes.)
 - A raising start: `set_route_status(failed, reason="consult start failed: <Type>: <msg>")`
   first, then `hand_to_person` (which keeps an ended route's status but re-addresses and replies).
   `start_consult` answering `{"started": False}`: the same, only while the route is still
@@ -145,6 +147,48 @@ Work started at 601ff64e27d03cece4c92e7764be252b593bad6f (HEAD b0299f8, a merge 
   `supervisor.consult_router.start_consult` (06, 07, 12): join `consult-` threads before the test
   ends (see `_join_router_threads` in `tests/comms_board/test_consult_router.py`).
 - 09: `on_question`'s outcomes are not recorded anywhere but the route row and the status reply.
+
+**Review fixes (round 1, quality review)**
+
+Test commit b0e9b38 (4 new tests, 6 direct `on_question` calls given the new `board`/`scope`
+keywords) failed for the right reasons: `start` got `''` and the other root, and the
+no-root / other-board questions were started.
+
+1. Blocker, project root from the body: fixed. `consult_trigger` now passes
+   `caller_identity(request).project_root` (the `run_tokens` row), never `data["project_root"]`.
+   The ticket's line "with the body's `project_root`" is deliberately not followed: the root is the
+   consult's spawn cwd and what `consult_window` measures, so the asking run must not choose it;
+   this follows `chief_run_record.py`'s rule (the session's root, never the body's). A routable
+   question whose token names no root is handed to the person (`the asking run's token names no
+   project root`); the body is never a fallback. Tests:
+   `test_a_question_with_no_root_in_the_body_starts_with_the_tokens_root`,
+   `test_a_question_naming_another_root_starts_with_the_tokens_root` (both: `start` gets the
+   token's root), `test_a_token_with_no_root_hands_the_question_to_the_person`.
+2. Minor, board/scope from the body: fixed. `on_question` takes the token's `board` and `scope`
+   and, for a `route` (after the host check, before `record_route`), compares them with the stored
+   question row's `board`/`scope`; a mismatch is handed to the person (`the question is on board
+   <b>/<s>, the asking run's is <b>/<s>`). Test:
+   `test_a_question_on_another_board_than_the_tokens_goes_to_the_person`.
+3. Minor, cost line checked against billed costs only: noted, not changed. It is the ticket 01
+   rule (`route_decision`, already documented as a soft line); a reservation would change
+   `consult_routes`, outside Touches. Added a paragraph to the "Consult router" section of
+   `src/pathly_orchestrator/CLAUDE.md` saying the per-task cap is what bounds it.
+4. Minor, two threads per consult: kept. The ticket asks for `start` "on a daemon thread named
+   `consult-<question id prefix>`" and the tests check that name; the router thread returns as soon
+   as `start_consult(block=False)` hands off. Noted in the same doc section.
+
+Proof after the fixes:
+- `python -m pytest tests/comms_board/test_consult_router.py -q -p no:cacheprovider`: `20 passed`, exit 0.
+- `python -m pytest tests/comms_board tests/http_api -q -p no:cacheprovider`: `4151 passed in 1071.71s`, exit 0.
+- `tests/comms_board/test_consult_router.py tests/dag_goals/test_task_waits_for_answer.py
+  tests/comms_board/test_comms_provenance.py`: 137 passed. `black --check src/ tests/` (746
+  unchanged), `mypy src/` (no issues, 367 files), `check_file_size.py` (none new, none grown;
+  `consult_router.py` 154 lines), `lint-imports` (1 kept, 0 broken), `gen_test_index.py` then
+  `--check` (up to date), `check_no_mirror_reads.py`: all exit 0. `consult_run.py` unchanged.
+
+For later tickets: `on_question` now requires `board` and `scope` (the asking token's); a test
+that posts a role question must mint its token with the same board and scope as the post body and
+a project root, or the question goes to the person.
 
 ## Review findings (round 1, quality review)
 

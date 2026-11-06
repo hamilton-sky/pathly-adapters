@@ -2,9 +2,10 @@
 
 ``trigger_consult`` is an ``after_request`` hook. For ``POST /comms/post`` answered 200 with
 ``ok`` and a ``message_id``, when the request body's ``type`` is ``question``, it calls
-``supervisor.consult_router.on_question`` with the body's ``project_root``,
-``broadcast_fn=sse._broadcast_spawn`` and ``host_present=bool(sse._spawn_clients)`` (the queues
-a spawn host reads, ``/events/spawn``). It never changes the response and never raises: a failure
+``supervisor.consult_router.on_question`` with the asking run's token's ``project_root``,
+``board`` and ``scope`` (``caller_identity``, the ``run_tokens`` row; never the body's, so a run
+cannot point a consult at another project or board), ``broadcast_fn=sse._broadcast_spawn`` and
+``host_present=bool(sse._spawn_clients)`` (the queues a spawn host reads, ``/events/spawn``). It never changes the response and never raises: a failure
 is logged, so routing can never turn a stored post into a 500.
 """
 
@@ -44,11 +45,15 @@ def trigger_consult(response):
         data = read_json_body() or {}
         if data.get("type") != "question":
             return response
+        from pathly_orchestrator.http_server.run_identity import caller_identity
         from pathly_orchestrator.supervisor.consult_router import on_question
 
+        asker = caller_identity(request)
         on_question(
             message_id,
-            project_root=str(data.get("project_root", "") or "").strip(),
+            project_root=asker.project_root,
+            board=asker.board,
+            scope=asker.scope,
             broadcast_fn=sse._broadcast_spawn,
             host_present=bool(sse._spawn_clients),
         )

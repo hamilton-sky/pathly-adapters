@@ -7,6 +7,9 @@
 - ``person`` → ``hand_to_person`` with the decision's reason.
 - ``route`` with no spawn host listening → nothing (``no_host``): the question stays as posted,
   since a change of ``to_agent`` there would rewrite rows other tests read (spec Decisions).
+- ``route`` from an asking run whose token names no project root, or whose token's board and
+  scope are not the question's → ``hand_to_person``: the consult runs in the asking run's own
+  project and board, never in ones the request body names.
 - ``route`` → ``record_route`` (insert-or-ignore; False for a duplicate and for a cap a racing
   question reached, so ``route_decision`` is asked again), then ``start`` on a daemon thread named
   ``consult-<question id prefix>``.
@@ -33,13 +36,16 @@ THREAD_PREFIX = "consult-"
 def on_question(
     question_id: str,
     *,
-    project_root: str,
+    project_root: str | None,
+    board: str | None,
+    scope: str | None,
     broadcast_fn,
     host_present: bool,
     start=None,
 ) -> str:
     """Route ``question_id``; returns what it did: ``none``, ``person``, ``routed`` or
-    ``no_host``. ``start`` defaults to ``consult_run.start_consult`` (read at call time).
+    ``no_host``. ``project_root``, ``board`` and ``scope`` are the asking run's token's.
+    ``start`` defaults to ``consult_run.start_consult`` (read at call time).
     """
     from ..db.connection import get_db
     from ..db.queries import consult_routes
@@ -48,6 +54,11 @@ def on_question(
     decision = consult_routes.route_decision(conn, question_id)
     if decision.kind == "route" and not host_present:
         return "no_host"
+    if decision.kind == "route":
+        refusal = _asker_refusal(conn, question_id, project_root, board, scope)
+        if refusal:
+            consult_routes.hand_to_person(conn, question_id, refusal, by=BY)
+            return "person"
     if decision.kind == "route" and not consult_routes.record_route(
         conn, decision, question_id
     ):
@@ -62,11 +73,38 @@ def on_question(
     threading.Thread(
         target=_start,
         args=(question_id, start or start_consult),
-        kwargs={"project_root": project_root, "broadcast_fn": broadcast_fn},
+        kwargs={
+            "project_root": (project_root or "").strip(),
+            "broadcast_fn": broadcast_fn,
+        },
         name=THREAD_PREFIX + question_id[:8],
         daemon=True,
     ).start()
     return "routed"
+
+
+def _asker_refusal(
+    conn,
+    question_id: str,
+    project_root: str | None,
+    board: str | None,
+    scope: str | None,
+) -> str | None:
+    """Why the asking run's token cannot carry this consult, else None: no project root, or a
+    board and scope that are not the question's."""
+    if not (project_root or "").strip():
+        return "the asking run's token names no project root"
+    row = conn.execute(
+        "SELECT board, scope FROM comms_messages WHERE id=?", (question_id,)
+    ).fetchone()
+    asked = (row["board"] or "", row["scope"] or "") if row else ("", "")
+    own = (board or "", scope or "")
+    if asked != own:
+        return (
+            f"the question is on board {asked[0]}/{asked[1]}, "
+            f"the asking run's is {own[0]}/{own[1]}"
+        )
+    return None
 
 
 def _start(question_id: str, start, *, project_root: str, broadcast_fn) -> None:
