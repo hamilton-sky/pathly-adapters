@@ -5,7 +5,7 @@ Status: open
 Blocked by: 05, 06
 Test first: yes
 Level: 2
-Touches: src/pathly_orchestrator/supervisor/run_task_outcome.py, src/pathly_data/core/skills/fragments/consult.md, src/pathly_data/core/skills/composition.yaml, src/pathly_data/core/skills/development/drain-dag.md, tests/snapshots/, tests/dag_goals/test_single_role_questions.py (new), tests/dag_goals/test_task_waits_for_answer.py, src/pathly_orchestrator/CLAUDE.md, src/pathly_data/CLAUDE.md, tests/INDEX.md, tests/dag_goals/INDEX.md
+Touches: src/pathly_orchestrator/supervisor/run_task_outcome.py, src/pathly_data/core/skills/fragments/consult.md, src/pathly_data/core/skills/composition.yaml, src/pathly_data/core/skills/development/drain-dag.md, tests/snapshots/, tests/dag_goals/test_single_role_questions.py (new), tests/dag_goals/test_task_waits_for_answer.py, src/pathly_orchestrator/CLAUDE.md, src/pathly_data/CLAUDE.md, tests/INDEX.md, tests/dag_goals/INDEX.md, tests/dag_goals/test_loop_park_gaps.py
 
 Delivery for `single` goals, and the agent-facing text for every executor (spec Decisions, "Park
 or enrich, per executor"). The drain-dag agent completes its own tasks, so the server can only
