@@ -3,7 +3,8 @@
 A DAG task used to pass on its own ``AGENT_DONE`` outcome. ``drain.drain_frontier`` now wraps the
 spawn with :func:`wrap`, inside the cost tracker. For a run id of the form
 ``sched-<task_id>#<n>`` the wrapper snapshots the working tree before the spawn and after it
-returns, and when the agent reported success it checks, in this order:
+returns, and when the agent reported success (and left no open question: such an attempt is
+returned unproven, and the scheduler parks it) it checks, in this order:
 
 * the floor guard over the diff (``proof.floor.scan``), leaving out the paths declared in the
   ``files`` of every task whose window overlapped this one;
@@ -314,6 +315,18 @@ def _prove(
     return failed
 
 
+def _asked(run_id: str) -> bool:
+    """True when the attempt left an open question: it is parked, not proven. Fails open."""
+    try:
+        from pathly_orchestrator.db.connection import get_db
+        from pathly_orchestrator.db.queries.task_waits import open_questions_by_run
+
+        return bool(open_questions_by_run(get_db(), run_id))
+    except Exception:
+        logger.warning("task_proof: questions of %s unreadable", run_id, exc_info=True)
+        return False
+
+
 def wrap(spawn_fn: Optional[Callable]) -> Callable:
     """A spawn function with ``scheduler._worker``'s signature that proves a DAG task.
 
@@ -337,6 +350,8 @@ def wrap(spawn_fn: Optional[Callable]) -> Callable:
             others = _close_window(run_id)
         finally:
             _close_window(run_id)
+        if _asked(run_id):
+            return outcome
         return _prove(state, run_id, task, before, after, others, outcome)
 
     return _spawn

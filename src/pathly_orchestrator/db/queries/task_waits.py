@@ -83,6 +83,53 @@ def _is_answered(conn: sqlite3.Connection, question_id: str) -> bool:
     return row["status"] == "answered" or bool(row["replied"])
 
 
+def park_and_recheck(
+    conn: sqlite3.Connection, task_id: str, question_ids: list[str]
+) -> str:
+    """``park_task``, then free the task at once when every question is answered now.
+
+    An answer written between the caller's ``open_questions_by_run`` and the park found no
+    blocked task to free, so the task would stay parked on an answered question. Returns
+    ``parked``, ``released`` (``pending`` again, the ids in ``answered_questions``, the wait
+    still counted) or ``not_parked`` (the task was not ``in_progress``).
+    """
+    if not park_task(conn, task_id, question_ids):
+        return "not_parked"
+    if question_ids and all(_is_answered(conn, q) for q in question_ids):
+        if task_id in release_waiting_tasks(conn, question_ids[0]):
+            return "released"
+    return "parked"
+
+
+def task_status(conn: sqlite3.Connection, task_id: str) -> str | None:
+    """The task's ``task_status``; None for a missing task."""
+    row = conn.execute(
+        "SELECT task_status FROM comms_messages WHERE id=?", (task_id,)
+    ).fetchone()
+    return row["task_status"] if row is not None else None
+
+
+def still_waiting(conn: sqlite3.Connection, task_ids: list[str]) -> list[str]:
+    """The ``task_ids`` that still wait: parked on a question, or ``pending`` again after an
+    answer and not yet run. A task that ran again (done, failed, in progress) is left out.
+    """
+    waiting: list[str] = []
+    for tid in task_ids:
+        row = conn.execute(
+            "SELECT task_status, fail_reason FROM comms_messages "
+            "WHERE id=? AND deleted_at IS NULL",
+            (tid,),
+        ).fetchone()
+        if row is None:
+            continue
+        status = row["task_status"]
+        if status == "pending" or (
+            status == "blocked" and waiting_question_ids(row["fail_reason"])
+        ):
+            waiting.append(tid)
+    return waiting
+
+
 def _merged_ids(answered_json: str | None, ids: list[str]) -> str:
     try:
         known = json.loads(answered_json) if answered_json else []
