@@ -443,7 +443,7 @@ GET  /comms                 ← list board messages (scoped)
 POST /comms/search          ← hybrid (semantic + keyword) search; semantic arm floored at SEMANTIC_DISTANCE_CEILING, keyword hits bypass; no match → [] (never padded with recent messages). Reached by AGENTS too via the `board-search` fragment (own board only) — the self-authored second query the pushed context can't make; Studio's search box is the other caller
 POST /comms/promote         ← copy a decision/constraint UP a tier (feature→project→global). COPY not move: the source board is the audit record of HOW the decision was reached. Stamps promoted_from/original_scope on the copy + promoted_to on the source (the three columns migrations.py reserved and nothing read). Idempotent, keyed off the COPY's promoted_from so one message can promote to two tiers. Own permission set `_PROMOTE_WRITERS` = {director, evaluator, human, **retro**} — NOT _GLOBAL_WRITERS, else the RETRO stage (the one headless role whose job IS capturing lessons) could never promote. decision/constraint only
 POST /comms/acknowledge     ← mark a message acknowledged
-POST /comms/answer          ← answer a posted question (frees the tasks parked on it, see "A task waits on its question")
+POST /comms/answer          ← answer a posted question (frees the tasks parked on it, see "A task waits on its question"); a chief's cited answer is stored `from_agent: human` with the cited text and stamped `chief`/<the chief's run>/`chief_relayed` (`chief_cite.relayed_stamp`, see "Author provenance on board writes"); any other answer is stamped `none`
 GET  /comms/tasks           ← list DAG tasks; each row carries `answered_questions: [{question, answer}]` (`[]` when it never waited; `blueprints/comms/tasks_ready.py`)
 POST /comms/tasks/complete  ← mark a task complete
 POST /comms/tasks/status    ← BULK terminal write-back (done|failed) for a resolving agent: `{task_ids,status,reason,from}`; reports updated/newly_ready/blocked/unknown. Re-opening (→pending) is deliberately NOT offered — that is a supervisory act
@@ -1555,7 +1555,7 @@ pathly_orchestrator/
                            # (plus PATHLY_RUN_TOKEN= / : values) and replaced by `[run token]` at the
                            # DB write chokepoints (chief-autopilot 03); imports nothing internal
     provenance_values.py   # the author_source vocabulary and the `system` stamp, defined ONCE
-                           # (AUTHOR_SOURCES = token|system|legacy|none, SYSTEM_ROLE, SYSTEM_AUTHOR,
+                           # (AUTHOR_SOURCES = token|system|legacy|none|chief_relayed, SYSTEM_ROLE, SYSTEM_AUTHOR,
                            # SYSTEM_PAIR) and check_author_source (the one ValueError for an
                            # unknown source: post_message and update_message_text ask it before
                            # writing); imported by runner/provenance.py and comms_artifacts.py
@@ -2718,8 +2718,8 @@ written by the asking run (`author_run_id`) is neither listed by `asked_question
 answered for a release, and a loop park whose `waits` passes `consult.max_per_task` +
 `task_waits.WAIT_MARGIN` (2) is `held` for the person (`park_and_recheck(hold_over=wait_ceiling)`)
 instead of released at once; a later answer to one of its questions frees it. An answer through
-`POST /comms/answer` carries no `author_run_id`, so only the ceiling bounds an agent that answers
-itself there. A question handed to the
+`POST /comms/answer` carries no `author_run_id` (only a chief's relayed answer does, and it names
+the chief's run), so only the ceiling bounds an agent that answers itself there. A question handed to the
 person has no pending route, so the run ends `waiting_for_answer` with no wait; so does a route
 still running at the timeout. `_drain` records on the run the tasks that still wait
 (`note_run_waits`, `task_waits.still_waiting`: parked, or `pending` and not yet run; one that ran
@@ -3582,7 +3582,16 @@ blueprints `comms/goals.py`, `project.py` and `settings.py` import it `as _post_
 call sites need no stamp argument). `consult_stamp(role, run_id)` gives `<role>`/`<run_id>`/`token`
 for a row the server posts on behalf of its own consult run (`supervisor/consult_run.py`, the only
 caller, which a provenance test checks); it raises `ValueError` unless the run id starts with
-`consult-` and the role is one of `consult_routes.CONSULT_ROLES`. The values (`AUTHOR_SOURCES`, the `system` constants) are
+`consult-` and the role is one of `consult_routes.CONSULT_ROLES`. `POST /comms/answer` stamps the
+answer a chief relays (the gate let a cited answer through, `g.chief_cited_text`, and the caller's
+run token is a chief's) with `http_server/chief_cite.relayed_stamp()`: `author_role="chief"`,
+`author_run_id=<the chief's run>` (from the token, `caller_identity` + `is_chief_run`, never the
+body), `author_source="chief_relayed"`; the row keeps `from_agent="human"` and the cited text (the
+words are the person's), and `answer_question` forwards the three columns to `post_message`. Any
+other answer (no token, the Studio UI) stays `none`. `runner/read_policy` treats every source but
+`none` as attributed, so a `chief_relayed` row is shown to agents like a token-stamped one, and
+`db/queries/comms_hydrate` stores a mirror row that claims `chief_relayed` as `legacy`, like every
+claimed source. The values (`AUTHOR_SOURCES`, the `system` constants) are
 defined once in `db/provenance_values.py`. `POST /comms/post` computes
 `stamp(caller_identity(request))` (`caller_identity` is in `http_server/`, so the identity is a
 parameter here), and the body's `from` / `run_id` are still stored in `from_agent` / `run_id` but

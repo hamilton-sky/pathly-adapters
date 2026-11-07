@@ -4,7 +4,7 @@
 
 Comms board / message-board subsystem — messages, tasks, artifacts, goals, context retrieval & relevance, board mirror & hydration.
 
-79 test file(s).
+80 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -33,6 +33,7 @@ Comms board / message-board subsystem — messages, tasks, artifacts, goals, con
 | `test_chief_hook_tags.py` | chief-agent 20, B17: the hook flags every tag that starts with the two names | 3 |
 | `test_chief_human_messages.py` | chief-agent 09: record what the human types in a claude chief tab | 16 |
 | `test_chief_prompt_hook.py` | chief-agent 09: the chief's UserPromptSubmit hook, its edge cases and as a real process | 12 |
+| `test_chief_relayed_answer.py` | chief-autopilot-round-two 11: an answer a chief relays is stamped ``chief_relayed`` | 5 |
 | `test_chief_tier_lines.py` | chief-agent 20, B18: the tier line is read from the lines the pasted text has | 6 |
 | `test_chief_tiers.py` | chief-agent 04: the chief tiers and the preset-to-tier resolution | 28 |
 | `test_comms_agent_context.py` | Tests for POST /comms/agent-context (BLOCK C1 — BOARD-INFO mode) | 6 |
