@@ -3,7 +3,8 @@
 A DAG task used to pass on its own ``AGENT_DONE`` outcome. ``drain.drain_frontier`` now wraps the
 spawn with :func:`wrap`, inside the cost tracker. For a run id of the form
 ``sched-<task_id>#<n>`` the wrapper snapshots the working tree before the spawn and after it
-returns, and when the agent reported success it checks, in this order:
+returns, and when the agent reported success (and left no open question: such an attempt is
+parked here and returned unproven; one that cannot be parked is proven) it checks, in this order:
 
 * the floor guard over the diff (``proof.floor.scan``), leaving out the paths declared in the
   ``files`` of every task whose window overlapped this one;
@@ -314,6 +315,40 @@ def _prove(
     return failed
 
 
+def _parked_on_question(task_id: str, run_id: str) -> bool:
+    """Park the task on the attempt's open questions; True when it waits and is left unproven.
+
+    ``task_waits.park_and_recheck`` parks it here, while the attempt can still be proven (and
+    frees it at once when the questions are answered by now); the ids and the result are
+    carried to the scheduler's ``task_wait_outcome.park_if_asked``. A task that cannot be
+    parked (no longer ``in_progress``, or an unreadable row) is proven instead, so an asking
+    attempt never reaches ``complete_task`` unproven."""
+    from .task_wait_outcome import carry_park
+
+    try:
+        from pathly_orchestrator.db.connection import get_db
+        from pathly_orchestrator.db.queries.task_waits import (
+            open_questions_by_run,
+            park_and_recheck,
+        )
+
+        conn = get_db()
+        asked = open_questions_by_run(conn, run_id)
+        if not asked:
+            return False
+        parked = park_and_recheck(conn, task_id, asked)
+    except Exception:
+        logger.warning(
+            "task_proof: parking %s failed; proving it", run_id, exc_info=True
+        )
+        return False
+    if parked == "not_parked":
+        logger.info("task_proof: %s asked but could not be parked; proving it", run_id)
+        return False
+    carry_park(run_id, asked, parked)
+    return True
+
+
 def wrap(spawn_fn: Optional[Callable]) -> Callable:
     """A spawn function with ``scheduler._worker``'s signature that proves a DAG task.
 
@@ -337,6 +372,8 @@ def wrap(spawn_fn: Optional[Callable]) -> Callable:
             others = _close_window(run_id)
         finally:
             _close_window(run_id)
+        if _parked_on_question(task_id, run_id):
+            return outcome
         return _prove(state, run_id, task, before, after, others, outcome)
 
     return _spawn

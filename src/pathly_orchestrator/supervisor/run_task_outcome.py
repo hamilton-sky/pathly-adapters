@@ -105,7 +105,7 @@ def _free_unfinished(run_id: str) -> tuple[Optional[str], int]:
     )
     from pathly_orchestrator.db.queries.task_waits import (
         open_questions_by_run,
-        park_task,
+        park_and_recheck,
     )
 
     from .task_retry import resolve_max_attempts
@@ -117,7 +117,7 @@ def _free_unfinished(run_id: str) -> tuple[Optional[str], int]:
     questions = open_questions_by_run(conn, run_id)
     if questions:
         for task in tasks:
-            park_task(conn, task["id"], questions)
+            park_and_recheck(conn, task["id"], questions)
         return WAITING_FOR_ANSWER, len(tasks)
     limit = resolve_max_attempts()
     for task in tasks:

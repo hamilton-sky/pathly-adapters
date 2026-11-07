@@ -10,6 +10,7 @@ from .interactions import _await_agent_question
 from .orchestrator_stage import _resolve_stage_supervised  # noqa: F401
 from .registry import _lock, _set_status, _write_mirror
 from .state import OpenSession, RunnerState, logger
+from .task_wait_outcome import waits_for_answer as _waits
 from .terminal import _write_supervisor_phase_summary
 
 # The terminal stage that seeds a board task-DAG. When a run carries a goal_id (it is a
@@ -292,7 +293,7 @@ def _loop(state: RunnerState, broadcast_fn: Optional[Callable]) -> None:
             # review is the pipeline's real gate, and halting here would change semantics for
             # standard/strict rigor. (Halting for no-review rigors — nano/lite — is an open product
             # decision, see pathly/features/unified-control-plane/SPEC.md §4 P-1.)
-            if _outcome_is_failure(invoke_result):
+            if _outcome_is_failure(invoke_result) and not _waits(invoke_result):
                 _stage = (response or {}).get("current_state") or ""
                 _reason = (
                     (invoke_result or {}).get("error")

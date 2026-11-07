@@ -27,6 +27,28 @@ def _checkpoint_text(topic: str, file_name: str, res: dict) -> str:
     return body
 
 
+def _record_waiting_outcome(state: RunnerState) -> None:
+    """``RUN_OUTCOME`` failed / ``waiting_for_answer`` for a run that ends on parked loop tasks,
+    in the storage ``run_history`` keys the run by, so ``GET /runs/<id>`` reads it."""
+    try:
+        from pathlib import Path
+
+        from pathly_orchestrator.fsm_ops import _resolve_storage_path
+
+        from .run_task_outcome import _record_run_outcome
+
+        storage = (
+            Path(state.storage_path)
+            if state.storage_path
+            else _resolve_storage_path(None, state.project_root, state.topic)
+        )
+        _record_run_outcome(storage, state.run_id, WAITING_FOR_ANSWER)
+    except Exception:
+        logger.warning(
+            "RUN_OUTCOME of waiting run %s failed", state.run_id, exc_info=True
+        )
+
+
 def _resolve_stage_supervised(
     state: RunnerState,
     flow: str,
@@ -102,6 +124,7 @@ def _resolve_stage_supervised(
         # would send INCOMPLETE_TASKS to a builder over a task that waits for a person.
         waiting = take_run_waits(state)
         if waiting:
+            _record_waiting_outcome(state)
             _fail(
                 WAITING_FOR_ANSWER,
                 f"{len(waiting)} task(s) wait for an answer to a question: {waiting}",
