@@ -1,7 +1,7 @@
 # Park a single run's unfinished task on its role question, and tell agents how consults work
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 05, 06
 Test first: yes
 Level: 2
@@ -76,7 +76,76 @@ exit 0
 
 ## Answer
 
+**Built**
+
+- `src/pathly_orchestrator/supervisor/run_task_outcome.py`: `ANSWER_READY = "answer_ready"` beside
+  `WAITING_FOR_ANSWER`; `_free_unfinished` reads `task_waits.asked_questions_by_run` (open human/`*`
+  questions plus every role or routed question, answered or not, minus self-answered) and maps
+  `park_and_recheck`'s results: any `parked` -> `waiting_for_answer` (count of parked tasks), else
+  any `released` -> `answer_ready` (count released), else `(None, 0)`. Module and
+  `free_tasks_of_failed_spawn` docstrings updated. 234 lines.
+- `src/pathly_data/core/skills/fragments/consult.md`: role questions are answered by a consult run
+  Pathly starts, usually within minutes; per way of running: loop task held and run again (finish on
+  the fallback), `drain-dag` leaves the task unfinished and goes on when the answer decides how to
+  build it (else completes on the fallback), team stage = advice on the board, a needed change is a
+  `feedback/<TYPE>.md`. "When you are consulted ... answer on the board" replaced with "do not answer
+  another agent's question yourself ... a consult run does". "Never block", the one-bounded-question
+  rule and the run-token line are kept.
+- `src/pathly_data/core/skills/composition.yaml`: `consult` added to `development/execute-task` and
+  `development/drain-dag`, before `completion-report` (still last).
+- `src/pathly_data/core/skills/development/drain-dag.md` step 3: `answered_questions` may come from
+  the person or a role; a task left unfinished for an answer is not claimed again in this run.
+- `tests/snapshots/team__build.claude.md`, `team__review.claude.md`, `team__test.claude.md`
+  regenerated with `compose_skill(skill, "claude")` (only these three snapshots differed).
+- `tests/dag_goals/test_single_role_questions.py` (new, 4 tests); `tests/dag_goals/test_task_waits_for_answer.py`:
+  `test_a_question_to_a_role_does_not_park` now asserts the park (function kept);
+  `tests/dag_goals/test_loop_park_gaps.py`: ticket 05's single-race test now expects
+  `answer_ready` (Touches widened in 7953af3).
+- `src/pathly_orchestrator/CLAUDE.md` (task_waits and run_task_outcome entries, "A task waits on its
+  question"), `src/pathly_data/CLAUDE.md` (drain-dag / execute-task fragment lists),
+  `tests/INDEX.md`, `tests/dag_goals/INDEX.md`.
+
+**Proof**
+
+- Test first: the test-only commit failed for the right reasons (`'task_unfinished' == 'waiting_for_answer'`,
+  `'task_unfinished' == 'answer_ready'`, `'pending' == 'blocked'`).
+- `python -m pytest tests/dag_goals/test_single_role_questions.py -q -p no:cacheprovider`: 4 passed, exit 0 (covers the park + `waiting_for_answer`, the at-once release + `answer_ready` in `GET /runs/<id>`, a later role answer freeing the task with question and answer in its ready row, a completed task staying `done`).
+- `python -m pytest tests/dag_goals/test_task_waits_for_answer.py tests/install_skills -q -p no:cacheprovider`: 430 passed, 2 skipped, exit 0 (the flipped role-question test asserts the park; `test_team_skill_matches_golden_snapshot` passes on the regenerated snapshots).
+- `python -m pytest tests/dag_goals tests/runner_supervisor -q -p no:cacheprovider`: 699 passed, exit 0.
+- Full `python -m pytest tests/ -q -p no:cacheprovider`: 6778 passed, 14 skipped, exit 0. An earlier full run, made while two other pytest runs were going at the same time, failed once in ticket 06's timing test `test_loop_role_questions.py::test_the_drain_waits_for_the_consult_and_runs_the_task_again_with_the_answer` (the wait released nothing). That loop path is untouched here; the test passed 3 of 3 times on its own and in the clean full run.
+- `python3 scripts/check_file_size.py` OK (none new, none grown); `python scripts/gen_test_index.py --check`
+  up to date; `black --check src/ tests/` clean.
+
+**Decisions**
+
+- A mix of parked and released tasks reports `waiting_for_answer` (the run still waits on
+  something); `answer_ready` only when no task stays parked and at least one was released.
+- A run none of whose tasks could be parked (no longer `in_progress`, a race) returns no error, as
+  for a run that left no task.
+- Single runs pass no `hold_over` to `park_and_recheck`: the next single run is started by the person
+  or the chief, never automatically, so no wait ceiling is needed there.
+- Ticket 05's single race case (an answer between the read and the park) is `answer_ready` now, per
+  this ticket's item 1 and the spec's Edge cases row.
+
+**Shortcuts taken**
+
+- `free_tasks_of_failed_spawn` still ignores the returned error (it only logs it), so a spawn that
+  raised writes no `answer_ready`; its `run_history` already says `error`. Worth upgrading if the
+  chief must tell `answer_ready` from a crash for failed spawns.
+- No wait ceiling for single runs (see Decisions): an agent that answers its own question through
+  `/comms/answer` (no `author_run_id`) gets a free re-run on each manual restart.
+
+**For later tickets**
+
+- 09/12: a single run's `GET /runs/<id>` error may now be `answer_ready` (task `pending` with its
+  answers, ready to start again) besides `waiting_for_answer`; notices should treat it as "can be
+  started again", not as waiting.
+- Loop and single agents now compose `consult`, so `development/execute-task` and
+  `development/drain-dag` prompts are longer; no golden snapshot exists for them.
+
 ## Attempt note
+
+Closed: attempt 2 finished the ticket after Touches was widened (7953af3); see the Answer.
 
 Attempt 1 (started at c9a97fc, branch HEAD da5180f; test-first commit 2c70d31). Everything in
 the ticket is built and its own Done-when checks pass, but one existing test outside `Touches`
