@@ -8,8 +8,9 @@ while the run is alive, then reports the run started and, unless the test holds 
 which makes the supervisor's spawn settle and revoke the token (the way
 ``test_rrp_acceptance.py`` finishes a stage). The real ``_broadcast_runner`` is used, so the
 queues see exactly what the server sends. ``Asker`` is a registered run whose stage waits in
-``_await_agent_question``. ``type_in_tab`` is the chief hook's own request, so the messages a
-chief may cite are recorded by the real route. The autouse guard closes every chief a test left
+``_await_agent_question``. ``type_in_tab`` is the chief hook's own request, with the secret
+``hook_secret`` claimed once through ``POST /chief/hook-secret``, so the messages a chief may cite
+are recorded by the real route. The autouse guard closes every chief a test left
 open (its watcher thread would wake 30 seconds later, in a later test, with no patched home) and
 fails the test when a thread it started is still alive. Imported by bare name: ``tests/comms_board``
 is on ``sys.path`` for the test files that sit in it.
@@ -252,13 +253,25 @@ def session_row(run_id: str) -> dict:
     return found
 
 
+_CLAIMED: dict[str, str] = {}
+
+
+def hook_secret(client, chief: Chief) -> str:
+    """The chief's hook secret, claimed once through ``POST /chief/hook-secret`` the way
+    Studio's main process claims it (tokenless), and kept for the test's later prompts: a second
+    claim would close the chief."""
+    if chief.run_id not in _CLAIMED:
+        resp = client.post("/chief/hook-secret", json={"run_id": chief.run_id})
+        assert resp.status_code == 200, resp.get_data(as_text=True)
+        _CLAIMED[chief.run_id] = resp.get_json()["hook_secret"]
+    return _CLAIMED[chief.run_id]
+
+
 def type_in_tab(client, chief: Chief, text: str, relayed: bool = False) -> dict:
     """What the chief's UserPromptSubmit hook posts when ``text`` is submitted in the tab
     (``relayed`` is the hook's flag for a prompt that another session or a task notification
     delivered)."""
-    from pathly_orchestrator.supervisor.chief_session import _chief_root
-
-    secret = (_chief_root() / chief.run_id / "hook_secret").read_text(encoding="utf-8")
+    secret = hook_secret(client, chief)
     body = {
         "run_id": chief.run_id,
         "hook_secret": secret,

@@ -1,7 +1,7 @@
 # Keep the chief's hook secret out of every file: the server's claim route and the hook
 
 Type: task
-Status: open
+Status: claimed
 Blocked by: 13
 Test first: yes
 Level: 3

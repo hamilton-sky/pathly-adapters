@@ -63,7 +63,7 @@ def test_a_codex_chief_has_no_settings_file_and_no_env_in_its_argv(project, chie
 
     run_id = open_with(project, host, engine="codex", preset="status")["run_id"]
 
-    assert sorted(p.name for p in (chief_root / run_id).iterdir()) == ["hook_secret"]
+    assert list((chief_root / run_id).iterdir()) == []
     argv = host.sent[0][1]["argv"]
     assert argv == chief_argv("codex", "", "s", "m", None)
     assert not [a for a in argv if "CLAUDE_CODE" in a]
