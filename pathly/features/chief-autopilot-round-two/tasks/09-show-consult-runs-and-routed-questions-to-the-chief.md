@@ -5,7 +5,7 @@ Status: open
 Blocked by: 01, 02, 16
 Test first: yes
 Level: 3
-Touches: src/pathly_orchestrator/db/queries/run_history_read.py, src/pathly_orchestrator/db/queries/run_consults.py (new), src/pathly_orchestrator/db/queries/chief_session_runs.py, src/pathly_orchestrator/http_server/blueprints/chief/notices.py, src/pathly_orchestrator/supervisor/chief_presets.py, tests/http_api/test_chief_notices_consults.py (new), src/pathly_orchestrator/CLAUDE.md, tests/INDEX.md, tests/http_api/INDEX.md
+Touches: src/pathly_orchestrator/db/queries/run_history_read.py, src/pathly_orchestrator/db/queries/run_consults.py (new), src/pathly_orchestrator/db/queries/chief_session_runs.py, src/pathly_orchestrator/http_server/blueprints/chief/notices.py, src/pathly_orchestrator/supervisor/chief_presets.py, tests/http_api/test_chief_notices_consults.py (new), src/pathly_orchestrator/CLAUDE.md, src/pathly_orchestrator/http_server/chief_field_reads.py, tests/INDEX.md, tests/http_api/INDEX.md
 
 The chief (and the person, through Studio's run pages) must see which questions a role answered
 and which wait for the person.
