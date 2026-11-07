@@ -65,6 +65,12 @@ DENY = [
     "Glob(~/.pathly/**)",
     "Bash(curl *)",
     "Bash(wget *)",
+    "Bash(env*)",
+    "Bash(printenv*)",
+    "Read(/proc/**)",
+    "Read(//proc/**)",
+    "Grep(//proc/**)",
+    "Glob(//proc/**)",
 ]
 
 
@@ -292,7 +298,8 @@ def test_codex_argv_is_read_only_with_no_session_id_and_no_claude_files(
     assert "--session-id" not in argv
     assert "--dangerously-bypass-approvals-and-sandbox" not in argv
     assert chief_queries.get_session(get_db(), run_id)["cli_session_id"] is None
-    assert sorted(p.name for p in (chief_root / run_id).iterdir()) == ["hook_secret"]
+    assert list((chief_root / run_id).iterdir()) == []
+    assert chief_queries.get_session(get_db(), run_id)["hook_secret_hash"] is None
     assert host.payload["label"] == "Chief · Status"
 
 
@@ -316,20 +323,20 @@ def test_the_settings_file_holds_the_hook_command_and_the_deny_list(
         "pathly_hooks.chief_prompt",
         "--run-id",
         run_id,
-        "--secret-file",
-        str(folder / "hook_secret"),
         "--port",
         "8123",
     ]
 
 
-def test_the_session_row_stores_the_hash_of_the_secret_the_folder_holds(
+def test_the_session_row_stores_the_hash_of_the_secret_the_server_hands_on(
     project, chief_root
 ):
+    from pathly_orchestrator.supervisor.chief_secret_claim import claim
+
     host = Host()
     run_id = _open(project, host, preset="planner", prompt="Plan things.")["run_id"]
     folder = chief_root / run_id
-    secret = (folder / "hook_secret").read_text(encoding="utf-8")
+    secret = claim(run_id)
     assert len(secret) >= 32
     session = chief_queries.get_session(get_db(), run_id)
     assert session["hook_secret_hash"] == hashlib.sha256(secret.encode()).hexdigest()
@@ -343,13 +350,14 @@ def test_the_session_row_stores_the_hash_of_the_secret_the_folder_holds(
     assert session["closed_at"] is None
     assert secret not in json.dumps(host.payload)
     assert not [p for p in folder.iterdir() if secret in p.name]
+    assert not [p for p in folder.iterdir() if secret in p.read_text(encoding="utf-8")]
 
 
 def test_the_session_files_are_private_on_posix(project, chief_root):
     host = Host()
     run_id = _open(project, host)["run_id"]
     if os.name == "posix":
-        for name in ("hook_secret", "settings.json", "mcp.json"):
+        for name in ("settings.json", "mcp.json"):
             mode = (chief_root / run_id / name).stat().st_mode & 0o777
             assert mode == 0o600, name
 

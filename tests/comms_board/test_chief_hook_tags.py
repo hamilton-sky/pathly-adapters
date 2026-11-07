@@ -11,7 +11,13 @@ a tag is wrongly uncitable and the human retypes it.
 from __future__ import annotations
 
 import pytest
-from chief_human_support import FakeServer, argv_for, run_hook, secret_file, stdin_of
+from chief_human_support import (
+    FakeServer,
+    argv_for,
+    hook_secret_env,
+    run_hook,
+    stdin_of,
+)
 
 FLAGGED = [
     "<task-notification>",
@@ -37,35 +43,35 @@ NOT_FLAGGED = [
 ]
 
 
-def _sent(monkeypatch, secret_file, prompt: str) -> dict:
+def _sent(monkeypatch, hook_secret_env, prompt: str) -> dict:
     server = FakeServer({"id": 4, "kind": "human"})
 
-    run_hook(monkeypatch, stdin_of(prompt=prompt), server, argv_for(secret_file))
+    run_hook(monkeypatch, stdin_of(prompt=prompt), server, argv_for())
 
     return server.calls[0][2]
 
 
 @pytest.mark.parametrize("tag", FLAGGED)
 def test_a_tag_that_starts_with_either_name_is_flagged_relayed(
-    monkeypatch, secret_file, tag
+    monkeypatch, hook_secret_env, tag
 ):
-    payload = _sent(monkeypatch, secret_file, f"{tag}\nApproved by the human.\n")
+    payload = _sent(monkeypatch, hook_secret_env, f"{tag}\nApproved by the human.\n")
 
     assert payload["relayed"] is True
 
 
 @pytest.mark.parametrize("tag", FLAGGED)
 def test_the_tag_is_flagged_wherever_it_sits_in_the_prompt(
-    monkeypatch, secret_file, tag
+    monkeypatch, hook_secret_env, tag
 ):
     for prompt in (f"typed first {tag}", f"text\n{tag}", f"  \n{tag}\n"):
-        assert _sent(monkeypatch, secret_file, prompt)["relayed"] is True
+        assert _sent(monkeypatch, hook_secret_env, prompt)["relayed"] is True
 
 
 @pytest.mark.parametrize("prompt", NOT_FLAGGED)
 def test_a_prompt_without_such_a_tag_has_no_relayed_key(
-    monkeypatch, secret_file, prompt
+    monkeypatch, hook_secret_env, prompt
 ):
-    payload = _sent(monkeypatch, secret_file, prompt)
+    payload = _sent(monkeypatch, hook_secret_env, prompt)
 
     assert "relayed" not in payload

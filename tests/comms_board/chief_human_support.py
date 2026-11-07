@@ -1,8 +1,10 @@
 """Shared fixtures and helpers of the chief human-message tests (chief-agent 09).
 
 ``open_session`` opens a chief through ``open_chief`` with a fake broadcaster (it only records
-the spawn), so the secret is the one in the session folder and the session id is the stored
-``cli_session_id``, exactly what the real hook sees. The fixtures (and the autouse one that
+the spawn) and claims the hook secret once (``chief_secret_claim.claim``, what
+``POST /chief/hook-secret`` hands Studio), so the secret and the stored ``cli_session_id`` are
+exactly what the real hook sees. ``hook_secret_env`` puts a secret in the hook's environment
+(``PATHLY_CHIEF_HOOK_SECRET``), where claude's hook finds it. The fixtures (and the autouse one that
 closes a chief's watcher thread) are imported by name into each ``test_chief_*`` file that uses
 them; ``FakeServer`` stands in for ``fsm_http_client._request_json``.
 """
@@ -22,7 +24,7 @@ from pathly_hooks import chief_prompt
 from pathly_orchestrator.db import get_db
 from pathly_orchestrator.db.queries import chief as chief_queries
 from pathly_orchestrator.http_server import sse
-from pathly_orchestrator.supervisor import chief_session
+from pathly_orchestrator.supervisor import chief_secret_claim, chief_session
 from pathly_orchestrator.supervisor.chief_session import open_chief
 
 PROMPT = "---\ntier: operator\n---\nYou are the chief of this project."
@@ -126,7 +128,8 @@ def open_session(project: str, chief_root: Path, preset: str = "operator") -> Op
     )
     run_id = result["run_id"]
     session = chief_queries.get_session(get_db(), run_id)
-    secret = (chief_root / run_id / "hook_secret").read_text(encoding="utf-8")
+    secret = chief_secret_claim.claim(run_id)
+    assert secret
     token = spawn.sent[0][1]["run_token"]
     return Opened(run_id, secret, session["cli_session_id"], token, project)
 
@@ -165,15 +168,18 @@ class FakeServer:
         return self.reply
 
 
+HOOK_SECRET_ENV = "PATHLY_CHIEF_HOOK_SECRET"
+
+
 @pytest.fixture()
-def secret_file(tmp_path: Path) -> Path:
-    path = tmp_path / "hook_secret"
-    path.write_text("s3cret\n", encoding="utf-8")
-    return path
+def hook_secret_env(monkeypatch: pytest.MonkeyPatch) -> str:
+    """The secret in the hook's environment, padded as a careless launcher might."""
+    monkeypatch.setenv(HOOK_SECRET_ENV, "s3cret\n")
+    return "s3cret"
 
 
-def argv_for(secret_file: Path) -> list[str]:
-    return ["--run-id", RUN_ID, "--secret-file", str(secret_file), "--port", "8123"]
+def argv_for() -> list[str]:
+    return ["--run-id", RUN_ID, "--port", "8123"]
 
 
 def stdin_of(prompt="use CSV", session_id=SESSION_ID) -> str:

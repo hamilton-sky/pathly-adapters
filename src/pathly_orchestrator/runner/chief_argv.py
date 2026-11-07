@@ -29,6 +29,17 @@ _CLAUDE_DENY = [
     "Glob(~/.pathly/**)",
     "Bash(curl *)",
     "Bash(wget *)",
+    # The hook secret is in the chief claude's environment (PATHLY_CHIEF_HOOK_SECRET), so the
+    # chief may not print it with these. They do not stop the shell expanding
+    # $PATHLY_CHIEF_HOOK_SECRET (or a slice of it) inside an allowed ``pathly api`` body.
+    # A single leading slash anchors a path rule at the settings source;
+    # ``//`` is the filesystem root, so ``//proc/**`` is the rule that reaches /proc.
+    "Bash(env*)",
+    "Bash(printenv*)",
+    "Read(/proc/**)",
+    "Read(//proc/**)",
+    "Grep(//proc/**)",
+    "Glob(//proc/**)",
 ]
 # claude 2.1.304 (measured): the first stops the ``<task-notification>`` prompts of background
 # tasks, the second stops the scheduler that fires ``.claude/scheduled_tasks.json`` as a bare prompt.
@@ -98,11 +109,14 @@ def claude_settings(hook_command: str) -> dict:
     scheduler (``_CLAUDE_ENV``), the two ways claude starts a turn nobody typed; measured on
     claude 2.1.304 only.
 
-    The session folder under ``~/.pathly/chief/`` holds the hook secret, so ``Read``, ``Grep``
-    and ``Glob`` are denied on ``~/.pathly/**`` (claude applies a ``Read`` rule to Grep, Glob,
-    Bash file commands and ``< file`` redirects too; the explicit rules cost nothing) and
-    ``blockReadsOutsideWorkingDirectories`` is set. There is no redirect rule: ``Bash(pathly *<*)``
-    would deny an ordinary body holding ``<``.
+    No file holds the hook secret: the hook reads it from claude's environment
+    (``PATHLY_CHIEF_HOOK_SECRET``), so ``Bash(env*)`` and ``Bash(printenv*)`` are denied, and
+    ``Read``, ``Grep`` and ``Glob`` on ``/proc`` (``//proc/**``, the filesystem root;
+    ``Read(/proc/**)`` too, which claude anchors at the settings source). ``Read``, ``Grep`` and
+    ``Glob`` stay denied on ``~/.pathly/**`` (the database; claude applies a ``Read`` rule to
+    Grep, Glob, Bash file commands and ``< file`` redirects too; the explicit rules cost nothing)
+    and ``blockReadsOutsideWorkingDirectories`` is set. There is no redirect rule:
+    ``Bash(pathly *<*)`` would deny an ordinary body holding ``<``.
     """
     return {
         "permissions": {

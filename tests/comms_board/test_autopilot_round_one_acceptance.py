@@ -51,6 +51,7 @@ from chief_acceptance_support import (
     _no_watcher_outlives_its_test,
     client,
     db,
+    hook_secret,
     open_chief,
     paste_prompt,
     project,
@@ -217,11 +218,10 @@ def test_a_secret_body_is_400_a_revoked_token_401_and_a_chief_flow_runs_headless
     client, agent_host, project
 ):
     from pathly_orchestrator.db.queries.run_tokens import lookup_run_token
-    from pathly_orchestrator.supervisor.chief_session import _chief_root
 
     root = str(project)
     chief = open_chief(client, agent_host, project, "operator")
-    secret = (_chief_root() / chief.run_id / "hook_secret").read_text(encoding="utf-8")
+    secret = hook_secret(client, chief)
 
     leaked = client.post(
         "/comms/post",

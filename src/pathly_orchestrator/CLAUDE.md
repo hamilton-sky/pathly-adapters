@@ -572,6 +572,7 @@ POST /chief/close           ← {project_root} → 200 {closed: true|false}
 GET  /chief/session?project_root=  ← {open: false} | {open: true, run_id, tab_id, tier, engine, opened_at, runs_started, max_runs_per_session, max_cost_usd_per_run}
 GET  /chief/presets?project_root=  ← {presets: [{name, label, tier, text, source, scope}], tiers: {tier: [action]}, limits: {max_runs_per_session, max_cost_usd_per_run}}   (blueprints/chief/presets.py)
 POST /chief/human-messages  ← {run_id, hook_secret, text, session_id, relayed?} → 201 {id, kind}   (blueprints/chief/human.py)
+POST /chief/hook-secret     ← {run_id} → 200 {hook_secret} once; 409 (and the chief is closed) after   (blueprints/chief/hook_secret.py)
 GET  /chief/notices?project_root=  ← {notices: [{run_id, session_run_id, started_at, kind, status, outcome, error, cost_usd, finished_at, open_questions}]}   (blueprints/chief/notices.py)
 POST /chief/notices/read    ← {project_root, run_ids} → 200 {marked}
 ```
@@ -640,9 +641,15 @@ POST /chief/notices/read    ← {project_root, run_ids} → 200 {marked}
 - **`pathly api METHOD /path [json | -]`** (`chief_cli.py`, the `pathly` console script) is the
   chief's only door to the server, because its settings allow `Bash(pathly *)` and deny `curl`
   and `wget` (`runner/chief_argv.py`). They also deny `Read`, `Grep` and `Glob` on `~/.pathly/**`
-  and set `permissions.blockReadsOutsideWorkingDirectories`, so the chief has no read path to its
-  session folder's `hook_secret` (chief-autopilot 02; no redirect rule, since `Bash(pathly *<*)`
-  would deny ordinary bodies holding `<`). The claude chief starts with `--permission-mode dontAsk`
+  and set `permissions.blockReadsOutsideWorkingDirectories` (chief-autopilot 02; no redirect rule,
+  since `Bash(pathly *<*)` would deny ordinary bodies holding `<`), and, since the hook secret is
+  in the chief claude's environment (round two, ticket 15; "Human messages"), deny `Bash(env*)`,
+  `Bash(printenv*)` and `Read`, `Grep` and `Glob` on `//proc/**` (two slashes is the filesystem
+  root; a single leading slash anchors a rule at the settings source, so `Read(/proc/**)` is kept
+  but does not reach `/proc`). These rules do not stop the shell expanding
+  `$PATHLY_CHIEF_HOOK_SECRET` (or a slice of it) inside an allowed `pathly api` body, so they do
+  not mean the chief cannot print its environment; a slice passes the gate's body scan. The
+  claude chief starts with `--permission-mode dontAsk`
   (`CLAUDE_PERMISSION_MODE`): with no mode, claude 2.1.310 started it in auto mode, which ran
   `python3` without asking (spike 19 part B, question 1). `dontAsk` denies every call that would
   otherwise prompt; claude's built-in read-only commands (`ls`, `git status`) and Read, Glob and
@@ -687,9 +694,11 @@ POST /chief/notices/read    ← {project_root, run_ids} → 200 {marked}
   the UI token (RRP-2b) exists (an unknown or revoked token is 401 before the route). The chief's own token is refused
   here by the chief gate ("Chief gate" below).
 - **Human messages:** `POST /chief/human-messages` is written to by the chief's
-  UserPromptSubmit hook only, `python -m pathly_hooks.chief_prompt --run-id <id> --secret-file
-  <path> --port <port>` (the command `open_chief` writes into the session's `settings.json`).
-  The hook posts `{run_id, hook_secret, text, session_id}` through
+  UserPromptSubmit hook only, `python -m pathly_hooks.chief_prompt --run-id <id> --port <port>`
+  (the command `open_chief` writes into the session's `settings.json`). The hook reads the secret
+  from its environment, `PATHLY_CHIEF_HOOK_SECRET` (a command hook inherits claude's environment),
+  and records nothing (exit 0) when it is unset or blank. The hook posts
+  `{run_id, hook_secret, text, session_id}` through
   `fsm_http_client._request_json` (127.0.0.1, 5 s) and always exits 0; for a reply of kind
   `human` it prints `Pathly recorded this as human message <id>; cite it with cite=<id> when you
   relay an answer.` (Claude Code adds hook stdout to the chief's context), for `style_prompt`
@@ -701,10 +710,33 @@ POST /chief/notices/read    ← {project_root, run_ids} → 200 {marked}
   this chief's claude session"}`; a codex session has none, so it records nothing); else
   `add_human_message(..., relayed=bool(relayed))` and 201 `{id, kind}`. It is not in
   `chief_routes.ROUTE_ACTIONS`, so the chief gate refuses it to a chief token at every tier: **no
-  chief token can write a message.** That is all "only the hook can write" means. The secret
-  file (0600) is readable by every other process of the same user and the claude `--session-id`
-  is in the chief's argv, so a same-user process that reads both (a headless builder, say) can
-  post a `human` row (spec § Risks).
+  chief token can write a message.** That is all "only the hook can write" means.
+  - **Where the secret lives (round two, ticket 15).** No file holds it. `open_chief` generates
+    it for a claude chief only, stores its sha256 (`hook_secret_hash`) and offers the plaintext to
+    `supervisor/chief_secret_claim` (memory; `close_chief` forgets it, a restart loses it). Studio's
+    main process claims it once with `POST /chief/hook-secret` `{run_id}` and starts the chief's
+    claude with it in `PATHLY_CHIEF_HOOK_SECRET` (ticket 18 builds that half). **Until ticket 18
+    lands nothing claims the secret**: a claude chief opened from Studio has none in its
+    environment, so its own hook records nothing, and any tokenless same-user process (a headless
+    agent with `curl`, say) can claim it, read the `--session-id` from the chief's argv and post
+    `human` rows, and nothing detects it, because no second claim ever comes. The exposure is
+    about that of the 0600 file it replaced. The route is 200 `{hook_secret}` once (`Cache-Control:
+    no-store`); a second claim is 409 and closes the chief (`close_chief(run_id, "hook secret
+    claimed twice")`, plus `TERMINAL_KILL` to its tab; ticket 13, question 2 = A). That detection
+    exists only once Studio makes the expected claim: then an earlier claimer's theft turns
+    Studio's claim into the second one, and the stolen secret works for no open session. A claim
+    that finds nothing offered (before `offer`, or after a server restart) closes the chief too.
+    404 for an unknown or closed session or
+    one with no hash; 403 for any caller with a live run token (an agent's `pathly api` sends
+    its own), and the chief gate refuses it to a chief token (not in `ROUTE_ACTIONS`). A codex
+    chief has no hook, so it gets no secret and no hash, and its folder stays empty.
+  - **What stays true.** While the chief runs, a same-user process can read its environment
+    (Linux `/proc/<pid>/environ`; macOS and Windows have their own same-user reads), and the claude
+    `--session-id` is in the chief's argv, so a same-user process that reads both (a headless
+    builder, say) can still post a `human` row; only OS isolation of headless agents (a later
+    round) closes that. A codex chief has no secret to lose, but its read-only sandbox reads the
+    whole file system, including headless agents' live `PATHLY_RUN_TOKEN`s (in their
+    environments), so Pathly cannot promise a codex chief stays inside its project.
   - **What the hook can and cannot tell apart.** The session id binds a recorded prompt to the
     chief's claude process, not to the typist, and claude runs the hook for prompts nobody typed
     with the same keys and values as for a typed one (measured on claude 2.1.304 in `claude -p`
@@ -955,8 +987,12 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
   hook secret"}` (`http_server/chief_secret_text.py`, chief-autopilot 02): nothing is stored, no
   citation spent, no run slot taken. It is `contains_secret_hash` against
   `chief_sessions.hook_secret_hash`, so `x<secret>` is caught, but a re-encoded secret is not: it is
-  defence in depth beside the settings' deny rules, not the guarantee. A session with no stored hash
-  (a codex chief) is not checked.
+  defence in depth beside the settings' deny rules (`env`, `printenv`, `/proc`; the secret is in
+  the chief claude's environment, in no file), not the guarantee. Neither stops the shell
+  expanding `$PATHLY_CHIEF_HOOK_SECRET` inside an allowed `pathly api` body: a slice of it (say
+  `${PATHLY_CHIEF_HOOK_SECRET:0:20}`) is not the whole secret, so the scan passes it. A session with no stored hash
+  (a codex chief) is not checked. `POST /chief/hook-secret` is not in `ROUTE_ACTIONS`, so a chief
+  token cannot claim the secret either.
 - **Overrides.** A body with a non-empty `prompt_override` or `stage_overrides`, on any route,
   also needs `run` (the 403 names `run`): the Planner may call the decompose routes but cannot
   hand verbatim prompt text to the agents they start.
@@ -1016,7 +1052,8 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
   `operator` chief, which can start a headless agent, a `human` row is "what the hook endpoint
   recorded", not proof that a person typed it (it need not even have reached the tab), because
   that agent runs as the same OS user and can post to `POST /chief/human-messages` itself if it
-  reads the session's secret file and `--session-id` (spec § Risks). The rule guards the chief
+  reads the chief claude's environment (`/proc/<pid>/environ`) and `--session-id` (spec § Risks;
+  "Where the secret lives"). The rule guards the chief
   token's own calls, not a process the chief starts: a headless agent the operator chief starts
   can call `/runner/agent-answer` and `/comms/answer`, which are unchanged for every caller
   without a chief token, with no `cite` at all. `/clear` in the tab changes claude's session id,
@@ -1758,7 +1795,8 @@ pathly_orchestrator/
     consult_window.py      # open_window(project_root, *, scope=None) / blamed(window) / withhold / noted (chief-autopilot-round-two 03): a consult that changed the project is withheld — see "Consult runs"
     chief_tiers.py         # what a chief may do (chief-agent): ACTIONS, TIERS (status=read; planner=read,post,plan; operator=all seven), actions_for/normalise_tier, and resolve_preset_tier — a user prompt file chief/<preset> names its tier in leading front matter `tier:`, else the built-in names map to themselves, anything else (unknown tier, missing front matter, malformed name) is status. Code, never read from prompt text; strip_front_matter reuses skills/compose_base
     chief_presets.py       # the chief's prompt (chief-agent 17): the built-in styles STATUS / PLANNER / OPERATOR (BUILT_IN), default_style (user file chief/<preset> wins, else the built-in text), compose_prompt (style + the chief-connect fragment, read at call time, + ROOT_LINE with the stored project root)
-    chief_session.py       # open_chief / close_chief (chief-agent): the chief is a long-lived interactive spawn, so it has its own open path instead of _run_stage_via_terminal (which blocks its caller and gives up after 30 minutes). open_chief validates (engine claude|codex, existing project_root, the style non-empty and at most 64 KiB, model not starting with `-`; `prompt` is optional for a preset that has a built-in text), raises ChiefAlreadyOpen(run_id, tab_id) for a project with an open chief, resolves the tier from the preset, writes ~/.pathly/chief/<run_id>/ (hook_secret, and for claude settings.json + an empty mcp.json; mode 0600), registers the chief_sessions row (secret sha256, the claude --session-id), mints a `chief` token on the project board, create_run(run_id), and sends one interactive TERMINAL_SPAWN (topic `chief:<run_id>`, submit false, the prompt from `chief_presets.compose_prompt`: style without front matter, then the `chief-connect` fragment, then the stored root); once the token is minted the session is read again, and a close that landed in between revokes the token, sends no spawn and raises ChiefClosedWhileOpening (POST /chief/open: 409; a close after that re-read cannot be shut out without a lock across the broadcast, it still revokes the token so the tab gets a dead one); a daemon watcher wakes on the first of the tab's `started` or its result (TerminalRun.wait_started_or_result) and closes the session as `never started` or `tab closed`. close_chief revokes the token, removes the folder and drops the run (False the second time). normalise_project_root (forward slashes, no trailing slash) keys a project's chief for open_chief and the routes; chief_startup_cleanup() closes every session still open at server start (reason `server restart`) and removes their folders; something_answers(host, port) is the TCP probe app.main() runs before it
+    chief_session.py       # open_chief / close_chief (chief-agent): the chief is a long-lived interactive spawn, so it has its own open path instead of _run_stage_via_terminal (which blocks its caller and gives up after 30 minutes). open_chief validates (engine claude|codex, existing project_root, the style non-empty and at most 64 KiB, model not starting with `-`; `prompt` is optional for a preset that has a built-in text), raises ChiefAlreadyOpen(run_id, tab_id) for a project with an open chief, resolves the tier from the preset, writes ~/.pathly/chief/<run_id>/ (for claude settings.json + an empty mcp.json, mode 0600; empty for codex; no file holds the hook secret), registers the chief_sessions row (for claude the hook secret's sha256 and the --session-id) and offers the claude secret to chief_secret_claim, mints a `chief` token on the project board, create_run(run_id), and sends one interactive TERMINAL_SPAWN (topic `chief:<run_id>`, submit false, the prompt from `chief_presets.compose_prompt`: style without front matter, then the `chief-connect` fragment, then the stored root); once the token is minted the session is read again, and a close that landed in between revokes the token, sends no spawn and raises ChiefClosedWhileOpening (POST /chief/open: 409; a close after that re-read cannot be shut out without a lock across the broadcast, it still revokes the token so the tab gets a dead one); a daemon watcher wakes on the first of the tab's `started` or its result (TerminalRun.wait_started_or_result) and closes the session as `never started` or `tab closed`. close_chief revokes the token, forgets an unclaimed hook secret, removes the folder and drops the run (False the second time). normalise_project_root (forward slashes, no trailing slash) keys a project's chief for open_chief and the routes; chief_startup_cleanup() closes every session still open at server start (reason `server restart`) and removes their folders; something_answers(host, port) is the TCP probe app.main() runs before it
+    chief_secret_claim.py  # offer / claim / forget (chief-autopilot-round-two 15): a claude chief's hook secret in memory only; claim hands it on once (POST /chief/hook-secret), a later claim closes the chief ("hook secret claimed twice"); close_chief forgets it
   http_server/             # Flask HTTP server: FSM endpoints + SSE + runner routes
     app.py                 # Flask app factory, blueprint registration, main() (which calls supervisor.chief_session.chief_startup_cleanup() before serving, unless chief_session.something_answers(host, port) finds a server already answering there; a failure is logged and boot goes on)
     middleware.py          # _log_request, _log_response, rate limiting, metrics
@@ -1830,7 +1868,8 @@ pathly_orchestrator/
                            # /chief/session; presets.py: GET /chief/presets (the styles and the
                            # tier each gets, for Studio's launcher); human.py: POST
                            # /chief/human-messages (the chief hook's
-                           # post) — see "Chief endpoints"; __init__.py exposes all_blueprints
+                           # post); hook_secret.py: POST /chief/hook-secret (Studio claims the
+                           # hook secret once) — see "Chief endpoints"; __init__.py exposes all_blueprints
                            # (registered in app.py like control/)
   chief_cli.py             # the `pathly` console script (chief-agent 17): `pathly api METHOD /path
                            # [json | -]` — the chief's only door to the server; see "Chief endpoints"

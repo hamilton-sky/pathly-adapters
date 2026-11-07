@@ -27,12 +27,12 @@ from chief_human_support import (
     body_of,
     chief_root,
     client,
+    hook_secret_env,
     host,
     open_session,
     project,
     rows_of,
     run_hook,
-    secret_file,
     stdin_of,
 )
 
@@ -220,11 +220,11 @@ def test_a_chief_token_on_the_route_is_403_at_every_tier(
 
 
 def test_hook_posts_prompt_and_session_id_and_prints_the_id(
-    monkeypatch, secret_file, capsys
+    monkeypatch, hook_secret_env, capsys
 ):
     server = FakeServer({"id": 7, "kind": "human"})
 
-    code = run_hook(monkeypatch, stdin_of(), server, argv_for(secret_file))
+    code = run_hook(monkeypatch, stdin_of(), server, argv_for())
 
     assert code == 0
     assert capsys.readouterr().out == (
@@ -243,10 +243,10 @@ def test_hook_posts_prompt_and_session_id_and_prints_the_id(
     assert 0 < kwargs["timeout"] <= 10
 
 
-def test_hook_prints_nothing_for_the_style_prompt(monkeypatch, secret_file, capsys):
+def test_hook_prints_nothing_for_the_style_prompt(monkeypatch, hook_secret_env, capsys):
     server = FakeServer({"id": 3, "kind": "style_prompt"})
 
-    code = run_hook(monkeypatch, stdin_of(), server, argv_for(secret_file))
+    code = run_hook(monkeypatch, stdin_of(), server, argv_for())
 
     assert code == 0
     assert capsys.readouterr().out == ""
@@ -265,11 +265,11 @@ def test_hook_prints_nothing_for_the_style_prompt(monkeypatch, secret_file, caps
     ],
 )
 def test_hook_sends_nothing_prints_nothing_and_exits_0_for_bad_stdin(
-    monkeypatch, secret_file, capsys, stdin
+    monkeypatch, hook_secret_env, capsys, stdin
 ):
     server = FakeServer({"id": 1, "kind": "human"})
 
-    code = run_hook(monkeypatch, stdin, server, argv_for(secret_file))
+    code = run_hook(monkeypatch, stdin, server, argv_for())
 
     assert code == 0
     assert server.calls == []
@@ -277,11 +277,11 @@ def test_hook_sends_nothing_prints_nothing_and_exits_0_for_bad_stdin(
 
 
 def test_hook_exits_0_and_prints_nothing_when_the_post_raises(
-    monkeypatch, secret_file, capsys
+    monkeypatch, hook_secret_env, capsys
 ):
     server = FakeServer(error=ConnectionRefusedError("refused"))
 
-    code = run_hook(monkeypatch, stdin_of(), server, argv_for(secret_file))
+    code = run_hook(monkeypatch, stdin_of(), server, argv_for())
 
     assert code == 0
     assert len(server.calls) == 1
@@ -289,13 +289,11 @@ def test_hook_exits_0_and_prints_nothing_when_the_post_raises(
 
 
 def test_hook_sends_relayed_for_a_cross_session_message(
-    monkeypatch, secret_file, capsys
+    monkeypatch, hook_secret_env, capsys
 ):
     server = FakeServer({"id": 4, "kind": "relayed"})
 
-    code = run_hook(
-        monkeypatch, stdin_of(prompt=WRAPPED), server, argv_for(secret_file)
-    )
+    code = run_hook(monkeypatch, stdin_of(prompt=WRAPPED), server, argv_for())
 
     assert code == 0
     payload = server.calls[0][2]
