@@ -1,7 +1,7 @@
 # Paste a chief's first prompt only when claude is ready, after its trust screen
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 13
 Test first: yes
 Level: 3
@@ -83,3 +83,75 @@ exit 0
 - spec.md § Decisions ("The trust screen")
 
 ## Answer
+
+Work started at `31fb2df` (a merge of master on top of `869b2b5`, the commit the prompt named).
+Test-only commit: the "14 failing test" commit (rebuilt after the fixture moved under `__tests__/`).
+
+**Built**
+- `studio/src/main/ipc/terminal/__tests__/claude-trust-screen.txt` (new): the trust screen as the
+  installed claude printed it, `# source: claude 2.1.319 (Claude Code), captured 2026-11-07`.
+  Captured by running `/opt/node22/bin/claude` in a fresh empty temp folder with `env -i` (PATH,
+  a fresh temp `HOME` holding only `{"hasCompletedOnboarding":true,"theme":"dark"}`, TERM; none of
+  our credentials, no `--dangerously-skip-permissions`), killed after 15 s, folder deleted. It did
+  not ask to log in; it showed the theme picker until the onboarding flag was set.
+- `studio/src/main/ipc/terminal/promptInjector.ts`: `TRUST_PROMPT_RE` adds `Is this a project you
+  created or one you trust` and `Yes, I trust this folder` (case-insensitive, `\s*` between
+  words); the trust answer is written 1 s after the screen is seen, Down + Enter when the cursor
+  sits on "No, exit", else Enter (headless dismisser and interactive injector both); the ready
+  prompt is `> ` or `❯` + space/no-break space (not `❯ 1.`); a chief tab (`^chief-[0-9a-f]{12}$`)
+  never starts the blind paste, it logs `no ready prompt yet: chief tab waits for it (no blind
+  paste)` at 5 s; other interactive tabs log `no ready prompt yet: pasting on the 5 s fallback`
+  and paste; screen text re-drawn after the answer is cut off before the ready check.
+- `studio/src/main/ipc/terminal/promptInjector.test.ts` (new): 11 tests, fake `IPty` + fake timers.
+- `studio/CLAUDE.md`: the `promptInjector.ts` row of the CLI-engine spawn scheduler table.
+
+**Proof**
+- `npm --prefix studio run test -- src/main/ipc/terminal/promptInjector.test.ts`: exit 0,
+  `Tests 11 passed (11)`. Covers: a chief tab fed the fixture (its `#` line dropped) gets
+  `\x1b[B\r` (ends in `\r`), no paste after a re-drawn screen and 30 s more, then exactly one
+  bracketed paste after `> `; the same screen sent as the PTY really sends it (no spaces); the
+  measured ready prompt `❯\u00a0`; a chief tab writes nothing in 60 s with no ready prompt and logs
+  "no ready prompt yet"; a non-chief tab pastes at exactly 5 s; only `chief-<12 lowercase hex>`
+  counts as a chief; the old wording "Do you trust the files in this folder" still matches
+  (interactive and headless, Enter); the issue-quoted wording with the cursor on Yes gets Enter; a
+  headless tab answers the current wording once. At `ec0063c` (test only) 7 of 11 failed.
+- `python -c "print(open('studio/src/main/ipc/terminal/__tests__/claude-trust-screen.txt', encoding='utf-8').readline())"`:
+  exit 0, prints `# source: claude 2.1.319 (Claude Code), captured 2026-11-07 (...)`.
+- `node studio/node_modules/typescript/bin/tsc --noEmit -p studio/tsconfig.node.json`: exit 0
+  (`npm --prefix studio run typecheck` too).
+- `npm --prefix studio run test`: exit 0, `Test Files 43 passed (43)`, `Tests 268 passed (268)`.
+- `python3 scripts/check_file_size.py`: OK (promptInjector.ts is 212 lines).
+- Extra, outside the Done when: the module bundled with esbuild and run on the real claude 2.1.319
+  through node-pty (same throwaway HOME, tab `chief-0123456789ab`): `+1530ms write "\x1b[B\r"`,
+  `+1776ms` bracketed paste, `hasTrustDialogAccepted` true, the prompt in claude's input. The
+  base version of the file on the same run: no answer, blind paste at `+5005ms`, folder not
+  trusted, prompt lost (spike S4 reproduced).
+
+**Decisions**
+- The ticket says the chief tab "gets `\r`". Measured on claude 2.1.319, the screen opens with
+  its cursor on "No, exit" (binary: `cancelFirst:!0, focus:"cancel", hideIndexes:!0`), and a bare
+  Enter makes claude exit 1. So the answer is Down + Enter in one write when the cursor sits on
+  "No, exit", and plain Enter otherwise (the old wording and the issue's quote put it on Yes).
+- The screen refuses keys for its first moment (Down + Enter at 0 s and 0.1 s were ignored; 0.2 s
+  and later worked), so the answer waits 1 s after the screen is first seen; the keys are chosen
+  from the buffer at that moment, when the options are drawn.
+- The ticket says the ready prompt is `> `. Current claude draws `❯` + U+00A0, never `> `, so with
+  `> ` alone a chief would wait forever. The ready check takes both; it applies to every
+  interactive tab, so non-chief tabs now paste on the ready prompt before the 5 s fallback too.
+- The current screen positions each word with a cursor-column escape, so the ANSI-stripped stream
+  has no spaces ("Isthisaproject..."): the new phrases match with `\s*`. The fixture shows the
+  columns as spaces so a person can read and replace it.
+
+**Shortcuts taken**
+- The answer keys depend on the `❯` cursor glyph before "No, exit". If a later claude changes the
+  glyph or the option order, the answer falls back to Enter (which may exit claude); the fixture
+  plus these tests are the place to re-measure. A chief whose claude never shows a recognised ready
+  prompt (a login screen, a new prompt glyph) gets no paste at all: safe (nothing is lost, the
+  person sees the screen), but the chief starts empty.
+- The 1 s answer delay is a margin over a measured ~0.2 s refusal window, not a contract.
+
+**For later tickets**
+- Ticket 12/18 and the person's confirmation (map Open questions): the trust screen was measured
+  here on claude 2.1.319; the person still confirms on their own claude and replaces the fixture if
+  it differs. `studio/CLAUDE.md` line "The chief's prompt is still auto-submitted" stays true.
+
