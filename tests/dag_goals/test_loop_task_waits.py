@@ -5,7 +5,8 @@ task's agent posted a question to ``human`` (``author_run_id`` is that run id) t
 when the spawn returns, the scheduler parks the task (``blocked``,
 ``fail_reason='waiting_for_answer:<ids>'``, ``waits + 1``) instead of completing it or retrying
 it, whatever the spawn reported, and broadcasts ``task_waiting``. After an answer the task is
-claimed again with a new run id and its prompt carries each question and its answer. A goal-loop
+claimed again with a new run id and its prompt carries each question and its answer. Since
+chief-autopilot-round-two 06 a question to a role (``architect``) parks the task too. A goal-loop
 run with a parked task drains the other ready tasks, then ends ``error`` with
 ``waiting_for_answer`` instead of sending the join's ``INCOMPLETE_TASKS`` to a builder.
 """
@@ -190,17 +191,23 @@ def test_a_loop_task_that_fails_with_an_open_question_is_parked_not_retried(
 
 
 def test_a_question_to_a_role_does_not_park_the_loop_task():
+    # Round two (chief-autopilot-round-two 06) reverses round one: a question to a role parks
+    # the task too, so the next attempt gets the role's answer. The name is round one's.
     scope = SCOPE + "-role"
     tid = _task(scope, "Build the router.")
+    asked: dict = {}
 
     def spawn(state, instructions, adapter, model, run_id, broadcast_fn):
-        _ask(scope, run_id, "Which layer owns this?", to="architect")
+        asked["qid"] = _ask(scope, run_id, "Which layer owns this?", to="architect")
         return {"result": "ok"}
 
     out = _drain(scope, spawn)
-    assert out["completed"] == [tid]
-    assert out["waiting"] == []
-    assert _row(tid)["task_status"] == "done"
+    assert out["completed"] == []
+    assert out["waiting"] == [tid]
+    row = _row(tid)
+    assert row["task_status"] == "blocked"
+    assert row["fail_reason"] == f"{WAITING}:{asked['qid']}"
+    assert row["attempts"] == 1 and row["waits"] == 1
 
 
 # ── the answer reaches the next attempt ─────────────────────────────────────────────────────
