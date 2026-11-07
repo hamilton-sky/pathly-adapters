@@ -108,7 +108,7 @@ def _agent_done_rec(payload: dict) -> dict:
     # <run_category> placeholder (a raw/interactive skill that skipped injection) lands as
     # NULL, not a junk bucket — the renderer then falls back to its scope_tier heuristic.
     cat = payload.get("category")
-    if cat not in ("flow", "single", "loop"):
+    if cat not in ("flow", "single", "loop", "consult"):
         cat = None
     return {
         "agent_role": payload.get("agent") or "agent",

@@ -19,6 +19,7 @@ from typing import Callable, Optional
 
 from pathly_orchestrator import eventlog as _eventlog
 from pathly_orchestrator.config import localize_fsm_urls
+from pathly_orchestrator.fsm_compose_vars import spawn_category
 
 from .state import RunnerState, logger
 from .registry import (
@@ -166,11 +167,10 @@ def _run_stage_via_terminal(
             "prompt": instructions,
             "stage": state.current_state,
             "interactive": use_interactive,
-            # Monitor category for this engine. Board one-shots (single-agent / evaluator /
-            # decompose) run with flow=='board-run' → 'single'; FSM pipeline stages → 'flow'.
-            # Without this the frontend tags EVERY registered runner tab 'flow' (terminal.ts
-            # buildEngineMeta), so a board single-agent run showed up as a FLOW run.
-            "category": "single" if (state.flow or "") == "board-run" else "flow",
+            # Monitor category for this engine (fsm_compose_vars.spawn_category: consult,
+            # board-run → single, else flow). Without this the frontend tags EVERY registered
+            # runner tab 'flow' (terminal.ts buildEngineMeta), so a board run showed as FLOW.
+            "category": spawn_category(state.flow or ""),
         }
         if broadcast_fn:
             broadcast_fn(state.topic, payload)

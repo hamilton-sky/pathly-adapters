@@ -40,7 +40,8 @@ def _no_async_embed(monkeypatch):
 @pytest.fixture(autouse=True)
 def _slow_path(monkeypatch):
     """The spawn returns on the PTY result (no early-advance watcher or billing thread), so the
-    synthetic AGENT_DONE and the BILLING_UPDATE are written before ``start_consult`` returns."""
+    synthetic AGENT_DONE and the BILLING_UPDATE are written before ``start_consult`` returns.
+    """
     monkeypatch.setenv("PATHLY_RUNNER_EARLY_ADVANCE", "0")
 
 
