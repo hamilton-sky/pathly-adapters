@@ -1,7 +1,7 @@
 # Park a loop task on its role question and run it again in the same drain
 
 Type: task
-Status: resolved
+Status: open
 Blocked by: 01, 05
 Test first: yes
 Level: 3
@@ -147,3 +147,37 @@ Work started at f54596839e773196830824569ed6b6b4a504eed8 (test-only commit de8d3
   drain), and `waiting` only lists still-waiting tasks.
 - HANDOFF 05's minor stays: `task_wait_outcome._CARRIED` entries can leak when a drain aborts
   after a wrapper park.
+
+## Review findings (round 1, quality review)
+
+Review: chief-autopilot-round-two 06, quality pass. Range f545968..12dbe0b. END is HEAD, so no later commits were left out. I read the ticket blob at the base commit and did not read the Answer.
+
+Focused tests rerun: tests/dag_goals/test_loop_role_questions.py, test_loop_task_waits.py, test_loop_park_gaps.py, tests/runner_supervisor/test_fan_out.py. 43 passed.
+
+Probe left behind: I ran /tmp/claude-0/-home-user-pathly-adapters/7b5894ea-4de6-51cb-9c61-75dd2332e1f2/scratchpad/probe06q/test_probe06q_selfanswer.py from the scratchpad. Because it sits outside tests/, tests/conftest.py's home isolation did not load, and the run created /root/.pathly/pathly.db and /root/.pathly/global (04:40 UTC). I left them in place. Delete them if they are not wanted.
+
+Inputs probed:
+- question to_agent: case, spaces, unknown role, human, *
+- the question's author_run_id (stamped from the run token, so an agent cannot charge its question to another task's run)
+- answer posts through /comms/answer and through /comms/post type answer
+- route status: queued, running, answered with no answer row, to_person, never ends
+- the abort flag, goal.max_cost_usd, WAIT_TIMEOUT
+- the merge of the two drains, still_waiting
+
+What holds:
+- The wait cannot spin. Each loop either releases a task or breaks, and it also breaks when the second drain claims nothing.
+- Abort and the cost cap are checked every poll.
+- A route that never ends is bounded by WAIT_TIMEOUT for each wait.
+- One tracker is passed to both drains, so cost is counted once and the cap applies across the drains.
+- claim_task stops a released task from being run twice.
+- still_waiting removes tasks that ran again, so the outcome and warning are right.
+- A question handed to the person has no pending route, so nothing waits on it and the run ends waiting_for_answer.
+- Questions are matched by author_run_id, so another agent cannot park a task on a question that task did not ask.
+
+QUALITY
+1. major src/pathly_orchestrator/db/queries/task_waits.py (asked_questions_by_run) with supervisor/task_proof.py / task_wait_outcome.py: a loop task can now re-run forever with no attempt counted. asked_questions_by_run lists role questions that are already answered, and park_and_recheck then releases the task at once (waits+1, attempts-waits unchanged), and scheduler_loop claims it again within the same drain. An agent (or a prompt-injected one) that posts a question to architect and then answers it itself through POST /comms/answer, or a type: answer post with reply_to, which nothing stops a run token from doing, gets a fresh paid spawn every attempt. consult.max_per_task does not stop this: after three routes the question is handed to the person, but the self-answer still marks it answered and still releases the task at once. The attempt limit never fires, because only failures reach resolve_task_failure, and goal.max_cost_usd has no default, so the run is unbounded. Probe: 12 self-answered asks gave 13 spawns of one task in one goal-loop run (status done). At the base commit the same agent got 1 spawn, because an answered question was never in open_questions_by_run. To fix: do not count (or release on) a role question whose only answer was written by the asking run itself (match the answer's author_run_id to the question's), and/or put a ceiling on waits per task. For example, once waits passes consult.max_per_task plus a small margin, keep the task parked for the person instead of releasing it at once. Add a test with a self-answering agent.
+2. minor src/pathly_orchestrator/supervisor/consult_wait.py: CONSULT_SPAWN_TIMEOUT = 600.0 copies consult_run._default_spawn's timeout=600 literal instead of sharing a constant, so the two can drift. Also, the 600 s spawn timeout starts only when the spawn host runs the consult. A consult queued behind Studio's headless cap can still be queued or running after 690 s, so the drain gives up early and the run ends waiting_for_answer. When the answer lands later, the task is left pending outside the run. Hoist one constant into consult_run (or a shared module) and import it here. Consider timing from the route's start, or note the limit in the docs.
+3. minor src/pathly_orchestrator/supervisor/consult_wait.py: a route that is answered but has no answer row (delivery crashed between set_route_status and the post) is waited on for the full timeout on every loop iteration. Waiting only a short grace period for that state would be enough.
+4. minor src/pathly_orchestrator/supervisor/fan_out.py (_concat_drains): if a consult answer frees a task between scheduler_loop's last get_ready_tasks and detect_deadlocks, the task and its dependents are pending and no longer behind a wait, so they are marked deadlocked. They then stay in the first drain's lists while the outer loop has already decided not to drain again. The window is narrow and existed in round one for answers from the person, but the automatic consults make it likelier. To fix, re-check the parked tasks before detect_deadlocks, or skip tasks that were waiting in this drain.
+
+REVIEW: FAIL
