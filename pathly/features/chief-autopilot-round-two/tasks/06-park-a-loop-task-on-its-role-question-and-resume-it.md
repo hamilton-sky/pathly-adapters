@@ -1,7 +1,7 @@
 # Park a loop task on its role question and run it again in the same drain
 
 Type: task
-Status: resolved
+Status: open
 Blocked by: 01, 05
 Test first: yes
 Level: 3
@@ -261,3 +261,49 @@ QUALITY
 4. minor src/pathly_orchestrator/supervisor/fan_out.py (_concat_drains): if a consult answer frees a task between scheduler_loop's last get_ready_tasks and detect_deadlocks, the task and its dependents are pending and no longer behind a wait, so they are marked deadlocked. They then stay in the first drain's lists while the outer loop has already decided not to drain again. The window is narrow and existed in round one for answers from the person, but the automatic consults make it likelier. To fix, re-check the parked tasks before detect_deadlocks, or skip tasks that were waiting in this drain.
 
 REVIEW: FAIL
+
+## Review findings (round 2, gate (quick))
+
+gate: Build: python -m build --wheel && npm --prefix studio run typecheck
+gate: Quick: python -m pytest tests/comms_board tests/db tests/runner_supervisor tests/http_api tests/dag_goals tests/fsm_flows tests/telemetry tests/consistency -q -x -p no:cacheprovider
+gate: Quick failed. the last lines of its output:
+........................................................................ [ 80%]
+........................................................................ [ 82%]
+........................................................................ [ 83%]
+........................................................................ [ 84%]
+.................ss..s.....ss..s.ss..................................... [ 85%]
+.......................................F
+=================================== FAILURES ===================================
+________ test_a_skip_blocks_building_and_passes_once_a_human_allows_it _________
+
+proj = PosixPath('/tmp/pathly-tests/tmpjrzm3rys/repo')
+flow = {'_comments': [], 'adapter_map': {'BUILDING': 'claude', 'REVIEWING': 'claude', 'TESTING': 'claude', 'default': 'claude...test'}, 'escalation_routing': {'REVIEW_FAILURES': 'planner', 'SCOPE_VIOLATION': 'planner', 'TEST_FAILURES': 'po'}, ...}
+
+    def test_a_skip_blocks_building_and_passes_once_a_human_allows_it(proj, flow):
+        _enter_building(proj, flow)
+        task_id = _claim()
+        _as(proj, flow, "builder", "BUILDING", _edit(proj, TESTS, SKIPPED))
+    
+        blocked = _complete(proj)
+    
+>       text = _assert_floor_block(blocked, proj)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/fsm_flows/test_floor_gate.py:179: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+result = {'schema_version': '1', 'decision': 'continue', 'current_state': 'REVIEWING', 'conv': 0, ...}
+repo = PosixPath('/tmp/pathly-tests/tmpjrzm3rys/repo')
+
+    def _assert_floor_block(result: dict, repo) -> str:
+>       assert result.get("blocked") is True, result
+E       AssertionError: {'schema_version': '1', 'decision': 'continue', 'current_state': 'REVIEWING', 'conv': 0, ...}
+E       assert None is True
+E        +  where None = <built-in method get of dict object at 0x7fb91f2bcec0>('blocked')
+E        +    where <built-in method get of dict object at 0x7fb91f2bcec0> = {'schema_version': '1', 'decision': 'continue', 'current_state': 'REVIEWING', 'conv': 0, ...}.get
+
+tests/fsm_flows/test_floor_gate.py:80: AssertionError
+=========================== short test summary info ============================
+FAILED tests/fsm_flows/test_floor_gate.py::test_a_skip_blocks_building_and_passes_once_a_human_allows_it
+!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!
+1 failed, 5141 passed, 10 skipped in 1349.84s (0:22:29)
