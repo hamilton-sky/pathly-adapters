@@ -115,7 +115,7 @@ Outside facts relied on (tickets 13 to 15, 18):
 - The trust screen's wording is unmeasured: its only source is a user's issue report with no
   claude version (Decisions so far), not a real claude run here. Ticket 14 records what it can
   (`claude --version` beside a fixture of the screen's text in
-  `studio/src/main/ipc/terminal/fixtures/claude-trust-screen.txt`, its source and version noted in
+  `studio/src/main/ipc/terminal/__tests__/claude-trust-screen.txt`, its source and version noted in
   the file); the person confirms one first open in a never-trusted folder on their claude after
   ticket 14, and replaces the fixture if the wording differs.
 - Ticket 13's answers are the brief's recommended ones, pending the person's tap; if the tap

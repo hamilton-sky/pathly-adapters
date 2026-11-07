@@ -5,7 +5,7 @@ Status: open
 Blocked by: 13
 Test first: yes
 Level: 3
-Touches: studio/src/main/ipc/terminal/promptInjector.ts, studio/src/main/ipc/terminal/promptInjector.test.ts (new), studio/src/main/ipc/terminal/fixtures/claude-trust-screen.txt (new), studio/CLAUDE.md
+Touches: studio/src/main/ipc/terminal/promptInjector.ts, studio/src/main/ipc/terminal/promptInjector.test.ts (new), studio/src/main/ipc/terminal/__tests__/claude-trust-screen.txt (new), studio/CLAUDE.md
 
 Spike leftover S4: the first open of a never-trusted folder lost the chief's pasted prompt to
 claude's folder-trust screen. Build ticket 13's answer to question 1: A, Studio answers the
@@ -13,7 +13,7 @@ screen and never pastes blind into a chief tab.
 
 0. **Record the wording first.** Its only source is a user's quote in
    https://github.com/anthropics/claude-code/issues/40002 (map Decisions so far), so it is
-   unmeasured. Write `studio/src/main/ipc/terminal/fixtures/claude-trust-screen.txt` (new): the
+   unmeasured. Write `studio/src/main/ipc/terminal/__tests__/claude-trust-screen.txt` (new): the
    screen's text as the installed claude prints it on a first interactive open of a fresh empty
    temporary folder (for example `script -qc claude /dev/null` under `timeout 15`, ANSI stripped,
    the folder deleted after), with a first line `# source: claude <claude --version>, captured
@@ -57,7 +57,7 @@ claude's ready prompt and how the trust screen is handled.
   old wording ("Do you trust the files in this folder") still matches; a headless tab answers the
   current wording once.
 - The fixture's first line names its source:
-  `python -c "print(open('studio/src/main/ipc/terminal/fixtures/claude-trust-screen.txt', encoding='utf-8').readline())"`
+  `python -c "print(open('studio/src/main/ipc/terminal/__tests__/claude-trust-screen.txt', encoding='utf-8').readline())"`
   prints `# source:`.
 - The main-process typecheck passes
   (`node studio/node_modules/typescript/bin/tsc --noEmit -p studio/tsconfig.node.json`).
@@ -67,7 +67,7 @@ claude's ready prompt and how the trust screen is handled.
 $ npm --prefix studio run test -- src/main/ipc/terminal/promptInjector.test.ts
 exit 0
 prints passed
-$ python -c "print(open('studio/src/main/ipc/terminal/fixtures/claude-trust-screen.txt', encoding='utf-8').readline())"
+$ python -c "print(open('studio/src/main/ipc/terminal/__tests__/claude-trust-screen.txt', encoding='utf-8').readline())"
 exit 0
 prints # source:
 $ node studio/node_modules/typescript/bin/tsc --noEmit -p studio/tsconfig.node.json
