@@ -60,6 +60,7 @@ def comms_answer():
         from pathly_orchestrator.db.connection import get_db as _get_db
         from pathly_orchestrator.db.queries.comms import answer_question as _answer
         from pathly_orchestrator.http_server.chief_cite import answer_text as _text_of
+        from pathly_orchestrator.http_server.chief_cite import relayed_stamp
 
         data = read_json_body()
         if not data:
@@ -80,8 +81,13 @@ def comms_answer():
         refused = refuse_agent_on_human_gate(conn, request, question_id)
         if refused:
             return refused
+        relayed = relayed_stamp()
         answer_id = _answer(
-            conn, question_id=question_id, answer_text=answer_text, option_id=option_id
+            conn,
+            question_id=question_id,
+            answer_text=answer_text,
+            option_id=option_id,
+            **(relayed or {}),
         )
 
         # Instant cross-client sync: nudge every board subscribed to this question's

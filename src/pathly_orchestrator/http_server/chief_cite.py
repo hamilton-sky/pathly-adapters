@@ -17,6 +17,8 @@ person. On success the gate spends the message (``record_citation``) and keeps t
 text on ``flask.g`` for the route, which reads its answer through ``answer_text``; so the words an
 agent receives are the ones the hook recorded, whatever the chief does with shell quoting. A
 caller without a chief token is never touched: ``answer_text`` gives it the ``answer`` it sent.
+``/comms/answer`` also stamps the row it stores through ``relayed_stamp``: ``author_role`` chief,
+``author_run_id`` the chief's run (from its token) and ``author_source`` ``chief_relayed``.
 
 What this shows is that the words are those of a prompt the hook recorded as one that reached the
 chief's tab, relayed to the question the chief picked. Outer whitespace is the one thing a route
@@ -79,6 +81,32 @@ def answer_text(data: Mapping) -> str:
     """The answer a route relays: the text the gate cited for a chief, else the body's own."""
     cited = getattr(g, "chief_cited_text", None)
     return data.get("answer", "") if cited is None else cited
+
+
+def relayed_stamp() -> dict | None:
+    """The author columns of an answer the gate let a chief relay on this request, else None.
+
+    ``{author_role: "chief", author_run_id: <the chief's run>, author_source: chief_relayed}``
+    when the gate cited a message for this request (``g.chief_cited_text``) and the caller's run
+    token is a chief's. The run id comes from that token (``caller_identity``), never from the
+    body. The row's ``from_agent`` stays ``human``: the words are the person's.
+    """
+    if getattr(g, "chief_cited_text", None) is None:
+        return None
+    from flask import request
+
+    from pathly_orchestrator.db.provenance_values import SOURCE_CHIEF_RELAYED
+
+    from .run_identity import caller_identity, is_chief_run
+
+    identity = caller_identity(request)
+    if not is_chief_run(identity):
+        return None
+    return {
+        "author_role": identity.role,  # "chief": is_chief_run checked it
+        "author_run_id": identity.run_id,
+        "author_source": SOURCE_CHIEF_RELAYED,
+    }
 
 
 def _not_cited(session: Mapping) -> str:

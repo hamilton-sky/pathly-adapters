@@ -281,6 +281,10 @@ def answer_question(
     question_id: str,
     answer_text: str,
     option_id: str | None = None,
+    *,
+    author_role: str | None = None,
+    author_run_id: str | None = None,
+    author_source: str | None = None,
 ) -> str:
     """Post an answer message replying to *question_id*. Returns the new message_id."""
     row = conn.execute(
@@ -297,6 +301,9 @@ def answer_question(
         type="answer",
         text=answer_text,
         reply_to=question_id,
+        author_role=author_role,
+        author_run_id=author_run_id,
+        author_source=author_source,
     )
     with _get_write_lock(conn):
         # Persist the chosen option id AND mark the question 'answered' (the status the

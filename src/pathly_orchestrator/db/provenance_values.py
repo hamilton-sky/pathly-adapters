@@ -15,8 +15,11 @@ SOURCE_TOKEN = "token"  # the caller's run token named a run and a role
 SOURCE_SYSTEM = "system"  # a row the server composed itself
 SOURCE_LEGACY = "legacy"  # a row written before provenance existed (backfilled)
 SOURCE_NONE = "none"  # unverified: no token, or one that names no role
+SOURCE_CHIEF_RELAYED = "chief_relayed"  # the person's cited words, relayed by the chief
 
-AUTHOR_SOURCES = frozenset({SOURCE_TOKEN, SOURCE_SYSTEM, SOURCE_LEGACY, SOURCE_NONE})
+AUTHOR_SOURCES = frozenset(
+    {SOURCE_TOKEN, SOURCE_SYSTEM, SOURCE_LEGACY, SOURCE_NONE, SOURCE_CHIEF_RELAYED}
+)
 
 SYSTEM_ROLE = "system"
 

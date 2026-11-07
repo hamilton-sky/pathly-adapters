@@ -21,7 +21,7 @@ PKG = SRC / "pathly_orchestrator"
 
 # The allowed values of comms_messages.author_source, pinned here independently of the code
 # (a test below checks db/provenance_values.py defines the same set).
-_SOURCES = frozenset({"token", "system", "legacy", "none"})
+_SOURCES = frozenset({"token", "system", "legacy", "none", "chief_relayed"})
 
 
 @pytest.fixture(autouse=True)
@@ -948,7 +948,9 @@ def test_every_post_message_call_in_supervisor_and_runner_passes_a_stamp():
 # so the list can only shrink.
 _UNSTAMPED_ALLOW = {
     # answer_question: written for a caller that is a human in the UI (no run token until
-    # RRP-2b), and its row is an `answer`, which no built-in policy withholds.
+    # RRP-2b), and its row is an `answer`, which no built-in policy withholds. It forwards the
+    # author columns its caller gives (POST /comms/answer passes chief_cite.relayed_stamp() for
+    # a chief's cited answer), which the scan cannot tell from a body value.
     "db/queries/comms_messages.py",
     # promote_message: the copy is not a new author; it carries the SOURCE row's three
     # author_* values (taken from the row, not from a stamp call), so a chain keeps them.

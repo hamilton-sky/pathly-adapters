@@ -1,7 +1,7 @@
 # Stamp an answer the chief relays as chief-relayed
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: —
 Test first: yes
 Level: 3
@@ -65,3 +65,15 @@ exit 0
 - `src/pathly_orchestrator/runner/provenance.py`, `src/pathly_orchestrator/runner/read_policy.py` (read-only)
 
 ## Answer
+
+Work started at `0b52f4681d6b42f48c5a4b434d52653d784b7b3b` (HEAD at claim: `d80d548`, the merge of master on top of it). Test-only commit: `2c24670`.
+
+- **Built**: `db/provenance_values.py` (`SOURCE_CHIEF_RELAYED = "chief_relayed"`, in `AUTHOR_SOURCES`); `db/queries/comms_messages.py::answer_question` (keyword-only `author_role`/`author_run_id`/`author_source`, forwarded to `post_message`; file now 399 lines); `http_server/chief_cite.py::relayed_stamp()` (+ one docstring sentence); `blueprints/comms/messages_crud.comms_answer` (passes `**(relayed_stamp() or {})`); `tests/comms_board/test_chief_relayed_answer.py` (new, 5 tests); `tests/comms_board/test_comms_provenance.py` (`_SOURCES` gains `chief_relayed`; the `comms_messages.py` allow-list comment now also says it forwards its caller's columns); `src/pathly_orchestrator/CLAUDE.md` (route table entry for `/comms/answer`, "Author provenance on board writes", the `provenance_values.py` tree line, the "No free re-runs" sentence); `tests/INDEX.md`, `tests/comms_board/INDEX.md` regenerated.
+- **Proof**:
+  - `python -m pytest tests/comms_board/test_chief_relayed_answer.py -q -p no:cacheprovider`: `5 passed`, exit 0 (at the test-only commit: 3 failed for the missing constant/function and the `none` stamp). Covers: a chief's cited `POST /comms/answer` stores `from_agent: human`, the cited text, `author_role: chief`, `author_run_id` the chief's run, `author_source: chief_relayed`; a tokenless answer stores `none`/None/None; `relayed_stamp()` is None for a chief token with nothing cited and for cited text with no chief token; `post_message(author_source="chief-relayed")` raises `ValueError`; a mirror row claiming `chief_relayed` hydrates as `legacy`.
+  - `python -m pytest tests/comms_board -q -p no:cacheprovider`: `1577 passed`, exit 0.
+  - `python -m pytest tests/http_api -q -p no:cacheprovider -k "chief_cite or chief_gate or answer"`: `1613 passed, 983 deselected`, exit 0; the full `tests/` suite afterwards on the final code: `6801 passed, 14 skipped`.
+  - Lint: `black --check src/ tests/`, `mypy`, `check_file_size.py` (none new, none grown), `check_no_mirror_reads.py`, `gen_test_index.py --check`, `lint-imports` (1 kept), `bandit -ll`: all clean.
+- **Decisions**: the chief's run id comes from the run token (`caller_identity(request)` + `is_chief_run`), never the body, and `author_role` is the token's role (`identity.role`, which `is_chief_run` has just checked is `chief`): the provenance scan `test_no_author_value_is_hard_coded_outside_the_db_constants` refuses an `author_*` string literal outside `db/`, and adding a `CHIEF_ROLE` constant was not needed. The token is resolved a second time (the gate does not keep its lookup on `g`), which keeps `chief_gate.py` out of the change. `relayed_stamp` imports `run_identity` and `provenance_values` lazily, as `chief_cite` does for its other db imports. `comms_messages.py` stays on `_UNSTAMPED_ALLOW` (its `post_message` forwards variables, which the scan reads as unstamped); no allow-list entry added.
+- **Shortcuts taken**: none.
+- **For later tickets**: an answer row with `author_source: chief_relayed` now carries the chief's run as `author_run_id` (a non-null run id on a `/comms/answer` row is new). `tests/comms_board/test_read_policy.py`'s own `SOURCES` list was not changed (not in Touches); `read_policy` needs no change since it only tests `== "none"`.
