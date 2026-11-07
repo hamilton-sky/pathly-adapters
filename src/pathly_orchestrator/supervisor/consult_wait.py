@@ -8,7 +8,15 @@ and returns the tasks now ``pending`` (an answer's ``release_on_answer`` freed t
 drain runs again. A question handed to the person has no pending route, so nothing waits on it.
 
 A consult's delivery ends the route ``answered`` just before it posts the answer row, so a route
-``answered`` whose question has no answer yet is waited on too (until the timeout at most).
+``answered`` whose question has no answer yet is waited on too, for ``ANSWERED_GRACE`` seconds at
+most (a delivery that crashed in that gap never posts it).
+
+Limits: ``CONSULT_SPAWN_TIMEOUT`` is a copy of the ``timeout=600`` literal in
+``consult_run._default_spawn`` (consult_run.py holds no constant to import), so the two can drift
+if that literal changes. And the timeout counts from the wait's start, not the consult's: a
+consult queued behind the spawn host's headless cap can still be ``queued`` or ``running`` when
+the wait gives up, and the run ends ``waiting_for_answer``; the answer that lands later frees the
+task outside the run (``pending``, for the next run).
 """
 
 from __future__ import annotations
@@ -25,10 +33,13 @@ CONSULT_SPAWN_TIMEOUT = 600.0
 # by ``fan_out._drain``, so a test can lower it.
 WAIT_TIMEOUT = CONSULT_SPAWN_TIMEOUT + 90.0
 POLL_INTERVAL = 1.0
+# How long a route ``answered`` with no answer row is waited on.
+ANSWERED_GRACE = 5.0
 
 
 def _waited_questions(conn, task_ids: list[str]) -> tuple[list[str], list[str]]:
-    """(the questions the parked ``task_ids`` wait on, the ids among them still waited for)."""
+    """(the ids with a ``queued`` or ``running`` route, the ids whose route is ``answered`` with
+    no answer row yet), among the questions the parked ``task_ids`` wait on."""
     from pathly_orchestrator.db.queries.consult_routes import (
         pending_routes,
         routes_for_questions,
@@ -51,14 +62,15 @@ def _waited_questions(conn, task_ids: list[str]) -> tuple[list[str], list[str]]:
             )
     if not qids:
         return [], []
-    waited = pending_routes(conn, qids)
+    pending = pending_routes(conn, qids)
+    gaps: list[str] = []
     for route in routes_for_questions(conn, qids):
         qid = route["question_id"]
-        if route["status"] == "answered" and qid not in waited:
+        if route["status"] == "answered" and qid not in pending + gaps:
             pairs = question_answers(conn, [qid])
             if pairs and pairs[0]["answer"] is None:
-                waited.append(qid)
-    return qids, waited
+                gaps.append(qid)
+    return pending, gaps
 
 
 def wait_for_consults(
@@ -78,9 +90,16 @@ def wait_for_consults(
         return []
     conn = get_db()
     deadline = time.monotonic() + max(0.0, float(timeout))
+    gap_seen: dict[str, float] = (
+        {}
+    )  # question id -> when its answered-but-no-row gap was seen
     try:
         while True:
-            _, waited = _waited_questions(conn, task_ids)
+            pending, gaps = _waited_questions(conn, task_ids)
+            now = time.monotonic()
+            waited = pending + [
+                q for q in gaps if now - gap_seen.setdefault(q, now) < ANSWERED_GRACE
+            ]
             if not waited:
                 break
             if abort_check is not None and abort_check():

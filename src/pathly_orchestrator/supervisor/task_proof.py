@@ -332,13 +332,14 @@ def _parked_on_question(task_id: str, run_id: str) -> bool:
         from pathly_orchestrator.db.queries.task_waits import (
             asked_questions_by_run,
             park_and_recheck,
+            wait_ceiling,
         )
 
         conn = get_db()
         asked = asked_questions_by_run(conn, run_id)
         if not asked:
             return False
-        parked = park_and_recheck(conn, task_id, asked)
+        parked = park_and_recheck(conn, task_id, asked, hold_over=wait_ceiling(conn))
     except Exception:
         logger.warning(
             "task_proof: parking %s failed; proving it", run_id, exc_info=True

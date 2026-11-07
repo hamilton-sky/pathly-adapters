@@ -60,7 +60,8 @@ def park_if_asked(
 
     ``task_waits.park_and_recheck`` parks it, and frees it at once when the questions were
     answered before the park: that task is ``pending`` again and still counts as a wait (True,
-    no attempt spent), so the scheduler's next frontier read claims it with the answers. A park
+    no attempt spent), so the scheduler's next frontier read claims it with the answers. Past
+    ``task_waits.wait_ceiling`` waits it is held for the person instead (``held``). A park
     that parks nothing (the task is no longer ``in_progress``) logs a warning and returns False.
 
     An attempt that reported success and asked was already parked by ``task_proof.wrap``
@@ -75,6 +76,7 @@ def park_if_asked(
         asked_questions_by_run,
         park_and_recheck,
         task_status,
+        wait_ceiling,
     )
 
     run_id = sched_run_id(task_id, int(task_attempts.get(task_id, 0)))
@@ -86,7 +88,9 @@ def park_if_asked(
             question_ids = asked_questions_by_run(conn, run_id)
             if not question_ids:
                 return False
-            parked = park_and_recheck(conn, task_id, question_ids)
+            parked = park_and_recheck(
+                conn, task_id, question_ids, hold_over=wait_ceiling(conn)
+            )
             if parked == "not_parked":
                 logger.warning(
                     "loop task %s asked %s but was not parked (task_status %s): "

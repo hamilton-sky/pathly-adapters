@@ -243,6 +243,22 @@ def _still_waiting(task_ids: list) -> list:
         return list(task_ids)
 
 
+def _restore_freed(drained: dict, waited: list, board: str, scope: str) -> list:
+    """``task_waits.restore_freed_waits`` on a drain's deadlocked tasks, dropped from its lists."""
+    try:
+        from pathly_orchestrator.db.connection import get_db
+        from pathly_orchestrator.db.queries.task_waits import restore_freed_waits
+
+        dead = list(drained.get("deadlocked") or [])
+        restored = restore_freed_waits(get_db(), board, scope, list(waited), dead)
+    except Exception:
+        logger.warning("restoring freed waiting tasks failed", exc_info=True)
+        return []
+    for key in ("deadlocked", "blocked"):
+        drained[key] = [t for t in drained.get(key) or [] if t not in restored]
+    return restored
+
+
 def _drain(
     state,
     config: dict,
@@ -304,8 +320,12 @@ def _drain(
         )
 
     drained, tracker = _drain_once()
-    while drained.get("waiting") and not tracker.exceeded() and not _abort_check():
-        released = consult_wait.wait_for_consults(
+    # A task freed by an answer during the drain's deadlock check is pending, not deadlocked.
+    restored = _restore_freed(drained, drained.get("waiting") or [], board, scope)
+    while (drained.get("waiting") or restored) and not tracker.exceeded():
+        if _abort_check():
+            break
+        released = restored or consult_wait.wait_for_consults(
             _still_waiting(drained["waiting"]),
             lambda: _abort_check() or bool(tracker.exceeded()),
             consult_wait.WAIT_TIMEOUT,
@@ -315,6 +335,8 @@ def _drain(
         more, tracker = _drain_once(tracker)
         if not any(more.get(k) for k in _DRAIN_KEYS):
             break  # the released tasks were not claimed: do not spin
+        waited = list(drained.get("waiting") or []) + list(more.get("waiting") or [])
+        restored = _restore_freed(more, waited, board, scope)
         drained = _concat_drains(drained, more)
     drained["waiting"] = _still_waiting(drained.get("waiting") or [])
     merged = _merge_drain_result(drained, tracker.total)

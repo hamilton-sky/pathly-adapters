@@ -1602,7 +1602,7 @@ pathly_orchestrator/
       comms_artifact_rows.py # insert_artifact: the comms_artifacts board-row insert (title/summary run-token redacted), moved out of comms_artifacts.py at its 400-line cap; re-exported from comms_artifacts / comms
       comms_tasks.py       # task DAG operations (get_ready, complete, claim, reclaim, goal_refs_coverage); re-exports fail_task
       comms_tasks_by_run.py # get_unfinished_tasks_of_run(conn, run_id): the tasks still in_progress with claimed_by = the run, with attempts and waits (chief-autopilot 05), read only; kept out of comms_tasks.py
-      task_waits.py        # open_questions_by_run / asked_questions_by_run (open ones + every role question, answered or not: the loop park, chief-autopilot-round-two 06) / park_task / park_and_recheck (parked|released|not_parked: re-checks the answers after the park; never raises once the park is committed) / release_waiting_tasks / still_waiting / task_status (+ best-effort release_on_answer, called by post_message for an answer with reply_to) / tasks_behind_waiting / question_answers (chief-autopilot 06, see "A task waits on its question")
+      task_waits.py        # open_questions_by_run / asked_questions_by_run (open ones + every role question, answered or not, except one only the asking run answered: the loop park, chief-autopilot-round-two 06) / park_task / park_and_recheck (parked|released|held|not_parked: re-checks the answers after the park; `hold_over` = `wait_ceiling` holds a loop task past consult.max_per_task + WAIT_MARGIN waits; never raises once the park is committed) / restore_freed_waits (undoes the deadlock mark on a task freed during the drain's deadlock check) / release_waiting_tasks / still_waiting / task_status (+ best-effort release_on_answer, called by post_message for an answer with reply_to) / tasks_behind_waiting / question_answers (chief-autopilot 06, see "A task waits on its question")
       consult_routes.py    # CONSULT_ROLES / consult_limits / asking_task / route_decision / record_route / set_route_status / hand_to_person / routes_for_questions / pending_routes / goal_consult_cost / end_stale_routes (chief-autopilot-round-two 01, see "Consult routes"); imports nothing above db/
       comms_task_fail.py   # fail_task: marks a task failed (fail_reason run-token redacted before its 4000-char cap) and cascades dependents to blocked; moved out of comms_tasks.py at its ratchet baseline; re-exported from comms_tasks / comms
       task_results.py      # build-proof: latest_task_summaries(conn, task_ids) — the newest AGENT_DONE `summary` of each task's `sched-<id>#<n>` runs (a dependent task's prompt shows it)
@@ -1686,7 +1686,8 @@ pathly_orchestrator/
                            #   project-board loop goal drains; "feature" with no goal/board.
                            #   A drain that parked tasks on a routed question waits for the
                            #   consults (consult_wait) and drains again with the same tracker;
-                           #   `waiting` keeps only still_waiting tasks (chief-autopilot-round-two 06).
+                           #   `waiting` keeps only still_waiting tasks; a waiting task freed during the
+                           #   deadlock check is restored and drained (chief-autopilot-round-two 06).
     spawn_window.py        # observe — wraps the single-path spawns (run_stage's and the feedback
                            #   spawn): a SPAWN_WINDOW event (role, tree + HEAD before/after) when
                            #   the flow has a floor/scope/reviewer gate (see "Spawn windows" below)
@@ -1711,7 +1712,8 @@ pathly_orchestrator/
                            #   a loop task that waits on its question (see "A task waits on its question")
     consult_wait.py        # wait_for_consults(task_ids, abort_check, timeout) -> the tasks now pending (chief-autopilot-round-two 06):
                            #   fan_out._drain waits (WAIT_TIMEOUT: consult spawn timeout + 90 s, POLL_INTERVAL) while a
-                           #   parked loop task's question has a queued/running route, then drains again
+                           #   parked loop task's question has a queued/running route (an answered route with
+                           #   no answer row: ANSWERED_GRACE at most), then drains again
     task_prompt.py         # build_task_prompt — ONE assembly of a DAG task's prompt: the composed
                            #   development/execute-task body with its fragment placeholders
                            #   SUBSTITUTED (the DAG path had no injector at all — see Phase E),
@@ -2693,11 +2695,23 @@ unreadable row keeps the error's word). `fan_out._drain` filters the drain's `wa
 `task_waits.still_waiting` before `_merge_drain_result`, so a task released and run again in the
 drain is not reported as a wait. When the drain ends with parked tasks whose question has a
 `queued` or `running` route (`consult_routes.pending_routes`; a route `answered` whose answer row
-is not posted yet counts too), `_drain` waits for the consults
+is not posted yet counts too, for `ANSWERED_GRACE` (5 s) at most), `_drain` waits for the consults
 (`supervisor/consult_wait.wait_for_consults`, polled every `POLL_INTERVAL`, until no such route is
 left, the abort flag or the cost cap stops it, or `WAIT_TIMEOUT`, the consult spawn's 600 s plus
 90 s, passes); when the wait released tasks it drains again with the same cost tracker (one cap,
-one total) and concatenates the results, until a wait releases nothing. A question handed to the
+one total) and concatenates the results, until a wait releases nothing. A task an answer freed
+between the scheduler's last ready read and `task_retry.detect_deadlocks` (marked deadlocked with
+its dependents) is put back to `pending` and drained (`task_waits.restore_freed_waits`). Limits:
+`consult_wait.CONSULT_SPAWN_TIMEOUT` copies `consult_run._default_spawn`'s `timeout=600` literal
+(the two can drift), and the timeout counts from the wait's start, so a consult queued behind the
+spawn host's headless cap can outlive it: the run ends `waiting_for_answer` and the late answer
+frees the task for the next run. **No free re-runs:** a role question whose only answers were
+written by the asking run (`author_run_id`) is neither listed by `asked_questions_by_run` nor
+answered for a release, and a loop park whose `waits` passes `consult.max_per_task` +
+`task_waits.WAIT_MARGIN` (2) is `held` for the person (`park_and_recheck(hold_over=wait_ceiling)`)
+instead of released at once; a later answer to one of its questions frees it. An answer through
+`POST /comms/answer` carries no `author_run_id`, so only the ceiling bounds an agent that answers
+itself there. A question handed to the
 person has no pending route, so the run ends `waiting_for_answer` with no wait; so does a route
 still running at the timeout. `_drain` records on the run the tasks that still wait
 (`note_run_waits`, `task_waits.still_waiting`: parked, or `pending` and not yet run; one that ran

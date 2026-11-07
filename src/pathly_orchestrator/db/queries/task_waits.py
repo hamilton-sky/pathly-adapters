@@ -9,7 +9,9 @@ post with ``reply_to``) frees every task whose questions are then all answered: 
 ``pending``, the reason cleared, the question ids kept in ``answered_questions`` (a JSON list)
 for the next attempt. Questions to a role (``to: architect``) park a loop task too
 (``asked_questions_by_run``, chief-autopilot-round-two 06); a single run reads only
-``open_questions_by_run``.
+``open_questions_by_run``. An answer written by the asking run itself does not count: such a
+question is neither listed nor answered. A loop park past ``wait_ceiling`` waits is held for the
+person instead of being released at once (``park_and_recheck(hold_over=...)``).
 
 Shared with the loop scheduler (ticket 12). Every SQL here is one literal.
 """
@@ -26,6 +28,8 @@ logger = logging.getLogger("pathly.task_waits")
 
 WAITING_FOR_ANSWER = "waiting_for_answer"
 _PREFIX = WAITING_FOR_ANSWER + ":"
+# Waits a loop task may have past ``consult.max_per_task`` before a park is held for the person.
+WAIT_MARGIN = 2
 
 
 def open_questions_by_run(conn: sqlite3.Connection, run_id: str) -> list[str]:
@@ -56,7 +60,10 @@ def asked_questions_by_run(conn: sqlite3.Connection, run_id: str) -> list[str]:
     ``open_questions_by_run`` (open questions to ``human`` or ``*``) plus each live question the
     run posted to a role in ``consult_routes.CONSULT_ROLES`` or that has a route row (one handed
     on to the person is addressed to ``human`` now), answered or not: an answer that came while
-    the attempt ran was never read by it. Each id once. A blank ``run_id`` matches nothing.
+    the attempt ran was never read by it. A question whose only answers were written by the
+    asking run itself (``author_run_id``) is left out: the run read its own answer, and counting
+    it would give the task a free attempt each time. Each id once. A blank ``run_id`` matches
+    nothing.
     """
     if not run_id:
         return []
@@ -69,6 +76,11 @@ def asked_questions_by_run(conn: sqlite3.Connection, run_id: str) -> list[str]:
         "AND (q.id IN (SELECT value FROM json_each(?)) "
         "OR lower(trim(COALESCE(q.to_agent, ''))) IN (SELECT value FROM json_each(?)) "
         "OR EXISTS (SELECT 1 FROM consult_routes r WHERE r.question_id=q.id)) "
+        "AND NOT (EXISTS (SELECT 1 FROM comms_messages a WHERE a.type='answer' "
+        "AND a.reply_to=q.id AND a.deleted_at IS NULL AND a.author_run_id=q.author_run_id) "
+        "AND NOT EXISTS (SELECT 1 FROM comms_messages a WHERE a.type='answer' "
+        "AND a.reply_to=q.id AND a.deleted_at IS NULL "
+        "AND COALESCE(a.author_run_id, '') != q.author_run_id)) "
         "ORDER BY q.ts ASC, q.id ASC",
         (
             run_id,
@@ -103,19 +115,38 @@ def park_task(conn: sqlite3.Connection, task_id: str, question_ids: list[str]) -
 
 
 def _is_answered(conn: sqlite3.Connection, question_id: str) -> bool:
+    """Answered by someone other than the asking run: a live answer row from another (or no)
+    run, or the ``answered`` status with no answer row from the asking run."""
     row = conn.execute(
         "SELECT q.status, EXISTS (SELECT 1 FROM comms_messages a WHERE a.type='answer' "
-        "AND a.reply_to=q.id AND a.deleted_at IS NULL) AS replied "
+        "AND a.reply_to=q.id AND a.deleted_at IS NULL AND (q.author_run_id IS NULL "
+        "OR COALESCE(a.author_run_id, '') != q.author_run_id)) AS replied, "
+        "EXISTS (SELECT 1 FROM comms_messages a WHERE a.type='answer' AND a.reply_to=q.id "
+        "AND a.deleted_at IS NULL AND a.author_run_id=q.author_run_id) AS self_replied "
         "FROM comms_messages q WHERE q.id=?",
         (question_id,),
     ).fetchone()
     if row is None:
         return False
-    return row["status"] == "answered" or bool(row["replied"])
+    if row["replied"]:
+        return True
+    return row["status"] == "answered" and not row["self_replied"]
+
+
+def wait_ceiling(conn: sqlite3.Connection) -> int:
+    """The waits a loop task may reach before a park is held for the person:
+    ``consult.max_per_task`` plus ``WAIT_MARGIN``."""
+    # Imported here: consult_routes imports comms_messages, which imports this module.
+    from .consult_routes import consult_limits
+
+    return consult_limits(conn)[0] + WAIT_MARGIN
 
 
 def park_and_recheck(
-    conn: sqlite3.Connection, task_id: str, question_ids: list[str]
+    conn: sqlite3.Connection,
+    task_id: str,
+    question_ids: list[str],
+    hold_over: int | None = None,
 ) -> str:
     """``park_task``, then free the task at once when every question is answered now.
 
@@ -125,11 +156,21 @@ def park_and_recheck(
     still counted) or ``not_parked`` (the task was not ``in_progress``). Once the park is
     committed it never raises: a recheck that fails is logged and the task stays ``parked``
     (an answer's own ``release_on_answer`` still frees it). A task an answer freed between the
-    park and the recheck reads ``released``.
+    park and the recheck reads ``released``. With ``hold_over``, a task whose ``waits`` is now
+    above it is not freed at once: ``held`` (parked for the person; a later answer to one of
+    its questions frees it as usual).
     """
     if not park_task(conn, task_id, question_ids):
         return "not_parked"
     try:
+        if hold_over is not None and task_waits(conn, task_id) > hold_over:
+            logger.warning(
+                "task %s has waited %d times (limit %d): held for the person",
+                task_id,
+                task_waits(conn, task_id),
+                hold_over,
+            )
+            return "held"
         if question_ids and all(_is_answered(conn, q) for q in question_ids):
             release_waiting_tasks(conn, question_ids[0])
         if task_status(conn, task_id) == "pending":
@@ -266,6 +307,58 @@ def tasks_behind_waiting(conn: sqlite3.Connection, board: str, scope: str) -> se
                 seen.add(dep)
                 stack.extend(deps.get(dep, []))
     return behind
+
+
+def restore_freed_waits(
+    conn: sqlite3.Connection,
+    board: str,
+    scope: str,
+    waited: list[str],
+    deadlocked: list[str],
+) -> list[str]:
+    """Undo the deadlock mark on the tasks an answer freed during a drain's deadlock check.
+
+    A task that waited in the drain and was freed after the scheduler's last ready read is
+    ``pending`` and no longer behind a wait, so ``task_retry.detect_deadlocks`` marks it, and the
+    tasks that depend on it, deadlocked. Each of ``deadlocked`` that is in ``waited``, or whose
+    dependency chain reaches one, goes back to ``pending``. Returns the ids restored.
+    """
+    freed = set(deadlocked) & set(waited)
+    if not freed:
+        return []
+    rows = conn.execute(
+        "SELECT id, depends_on FROM comms_messages "
+        "WHERE board=? AND scope=? AND type='task' AND deleted_at IS NULL",
+        (board, scope),
+    ).fetchall()
+    deps: dict[str, list[str]] = {}
+    for row in rows:
+        try:
+            parsed = json.loads(row["depends_on"]) if row["depends_on"] else []
+        except (TypeError, ValueError):
+            parsed = []
+        deps[row["id"]] = [str(d) for d in parsed] if isinstance(parsed, list) else []
+    restored: list[str] = []
+    for tid in deadlocked:
+        seen: set[str] = set()
+        stack = [tid]
+        while stack and not freed.intersection(stack):
+            dep = stack.pop()
+            if dep not in seen:
+                seen.add(dep)
+                stack.extend(deps.get(dep, []))
+        if not stack:
+            continue
+        with _get_write_lock(conn):
+            cur = conn.execute(
+                "UPDATE comms_messages SET task_status='pending', fail_reason=NULL "
+                "WHERE id=? AND task_status='blocked' AND fail_reason LIKE 'deadlocked:%'",
+                (tid,),
+            )
+            conn.commit()
+        if cur.rowcount == 1:
+            restored.append(tid)
+    return restored
 
 
 def question_answers(conn: sqlite3.Connection, question_ids: list[str]) -> list[dict]:

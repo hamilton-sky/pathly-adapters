@@ -1,7 +1,7 @@
 # Park a loop task on its role question and run it again in the same drain
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 01, 05
 Test first: yes
 Level: 3
@@ -147,6 +147,86 @@ Work started at f54596839e773196830824569ed6b6b4a504eed8 (test-only commit de8d3
   drain), and `waiting` only lists still-waiting tasks.
 - HANDOFF 05's minor stays: `task_wait_outcome._CARRIED` entries can leak when a drain aborts
   after a wrapper park.
+
+### Round 2 (review round 1 fixes)
+
+Work started at 6e958860b47504e93fd3116e188813b98a8cd35c. Test-first commit: 841a59e (4 of the
+new tests failed there: the self-answering run never finished in 120 s (unbounded re-runs), and
+ImportError/AttributeError for `WAIT_MARGIN`, `ANSWERED_GRACE`, `restore_freed_waits`).
+
+*Built*
+
+- `db/queries/task_waits.py` (380 lines): `asked_questions_by_run` leaves out a question whose only
+  live answers carry the asking run's `author_run_id`; `_is_answered` does not count such an answer
+  (an answer from another or no run, or the `answered` status with no self-answer row, counts);
+  `WAIT_MARGIN = 2`, `wait_ceiling(conn)` (= `consult.max_per_task` + 2, via `consult_limits`);
+  `park_and_recheck(..., hold_over=None)` returns `held` (parked, not released) when the task's
+  `waits` is now above `hold_over`; `restore_freed_waits(conn, board, scope, waited, deadlocked)`.
+  Every SQL is still one literal (no concatenation, so bandit B608 stays quiet).
+- `supervisor/task_wait_outcome.py`, `supervisor/task_proof.py`: the loop park sites pass
+  `hold_over=wait_ceiling(conn)`. `run_task_outcome` (single runs) is untouched.
+- `supervisor/consult_wait.py` (120 lines): `ANSWERED_GRACE = 5.0`; an `answered` route with no
+  answer row is waited on for at most that long per wait call; module docstring documents the
+  copied 600 s and the queue limit.
+- `supervisor/fan_out.py` (395 lines): `_restore_freed` after each drain; restored tasks are
+  drained again like released ones.
+- Tests: `test_loop_role_questions.py` +3 (stamped self-answer is not a wait: 1 spawn, done,
+  waits 0; unstamped self-answer every attempt with `consult.max_per_task=1`: exactly
+  ceiling + 1 = 4 spawns, then held `blocked`/`waiting_for_answer`, `attempts - waits == 0`, run
+  ends `waiting_for_answer`; answered route with no answer row: wait returns after >= 0.3 s grace,
+  < 5 s, with a 60 s timeout). `test_loop_task_waits.py` +1 (`restore_freed_waits` restores the
+  freed task and its dependent, leaves a real deadlock blocked).
+- `src/pathly_orchestrator/CLAUDE.md` (map lines and the "Loop tasks" paragraph), `tests/dag_goals/INDEX.md`.
+
+*Proof (all run fresh after the last edit)*
+
+- `pytest tests/dag_goals/test_loop_role_questions.py`: 9 passed, exit 0.
+  `pytest tests/dag_goals/test_loop_task_waits.py`: 7 passed.
+- `pytest tests/dag_goals tests/runner_supervisor tests/fsm_flows tests/comms_board/test_comms_provenance.py`:
+  1515 passed, 9 skipped, exit 0.
+- The reviewer's probe (copied under tests/ for conftest isolation, then removed): 13 spawns
+  before, now `SPAWNS 6 attempts 6 waits 6 error` (default ceiling 3 + 2 = 5, held on the 6th park,
+  run ends `waiting_for_answer`). Its own `<= 3` assert still fails: its answers go through
+  `answer_question`, which stamps no run (see Review fixes 1).
+- `black --check src/ tests/` 749 unchanged; mypy no issues (368 files); `check_file_size.py` OK
+  (none new, none grown); `lint-imports` 1 kept 0 broken; `bandit -q -r src/ -ll -x src/pathly_data/`
+  exit 0; `check_no_mirror_reads.py` OK; `gen_test_index.py` regenerated, `--check` up to date.
+
+*Review fixes*
+
+1. Major (fixed). Two guards. (a) A role question whose only answers were written by the asking
+   run (`author_run_id` equal to the question's) is neither listed by `asked_questions_by_run`
+   (so the attempt is proven and completed as before round two) nor counted as answered for a
+   release. (b) A ceiling: a loop park whose `waits` passes `consult.max_per_task + WAIT_MARGIN`
+   is `held` for the person instead of released at once; a later answer to one of its questions
+   frees it as usual. Gap I could not close inside Touches: `POST /comms/answer`
+   (`http_server/blueprints/comms/messages_crud.py` -> `answer_question`) stamps no
+   `author_run_id`, so a self-answer there cannot be told from the person's and only the
+   ceiling (b) bounds it (5 extra spawns by default). Stamping that route from the run token
+   needs a change outside Touches (messages_crud.py, comms_messages.py): worth a follow-up ticket.
+2. Minor (documented). consult_run.py is outside Touches, so `CONSULT_SPAWN_TIMEOUT` stays a copy;
+   the drift and the queue limit (the wait times from its own start, so a consult queued behind
+   the headless cap can outlive it and the run ends `waiting_for_answer`, the late answer freeing
+   the task for the next run) are in consult_wait's docstring and the orchestrator CLAUDE.md.
+3. Minor (fixed). An `answered` route with no answer row is waited on for `ANSWERED_GRACE` (5 s)
+   at most per wait, not the full timeout.
+4. Minor (fixed). After each drain, `fan_out._restore_freed` calls
+   `task_waits.restore_freed_waits`: a deadlocked task that waited in this run's drains (it was
+   freed during the deadlock check), and any deadlocked task whose dependency chain reaches one,
+   go back to `pending` and are dropped from `deadlocked`/`blocked`; the loop drains them again.
+   The fan_out integration (the race itself) has no test of its own; the helper does.
+
+*Shortcuts taken*
+
+- `test_loop_role_questions.py` is 497 lines (413 after round one). `check_file_size.py` gates only
+  `src/pathly_orchestrator` and `studio/src`, and Touches allows no new test file to split it into.
+- The ceiling counts waits, not distinct questions; a task the person answers more than
+  max_per_task + 2 times in one run is held too (the person's next answer frees it).
+
+*For later tickets*
+
+- 07: `park_and_recheck`'s `hold_over` is opt-in; single runs do not pass it.
+- A follow-up should stamp `author_run_id` on `/comms/answer` posts made with a run token.
 
 ## Review findings (round 1, quality review)
 
