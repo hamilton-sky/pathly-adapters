@@ -1,7 +1,7 @@
 # Refuse a decompose's task that has no check block and no `Check: none` reason
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: —
 Test first: yes
 Level: 3
@@ -77,3 +77,32 @@ exit 0
 - `src/pathly_data/core/skills/planning/plan.md` (its `Check: none - <why>` rule, read-only)
 
 ## Answer
+
+- **Built**: new `src/pathly_orchestrator/http_server/blueprints/comms/_task_post_lint.py`
+  (`task_check_refusal`, `ref_warning`, plus `decompose_refusal(identity, msg_type, text)` that
+  builds the 422 body and `task_title`); `messages_write.comms_post` calls `decompose_refusal`
+  before `_post_message` and `ref_warning` at the end (399 -> 398 lines, was 400);
+  `fragments/task-dag-post.md` and `planning/dag-sketch.md` text; `src/pathly_orchestrator/CLAUDE.md`
+  `POST /comms/post` line; new `tests/comms_board/test_decompose_check_lint.py` (17 tests);
+  `tests/INDEX.md`, `tests/comms_board/INDEX.md` regenerated.
+- **Proof**: `pytest tests/comms_board/test_decompose_check_lint.py` 17 passed (failing commit
+  ec42dea: 8 failed for the missing module / no 422); it covers planner no-check 422 + no row,
+  check block 200, `Check: none - docs only` 200 (and `—`, `:`), bare `Check: none` / `-` / `—` 422,
+  empty block 422, unparseable block 422 with `str(ParseError)`, tokenless / chief / builder 200,
+  planner non-task not linted, `ref_warning` on a refless task. `pytest tests/install_skills`
+  419 passed, 2 skipped. `tests/comms_board tests/dag_goals tests/http_api`: 4450 passed, exit 0.
+  Full `tests/`: 6795 passed, 1 failed (`test_build_proof_acceptance.py::test_8_happy_path_goal_loop_reaches_done`,
+  FLOOR_CHECKED missing = the known event-mirror/`git add -A` floor flake, learnings 04/06; the
+  previous full run passed it, and 3 isolated reruns of the file pass 11/11). black, mypy,
+  check_file_size, gen_test_index --check, lint-imports, bandit clean.
+- **Decisions**: the role comes only from `caller_identity(request)` (kind `run`, role
+  `planner`). The route still calls `caller_identity(request)` inline in `stamp(...)` (a second
+  lookup): the provenance scan (`test_every_post_message_call_is_stamped_or_on_the_allow_list`)
+  accepts only the literal `stamp(caller_identity(request))` form. A ParseError wins over a
+  `Check: none` line (a broken block is reported as such). An empty ```check block counts as no
+  check. `Check: none` must be at a line start and followed by whitespace, a separator or the line
+  end (`Check: nonesense` is no reason). `proof.checks` is imported lazily inside the function.
+- **Shortcuts taken**: none. No snapshot changed: `task-dag-post` is gated on `goal_id` and no
+  golden snapshot composes it, so none was regenerated.
+- **For later tickets**: a test whose fake planner posts tasks over HTTP with a planner run token
+  needs a check block or `Check: none - <why>` line in the text; none exists today.

@@ -24,6 +24,7 @@ from ._helpers import (
 )
 from ._messages_bp import bp
 from ._supersede_on_post import apply_supersedes, response_fields, validate_supersedes
+from ._task_post_lint import decompose_refusal, ref_warning
 
 
 @bp.route("/comms/post", methods=["POST"])
@@ -279,6 +280,10 @@ def comms_post():
             except Exception:
                 pass
 
+        refused = decompose_refusal(caller_identity(request), msg_type, text)
+        if refused is not None:
+            return jsonify(refused), 422
+
         message_id = _post_message(
             conn,
             board=board,
@@ -381,19 +386,12 @@ def comms_post():
             },
         )
 
-        # T3a: server-side context_refs enforcement for DAG tasks. A task posted with no
-        # refs (and no explicit no_refs justification) will fall back to unverified
-        # auto-derived context — surface that as a NON-BLOCKING warning so the gap is
-        # visible to the poster instead of silently degrading context quality (ISSUE-4).
+        # T3a: a task with no context_refs gets a NON-BLOCKING ref_warning (_task_post_lint).
         resp = {"ok": True, "message_id": message_id}
         resp.update(response_fields(supersede_result))
-        if msg_type == "task":
-            _has_refs = isinstance(context_refs, list) and len(context_refs) > 0
-            if not _has_refs and not data.get("no_refs"):
-                resp["ref_warning"] = (
-                    "task has no context_refs; agents will fall back to unverified "
-                    "auto-derived context — add context_refs or pass no_refs=<reason>"
-                )
+        warning = ref_warning(data, context_refs) if msg_type == "task" else None
+        if warning is not None:
+            resp["ref_warning"] = warning
         return jsonify(resp), 200
     except Exception as exc:
         logging.exception("comms_post error")
