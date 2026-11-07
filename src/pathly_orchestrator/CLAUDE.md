@@ -1602,7 +1602,7 @@ pathly_orchestrator/
       comms_artifact_rows.py # insert_artifact: the comms_artifacts board-row insert (title/summary run-token redacted), moved out of comms_artifacts.py at its 400-line cap; re-exported from comms_artifacts / comms
       comms_tasks.py       # task DAG operations (get_ready, complete, claim, reclaim, goal_refs_coverage); re-exports fail_task
       comms_tasks_by_run.py # get_unfinished_tasks_of_run(conn, run_id): the tasks still in_progress with claimed_by = the run, with attempts and waits (chief-autopilot 05), read only; kept out of comms_tasks.py
-      task_waits.py        # open_questions_by_run / park_task / park_and_recheck (parked|released|not_parked: re-checks the answers after the park) / release_waiting_tasks / still_waiting / task_status (+ best-effort release_on_answer, called by post_message for an answer with reply_to) / tasks_behind_waiting / question_answers (chief-autopilot 06, see "A task waits on its question")
+      task_waits.py        # open_questions_by_run / park_task / park_and_recheck (parked|released|not_parked: re-checks the answers after the park; never raises once the park is committed) / release_waiting_tasks / still_waiting / task_status (+ best-effort release_on_answer, called by post_message for an answer with reply_to) / tasks_behind_waiting / question_answers (chief-autopilot 06, see "A task waits on its question")
       consult_routes.py    # CONSULT_ROLES / consult_limits / asking_task / route_decision / record_route / set_route_status / hand_to_person / routes_for_questions / pending_routes / goal_consult_cost / end_stale_routes (chief-autopilot-round-two 01, see "Consult routes"); imports nothing above db/
       comms_task_fail.py   # fail_task: marks a task failed (fail_reason run-token redacted before its 4000-char cap) and cascades dependents to blocked; moved out of comms_tasks.py at its ratchet baseline; re-exported from comms_tasks / comms
       task_results.py      # build-proof: latest_task_summaries(conn, task_ids) — the newest AGENT_DONE `summary` of each task's `sched-<id>#<n>` runs (a dependent task's prompt shows it)
@@ -1704,7 +1704,7 @@ pathly_orchestrator/
     scheduler.py           # DAG frontier loop (scheduler_loop): event-driven, blocks on completion_q;
                            #   at most one worker per lane; goal_id= scopes the frontier to one goal's tasks;
                            #   a task whose spawn left an open question is parked (result key `waiting`)
-    task_wait_outcome.py   # park_if_asked / note_run_waits / take_run_waits / waits_for_answer / answered_questions_block —
+    task_wait_outcome.py   # park_if_asked / carry_park / note_run_waits / take_run_waits / waits_for_answer / answered_questions_block —
                            #   a loop task that waits on its question (see "A task waits on its question")
     task_prompt.py         # build_task_prompt — ONE assembly of a DAG task's prompt: the composed
                            #   development/execute-task body with its fragment placeholders
@@ -2670,13 +2670,19 @@ scheduler's completion handler first calls `park_if_asked`: when the spawn's run
 `resolve_task_failure`, so no attempt is counted (`resolve_task_failure` already subtracts
 `waits`; the scheduler does not). A task `released` by that re-check is a wait too (`True`): it is
 `pending`, so the scheduler's next frontier read claims it again in the same drain with the
-answers. A park that parks nothing (`not_parked`: the task is no longer `in_progress`) logs a
+answers. An attempt that reported success inside a drain was parked already by
+`task_proof.wrap` (`carry_park`, see "Task proof in the goal-loop drain"); the handler takes that
+park as it is. A park that parks nothing (`not_parked`: the task is no longer `in_progress`) logs a
 warning naming the task, its `task_status` and the questions, and the handler goes on as for a
-task with no question. It broadcasts `task_waiting` (`task_id`, `run_id`, `questions`) and the
+task with no question (such an attempt was proven by the wrapper). Once the park is committed,
+`park_and_recheck` never raises: a failed re-check leaves it `parked`. It broadcasts `task_waiting` (`task_id`, `run_id`, `questions`) and the
 drain result carries `waiting`. `fan_out._merge_drain_result` reports a drain with waiting tasks
 as `outcome: failed` with an `error` starting `waiting_for_answer`, which `orchestrator._loop`
-does not broadcast as the "continuing to the next stage" `RUNNER_WARNING`
-(`task_wait_outcome.waits_for_answer`). `_drain` records on the run the tasks that still wait
+does not broadcast as the "continuing to the next stage" `RUNNER_WARNING` when one of its
+`waiting` tasks still waits (`task_wait_outcome.waits_for_answer`, `task_waits.still_waiting`; an
+unreadable row keeps the error's word). A task released and run again in the drain that then
+escalated still gets the warning, although the stage result's `error` keeps saying
+`waiting_for_answer` (`_merge_drain_result` does not filter `waiting`). `_drain` records on the run the tasks that still wait
 (`note_run_waits`, `task_waits.still_waiting`: parked, or `pending` and not yet run; one that ran
 again in the drain is dropped); once the other ready tasks have drained,
 `orchestrator_stage._resolve_stage_supervised` takes them (`take_run_waits`) before
@@ -2855,7 +2861,12 @@ still works). A project root that is not a directory is not proven.
 2. **The spawn runs.** If it raised, or `scheduler._outcome_is_failure(outcome)` already holds,
    the result is returned as is: nothing is proven and no `TASK_PROOF` is written. So is the
    result of an attempt that left an open question (`task_waits.open_questions_by_run` for its
-   run id; an unreadable read proves it as before): the scheduler parks it.
+   run id): the wrapper parks it there (`park_and_recheck`, released at once when the questions
+   are answered by now) and carries the ids and the result to the scheduler's `park_if_asked`
+   (`task_wait_outcome.carry_park`), which takes that park with no second read. An attempt that
+   cannot be parked (the task is no longer `in_progress`, e.g. the agent marked it done itself,
+   or the read or the park raised) is proven, so an asking attempt never reaches `complete_task`
+   unproven.
 3. **After it returns**, a second snapshot, then in order:
    - *Floor guard* (skipped when `floor.enabled` is off or either snapshot is `None`):
      `proof.floor.scan(root, before, after, allow=<the task's floor_allow>, protected=[board

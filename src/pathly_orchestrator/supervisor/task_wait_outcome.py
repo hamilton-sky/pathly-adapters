@@ -9,7 +9,9 @@ set it ``pending`` and spent an attempt.
   (``sched-<task>#N``) left open questions (``db/queries/task_waits.open_questions_by_run``),
   the task is parked with ``task_waits.park_and_recheck`` (``blocked``,
   ``fail_reason='waiting_for_answer:<ids>'``, ``waits + 1``; freed at once when the questions
-  were answered before the park), whatever the spawn reported; the handler then calls neither
+  were answered before the park), whatever the spawn reported. A drain's attempt that reported
+  success was parked already by ``task_proof.wrap`` (``carry_park``), which proves one it cannot
+  park; the handler takes that park as it is. The handler then calls neither
   ``complete_task`` nor ``resolve_task_failure``, so no attempt is counted, and a
   ``task_waiting`` event is broadcast. The next claim builds its run id from
   ``attempts``, which only grows, so the asking run id is never reused.
@@ -27,12 +29,17 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
 from typing import Callable, Optional
 
 logger = logging.getLogger("pathly.task_wait_outcome")
 
 WAITING_FOR_ANSWER = "waiting_for_answer"
 _RUN_ATTR = "_waiting_tasks"
+
+_CARRIED_LOCK = threading.Lock()
+# run_id -> (question ids, park_and_recheck result) of an attempt task_proof parked itself.
+_CARRIED: dict[str, tuple[list, str]] = {}
 
 
 def sched_run_id(task_id: str, prior_attempts: int) -> str:
@@ -55,6 +62,10 @@ def park_if_asked(
     no attempt spent), so the scheduler's next frontier read claims it with the answers. A park
     that parks nothing (the task is no longer ``in_progress``) logs a warning and returns False.
 
+    An attempt that reported success and asked was already parked by ``task_proof.wrap``
+    (``carry_park``): that park is taken as it is, with no second read, so an answer landing
+    between the reads cannot complete the task unproven.
+
     The run id comes from ``task_attempts`` (the attempts before the claim, as the claim built
     it). On a park the task's entries in ``task_attempts`` and ``task_texts`` are dropped, so the
     attempt is never counted, and ``task_waiting`` is broadcast on the comms stream.
@@ -66,23 +77,27 @@ def park_if_asked(
     )
 
     run_id = sched_run_id(task_id, int(task_attempts.get(task_id, 0)))
-    try:
-        question_ids = open_questions_by_run(conn, run_id)
-        if not question_ids:
+    carried = _take_carried(run_id)
+    if carried is not None:
+        question_ids, parked = carried
+    else:
+        try:
+            question_ids = open_questions_by_run(conn, run_id)
+            if not question_ids:
+                return False
+            parked = park_and_recheck(conn, task_id, question_ids)
+            if parked == "not_parked":
+                logger.warning(
+                    "loop task %s asked %s but was not parked (task_status %s): "
+                    "handled as not waiting",
+                    task_id,
+                    question_ids,
+                    task_status(conn, task_id),
+                )
+                return False
+        except Exception:
+            logger.warning("parking loop task %s failed", task_id, exc_info=True)
             return False
-        parked = park_and_recheck(conn, task_id, question_ids)
-        if parked == "not_parked":
-            logger.warning(
-                "loop task %s asked %s but was not parked (task_status %s): "
-                "handled as not waiting",
-                task_id,
-                question_ids,
-                task_status(conn, task_id),
-            )
-            return False
-    except Exception:
-        logger.warning("parking loop task %s failed", task_id, exc_info=True)
-        return False
     task_attempts.pop(task_id, None)
     task_texts.pop(task_id, None)
     logger.info(
@@ -97,6 +112,19 @@ def park_if_asked(
         {"task_id": task_id, "run_id": run_id, "questions": question_ids},
     )
     return True
+
+
+def carry_park(run_id: str, question_ids: list, parked: str) -> None:
+    """``task_proof.wrap`` parked the attempt ``run_id`` on ``question_ids`` itself (it left the
+    attempt unproven because it asked): the completion handler takes this park as it is.
+    """
+    with _CARRIED_LOCK:
+        _CARRIED[run_id] = (list(question_ids), parked)
+
+
+def _take_carried(run_id: str) -> Optional[tuple]:
+    with _CARRIED_LOCK:
+        return _CARRIED.pop(run_id, None)
 
 
 def note_run_waits(state, task_ids: list) -> None:
@@ -118,9 +146,22 @@ def note_run_waits(state, task_ids: list) -> None:
 
 def waits_for_answer(result) -> bool:
     """True when a stage result is a drain that parked tasks (``error`` starts with
-    ``waiting_for_answer``, ``fan_out._merge_drain_result``)."""
+    ``waiting_for_answer``, ``fan_out._merge_drain_result``) and one of its ``waiting`` tasks
+    still waits (``task_waits.still_waiting``): a task released and run again in the drain is
+    not a wait. An unreadable row keeps the error's word."""
     error = (result or {}).get("error") if isinstance(result, dict) else None
-    return str(error or "").startswith(WAITING_FOR_ANSWER)
+    if not str(error or "").startswith(WAITING_FOR_ANSWER):
+        return False
+    inner = result.get("result")
+    waiting = list((inner.get("waiting") if isinstance(inner, dict) else None) or [])
+    try:
+        from pathly_orchestrator.db.connection import get_db
+        from pathly_orchestrator.db.queries.task_waits import still_waiting
+
+        return bool(still_waiting(get_db(), waiting))
+    except Exception:
+        logger.warning("re-reading waiting tasks %s failed", waiting, exc_info=True)
+        return True
 
 
 def take_run_waits(state) -> list:

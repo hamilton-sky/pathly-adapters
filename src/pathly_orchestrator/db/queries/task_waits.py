@@ -91,13 +91,20 @@ def park_and_recheck(
     An answer written between the caller's ``open_questions_by_run`` and the park found no
     blocked task to free, so the task would stay parked on an answered question. Returns
     ``parked``, ``released`` (``pending`` again, the ids in ``answered_questions``, the wait
-    still counted) or ``not_parked`` (the task was not ``in_progress``).
+    still counted) or ``not_parked`` (the task was not ``in_progress``). Once the park is
+    committed it never raises: a recheck that fails is logged and the task stays ``parked``
+    (an answer's own ``release_on_answer`` still frees it). A task an answer freed between the
+    park and the recheck reads ``released``.
     """
     if not park_task(conn, task_id, question_ids):
         return "not_parked"
-    if question_ids and all(_is_answered(conn, q) for q in question_ids):
-        if task_id in release_waiting_tasks(conn, question_ids[0]):
+    try:
+        if question_ids and all(_is_answered(conn, q) for q in question_ids):
+            release_waiting_tasks(conn, question_ids[0])
+        if task_status(conn, task_id) == "pending":
             return "released"
+    except Exception:
+        logger.warning("recheck of parked task %s failed", task_id, exc_info=True)
     return "parked"
 
 

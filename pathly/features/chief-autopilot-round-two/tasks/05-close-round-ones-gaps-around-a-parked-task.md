@@ -1,7 +1,7 @@
 # Close round one's gaps around a parked task
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: —
 Test first: yes
 Level: 3
@@ -135,11 +135,9 @@ Test-first commit: f79faf1 (all 7 new tests failed there for the reasons below).
 
 - `fan_out._merge_drain_result` still lists a released-and-rerun task in `result.waiting` (and
   sets the `waiting_for_answer` error) for that stage's result, because scheduler.py and fan_out.py
-  are outside Touches. Only the stage result is wrong. The run's end and the RUNNER_WARNING read
-  `note_run_waits` and the error prefix. One side effect: a drain where one task waited and was
-  released while another escalated reports the `waiting_for_answer` error, so the escalation's
-  RUNNER_WARNING is not broadcast (`require_tasks_done` still blocks). Ticket 06 changes fan_out.py
-  and can drop rerun tasks from `waiting` there.
+  are outside Touches. Only the stage result is wrong. The run's end reads `note_run_waits`, and
+  (since review round 1) the RUNNER_WARNING reads `waits_for_answer`, which also asks
+  `still_waiting`, so a real escalation is warned about (see Review fixes, major 2).
 
 **For later tickets**
 
@@ -149,6 +147,82 @@ Test-first commit: f79faf1 (all 7 new tests failed there for the reasons below).
   drain does not end the run `waiting_for_answer`.
 - orchestrator.py is at exactly 400 lines: no line may be added there.
 
+
+**Review round 1 (send-back)**
+
+Work restarted at e23091a. Test-first commit: 7907010 (5 new tests, all failing for the reasons
+below). Reproduced first with the reviewer's probe: (a) `completed=[tid]`, no TASK_PROOF, check not
+run; (b) `completed=[tid]`, one spawn, no proof; major 2 `waits_for_answer` True.
+
+*Built:* `supervisor/task_proof.py` (`_asked` replaced by `_parked_on_question`: reads the run's
+open questions and parks with `park_and_recheck` in the wrapper, while the attempt can still be
+proven; `parked`/`released` -> `task_wait_outcome.carry_park(run_id, ids, result)` and the outcome
+is returned unproven; `not_parked` or any read/park error -> the attempt is proven as before);
+`supervisor/task_wait_outcome.py` (`carry_park` / `_take_carried`, a lock-guarded run_id dict;
+`park_if_asked` takes a carried park as it is, with no second read; `waits_for_answer` also
+requires `still_waiting` to find one of `result["result"]["waiting"]`, fail open to the error
+word); `db/queries/task_waits.py` (`park_and_recheck` never raises once the park is committed;
+reports `released` from the task's status after the recheck); `src/pathly_orchestrator/CLAUDE.md`
+("A task waits on its question", "Task proof in the goal-loop drain", file map);
+`tests/dag_goals/test_loop_park_gaps.py` (+5 tests); `tests/dag_goals/INDEX.md`.
+
+*Proof:* `python -m pytest tests/dag_goals/test_loop_park_gaps.py -q -p no:cacheprovider`: `12 passed`,
+exit 0. `python -m pytest tests/dag_goals tests/runner_supervisor tests/fsm_flows tests/comms_board/test_comms_provenance.py -q -p no:cacheprovider`:
+`1505 passed, 9 skipped`, exit 0. black --check: 747 unchanged; `mypy src/ --ignore-missing-imports --no-strict-optional`:
+no issues in 367 files; check_file_size OK (task_proof.py 379, task_wait_outcome.py 206, task_waits.py 256,
+orchestrator.py 400, unchanged); check_no_mirror_reads OK; lint-imports 1 kept 0 broken; bandit exit 0;
+gen_test_index regenerated, `--check` up to date. The reviewer's probe now gives (a) `completed=[]`,
+`failed=[tid]`, a TASK_PROOF with `checks: failed`, and major 2 `waits_for_answer` False; its (b)
+patches `task_proof._asked`, which no longer exists, so `test_an_answer_between_the_proof_read_and_the_park_releases_the_task` covers it.
+
+*Review fixes*
+
+1. Major 1 (fixed). The wrapper parks the asking attempt itself and carries the ids to the
+   handler, so there is one read: an answer that lands after it is caught by
+   `park_and_recheck`'s recheck (released at once, a wait, `#2` runs with the answer and is proven).
+   Releasing in the worker thread is safe: the task's lane stays in `in_flight_lanes` until the
+   handler runs, so the frontier cannot claim it early. A task that cannot be parked (the agent
+   marked it done itself, or the read/park raised) is proven in the wrapper; the handler then
+   sees `not_parked` (warning) and goes on with the proven outcome, so a failing check goes to
+   `resolve_task_failure`. Tests: `test_an_asking_attempt_that_marked_its_own_task_done_is_proven`
+   (failed, not completed, check ran, TASK_PROOF written) and
+   `test_an_answer_between_the_proof_read_and_the_park_releases_the_task` (spawns `#1`, `#2`, the
+   answer in `#2`'s prompt, completed, TASK_PROOF only for `#2`, waits 1).
+2. Major 2 (fixed inside Touches). `waits_for_answer` is True only when `still_waiting` finds a
+   `waiting` task that still waits, so orchestrator.py's RUNNER_WARNING fires for a released task
+   that ran again and escalated; orchestrator.py is unchanged (400 lines). Test:
+   `test_a_drain_whose_waiting_task_ran_again_and_failed_is_not_a_wait`. Left as is: the stage
+   result's `error` from `fan_out._merge_drain_result` still says `waiting_for_answer: N task(s)
+   wait ...` in that case (and `outcome`/`result.waiting` still list the task). **Ticket 06 must
+   filter `drained["waiting"]` through `task_waits.still_waiting` in `fan_out._drain`** before
+   `_merge_drain_result`, so the error, outcome, `note_run_waits` and the warning read one list.
+3. Minor 3 (fixed). `park_and_recheck` catches errors after the park commit and returns `parked`,
+   so the handler counts a wait and never runs `complete_task` on a blocked task. Test:
+   `test_park_and_recheck_reports_a_park_whose_recheck_fails`.
+4. Minor 4 (fixed). `released` is read from the task's status after the recheck, so a release the
+   answer's own `release_on_answer` won is reported as `released`. Test:
+   `test_park_and_recheck_reports_a_release_the_answer_won`.
+5. Minor 5 (not fixed, answered). A `pending` released task counts as waiting so that one freed
+   after the scheduler's last frontier read ends the run `waiting_for_answer` rather than sending
+   `INCOMPLETE_TASKS` to a builder. An `abort_check` from the FSM's own abort is caught by
+   `_resolve_stage_supervised`'s abort check before `take_run_waits` (the run ends `aborted`), so
+   only a cost-cap stop after a release reports `waiting_for_answer`. Telling those apart needs the
+   drain's abort reason, which `note_run_waits` is not given (fan_out.py, outside Touches); 06 can
+   pass it when it changes `_drain`.
+6. Minor 6 (not fixed, answered). With major 2 fixed, a wait plus an escalation in one drain still
+   ends the run `waiting_for_answer` (the run's end comes first, as the spec words it); the stage
+   error naming both lives in `fan_out._merge_drain_result` (outside Touches, owned by 06). The
+   RUN_OUTCOME error stays the bare `waiting_for_answer` the ticket's Done when asks for.
+
+*Shortcuts:* the carried-park dict keeps an entry if a drain stops before handling that
+completion (one small tuple per lost completion, cleared on process exit); worth a sweep only if
+drains are aborted mid-flight often.
+
+*For later tickets:* 06 swaps `open_questions_by_run` to `asked_questions_by_run` in
+`task_proof._parked_on_question` (was `_asked`) and in `park_if_asked`'s fallback read; the filter
+in `fan_out._drain` is above. `tests/dag_goals/test_loop_park_gaps.py` is 559 lines: the 400-line
+rule (`check_file_size.py`) covers `src/` only, and no second test file is in this ticket's
+Touches, so it was not split.
 
 ## Review findings (round 1, quality review)
 
