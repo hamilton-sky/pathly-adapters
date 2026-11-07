@@ -40,7 +40,10 @@ Put the phase's ```check block (its `Check:` field in `IMPLEMENTATION_PLAN.md`) 
 the task `text`, verbatim. After the task reports success the supervisor runs the block and
 fails the task if a command does not give the result the block asks for. It runs the block
 from the `text` as it was when the task was claimed, so an edit made after the claim does not
-count: the block must be right before you post. A phase marked `Check: none` posts no block.
+count: the block must be right before you post. A phase marked `Check: none - <why>` posts no
+block: it puts that line, `Check: none - <why>` with its reason, at the end of the task `text`
+instead. The board refuses a task with neither (HTTP 422, nothing stored, the `error` says what
+is missing): post it again with its block or its `Check: none - <why>` line.
 
 The block is one `$ <command>` line per command, each with optional `exit <N>` (or
 `exit nonzero`) and `prints <text>` lines. Commands are read-only, run from the repo root and
