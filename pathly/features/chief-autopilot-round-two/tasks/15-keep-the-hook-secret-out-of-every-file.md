@@ -1,7 +1,7 @@
 # Keep the chief's hook secret out of every file: the server's claim route and the hook
 
 Type: task
-Status: resolved
+Status: open
 Blocked by: 13
 Test first: yes
 Level: 3
@@ -178,3 +178,21 @@ named `ea055fe`, which a later merge commit followed). Failing-test commit: `7a0
 - Root `CLAUDE.md`'s chief blueprint list (`chief/` row of the domain map) does not name
   `POST /chief/hook-secret`; it was outside this ticket's Touches.
 
+
+## Review findings (round 1, quality review)
+
+QUALITY
+Scope: reviewed ea055fe..926ab0b (END is HEAD; no later commits were left out). I read the ticket at ea055fe, so its Answer never reached me. I re-ran all three Done when checks: 17 passed; 2739 passed (-k chief, 1877 deselected); 97 passed (round one acceptance + tests/consistency). git status was clean afterwards.
+
+Inputs I probed as a hostile caller:
+- POST /chief/hook-secret: run_id (missing, non-string, unknown, closed, codex), the body shape, X-Pathly-Run-Token (builder, chief, revoked: run_token_guard refuses a revoked one before the route), two concurrent claims (pop under the lock, so exactly one 200), claim racing close_chief (404, or 409 with a harmless second close), a browser Origin (the api-secret CSRF check runs first; api_secret is always set).
+- PATHLY_CHIEF_HOOK_SECRET in the hook (unset or blank: exit 0, nothing recorded).
+- The chief's own tools: Bash is allowed only for `pathly *` with dontAsk. `pathly api` refuses to run without PATHLY_RUN_TOKEN, so the chief cannot make a tokenless claim or post. The route refuses a chief token (403 from _refuse_agent, and the chief gate).
+- The secret's homes: no file, no TERMINAL_SPAWN payload, no log line (only the path and the status are logged), Cache-Control: no-store, forgotten in close_chief's finally, lost on restart.
+
+1. major src/pathly_orchestrator/CLAUDE.md ("Where the secret lives"): the doc says that until ticket 18 lands, "its hook records nothing: citations are lost, nothing is forged". That is not true of the code in this commit. Nothing claims the secret before ticket 18, so a headless agent (running with --dangerously-skip-permissions) can `curl -X POST 127.0.0.1:8765/chief/hook-secret -d '{"run_id":...}'` with no token header, which counts as anonymous. It gets 200 and the secret. It reads the chief's --session-id from the process list (`ps`) and posts `human` rows to /chief/human-messages. No second claim ever happens, so the chief is never closed and the theft goes unnoticed. The exposure is about the same as the 0600 file it replaces, so this is not a regression. But this living doc is loaded into agents' context and states a security property that does not hold. Change: say plainly that until ticket 18, any tokenless same-user process can claim the secret and nothing detects it. The detection (a second claim closes the chief) only exists once Studio makes the expected claim. The same wording in the ticket text should not be copied into later docs. Also check human.py's module docstring, which implies the claim-once property protects the secret today.
+2. minor src/pathly_orchestrator/runner/chief_argv.py: denying `Bash(env*)` and `Bash(printenv*)` does not stop shell expansion of `$PATHLY_CHIEF_HOOK_SECRET` (or `${PATHLY_CHIEF_HOOK_SECRET:0:20}`) inside an allowed `pathly api ...` body. A partial or split secret gets past the gate's body scan, so a chief steered by prompt injection could leak it to the board in pieces. I did not measure it against claude's matcher. Its value to an attacker is low, because any same-user process can read /proc/<pid>/environ anyway. Change: note this in the deny-list comment and the Chief gate docs, or deny `$PATHLY_CHIEF_HOOK_SECRET` patterns as well. Do not claim the chief "cannot print its environment".
+3. minor src/pathly_orchestrator/supervisor/chief_secret_claim.py: when claim() finds no offered secret it closes the chief, whatever the reason. A claim that lands in the gap between create_session and offer(), or any claim after a restart, closes a healthy chief. Any tokenless caller can already close a chief on purpose by claiming twice, which is the accepted q2=A trade-off. Change: none needed; a one-line note in the docstring would help ticket 18.
+4. minor src/pathly_orchestrator/runner/chief_argv.py: `Read(/proc/**)` is kept although, by its own comment, it does not reach /proc. It exists only because the ticket named it. Harmless.
+
+REVIEW: FAIL
