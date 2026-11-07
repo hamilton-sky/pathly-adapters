@@ -1,7 +1,7 @@
 # Park a loop task on its role question and run it again in the same drain
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 01, 05
 Test first: yes
 Level: 3
@@ -227,6 +227,59 @@ ImportError/AttributeError for `WAIT_MARGIN`, `ANSWERED_GRACE`, `restore_freed_w
 
 - 07: `park_and_recheck`'s `hold_over` is opt-in; single runs do not pass it.
 - A follow-up should stamp `author_run_id` on `/comms/answer` posts made with a run token.
+
+### Round 3 (gate round 2 send-back)
+
+Work started at 49db632. No code changed: the failure is the pre-existing event-mirror race the
+04 CARRY note names, not ticket 06.
+
+*Review fixes*
+
+1. Gate (quick), `test_floor_gate.py::test_a_skip_blocks_building_and_passes_once_a_human_allows_it`
+   (not caused by 06; no change). Evidence:
+   - Fail-open path: `fsm/gates/floor.py::_scan` calls `proof.tree.snapshot(root)`; on None it
+     appends `GATE_SKIPPED snapshot_failed` and returns None, so `check_floor_gate` passes the
+     transition. `snapshot` returns None whenever `git add -A` (private index) exits non-zero.
+     That is exactly the failing result (`decision: continue`, `current_state: REVIEWING`, no
+     `blocked`).
+   - The writer: `event_mirror` runs one process-wide `event-mirror-flusher` thread (0.5 s tick)
+     that writes `<feature>/EVENTS.tmp` then `os.replace`s it to `EVENTS.jsonl`. In this test the
+     feature dir is inside the test's git repo (no .gitignore). A diagnostic plugin (scratchpad
+     only) listed `pathly/features/demo/EVENTS.tmp` next to `EVENTS.jsonl` in the test repo after
+     a run, so the flusher writes there while `complete_stage` runs its gates.
+   - The race on its own: a script with a thread looping tmp-write + `os.replace` beside
+     `tree.snapshot` gave 26 None out of 200 snapshots, each one git rc 128 `fatal: unable to stat
+     'pathly/features/f/EVENTS.tmp': No such file or directory`.
+   - The exact failure: the same plugin made the floor gate's `tree.snapshot` run while that
+     tmp + `os.replace` write looped in the test repo's feature dir. The test then failed with the
+     gate's exact assertion (`{'decision': 'continue', 'current_state': 'REVIEWING', ...}`,
+     `assert None is True`), with git logging rc 128 `unable to stat 'pathly/features/demo/E...'`.
+   - Not 06: the 06 diff (f545968..HEAD) touches none of `floor.py`, `proof/tree.py`,
+     `event_mirror.py`, the fixture or the flow. The `consult_wait` poll runs in the drain's own
+     thread, not a new one. After every test in `test_loop_role_questions.py`, only the
+     process-wide `board-mirror-flusher`, `event-mirror-flusher` and per-DB `pathly-wal-checkpoint`
+     threads were alive. Those threads exist after every other test too (one wal thread more per
+     test, same rate before and after the 06 file). No `consult-`, drain or scheduler thread was
+     left.
+   - Suite order: `pytest tests/dag_goals tests/fsm_flows -q` gave 991 passed, 9 skipped, exit 0,
+     with no `unable to stat` in the git log. The full Quick list (the gate's exact command) gave
+     5956 passed, 11 skipped, exit 0, in 24:28. `test_floor_gate.py` alone: 20 passed.
+   - The fix belongs outside Touches (event_mirror's temp file name or location, `tree.snapshot`
+     retrying a vanished path, or the floor gate failing closed instead of open on a failed
+     snapshot). It needs its own ticket. The 04 CARRY already asks for one.
+
+*Proof (run fresh in this round)*
+
+- `pytest tests/dag_goals/test_loop_role_questions.py -q -p no:cacheprovider`: 9 passed, exit 0.
+- `pytest tests/dag_goals/test_loop_task_waits.py -q -p no:cacheprovider`: 7 passed, exit 0.
+- `pytest tests/dag_goals tests/runner_supervisor -q -p no:cacheprovider`: 695 passed, exit 0.
+- Gate Quick (full list, `-x`): 5956 passed, 11 skipped, exit 0.
+
+*For later tickets*
+
+- A ticket for the race should also count `board_mirror` (same `.tmp` + `os.replace` pattern).
+  A failed snapshot makes `floor_gate` (and the review packet) skip silently. That is a
+  fail-open hole in the floor gate, not only a flaky test.
 
 ## Review findings (round 1, quality review)
 
