@@ -1713,7 +1713,7 @@ pathly_orchestrator/
     consult_wait.py        # wait_for_consults(task_ids, abort_check, timeout) -> the tasks now pending (chief-autopilot-round-two 06):
                            #   fan_out._drain waits (WAIT_TIMEOUT: consult spawn timeout + 90 s, POLL_INTERVAL) while a
                            #   parked loop task's question has a queued/running route (an answered route with
-                           #   no answer row: ANSWERED_GRACE at most), then drains again
+                           #   whose task is still blocked, i.e. no answer row or release yet: ANSWERED_GRACE at most), then drains again
     task_prompt.py         # build_task_prompt — ONE assembly of a DAG task's prompt: the composed
                            #   development/execute-task body with its fragment placeholders
                            #   SUBSTITUTED (the DAG path had no injector at all — see Phase E),

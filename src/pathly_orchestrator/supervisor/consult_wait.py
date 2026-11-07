@@ -7,9 +7,10 @@ no question those tasks wait on has a pending route, the abort flag is set, or t
 and returns the tasks now ``pending`` (an answer's ``release_on_answer`` freed them), which the
 drain runs again. A question handed to the person has no pending route, so nothing waits on it.
 
-A consult's delivery ends the route ``answered`` just before it posts the answer row, so a route
-``answered`` whose question has no answer yet is waited on too, for ``ANSWERED_GRACE`` seconds at
-most (a delivery that crashed in that gap never posts it).
+A consult's delivery ends the route ``answered`` just before it posts the answer row, and
+``post_message`` commits that row before its ``release_on_answer`` frees the task, so a route
+``answered`` whose task is still ``blocked`` on it is waited on too, for ``ANSWERED_GRACE`` seconds
+at most (a delivery that crashed in either gap never frees it).
 
 Limits: ``CONSULT_SPAWN_TIMEOUT`` is a copy of the ``timeout=600`` literal in
 ``consult_run._default_spawn`` (consult_run.py holds no constant to import), so the two can drift
@@ -38,16 +39,14 @@ ANSWERED_GRACE = 5.0
 
 
 def _waited_questions(conn, task_ids: list[str]) -> tuple[list[str], list[str]]:
-    """(the ids with a ``queued`` or ``running`` route, the ids whose route is ``answered`` with
-    no answer row yet), among the questions the parked ``task_ids`` wait on."""
+    """(the ids with a ``queued`` or ``running`` route, the ids whose route is ``answered`` while
+    a task is still ``blocked`` on them), among the questions the parked ``task_ids`` wait on.
+    """
     from pathly_orchestrator.db.queries.consult_routes import (
         pending_routes,
         routes_for_questions,
     )
-    from pathly_orchestrator.db.queries.task_waits import (
-        question_answers,
-        waiting_question_ids,
-    )
+    from pathly_orchestrator.db.queries.task_waits import waiting_question_ids
 
     qids: list[str] = []
     for tid in task_ids:
@@ -66,10 +65,10 @@ def _waited_questions(conn, task_ids: list[str]) -> tuple[list[str], list[str]]:
     gaps: list[str] = []
     for route in routes_for_questions(conn, qids):
         qid = route["question_id"]
+        # qids come only from tasks still blocked on them: an answered route here has no
+        # answer row yet, or its answer's release has not committed yet.
         if route["status"] == "answered" and qid not in pending + gaps:
-            pairs = question_answers(conn, [qid])
-            if pairs and pairs[0]["answer"] is None:
-                gaps.append(qid)
+            gaps.append(qid)
     return pending, gaps
 
 
