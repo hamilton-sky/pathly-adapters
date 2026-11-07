@@ -174,7 +174,7 @@ def test_single_an_answer_between_the_read_and_the_park_leaves_the_task_pending(
 
     assert answered == [qid]
     row = _row(tid)
-    assert error == WAITING
+    assert error == "answer_ready"
     assert row["task_status"] == "pending"
     assert row["fail_reason"] is None
     assert json.loads(row["answered_questions"]) == [qid]

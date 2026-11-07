@@ -616,14 +616,20 @@ Who owns what:
 
 Rules:
 - Ask exactly ONE bounded question, and state the fallback assumption you will proceed on. **Never
-  block** waiting for a reply — the runner/human routes the answer back asynchronously.
-- A consult yields advice. If you actually need the specialist to CHANGE an artifact (not just
-  advise), write the matching `feedback/<TYPE>.md` instead — see the Feedback protocol — and the FSM
-  routes them to resolve it before the pipeline advances.
-
-**When you are consulted** (a `question` whose `to` is your role): answer on the board with
-`{"from": "<role>", "type": "answer", "reply_to": "<question id>", ...}` — concrete and advice-only.
-Do not edit code or plan files unless that is your current stage.
+  block** waiting for a reply — the answer comes back asynchronously.
+- A question to a role is answered by a consult run of that role that Pathly starts itself,
+  usually within minutes. What happens next depends on how you are running:
+  - **A loop task** (`execute-task`): Pathly holds your task when you end and runs it again with
+    the answer, so finish this attempt on your fallback assumption.
+  - **`drain-dag`**: when the answer decides how to build the task, post the question, leave that
+    task unfinished (do not complete or fail it) and go on with the other ready tasks; Pathly
+    parks it until the answer comes, and its next run reads the answer. Otherwise complete it on
+    your fallback.
+  - **A team stage**: the answer is advice on the board. If you need the specialist to CHANGE an
+    artifact (not just advise), write the matching `feedback/<TYPE>.md` instead — see the Feedback
+    protocol — and the FSM routes them to resolve it before the pipeline advances.
+- Do not answer another agent's question yourself, even one addressed to your role: a consult run
+  does.
 
 ## Posting to the Comms Board
 
