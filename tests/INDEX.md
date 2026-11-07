@@ -18,4 +18,4 @@ Tests are grouped into domain folders that mirror the app's architecture layers.
 | [`local_operator/`](local_operator/INDEX.md) | HQ operator actions — action catalog & availability, operator turn, proposal check, confirmed execution through real routes, audit. | 4 |
 | [`runner_supervisor/`](runner_supervisor/INDEX.md) | Runner control loop, supervisor, spawn channel, lane/worktree isolation, file-claim registry, services facade. | 31 |
 | [`storage_paths/`](storage_paths/INDEX.md) | Feature/goal storage layout, slugs, canonical artifact paths, storage migrations. | 13 |
-| [`telemetry/`](telemetry/INDEX.md) | Cost/token telemetry — invocation projection, pricing, OTel export, observability, log formatting. | 17 |
+| [`telemetry/`](telemetry/INDEX.md) | Cost/token telemetry — invocation projection, pricing, OTel export, observability, log formatting. | 18 |
