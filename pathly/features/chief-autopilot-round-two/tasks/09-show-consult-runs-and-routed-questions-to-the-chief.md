@@ -1,7 +1,7 @@
 # Show consult runs and routed questions in the run views and the chief's notices
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 01, 02, 16
 Test first: yes
 Level: 3
@@ -72,3 +72,69 @@ exit 0
 - round one learnings (07, 08)
 
 ## Answer
+
+Work started at `142c668d851f3821a40f00125253b63d47d966f7`; attempt 2 built on HEAD `5fd6168`
+(attempt 1's test commit cherry-picked on `4d5a108`, which adds `chief_field_reads.py` to
+Touches). Test-only commit `5fd6168`: there all 8 tests of
+`tests/http_api/test_chief_notices_consults.py` fail (kind `single` for a `consult-` run,
+`KeyError: 'consults'`, the chief gate's 403 on `limit`, the 31-day row kept). Attempt 1 stopped
+because the gate's key table is outside its first Touches (kept on `backup-09-attempt1`).
+
+**Built**
+
+- `src/pathly_orchestrator/db/queries/run_consults.py` (new): `is_consult_run`,
+  `consults_of_run(conn, run_row)` (routes whose `asking_run_id` is the run or one of
+  `run_history_read._child_rows`, imported lazily), `waiting_for_person(conn, consults)`
+  (`to_person`/`withheld` with no live `answer` row replying), `consult_fields`.
+- `db/queries/run_history_read.py` (397 lines): `_classify_kind` returns `consult` first; a
+  parent's window cost adds `AND COALESCE(category, '') != 'consult'`; a consult row's
+  `stage_count` defaults to 1; `get_run_detail` adds `run.consults` and `run.waiting_for_person`.
+  `_run_outcome` not moved (the file stays under 400).
+- `db/queries/chief_session_runs.py`: `record_session_run` deletes the project's rows with
+  `read_at` older than 30 days (one `DELETE`, same write lock, before the insert);
+  `ended_unread_runs(..., limit=50)` (`LIMIT ?`); `run_notice` carries the consult fields.
+- `http_server/blueprints/chief/notices.py`: `limit` (default 50, `int()` of 1 to 200, else 400
+  `{"error": "limit must be an integer from 1 to 200"}`); each notice has `consults` and
+  `waiting_for_person`.
+- `http_server/chief_field_reads.py`: `/chief/notices` lists `keys={"limit": NUMBER}`.
+- `supervisor/chief_presets.py`: one Operator bullet on consult runs, notice `consults`, and that
+  only `to: human` questions (handed-on ones too) wait for the user; "has no cap of its own"
+  shortened to "has no cap" to stay under 4000 (now 3997).
+- `src/pathly_orchestrator/CLAUDE.md`: the notices route line and paragraph, the
+  `run_consults.py` tree entry, the `GET /runs/<id>` paragraph.
+- `tests/http_api/test_chief_notices_consults.py` (new, 8 tests); `tests/INDEX.md`,
+  `tests/http_api/INDEX.md` regenerated.
+
+**Proof (fresh, after the last edit)**
+
+- `python -m pytest tests/http_api/test_chief_notices_consults.py -q -p no:cacheprovider`:
+  `8 passed`. Covers a `consult-` run listed as `kind: consult` (cost 0.40, own row) and the loop
+  parent's cost 0.10 without it; a single run's answered + handed-on routes both in `consults`,
+  `waiting_for_person: 1`, another run's route left out; a withheld unanswered route counts and an
+  answered hand-on does not; a loop parent shows its two `sched-` tasks' consults and not a third
+  run's; no routes gives `[]`/0; a notice equals the detail's `consults` with
+  `waiting_for_person: 1`; `limit=2` gives the oldest two of three, `0`, `x`, `201`, `-1`, `2.5`
+  are 400 with the exact error, `200` is 200; a row read 31 days ago is deleted, one read
+  yesterday, an unread one and another project's old read row stay.
+- `python -m pytest tests/http_api/test_chief_cli.py -q -p no:cacheprovider`: `25 passed`.
+- `python -m pytest tests/http_api tests/db -q -p no:cacheprovider -k "chief or runs or run_history"`: `2471 passed, 306 deselected`, exit 0.
+- Gate key tests (`test_chief_gate_keys.py`, `test_chief_gate_tables.py`,
+  `test_chief_gate_kinds.py`): `113 passed`.
+- `python3 scripts/check_file_size.py`: `OK: 1075 source files checked; 16 known over 400 lines,
+  none new, none grown.` black, mypy (no issues), lint-imports (1 kept, 0 broken), bandit on the
+  changed files (none), mirror reads OK, test indexes up to date.
+
+**Decisions**
+
+- `waiting_for_person` is a count; "answered" means a live `answer` row replies to the question
+  (as `open_questions_on_board` reads it), not the question's `status`.
+- `consults` carries exactly the five ticket keys; the answered check is a second query.
+- `limit` uses `int()` on the raw string, so `2.5` and `x` are 400.
+- The prune runs on every `record_session_run`, even when the insert is ignored.
+
+**Shortcuts taken**: none.
+
+**For later tickets**
+
+- 10: `GET /runs` rows now have `kind: consult`; Studio can bucket on it.
+- 12: the Operator text is at 3997 of 4000 characters; any later addition must shorten something.

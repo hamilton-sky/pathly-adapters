@@ -6,7 +6,9 @@ nothing enters the chief's tab. The notices are the project's recorded runs that
 status (``parked`` included) and are unread, each with what ``GET /runs/<id>`` says of its kind,
 status, outcome and cost (``chief_session_runs.run_notice``, which reads only the run, not its
 stages, logs or board posts) and the count of open questions and escalations to the person on the
-run's board. Rows outlive the session, so the next chief of the project sees them.
+run's board, and the run's routed questions (``consults``) with how many of them wait for the person
+(``waiting_for_person``, ``db/queries/run_consults``). Rows outlive the session, so the next chief
+of the project sees them.
 
 ``GET /chief/notices`` is a read, which the chief gate lets a chief call for its own project.
 ``POST /chief/notices/read`` is the person's: it is not in ``chief_routes.ROUTE_ACTIONS``, so the
@@ -21,6 +23,22 @@ import logging
 from flask import Blueprint, jsonify, request
 
 bp = Blueprint("chief_notices", __name__)
+
+LIMIT_MAX = 200
+LIMIT_ERROR = "limit must be an integer from 1 to 200"
+
+
+def _limit(raw: str | None) -> int | None:
+    """The ``limit`` query parameter: 50 when absent, an integer 1 to 200, else None."""
+    from pathly_orchestrator.db.queries.chief_session_runs import DEFAULT_NOTICES
+
+    if raw is None:
+        return DEFAULT_NOTICES
+    try:
+        value = int(raw)
+    except ValueError:
+        return None
+    return value if 1 <= value <= LIMIT_MAX else None
 
 
 def _notice(conn, row: dict) -> dict | None:
@@ -44,18 +62,24 @@ def _notice(conn, row: dict) -> dict | None:
         "cost_usd": run["cost_usd"],
         "finished_at": run["finished_at"],
         "open_questions": open_questions_on_board(conn, run["board"] or ""),
+        "consults": run["consults"],
+        "waiting_for_person": run["waiting_for_person"],
     }
 
 
 @bp.route("/chief/notices", methods=["GET"])
 def chief_notices():
     """``{notices: [{run_id, session_run_id, started_at, kind, status, outcome, error, cost_usd,
-    finished_at, open_questions}]}``, oldest first. 400 without a ``project_root`` query
-    parameter."""
+    finished_at, open_questions, consults, waiting_for_person}]}``, oldest first, at most
+    ``limit`` (default 50). 400 without a ``project_root`` query parameter, or for a ``limit``
+    that is not an integer from 1 to 200."""
     try:
         project_root = request.args.get("project_root", "")
         if not project_root:
             return jsonify({"error": "Query parameter 'project_root' is required"}), 400
+        limit = _limit(request.args.get("limit"))
+        if limit is None:
+            return jsonify({"error": LIMIT_ERROR}), 400
 
         from pathly_orchestrator.db.connection import get_db
         from pathly_orchestrator.db.queries.chief_session_runs import (
@@ -66,7 +90,7 @@ def chief_notices():
         )
 
         conn = get_db()
-        rows = ended_unread_runs(conn, normalise_project_root(project_root))
+        rows = ended_unread_runs(conn, normalise_project_root(project_root), limit)
         found = [_notice(conn, row) for row in rows]
         return jsonify({"notices": [n for n in found if n is not None]}), 200
     except Exception as exc:

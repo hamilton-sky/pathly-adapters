@@ -6,8 +6,11 @@ project's rows whose run reached a terminal status in ``run_history`` (``done``,
 ``aborted`` and ``parked``: the ends ``registry._set_status`` and ``terminal_identity`` write; a
 parked run's row is final too, because resuming it starts a NEW run id,
 ``supervisor/api.resume_parked_run``) and that nobody marked read; ``mark_runs_read`` marks them.
+Recording a run deletes the project's rows marked read more than ``READ_KEPT_SECONDS`` (30 days)
+ago, so the table does not grow forever.
 ``run_notice`` reads what a notice shows of one run with the helpers behind ``GET /runs/<id>``,
-without its stages, logs, board posts or artifacts. ``open_questions_on_board`` counts the
+without its stages, logs, board posts or artifacts, with the run's routed questions
+(``run_consults``). ``open_questions_on_board`` counts the
 questions and escalations to the person (``human`` or ``*``) still open on a board: the rows that
 park a task (ticket 06). Rows outlive the session that made them, so the next chief of the project
 sees them.
@@ -21,7 +24,11 @@ import sqlite3
 import time
 
 from ..connection import _get_write_lock
+from .run_consults import consult_fields
 from .run_history_read import _classify_kind, _run_cost, _run_outcome
+
+READ_KEPT_SECONDS = 30 * 86400
+DEFAULT_NOTICES = 50
 
 
 def record_session_run(
@@ -33,36 +40,45 @@ def record_session_run(
 ) -> bool:
     """Record that the chief session ``session_run_id`` started ``run_id`` in ``project_root``.
 
-    False, writing nothing, when the run is already recorded (a run id is recorded once).
+    False, writing nothing, when the run is already recorded (a run id is recorded once). Deletes
+    the project's rows marked read more than ``READ_KEPT_SECONDS`` ago either way.
     """
+    now = time.time()
     with _get_write_lock(conn):
+        conn.execute(
+            "DELETE FROM chief_session_runs"
+            " WHERE project_root = ? AND read_at IS NOT NULL AND read_at < ?",
+            (project_root, now - READ_KEPT_SECONDS),
+        )
         cur = conn.execute(
             "INSERT OR IGNORE INTO chief_session_runs"
             " (run_id, session_run_id, project_root, started_at)"
             " VALUES (?, ?, ?, ?)",
-            (run_id, session_run_id, project_root, started_at or time.time()),
+            (run_id, session_run_id, project_root, started_at or now),
         )
         conn.commit()
         return cur.rowcount == 1
 
 
-def ended_unread_runs(conn: sqlite3.Connection, project_root: str) -> list[dict]:
+def ended_unread_runs(
+    conn: sqlite3.Connection, project_root: str, limit: int = DEFAULT_NOTICES
+) -> list[dict]:
     """The project's recorded runs that ended and are unread, oldest
-    first: ``{run_id, session_run_id, started_at}``."""
+    first, at most ``limit``: ``{run_id, session_run_id, started_at}``."""
     rows = conn.execute(
         "SELECT s.run_id, s.session_run_id, s.started_at FROM chief_session_runs s"
         " JOIN run_history h ON h.run_id = s.run_id"
         " WHERE s.project_root = ? AND s.read_at IS NULL"
         " AND h.status IN ('done', 'error', 'aborted', 'parked')"
-        " ORDER BY s.started_at ASC, s.run_id ASC",
-        (project_root,),
+        " ORDER BY s.started_at ASC, s.run_id ASC LIMIT ?",
+        (project_root, limit),
     ).fetchall()
     return [dict(r) for r in rows]
 
 
 def run_notice(conn: sqlite3.Connection, run_id: str) -> dict | None:
     """What a notice shows of ``run_id``: ``{kind, status, outcome, error, cost_usd,
-    finished_at, board}``, read as ``GET /runs/<id>`` reads them (``run_history_read``), or None
+    finished_at, board, consults, waiting_for_person}``, read as ``GET /runs/<id>`` reads them (``run_history_read``), or None
     for a run with no ``run_history`` row. ``board`` is the run's ``board_scope``, else its
     feature."""
     row = conn.execute(
@@ -79,6 +95,7 @@ def run_notice(conn: sqlite3.Connection, run_id: str) -> dict | None:
         "board": row["board_scope"] or row["feature"],
     }
     notice.update(_run_outcome(conn, row["feature"], row["run_id"]))
+    notice.update(consult_fields(conn, row))
     return notice
 
 
