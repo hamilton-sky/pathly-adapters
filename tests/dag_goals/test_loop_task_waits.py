@@ -370,3 +370,27 @@ def test_a_goal_loop_run_with_a_parked_task_drains_the_rest_then_ends_waiting(
         .fetchone()
     )
     assert history is not None and history["status"] == "error"
+
+
+def test_a_waiting_task_freed_during_the_deadlock_check_is_restored_with_its_dependents():
+    from pathly_orchestrator.db.queries.task_waits import restore_freed_waits
+
+    scope = SCOPE + "-freed"
+    freed = _task(scope, "Waited, freed by an answer.")
+    after = _task(scope, "Depends on it.", depends_on=[freed])
+    stuck = _task(scope, "A real deadlock.", depends_on=["missing"])
+    reason = "deadlocked: unsatisfiable dependency (cycle or missing depends_on)"
+    for tid in (freed, after, stuck):
+        _conn().execute(
+            "UPDATE comms_messages SET task_status='blocked', fail_reason=? WHERE id=?",
+            (reason, tid),
+        )
+    _conn().commit()
+
+    out = restore_freed_waits(_conn(), "feature", scope, [freed], [freed, after, stuck])
+    assert out == [freed, after]
+    assert [_row(t)["task_status"] for t in (freed, after, stuck)] == [
+        "pending",
+        "pending",
+        "blocked",
+    ]

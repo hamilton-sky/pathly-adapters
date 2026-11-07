@@ -411,3 +411,87 @@ def test_asked_questions_by_run_lists_open_and_role_questions_once_oldest_first(
         unrouted,
     ]
     assert asked_questions_by_run(_conn(), "") == []
+
+
+# ── an agent that answers its own role question gets no free re-run ─────────────────────────
+
+
+def test_a_role_question_the_asking_run_answered_itself_is_not_a_wait(
+    tmp_path, monkeypatch
+):
+    from pathly_orchestrator.db.queries.comms import post_message
+
+    topic = "feat-role-q-self"
+    _fast_polls(monkeypatch, 5.0)
+
+    def on_spawn(tid, run_id):
+        qid = _ask(topic, run_id, f"Which queue, {run_id}?")
+        # What POST /comms/post with the run's own token stamps: the asking run.
+        post_message(
+            _conn(),
+            board="feature",
+            scope=topic,
+            from_agent="builder",
+            type="answer",
+            text="self",
+            reply_to=qid,
+            author_run_id=run_id,
+        )
+
+    state, results, spawns, tid = _run_goal_loop(tmp_path, monkeypatch, topic, on_spawn)
+
+    assert [r for r, _ in spawns] == [f"sched-{tid}#1"]
+    row = _row(tid)
+    assert row["task_status"] == "done" and row["waits"] == 0
+    assert state.status == "done", (state.status, state.error_kind, results)
+
+
+def test_a_task_past_the_wait_ceiling_is_held_for_the_person(tmp_path, monkeypatch):
+    from pathly_orchestrator.db.queries.app_settings import set_setting
+    from pathly_orchestrator.db.queries.comms import answer_question
+    from pathly_orchestrator.db.queries.task_waits import WAIT_MARGIN
+
+    topic = "feat-role-q-ceiling"
+    _fast_polls(monkeypatch, 5.0)
+    set_setting(_conn(), "consult.max_per_task", "1")
+    ceiling = 1 + WAIT_MARGIN
+
+    def on_spawn(tid, run_id):
+        # An answer through /comms/answer carries no run: it cannot be told from the person's.
+        answer_question(
+            _conn(), question_id=_ask(topic, run_id, run_id), answer_text="x"
+        )
+
+    state, results, spawns, tid = _run_goal_loop(tmp_path, monkeypatch, topic, on_spawn)
+
+    assert len(spawns) == ceiling + 1, [r for r, _ in spawns]
+    row = _row(tid)
+    assert row["task_status"] == "blocked"
+    assert row["fail_reason"].startswith(f"{WAITING}:")
+    assert row["waits"] == ceiling + 1 and row["attempts"] - row["waits"] == 0
+    assert state.status == "error" and state.error_kind == WAITING
+    assert results["error"] == WAITING
+
+
+def test_an_answered_route_with_no_answer_row_is_waited_on_only_briefly(monkeypatch):
+    from pathly_orchestrator.db.queries import consult_routes as cr
+    from pathly_orchestrator.supervisor import consult_wait
+
+    scope = "feat-role-q-gap"
+    monkeypatch.setattr(consult_wait, "POLL_INTERVAL", 0.05)
+    monkeypatch.setattr(consult_wait, "ANSWERED_GRACE", 0.3)
+    tid = _task(scope, "Build it.")
+    qid = _ask(scope, "sched-gap#1", "Which queue?")
+    _route(qid, tid, "sched-gap#1", "running")
+    cr.set_route_status(
+        _conn(), qid, "answered"
+    )  # the delivery crashed before the answer row
+    _conn().execute(
+        "UPDATE comms_messages SET task_status='blocked', fail_reason=? WHERE id=?",
+        (f"{WAITING}:{qid}", tid),
+    )
+    _conn().commit()
+
+    began = time.monotonic()
+    assert consult_wait.wait_for_consults([tid], None, 60.0) == []
+    assert 0.3 <= time.monotonic() - began < 5
