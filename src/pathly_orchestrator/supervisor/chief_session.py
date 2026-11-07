@@ -34,6 +34,7 @@ from pathly_orchestrator.db.queries.run_tokens import mint_run_token, revoke_run
 from pathly_orchestrator.runner.chief_argv import chief_argv, claude_settings
 from pathly_orchestrator.scope_names import normalise_root
 
+from . import chief_secret_claim
 from .chief_presets import BUILT_IN, compose_prompt, default_style
 from .chief_tiers import resolve_preset_tier, strip_front_matter
 from .registry import create_run, drop_run, get_run
@@ -117,7 +118,8 @@ def _write_private(path: Path, text: str) -> None:
         handle.write(text)
 
 
-def _hook_command(run_id: str, secret_file: Path) -> str:
+def _hook_command(run_id: str) -> str:
+    """The hook's command line: no secret, which the hook reads from its environment."""
     port = Settings.from_env().port
     return " ".join(
         [
@@ -126,25 +128,20 @@ def _hook_command(run_id: str, secret_file: Path) -> str:
             "pathly_hooks.chief_prompt",
             "--run-id",
             shlex.quote(run_id),
-            "--secret-file",
-            shlex.quote(str(secret_file)),
             "--port",
             str(port),
         ]
     )
 
 
-def _write_session_folder(folder: Path, engine: str, run_id: str) -> str:
-    """Write the folder's files; returns the sha256 of the hook secret."""
+def _write_session_folder(folder: Path, engine: str, run_id: str) -> None:
+    """Write the folder's files: a claude chief's settings and empty MCP config. No file holds
+    the hook secret (``chief_secret_claim``)."""
     folder.mkdir(parents=True, mode=0o700)
-    secret = secrets.token_urlsafe(32)
-    secret_file = folder / "hook_secret"
-    _write_private(secret_file, secret)
     if engine == "claude":
-        settings = claude_settings(_hook_command(run_id, secret_file))
+        settings = claude_settings(_hook_command(run_id))
         _write_private(folder / "settings.json", json.dumps(settings, indent=2))
         _write_private(folder / "mcp.json", json.dumps({"mcpServers": {}}))
-    return hashlib.sha256(secret.encode("utf-8")).hexdigest()
 
 
 def _remove_folder(run_id: str) -> None:
@@ -201,7 +198,12 @@ def open_chief(
         if existing is not None:
             raise ChiefAlreadyOpen(existing["run_id"], existing["tab_id"])
         try:
-            secret_hash = _write_session_folder(folder, engine, run_id)
+            _write_session_folder(folder, engine, run_id)
+            # Only a claude chief has a hook, so only it gets a secret (and a hash).
+            secret = secrets.token_urlsafe(32) if engine == "claude" else None
+            secret_hash = (
+                hashlib.sha256(secret.encode("utf-8")).hexdigest() if secret else None
+            )
             queries.create_session(
                 conn,
                 run_id=run_id,
@@ -214,6 +216,8 @@ def open_chief(
                 hook_secret_hash=secret_hash,
                 settings_dir=str(folder),
             )
+            if secret is not None:
+                chief_secret_claim.offer(run_id, secret)
         except BaseException:
             _remove_folder(run_id)
             raise
@@ -290,7 +294,8 @@ def _watch(run, run_id: str, start_timeout: float) -> None:
 
 
 def close_chief(run_id: str, reason: str) -> bool:
-    """Close the session: revoke its token, remove its folder, drop its run.
+    """Close the session: revoke its token, forget its unclaimed hook secret, remove its
+    folder, drop its run.
 
     Returns False when the session was unknown or already closed, so it is safe to call twice.
     A watcher still waiting on the run is let go, so no thread outlives the session.
@@ -300,6 +305,7 @@ def close_chief(run_id: str, reason: str) -> bool:
     try:
         return queries.close_session(get_db(), run_id, reason)
     finally:
+        chief_secret_claim.forget(run_id)
         _remove_folder(run_id)
         run = get_run(run_id)
         if run is not None:
@@ -338,9 +344,9 @@ def something_answers(host: str, port: int, timeout: float = 1.0) -> bool:
 def chief_startup_cleanup() -> list[str]:
     """Close every session the last server process left open and remove its folder.
 
-    A chief open across a restart has no watcher left to close it, so its token and its hook
-    secret must not outlive the process. Called once by ``app.main()`` before the server
-    serves. Returns the closed run ids.
+    A chief open across a restart has no watcher left to close it, so its token must not outlive
+    the process (its hook secret, held in memory only, already did not). Called once by
+    ``app.main()`` before the server serves. Returns the closed run ids.
     """
     closed = queries.close_stale_sessions(get_db())
     for run_id in closed:

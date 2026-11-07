@@ -1,19 +1,21 @@
 """The hook-secret check of the chief gate (chief-autopilot 02): a body never carries it.
 
-A chief's session folder ``~/.pathly/chief/<run_id>/`` holds ``hook_secret``, which the
-``UserPromptSubmit`` hook sends with each prompt it records as typed by the person. The chief's
-settings give it no read path to that folder (``runner/chief_argv.claude_settings``); this check
-is defence in depth. A chief-token request any of whose JSON string values, at any depth, holds
-the session's own hook secret is refused (400) before the cite and budget checks, so nothing is
-stored, no citation is spent and no run slot is taken. That covers the text, goal and task
-fields of ``/comms/post``, the text of ``/comms/directives``, ``/comms/acknowledge`` and
-``/runner/agent-answer``, and every other route a chief may write.
+The ``UserPromptSubmit`` hook sends the session's hook secret with each prompt it records as typed
+by the person. No file holds it: it is in the chief claude's environment
+(``PATHLY_CHIEF_HOOK_SECRET``, claimed once by Studio with ``POST /chief/hook-secret``), and the
+chief's settings deny it ``env``, ``printenv`` and reads of ``/proc``
+(``runner/chief_argv.claude_settings``); this check is defence in depth. A chief-token request any
+of whose JSON string values, at any depth, holds the session's own hook secret is refused (400)
+before the cite and budget checks, so nothing is stored, no citation is spent and no run slot is
+taken. That covers the text, goal and task fields of ``/comms/post``, the text of
+``/comms/directives``, ``/comms/acknowledge`` and ``/runner/agent-answer``, and every other route a
+chief may write.
 
 The scan is ``db/secret_scan.contains_secret_hash`` against ``chief_sessions.hook_secret_hash``:
 every 43-character window of each URL-safe run is hashed, so the secret inside a longer run
 (``x<secret>``) is caught. A re-encoded secret (base64 of it, split in two, reversed) is not: this
-is not the guarantee, which is that the chief cannot read the file. A session with no stored hash
-(a codex chief) is not checked.
+is not the guarantee, which is that the chief cannot read its environment. A session with no
+stored hash (a codex chief) is not checked.
 """
 
 from __future__ import annotations

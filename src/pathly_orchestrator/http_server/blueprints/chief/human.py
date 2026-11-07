@@ -1,13 +1,17 @@
 """POST /chief/human-messages — record a prompt that reached a chief's claude tab (chief-agent).
 
 Written to by one caller in practice: the chief's UserPromptSubmit hook
-(``pathly_hooks.chief_prompt``), which holds the session's hook secret (a 0600 file in the
-session folder; the session row keeps only its sha256) and the claude session id. The chief
-itself holds a run token, never the secret, and the chief gate refuses this route to a chief
-token (it is not in ``chief_routes.ROUTE_ACTIONS``). So "only the hook can write" means no
-chief token can. The secret file is readable by every other process of the same user and the
-claude ``--session-id`` is in the chief's argv, so a same-user process that reads both (a
-headless builder, say) can post a ``human`` row. The caller must also name the chief's own
+(``pathly_hooks.chief_prompt``), which holds the session's hook secret and the claude session id.
+No file holds the secret (round two, ticket 15): the server keeps it in memory until Studio's
+main process claims it once (``POST /chief/hook-secret``; a second claim closes the chief) and
+puts it in the chief claude's environment, ``PATHLY_CHIEF_HOOK_SECRET``, which the hook inherits;
+the session row keeps only its sha256. The chief itself holds a run token, never the secret, its
+settings deny it ``env``, ``printenv`` and reads of ``/proc``, and the chief gate refuses this
+route to a chief token (it is not in ``chief_routes.ROUTE_ACTIONS``). So "only the hook can
+write" means no chief token can. What stays true: while the chief runs, a same-user process can
+read its environment (Linux ``/proc/<pid>/environ``), and the claude ``--session-id`` is in the
+chief's argv, so a same-user process that reads both can post a ``human`` row; only OS isolation
+of headless agents closes that. The caller must also name the chief's own
 claude session id (``chief_sessions.cli_session_id``, which ``open_chief`` passed to claude as
 ``--session-id``), so a hook that picked up the settings file in another claude session records
 nothing; ``/clear`` in the tab gives claude a new id, after which every prompt is a 403.

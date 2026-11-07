@@ -4,14 +4,15 @@
 
 Runner control loop, supervisor, spawn channel, lane/worktree isolation, file-claim registry, services facade.
 
-30 test file(s).
+31 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
 | `test_base_smoke.py` | supervisor/base_smoke.py — a red base parks a run before it spawns anything (build-proof 12) | 19 |
+| `test_chief_hook_secret_claim.py` | chief-autopilot-round-two 15: the chief's hook secret is in no file, and is claimed once | 12 |
 | `test_chief_open_close_races.py` | chief-agent 20, B8 and B9: a close that lands while a chief is opening, and a tab that ended | 9 |
 | `test_chief_permission_mode.py` | chief-autopilot 01: a claude chief starts in ``dontAsk`` permission mode, never auto mode | 5 |
-| `test_chief_secret_reach.py` | chief-autopilot 02: the chief's settings give it no read path to ``~/.pathly`` | 4 |
+| `test_chief_secret_reach.py` | chief-autopilot 02 and round two 15: the chief's settings give it no read path to the secret | 6 |
 | `test_chief_session.py` | chief-agent 06: opening and closing a chief session in the supervisor | 29 |
 | `test_chief_settings_env.py` | chief-agent 20, B1: the chief's claude starts without background-task and scheduled-task prompts | 4 |
 | `test_consult_read_only.py` | chief-autopilot-round-two 03: the answer of a consult that changed the project is withheld | 21 |

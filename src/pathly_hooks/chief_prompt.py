@@ -1,12 +1,14 @@
 """UserPromptSubmit hook of a claude chief session: record prompts that reach its tab (chief-agent).
 
-Claude Code runs ``<python> -m pathly_hooks.chief_prompt --run-id <id> --secret-file <path>
---port <port>`` (the command ``supervisor/chief_session.py`` writes into the session's claude
-settings) for every prompt the chief's claude receives, and passes the event as JSON on stdin:
-``prompt`` and ``session_id`` are the two fields used here. The hook posts them with the
-session's hook secret to ``POST /chief/human-messages``; the server stores the prompt and only
-accepts it from the chief's own claude session. For a message stored as ``human`` the hook
-prints one line, which Claude Code adds to the chief's context, naming the id to cite. The
+Claude Code runs ``<python> -m pathly_hooks.chief_prompt --run-id <id> --port <port>`` (the command
+``supervisor/chief_session.py`` writes into the session's claude settings) for every prompt the
+chief's claude receives, and passes the event as JSON on stdin: ``prompt`` and ``session_id`` are
+the two fields used here. The hook posts them with the session's hook secret to
+``POST /chief/human-messages``. No file holds the secret: it is in claude's environment,
+``PATHLY_CHIEF_HOOK_SECRET``, which a command hook inherits (Studio's main process claims it once
+with ``POST /chief/hook-secret`` and starts the chief's claude with it); the server stores the
+prompt and only accepts it from the chief's own claude session. For a message stored as ``human``
+the hook prints one line, which Claude Code adds to the chief's context, naming the id to cite. The
 session's first prompt (the pasted style) and a ``relayed`` one print nothing.
 
 The hook is also run for prompts nobody typed, and nothing in the hook input says which: the
@@ -35,8 +37,8 @@ settings of a claude chief set both (``runner/chief_argv.claude_settings``; see
 tag is wrongly uncitable, which the human repairs by retyping; the other mistake would let
 another party's words pass as the human's.
 
-The hook never blocks or alters the prompt: bad stdin, bad arguments, a missing secret file, a
-server that is down, a 403 or a stdout nobody reads all end in exit 0.
+The hook never blocks or alters the prompt: bad stdin, bad arguments, no secret in the
+environment, a server that is down, a 403 or a stdout nobody reads all end in exit 0.
 """
 
 from __future__ import annotations
@@ -46,11 +48,11 @@ import json
 import os
 import re
 import sys
-from pathlib import Path
 
 from pathly_orchestrator.fsm_http_client import DEFAULT_HOST, _request_json
 
 PATH = "/chief/human-messages"
+SECRET_ENV = "PATHLY_CHIEF_HOOK_SECRET"
 TIMEOUT_SECONDS = 5.0
 CITE_LINE = (
     "Pathly recorded this as human message {id}; "
@@ -67,7 +69,6 @@ class _Args(argparse.ArgumentParser):
 def _parse(argv: list[str]) -> argparse.Namespace:
     parser = _Args(prog="chief_prompt", add_help=False)
     parser.add_argument("--run-id", required=True)
-    parser.add_argument("--secret-file", required=True)
     parser.add_argument("--port", required=True, type=int)
     return parser.parse_args(argv)
 
@@ -105,7 +106,7 @@ def _record(argv: list[str]) -> str:
     if found is None:
         return ""
     prompt, session_id = found
-    secret = Path(args.secret_file).read_text(encoding="utf-8").strip()
+    secret = os.environ.get(SECRET_ENV, "").strip()
     if not secret:
         return ""
     payload: dict = {
