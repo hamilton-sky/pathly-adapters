@@ -115,7 +115,7 @@ Outside facts relied on (tickets 13 to 15, 18):
 - The trust screen's wording is unmeasured: its only source is a user's issue report with no
   claude version (Decisions so far), not a real claude run here. Ticket 14 records what it can
   (`claude --version` beside a fixture of the screen's text in
-  `studio/src/main/ipc/terminal/fixtures/claude-trust-screen.txt`, its source and version noted in
+  `studio/src/main/ipc/terminal/__tests__/claude-trust-screen.txt`, its source and version noted in
   the file); the person confirms one first open in a never-trusted folder on their claude after
   ticket 14, and replaces the fixture if the wording differs.
 - Ticket 13's answers are the brief's recommended ones, pending the person's tap; if the tap
@@ -134,3 +134,4 @@ Outside facts relied on (tickets 13 to 15, 18):
 - 07 — single runs park an unfinished task on `asked_questions_by_run` (role questions too); run error `waiting_for_answer` while any task stays parked, `answer_ready` (`run_task_outcome.ANSWER_READY`) when every park was released at once; `consult` fragment composed by execute-task and drain-dag (drain-dag leaves a task unfinished when the answer decides how to build it)
 - 08 — `POST /comms/post` refuses (422 `{error, reason, task}`, nothing stored) a `type: task` from a live planner run token with no ```check command and no `Check: none <why>` line (`blueprints/comms/_task_post_lint.py`); tokenless, chief and other roles unchanged; `ref_warning` moved there unchanged
 - 11 — `POST /comms/answer` stamps a chief's cited answer `chief`/<chief run from the token>/`chief_relayed` (`chief_cite.relayed_stamp`), `from_agent` stays `human`; `answer_question` forwards optional author kwargs; other answers stay `none`
+- 14 — chief tabs (`^chief-[0-9a-f]{12}$`) paste only on claude's ready prompt (`> ` or `❯`+U+00A0, measured 2.1.319), never the 5 s fallback; trust screen (old + current wording, fixture measured on claude 2.1.319) answered after 1 s with Down+Enter when the cursor is on "No, exit" (a bare Enter exits claude), else Enter
