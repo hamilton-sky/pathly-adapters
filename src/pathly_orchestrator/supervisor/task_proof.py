@@ -316,7 +316,9 @@ def _prove(
 
 
 def _parked_on_question(task_id: str, run_id: str) -> bool:
-    """Park the task on the attempt's open questions; True when it waits and is left unproven.
+    """Park the task on the attempt's asked questions; True when it waits and is left unproven.
+
+    ``task_waits.asked_questions_by_run``: open questions to the person and every role question.
 
     ``task_waits.park_and_recheck`` parks it here, while the attempt can still be proven (and
     frees it at once when the questions are answered by now); the ids and the result are
@@ -328,15 +330,16 @@ def _parked_on_question(task_id: str, run_id: str) -> bool:
     try:
         from pathly_orchestrator.db.connection import get_db
         from pathly_orchestrator.db.queries.task_waits import (
-            open_questions_by_run,
+            asked_questions_by_run,
             park_and_recheck,
+            wait_ceiling,
         )
 
         conn = get_db()
-        asked = open_questions_by_run(conn, run_id)
+        asked = asked_questions_by_run(conn, run_id)
         if not asked:
             return False
-        parked = park_and_recheck(conn, task_id, asked)
+        parked = park_and_recheck(conn, task_id, asked, hold_over=wait_ceiling(conn))
     except Exception:
         logger.warning(
             "task_proof: parking %s failed; proving it", run_id, exc_info=True

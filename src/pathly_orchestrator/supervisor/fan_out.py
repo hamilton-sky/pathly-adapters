@@ -216,6 +216,49 @@ def _merge_drain_result(drained: dict, cost_usd: float) -> dict:
     return merged
 
 
+_DRAIN_KEYS = ("completed", "failed", "blocked", "deadlocked", "waiting")
+
+
+def _concat_drains(first: dict, second: dict) -> dict:
+    """The two drains' lists concatenated, each id once (a task can wait in both)."""
+    out = dict(first)
+    for key in _DRAIN_KEYS:
+        ids = list(first.get(key) or [])
+        out[key] = ids + [t for t in (second.get(key) or []) if t not in ids]
+    return out
+
+
+def _still_waiting(task_ids: list) -> list:
+    """``task_waits.still_waiting``: a task released and run again is no longer a wait (an
+    unreadable row keeps the list)."""
+    if not task_ids:
+        return []
+    try:
+        from pathly_orchestrator.db.connection import get_db
+        from pathly_orchestrator.db.queries.task_waits import still_waiting
+
+        return still_waiting(get_db(), list(task_ids))
+    except Exception:
+        logger.warning("re-reading waiting tasks %s failed", task_ids, exc_info=True)
+        return list(task_ids)
+
+
+def _restore_freed(drained: dict, waited: list, board: str, scope: str) -> list:
+    """``task_waits.restore_freed_waits`` on a drain's deadlocked tasks, dropped from its lists."""
+    try:
+        from pathly_orchestrator.db.connection import get_db
+        from pathly_orchestrator.db.queries.task_waits import restore_freed_waits
+
+        dead = list(drained.get("deadlocked") or [])
+        restored = restore_freed_waits(get_db(), board, scope, list(waited), dead)
+    except Exception:
+        logger.warning("restoring freed waiting tasks failed", exc_info=True)
+        return []
+    for key in ("deadlocked", "blocked"):
+        drained[key] = [t for t in drained.get(key) or [] if t not in restored]
+    return restored
+
+
 def _drain(
     state,
     config: dict,
@@ -223,8 +266,15 @@ def _drain(
     broadcast_fn: Optional[Callable],
     autonomy: bool,
 ) -> dict:
-    """Drain this state's ready tasks through ``scheduler_loop`` and merge the result."""
+    """Drain this state's ready tasks through ``scheduler_loop`` and merge the result.
+
+    When the drain ends with tasks parked on a question whose consult is still pending, it waits
+    for the consults (``consult_wait``) and drains again while that releases tasks; the results
+    are concatenated, the cost is the one tracker's total, and ``waiting`` keeps only the tasks
+    that still wait (``task_waits.still_waiting``).
+    """
     import pathly_orchestrator.supervisor as _sup
+    from pathly_orchestrator.supervisor import consult_wait
     from pathly_orchestrator.supervisor.drain import drain_frontier
     from pathly_orchestrator.supervisor.task_wait_outcome import note_run_waits
 
@@ -251,20 +301,44 @@ def _drain(
         # caller can forget it.
         return bool(getattr(state, "_abort_flag", False))
 
-    drained, tracker = drain_frontier(
-        state,
-        board,
-        scope,
-        isolation=_resolve_isolation(config, state_name, board, scope, goal_id),
-        spawn_fn=_spawn,
-        abort_check=_abort_check,
-        broadcast_fn=broadcast_fn,
-        # Per-task task_claimed/task_done COMMS_UPDATEs. `executor: loop` handed these to
-        # scheduler_loop directly; now the FSM owns the drain, so the run carries the
-        # broadcaster (supervisor/ may not import http_server/ to fetch one itself).
-        event_broadcast_fn=getattr(state, "_comms_broadcast_fn", None),
-        goal_id=goal_id,
-    )
+    def _drain_once(tracker=None):
+        return drain_frontier(
+            state,
+            board,
+            scope,
+            isolation=_resolve_isolation(config, state_name, board, scope, goal_id),
+            spawn_fn=_spawn,
+            abort_check=_abort_check,
+            broadcast_fn=broadcast_fn,
+            # Per-task task_claimed/task_done COMMS_UPDATEs. `executor: loop` handed these to
+            # scheduler_loop directly; now the FSM owns the drain, so the run carries the
+            # broadcaster (supervisor/ may not import http_server/ to fetch one itself).
+            event_broadcast_fn=getattr(state, "_comms_broadcast_fn", None),
+            goal_id=goal_id,
+            # The same tracker on a drain after a consult wait: one cost cap, one total.
+            tracker=tracker,
+        )
+
+    drained, tracker = _drain_once()
+    # A task freed by an answer during the drain's deadlock check is pending, not deadlocked.
+    restored = _restore_freed(drained, drained.get("waiting") or [], board, scope)
+    while (drained.get("waiting") or restored) and not tracker.exceeded():
+        if _abort_check():
+            break
+        released = restored or consult_wait.wait_for_consults(
+            _still_waiting(drained["waiting"]),
+            lambda: _abort_check() or bool(tracker.exceeded()),
+            consult_wait.WAIT_TIMEOUT,
+        )
+        if not released or _abort_check() or tracker.exceeded():
+            break
+        more, tracker = _drain_once(tracker)
+        if not any(more.get(k) for k in _DRAIN_KEYS):
+            break  # the released tasks were not claimed: do not spin
+        waited = list(drained.get("waiting") or []) + list(more.get("waiting") or [])
+        restored = _restore_freed(more, waited, board, scope)
+        drained = _concat_drains(drained, more)
+    drained["waiting"] = _still_waiting(drained.get("waiting") or [])
     merged = _merge_drain_result(drained, tracker.total)
     note_run_waits(state, merged["result"]["waiting"])
     tracker.report(merged)  # stamps error/cost_cap_exceeded when the cap was breached

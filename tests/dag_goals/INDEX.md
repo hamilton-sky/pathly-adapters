@@ -4,7 +4,7 @@
 
 Goal/DAG decomposition & scheduling — feature/flow/project decompose, goals read-model, PRD import.
 
-23 test file(s).
+24 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -22,7 +22,8 @@ Goal/DAG decomposition & scheduling — feature/flow/project decompose, goals re
 | `test_loop_drains_goal_board.py` | chief-autopilot 14: a loop goal's tasks drain from the goal's own board | 2 |
 | `test_loop_is_an_fsm_flow.py` | fsm-fan-out Phase E — `executor: loop` stops being a second engine | 18 |
 | `test_loop_park_gaps.py` | chief-autopilot-round-two 05: round one's gaps around a parked task are closed | 12 |
-| `test_loop_task_waits.py` | chief-autopilot 12: a loop task parks on its question in the scheduler and gets the answer | 6 |
+| `test_loop_role_questions.py` | chief-autopilot-round-two 06: a loop task parks on its role question and runs again with the answer | 10 |
+| `test_loop_task_waits.py` | chief-autopilot 12: a loop task parks on its question in the scheduler and gets the answer | 7 |
 | `test_prd_import_new.py` | Board-native PRD import contract (planner-hierarchy G3) | 8 |
 | `test_project_decompose.py` | Project-decompose ladder (planner-hierarchy G2): route dispatch, feature-count gate, flow, skill | 11 |
 | `test_project_goal_decompose.py` | Tests for T6: goal-slug routing at goal call sites | 6 |
