@@ -75,3 +75,35 @@ exit 0
 - `src/pathly_data/core/skills/development/execute-task.md` (read-only)
 
 ## Answer
+
+## Attempt note
+
+Attempt 1 (started at c9a97fc, branch HEAD da5180f; test-first commit 2c70d31). Everything in
+the ticket is built and its own Done-when checks pass, but one existing test outside `Touches`
+now fails, so the ticket is left open: the plan has to change, not the footprint.
+
+- Fails: `tests/dag_goals/test_loop_park_gaps.py::test_single_an_answer_between_the_read_and_the_park_leaves_the_task_pending`
+  (ticket 05's single-run race test) asserts `error == "waiting_for_answer"` for a single run
+  whose parked task an answer released at once (the answer lands between the question read and
+  the park). Item 1 of this ticket and the spec's Edge cases row ("A single run whose parked task
+  was released before the run settled | run error `answer_ready`") make that exact case
+  `answer_ready`, which is what `settle_run_tasks` now returns
+  (`AssertionError: assert 'answer_ready' == 'waiting_for_answer'`). Its other asserts (task
+  `pending`, reason cleared, `answered_questions == [qid]`, `waits` 1) still hold.
+- Needed: add `tests/dag_goals/test_loop_park_gaps.py` to this ticket's `Touches` and change
+  that one assert to `"answer_ready"` (ticket 05's Answer says "The single path ignores the
+  `park_and_recheck` result ... the run still fails `waiting_for_answer`", which this ticket
+  deliberately reverses). No other change is needed.
+- Built so far (committed with this note): `supervisor/run_task_outcome.py` (`ANSWER_READY`;
+  `_free_unfinished` reads `asked_questions_by_run` and maps `park_and_recheck`'s results: any
+  `parked` -> `waiting_for_answer`, else any `released` -> `answer_ready`, else `(None, 0)`),
+  `fragments/consult.md`, `composition.yaml` (`consult` before `completion-report` in
+  `development/execute-task` and `development/drain-dag`), `development/drain-dag.md` step 3,
+  the three regenerated team snapshots, the flipped role-question test, the new
+  `tests/dag_goals/test_single_role_questions.py` (4 tests), both CLAUDE.md files and the
+  INDEX files.
+- Measured: `tests/dag_goals/test_single_role_questions.py` 4 passed;
+  `tests/dag_goals/test_task_waits_for_answer.py tests/install_skills` 430 passed, 2 skipped;
+  `tests/dag_goals tests/runner_supervisor` 1 failed (the test above), 698 passed;
+  `tests/consistency` 91 passed; `check_file_size.py` OK; `gen_test_index.py --check` up to date;
+  `black --check src/ tests/` clean.

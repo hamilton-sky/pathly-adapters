@@ -1602,7 +1602,7 @@ pathly_orchestrator/
       comms_artifact_rows.py # insert_artifact: the comms_artifacts board-row insert (title/summary run-token redacted), moved out of comms_artifacts.py at its 400-line cap; re-exported from comms_artifacts / comms
       comms_tasks.py       # task DAG operations (get_ready, complete, claim, reclaim, goal_refs_coverage); re-exports fail_task
       comms_tasks_by_run.py # get_unfinished_tasks_of_run(conn, run_id): the tasks still in_progress with claimed_by = the run, with attempts and waits (chief-autopilot 05), read only; kept out of comms_tasks.py
-      task_waits.py        # open_questions_by_run / asked_questions_by_run (open ones + every role question, answered or not, except one only the asking run answered: the loop park, chief-autopilot-round-two 06) / park_task / park_and_recheck (parked|released|held|not_parked: re-checks the answers after the park; `hold_over` = `wait_ceiling` holds a loop task past consult.max_per_task + WAIT_MARGIN waits; never raises once the park is committed) / restore_freed_waits (undoes the deadlock mark on a task freed during the drain's deadlock check) / release_waiting_tasks / still_waiting / task_status (+ best-effort release_on_answer, called by post_message for an answer with reply_to) / tasks_behind_waiting / question_answers (chief-autopilot 06, see "A task waits on its question")
+      task_waits.py        # open_questions_by_run / asked_questions_by_run (open ones + every role question, answered or not, except one only the asking run answered: the loop park, chief-autopilot-round-two 06, and the single-run park, 07) / park_task / park_and_recheck (parked|released|held|not_parked: re-checks the answers after the park; `hold_over` = `wait_ceiling` holds a loop task past consult.max_per_task + WAIT_MARGIN waits; never raises once the park is committed) / restore_freed_waits (undoes the deadlock mark on a task freed during the drain's deadlock check) / release_waiting_tasks / still_waiting / task_status (+ best-effort release_on_answer, called by post_message for an answer with reply_to) / tasks_behind_waiting / question_answers (chief-autopilot 06, see "A task waits on its question")
       consult_routes.py    # CONSULT_ROLES / consult_limits / asking_task / route_decision / record_route / set_route_status / hand_to_person / routes_for_questions / pending_routes / goal_consult_cost / end_stale_routes (chief-autopilot-round-two 01, see "Consult routes"); imports nothing above db/
       comms_task_fail.py   # fail_task: marks a task failed (fail_reason run-token redacted before its 4000-char cap) and cascades dependents to blocked; moved out of comms_tasks.py at its ratchet baseline; re-exported from comms_tasks / comms
       task_results.py      # build-proof: latest_task_summaries(conn, task_ids) — the newest AGENT_DONE `summary` of each task's `sched-<id>#<n>` runs (a dependent task's prompt shows it)
@@ -1667,7 +1667,7 @@ pathly_orchestrator/
     terminal_argv.py       # _resolve_spawn_argv — the seam a NEW ADAPTER touches
     terminal_identity.py   # _record_spawn_identity/_record_spawn_prompt/_settle_spawn_identity, _run_board_scope; _issue_spawn_token/_spawn_role mint the spawn's run token (revoked in _settle_spawn_identity)
     terminal_reconcile.py  # _agent_done_watcher, _reconciliation_window, _synthesize_agent_done_if_missing (outcome failed + error task_unfinished when run_task_outcome says so)
-    run_task_outcome.py    # settle_run_tasks / settle_early_advance / free_tasks_of_failed_spawn: at the end of a board/single run, frees the tasks it left in_progress and fails the run (see "No success over an unfinished task")
+    run_task_outcome.py    # settle_run_tasks / settle_early_advance / free_tasks_of_failed_spawn: at the end of a board/single run, frees (or parks on its asked questions) the tasks it left in_progress and fails the run: task_unfinished | waiting_for_answer | answer_ready (see "No success over an unfinished task", "A task waits on its question")
     terminal_billing.py    # _emit_executor_telemetry, _reconcile_billing_now (were spawn-local closures)
     terminal_phase.py      # _write_supervisor_phase_summary
     interactions.py        # _await_agent_question (keeps the pending question on RunnerState._agent_question: question, options, every question of the ask, asked_at; cleared on every exit)
@@ -2640,19 +2640,27 @@ run ids, the `goal-loop` flow) are the scheduler's and are not touched.
 
 ## A task waits on its question (`db/queries/task_waits.py`, chief-autopilot 06)
 
-A single run whose agent posted a board `question` to `human` (or `*`) and ended with its task
-still `in_progress` parks the task instead of freeing it: `settle_run_tasks` (and
-`free_tasks_of_failed_spawn`) first read `open_questions_by_run(conn, run_id)`, the questions
-whose `author_run_id` is the run (`runner/provenance.stamp`) with status not `answered` and no
-live `type: answer` row replying to them. When there is one, each unfinished task is parked
+A single run whose agent posted a board `question` and ended with its task still `in_progress`
+parks the task instead of freeing it: `settle_run_tasks` (and `free_tasks_of_failed_spawn`) first
+read `asked_questions_by_run(conn, run_id)` (chief-autopilot-round-two 07; round one read only
+`open_questions_by_run`): the questions whose `author_run_id` is the run
+(`runner/provenance.stamp`) that are open and addressed to `human` (or `*`), plus every one
+addressed to a role (or routed), answered or not, except one only the asking run answered. When
+there is one, each unfinished task is parked
 with `park_and_recheck`: `park_task` (`task_status='blocked'`,
 `fail_reason='waiting_for_answer:<id>[,<id>]'`, claim released, `waits = waits + 1`;
 `comms_messages.waits`, `db/migrations_task_waits.py`), then, when every one of its questions is
 answered by now (an answer written between the read and the park found no blocked task to free),
 `release_waiting_tasks` at once: the task is `pending` with `answered_questions`, the wait still
 counted (`released`). The run is failed with `error: "waiting_for_answer"` the same way as
-`task_unfinished`. In a single run, questions to a role
-(`to: architect`, the `consult` fragment) never park a task; a loop task parks on them (below).
+`task_unfinished` while any task stays parked, and with `error: "answer_ready"`
+(`run_task_outcome.ANSWER_READY`) when every parked task was released at once: the task is
+`pending` with `answered_questions`, no attempt counted, and its next run reads them in the ready
+rows. Starting that next run is the person's or the chief's. A task the run completed after asking
+stays `done` (the answer is advice on the board only). The `consult` fragment, composed by
+`development/drain-dag` and `development/execute-task`, tells the agent to leave a task
+unfinished when the answer decides how to build it; a loop task parks on any role question
+(below).
 
 `attempts` only grows (the loop scheduler's run ids are built from it); every limit compares
 `attempts - waits`: `run_task_outcome.counted_attempts` and `task_retry.resolve_task_failure`

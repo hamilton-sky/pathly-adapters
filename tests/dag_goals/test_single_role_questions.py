@@ -213,9 +213,7 @@ def _run_id(n: int) -> str:
     return f"{n:08d}-bbbb-4bbb-8bbb-{n:012d}"
 
 
-def test_an_unfinished_task_that_asked_a_role_parks_and_the_run_waits(
-    client, tmp_path
-):
+def test_an_unfinished_task_that_asked_a_role_parks_and_the_run_waits(client, tmp_path):
     tid = _task()
     seen = _spawn(client, tmp_path, _run_id(1), tid)
     assert seen["claim"]["claimed"] is True

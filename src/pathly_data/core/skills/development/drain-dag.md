@@ -40,8 +40,12 @@ Read the task's `text` (what to build) and `artifact_path` (the plan/spec to wor
 from — open it for context).
 
 If the task's `answered_questions` is not empty, read every `{question, answer}` in it
-before you work: an earlier attempt asked the person those questions, and the answers
-decide how you do the task. Follow them.
+before you work: an earlier attempt asked those questions (of the person or of a role),
+and the answers decide how you do the task. Follow them.
+
+If you posted a question whose answer decides how to build this task (see Consult a peer)
+and left the task unfinished for it, do not claim it again in this run: go back to step 1
+and work the other ready tasks. Pathly parks it until the answer comes.
 
 If the task has `context_refs`, for each `{artifact, anchor}` call:
 ```

@@ -16,13 +16,17 @@ end ``success`` and leave the task stuck for good (chief-autopilot 05, spike S6)
   ``RUN_OUTCOME`` event. A second ``AGENT_DONE`` would give the run a second invocation row;
   the projection ignores ``RUN_OUTCOME``, and ``GET /runs/<id>`` reads it over the AGENT_DONE.
 
-A run that posted a question to ``human`` (or ``*``) that is still unanswered parks those tasks
-instead (chief-autopilot 06, ``db/queries/task_waits.py``): ``blocked`` with
+A run that asked a question its attempt did not see answered (``task_waits.asked_questions_by_run``:
+an open one to ``human`` or ``*``, or any one to a role, chief-autopilot-round-two 07) parks those
+tasks instead (``task_waits.park_and_recheck``): ``blocked`` with
 ``fail_reason='waiting_for_answer:<ids>'`` and ``waits + 1``, freed by any answer; the run is
-failed with ``waiting_for_answer``. ``counted_attempts`` is ``attempts - waits``, so a wait never
+failed with ``waiting_for_answer``. When every parked task was released at once because its
+questions were already answered, the task is ``pending`` with ``answered_questions`` (its next run
+reads them in the ready rows) and the run is failed with ``answer_ready``. A task the run completed
+is left ``done`` whatever it asked. ``counted_attempts`` is ``attempts - waits``, so a wait never
 spends a retry.
 
-It returns the error (``task_unfinished`` or ``waiting_for_answer``) so the caller's synthetic
+It returns the error (``task_unfinished``, ``waiting_for_answer`` or ``answer_ready``) so the caller's synthetic
 ``AGENT_DONE`` can carry ``outcome: failed``, or None when the run is unchanged. A spawn that raises (non-zero exit,
 timeout, stop) never reaches it: ``free_tasks_of_failed_spawn`` frees (or parks) its tasks
 from the spawn's ``finally`` instead. Loop tasks are the scheduler's
@@ -41,6 +45,7 @@ from .state import RunnerState, logger
 
 TASK_UNFINISHED = "task_unfinished"
 WAITING_FOR_ANSWER = "waiting_for_answer"
+ANSWER_READY = "answer_ready"
 
 _failed_runs: set[str] = set()
 _failed_lock = threading.Lock()
@@ -97,14 +102,15 @@ def _record_run_outcome(storage: Path, run_id: str, error: str) -> None:
 
 
 def _free_unfinished(run_id: str) -> tuple[Optional[str], int]:
-    """Park (open question) or free every task the run left ``in_progress``: the error and
-    the number of tasks, or ``(None, 0)`` when it left none."""
+    """Park (asked question) or free every task the run left ``in_progress``: the error and
+    the number of tasks, or ``(None, 0)`` when it left none (or none could be parked).
+    """
     from pathly_orchestrator.db.connection import get_db
     from pathly_orchestrator.db.queries.comms_tasks_by_run import (
         get_unfinished_tasks_of_run,
     )
     from pathly_orchestrator.db.queries.task_waits import (
-        open_questions_by_run,
+        asked_questions_by_run,
         park_and_recheck,
     )
 
@@ -114,11 +120,14 @@ def _free_unfinished(run_id: str) -> tuple[Optional[str], int]:
     tasks = get_unfinished_tasks_of_run(conn, run_id)
     if not tasks:
         return None, 0
-    questions = open_questions_by_run(conn, run_id)
+    questions = asked_questions_by_run(conn, run_id)
     if questions:
-        for task in tasks:
-            park_and_recheck(conn, task["id"], questions)
-        return WAITING_FOR_ANSWER, len(tasks)
+        results = [park_and_recheck(conn, t["id"], questions) for t in tasks]
+        if "parked" in results:
+            return WAITING_FOR_ANSWER, results.count("parked")
+        if "released" in results:
+            return ANSWER_READY, results.count("released")
+        return None, 0
     limit = resolve_max_attempts()
     for task in tasks:
         _free_task(conn, task, limit)
@@ -198,7 +207,7 @@ def mark_pty_failed(data: Optional[dict], error: str) -> None:
 
 def free_tasks_of_failed_spawn(state: RunnerState, run_id: str) -> None:
     """A spawn that raised (non-zero exit, timeout, stop) frees the tasks it left
-    ``in_progress`` (or parks them on its open questions), nothing else: its ``run_history``
+    ``in_progress`` (or parks them on its asked questions), nothing else: its ``run_history``
     row already says ``error``, and no ``AGENT_DONE`` or ``RUN_OUTCOME`` is written."""
     if not _owns_its_tasks(state, run_id):
         return
