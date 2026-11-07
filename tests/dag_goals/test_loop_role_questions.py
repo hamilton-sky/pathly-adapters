@@ -495,3 +495,43 @@ def test_an_answered_route_with_no_answer_row_is_waited_on_only_briefly(monkeypa
     began = time.monotonic()
     assert consult_wait.wait_for_consults([tid], None, 60.0) == []
     assert 0.3 <= time.monotonic() - began < 5
+
+
+def test_an_answer_whose_release_has_not_committed_yet_is_waited_for(monkeypatch):
+    """``post_message`` commits the answer row before ``release_on_answer`` frees the task; a
+    wait that polls in between must not give up on a task about to be freed."""
+    from pathly_orchestrator.db.queries import consult_routes as cr
+    from pathly_orchestrator.db.queries.task_waits import release_waiting_tasks
+    from pathly_orchestrator.supervisor import consult_wait
+
+    scope = "feat-role-q-release-gap"
+    monkeypatch.setattr(consult_wait, "POLL_INTERVAL", 0.05)
+    monkeypatch.setattr(consult_wait, "ANSWERED_GRACE", 30.0)
+    tid = _task(scope, "Build it.")
+    qid = _ask(scope, "sched-rgap#1", "Which queue?")
+    _route(qid, tid, "sched-rgap#1", "running")
+    _conn().execute(
+        "UPDATE comms_messages SET task_status='blocked', fail_reason=? WHERE id=?",
+        (f"{WAITING}:{qid}", tid),
+    )
+    _conn().commit()
+    cr.set_route_status(_conn(), qid, "answered")
+    # The answer row, committed with no release yet (the moment between the two in post_message).
+    _conn().execute(
+        "INSERT INTO comms_messages (id, board, scope, from_agent, type, text, reply_to, ts) "
+        "VALUES ('rgap-answer', 'feature', ?, 'architect', 'answer', 'Use the queue.', ?, "
+        "'2026-01-01T00:00:00Z')",
+        (scope, qid),
+    )
+    _conn().commit()
+
+    def release_later():
+        time.sleep(0.3)
+        release_waiting_tasks(_conn(), qid)
+
+    t = threading.Thread(target=release_later, name="rgap-release", daemon=True)
+    t.start()
+    try:
+        assert consult_wait.wait_for_consults([tid], None, 60.0) == [tid]
+    finally:
+        t.join(10)
