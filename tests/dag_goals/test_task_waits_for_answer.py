@@ -10,8 +10,8 @@ still ``in_progress``:
 
 An answer through ``/comms/answer`` or a ``type: answer`` post with ``reply_to`` frees the task
 (back to ``pending``) once every question it waits for is answered, and the ready-tasks row then
-carries ``answered_questions: [{question, answer}]``. A question to a role does not park a task,
-a dependent of a parked task is never deadlocked, and an answer after the task was deleted is
+carries ``answered_questions: [{question, answer}]``. A question to a role parks a task too
+(round two 07), a dependent of a parked task is never deadlocked, and an answer after the task was deleted is
 stored and changes nothing else.
 """
 
@@ -286,15 +286,17 @@ def test_the_loop_retry_limit_counts_attempts_minus_waits(client):
 
 
 def test_a_question_to_a_role_does_not_park(client, tmp_path):
+    """Round two (07) changed this: a question to a role now parks the unfinished task."""
     tid = _task()
     seen = _spawn(
         client, tmp_path, _run_id(1), tid, questions=(("architect", "Which store?"),)
     )
-    assert seen["result"]["error"] == "task_unfinished"
+    qid = seen["questions"][0]
+    assert seen["result"]["error"] == WAITING
     row = _row(tid)
-    assert row["task_status"] == "pending"
-    assert row["fail_reason"] == "task_unfinished"
-    assert row["waits"] == 0
+    assert row["task_status"] == "blocked"
+    assert row["fail_reason"] == f"{WAITING}:{qid}"
+    assert row["waits"] == 1
 
 
 @pytest.mark.parametrize("answer", [_answer_via_route, _answer_via_post])
