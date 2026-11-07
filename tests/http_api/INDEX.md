@@ -4,7 +4,7 @@
 
 HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, prompt-event contract.
 
-66 test file(s).
+67 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -49,6 +49,7 @@ HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, 
 | `test_chief_gate_unbound_reads.py` | chief-agent 08: the reads that are fleet-wide say so, and no more | 4 |
 | `test_chief_help_routes.py` | `pathly help` and the chief's texts show each route in the form that works (chief-agent 17) | 14 |
 | `test_chief_notices.py` | chief-autopilot 08: a chief's runs are recorded, and the ended ones are listed for the person | 20 |
+| `test_chief_notices_consults.py` | chief-autopilot-round-two 09: consult runs and routed questions in the run views and notices | 8 |
 | `test_chief_presets_route.py` | GET /chief/presets: the styles Studio's Chief launcher lists, with the tier the server enforces | 5 |
 | `test_chief_prompt_text.py` | chief-agent 17: what the chief's prompt texts tell it to do, against the real gate tables | 13 |
 | `test_chief_prose_rules.py` | The rules in the chief's prompt texts, pinned (chief-agent 17) | 17 |
