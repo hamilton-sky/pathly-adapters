@@ -7,7 +7,9 @@ still ``in_progress`` parks the task instead of failing it (chief-autopilot 06, 
 attempt limit compares ``attempts - waits``. An answer (``answer_question`` or a ``type: answer``
 post with ``reply_to``) frees every task whose questions are then all answered: back to
 ``pending``, the reason cleared, the question ids kept in ``answered_questions`` (a JSON list)
-for the next attempt. Questions to a role (``to: architect``) never park a task.
+for the next attempt. Questions to a role (``to: architect``) park a loop task too
+(``asked_questions_by_run``, chief-autopilot-round-two 06); a single run reads only
+``open_questions_by_run``.
 
 Shared with the loop scheduler (ticket 12). Every SQL here is one literal.
 """
@@ -44,6 +46,35 @@ def open_questions_by_run(conn: sqlite3.Connection, run_id: str) -> list[str]:
         "AND a.reply_to=q.id AND a.deleted_at IS NULL) "
         "ORDER BY q.ts ASC, q.id ASC",
         (run_id,),
+    ).fetchall()
+    return [r["id"] for r in rows]
+
+
+def asked_questions_by_run(conn: sqlite3.Connection, run_id: str) -> list[str]:
+    """Ids of every question the run asked that its attempt did not see answered, oldest first.
+
+    ``open_questions_by_run`` (open questions to ``human`` or ``*``) plus each live question the
+    run posted to a role in ``consult_routes.CONSULT_ROLES`` or that has a route row (one handed
+    on to the person is addressed to ``human`` now), answered or not: an answer that came while
+    the attempt ran was never read by it. Each id once. A blank ``run_id`` matches nothing.
+    """
+    if not run_id:
+        return []
+    # Imported here: consult_routes imports comms_messages, which imports this module.
+    from .consult_routes import CONSULT_ROLES
+
+    rows = conn.execute(
+        "SELECT q.id FROM comms_messages q "
+        "WHERE q.type='question' AND q.author_run_id=? AND q.deleted_at IS NULL "
+        "AND (q.id IN (SELECT value FROM json_each(?)) "
+        "OR lower(trim(COALESCE(q.to_agent, ''))) IN (SELECT value FROM json_each(?)) "
+        "OR EXISTS (SELECT 1 FROM consult_routes r WHERE r.question_id=q.id)) "
+        "ORDER BY q.ts ASC, q.id ASC",
+        (
+            run_id,
+            json.dumps(open_questions_by_run(conn, run_id)),
+            json.dumps(list(CONSULT_ROLES)),
+        ),
     ).fetchall()
     return [r["id"] for r in rows]
 

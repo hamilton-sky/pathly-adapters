@@ -6,8 +6,9 @@ posted a question to ``human`` (or ``*``) was completed over the open question, 
 set it ``pending`` and spent an attempt.
 
 * ``park_if_asked``: the scheduler's completion handler calls it first. When the spawn's run
-  (``sched-<task>#N``) left open questions (``db/queries/task_waits.open_questions_by_run``),
-  the task is parked with ``task_waits.park_and_recheck`` (``blocked``,
+  (``sched-<task>#N``) asked questions (``db/queries/task_waits.asked_questions_by_run``: open
+  ones to the person, and every one to a role, answered or not: the attempt did not see an
+  answer that came while it ran, chief-autopilot-round-two 06), the task is parked with ``task_waits.park_and_recheck`` (``blocked``,
   ``fail_reason='waiting_for_answer:<ids>'``, ``waits + 1``; freed at once when the questions
   were answered before the park), whatever the spawn reported. A drain's attempt that reported
   success was parked already by ``task_proof.wrap`` (``carry_park``), which proves one it cannot
@@ -55,7 +56,7 @@ def park_if_asked(
     broadcast_fn: Optional[Callable],
     scope: str,
 ) -> bool:
-    """Park the task when its spawn left an open question; True when it waits.
+    """Park the task when its spawn asked a question (``asked_questions_by_run``); True when it waits.
 
     ``task_waits.park_and_recheck`` parks it, and frees it at once when the questions were
     answered before the park: that task is ``pending`` again and still counts as a wait (True,
@@ -71,7 +72,7 @@ def park_if_asked(
     attempt is never counted, and ``task_waiting`` is broadcast on the comms stream.
     """
     from pathly_orchestrator.db.queries.task_waits import (
-        open_questions_by_run,
+        asked_questions_by_run,
         park_and_recheck,
         task_status,
     )
@@ -82,7 +83,7 @@ def park_if_asked(
         question_ids, parked = carried
     else:
         try:
-            question_ids = open_questions_by_run(conn, run_id)
+            question_ids = asked_questions_by_run(conn, run_id)
             if not question_ids:
                 return False
             parked = park_and_recheck(conn, task_id, question_ids)

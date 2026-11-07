@@ -275,7 +275,7 @@ def test_the_drain_waits_for_the_consult_and_runs_the_task_again_with_the_answer
     row = _row(tid)
     assert row["task_status"] == "done"
     assert row["attempts"] - row["waits"] == 1
-    assert state.status != "error", (state.status, state.error_kind, results)
+    assert state.status == "done", (state.status, state.error_kind, results)
     assert state.error_kind != WAITING
     assert results.get("error") != WAITING
 
@@ -304,7 +304,7 @@ def test_a_role_question_answered_before_the_attempt_ended_still_runs_it_again(
     assert row["task_status"] == "done"
     assert row["attempts"] - row["waits"] == 1 and row["waits"] == 1
     assert json.loads(row["answered_questions"]) == [asked["qid"]]
-    assert state.status != "error", (state.status, state.error_kind, results)
+    assert state.status == "done", (state.status, state.error_kind, results)
 
 
 # ── what still ends the run waiting_for_answer ──────────────────────────────────────────────
@@ -376,7 +376,7 @@ def test_an_attempt_with_no_question_is_unchanged(tmp_path, monkeypatch):
     row = _row(tid)
     assert row["task_status"] == "done"
     assert row["attempts"] == 1 and row["waits"] == 0
-    assert state.status != "error", (state.status, state.error_kind, results)
+    assert state.status == "done", (state.status, state.error_kind, results)
 
 
 # ── asked_questions_by_run ───────────────────────────────────────────────────────────────────

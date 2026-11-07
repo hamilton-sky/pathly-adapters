@@ -1602,7 +1602,7 @@ pathly_orchestrator/
       comms_artifact_rows.py # insert_artifact: the comms_artifacts board-row insert (title/summary run-token redacted), moved out of comms_artifacts.py at its 400-line cap; re-exported from comms_artifacts / comms
       comms_tasks.py       # task DAG operations (get_ready, complete, claim, reclaim, goal_refs_coverage); re-exports fail_task
       comms_tasks_by_run.py # get_unfinished_tasks_of_run(conn, run_id): the tasks still in_progress with claimed_by = the run, with attempts and waits (chief-autopilot 05), read only; kept out of comms_tasks.py
-      task_waits.py        # open_questions_by_run / park_task / park_and_recheck (parked|released|not_parked: re-checks the answers after the park; never raises once the park is committed) / release_waiting_tasks / still_waiting / task_status (+ best-effort release_on_answer, called by post_message for an answer with reply_to) / tasks_behind_waiting / question_answers (chief-autopilot 06, see "A task waits on its question")
+      task_waits.py        # open_questions_by_run / asked_questions_by_run (open ones + every role question, answered or not: the loop park, chief-autopilot-round-two 06) / park_task / park_and_recheck (parked|released|not_parked: re-checks the answers after the park; never raises once the park is committed) / release_waiting_tasks / still_waiting / task_status (+ best-effort release_on_answer, called by post_message for an answer with reply_to) / tasks_behind_waiting / question_answers (chief-autopilot 06, see "A task waits on its question")
       consult_routes.py    # CONSULT_ROLES / consult_limits / asking_task / route_decision / record_route / set_route_status / hand_to_person / routes_for_questions / pending_routes / goal_consult_cost / end_stale_routes (chief-autopilot-round-two 01, see "Consult routes"); imports nothing above db/
       comms_task_fail.py   # fail_task: marks a task failed (fail_reason run-token redacted before its 4000-char cap) and cascades dependents to blocked; moved out of comms_tasks.py at its ratchet baseline; re-exported from comms_tasks / comms
       task_results.py      # build-proof: latest_task_summaries(conn, task_ids) — the newest AGENT_DONE `summary` of each task's `sched-<id>#<n>` runs (a dependent task's prompt shows it)
@@ -1684,6 +1684,9 @@ pathly_orchestrator/
                            #   BOARD scope, not state.topic (a goal run's topic is its own slug).
                            #   Frontier board = the goal row's own board (`_goal_board`), so a
                            #   project-board loop goal drains; "feature" with no goal/board.
+                           #   A drain that parked tasks on a routed question waits for the
+                           #   consults (consult_wait) and drains again with the same tracker;
+                           #   `waiting` keeps only still_waiting tasks (chief-autopilot-round-two 06).
     spawn_window.py        # observe — wraps the single-path spawns (run_stage's and the feedback
                            #   spawn): a SPAWN_WINDOW event (role, tree + HEAD before/after) when
                            #   the flow has a floor/scope/reviewer gate (see "Spawn windows" below)
@@ -1706,6 +1709,9 @@ pathly_orchestrator/
                            #   a task whose spawn left an open question is parked (result key `waiting`)
     task_wait_outcome.py   # park_if_asked / carry_park / note_run_waits / take_run_waits / waits_for_answer / answered_questions_block —
                            #   a loop task that waits on its question (see "A task waits on its question")
+    consult_wait.py        # wait_for_consults(task_ids, abort_check, timeout) -> the tasks now pending (chief-autopilot-round-two 06):
+                           #   fan_out._drain waits (WAIT_TIMEOUT: consult spawn timeout + 90 s, POLL_INTERVAL) while a
+                           #   parked loop task's question has a queued/running route, then drains again
     task_prompt.py         # build_task_prompt — ONE assembly of a DAG task's prompt: the composed
                            #   development/execute-task body with its fragment placeholders
                            #   SUBSTITUTED (the DAG path had no injector at all — see Phase E),
@@ -2643,8 +2649,8 @@ with `park_and_recheck`: `park_task` (`task_status='blocked'`,
 answered by now (an answer written between the read and the park found no blocked task to free),
 `release_waiting_tasks` at once: the task is `pending` with `answered_questions`, the wait still
 counted (`released`). The run is failed with `error: "waiting_for_answer"` the same way as
-`task_unfinished`. Questions to a role
-(`to: architect`, the `consult` fragment) never park a task.
+`task_unfinished`. In a single run, questions to a role
+(`to: architect`, the `consult` fragment) never park a task; a loop task parks on them (below).
 
 `attempts` only grows (the loop scheduler's run ids are built from it); every limit compares
 `attempts - waits`: `run_task_outcome.counted_attempts` and `task_retry.resolve_task_failure`
@@ -2665,7 +2671,10 @@ parked task (`tasks_behind_waiting`).
 **Loop tasks** (`supervisor/task_wait_outcome.py`, chief-autopilot 12). A goal-loop task runs
 inside the `DRAINING` fan-out stage and the scheduler, not the agent, completes or retries it. The
 scheduler's completion handler first calls `park_if_asked`: when the spawn's run
-(`sched-<task>#N`, `sched_run_id`) left an open question, the task is parked with
+(`sched-<task>#N`, `sched_run_id`) asked a question (`task_waits.asked_questions_by_run`: the
+open questions to `human`/`*` plus every live question to a role in `consult_routes.CONSULT_ROLES`
+or with a route row, answered or not, since the attempt never saw an answer that came while it
+ran; each id once; chief-autopilot-round-two 06), the task is parked with
 `park_and_recheck` whatever the spawn reported, and the handler calls neither `complete_task` nor
 `resolve_task_failure`, so no attempt is counted (`resolve_task_failure` already subtracts
 `waits`; the scheduler does not). A task `released` by that re-check is a wait too (`True`): it is
@@ -2680,9 +2689,17 @@ drain result carries `waiting`. `fan_out._merge_drain_result` reports a drain wi
 as `outcome: failed` with an `error` starting `waiting_for_answer`, which `orchestrator._loop`
 does not broadcast as the "continuing to the next stage" `RUNNER_WARNING` when one of its
 `waiting` tasks still waits (`task_wait_outcome.waits_for_answer`, `task_waits.still_waiting`; an
-unreadable row keeps the error's word). A task released and run again in the drain that then
-escalated still gets the warning, although the stage result's `error` keeps saying
-`waiting_for_answer` (`_merge_drain_result` does not filter `waiting`). `_drain` records on the run the tasks that still wait
+unreadable row keeps the error's word). `fan_out._drain` filters the drain's `waiting` through
+`task_waits.still_waiting` before `_merge_drain_result`, so a task released and run again in the
+drain is not reported as a wait. When the drain ends with parked tasks whose question has a
+`queued` or `running` route (`consult_routes.pending_routes`; a route `answered` whose answer row
+is not posted yet counts too), `_drain` waits for the consults
+(`supervisor/consult_wait.wait_for_consults`, polled every `POLL_INTERVAL`, until no such route is
+left, the abort flag or the cost cap stops it, or `WAIT_TIMEOUT`, the consult spawn's 600 s plus
+90 s, passes); when the wait released tasks it drains again with the same cost tracker (one cap,
+one total) and concatenates the results, until a wait releases nothing. A question handed to the
+person has no pending route, so the run ends `waiting_for_answer` with no wait; so does a route
+still running at the timeout. `_drain` records on the run the tasks that still wait
 (`note_run_waits`, `task_waits.still_waiting`: parked, or `pending` and not yet run; one that ran
 again in the drain is dropped); once the other ready tasks have drained,
 `orchestrator_stage._resolve_stage_supervised` takes them (`take_run_waits`) before
@@ -2860,8 +2877,8 @@ still works). A project root that is not a directory is not proven.
    in-flight registry with its declared `files`, and `proof.tree.snapshot` the project root.
 2. **The spawn runs.** If it raised, or `scheduler._outcome_is_failure(outcome)` already holds,
    the result is returned as is: nothing is proven and no `TASK_PROOF` is written. So is the
-   result of an attempt that left an open question (`task_waits.open_questions_by_run` for its
-   run id): the wrapper parks it there (`park_and_recheck`, released at once when the questions
+   result of an attempt that asked a question (`task_waits.asked_questions_by_run` for its
+   run id: open questions to the person and every role question): the wrapper parks it there (`park_and_recheck`, released at once when the questions
    are answered by now) and carries the ids and the result to the scheduler's `park_if_asked`
    (`task_wait_outcome.carry_park`), which takes that park with no second read. An attempt that
    cannot be parked (the task is no longer `in_progress`, e.g. the agent marked it done itself,
