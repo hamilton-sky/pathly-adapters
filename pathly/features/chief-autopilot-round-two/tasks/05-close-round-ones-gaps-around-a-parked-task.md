@@ -1,7 +1,7 @@
 # Close round one's gaps around a parked task
 
 Type: task
-Status: resolved
+Status: open
 Blocked by: —
 Test first: yes
 Level: 3
@@ -149,3 +149,19 @@ Test-first commit: f79faf1 (all 7 new tests failed there for the reasons below).
   drain does not end the run `waiting_for_answer`.
 - orchestrator.py is at exactly 400 lines: no line may be added there.
 
+
+## Review findings (round 1, quality review)
+
+Ticket 05 (chief-autopilot-round-two), quality pass. Range c8521af..4b299a1 (END = HEAD, so no later commits were left out). The ticket was read at c8521af, and its Answer was not read. The focused tests pass (51 passed), and check_file_size is OK (orchestrator.py is at exactly 400 lines). I left a probe test in the scratchpad (/tmp/claude-0/-home-user-pathly-adapters/7b5894ea-4de6-51cb-9c61-75dd2332e1f2/scratchpad/probe/test_probe_05q.py). It is outside the repo, and nothing in the repo changed.
+
+Inputs probed: the timing of the answer post (between each read and the write that follows), the task's status at park time (the agent can set it through POST /comms/tasks/status with its own run token), the drain's waiting list as the scheduler returns it, the stage result's error string, and the RUN_OUTCOME storage path.
+
+QUALITY
+1. major src/pathly_orchestrator/supervisor/task_proof.py: an asking attempt is no longer proven, but the task can still be completed. wrap() skips _prove whenever _asked(run_id) is true. The scheduler then completes the task with no proof whenever park_if_asked returns False. I reproduced this two ways, each with a task whose check block exits 1: (a) the agent posts a question to human, marks its own task done (POST /comms/tasks/status, which is allowed for its own board), and reports success. park_task finds no in_progress row, so the result is not_parked, then a warning, then complete_task. The result is completed=[tid], no TASK_PROOF, and the check never ran. (b) An answer lands after _asked and before park_if_asked's open_questions_by_run. That read finds no open question, so the handler completes the task, again with no proof and no check. At c8521af the proof always ran. The goal-loop's DRAINING->DONE task_checks and floor_gate still run these checks later, but by then the task is done and its dependents have run on top of unproven work. Fix: carry the asked question ids from wrap to the handler (for example a marker on the outcome) and park with those ids. park_and_recheck then releases at once if they are already answered. Never let an attempt that was left unproven because it asked reach complete_task: if it cannot be parked, prove it then or route it to resolve_task_failure.
+2. major src/pathly_orchestrator/supervisor/scheduler.py + fan_out.py (from task_wait_outcome.note_run_waits / park_and_recheck): a task freed by park_and_recheck stays in the scheduler's result_waiting. Only note_run_waits filters it, through still_waiting, and _merge_drain_result does not. Suppose the freed task runs again in the same drain and escalates (or completes). The merged stage result still says outcome failed and error "waiting_for_answer: 1 task(s) wait...". take_run_waits returns [], so the run goes on to complete_stage. waits_for_answer(result) is true, so orchestrator.py drops the RUNNER_WARNING for a real escalation. I confirmed this: _merge_drain_result({failed:[t1], waiting:[t1]}) gives a waiting_for_answer error, and waits_for_answer returns True. That is a failure with nothing waiting that raises no warning and is reported as a wait. Fix: in fan_out._drain, filter drained["waiting"] through still_waiting before _merge_drain_result, so outcome, error, note_run_waits and the warning all read the same list. Or the scheduler can drop a task from result_waiting when it is claimed again.
+3. minor src/pathly_orchestrator/supervisor/task_wait_outcome.py: park_and_recheck commits the park before release_waiting_tasks runs. If the recheck raises (for example, the database is locked), park_if_asked catches the error and returns False. The handler then runs complete_task, which does not check the task's status, on a task that is now blocked. Fix: return True (it waits) once the park has committed, even if the recheck fails, or catch errors inside park_and_recheck after the park.
+4. minor src/pathly_orchestrator/db/queries/task_waits.py: if the answer's own release_on_answer frees the task first, park_and_recheck returns "parked" for a task that is already pending. The task state is still correct; only the log line ("... (parked)") is wrong.
+5. minor src/pathly_orchestrator/supervisor/task_wait_outcome.py: still_waiting counts any pending task as waiting. If the drain is aborted after a release, the run ends with waiting_for_answer and RUN_OUTCOME waiting_for_answer, even though nothing is open for a person.
+6. minor src/pathly_orchestrator/supervisor/orchestrator.py: when a true wait and a non-wait escalation happen in the same drain, the error says only waiting_for_answer, and the escalation gets no warning. This matches the spec's wording, but it should be named in the RUN_OUTCOME or notice text.
+
+REVIEW: FAIL
