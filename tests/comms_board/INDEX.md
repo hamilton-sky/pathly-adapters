@@ -4,7 +4,7 @@
 
 Comms board / message-board subsystem — messages, tasks, artifacts, goals, context retrieval & relevance, board mirror & hydration.
 
-77 test file(s).
+78 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -73,6 +73,7 @@ Comms board / message-board subsystem — messages, tasks, artifacts, goals, con
 | `test_comms_tasks_claim_fail.py` | Tests for POST /comms/tasks/claim and POST /comms/tasks/fail (DAG scheduler routes) | 13 |
 | `test_comms_tasks_status.py` | Guaranteed per-task progress for the SINGLE executor (route-level status posts) | 5 |
 | `test_comms_write_perm.py` | Tests for Phase 13 — role-based write permissions | 33 |
+| `test_consult_router.py` | chief-autopilot-round-two 04: a run's role question is routed to a consult when it is posted | 19 |
 | `test_consult_routes.py` | chief-autopilot-round-two 01: the consult_routes store and who answers each routed question | 36 |
 | `test_directive_route_caller.py` | chief-agent 20, B14: a directive is stamped with the caller that was checked | 2 |
 | `test_directive_single_insert.py` | chief-agent 20, B6: a directive is written with one INSERT | 8 |
