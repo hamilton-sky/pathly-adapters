@@ -5,7 +5,9 @@ stores only its sha256 in the session row and ``offer``s the plaintext here. Stu
 ``claim``s it once (``POST /chief/hook-secret``) and puts it in the chief claude's environment,
 where the ``UserPromptSubmit`` hook reads it. A claim that finds nothing to hand on means the
 secret was taken already (or was never offered), so it closes the chief (ticket 13, question 2 =
-A): whoever took it first no longer holds a working secret. ``close_chief`` calls ``forget``.
+A): whoever took it first no longer holds a working secret. That detection needs the expected
+claim to come: until ticket 18 builds Studio's, nothing claims, so a first claimer goes
+unnoticed. ``close_chief`` calls ``forget``.
 
 The secrets live in this process only: a restart loses them, and ``chief_startup_cleanup`` closes
 every session the last process left open.
@@ -31,7 +33,8 @@ def claim(run_id: str) -> str | None:
     """The secret, once; it is forgotten as it is handed on.
 
     Any later call returns None and closes the chief (``close_chief(run_id, SECOND_CLAIM)``,
-    harmless for a session that is closed or unknown). The lock is not held across the close,
+    harmless for a session that is closed or unknown). So does a claim with nothing offered: one
+    before ``offer`` or after a server restart closes an open chief. The lock is not held across the close,
     which calls ``forget``.
     """
     with _lock:

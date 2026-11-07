@@ -30,7 +30,9 @@ _CLAUDE_DENY = [
     "Bash(curl *)",
     "Bash(wget *)",
     # The hook secret is in the chief claude's environment (PATHLY_CHIEF_HOOK_SECRET), so the
-    # chief may not print it. A single leading slash anchors a path rule at the settings source;
+    # chief may not print it with these. They do not stop the shell expanding
+    # $PATHLY_CHIEF_HOOK_SECRET (or a slice of it) inside an allowed ``pathly api`` body.
+    # A single leading slash anchors a path rule at the settings source;
     # ``//`` is the filesystem root, so ``//proc/**`` is the rule that reaches /proc.
     "Bash(env*)",
     "Bash(printenv*)",

@@ -13,9 +13,10 @@ chief may write.
 
 The scan is ``db/secret_scan.contains_secret_hash`` against ``chief_sessions.hook_secret_hash``:
 every 43-character window of each URL-safe run is hashed, so the secret inside a longer run
-(``x<secret>``) is caught. A re-encoded secret (base64 of it, split in two, reversed) is not: this
-is not the guarantee, which is that the chief cannot read its environment. A session with no
-stored hash (a codex chief) is not checked.
+(``x<secret>``) is caught. A re-encoded secret (base64 of it, split in two, reversed) is not, nor
+a slice the shell expands from ``$PATHLY_CHIEF_HOOK_SECRET`` inside an allowed ``pathly api``
+body, which the deny rules do not stop either: neither is a guarantee. A session with no stored
+hash (a codex chief) is not checked.
 """
 
 from __future__ import annotations

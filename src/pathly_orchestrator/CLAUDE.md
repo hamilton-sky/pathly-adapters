@@ -646,7 +646,10 @@ POST /chief/notices/read    ← {project_root, run_ids} → 200 {marked}
   in the chief claude's environment (round two, ticket 15; "Human messages"), deny `Bash(env*)`,
   `Bash(printenv*)` and `Read`, `Grep` and `Glob` on `//proc/**` (two slashes is the filesystem
   root; a single leading slash anchors a rule at the settings source, so `Read(/proc/**)` is kept
-  but does not reach `/proc`). The claude chief starts with `--permission-mode dontAsk`
+  but does not reach `/proc`). These rules do not stop the shell expanding
+  `$PATHLY_CHIEF_HOOK_SECRET` (or a slice of it) inside an allowed `pathly api` body, so they do
+  not mean the chief cannot print its environment; a slice passes the gate's body scan. The
+  claude chief starts with `--permission-mode dontAsk`
   (`CLAUDE_PERMISSION_MODE`): with no mode, claude 2.1.310 started it in auto mode, which ran
   `python3` without asking (spike 19 part B, question 1). `dontAsk` denies every call that would
   otherwise prompt; claude's built-in read-only commands (`ls`, `git status`) and Read, Glob and
@@ -712,12 +715,18 @@ POST /chief/notices/read    ← {project_root, run_ids} → 200 {marked}
     it for a claude chief only, stores its sha256 (`hook_secret_hash`) and offers the plaintext to
     `supervisor/chief_secret_claim` (memory; `close_chief` forgets it, a restart loses it). Studio's
     main process claims it once with `POST /chief/hook-secret` `{run_id}` and starts the chief's
-    claude with it in `PATHLY_CHIEF_HOOK_SECRET` (ticket 18 builds that half; until then a claude
-    chief opened from Studio has no secret in its environment, so its hook records nothing:
-    citations are lost, nothing is forged). The route is 200 `{hook_secret}` once (`Cache-Control:
+    claude with it in `PATHLY_CHIEF_HOOK_SECRET` (ticket 18 builds that half). **Until ticket 18
+    lands nothing claims the secret**: a claude chief opened from Studio has none in its
+    environment, so its own hook records nothing, and any tokenless same-user process (a headless
+    agent with `curl`, say) can claim it, read the `--session-id` from the chief's argv and post
+    `human` rows, and nothing detects it, because no second claim ever comes. The exposure is
+    about that of the 0600 file it replaced. The route is 200 `{hook_secret}` once (`Cache-Control:
     no-store`); a second claim is 409 and closes the chief (`close_chief(run_id, "hook secret
-    claimed twice")`, plus `TERMINAL_KILL` to its tab; ticket 13, question 2 = A), so a first
-    claimer holds a secret that works for no open session; 404 for an unknown or closed session or
+    claimed twice")`, plus `TERMINAL_KILL` to its tab; ticket 13, question 2 = A). That detection
+    exists only once Studio makes the expected claim: then an earlier claimer's theft turns
+    Studio's claim into the second one, and the stolen secret works for no open session. A claim
+    that finds nothing offered (before `offer`, or after a server restart) closes the chief too.
+    404 for an unknown or closed session or
     one with no hash; 403 for any caller with a live run token (an agent's `pathly api` sends
     its own), and the chief gate refuses it to a chief token (not in `ROUTE_ACTIONS`). A codex
     chief has no hook, so it gets no secret and no hash, and its folder stays empty.
@@ -979,7 +988,9 @@ tiers are `supervisor/chief_tiers.py`'s: `status` = read; `planner` = read, post
   citation spent, no run slot taken. It is `contains_secret_hash` against
   `chief_sessions.hook_secret_hash`, so `x<secret>` is caught, but a re-encoded secret is not: it is
   defence in depth beside the settings' deny rules (`env`, `printenv`, `/proc`; the secret is in
-  the chief claude's environment, in no file), not the guarantee. A session with no stored hash
+  the chief claude's environment, in no file), not the guarantee. Neither stops the shell
+  expanding `$PATHLY_CHIEF_HOOK_SECRET` inside an allowed `pathly api` body: a slice of it (say
+  `${PATHLY_CHIEF_HOOK_SECRET:0:20}`) is not the whole secret, so the scan passes it. A session with no stored hash
   (a codex chief) is not checked. `POST /chief/hook-secret` is not in `ROUTE_ACTIONS`, so a chief
   token cannot claim the secret either.
 - **Overrides.** A body with a non-empty `prompt_override` or `stage_overrides`, on any route,

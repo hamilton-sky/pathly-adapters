@@ -5,9 +5,10 @@ after the chief's ``TERMINAL_SPAWN`` and starts the chief's claude with it in th
 (``PATHLY_CHIEF_HOOK_SECRET``), where the ``UserPromptSubmit`` hook reads it. Only a tokenless
 caller may claim: any caller that sends a live run token is refused (403), and an agent's
 ``pathly api`` sends its own. The chief gate refuses the route to a chief token too (it is not in
-``chief_routes.ROUTE_ACTIONS``). A tokenless same-user process can still claim first; then
-Studio's claim is the second one, which closes the chief, so the first claimer's secret works
-for no open session. The secret is never logged.
+``chief_routes.ROUTE_ACTIONS``). A tokenless same-user process can still claim first. Once
+Studio claims (ticket 18), its claim is then the second one, which closes the chief, so the first
+claimer's secret works for no open session. Until ticket 18 nothing claims, so such a theft is
+not detected. The secret is never logged.
 """
 
 from __future__ import annotations

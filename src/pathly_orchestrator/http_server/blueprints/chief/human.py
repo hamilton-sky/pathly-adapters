@@ -5,8 +5,12 @@ Written to by one caller in practice: the chief's UserPromptSubmit hook
 No file holds the secret (round two, ticket 15): the server keeps it in memory until Studio's
 main process claims it once (``POST /chief/hook-secret``; a second claim closes the chief) and
 puts it in the chief claude's environment, ``PATHLY_CHIEF_HOOK_SECRET``, which the hook inherits;
-the session row keeps only its sha256. The chief itself holds a run token, never the secret, its
-settings deny it ``env``, ``printenv`` and reads of ``/proc``, and the chief gate refuses this
+the session row keeps only its sha256. Until ticket 18 builds Studio's claim nothing claims it,
+so any tokenless same-user process can claim it unnoticed and, with the ``--session-id``, post
+``human`` rows here; the claim-once rule detects a theft only once Studio makes the expected
+claim. The chief itself holds a run token, never the secret, its settings deny it ``env``,
+``printenv`` and reads of ``/proc`` (not the shell expanding the variable inside an allowed
+``pathly api`` body), and the chief gate refuses this
 route to a chief token (it is not in ``chief_routes.ROUTE_ACTIONS``). So "only the hook can
 write" means no chief token can. What stays true: while the chief runs, a same-user process can
 read its environment (Linux ``/proc/<pid>/environ``), and the claude ``--session-id`` is in the

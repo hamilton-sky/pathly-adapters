@@ -1,7 +1,7 @@
 # Keep the chief's hook secret out of every file: the server's claim route and the hook
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 13
 Test first: yes
 Level: 3
@@ -178,6 +178,41 @@ named `ea055fe`, which a later merge commit followed). Failing-test commit: `7a0
 - Root `CLAUDE.md`'s chief blueprint list (`chief/` row of the domain map) does not name
   `POST /chief/hook-secret`; it was outside this ticket's Touches.
 
+
+**Rework, round 1** (work started at `6ec2edc`; docs and docstrings only, no behaviour change)
+
+**Review fixes**
+
+- 1 (major, docs): `src/pathly_orchestrator/CLAUDE.md` "Where the secret lives" no longer says
+  "its hook records nothing: citations are lost, nothing is forged". It now says that until
+  ticket 18 nothing claims the secret, so any tokenless same-user process can claim it, read the
+  `--session-id` from the chief's argv and post `human` rows unnoticed (no second claim ever
+  comes; exposure about that of the old 0600 file), and that the second-claim detection exists
+  only once Studio makes the expected claim. The docstrings that implied the claim-once rule
+  protects the secret today now say the same: `blueprints/chief/human.py`,
+  `blueprints/chief/hook_secret.py`, `supervisor/chief_secret_claim.py` (module docstring).
+  `http_server/chief_secret_text.py` also claimed "the guarantee ... is that the chief cannot read
+  its environment"; that sentence is gone.
+- 2 (minor): the deny-list comment in `runner/chief_argv.py`, the `pathly api` deny paragraph
+  and the "Hook secret in a body" bullet of the Chief gate docs, `human.py` and
+  `chief_secret_text.py` now say the deny rules do not stop the shell expanding
+  `$PATHLY_CHIEF_HOOK_SECRET` (or a slice) inside an allowed `pathly api` body, and a slice passes
+  the body scan. No doc claims the chief cannot print its environment. No new deny rule (not
+  measured against claude's matcher; outside what the ticket asks).
+- 3 (minor): `chief_secret_claim.claim`'s docstring and the CLAUDE.md section note that a claim
+  with nothing offered (before `offer`, or after a server restart) closes an open chief.
+- 4 (minor): `Read(/proc/**)` left as is, as instructed (the ticket names it; harmless).
+
+**Proof (rework)**, re-run on the reworked tree:
+- `python -m pytest tests/runner_supervisor/test_chief_hook_secret_claim.py -q -p no:cacheprovider`:
+  `17 passed`.
+- `python -m pytest tests/comms_board tests/runner_supervisor tests/http_api -q -p no:cacheprovider -k chief`:
+  `2739 passed, 1877 deselected`, exit 0.
+- `python -m pytest tests/comms_board/test_autopilot_round_one_acceptance.py tests/consistency -q -p no:cacheprovider`:
+  `97 passed`.
+- Full `python -m pytest tests -q -p no:cacheprovider`: `6828 passed, 14 skipped`, exit 0.
+- `black --check src/ tests/` (756 unchanged), `lint-imports` (1 kept, 0 broken),
+  `gen_test_index.py --check` (up to date), `check_file_size.py` (none new, none grown): exit 0.
 
 ## Review findings (round 1, quality review)
 
