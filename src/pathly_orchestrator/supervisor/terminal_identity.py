@@ -51,11 +51,11 @@ def _record_spawn_identity(
 
 
 def _spawn_role(state: RunnerState, run_id: str) -> Optional[str]:
-    """The Pathly role this spawn runs as. Board run: the selected agent (current_state).
+    """The Pathly role this spawn runs as. Board run or consult: the agent (current_state).
     Loop task (``sched-`` run_id): the DAG task role. FSM stage: the role of the flow's
     agent_map entry for the current state. None when it cannot be resolved."""
     try:
-        if (state.flow or "") == "board-run":
+        if (state.flow or "") in ("board-run", "consult"):
             return state.current_state or None
         if (run_id or "").startswith("sched-"):
             from .task_prompt import _TASK_ROLE

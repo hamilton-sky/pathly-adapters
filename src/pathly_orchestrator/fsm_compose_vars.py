@@ -11,6 +11,14 @@ import re
 from pathlib import Path
 
 
+def spawn_category(flow: str) -> str:
+    """The run TYPE a spawn of ``flow`` carries on its ``TERMINAL_SPAWN`` payload: ``consult``
+    for a consult run, ``single`` for a board run, else ``flow``."""
+    if flow == "consult":
+        return "consult"
+    return "single" if flow == "board-run" else "flow"
+
+
 def _inject_prompt_vars(
     text: str,
     feature: str,
@@ -24,10 +32,11 @@ def _inject_prompt_vars(
 ) -> str:
     """Replace log-phase markers and common placeholders with real values.
 
-    ``run_category`` is the run TYPE (``flow``|``single``|``loop``) written into the
+    ``run_category`` is the run TYPE (``flow``|``single``|``loop``|``consult``) written into the
     completion-report ``AGENT_DONE`` so the Monitor's RECENT list buckets a finished run the
     same way its live card did. FSM/team stages are ``flow`` (this default); board/single runs
-    override it to ``single`` via ``board_run._inject_board_prompt_vars``.
+    override it to ``single`` via ``board_run._inject_board_prompt_vars``, and a consult run
+    (``supervisor/consult_run``) to ``consult``.
 
     ``board_scope_cfg`` is the run's already-resolved tier selection, used for the
     ``<search_tiers>`` the board-search fragment hands the agent. Omitted, it is looked up from

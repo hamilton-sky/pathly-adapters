@@ -1627,10 +1627,14 @@ pathly_orchestrator/
                            #   cost_source='unavailable' instead of a misleading $0. run_id is now
                            #   stamped on the projected row (AGENT_DONE.run_id, or a later
                            #   BILLING_UPDATE.run_id via COALESCE) — backs GET /db/runs/<run_id>/cost.
-                           #   `category` (flow|single|loop) is the run TYPE, read from the
+                           #   `category` (flow|single|loop|consult) is the run TYPE, read from the
                            #   AGENT_DONE payload (completion-report's <run_category>, or Fix A's
                            #   synthetic) and guarded to the valid set — backs the Monitor RECENT
-                           #   bucketing (scope_tier is the board tier, not the run type).
+                           #   bucketing (scope_tier is the board tier, not the run type). A consult
+                           #   run (`flow="consult"`) is `consult` on its synthetic AGENT_DONE and
+                           #   its TERMINAL_SPAWN payload (`fsm_compose_vars.spawn_category`:
+                           #   consult → consult, board-run → single, else flow); its run token's
+                           #   role is the asked role (`terminal_identity._spawn_role`).
       comms.py             # re-export shim — splits into comms_messages, comms_artifacts, comms_tasks, comms_embeddings, comms_counts, comms_goals_read (import from domain modules for new code)
       comms_messages.py    # board message CRUD; goal_id/executor columns back the Goals->Task-DAG model
       comms_directives.py  # get_binding_decisions(conn, boards, scopes, role): the binding (`binding = 1`) decisions a prompt carries whatever their status, not deleted or superseded, addressed to the role or `*` (`*` only for an empty role), oldest first; board and scope lists go in as one JSON string each through `json_each`, so the statement is one static literal; `post_directive(conn, scope, to_agent, text, **author)`: the one writer of `binding = 1` (a `decision` from `chief` on the project board through `post_message(..., binding=1)`, whose one INSERT sets the flag)

@@ -237,9 +237,9 @@ def _synthesize_agent_done_if_missing(
             # run-identity: the board scope issued at spawn (NULL only when unresolvable).
             "board_scope": _run_board_scope(state, storage) or None,
             # Executor-owned run TYPE for the Monitor's RECENT bucketing (goal-loop → loop,
-            # board/single runs → single) — mirrors the completion-report <run_category>.
-            "category": (
-                "loop" if (state.flow or "").lower() == "goal-loop" else "single"
+            # consult → consult, board/single runs → single) — mirrors <run_category>.
+            "category": {"goal-loop": "loop", "consult": "consult"}.get(
+                (state.flow or "").lower(), "single"
             ),
             "conversation": 0,
             "result": "DONE",
