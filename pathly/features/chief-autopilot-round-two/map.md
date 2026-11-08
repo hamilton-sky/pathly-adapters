@@ -147,3 +147,4 @@ Outside facts relied on (tickets 13 to 15, 18):
 - 19 — consult_trigger passes `sse._broadcast_runner`; the consult fragment posts `"board": "<board>"`; `api.start_run(board=)` sets scope_tier (goal flow runs get the goal's board); AGENT_DONE lookups in runner/events and terminal_reconcile key the root by `eventlog._project_root_of`
 - 19 (review round 1) — only `goal-loop` gets the goal's board as scope_tier (team-build stage prompts derive `<board>` from storage, so their tokens stay `feature`); `resume_parked_run` carries scope_tier
 - 20 — `proof/tree.snapshot` retries `git add -A` (3 attempts, `_add_all`/`_vanished` over a new `_git_run`) only when stderr says `unable to stat` + `No such file or directory`; any other failure is None at once
+- 12 — acceptance: `test_autopilot_round_two_acceptance.py` (6 tests, 7 steps) passes through the real routes, router and supervisor with no test-side patches; full suite 6881 passed

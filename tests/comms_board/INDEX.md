@@ -4,12 +4,13 @@
 
 Comms board / message-board subsystem — messages, tasks, artifacts, goals, context retrieval & relevance, board mirror & hydration.
 
-80 test file(s).
+81 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
 | `test_artifact_reconcile.py` | T12: ensure_attached idempotency + reconcile + goal-path resolution + complete_stage threading | 5 |
 | `test_autopilot_round_one_acceptance.py` | Round one of the autopilot, proven end to end (chief-autopilot 09): the bar of the plan's map.md | 4 |
+| `test_autopilot_round_two_acceptance.py` | Round two of the autopilot, proven end to end (chief-autopilot-round-two 12): the plan's bar | 6 |
 | `test_binding_directive_guard.py` | chief-agent 16: only the chief retires a binding directive, and hydration cannot forge one | 28 |
 | `test_binding_directive_hardening.py` | Standing orders under bad input and a failing query (chief-agent 11) | 9 |
 | `test_binding_directives.py` | Binding decisions (standing orders) keep reaching the prompts of the roles they target | 26 |
