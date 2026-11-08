@@ -24,6 +24,7 @@ import queue
 import re
 import threading
 import time
+import types
 from pathlib import Path
 
 import pytest
@@ -339,16 +340,14 @@ def goal_runs(project, monkeypatch):
         started.append(state.topic)
         return goal, state
 
-    start.park = park  # type: ignore[attr-defined]
-    start.started = started  # type: ignore[attr-defined]
-    yield start
+    yield types.SimpleNamespace(start=start, park=park)
     with registry._lock:
         for topic in started:
             registry._registry.pop(topic, None)
 
 
 def test_a_goal_loop_run_on_the_project_board_has_the_project_scope_tier(goal_runs):
-    _, state = goal_runs("loop")
+    _, state = goal_runs.start("loop")
 
     assert state.flow == "goal-loop"
     assert state.scope_tier == "project"
@@ -359,7 +358,7 @@ def test_a_resumed_goal_loop_run_keeps_the_project_scope_tier(goal_runs):
     from pathly_orchestrator.supervisor.api import resume_parked_run
 
     goal_runs.park.append(True)
-    _, parked = goal_runs("loop")
+    _, parked = goal_runs.start("loop")
     assert (parked.status, parked.scope_tier) == ("parked", "project")
     goal_runs.park.clear()
 
@@ -396,7 +395,7 @@ def test_a_team_build_stage_question_on_the_project_board_is_routed(
 
     monkeypatch.setattr(consult_router, "start_consult", fake_start)
     root = str(project)
-    goal, state = goal_runs("team")
+    goal, state = goal_runs.start("team")
     assert state.flow == "team-build"
     storage = Path(_resolve_storage_path(None, root, state.topic))
     prompt = build_prompt(

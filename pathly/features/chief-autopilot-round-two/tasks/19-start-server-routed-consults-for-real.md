@@ -1,7 +1,7 @@
 # Start a server-routed consult for real, on the asking run's board, billed once
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 04, 06, 07, 16
 Test first: yes
 Level: 3
@@ -146,6 +146,13 @@ check_adapters, check_entry_points: clean.
 keys `project_root` by `storage_path.parent.parent.parent`, wrong for nested project-board runs;
 a follow-up should use `eventlog._project_root_of`. `control/_helpers.handle_retry` starts every
 retry at `scope_tier` `feature` (see fix 2).
+
+**Review fixes** (round 2, floor guard): agreed. The two `# type: ignore[attr-defined]` comments are
+gone: the `goal_runs` fixture yields `types.SimpleNamespace(start=start, park=park)` and the tests
+call `goal_runs.start(...)` / `goal_runs.park`; no suppression is left in the file. Proof:
+`test_consult_start_for_real.py` 10 passed; `tests/comms_board tests/runner_supervisor
+tests/telemetry tests/dag_goals` 2458 passed, exit 0; black and mypy on the test file clean;
+`gen_test_index.py --check` up to date.
 
 ## Review findings (round 1, quality review)
 
