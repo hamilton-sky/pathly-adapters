@@ -2,7 +2,7 @@
 
 Type: task
 Status: open
-Blocked by: 01, 02, 03, 04, 05, 06, 07, 08, 09, 10, 11, 14, 15, 16, 17, 18
+Blocked by: 01, 02, 03, 04, 05, 06, 07, 08, 09, 10, 11, 14, 15, 16, 17, 18, 19
 Test first: no
 Level: 1
 Touches: tests/comms_board/test_autopilot_round_two_acceptance.py (new), tests/comms_board/autopilot_round_two_support.py (new), tests/INDEX.md, tests/comms_board/INDEX.md

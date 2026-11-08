@@ -65,6 +65,7 @@ no:cacheprovider` passes in full.
 | 16 consult billing and category | "billed and appear in the Monitor ... their own run category" |
 | 17 a consult cannot post its own answer | read-only: the answer is not delivered around the check |
 | 18 hook secret in Studio, the pty host and the launcher | the hook secret out of every same-user process's reach |
+| 19 server-routed consults start for real (found by 12) | a role question reaches a consult run, on the asking run's board, billed once |
 
 ## Decisions so far
 
