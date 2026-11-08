@@ -5,7 +5,7 @@ Status: open
 Blocked by: 13, 15
 Test first: yes
 Level: 3
-Touches: src/pathly_orchestrator/pty_host/host.py, tests/runner_supervisor/test_pty_host_strips_chief_secret.py (new), studio/src/main/ipc/terminal.ts, studio/src/main/ipc/terminal/chiefSecret.ts (new), studio/src/main/ipc/terminal/chiefSecret.test.ts (new), studio/src/main/ipc/terminal/spawnEnv.ts, studio/src/main/ipc/terminal/spawnEnv.test.ts, studio/src/renderer/src/components/topbar/ChiefButton/ChiefLauncher/ChiefLauncher.tsx, studio/src/renderer/src/components/topbar/ChiefButton/ChiefLauncher/ChiefLauncher.test.tsx, studio/CLAUDE.md, tests/INDEX.md, tests/runner_supervisor/INDEX.md
+Touches: src/pathly_orchestrator/pty_host/host.py, tests/runner_supervisor/test_pty_host_strips_chief_secret.py (new), studio/src/main/ipc/terminal.ts, studio/src/main/ipc/terminal/chiefSecret.ts (new), studio/src/main/ipc/terminal/chiefSecret.test.ts (new), studio/src/main/ipc/terminal/spawnEnv.ts, studio/src/main/ipc/terminal/spawnEnv.test.ts, studio/src/renderer/src/components/topbar/ChiefButton/ChiefLauncher/ChiefLauncher.tsx, studio/src/renderer/src/components/topbar/ChiefButton/ChiefLauncher/ChiefLauncher.test.tsx, studio/CLAUDE.md, src/pathly_orchestrator/CLAUDE.md, CLAUDE.md, tests/INDEX.md, tests/runner_supervisor/INDEX.md
 
 Split from ticket 15, which made the server keep the chief's hook secret in memory and offer it
 once at `POST /chief/hook-secret`. This ticket makes Studio's main process the one claimer, keeps
