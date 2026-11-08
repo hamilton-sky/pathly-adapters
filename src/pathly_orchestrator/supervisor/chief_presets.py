@@ -91,7 +91,7 @@ pathly api POST /runs/<run_id>/stop
 ```
 
 - A flow runs headless, stage after stage: `team` is the full pipeline (planner, designer, builder, reviewer, tester), `team-build` the same from the builder on.
-- Only a flow start (`{"kind": "flow", "flow": "team-build", "scope": "<feature>", "project_root": "<root>", "max_cost_usd": <dollars>}`) and the `retry` verb take `max_cost_usd`. A goal, board or task run has no cap of its own: only the number of runs bounds it. Before you quote a limit, read `GET /chief/session?project_root=<root>` again.
+- Only a flow start (`{"kind": "flow", "flow": "team-build", "scope": "<feature>", "project_root": "<root>", "max_cost_usd": <dollars>}`) and the `retry` verb take `max_cost_usd`. A goal, board or task run has no cap: only the number of runs bounds it. Before you quote a limit, read `GET /chief/session?project_root=<root>` again.
 - A task waiting for an answer is `blocked`, its `fail_reason` `waiting_for_answer:<question ids>`:
 
 ```
@@ -99,6 +99,7 @@ pathly api GET '/comms/tasks?board=project&scope=<root>&feature=project&goal_id=
 ```
 
   Its questions are the pending `question` rows. Answering them frees the task; then the user may start the goal again.
+- Pathly starts consult runs to answer agents' questions to a role; a notice's `consults` give each one's status. Only questions to the user (`to: human`, those a role handed on too) wait for the user's answer.
 - To answer, once the user has answered you in this tab (their message number is the `cite`):
 
 ```

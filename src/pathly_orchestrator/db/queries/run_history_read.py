@@ -21,6 +21,7 @@ import sqlite3
 from datetime import datetime, timezone
 
 from .fsm_events import _norm
+from .run_consults import CONSULT_KIND, consult_fields, is_consult_run
 from .run_log import get_run_log
 
 _FLOW_KEY_RE = re.compile(r"^flow:[ \t]*([A-Za-z0-9_.-]+)[ \t]*$", re.MULTILINE)
@@ -73,13 +74,16 @@ def _now_iso() -> str:
 def _classify_kind(run_id: str, adapter: str | None) -> str:
     """Classify a run by run_id shape + adapter (ARCHITECTURE §1).
 
-    Returns ``'loop'`` | ``'stage'`` | ``'flow'`` | ``'single'``. ``'stage'`` is a CHILD of a
+    Returns ``'consult'`` | ``'loop'`` | ``'stage'`` | ``'flow'`` | ``'single'`` (a ``consult-``
+    run is a top-level row of its own). ``'stage'`` is a CHILD of a
     flow — excluded from ``list_runs`` and folded into the parent's RunDetail. ``'loop'`` covers
     BOTH a loop's per-task ``sched-*`` rows (children) AND its bare-uuid PARENT (adapter
     ``goal-loop``); the two are told apart by run_id shape (``_is_parent``), so the parent windows
     its ``sched-*`` tasks like a flow windows its stages.
     """
     rid = run_id or ""
+    if is_consult_run(rid):
+        return CONSULT_KIND
     if rid.startswith("sched-"):
         return "loop"
     if _STAGE_RE.search(rid) and not _UUID_RE.fullmatch(rid):
@@ -115,7 +119,8 @@ def _run_cost(
 
     single / loop-task / stage → exact SUM over ``run_id``. PARENT runs (flow / decompose /
     loop parent, ``_is_parent``) → SUM over the child time-window (``project_root`` + ``feature``
-    + ``board_scope``, ``started_at`` within the parent's lifespan) — the PO-sanctioned window
+    + ``board_scope``, ``started_at`` within the parent's lifespan, ``category`` not ``consult``:
+    a consult is its own row) — the PO-sanctioned window
     join (approximate under back-to-back same-board runs; made exact in P1 by stamping the parent
     run_id onto child rows).
     """
@@ -126,7 +131,7 @@ def _run_cost(
             "COALESCE(SUM(COALESCE(tokens_in, 0) + COALESCE(tokens_out, 0)), 0) t, "
             "COUNT(*) n FROM agent_invocations "
             "WHERE project_root=? AND feature=? AND COALESCE(board_scope, feature)=? "
-            "AND started_at BETWEEN ? AND ?",
+            "AND started_at BETWEEN ? AND ? AND COALESCE(category, '') != 'consult'",
             (
                 row["project_root"],
                 row["feature"],
@@ -191,7 +196,9 @@ def list_runs(
         if kind == "stage" or _folded_loop_task(r):
             continue
         cost_usd, tokens_total = _run_cost(conn, r, kind)[:2]
-        stage_count = r["stage_count"] or (1 if kind in ("single", "loop") else 0)
+        stage_count = r["stage_count"] or (
+            1 if kind in ("single", "loop", CONSULT_KIND) else 0
+        )
         out.append(
             {
                 "run_id": r["run_id"],
@@ -375,6 +382,7 @@ def get_run_detail(conn: sqlite3.Connection, run_id: str) -> dict:
     run = dict(row)
     run.update({"kind": kind, "cost_usd": cost_usd, "tokens_total": tokens_total})
     run.update(_run_outcome(conn, row["feature"], row["run_id"]))
+    run.update(consult_fields(conn, row))
     return {
         "run": run,
         "stages": stages,

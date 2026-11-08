@@ -573,7 +573,7 @@ GET  /chief/session?project_root=  ← {open: false} | {open: true, run_id, tab_
 GET  /chief/presets?project_root=  ← {presets: [{name, label, tier, text, source, scope}], tiers: {tier: [action]}, limits: {max_runs_per_session, max_cost_usd_per_run}}   (blueprints/chief/presets.py)
 POST /chief/human-messages  ← {run_id, hook_secret, text, session_id, relayed?} → 201 {id, kind}   (blueprints/chief/human.py)
 POST /chief/hook-secret     ← {run_id} → 200 {hook_secret} once; 409 (and the chief is closed) after   (blueprints/chief/hook_secret.py)
-GET  /chief/notices?project_root=  ← {notices: [{run_id, session_run_id, started_at, kind, status, outcome, error, cost_usd, finished_at, open_questions}]}   (blueprints/chief/notices.py)
+GET  /chief/notices?project_root=&limit=  ← {notices: [{run_id, session_run_id, started_at, kind, status, outcome, error, cost_usd, finished_at, open_questions, consults, waiting_for_person}]}   (blueprints/chief/notices.py)
 POST /chief/notices/read    ← {project_root, run_ids} → 200 {marked}
 ```
 
@@ -599,7 +599,11 @@ POST /chief/notices/read    ← {project_root, run_ids} → 200 {marked}
   the `run_history_read` helpers behind `GET /runs/<id>`, without stages, logs or board posts) plus
   `open_questions`: the `question` and `escalation` rows to `human` or `*` still open on the run's
   board (by scope: the board has no project column, so a same-named feature of another project
-  counts too). Rows outlive the
+  counts too), and the run's routed questions: `consults` and `waiting_for_person`, as
+  `GET /runs/<id>` reports them (chief-autopilot-round-two 09). `limit` (default 50, an integer 1
+  to 200, else 400 `{"error": "limit must be an integer from 1 to 200"}`; the gate entry lists it)
+  caps the list, oldest first. `record_session_run` also deletes the project's rows marked read
+  more than 30 days ago (one `DELETE`). Rows outlive the
   session, so the next chief of the project sees them. The chief gate classes the GET `read` (its
   entry binds `project_root`); `POST /chief/notices/read` is not in `ROUTE_ACTIONS`, so a chief
   token is refused, and the view refuses any other live run token. Studio's Chief button will show
@@ -1644,6 +1648,7 @@ pathly_orchestrator/
       comms_tasks.py       # task DAG operations (get_ready, complete, claim, reclaim, goal_refs_coverage); re-exports fail_task
       comms_tasks_by_run.py # get_unfinished_tasks_of_run(conn, run_id): the tasks still in_progress with claimed_by = the run, with attempts and waits (chief-autopilot 05), read only; kept out of comms_tasks.py
       task_waits.py        # open_questions_by_run / asked_questions_by_run (open ones + every role question, answered or not, except one only the asking run answered: the loop park, chief-autopilot-round-two 06, and the single-run park, 07) / park_task / park_and_recheck (parked|released|held|not_parked: re-checks the answers after the park; `hold_over` = `wait_ceiling` holds a loop task past consult.max_per_task + WAIT_MARGIN waits; never raises once the park is committed) / restore_freed_waits (undoes the deadlock mark on a task freed during the drain's deadlock check) / release_waiting_tasks / still_waiting / task_status (+ best-effort release_on_answer, called by post_message for an answer with reply_to) / tasks_behind_waiting / question_answers (chief-autopilot 06, see "A task waits on its question")
+      run_consults.py      # is_consult_run / consults_of_run (the consult_routes rows asked by a run or its children: a loop parent's sched- tasks, a flow's stages) / waiting_for_person (to_person or withheld, no live answer) / consult_fields; read by GET /runs/<id> and the chief's notices (chief-autopilot-round-two 09)
       consult_routes.py    # CONSULT_ROLES / consult_limits / asking_task / route_decision / record_route / set_route_status / hand_to_person / routes_for_questions / pending_routes / goal_consult_cost / end_stale_routes (chief-autopilot-round-two 01, see "Consult routes"); imports nothing above db/
       comms_task_fail.py   # fail_task: marks a task failed (fail_reason run-token redacted before its 4000-char cap) and cascades dependents to blocked; moved out of comms_tasks.py at its ratchet baseline; re-exported from comms_tasks / comms
       task_results.py      # build-proof: latest_task_summaries(conn, task_ids) — the newest AGENT_DONE `summary` of each task's `sched-<id>#<n>` runs (a dependent task's prompt shows it)
@@ -2678,7 +2683,12 @@ the run's `in_progress` tasks the same way and writes nothing else (no `AGENT_DO
 
 `GET /runs/<id>` reports `run.outcome` / `run.error` (`run_history_read._run_outcome`): the latest
 `RUN_OUTCOME` for the run over its latest `AGENT_DONE` (an `AGENT_DONE` with no outcome reads
-`success`; no event, null). A run whose tasks are all `done` is unchanged. Loop tasks (`sched-`
+`success`; no event, null). It also reports `run.consults` (`[{question_id, role, status,
+consult_run_id, reason}]`, the routes asked by the run or its children,
+`db/queries/run_consults.py`) and `run.waiting_for_person` (those handed to the person or
+withheld whose question has no answer yet). A `consult-` run is kind `consult`, a top-level row of
+`GET /runs`; a parent's window cost leaves out invocations with `category = 'consult'`, so a
+consult is counted once, on its own row (chief-autopilot-round-two 09). A run whose tasks are all `done` is unchanged. Loop tasks (`sched-`
 run ids, the `goal-loop` flow) are the scheduler's and are not touched.
 
 ## A task waits on its question (`db/queries/task_waits.py`, chief-autopilot 06)
