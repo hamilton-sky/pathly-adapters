@@ -140,3 +140,4 @@ Outside facts relied on (tickets 13 to 15, 18):
 - 16 — consult runs are `consult` on the TERMINAL_SPAWN payload (`fsm_compose_vars.spawn_category`), the synthetic AGENT_DONE and the projection guard; `_spawn_role` names the asked role for `flow == "consult"`
 - 09 — `consult-` runs are kind `consult` (own row; parent window cost skips `category = 'consult'`); `run_consults.consults_of_run`/`waiting_for_person` back `run.consults` on `GET /runs/<id>` and on notices; notices take `limit` 1..200 (gate key listed); `record_session_run` prunes rows read >30 days ago
 - 10 — Studio category union is `flow | loop | single | consult` in every copy; consult gets its own `Consults` section and dock colour `var(--orange)`, single's controls
+- 17 — `http_server/consult_guard.py` (before_request after `run_token_guard`) 403s a live `consult-` run token's `POST /comms/answer` and `POST /comms/post` with type answer; its other posts, other callers and non-JSON bodies pass
