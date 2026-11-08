@@ -236,11 +236,6 @@ def runner_retry():
                 409,
             )
 
-        from pathly_orchestrator.supervisor import _lock, _registry
-
-        with _lock:
-            _registry.pop(topic, None)
-
         required = {"flow", "project_root", "max_iterations", "max_cost_usd"}
         missing = required - set(data.keys())
         if missing:
@@ -270,6 +265,22 @@ def runner_retry():
         if not isinstance(autonomy, dict):
             autonomy = {}
 
+        # The ended run's goal, board and mode carry over; with no prior state the
+        # defaults stand. Drop the entry only once the body is valid.
+        carried = (
+            {}
+            if state is None
+            else {
+                "interactive": state.interactive,
+                "goal_id": state.goal_id,
+                "board": state.scope_tier,
+            }
+        )
+        from pathly_orchestrator.supervisor import _lock, _registry
+
+        with _lock:
+            _registry.pop(topic, None)
+
         _sup.start_run(
             topic=topic,
             flow=data["flow"],
@@ -280,6 +291,7 @@ def runner_retry():
             max_cost_usd=max_cost_usd,
             autonomy=autonomy,
             broadcast_fn=_broadcast_runner,
+            **carried,
         )
         return jsonify({"status": "retried", "topic": topic}), 200
     except ValueError as exc:

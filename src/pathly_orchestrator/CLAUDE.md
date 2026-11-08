@@ -2946,8 +2946,10 @@ run's token is minted with `board_run`'s `scope_tier_for(board)`, a consult's wi
 (`task_prompt`). Every other goal flow (`team-build`, ...) keeps `feature`: its stage prompt's
 `<board>` comes from the storage folder (`fsm_compose.build_prompt`: `project` only for
 `pathly/project` itself), which is `feature` for a goal's `pathly/project/goals/<slug>`, so token
-and prompt still agree. `resume_parked_run` carries the parked run's `scope_tier`; the
-control-plane retry (`control/_helpers.handle_retry`) starts with the default `feature`.
+and prompt still agree. `resume_parked_run` carries the parked run's `scope_tier`, and so do both
+retries (`control/_helpers.handle_retry` and `POST /runner/retry`), which also carry its `goal_id`
+and `interactive` (`/runner/retry` with no prior state keeps the defaults) and drop the ended run's
+registry entry only once the body is valid, so a 400 leaves it for a valid retry.
 
 `on_question(question_id, *, project_root, board, scope, broadcast_fn, host_present, start=None) -> str`
 (`start` defaults to `consult_run.start_consult`, read at call time) returns what it did:

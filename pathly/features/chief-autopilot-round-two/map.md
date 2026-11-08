@@ -148,3 +148,4 @@ Outside facts relied on (tickets 13 to 15, 18):
 - 19 (review round 1) — only `goal-loop` gets the goal's board as scope_tier (team-build stage prompts derive `<board>` from storage, so their tokens stay `feature`); `resume_parked_run` carries scope_tier
 - 20 — `proof/tree.snapshot` retries `git add -A` (3 attempts, `_add_all`/`_vanished` over a new `_git_run`) only when stderr says `unable to stat` + `No such file or directory`; any other failure is None at once
 - 12 — acceptance: `test_autopilot_round_two_acceptance.py` (6 tests, 7 steps) passes through the real routes, router and supervisor with no test-side patches; full suite 6881 passed
+- 21 — both retries (`handle_retry`, `/runner/retry`) pass the ended run's `interactive`, `goal_id` and `scope_tier` (as `board`) to `start_run`, and pop the registry entry only after the body validates
