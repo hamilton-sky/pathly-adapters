@@ -40,7 +40,7 @@ export interface RunningEngine {
   label: string
   startedAt: number
   /** How the engine was spawned — the board's primary grouping (runner tab → flow, else single). */
-  category: 'flow' | 'loop' | 'single'
+  category: 'flow' | 'loop' | 'single' | 'consult'
   /** Feature/topic this engine serves, when known (runner topic or spawn telemetry.feature). */
   feature?: string
   /** Agent role from spawn telemetry (single-shot editor/AI actions); absent for runner tabs. */

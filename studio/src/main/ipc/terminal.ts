@@ -367,7 +367,7 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
   // first and race a reconcile into false-clearing a run that is actually still alive.
   ipcMain.handle('terminal:get-engines', () => listActiveEngines())
 
-  ipcMain.handle('terminal:register-runner', (_event, tabId: string, topic: string, runId: string, label?: string, category?: 'flow' | 'loop' | 'single', runToken?: string) => {
+  ipcMain.handle('terminal:register-runner', (_event, tabId: string, topic: string, runId: string, label?: string, category?: 'flow' | 'loop' | 'single' | 'consult', runToken?: string) => {
     runnerTabMeta.set(tabId, { run_id: runId, topic, spawnedAt: Date.now(), label: label ?? tabId, category, run_token: runToken || undefined })
   })
 

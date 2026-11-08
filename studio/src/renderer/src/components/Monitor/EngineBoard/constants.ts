@@ -17,6 +17,7 @@ export const CATEGORY_META: CategoryMeta[] = [
   { key: 'flow',   label: 'Flow runs',    blurb: 'full FSM pipeline runs',        color: 'var(--accent)' },
   { key: 'loop',   label: 'Loop cycles',  blurb: 'iterative debug / explore cycles', color: 'var(--purple)' },
   { key: 'single', label: 'Single shots', blurb: 'one-shot editor & board actions',  color: 'var(--runtime)' },
+  { key: 'consult', label: 'Consults',    blurb: "role agents answering agents' questions", color: 'var(--orange)' },
 ]
 
 function categoryColor(cat: EngineCategory): string {

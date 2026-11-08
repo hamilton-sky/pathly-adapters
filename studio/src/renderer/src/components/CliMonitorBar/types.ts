@@ -2,7 +2,7 @@
 // The floating dock reuses the Monitor's engine model. Keep this in sync with
 // ../Monitor/types.ts (or import from there once both live in the tree).
 
-export type EngineCategory = 'flow' | 'loop' | 'single'
+export type EngineCategory = 'flow' | 'loop' | 'single' | 'consult'
 export type EngineAdapter = 'Claude' | 'Codex' | 'Gemini'
 export type EngineStatus = 'running' | 'queued' | 'done' | 'failed'
 

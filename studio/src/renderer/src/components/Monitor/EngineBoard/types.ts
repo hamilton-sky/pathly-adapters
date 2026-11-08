@@ -3,7 +3,7 @@
 // Field names align with the runner/terminal telemetry surfaced to the renderer.
 
 /** How the engine was spawned — the primary board grouping. */
-export type EngineCategory = 'flow' | 'loop' | 'single'
+export type EngineCategory = 'flow' | 'loop' | 'single' | 'consult'
 
 /** Which host CLI is driving the engine. */
 export type EngineAdapter = 'Claude' | 'Codex' | 'Gemini'

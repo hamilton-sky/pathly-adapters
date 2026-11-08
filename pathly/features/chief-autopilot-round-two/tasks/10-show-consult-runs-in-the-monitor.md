@@ -1,7 +1,7 @@
 # Show consult runs in the Monitor as their own category
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 16
 Test first: yes
 Level: 3
@@ -62,3 +62,11 @@ exit 0
 - `studio/CLAUDE.md` (typecheck commands, IPC pattern)
 
 ## Answer
+
+Work started at 399633093da700cbbd3e971782e1b9d9ce911d09 (a tree-same merge of master on e451529).
+
+- **Built**: `'consult'` added to the category union in `Monitor/EngineBoard/types.ts`, `CliMonitorBar/types.ts`, `types/global.d.ts` (both `category` fields), the cast in `TerminalSpawnListener.tsx`, `registerRunner` in `main/preload/index.ts`, the `terminal:register-runner` handler in `main/ipc/terminal.ts`, `runnerTabMeta` in `terminal/ptyRegistry.ts` and the engine record in `terminal/spawnGate.ts`. A fourth `CATEGORY_META` entry (`consult`, `Consults`, `role agents answering agents' questions`, `var(--orange)`) after `single`; the dock's `CATEGORY_ORDER` ends with `consult` and `categoryColor` maps it to `var(--orange)`. New test `Monitor/EngineBoard/constants.test.ts`. `studio/CLAUDE.md` names the set `flow | loop | single | consult`.
+- **Proof**: `npm --prefix studio run test -- src/renderer/src/components/Monitor/EngineBoard/constants.test.ts`: 6 passed, exit 0 (at the test commit: 4 failed, 2 passed). `npm --prefix studio run typecheck`: exit 0. `node studio/node_modules/typescript/bin/tsc --noEmit -p studio/tsconfig.node.json`: exit 0. `npm --prefix studio run test`: 44 files, 274 tests passed, exit 0.
+- **Decisions**: `var(--orange)` (defined in `styles/tokens.css`; the other three are accent, purple, runtime). The test also checks the dock's colour equals the board's for every category, so the two copies cannot drift. The board's own `categoryColor` stays unexported, as it was.
+- **Shortcuts taken**: two places outside Touches still know only three categories, harmlessly: `CategoryBadge.module.css` has no `[data-cat='consult']` rule (the badge renders with its base style, no category tint), and `CliMonitorBar/DockFilter/DockFilter.tsx`'s segment list has no `Consult` segment (consult rows show under `all`, not filterable alone). Worth a follow-up if consults get frequent.
+- **For later tickets**: none affected.
