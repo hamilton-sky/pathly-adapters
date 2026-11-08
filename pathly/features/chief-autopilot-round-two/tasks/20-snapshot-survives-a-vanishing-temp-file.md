@@ -1,7 +1,7 @@
 # A working-tree snapshot survives a temp file that vanishes mid-add
 
 Type: task
-Status: resolved
+Status: open
 Blocked by: 19
 Test first: yes
 Level: 2
@@ -79,3 +79,9 @@ Base: f6a6bde8311c042bca7de2f56436a45ca03c358c. Failing test commit: 2d71f95.
   files out of the tree (out of scope here).
 - **For later tickets**: 12 — the acceptance flake (`FLOOR_CHECKED 3 != 4`) should now be rare,
   but it can still happen under heavy mirror churn (see Shortcuts).
+
+## Review findings (round 1, floor guard)
+
+floor guard: the diff weakens the bar instead of meeting it
+ticket-edit: pathly/features/chief-autopilot-round-two/tasks/20-snapshot-survives-a-vanishing-temp-file.md: text outside the Status line and the Answer was changed
+if a finding is intended, the ticket needs a line like: Floor: allow <category>
