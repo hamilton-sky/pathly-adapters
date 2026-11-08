@@ -66,6 +66,7 @@ no:cacheprovider` passes in full.
 | 17 a consult cannot post its own answer | read-only: the answer is not delivered around the check |
 | 18 hook secret in Studio, the pty host and the launcher | the hook secret out of every same-user process's reach |
 | 19 server-routed consults start for real (found by 12) | a role question reaches a consult run, on the asking run's board, billed once |
+| 20 snapshot survives a vanishing temp file (CI race, person's call on #138) | the floor gate's measurement is not skipped by a mirror's rename |
 
 ## Decisions so far
 
