@@ -301,30 +301,138 @@ def test_a_single_runs_question_posted_as_the_fragment_says_is_routed(
     assert _to_agent(question) == "architect"
 
 
-def test_a_goal_loop_run_on_the_project_board_has_the_project_scope_tier(
-    project, monkeypatch
-):
+@pytest.fixture()
+def goal_runs(project, monkeypatch):
+    """Start goal flow runs for real (``goal_executor`` -> ``api.start_run``) with the FSM loop
+    stubbed (``park`` set: the loop parks the run, as a human checkpoint does), and take every
+    run the test started out of the runner registry afterwards."""
     from pathly_orchestrator.supervisor import base_smoke, orchestrator, registry
     from pathly_orchestrator.supervisor.goal_executor import start_goal_run
 
-    monkeypatch.setattr(orchestrator, "_loop", lambda state, broadcast_fn: None)
+    park: list[bool] = []
+
+    def loop(state, broadcast_fn):
+        if park:
+            state.status = "parked"
+
+    monkeypatch.setattr(orchestrator, "_loop", loop)
     monkeypatch.setattr(base_smoke, "check_base", lambda state, broadcast_fn: True)
-    root = str(project)
-    goal = post_message(
-        get_db(), "project", root, "chief", type="goal", text="Ship the parser"
-    )
-    get_db().execute("UPDATE comms_messages SET executor='loop' WHERE id=?", (goal,))
-    get_db().commit()
-    done: list = []
+    started: list = []
 
-    result = start_goal_run(goal, project_root=root, on_done=lambda *a: done.append(a))
+    def start(executor: str):
+        root = str(project)
+        goal = post_message(
+            get_db(), "project", root, "chief", type="goal", text="Ship the parser"
+        )
+        done: list = []
+        result = start_goal_run(
+            goal,
+            executor_override=executor,
+            project_root=root,
+            on_done=lambda *a: done.append(a),
+        )
+        assert result["ok"], result
+        _wait_for(lambda: done, "the run to end")
+        state = next(
+            s for s in registry._registry.values() if s.run_id == result["run_id"]
+        )
+        started.append(state.topic)
+        return goal, state
 
-    assert result["ok"], result
-    assert result["executor"] == "loop"
-    _wait_for(lambda: done, "the run to end")
-    state = next(s for s in registry._registry.values() if s.run_id == result["run_id"])
+    start.park = park  # type: ignore[attr-defined]
+    start.started = started  # type: ignore[attr-defined]
+    yield start
+    with registry._lock:
+        for topic in started:
+            registry._registry.pop(topic, None)
+
+
+def test_a_goal_loop_run_on_the_project_board_has_the_project_scope_tier(goal_runs):
+    _, state = goal_runs("loop")
+
     assert state.flow == "goal-loop"
     assert state.scope_tier == "project"
+
+
+def test_a_resumed_goal_loop_run_keeps_the_project_scope_tier(goal_runs):
+    from pathly_orchestrator.supervisor import registry
+    from pathly_orchestrator.supervisor.api import resume_parked_run
+
+    goal_runs.park.append(True)
+    _, parked = goal_runs("loop")
+    assert (parked.status, parked.scope_tier) == ("parked", "project")
+    goal_runs.park.clear()
+
+    done: list = []
+    resumed = resume_parked_run(parked.topic, on_done=lambda *a: done.append(a))
+
+    _wait_for(lambda: done, "the resumed run to end")
+    assert resumed.run_id != parked.run_id
+    assert registry._registry[parked.topic] is resumed
+    assert resumed.scope_tier == "project"
+
+
+def test_a_team_build_stage_question_on_the_project_board_is_routed(
+    client, project, goal_runs, monkeypatch
+):
+    """The real stage path of a project-board team-build goal: the stage prompt from
+    ``fsm_compose.build_prompt`` and the token ``_mint_spawn_token`` mints for its spawn. The
+    consult post the prompt gives, sent with that token, is routed (not handed to the person):
+    the prompt's board and the token's board come from one place."""
+    from pathly_orchestrator.fsm_compose import build_prompt
+    from pathly_orchestrator.fsm_ops import _load_flow, _resolve_storage_path
+    from pathly_orchestrator.http_server import sse
+    from pathly_orchestrator.supervisor import consult_router
+    from pathly_orchestrator.supervisor.terminal_identity import (
+        _mint_spawn_token,
+        _run_board_scope,
+    )
+
+    started: list[str] = []
+
+    def fake_start(question_id, *, project_root, broadcast_fn, block):
+        started.append(question_id)
+        return {"started": True, "run_id": "consult-0123456789ab", "status": "running"}
+
+    monkeypatch.setattr(consult_router, "start_consult", fake_start)
+    root = str(project)
+    goal, state = goal_runs("team")
+    assert state.flow == "team-build"
+    storage = Path(_resolve_storage_path(None, root, state.topic))
+    prompt = build_prompt(
+        _load_flow("team-build", root), "BUILDING", storage, goal_id=goal
+    )
+    section = prompt[prompt.index("**To consult, post a board question") :]
+    found = re.search(r"POST [^\n]*/comms/post\n(\{.*?\})\n```", section, re.S)
+    assert found, "the stage prompt's consult post"
+    body = json.loads(
+        found.group(1).replace("<your role>", "builder").replace("<role>", "architect")
+    )
+    body["text"] = QUESTION
+    tid = post_message(
+        get_db(), "project", root, "planner", type="task", text="Parse.", goal_id=goal
+    )
+    run_id = f"{state.run_id}-build"
+    assert claim_task(get_db(), tid, run_id)
+    token = _mint_spawn_token(
+        state, run_id, "builder", storage.name, _run_board_scope(state, storage)
+    )
+    assert token
+    inbox: queue.Queue = queue.Queue()
+    with sse._spawn_lock:
+        sse._spawn_clients.append(inbox)
+    try:
+        resp = client.post("/comms/post", json=body, headers={TOKEN_HEADER: token})
+        assert resp.status_code == 200, resp.get_data(as_text=True)
+        question = resp.get_json()["message_id"]
+        _wait_for(lambda: started or _to_agent(question) == "human", "the routing")
+    finally:
+        with sse._spawn_lock:
+            sse._spawn_clients.remove(inbox)
+
+    assert _to_agent(question) == "architect"
+    assert started == [question]
+    assert _route(question)["status"] == "queued"
 
 
 # -- 3. a project-board consult is billed once --------------------------------------------------
