@@ -58,7 +58,7 @@ describe('claimChiefHookSecret', () => {
 
   it('never logs the secret', async () => {
     const spies = (['log', 'info', 'warn', 'error', 'debug'] as const).map((m) => vi.spyOn(console, m).mockImplementation(() => undefined))
-    fetchMock.mockResolvedValue(answer(200, { hook_secret: SECRET }))
+    fetchMock.mockImplementation(async () => answer(200, { hook_secret: SECRET }))
     await claimChiefHookSecret(CHIEF)
     await chiefSecretForSpawn(CHIEF, ['claude'], true)
     for (const spy of spies) {

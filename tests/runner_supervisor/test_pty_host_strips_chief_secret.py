@@ -27,7 +27,9 @@ def host_has_the_secret(monkeypatch):
 
 
 @pytest.mark.parametrize("run_token", [None, "", "tok-made-up"])
-def test_the_child_env_has_no_chief_hook_secret(host_has_the_secret, tmp_path, run_token):
+def test_the_child_env_has_no_chief_hook_secret(
+    host_has_the_secret, tmp_path, run_token
+):
     env = SpawnHost._child_env(str(tmp_path), run_token)
 
     assert "PATHLY_CHIEF_HOOK_SECRET" not in env
@@ -51,7 +53,9 @@ def test_the_hosts_own_environment_keeps_its_value(host_has_the_secret, tmp_path
     assert os.environ["PATHLY_CHIEF_HOOK_SECRET"] == FAKE_SECRET
 
 
-def test_a_real_child_started_with_that_env_cannot_read_it(host_has_the_secret, tmp_path):
+def test_a_real_child_started_with_that_env_cannot_read_it(
+    host_has_the_secret, tmp_path
+):
     env = SpawnHost._child_env(str(tmp_path))
     code = "import os; print(repr(os.environ.get('PATHLY_CHIEF_HOOK_SECRET')))"
 

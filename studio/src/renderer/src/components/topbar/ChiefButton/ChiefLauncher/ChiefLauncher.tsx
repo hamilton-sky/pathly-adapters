@@ -8,6 +8,9 @@ import s from './ChiefLauncher.module.css'
 // Spec "codex chief" (chief-autopilot 13): codex's read-only sandbox still reads the whole disk.
 const CODEX_NOTE =
   'A codex chief can read files outside the project, so it is not safe to leave alone yet.'
+// Round two 18: no file holds a claude chief's hook secret, but its environment does.
+const SAME_USER_NOTE =
+  'While the chief runs, another program running as you can still read its environment, so keep untrusted programs off this account.'
 
 interface Props {
   projectRoot: string
@@ -42,6 +45,7 @@ export function ChiefLauncher({ projectRoot, onOpened }: Props): JSX.Element {
       <strong>{tierSummary(l.current.tier)}</strong>
       {spend && <span className={s.spend}>{spend}</span>}
       {l.cli === 'codex' && <span className={s.spend}>{CODEX_NOTE}</span>}
+      {l.cli === 'claude' && <span className={s.spend}>{SAME_USER_NOTE}</span>}
       {l.error && <span className={s.errorText} role="alert">{l.error}</span>}
     </div>
   )
