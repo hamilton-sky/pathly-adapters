@@ -1,7 +1,7 @@
 # A working-tree snapshot survives a temp file that vanishes mid-add
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 19
 Test first: yes
 Level: 2
@@ -43,7 +43,6 @@ Document the retry in `src/pathly_orchestrator/CLAUDE.md`, in the floor guard pa
   the same files.
 - `python -m pytest tests/fsm_flows -q -p no:cacheprovider` passes, and
   `python scripts/gen_test_index.py --check` passes.
-
 ## Answer
 
 Base: f6a6bde8311c042bca7de2f56436a45ca03c358c. Failing test commit: 2d71f95.
@@ -79,6 +78,9 @@ Base: f6a6bde8311c042bca7de2f56436a45ca03c358c. Failing test commit: 2d71f95.
   files out of the tree (out of scope here).
 - **For later tickets**: 12 — the acceptance flake (`FLOOR_CHECKED 3 != 4`) should now be rare,
   but it can still happen under heavy mirror churn (see Shortcuts).
+- **Review fixes**: round 1 (floor guard, ticket-edit): the ticket as planned ended without an
+  `## Answer` heading, so the blank line written before the new Answer counted as an edit above it.
+  That blank line is gone; nothing above the Answer differs from the base now.
 
 ## Review findings (round 1, floor guard)
 
