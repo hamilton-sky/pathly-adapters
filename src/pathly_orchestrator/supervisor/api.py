@@ -27,6 +27,7 @@ def start_run(
     stage_overrides: Optional[dict] = None,
     event_broadcast_fn: Optional[Callable] = None,
     smoke_base: bool = True,
+    board: str = "",
 ) -> RunnerState:
     """Start a new supervised run for *topic*.  Raises ValueError if already active.
 
@@ -46,8 +47,13 @@ def start_run(
     smoke_base: run ``base_smoke.check_base`` before the first spawn. A red base parks the
         run (``error_kind="base_red"``) with nothing spawned. ``resume_parked_run`` turns it
         off unless the run was parked for exactly that.
+    board: the board the run is on (a goal flow run: the goal's). It sets ``scope_tier``
+        (``runner.telemetry.scope_tier_for``), which the run's spawn tokens are minted with, so
+        a ``goal-loop`` task's token names the board its prompt posts on. Default ``feature``.
     """
     import uuid as _uuid
+
+    from ..runner.telemetry import scope_tier_for
 
     with _lock:
         existing = _registry.get(topic)
@@ -71,6 +77,7 @@ def start_run(
             goal_id=goal_id,
             stage_overrides=stage_overrides or {},
             _comms_broadcast_fn=event_broadcast_fn,
+            scope_tier=scope_tier_for(board),
         )
         state.trace_id = secrets.token_hex(16)
         _registry[topic] = state

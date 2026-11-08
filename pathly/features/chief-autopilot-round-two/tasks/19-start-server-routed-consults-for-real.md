@@ -1,7 +1,7 @@
 # Start a server-routed consult for real, on the asking run's board, billed once
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 04, 06, 07, 16
 Test first: yes
 Level: 3
@@ -75,3 +75,41 @@ exit 0
 - `src/pathly_orchestrator/supervisor/consult_router.py` (`_asker_refusal`), `supervisor/board_run.py` and `supervisor/consult_run.py` (`scope_tier_for`)
 
 ## Answer
+
+Base: 8d00fd0bcf569d0b4cd07c10ffbea4b53f318535. Failing test commit: 94a8a2b.
+
+- **Built**: `http_server/consult_trigger.py` (`broadcast_fn=sse._broadcast_runner`);
+  `fragments/consult.md` (the post carries `"board": "<board>"`) and the three team snapshots,
+  regenerated with `compose_skill` (learnings 07); `supervisor/api.py` (`start_run(board="")` sets
+  `RunnerState.scope_tier = scope_tier_for(board)`); `supervisor/goal_executor.py` (`_run_team`
+  passes `board=board`, so goal-loop and team-build runs both get the goal's tier);
+  `runner/events.py` (`_patch_last_agent_done` and `read_last_agent_done`) and
+  `supervisor/terminal_reconcile.py` (`_agent_done_watcher`) take the root from
+  `eventlog._project_root_of(Path(storage).resolve())`; `src/pathly_orchestrator/CLAUDE.md`
+  (Consult router: broadcaster and board rule; Consult runs: root derivation);
+  `tests/comms_board/test_consult_router.py` (asserts `_broadcast_runner`, lines 178 and 366);
+  new `tests/runner_supervisor/test_consult_start_for_real.py` (8 tests); INDEX files.
+- **Proof**:
+  - `python -m pytest tests/runner_supervisor/test_consult_start_for_real.py -q -p no:cacheprovider`:
+    8 passed (at 94a8a2b, 8 failed: the `_broadcast_spawn() takes 1 positional argument` route
+    `failed`, no `"board"` in the fragment or composed team prompts, the single run's question
+    never started, `scope_tier` `feature`, two invocation rows).
+  - Composed team prompts: `test_the_composed_team_prompts_post_the_consult_on_the_stage_board`
+    (team/build, review, test with `board_tier="project"` show `"board": "project"`);
+    `tests/install_skills -k "snapshot or compose"`: 116 passed.
+  - `python -m pytest tests/comms_board tests/runner_supervisor tests/telemetry tests/dag_goals -q -p no:cacheprovider`:
+    2456 passed, exit 0 (505 s).
+  - black, `check_file_size.py` (none grown), `gen_test_index.py --check`, `lint-imports` (kept),
+    mypy on the changed files, `check_no_mirror_reads.py`, bandit on the changed files: clean.
+- **Decisions**: `start_run` takes the board (not a tier) and maps it itself with the one
+  `scope_tier_for`, so no new import in `goal_executor`. `goal_executor.py` is frozen at 492 lines
+  in the size baseline: the added `board=board,` line is offset by folding the two-line comment
+  above it into one line (same meaning). The root reuses `eventlog._project_root_of` (the
+  `append_event` keying itself, already lazily imported by runner/events and imported by
+  terminal_reconcile), not a third copy; the path is resolved first as `append_event` does.
+- **Shortcuts taken**: none.
+- **For later tickets**: 12 — the draft acceptance test does NOT pass unchanged: its
+  `autopilot_round_two_support.ask_role` posts the fragment's OLD body (no `"board"`), which now
+  lands on `feature` while both the single run's and (now) the loop task's tokens name `project`,
+  so 5 of 6 fail (routed to the person). With `"board": "project"` added to `ask_role`'s body
+  (what the fragment now says; the docstring's "no board" goes too) all 6 pass in ~7 s.

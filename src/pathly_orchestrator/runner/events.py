@@ -45,10 +45,13 @@ def _patch_last_agent_done(
     try:
         from pathly_orchestrator.db import get_db as _get_db
         from pathly_orchestrator.db import read_last_agent_done as _db_read_last
+        from pathly_orchestrator.eventlog import _project_root_of
 
         conn = _get_db()
         feature = storage_path.name
-        project_root = str(storage_path.parent.parent.parent)
+        # By the pathly/ anchor, as append_event keys it: a project-board run's storage is
+        # <root>/pathly/project[/<kind>/<slug>], not three levels below the root.
+        project_root = _project_root_of(Path(storage_path).resolve())
         last = _db_read_last(conn, project_root, feature)
         if last:
             patched_agent = last.get("agent")
@@ -92,10 +95,13 @@ def read_last_agent_done(storage_path: Path) -> dict[str, Any] | None:
     try:
         from pathly_orchestrator.db import get_db as _get_db
         from pathly_orchestrator.db import read_last_agent_done as _db_read_last
+        from pathly_orchestrator.eventlog import _project_root_of
 
         conn = _get_db()
         feature = storage_path.name
-        project_root = str(storage_path.parent.parent.parent)
+        # By the pathly/ anchor, as append_event keys it: a project-board run's storage is
+        # <root>/pathly/project[/<kind>/<slug>], not three levels below the root.
+        project_root = _project_root_of(Path(storage_path).resolve())
         return _db_read_last(conn, project_root, feature)
     except Exception:
         return None

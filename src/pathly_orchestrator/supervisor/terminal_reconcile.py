@@ -44,7 +44,8 @@ def _agent_done_watcher(
         logger.warning("_agent_done_watcher: cannot open DB for %s: %s", feature, exc)
         return
 
-    project_root = str(feature_dir.parent.parent.parent)
+    # By the pathly/ anchor, as append_event keys the events.
+    project_root = _eventlog._project_root_of(Path(feature_dir).resolve())
     _POLL = 0.15
     elapsed = 0.0
     seq = last_seq
