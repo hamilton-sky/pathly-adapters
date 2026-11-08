@@ -135,9 +135,6 @@ def handle_retry(run_id: str, topic: str, state, body: dict) -> tuple[dict, int]
     from pathly_orchestrator.supervisor import _lock, _registry
     from pathly_orchestrator.supervisor.api import start_run
 
-    with _lock:
-        _registry.pop(topic, None)
-
     required = {"flow", "project_root", "max_iterations", "max_cost_usd"}
     missing = required - set(body.keys())
     if missing:
@@ -161,6 +158,10 @@ def handle_retry(run_id: str, topic: str, state, body: dict) -> tuple[dict, int]
 
     from ...sse import _broadcast_runner
 
+    # Drop the ended run only once the body is valid, so a 400 leaves it for a valid retry.
+    with _lock:
+        _registry.pop(topic, None)
+
     try:
         new_state = start_run(
             topic=topic,
@@ -172,6 +173,11 @@ def handle_retry(run_id: str, topic: str, state, body: dict) -> tuple[dict, int]
             max_cost_usd=max_cost_usd,
             autonomy=autonomy,
             broadcast_fn=_broadcast_runner,
+            # The ended run's goal, board and mode carry over, as resume_parked_run's do
+            # (read with RunnerState's defaults: the registry can hold a bare stand-in).
+            interactive=getattr(state, "interactive", True),
+            goal_id=getattr(state, "goal_id", ""),
+            board=getattr(state, "scope_tier", ""),
         )
     except ValueError as exc:
         return {"error": str(exc)}, 409

@@ -1,7 +1,7 @@
 # A retried run keeps its goal, its board and its interactive mode
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 12
 Test first: yes
 Level: 2
@@ -69,3 +69,37 @@ exit 0
 - HANDOFF 19 in `/mnt/project-files/chief-autopilot-round-two/handoffs.md` (minors carried).
 
 ## Answer
+
+Work started at `aca614d4af3d5e52fa0497c89409c5d54b18029b`; test-only commit `c8accaa`.
+
+- **Built**: `control/_helpers.py` (`handle_retry`), `runner/api_control.py` (`runner_retry`),
+  new `tests/http_api/test_retry_keeps_goal_and_board.py` (5 tests), `src/pathly_orchestrator/CLAUDE.md`
+  (the scope_tier sentence), `tests/INDEX.md` and `tests/http_api/INDEX.md` (regenerated).
+- **Proof**:
+  - `python -m pytest tests/http_api/test_retry_keeps_goal_and_board.py -q -p no:cacheprovider`:
+    `5 passed`, exit 0 (at the test-only commit: 4 failed, `KeyError: 'goal_id'` and the run gone
+    from the registry after the 400). Covers both routes: `start_run` gets `goal_id="g-1"`,
+    `board="project"`, `interactive=False`; a body missing `max_cost_usd` answers 400, starts
+    nothing, leaves the run in `_registry`, and the following valid retry reaches `start_run`;
+    plus `/runner/retry` with no prior state passes none of the three (defaults stand).
+  - `tests/http_api/test_runs_control.py`, `test_run_cost_values.py`, `test_chief_budget_edges.py`
+    together with the new file: `259 passed`.
+  - `python -m pytest tests/http_api -q -p no:cacheprovider`: `4 failed, 2615 passed` (exit 1).
+    The 4 (`test_chief_routes.py::test_main_closes_a_session_the_last_process_left_open_before_serving`,
+    `::test_main_still_serves_when_the_chief_cleanup_fails`,
+    `test_chief_startup_port.py::test_main_leaves_a_chief_open_when_something_already_answers_on_its_port`,
+    `::test_main_closes_the_sessions_when_nothing_answers_on_its_port`) fail identically at the
+    base commit with my changes stashed (4 failed, 74 passed): their subprocess sets `HOME` to a
+    temp dir, and in this container `markupsafe` lives only in the user site of the real home, so
+    `import flask` fails ("Flask not installed"). Environment, not this ticket; left alone.
+  - `python scripts/gen_test_index.py --check`: "All test INDEX.md files up to date.", exit 0.
+  - Also: black, mypy (blueprints), `check_file_size.py` (none new, none grown; files at 335 and
+    347 lines), `lint-imports` all clean.
+- **Decisions**: the registry pop moved below all body validation (kept, not dropped, so the
+  ended entry is gone before `start_run` as before). `handle_retry` reads the three fields with
+  `getattr` and `RunnerState`'s defaults, because `tests/http_api/chief_budget_support.py` puts a
+  `SimpleNamespace` (no `interactive`/`goal_id`/`scope_tier`) in the registry and that support
+  file is outside Touches; with plain attribute access 7 budget-edge tests answered 500.
+  `runner_retry` passes the three only when `state is not None` (`**carried`).
+- **Shortcuts taken**: none.
+- **For later tickets**: none affected.
