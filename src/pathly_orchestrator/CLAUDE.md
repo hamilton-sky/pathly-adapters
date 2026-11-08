@@ -718,18 +718,21 @@ POST /chief/notices/read    ← {project_root, run_ids} → 200 {marked}
   - **Where the secret lives (round two, ticket 15).** No file holds it. `open_chief` generates
     it for a claude chief only, stores its sha256 (`hook_secret_hash`) and offers the plaintext to
     `supervisor/chief_secret_claim` (memory; `close_chief` forgets it, a restart loses it). Studio's
-    main process claims it once with `POST /chief/hook-secret` `{run_id}` and starts the chief's
-    claude with it in `PATHLY_CHIEF_HOOK_SECRET` (ticket 18 builds that half). **Until ticket 18
-    lands nothing claims the secret**: a claude chief opened from Studio has none in its
-    environment, so its own hook records nothing, and any tokenless same-user process (a headless
-    agent with `curl`, say) can claim it, read the `--session-id` from the chief's argv and post
-    `human` rows, and nothing detects it, because no second claim ever comes. The exposure is
-    about that of the 0600 file it replaced. The route is 200 `{hook_secret}` once (`Cache-Control:
-    no-store`); a second claim is 409 and closes the chief (`close_chief(run_id, "hook secret
-    claimed twice")`, plus `TERMINAL_KILL` to its tab; ticket 13, question 2 = A). That detection
-    exists only once Studio makes the expected claim: then an earlier claimer's theft turns
-    Studio's claim into the second one, and the stolen secret works for no open session. A claim
-    that finds nothing offered (before `offer`, or after a server restart) closes the chief too.
+    main process claims it once with `POST /chief/hook-secret` `{run_id}` when it spawns the chief's
+    tab (`studio/src/main/ipc/terminal/chiefSecret.ts`, ticket 18) and starts the chief's claude
+    with it in `PATHLY_CHIEF_HOOK_SECRET`; Studio's `buildSpawnEnv` and `pathly-pty-host`'s
+    `_child_env` strip that variable from every other child. A Studio claim that fails (409, any
+    other status, no server) refuses the spawn, and the watcher closes the session as "never
+    started". The route is 200 `{hook_secret}` once (`Cache-Control: no-store`); a second claim
+    is 409 and closes the chief (`close_chief(run_id, "hook secret claimed twice")`, plus
+    `TERMINAL_KILL` to its tab; ticket 13, question 2 = A). So a tokenless same-user process (a
+    headless agent with `curl`, say) that claims first, between the `TERMINAL_SPAWN` and Studio's
+    claim, does get the secret, but Studio's claim then is the second one: the chief is closed and
+    never starts, so the stolen secret works for no open session (`/chief/human-messages` 404s a
+    closed one). One that claims after Studio gets nothing and closes the chief: a denial of
+    service, not a theft. This detects a claim; it does not stop a same-user process reading the
+    secret from the running chief's environment ("What stays true"). A claim that finds nothing
+    offered (before `offer`, or after a server restart) closes the chief too.
     404 for an unknown or closed session or
     one with no hash; 403 for any caller with a live run token (an agent's `pathly api` sends
     its own), and the chief gate refuses it to a chief token (not in `ROUTE_ACTIONS`). A codex
