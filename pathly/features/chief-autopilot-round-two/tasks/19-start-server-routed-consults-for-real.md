@@ -1,7 +1,7 @@
 # Start a server-routed consult for real, on the asking run's board, billed once
 
 Type: task
-Status: resolved
+Status: open
 Blocked by: 04, 06, 07, 16
 Test first: yes
 Level: 3
@@ -160,3 +160,10 @@ QUALITY
 Checked and fine: the `_broadcast_runner` swap. The `_project_root_of(Path(...).resolve())` root derivation matches how `append_event` keys events, including `.resolve()`, and gives the same result as parent^3 for flat `pathly/features/<f>` and legacy `pathly/plans/<f>` storage (no flat regression). `terminal_reconcile`'s watcher root is fixed too. `scope_tier` otherwise feeds only token minting and the executor OTel span tag; invocation billing and board context retrieval do not read it. The goal-loop task prompt (`task_prompt._inject_vars`) uses the real goal board. The goal_executor comment fold keeps its meaning.
 
 REVIEW: FAIL
+
+## Review findings (round 2, floor guard)
+
+floor guard: the diff weakens the bar instead of meeting it
+suppress: tests/runner_supervisor/test_consult_start_for_real.py: start.park = park  # type: ignore[attr-defined]
+suppress: tests/runner_supervisor/test_consult_start_for_real.py: start.started = started  # type: ignore[attr-defined]
+if a finding is intended, the ticket needs a line like: Floor: allow <category>
