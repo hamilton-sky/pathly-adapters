@@ -2016,7 +2016,10 @@ warning, not a finding; categories in `allow` are dropped. The snapshot (`tree.s
 the file `git rev-parse --git-path index` names to a temp file, keeping its mtime (git re-reads an
 entry as new as the index file, so a fresh mtime would hide a same-second, same-size edit), points
 `GIT_INDEX_FILE` at it, runs `git add -A` and `git write-tree`: a tree id for tracked and untracked
-(not ignored) files, with the repo's real index and `HEAD` untouched. `head`, `changes`,
+(not ignored) files, with the repo's real index and `HEAD` untouched. When `git add -A` fails only
+because a path vanished (stderr `unable to stat` … `No such file or directory`: a mirror's
+`<name>.tmp` renamed away by `os.replace` between git listing and statting it), the add runs again
+on the same private index, 3 attempts in all (`ADD_ATTEMPTS`); any other failure is `None` at once. `head`, `changes`,
 `diff_text` (with `:(exclude)<path>` pathspecs), `blob` and `read` work on those tree ids;
 `changes_or_none` and `diff_text_or_none` return `None` when git fails, and `unquote_path` reads a
 name git C-quotes in a patch header. Every `tree` function fails open (`None` or empty) when the
