@@ -2936,10 +2936,15 @@ The board rule (ticket 19): the question must sit on the board the asking run's 
 the router hands it to the person. The `consult` fragment's post carries `"board": "<board>"`
 (the tier the runner substitutes, as `comms-post.md` does) beside `"scope": "<feature>"`; a single
 run's token is minted with `board_run`'s `scope_tier_for(board)`, a consult's with
-`consult_run`'s, and a goal flow run's (`goal-loop`, `team-build`) with the goal's board:
-`goal_executor._run_team` passes `board=` to `api.start_run`, which sets
+`consult_run`'s, and a `goal-loop` run's with the goal's board: `goal_executor._run_team` passes
+`board=` to `api.start_run` for that flow only, which sets
 `RunnerState.scope_tier = runner.telemetry.scope_tier_for(board)` (default `feature`), so a
-`sched-` task token of a project-board goal names `project`, the board its prompt posts on.
+`sched-` task token of a project-board goal names `project`, the board its task prompt posts on
+(`task_prompt`). Every other goal flow (`team-build`, ...) keeps `feature`: its stage prompt's
+`<board>` comes from the storage folder (`fsm_compose.build_prompt`: `project` only for
+`pathly/project` itself), which is `feature` for a goal's `pathly/project/goals/<slug>`, so token
+and prompt still agree. `resume_parked_run` carries the parked run's `scope_tier`; the
+control-plane retry (`control/_helpers.handle_retry`) starts with the default `feature`.
 
 `on_question(question_id, *, project_root, board, scope, broadcast_fn, host_present, start=None) -> str`
 (`start` defaults to `consult_run.start_consult`, read at call time) returns what it did:

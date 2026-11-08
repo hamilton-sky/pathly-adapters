@@ -47,9 +47,12 @@ def start_run(
     smoke_base: run ``base_smoke.check_base`` before the first spawn. A red base parks the
         run (``error_kind="base_red"``) with nothing spawned. ``resume_parked_run`` turns it
         off unless the run was parked for exactly that.
-    board: the board the run is on (a goal flow run: the goal's). It sets ``scope_tier``
-        (``runner.telemetry.scope_tier_for``), which the run's spawn tokens are minted with, so
-        a ``goal-loop`` task's token names the board its prompt posts on. Default ``feature``.
+    board: the board the run is on (``goal_executor`` passes the goal's for a ``goal-loop`` run
+        only). It sets ``scope_tier`` (``runner.telemetry.scope_tier_for``), which the run's
+        spawn tokens are minted with, so a ``goal-loop`` task's token names the board its prompt
+        posts on. Default ``feature``: a team stage's prompt derives its ``<board>`` from the
+        storage folder (``fsm_compose.build_prompt``), so its token stays ``feature`` to match.
+        ``resume_parked_run`` carries the parked run's ``scope_tier``.
     """
     import uuid as _uuid
 
@@ -200,6 +203,9 @@ def resume_parked_run(
             prior.interactive,
             prior.goal_id,
         )
+        # The tier is the board (scope_tier_for maps it back), so the resumed run's spawn
+        # tokens name the board the parked run's did.
+        board = prior.scope_tier
 
     return start_run(
         topic,
@@ -215,6 +221,7 @@ def resume_parked_run(
         goal_id=goal_id,
         on_done=on_done,
         smoke_base=smoke_base,
+        board=board,
     )
 
 

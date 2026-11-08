@@ -1,7 +1,7 @@
 # Start a server-routed consult for real, on the asking run's board, billed once
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 04, 06, 07, 16
 Test first: yes
 Level: 3
@@ -113,6 +113,39 @@ Base: 8d00fd0bcf569d0b4cd07c10ffbea4b53f318535. Failing test commit: 94a8a2b.
   lands on `feature` while both the single run's and (now) the loop task's tokens name `project`,
   so 5 of 6 fail (routed to the person). With `"board": "project"` added to `ask_role`'s body
   (what the fragment now says; the docstring's "no board" goes too) all 6 pass in ~7 s.
+
+**Review fixes** (round 1, failing test 55b63b5):
+
+1. blocker (team-build on the project board): agreed and reproduced. At 4d5b0ab the new
+   `test_a_team_build_stage_question_on_the_project_board_is_routed` fails: it starts a real
+   project-board `team` goal through `goal_executor`, builds the BUILDING prompt with the real
+   `fsm_compose.build_prompt`, mints the stage token with `terminal_identity._mint_spawn_token` /
+   `_run_board_scope`, and posts the prompt's consult body with it; the question went to the
+   person. Fix: `_run_team` passes `board=` only for `goal-loop` (`board if flow == _LOOP_FLOW
+   else ""`), whose task prompts carry the goal's board; every other flow is as before (token
+   `feature`, prompt `feature`), and the test now routes it. `fsm_compose.py` is outside Touches,
+   so the prompt side is left as it was.
+2. major (resume): agreed. `resume_parked_run` passes `board=prior.scope_tier`
+   (`test_a_resumed_goal_loop_run_keeps_the_project_scope_tier`: fails at 4d5b0ab with
+   `feature`, passes now). The control-plane retry (`control/_helpers.handle_retry`) is outside
+   Touches and not changed: it starts from the request body (flow, root) with no goal id, as
+   `POST /runner/retry` does, so a retried goal run is no longer a goal run anyway. A one-line
+   patch (`board=getattr(state, "scope_tier", "") or ""`) is kept in the scratchpad
+   (`19-handle-retry-board.patch`) if Touches is widened.
+3. minor (`fsm/engine_transitions.py:309`): left alone, noted under For later tickets.
+4. minor (registry): the goal-run tests use a `goal_runs` fixture that pops every topic it
+   started from `registry._registry` (under `registry._lock`) at teardown.
+
+Proof after the fixes: `test_consult_start_for_real.py` 10 passed (2 failed at 4d5b0ab code);
+`tests/comms_board tests/runner_supervisor tests/telemetry tests/dag_goals`: 2458 passed, exit 0;
+`tests/install_skills` 419 passed, 2 skipped; black, check_file_size (none grown; goal_executor
+still 492), gen_test_index --check, lint-imports, mypy src/, check_no_mirror_reads, bandit,
+check_adapters, check_entry_points: clean.
+
+**For later tickets** (round 1): `fsm/engine_transitions.py:309` (feedback-item DB sync) still
+keys `project_root` by `storage_path.parent.parent.parent`, wrong for nested project-board runs;
+a follow-up should use `eventlog._project_root_of`. `control/_helpers.handle_retry` starts every
+retry at `scope_tier` `feature` (see fix 2).
 
 ## Review findings (round 1, quality review)
 

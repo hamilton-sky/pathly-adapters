@@ -475,7 +475,7 @@ def _run_team(
             stage_overrides=stage_overrides,
             # A fan-out state's per-task board events (goal-loop); none for other flows.
             event_broadcast_fn=event_broadcast_fn,
-            board=board,  # sets the run's scope_tier, which its spawn tokens carry
+            board=board if flow == _LOOP_FLOW else "",  # loop task prompts post on it
         )
     except ValueError as exc:
         return {"ok": False, "reason": "board_busy", "error": str(exc)}
