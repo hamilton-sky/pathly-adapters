@@ -3,10 +3,10 @@ import type { EngineAdapter, EngineCategory, EngineStatus, Stage } from './types
 // Visual language for the dock. All colors resolve to design-system tokens; the only
 // hex values are host-CLI brand accents (injected as a --adapter custom property).
 
-export const CATEGORY_ORDER: EngineCategory[] = ['flow', 'loop', 'single']
+export const CATEGORY_ORDER: EngineCategory[] = ['flow', 'loop', 'single', 'consult']
 
 export function categoryColor(cat: EngineCategory): string {
-  return { flow: 'var(--accent)', loop: 'var(--purple)', single: 'var(--runtime)' }[cat]
+  return { flow: 'var(--accent)', loop: 'var(--purple)', single: 'var(--runtime)', consult: 'var(--orange)' }[cat]
 }
 
 export const ADAPTER_COLOR: Record<EngineAdapter, string> = {

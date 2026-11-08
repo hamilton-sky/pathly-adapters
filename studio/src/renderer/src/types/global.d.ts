@@ -14,7 +14,7 @@ declare global {
     label: string
     startedAt: number
     /** How the engine was spawned — the Monitor board's primary grouping. */
-    category: 'flow' | 'loop' | 'single'
+    category: 'flow' | 'loop' | 'single' | 'consult'
     /** Feature/topic this engine serves, when known (runner topic or spawn telemetry.feature). */
     feature?: string
     /** Agent role from spawn telemetry (single-shot editor/AI actions); absent for runner tabs. */
@@ -236,7 +236,7 @@ declare global {
         queueControl: (action: QueueAction) => Promise<void>
         preflight: (force?: boolean) => Promise<EnginePreflight[]>
         getEngines: () => Promise<RunningEngine[]>
-        registerRunner: (tabId: string, topic: string, runId: string, label?: string, category?: 'flow' | 'loop' | 'single', runToken?: string) => Promise<void>
+        registerRunner: (tabId: string, topic: string, runId: string, label?: string, category?: 'flow' | 'loop' | 'single' | 'consult', runToken?: string) => Promise<void>
         onStageResult: (cb: (tabId: string, data: Record<string, unknown>) => void) => () => void
       }
       setup: {

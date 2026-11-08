@@ -83,7 +83,7 @@ export function TerminalSpawnListener(): null {
       const initialInput = isInteractive && prompt ? prompt : undefined
       // Carry the run kind (board one-shot → 'single', FSM pipeline → 'flow') so the Monitor
       // categorizes it correctly instead of tagging every registered runner tab 'flow'.
-      const category = data.category as 'flow' | 'loop' | 'single' | undefined
+      const category = data.category as 'flow' | 'loop' | 'single' | 'consult' | undefined
       // The per-run identity token (best-effort mint → may be absent). Handed to the main
       // process only, which puts it in the child env; never stored in the renderer or logged.
       const runToken = typeof data.run_token === 'string' && data.run_token ? data.run_token : undefined
