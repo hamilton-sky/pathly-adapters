@@ -226,12 +226,15 @@ class SpawnHost:
         # exports on every child. PATHLY_RUN_TOKEN is the per-run identity token minted at
         # spawn; it is set only when the payload carries one (the mint is best-effort), and a
         # token inherited from the host's own environment is never passed on to a child.
+        # PATHLY_CHIEF_HOOK_SECRET is never passed on either: only Studio's main process claims
+        # it, for the chief claude it spawns, and this host refuses interactive spawns.
         env = {
             **os.environ,
             "PATHLY_PROJECT_ROOT": cwd,
             "PATHLY_GATE_BILLED": "1",
         }
         env.pop("PATHLY_RUN_TOKEN", None)
+        env.pop("PATHLY_CHIEF_HOOK_SECRET", None)
         if isinstance(run_token, str) and run_token:
             env["PATHLY_RUN_TOKEN"] = run_token
         return env

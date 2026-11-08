@@ -4,7 +4,7 @@
 
 HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, prompt-event contract.
 
-67 test file(s).
+68 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -58,6 +58,7 @@ HTTP server surface — Flask app & endpoints, chat handler, Settings.from_env, 
 | `test_chief_startup_port.py` | chief-agent 20, B7: a second server started on a busy port leaves the first server's chief open | 6 |
 | `test_comms_body_unicode.py` | chief-agent 20, B2: a lone surrogate in a comms body is a 400, not a 500 | 8 |
 | `test_config.py` | Tests for Settings.from_env() — specifically bind-host validation | 8 |
+| `test_consult_answer_guard.py` | chief-autopilot-round-two 17: a consult run cannot post its own answer | 7 |
 | `test_db_agents_route.py` | GET /db/agents — registry-backed agent list for the spawn-policy Settings model-policy UI | 3 |
 | `test_db_features_fields.py` | Tests for the state-one-authority /db/features extension (split-db-api-explorer) | 7 |
 | `test_db_query_read_only.py` | POST /db/query runs its statement read-only | 5 |

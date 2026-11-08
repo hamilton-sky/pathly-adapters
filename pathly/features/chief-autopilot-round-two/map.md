@@ -65,6 +65,7 @@ no:cacheprovider` passes in full.
 | 16 consult billing and category | "billed and appear in the Monitor ... their own run category" |
 | 17 a consult cannot post its own answer | read-only: the answer is not delivered around the check |
 | 18 hook secret in Studio, the pty host and the launcher | the hook secret out of every same-user process's reach |
+| 19 server-routed consults start for real (found by 12) | a role question reaches a consult run, on the asking run's board, billed once |
 
 ## Decisions so far
 
@@ -140,3 +141,5 @@ Outside facts relied on (tickets 13 to 15, 18):
 - 16 — consult runs are `consult` on the TERMINAL_SPAWN payload (`fsm_compose_vars.spawn_category`), the synthetic AGENT_DONE and the projection guard; `_spawn_role` names the asked role for `flow == "consult"`
 - 09 — `consult-` runs are kind `consult` (own row; parent window cost skips `category = 'consult'`); `run_consults.consults_of_run`/`waiting_for_person` back `run.consults` on `GET /runs/<id>` and on notices; notices take `limit` 1..200 (gate key listed); `record_session_run` prunes rows read >30 days ago
 - 10 — Studio category union is `flow | loop | single | consult` in every copy; consult gets its own `Consults` section and dock colour `var(--orange)`, single's controls
+- 17 — `http_server/consult_guard.py` (before_request after `run_token_guard`) 403s a live `consult-` run token's `POST /comms/answer` and `POST /comms/post` with type answer; its other posts, other callers and non-JSON bodies pass
+- 18 — Studio main claims a claude chief's hook secret (`terminal/chiefSecret.ts`, tokenless `POST /chief/hook-secret` before the gate, refused spawn on any failure); `buildSpawnEnv` and the pty host strip `PATHLY_CHIEF_HOOK_SECRET` from every other child; launcher shows a same-user line for a claude chief

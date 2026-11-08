@@ -38,4 +38,29 @@ describe('buildSpawnEnv', () => {
     buildSpawnEnv('/proj', { run_token: 'secret' })
     expect(process.env.PATHLY_RUN_TOKEN).toBeUndefined()
   })
+
+  describe('PATHLY_CHIEF_HOOK_SECRET', () => {
+    // Made-up values only.
+    beforeEach(() => { process.env.PATHLY_CHIEF_HOOK_SECRET = 'made-up-studio-own-value' })
+    afterEach(() => { delete process.env.PATHLY_CHIEF_HOOK_SECRET })
+
+    it("never reaches a non-chief child, even when Studio's own environment has one", () => {
+      expect('PATHLY_CHIEF_HOOK_SECRET' in buildSpawnEnv('/proj', undefined)).toBe(false)
+      expect('PATHLY_CHIEF_HOOK_SECRET' in buildSpawnEnv('/proj', {})).toBe(false)
+      expect('PATHLY_CHIEF_HOOK_SECRET' in buildSpawnEnv('/proj', { run_token: 't' })).toBe(false)
+      expect('PATHLY_CHIEF_HOOK_SECRET' in buildSpawnEnv('/proj', { run_token: 't' }, undefined)).toBe(false)
+      expect('PATHLY_CHIEF_HOOK_SECRET' in buildSpawnEnv('/proj', { run_token: 't' }, '')).toBe(false)
+    })
+
+    it('gives a chief child exactly the claimed value', () => {
+      const env = buildSpawnEnv('/proj', { run_token: 't' }, 'made-up-claimed-value')
+      expect(env.PATHLY_CHIEF_HOOK_SECRET).toBe('made-up-claimed-value')
+      expect(env.PATHLY_RUN_TOKEN).toBe('t')
+    })
+
+    it('does not write the claimed value into process.env', () => {
+      buildSpawnEnv('/proj', { run_token: 't' }, 'made-up-claimed-value')
+      expect(process.env.PATHLY_CHIEF_HOOK_SECRET).toBe('made-up-studio-own-value')
+    })
+  })
 })

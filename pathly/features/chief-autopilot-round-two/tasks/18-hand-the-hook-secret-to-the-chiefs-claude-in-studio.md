@@ -1,11 +1,11 @@
 # Hand the hook secret to the chief's claude in Studio, strip it everywhere else, and say so in the launcher
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 13, 15
 Test first: yes
 Level: 3
-Touches: src/pathly_orchestrator/pty_host/host.py, tests/runner_supervisor/test_pty_host_strips_chief_secret.py (new), studio/src/main/ipc/terminal.ts, studio/src/main/ipc/terminal/chiefSecret.ts (new), studio/src/main/ipc/terminal/chiefSecret.test.ts (new), studio/src/main/ipc/terminal/spawnEnv.ts, studio/src/main/ipc/terminal/spawnEnv.test.ts, studio/src/renderer/src/components/topbar/ChiefButton/ChiefLauncher/ChiefLauncher.tsx, studio/src/renderer/src/components/topbar/ChiefButton/ChiefLauncher/ChiefLauncher.test.tsx, studio/CLAUDE.md, tests/INDEX.md, tests/runner_supervisor/INDEX.md
+Touches: src/pathly_orchestrator/pty_host/host.py, tests/runner_supervisor/test_pty_host_strips_chief_secret.py (new), studio/src/main/ipc/terminal.ts, studio/src/main/ipc/terminal/chiefSecret.ts (new), studio/src/main/ipc/terminal/chiefSecret.test.ts (new), studio/src/main/ipc/terminal/spawnEnv.ts, studio/src/main/ipc/terminal/spawnEnv.test.ts, studio/src/renderer/src/components/topbar/ChiefButton/ChiefLauncher/ChiefLauncher.tsx, studio/src/renderer/src/components/topbar/ChiefButton/ChiefLauncher/ChiefLauncher.test.tsx, studio/CLAUDE.md, src/pathly_orchestrator/CLAUDE.md, CLAUDE.md, tests/INDEX.md, tests/runner_supervisor/INDEX.md
 
 Split from ticket 15, which made the server keep the chief's hook secret in memory and offer it
 once at `POST /chief/hook-secret`. This ticket makes Studio's main process the one claimer, keeps
@@ -73,3 +73,116 @@ exit 0
 - `tests/runner_supervisor/test_chief_secret_reach.py`
 
 ## Answer
+
+Work started at `141a62b7dabf8c827a737f217e87544fbfbc15b3`. Failing-test commit: `c177ff7`.
+
+**Built**
+
+- `src/pathly_orchestrator/pty_host/host.py`: `_child_env` pops `PATHLY_CHIEF_HOOK_SECRET` (after
+  the run-token pop), with a comment why.
+- `studio/src/main/ipc/terminal/chiefSecret.ts` (new): `isChiefClaudeSpawn(runId, argv,
+  interactive)`, `claimChiefHookSecret(runId)` (tokenless `POST ${getApiBase()}/chief/hook-secret`
+  `{run_id}` with `X-Pathly-Secret`; the secret on a 200 with a non-empty string, else null for any
+  other status, bad body or network error), `chiefSecretForSpawn` (undefined when not a claude
+  chief; throws when the claim fails, which refuses the spawn).
+- `studio/src/main/ipc/terminal/spawnEnv.ts`: `buildSpawnEnv(cwd, meta, chiefHookSecret?)` deletes
+  `PATHLY_CHIEF_HOOK_SECRET` for every child and sets it only from the third argument.
+- `studio/src/main/ipc/terminal.ts`: `handleSpawn` awaits `chiefSecretForSpawn(runnerTabMeta.get(tabId)?.run_id,
+  runnerArgv, !!initialInput)` after argv/shell resolution and before the gate (so a refused claim
+  holds no slot), and passes it to `buildSpawnEnv`. 381 lines (under 400).
+- `ChiefLauncher.tsx`: `SAME_USER_NOTE` shown when `l.cli === 'claude'`; `CODEX_NOTE` unchanged.
+- Tests: new `tests/runner_supervisor/test_pty_host_strips_chief_secret.py` (6),
+  new `chiefSecret.test.ts` (18), `spawnEnv.test.ts` (+3), `ChiefLauncher.test.tsx` (+2).
+- Docs: `studio/CLAUDE.md` module table (`spawnEnv.ts` row, new `chiefSecret.ts` row) and the
+  dependency line. `tests/INDEX.md`, `tests/runner_supervisor/INDEX.md` regenerated.
+
+**Proof**
+
+- `python -m pytest tests/runner_supervisor/test_pty_host_strips_chief_secret.py -q -p no:cacheprovider`:
+  `6 passed`, exit 0 (at `c177ff7`: 4 failed, the env still held the made-up secret).
+- `npm --prefix studio run test -- src/main/ipc/terminal/spawnEnv.test.ts src/main/ipc/terminal/chiefSecret.test.ts`:
+  `2 passed (2)`, `24 passed (24)`, exit 0. Covers: non-chief child (no meta, `{}`, a run token,
+  undefined/empty third arg) never gets the variable with Studio's own env holding one; a chief
+  child gets exactly the claimed value and `process.env` keeps its own; 409/403/404/500, a network
+  error and a 200 with no usable secret return null; a 409 or failed claim makes
+  `chiefSecretForSpawn` throw (spawn refused); non-chief/codex/headless spawns claim nothing; the
+  secret is in no console call. At `c177ff7`: chiefSecret.ts missing, 2 spawnEnv cases failed.
+- `npm --prefix studio run test -- src/renderer/src/components/topbar/ChiefButton/ChiefLauncher/ChiefLauncher.test.tsx`:
+  `3 passed (3)`, exit 0 (claude shows the same-user line, not CODEX_NOTE; codex shows CODEX_NOTE,
+  not the line). At `c177ff7`: the 2 new cases failed.
+- `node studio/node_modules/typescript/bin/tsc --noEmit -p studio/tsconfig.node.json`: exit 0.
+  `npm --prefix studio run typecheck`: exit 0. `npm --prefix studio run test`: `45 passed (45)`
+  files, `295 passed (295)`, exit 0.
+- Also: `python -m pytest tests/consistency tests/runner_supervisor -q -x`: `540 passed`;
+  `black --check` (after formatting the new test), `check_file_size.py` (none new, none grown),
+  `gen_test_index.py --check`, bandit and mypy on `pty_host`: exit 0.
+
+**Decisions**
+
+- The chief check uses the original `runnerArgv[0] === 'claude'` (the bare name `ALLOWED_SHELLS`
+  admits, before launcher resolution) and the runner meta's `run_id`, not the tab id.
+- The claim runs before the concurrency gate, so a refused chief never takes an interactive slot.
+- `chiefSecret.ts` imports `../../apiConfig` relatively: vitest has no `@main` alias.
+
+**Shortcuts taken**: none.
+
+**For later tickets**
+
+- Both CLAUDE.md files were added to this ticket's Touches (takeover, `4daf5cc`) and fixed in
+  `6531b7d`: `src/pathly_orchestrator/CLAUDE.md` says Studio's main process claims the secret
+  before the spawn, and the root `chief/` row names `POST /chief/hook-secret`. The failing-test
+  commit after the takeover is `f8811fe`.
+
+**Review fixes**
+
+- Gate (quick), round 1: `tests/fsm_flows/test_build_proof_acceptance.py::test_8_happy_path_team_build_reaches_done`
+  (FLOOR_CHECKED 3 != 4). Not this ticket's: the diff touches no FSM, floor or proof code; the
+  file passes alone 4 of 4 times (11 passed each); it is the known EVENTS.tmp mirror vs
+  `proof/tree.snapshot` race (the snapshot fails under full-suite load, so one floor check is
+  skipped), which also failed CI on PR #138 and the gates of 04 and 06. No code change.
+
+## Review findings (round 1, gate (quick))
+
+gate: Build: python -m build --wheel && npm --prefix studio run typecheck
+gate: Quick: python -m pytest tests/comms_board tests/db tests/runner_supervisor tests/http_api tests/dag_goals tests/fsm_flows tests/telemetry tests/consistency -q -x -p no:cacheprovider
+gate: Quick failed. the last lines of its output:
+        assert "### The task" in task_part and "FROZEN-TASK-TEXT" in task_part
+        assert "+def answer():" in diff_part
+        assert BUILDER_SUMMARY not in reviewer.instructions
+        assert [e["summary"] for e in h.events("AGENT_DONE")][0] == BUILDER_SUMMARY
+        # The reviewer's own spawn changed REVIEW.md and nothing else.
+        windows = [e for e in h.events("SPAWN_WINDOW") if e["role"] == "reviewer"]
+        assert [tree.changes(str(h.root), w["before"], w["after"]) for w in windows] == [
+            [("A", "pathly/features/bp-happy-team/REVIEW.md")]
+        ]
+        # A fresh session for the reviewer although the builder returned one; the tester resumes it.
+        assert builder.session is None and builder.returned_session
+        assert reviewer.session is None
+        assert tester.session == reviewer.returned_session
+        assert retro.session == tester.returned_session
+        sessions = [
+            (b["kind"], b["independent"]) for b in h.broadcasts if b["type"] == "SESSION"
+        ]
+        assert sessions == [
+            ("opened", False),
+            ("opened", True),
+            ("continued", False),
+            ("continued", False),
+        ]
+        # The checks ran once, at the first join; the later joins found the task proven.
+        assert log.read_text() == "x"
+        proofs = h.events("TASK_PROOF")
+        assert [(p["run_id"], p["checks"]) for p in proofs] == [
+            ("gate:BUILDING->REVIEWING", "passed")
+        ]
+>       assert len(h.events("FLOOR_CHECKED")) == 4
+E       AssertionError: assert 3 == 4
+E        +  where 3 = len([{'type': 'FLOOR_CHECKED', 'warnings': [], 'schema_version': 1, 'ts': '2026-11-08T03:49:23Z', ...}, {'type': 'FLOOR_CH...08T03:49:23Z', ...}, {'type': 'FLOOR_CHECKED', 'warnings': [], 'schema_version': 1, 'ts': '2026-11-08T03:49:23Z', ...}])
+E        +    where [{'type': 'FLOOR_CHECKED', 'warnings': [], 'schema_version': 1, 'ts': '2026-11-08T03:49:23Z', ...}, {'type': 'FLOOR_CH...08T03:49:23Z', ...}, {'type': 'FLOOR_CHECKED', 'warnings': [], 'schema_version': 1, 'ts': '2026-11-08T03:49:23Z', ...}] = events('FLOOR_CHECKED')
+E        +      where events = Harness(root=PosixPath('/tmp/pathly-tests/tmp483rfmmq/bp-happy-team'), topic='bp-happy-team', script=<function run_hap...tus': 'done'}], goal_id='6b244255-2e01-4ca0-b941-db99a5b98471', _lock=<unlocked _thread.lock object at 0x7fc1fa9f7710>).events
+
+tests/fsm_flows/test_build_proof_acceptance.py:255: AssertionError
+=========================== short test summary info ============================
+FAILED tests/fsm_flows/test_build_proof_acceptance.py::test_8_happy_path_team_build_reaches_done
+!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!
+1 failed, 5102 passed, 2 skipped in 1257.78s (0:20:57)

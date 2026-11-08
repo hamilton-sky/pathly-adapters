@@ -8,6 +8,7 @@
 //   spawnReporting — the post-exit telemetry / runner-result POSTs
 //   preflight      — is this engine installed?
 //   spawnEnv       — the PTY child's environment (incl. the per-run token for runner tabs)
+//   chiefSecret    — claims a claude chief's hook secret, for that child's environment only
 
 import { ipcMain, BrowserWindow, app, type IpcMainInvokeEvent } from 'electron'
 import * as fs from 'fs'
@@ -21,6 +22,7 @@ import {
 } from './terminal/shells'
 import { preflightEngines } from './terminal/preflight'
 import { buildSpawnEnv } from './terminal/spawnEnv'
+import { chiefSecretForSpawn } from './terminal/chiefSecret'
 import {
   activePtys, ptyWindows, ptyOwners, ptyOutput, runnerTabMeta, ptyKilledByRunner, runnerScripts,
   sendToWindow, tailMeaningfulOutput, killPtyTree,
@@ -107,6 +109,9 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
       ;({ shell, args: shellArgs } = resolveShell(command))
     }
 
+    // A claude chief's tab gets its hook secret, claimed once from the server; no secret refuses it.
+    const chiefHookSecret = await chiefSecretForSpawn(runnerTabMeta.get(tabId)?.run_id, runnerArgv, !!initialInput)
+
     // The monitor record for this engine, from what's known now: adapter, plus category/feature/
     // role from the runner topic or spawn telemetry. Used both while queued (waiting for a slot)
     // and once the PTY spawns, so a queued engine renders with the same identity it'll run with.
@@ -162,7 +167,7 @@ export function registerTerminalHandlers(win: BrowserWindow): void {
         cols: 80,
         rows: 24,
         cwd: cwd,
-        env: buildSpawnEnv(cwd, runnerTabMeta.get(tabId)),
+        env: buildSpawnEnv(cwd, runnerTabMeta.get(tabId), chiefHookSecret),
       })
     } catch (e) {
       console.error('[spawn] pty.spawn FAILED', tabId, 'shell=' + shell, 'args=' + JSON.stringify(shellArgs).slice(0, 200), '→', (e as Error).message)

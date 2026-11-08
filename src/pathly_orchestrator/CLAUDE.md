@@ -718,18 +718,21 @@ POST /chief/notices/read    ← {project_root, run_ids} → 200 {marked}
   - **Where the secret lives (round two, ticket 15).** No file holds it. `open_chief` generates
     it for a claude chief only, stores its sha256 (`hook_secret_hash`) and offers the plaintext to
     `supervisor/chief_secret_claim` (memory; `close_chief` forgets it, a restart loses it). Studio's
-    main process claims it once with `POST /chief/hook-secret` `{run_id}` and starts the chief's
-    claude with it in `PATHLY_CHIEF_HOOK_SECRET` (ticket 18 builds that half). **Until ticket 18
-    lands nothing claims the secret**: a claude chief opened from Studio has none in its
-    environment, so its own hook records nothing, and any tokenless same-user process (a headless
-    agent with `curl`, say) can claim it, read the `--session-id` from the chief's argv and post
-    `human` rows, and nothing detects it, because no second claim ever comes. The exposure is
-    about that of the 0600 file it replaced. The route is 200 `{hook_secret}` once (`Cache-Control:
-    no-store`); a second claim is 409 and closes the chief (`close_chief(run_id, "hook secret
-    claimed twice")`, plus `TERMINAL_KILL` to its tab; ticket 13, question 2 = A). That detection
-    exists only once Studio makes the expected claim: then an earlier claimer's theft turns
-    Studio's claim into the second one, and the stolen secret works for no open session. A claim
-    that finds nothing offered (before `offer`, or after a server restart) closes the chief too.
+    main process claims it once with `POST /chief/hook-secret` `{run_id}` when it spawns the chief's
+    tab (`studio/src/main/ipc/terminal/chiefSecret.ts`, ticket 18) and starts the chief's claude
+    with it in `PATHLY_CHIEF_HOOK_SECRET`; Studio's `buildSpawnEnv` and `pathly-pty-host`'s
+    `_child_env` strip that variable from every other child. A Studio claim that fails (409, any
+    other status, no server) refuses the spawn, and the watcher closes the session as "never
+    started". The route is 200 `{hook_secret}` once (`Cache-Control: no-store`); a second claim
+    is 409 and closes the chief (`close_chief(run_id, "hook secret claimed twice")`, plus
+    `TERMINAL_KILL` to its tab; ticket 13, question 2 = A). So a tokenless same-user process (a
+    headless agent with `curl`, say) that claims first, between the `TERMINAL_SPAWN` and Studio's
+    claim, does get the secret, but Studio's claim then is the second one: the chief is closed and
+    never starts, so the stolen secret works for no open session (`/chief/human-messages` 404s a
+    closed one). One that claims after Studio gets nothing and closes the chief: a denial of
+    service, not a theft. This detects a claim; it does not stop a same-user process reading the
+    secret from the running chief's environment ("What stays true"). A claim that finds nothing
+    offered (before `offer`, or after a server restart) closes the chief too.
     404 for an unknown or closed session or
     one with no hash; 403 for any caller with a live run token (an agent's `pathly api` sends
     its own), and the chief gate refuses it to a chief token (not in `ROUTE_ACTIONS`). A codex
@@ -1823,6 +1826,7 @@ pathly_orchestrator/
     chief_secret_text.py   # secret_refusal(): the gate's 400 for a chief-token body whose string values hold the session's hook secret (contains_secret_hash; a re-encoded secret is not caught) — see "Chief gate"
     chief_cite.py          # cite_refusal() / answer_text(): the cite rule for an `answer` action — the chief names a human message of its session by `cite`, the gate checks it (kind human, this session, typed after the question, once; an acknowledgement must say `agent: "chief"`) and keeps its text on flask.g for the answer routes to relay — see "Chief gate"
     run_identity.py        # caller_identity(request) -> CallerIdentity: kind run|anonymous from the X-Pathly-Run-Token header (body role/run_id/from never read); unknown/revoked token logged at info with the remote addr; `ui` kind reserved (RRP-2b); `is_chief_run(identity)`: True for a live run whose role is `chief` and nobody else (the test behind who may post and who may retire a binding directive). Routes apply a policy from it: who posts and retires a directive, the human-gate refusals (`comms/_helpers.py`), a task's completion and `floor-allow` (`comms/tasks_status.py`, `tasks_floor.py`), `force_past_gate` (`core/fsm.py`) and the chief open/close routes; `chief_gate` reads the token row itself (`lookup_run_token`) instead
+    consult_guard.py       # consult_guard(): the before_request hook (after run_token_guard) that answers 403 to a consult run's own answer (POST /comms/answer, or POST /comms/post with type answer) — see the consult run's "Own answer refused"
     run_token_guard.py     # run_token_guard(): the before_request hook (after _log_request, before chief_gate) that answers 401 {"error": "unknown run token"} for an X-Pathly-Run-Token that is unknown or revoked (a revoked chief token is left to chief_gate); no header or an empty one passes — see "Unknown run tokens"
     sse.py                 # SSE globals (_clients, _runner_clients, _menu_clients) + broadcast helpers
     pricing.py             # MODEL_PRICING, compute_cost_usd()
@@ -2871,6 +2875,14 @@ spawns nothing), then (on a daemon thread unless `block`) one headless spawn of 
   - Every end is a compare-and-set from this consult's `running` route. A question handed to the
     person while the consult ran keeps its route and gets nothing; one answered meanwhile gets no
     second answer (route `answered`).
+- Own answer refused (ticket 17): `http_server/consult_guard.py::consult_guard`, a `before_request`
+  registered in `app.py` right after `run_token_guard`, answers 403 `{"error": "a consult answers in
+  its completion summary; Pathly posts the answer"}` to `POST /comms/answer`, and to `POST
+  /comms/post` whose JSON body has `"type": "answer"`, when the caller's live run token has a run id
+  starting `consult-`, so a consult cannot free a parked task before the router measures it. Its
+  other posts (status, discovery, question) pass, an answer from any other caller is unchanged, a
+  body that is not JSON reaches the route (which refuses it), and a revoked consult token stays
+  `run_token_guard`'s 401.
 - Read-only, measured (`supervisor/consult_window.py`, ticket 03): `open_window(project_root,
   scope=, run_id=)` before the spawn (git tree via `proof/tree.snapshot`, `HEAD`, the ids of the
   task rows and the declared `files` (`task_proof._declared`) of every task `in_progress` on the
