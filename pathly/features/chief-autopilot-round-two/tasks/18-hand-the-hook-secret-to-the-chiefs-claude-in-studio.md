@@ -1,7 +1,7 @@
 # Hand the hook secret to the chief's claude in Studio, strip it everywhere else, and say so in the launcher
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 13, 15
 Test first: yes
 Level: 3
@@ -128,13 +128,18 @@ Work started at `141a62b7dabf8c827a737f217e87544fbfbc15b3`. Failing-test commit:
 
 **For later tickets**
 
-- `src/pathly_orchestrator/CLAUDE.md` ("Where the secret lives", from 15's rework) still says that
-  until ticket 18 nothing claims the secret; with this ticket Studio claims it on every claude
-  chief spawn, so that sentence is now stale. It is outside this ticket's Touches; the next ticket
-  that touches that doc (or a docs pass) should say Studio's main process claims it before the
-  spawn, so a second (thieving) claim now closes the chief, while a claim that wins the race
-  before Studio's makes Studio's 409 and the chief is refused and closed.
-- Root `CLAUDE.md`'s `chief/` row still does not name `POST /chief/hook-secret` (noted by 15).
+- Both CLAUDE.md files were added to this ticket's Touches (takeover, `4daf5cc`) and fixed in
+  `6531b7d`: `src/pathly_orchestrator/CLAUDE.md` says Studio's main process claims the secret
+  before the spawn, and the root `chief/` row names `POST /chief/hook-secret`. The failing-test
+  commit after the takeover is `f8811fe`.
+
+**Review fixes**
+
+- Gate (quick), round 1: `tests/fsm_flows/test_build_proof_acceptance.py::test_8_happy_path_team_build_reaches_done`
+  (FLOOR_CHECKED 3 != 4). Not this ticket's: the diff touches no FSM, floor or proof code; the
+  file passes alone 4 of 4 times (11 passed each); it is the known EVENTS.tmp mirror vs
+  `proof/tree.snapshot` race (the snapshot fails under full-suite load, so one floor check is
+  skipped), which also failed CI on PR #138 and the gates of 04 and 06. No code change.
 
 ## Review findings (round 1, gate (quick))
 
