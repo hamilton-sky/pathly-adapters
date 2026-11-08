@@ -24,6 +24,9 @@ from pathlib import Path
 
 TIMEOUT_SECONDS = 60
 
+# Tries of ``git add -A`` when a path vanished mid-add (see :func:`_add_all`).
+ADD_ATTEMPTS = 3
+
 # Variables that point git at another repo or index, or change how it reads a pathspec. One
 # inherited from the caller (a git hook, say) must not override the repo that ``cwd=root``
 # names, or turn ``:(exclude)pathly/`` into a literal file name.
@@ -48,13 +51,15 @@ _ESCAPE = re.compile(rb"\\([0-3][0-7]{2}|.)", re.DOTALL)
 _C_ESCAPES = {b"a": 7, b"b": 8, b"t": 9, b"n": 10, b"v": 11, b"f": 12, b"r": 13}
 
 
-def _git(root: str | Path, *args: str, index: str | None = None) -> str | None:
-    """stdout of ``git <args>`` run in ``root``, or None when git fails or cannot run."""
+def _git_run(
+    root: str | Path, *args: str, index: str | None = None
+) -> subprocess.CompletedProcess[bytes] | None:
+    """The finished ``git <args>`` run in ``root`` (any exit code), or None when it cannot run."""
     env = {key: value for key, value in os.environ.items() if key not in _REPO_ENV}
     if index is not None:
         env["GIT_INDEX_FILE"] = index
     try:
-        done = subprocess.run(
+        return subprocess.run(
             ["git", "-c", "core.quotepath=off", *args],
             cwd=str(root),
             capture_output=True,
@@ -63,9 +68,37 @@ def _git(root: str | Path, *args: str, index: str | None = None) -> str | None:
         )
     except (OSError, subprocess.SubprocessError):
         return None
-    if done.returncode != 0:
+
+
+def _git(root: str | Path, *args: str, index: str | None = None) -> str | None:
+    """stdout of ``git <args>`` run in ``root``, or None when git fails or cannot run."""
+    done = _git_run(root, *args, index=index)
+    if done is None or done.returncode != 0:
         return None
     return done.stdout.decode("utf-8", "surrogateescape")
+
+
+def _vanished(done: subprocess.CompletedProcess[bytes]) -> bool:
+    """True when git failed only because a listed path was gone by the time it looked."""
+    err = (done.stderr or b"").decode("utf-8", "surrogateescape")
+    return "unable to stat" in err and "No such file or directory" in err
+
+
+def _add_all(root: str | Path, index: str) -> bool:
+    """``git add -A`` into ``index``, again (3 attempts in all) while only a path vanished.
+
+    A mirror writes ``<name>.tmp`` and renames it away; git can list the file and then fail to
+    stat it. Any other failure, or one that git cannot even start, ends at once.
+    """
+    for _ in range(ADD_ATTEMPTS):
+        done = _git_run(root, "add", "-A", index=index)
+        if done is None:
+            return False
+        if done.returncode == 0:
+            return True
+        if not _vanished(done):
+            return False
+    return False
 
 
 def _is_top(root: str | Path | None) -> bool:
@@ -110,7 +143,7 @@ def snapshot(root: str | Path) -> str | None:
                 shutil.copy2(real_index, private)
             except OSError:
                 return None
-        if _git(root, "add", "-A", index=private) is None:
+        if not _add_all(root, private):
             return None
         tree = _git(root, "write-tree", index=private)
     return _trimmed(tree)

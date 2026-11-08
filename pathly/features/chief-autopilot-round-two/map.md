@@ -66,6 +66,7 @@ no:cacheprovider` passes in full.
 | 17 a consult cannot post its own answer | read-only: the answer is not delivered around the check |
 | 18 hook secret in Studio, the pty host and the launcher | the hook secret out of every same-user process's reach |
 | 19 server-routed consults start for real (found by 12) | a role question reaches a consult run, on the asking run's board, billed once |
+| 20 snapshot survives a vanishing temp file (CI race, person's call on #138) | the floor gate's measurement is not skipped by a mirror's rename |
 
 ## Decisions so far
 
@@ -145,3 +146,4 @@ Outside facts relied on (tickets 13 to 15, 18):
 - 18 — Studio main claims a claude chief's hook secret (`terminal/chiefSecret.ts`, tokenless `POST /chief/hook-secret` before the gate, refused spawn on any failure); `buildSpawnEnv` and the pty host strip `PATHLY_CHIEF_HOOK_SECRET` from every other child; launcher shows a same-user line for a claude chief
 - 19 — consult_trigger passes `sse._broadcast_runner`; the consult fragment posts `"board": "<board>"`; `api.start_run(board=)` sets scope_tier (goal flow runs get the goal's board); AGENT_DONE lookups in runner/events and terminal_reconcile key the root by `eventlog._project_root_of`
 - 19 (review round 1) — only `goal-loop` gets the goal's board as scope_tier (team-build stage prompts derive `<board>` from storage, so their tokens stay `feature`); `resume_parked_run` carries scope_tier
+- 20 — `proof/tree.snapshot` retries `git add -A` (3 attempts, `_add_all`/`_vanished` over a new `_git_run`) only when stderr says `unable to stat` + `No such file or directory`; any other failure is None at once

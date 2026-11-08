@@ -4,7 +4,7 @@
 
 FSM engine, gates, transitions, flow definitions, feedback protocol & fix-routing.
 
-46 test file(s).
+47 test file(s).
 
 | File | Covers | Tests |
 | --- | --- | --- |
@@ -35,6 +35,7 @@ FSM engine, gates, transitions, flow definitions, feedback protocol & fix-routin
 | `test_proof_checks.py` | Task check blocks (``proof/checks.py``) and the shared command runner (``proof/command.py``) | 16 |
 | `test_proof_floor.py` | The floor scan over two working-tree snapshots (``proof/floor.py``) | 30 |
 | `test_proof_tree.py` | Git working-tree snapshots and the diffs between them (``proof/tree.py``) | 17 |
+| `test_proof_tree_vanishing_file.py` | ``proof/tree.snapshot`` survives a file that vanishes while ``git add -A`` runs | 5 |
 | `test_retry_ladder.py` | Retry ladder: what varies by ATTEMPT, not just who owns it | 14 |
 | `test_review_base_state.py` | build-proof 10: the diff base for the Review packet lives in STATE | 6 |
 | `test_review_packet.py` | build-proof 10: the REVIEWING prompt carries a Review packet, not the builder's summary | 13 |
