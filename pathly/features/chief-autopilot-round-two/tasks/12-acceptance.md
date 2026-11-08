@@ -1,7 +1,7 @@
 # Acceptance: agents answer agents, and only the person's questions reach the person
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 01, 02, 03, 04, 05, 06, 07, 08, 09, 10, 11, 14, 15, 16, 17, 18, 19, 20
 Test first: no
 Level: 1
@@ -64,6 +64,31 @@ exit 0
 - round one learnings (09): a Flask test client used from another thread needs its own `app.test_client()`
 
 ## Answer
+
+Built (attempt 2, base eb1f286, from attempt 1's draft):
+- `tests/comms_board/test_autopilot_round_two_acceptance.py` (new, 6 tests for the 7 steps; steps 3
+  and 6 share one test), unchanged from the draft.
+- `tests/comms_board/autopilot_round_two_support.py` (new): the draft with one change, `ask_role`
+  sends `"board": "project"` (the consult fragment's post now carries `"board": "<board>"`, ticket
+  19) and its docstring no longer says "no board".
+- `tests/INDEX.md`, `tests/comms_board/INDEX.md` regenerated (`python scripts/gen_test_index.py`).
+
+Proof:
+- `python -m pytest tests/comms_board/test_autopilot_round_two_acceptance.py -q -p no:cacheprovider`:
+  `6 passed in 6.87s`, exit 0.
+- `python -m pytest tests/ -q -p no:cacheprovider`: `6881 passed, 14 skipped in 1661.86s`, exit 0
+  (the 14 skips are existing ones; this ticket adds none).
+- Also: `black --check` on both files clean, `gen_test_index.py --check` up to date,
+  `check_file_size.py` OK, `tests/consistency -k "guard or fragments"` 79 passed.
+
+Decisions: the draft holds no test-side patch of the bugs tickets 19 and 20 fixed (no
+monkeypatch, no broadcast or root override), so nothing was removed; the test drives only the
+real routes, router and supervisor.
+
+Shortcuts taken: none.
+
+For later tickets: a real claude or codex following `planning/consult-answer` is still unmeasured
+(map Open questions).
 
 ## Attempt note
 
