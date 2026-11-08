@@ -175,7 +175,7 @@ def test_a_question_to_architect_records_one_route_and_starts_once(
     call = fake_start.calls[0]
     assert call["question_id"] == qid
     assert call["project_root"] == str(project)
-    assert call["broadcast_fn"] is sse._broadcast_spawn
+    assert call["broadcast_fn"] is sse._broadcast_runner
     assert call["block"] is False
     assert call["thread"] == f"consult-{qid[:8]}"
     assert _to_agent(qid) == "architect"
@@ -363,7 +363,7 @@ def test_no_spawn_host_leaves_the_question_as_posted(client, project, fake_start
         project_root=str(project),
         board="feature",
         scope=SCOPE,
-        broadcast_fn=sse._broadcast_spawn,
+        broadcast_fn=sse._broadcast_runner,
         host_present=False,
     )
     assert said == "no_host"

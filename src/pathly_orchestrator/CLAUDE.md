@@ -2857,7 +2857,12 @@ spawns nothing), then (on a daemon thread unless `block`) one headless spawn of 
   task, else `asking_task` of the asking run), the feedback folder (`<board storage>/feedback/`)
   and `board_context_for(..., role=role)`.
 - Result: the one `AGENT_DONE` whose `run_id` is the consult run. The supervisor's synthetic one
-  (`synthetic: true`) counts only when the agent wrote none; two from the agent fail the consult
+  (`synthetic: true`, `terminal_reconcile._synthesize_agent_done_if_missing`) is written only when
+  `runner.events.read_last_agent_done` finds none for the run; it and the billing patch's
+  `AGENT_DONE` lookup derive the project root by the `pathly/` anchor
+  (`eventlog._project_root_of`), as `append_event` keys events, so a project-board run's storage
+  (`<root>/pathly/project`) finds its own `AGENT_DONE` and is billed once (ticket 19: the old
+  `storage.parent.parent.parent` was one level too high there and wrote a second one). It counts only when the agent wrote none; two from the agent fail the consult
   (`more than one AGENT_DONE carries its run id`: someone else wrote one too). This bounds a forged
   answer but does not close it: `/runner/event` takes an `AGENT_DONE` from anyone, so one written
   for a consult whose agent writes none is still read. Its `summary` starts with `ANSWER: <text>` or `ANSWER: USER <why>`; architect, po or designer
@@ -2917,11 +2922,29 @@ Server-driven, no chief turn. `http_server/consult_trigger.trigger_consult` is a
 hook, registered in `app.py` after `record_chief_run` (so it runs first: hooks run in reverse
 order). For `POST /comms/post` answered 200 with `ok` and a `message_id`, when the request body's
 `type` is `question` (read with `read_json_body`), it calls `on_question(message_id,
-project_root=, board=, scope=, broadcast_fn=sse._broadcast_spawn, host_present=bool(sse._spawn_clients))`
+project_root=, board=, scope=, broadcast_fn=sse._broadcast_runner, host_present=bool(sse._spawn_clients))`
 with the project root, board and scope of the asking run's token row (`caller_identity(request)`,
 `run_tokens`), never the body's: the root is where the consult spawns and what `consult_window`
 measures, so a run must not pick it (the rule of `chief_run_record.py`).
 It never changes the response and never raises (a failure is logged to `pathly.http`).
+`broadcast_fn` is `sse._broadcast_runner` (the consult's stage spawn calls it as
+`broadcast_fn(topic, payload)`, and it mirrors `TERMINAL_SPAWN` to `/events/spawn`, where the
+spawn host reads it), as the goal-run and decompose routes pass (ticket 19: the one-argument
+`_broadcast_spawn` raised a `TypeError` in every consult spawn, so every route failed).
+
+The board rule (ticket 19): the question must sit on the board the asking run's token names, or
+the router hands it to the person. The `consult` fragment's post carries `"board": "<board>"`
+(the tier the runner substitutes, as `comms-post.md` does) beside `"scope": "<feature>"`; a single
+run's token is minted with `board_run`'s `scope_tier_for(board)`, a consult's with
+`consult_run`'s, and a `goal-loop` run's with the goal's board: `goal_executor._run_team` passes
+`board=` to `api.start_run` for that flow only, which sets
+`RunnerState.scope_tier = runner.telemetry.scope_tier_for(board)` (default `feature`), so a
+`sched-` task token of a project-board goal names `project`, the board its task prompt posts on
+(`task_prompt`). Every other goal flow (`team-build`, ...) keeps `feature`: its stage prompt's
+`<board>` comes from the storage folder (`fsm_compose.build_prompt`: `project` only for
+`pathly/project` itself), which is `feature` for a goal's `pathly/project/goals/<slug>`, so token
+and prompt still agree. `resume_parked_run` carries the parked run's `scope_tier`; the
+control-plane retry (`control/_helpers.handle_retry`) starts with the default `feature`.
 
 `on_question(question_id, *, project_root, board, scope, broadcast_fn, host_present, start=None) -> str`
 (`start` defaults to `consult_run.start_consult`, read at call time) returns what it did:
